@@ -132,6 +132,11 @@ type NavigationAction =
   | { route: "topupInvoice" }
   | { route: "wallet" };
 
+/** Leaves the app for another page, such as the site a login came from. */
+export const navigateAwayTo = (url: string): void => {
+  window.location.assign(url);
+};
+
 export const navigateTo = (action: NavigationAction): void => {
   switch (action.route) {
     case "contacts":

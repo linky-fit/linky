@@ -74,7 +74,7 @@ import { useAppPreferences } from "./hooks/useAppPreferences";
 import { useTopDownTilt } from "./hooks/useTopDownTilt";
 import { useFiatRates } from "./hooks/useFiatRates";
 import { useLnurlAuth } from "./hooks/useLnurlAuth";
-import { useNostrConnectLogin } from "./hooks/useNostrConnectLogin";
+import { useSiteLogin } from "./hooks/useSiteLogin";
 import {
   useContactsRepository,
   useConversationsRepository,
@@ -873,13 +873,14 @@ export const useAppShellComposition = ({
   } = useLnurlAuth({ currentNsec, setStatus, t });
 
   const {
-    closeNostrConnectLoginConfirmation,
-    confirmNostrConnectLogin,
-    nostrConnectLoginIsBusy,
-    nostrConnectLoginIsDone,
-    pendingNostrConnectLoginConfirmation,
-    requestNostrConnectLoginConfirmation,
-  } = useNostrConnectLogin({ setStatus, t });
+    closeSiteLoginConfirmation,
+    confirmSiteLogin,
+    siteLoginIsBusy,
+    siteLoginIsDone,
+    pendingSiteLoginConfirmation,
+    requestLinkauthLogin,
+    requestSiteLoginConfirmation,
+  } = useSiteLogin({ setStatus, t });
 
   const { navigateToMainReturn, openMenu } = useMainMenuState({ route });
 
@@ -950,7 +951,8 @@ export const useAppShellComposition = ({
     persistContactsOnboardingDismissed,
     pushToast,
     requestLnurlAuthConfirmation,
-    requestNostrConnectLoginConfirmation,
+    requestLinkauthLogin,
+    requestSiteLoginConfirmation,
     route,
     saveCashuFromText,
     setPendingLightningInvoiceConfirmation,
@@ -1140,14 +1142,14 @@ export const useAppShellComposition = ({
     }
     // The paid overlay hides every confirmation below it and clears itself when
     // the payment ends, so there is nothing for back to dismiss while it is up.
-    if (paidOverlayIsOpen || lnurlAuthIsDone || nostrConnectLoginIsDone) {
+    if (paidOverlayIsOpen || lnurlAuthIsDone || siteLoginIsDone) {
       return null;
     }
     if (pendingPaymentMintMeltConfirmation) {
       return closePaymentMintMeltConfirmation;
     }
-    if (pendingNostrConnectLoginConfirmation) {
-      return closeNostrConnectLoginConfirmation;
+    if (pendingSiteLoginConfirmation) {
+      return closeSiteLoginConfirmation;
     }
     if (pendingLnurlAuthConfirmation) return closeLnurlAuthConfirmation;
     if (pendingLnurlWithdrawConfirmation) {
@@ -1691,7 +1693,7 @@ export const useAppShellComposition = ({
       pendingPaymentMintMeltConfirmation,
       pendingLnurlAuthConfirmation,
       pendingLnurlWithdrawConfirmation,
-      pendingNostrConnectLoginConfirmation,
+      pendingSiteLoginConfirmation,
       pendingLightningInvoiceConfirmation,
       pendingCashuPaymentRequestConfirmation,
       postPaySaveContact,
@@ -1728,8 +1730,8 @@ export const useAppShellComposition = ({
       lnurlAuthIsBusy,
       lnurlAuthIsDone,
       lnurlWithdrawIsBusy,
-      nostrConnectLoginIsBusy,
-      nostrConnectLoginIsDone,
+      siteLoginIsBusy,
+      siteLoginIsDone,
     }),
     [
       allowedDisplayCurrencies,
@@ -1764,8 +1766,8 @@ export const useAppShellComposition = ({
       lnurlAuthIsDone,
       lnurlWithdrawIsBusy,
       myProfileStatus,
-      nostrConnectLoginIsBusy,
-      nostrConnectLoginIsDone,
+      siteLoginIsBusy,
+      siteLoginIsDone,
       nfcWritePromptKind,
       nostrPictureByNpub,
       paidOverlayDetails,
@@ -1776,7 +1778,7 @@ export const useAppShellComposition = ({
       pendingCashuPaymentRequestConfirmation,
       pendingLnurlAuthConfirmation,
       pendingLnurlWithdrawConfirmation,
-      pendingNostrConnectLoginConfirmation,
+      pendingSiteLoginConfirmation,
       pendingPaymentMintMeltConfirmation,
       postPaySaveContact,
       profileCustomPictureUrl,
@@ -1818,7 +1820,7 @@ export const useAppShellComposition = ({
       closeProfileShareOverlay,
       closeLnurlAuthConfirmation,
       closeLnurlWithdrawConfirmation,
-      closeNostrConnectLoginConfirmation,
+      closeSiteLoginConfirmation,
       closeShareOptions,
       closeLightningInvoiceConfirmation,
       closeScan,
@@ -1826,7 +1828,7 @@ export const useAppShellComposition = ({
       confirmPaymentMintMelt,
       confirmLnurlAuth,
       confirmLnurlWithdraw,
-      confirmNostrConnectLogin,
+      confirmSiteLogin,
       confirmLightningInvoicePayment,
       confirmCashuPaymentRequest,
       contactsGuideNav: stableContactsGuideNav,
@@ -1874,7 +1876,7 @@ export const useAppShellComposition = ({
       closeLightningInvoiceConfirmation,
       closeLnurlAuthConfirmation,
       closeLnurlWithdrawConfirmation,
-      closeNostrConnectLoginConfirmation,
+      closeSiteLoginConfirmation,
       closePaymentMintMeltConfirmation,
       closeProfileShareOverlay,
       closeScan,
@@ -1884,7 +1886,7 @@ export const useAppShellComposition = ({
       confirmCashuPaymentRequest,
       confirmLnurlAuth,
       confirmLnurlWithdraw,
-      confirmNostrConnectLogin,
+      confirmSiteLogin,
       confirmPaymentMintMelt,
       stableContactsGuideNav,
       copyShareOptionsText,

@@ -213,11 +213,23 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "lnurlAuth.failed":
     "An approved LNURL-auth request did not end in a confirmed login — the domain rejected it (expired challenge, unknown key), answered with something other than OK, or the callback never completed. The payload carries the reason shown to the user.",
   "nostrConnectLogin.requested":
-    "A scanned, pasted or opened nostrconnect:// URI was recognized and put in front of the user; nothing is sent to the site until they approve it. The site's name and URL in the payload are its own unverified claims, and the pubkey link is the site's one-off client key.",
+    "A scanned, pasted or opened nostrconnect:// URI was recognized and put in front of the user; nothing is sent to the site until they approve it. The site's name and URL in the payload are its own unverified claims, and the pubkey link is the site's one-off client key. For a login request, domainDocument says why the origin's /.well-known/linkauth.json could not be loaded, which is what lets the request through.",
+  "nostrConnectLogin.refused":
+    "A nostrconnect:// login was refused without being offered: its origin publishes a valid /.well-known/linkauth.json, so that site logs in with its own Log in with Linky button, and a relay request naming it may come from any page. Nothing was sent to the site. domainName is the name from the site's document; the pubkey link is the requesting client key.",
   "nostrConnectLogin.approved":
     "The user approved a Nostr Connect login and the NIP-46 exchange finished: Linky acked the connect, answered get_public_key and signed at most one login event (signedKind) with the identity key. No session is kept.",
   "nostrConnectLogin.failed":
     "An approved Nostr Connect login did not finish — the site never answered, asked for a signature other than a login, or no relay accepted the replies. The payload carries the error tag; the URI secret is never logged.",
+  "linkauthLogin.resolved":
+    "A #linkauth link (opened, scanned or pasted) was checked against the site it names: Linky fetched the origin's /.well-known/linkauth.json directly from the device. The outcome is verified, or the reason the login is not offered: unverified-domain (the document could not be loaded or is invalid; detail says why), callback-not-listed (the link's return address is not one the site published) or malformed-link. Verified carries the site's name, its relay count and the delivery kind (callback or nostr). The nonce link ties the check to the login's outcome.",
+  "linkauthLogin.requested":
+    "A verified #linkauth login was put in front of the user; nothing is signed until they approve it. The audience is the origin the login is bound to; the name comes from the site's domain document. Delivery says how an approval is answered: callback (the browser goes back to the site) or nostr (an encrypted event is published to the site's relays, for a QR code on another device).",
+  "linkauthLogin.approved":
+    "The user approved a verified login. Linky signed the canonical login event for the audience and nonce with the identity key. With callback delivery it navigated the browser to the site's callback with the event in the URL fragment. With nostr delivery it published the event, encrypted to the site's key, to the relays from the site's document: the wrap link matches the wire rows, and results lists which relays accepted it. Whether the site accepted the login is not visible from here.",
+  "linkauthLogin.denied":
+    "The user cancelled a verified login and nothing was signed. With callback delivery the browser was sent back to the site's callback with a denied result; with nostr delivery nothing is sent.",
+  "linkauthLogin.failed":
+    "An approved verified login did not go out: it could not be signed (for example no unlocked identity), or with nostr delivery no relay of the site accepted the event. The dialog stays open so the user can retry; nothing reached the site.",
   "relayList.publishFailed":
     "Publishing the user's NIP-65 / NIP-17 relay lists after an add or remove failed; the local list was already updated, so the relays are out of sync until the next successful publish.",
   "relayList.syncFailed":

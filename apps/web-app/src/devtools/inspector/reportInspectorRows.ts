@@ -87,12 +87,16 @@ const flushPendingRows = (): void => {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ client: getClientId(), rows }),
+    keepalive: true,
   }).catch(() => {
     // Collector unreachable (e.g. served without the dev middleware): back
     // off and drop this batch instead of buffering forever.
     backoffUntilMs = Date.now() + FAILURE_BACKOFF_MS;
   });
 };
+
+// Keeps rows reported right before navigating away, e.g. a login returning to its site.
+if (import.meta.env.DEV) window.addEventListener("pagehide", flushPendingRows);
 
 const scheduleFlush = (): void => {
   if (flushTimeoutId !== null) return;

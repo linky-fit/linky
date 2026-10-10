@@ -1,8 +1,4 @@
-import {
-  encodeNprofile,
-  encodeNpub,
-  type NostrConnectRequest,
-} from "@linky-fit/linkstr";
+import { encodeNprofile, encodeNpub } from "@linky-fit/linkstr";
 import { createId } from "@linky-fit/linksync";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { encode } from "cbor-x";
@@ -13,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import type { LnurlAuthPreview } from "../../lnurlAuth";
 import type { Translate } from "../../i18n";
+import type { SiteLoginRequest } from "../../siteLogin";
 import { useScannedTextHandler } from "./useScannedTextHandler";
 import { useCashuPaymentRequestConfirmation } from "./payments/useCashuPaymentRequestConfirmation";
 import {
@@ -21,6 +18,10 @@ import {
 } from "../lib/paymentRequestMessage";
 import { encodeBase64Url } from "../../utils/base64";
 import { optimizeCaseInsensitiveQrPayload } from "../../utils/qrPayload";
+import {
+  CALLBACK_URL,
+  linkauthFragment,
+} from "../../testUtils/siteLoginFixtures";
 import { isKeryxJoinUrl, takeKeryxJoinOffer } from "../lib/keryxJoinOffer";
 
 const K1 = "b".repeat(64);
@@ -59,8 +60,12 @@ const setup = async ({
 } = {}) => {
   const requestLnurlAuthConfirmation = vi.fn<(p: LnurlAuthPreview) => void>();
   const requestLnurlWithdrawConfirmation = vi.fn();
-  const requestNostrConnectLoginConfirmation =
-    vi.fn<(request: NostrConnectRequest) => void>();
+  const requestSiteLoginConfirmation = vi
+    .fn<(login: SiteLoginRequest) => Promise<void>>()
+    .mockResolvedValue(undefined);
+  const requestLinkauthLogin = vi
+    .fn<(link: string) => Promise<void>>()
+    .mockResolvedValue(undefined);
   const runCashuPaymentRequest = vi
     .fn<(request: CashuPaymentRequestMessageInfo) => Promise<void>>()
     .mockResolvedValue(undefined);
@@ -99,7 +104,8 @@ const setup = async ({
       requestLightningInvoiceConfirmation,
       requestLnurlAuthConfirmation,
       requestLnurlWithdrawConfirmation,
-      requestNostrConnectLoginConfirmation,
+      requestLinkauthLogin,
+      requestSiteLoginConfirmation,
       saveCashuFromText: async () => undefined,
       scanAcceptsBankPayment: false,
       scanEntryPoint: null,
@@ -135,7 +141,8 @@ const setup = async ({
     requestLightningInvoiceConfirmation,
     requestLnurlAuthConfirmation,
     requestLnurlWithdrawConfirmation,
-    requestNostrConnectLoginConfirmation,
+    requestLinkauthLogin,
+    requestSiteLoginConfirmation,
   };
 };
 
@@ -202,12 +209,34 @@ describe("scanned Nostr Connect logins", () => {
 
     await scan.handle(text);
 
-    expect(scan.requestNostrConnectLoginConfirmation).toHaveBeenCalledOnce();
-    const request =
-      scan.requestNostrConnectLoginConfirmation.mock.calls[0]?.[0];
-    expect(request?.clientPubkey).toBe(CLIENT);
-    expect(request?.name).toBe("Example");
-    expect(request?.url).toBe("https://example.com");
+    expect(scan.requestSiteLoginConfirmation).toHaveBeenCalledOnce();
+    expect(scan.requestSiteLoginConfirmation.mock.calls[0]?.[0]).toMatchObject({
+      channel: "relay",
+      request: {
+        clientPubkey: CLIENT,
+        name: "Example",
+        url: "https://example.com",
+      },
+    });
+  });
+
+  const LINKAUTH_FRAGMENT = linkauthFragment({ cb: CALLBACK_URL });
+
+  it.each([
+    ["a pasted web link", `https://app.linky.fit/#${LINKAUTH_FRAGMENT}`],
+    ["a stored hash fragment", LINKAUTH_FRAGMENT],
+    ["a cross-device link", `https://app.linky.fit/#${linkauthFragment()}`],
+    [
+      "a link with an unusable callback",
+      `https://app.linky.fit/#${linkauthFragment({ cb: "http://shop.example" })}`,
+    ],
+  ])("hands %s to the linkauth resolution untouched", async (_, text) => {
+    const scan = await setup();
+
+    await scan.handle(text);
+
+    expect(scan.requestLinkauthLogin).toHaveBeenCalledExactlyOnceWith(text);
+    expect(scan.requestSiteLoginConfirmation).not.toHaveBeenCalled();
   });
 
   it("rejects a nostrconnect URI without relays as unsupported", async () => {
@@ -215,7 +244,7 @@ describe("scanned Nostr Connect logins", () => {
 
     await scan.handle(`nostrconnect://${CLIENT}?secret=s3cr3t`);
 
-    expect(scan.requestNostrConnectLoginConfirmation).not.toHaveBeenCalled();
+    expect(scan.requestSiteLoginConfirmation).not.toHaveBeenCalled();
   });
 });
 

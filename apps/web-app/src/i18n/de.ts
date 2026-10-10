@@ -1069,25 +1069,51 @@ export const de = {
   lnurlAuthDoneHint: "Du kannst zur Website zurückkehren.",
   lnurlAuthFailed: "LNURL-Anmeldung fehlgeschlagen",
   lnurlAuthUnavailable: "Für die Anmeldung muss die Identität entsperrt sein.",
-  nostrConnectLoginConfirm: "Anmelden",
-  nostrConnectLoginConfirmDevice: "Anmelden und Gerät verknüpfen",
-  nostrConnectLoginWaiting: "Warte auf die Website…",
-  nostrConnectLoginUnknownSite: "Unbekannte Website",
-  nostrConnectLoginUnverified: "Nicht verifiziert",
-  nostrConnectLoginAs: "Anmelden als",
-  nostrConnectLoginLinksDevice:
+  siteLoginConfirm: "Anmelden",
+  siteLoginConfirmDevice: "Anmelden und Gerät verknüpfen",
+  siteLoginWaiting: "Warte auf die Website…",
+  siteLoginUnverified: "Nicht verifiziert",
+  siteLoginTo: "Anmelden bei",
+  siteLoginAs: "Anmelden als",
+  siteLoginRevealsProfile: "{site} sieht dein öffentliches Nostr-Profil.",
+  siteLoginLinksDevice:
     "{site} möchte außerdem eines seiner Geräte mit dir verknüpfen. Du unterschreibst, dass dieses Gerät in {site} für dich handeln darf.",
-  nostrConnectLoginShares:
-    "Die Website erhält deinen öffentlichen Schlüssel und eine einmalige Anmeldesignatur. Sie kann nicht in deinem Namen posten und deine Nachrichten nicht lesen.",
-  nostrConnectLoginDone: "Bei {site} angemeldet",
-  nostrConnectLoginDoneHint: "Du kannst zur Website zurückkehren.",
-  nostrConnectLoginFailed: "Nostr-Connect-Anmeldung fehlgeschlagen",
-  nostrConnectLoginTimedOut: "Die Website hat nicht geantwortet.",
-  nostrConnectLoginRefused: "Linky signiert nur Anmeldeanfragen.",
-  nostrConnectLoginUnreachable:
-    "Die Relays der Website waren nicht erreichbar.",
-  nostrConnectLoginUnavailable:
-    "Für die Anmeldung muss die Identität entsperrt sein.",
+  siteLoginShares:
+    "Mit deiner Zustimmung beweist du {site}, dass dir dieser Nostr-Schlüssel gehört. Das gilt nur für diese Website, und sie kann weder in deinem Namen posten noch deine Nachrichten lesen.",
+  siteLoginStartedHere:
+    "Stimme nur zu, wenn du diese Anmeldung selbst auf {site} gestartet hast.",
+  siteLoginDone: "Bei {site} angemeldet",
+  siteLoginDoneHint: "Du kannst zur Website zurückkehren.",
+  siteLoginDoneReturning: "Du wirst zur Website zurückgebracht…",
+  siteLoginUnsupported: "Nicht unterstützte Anmeldeanfrage",
+  siteLoginUnsupportedHint:
+    "Linky signiert eine Anmeldung nur für die Website, die sie angefordert hat. Diese Anfrage nennt keine Website oder fordert keine Anmeldung an, deshalb kann sie nicht genehmigt werden.",
+  siteLoginFailed: "Anmeldung fehlgeschlagen",
+  siteLoginTimedOut: "Die Website hat nicht geantwortet.",
+  siteLoginRefused: "Linky signiert nur Anmeldeanfragen.",
+  siteLoginUnreachable: "Die Relays der Website waren nicht erreichbar.",
+  siteLoginUnavailable: "Für die Anmeldung muss die Identität entsperrt sein.",
+  siteLoginVerified: "Verifiziert",
+  siteLoginNameClaim: "Name von der Website angegeben",
+  siteLoginChecking: "{site} wird geprüft…",
+  siteLoginCheckingHint:
+    "Linky lädt das Domain-Dokument, das die Website veröffentlicht. Noch wird nichts signiert.",
+  siteLoginCheckAddress:
+    "Stimme nur zu, wenn du auf {site} selbst auf Anmelden getippt hast und die Adresszeile {site} zeigt.",
+  siteLoginDoneOtherDevice:
+    "Zustimmung gesendet. Beende die Anmeldung auf dem anderen Gerät.",
+  siteLoginCannotVerify: "{site} kann nicht verifiziert werden",
+  siteLoginCannotVerifyHint:
+    "Linky konnte diese Website nicht verifizieren und bietet die Anmeldung deshalb nicht an. Die Website ist vielleicht offline oder veröffentlicht keine gültige Anmeldeidentität.",
+  siteLoginCallbackNotListed: "Rücksprungadresse nicht veröffentlicht",
+  siteLoginCallbackNotListedHint:
+    "Dieser Link würde deine Anmeldung an eine Seite schicken, die {site} nicht als Rücksprungziel veröffentlicht hat. Linky bietet die Anmeldung deshalb nicht an.",
+  siteLoginInvalidLink: "Ungültiger Anmeldelink",
+  siteLoginInvalidLinkHint:
+    "Dieser Link sieht wie eine Anmeldung aus, ist aber unvollständig oder beschädigt. Linky kann die Anmeldung deshalb nicht anbieten.",
+  siteLoginSupportsLinky: "{site} unterstützt die Anmeldung mit Linky",
+  siteLoginSupportsLinkyHint:
+    "Nutze stattdessen den Button „Mit Linky anmelden“ auf {site}. Einen solchen Anmeldecode kann jede Seite anzeigen, deshalb genehmigt Linky ihn für {site} nicht.",
   lnurlWithdrawPreparing: "Auszahlung wird vorbereitet…",
   lnurlWithdrawPending: "Die Auszahlung wartet auf den Eingang in der Wallet.",
   lnurlWithdrawFailed: "LNURLw-Auszahlung fehlgeschlagen",

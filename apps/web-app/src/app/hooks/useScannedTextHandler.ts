@@ -1,14 +1,15 @@
+import { isLinkauthLink } from "@linky-fit/linkauth/signer";
 import { NonEmptyString1000 } from "@linky-fit/linksync";
-import { decodeNpub, encodeNpub } from "@linky-fit/linkstr";
+import {
+  decodeNpub,
+  encodeNpub,
+  parseNostrConnectUri,
+} from "@linky-fit/linkstr";
 import { createId, type ContactsRepository } from "@linky-fit/linksync";
 import React from "react";
 import { ContactId } from "../../evoluIds";
 import { navigateTo } from "../../hooks/useRouting";
 import { parseLnurlAuthTarget } from "../../lnurlAuth";
-import {
-  parseNostrConnectUri,
-  type NostrConnectRequest,
-} from "../../nostrConnect";
 import {
   fetchLnurlWithdrawPreview,
   isLightningAddress,
@@ -37,6 +38,7 @@ import { isKeryxJoinUrl, offerKeryxJoin } from "../lib/keryxJoinOffer";
 import { runWrite } from "../lib/storeWrite";
 import type { ContactRowLike } from "../types/appTypes";
 import type { Translate } from "../../i18n";
+import type { SiteLoginRequest } from "../../siteLogin";
 
 interface UseScannedTextHandlerParams<TContact extends ContactRowLike> {
   closeScan: () => void;
@@ -62,7 +64,8 @@ interface UseScannedTextHandlerParams<TContact extends ContactRowLike> {
   requestLnurlWithdrawConfirmation: (
     preview: import("../../lnurlPay").LnurlWithdrawPreview,
   ) => void;
-  requestNostrConnectLoginConfirmation: (request: NostrConnectRequest) => void;
+  requestLinkauthLogin: (link: string) => Promise<void>;
+  requestSiteLoginConfirmation: (login: SiteLoginRequest) => Promise<void>;
   saveCashuFromText: (
     text: string,
     options?: { navigateToTokens?: boolean; navigateToWallet?: boolean },
@@ -88,7 +91,8 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
   requestLightningInvoiceConfirmation,
   requestLnurlAuthConfirmation,
   requestLnurlWithdrawConfirmation,
-  requestNostrConnectLoginConfirmation,
+  requestLinkauthLogin,
+  requestSiteLoginConfirmation,
   saveCashuFromText,
   scanAcceptsBankPayment,
   scanEntryPoint,
@@ -106,7 +110,16 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
       const nostrConnect = parseNostrConnectUri(scanText);
       if (nostrConnect) {
         closeScan();
-        requestNostrConnectLoginConfirmation(nostrConnect);
+        void requestSiteLoginConfirmation({
+          channel: "relay",
+          request: nostrConnect,
+        });
+        return;
+      }
+
+      if (isLinkauthLink(scanText)) {
+        closeScan();
+        void requestLinkauthLogin(scanText);
         return;
       }
 
@@ -351,7 +364,8 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
       requestLightningInvoiceConfirmation,
       requestLnurlAuthConfirmation,
       requestLnurlWithdrawConfirmation,
-      requestNostrConnectLoginConfirmation,
+      requestLinkauthLogin,
+      requestSiteLoginConfirmation,
       saveCashuFromText,
       scanAcceptsBankPayment,
       scanEntryPoint,
