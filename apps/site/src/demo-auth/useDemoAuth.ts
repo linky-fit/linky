@@ -143,7 +143,8 @@ export const useDemoAuth = () => {
         audience,
         nonce,
         callbackUrl,
-        signerAppUrl,
+        signerApp: "nightly",
+        ...(signerAppUrl ? { signerAppUrl } : {}),
       });
       let otherSignerConnected = false;
       const connectOtherSigner = () => {
