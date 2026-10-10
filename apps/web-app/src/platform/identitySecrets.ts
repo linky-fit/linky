@@ -10,6 +10,7 @@ import {
   clearStoredPushNsec,
   setStoredPushNsec,
 } from "../utils/pushNsecStorage";
+import { forgetRecoveredMasterSecret } from "../utils/slip39Nostr";
 import { wipeLinkshuSeedBoundState } from "./linkshu/wipeLinkshuSeedBoundState";
 import {
   readStoredSecret,
@@ -164,6 +165,7 @@ export const clearIdentitySecrets = async (): Promise<void> => {
 
   safeLocalStorageRemove(NOSTR_IDENTITY_SOURCE_STORAGE_KEY);
   safeLocalStorageRemove(NOSTR_IDENTITY_SWITCHED_AT_SEC_STORAGE_KEY);
+  forgetRecoveredMasterSecret();
 
   await clearStoredPushNsec();
 };

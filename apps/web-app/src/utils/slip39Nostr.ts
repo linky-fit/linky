@@ -55,6 +55,10 @@ const recoverMasterSecret = (rawText: string): Promise<MasterSecret> => {
   return lastRecovery.masterSecret;
 };
 
+export const forgetRecoveredMasterSecret = (): void => {
+  lastRecovery = null;
+};
+
 export const deriveNostrKeysFromSlip39 = async (
   rawText: string,
 ): Promise<DerivedNostrKeys | null> => {

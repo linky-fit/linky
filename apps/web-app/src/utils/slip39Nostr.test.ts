@@ -4,6 +4,7 @@ import {
   deriveCashuBip85MnemonicFromSlip39,
   deriveEvoluOwnerMnemonicFromSlip39,
   deriveNostrKeysFromSlip39,
+  forgetRecoveredMasterSecret,
 } from "./slip39Nostr";
 
 vi.mock("@linky-fit/identity", async (importOriginal) => {
@@ -48,6 +49,10 @@ describe("slip39Nostr", () => {
     const [otherKeys] = await deriveAll(OTHER_SHARE);
     expect(otherKeys?.nsec).not.toBe(keys?.nsec);
     expect(recoverMasterSecretFromSlip39Share).toHaveBeenCalledTimes(2);
+
+    forgetRecoveredMasterSecret();
+    await deriveAll(OTHER_SHARE);
+    expect(recoverMasterSecretFromSlip39Share).toHaveBeenCalledTimes(3);
   });
 
   it("returns null for text that is not a share", async () => {
