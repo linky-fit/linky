@@ -31,9 +31,16 @@ export type SessionState =
       readonly secrets: SessionSecrets;
       readonly degraded: true;
       readonly cause: string;
+      /** Failed in the secure store with no localStorage copy: unknown, not missing. */
+      readonly unreadable: ReadonlySet<keyof SessionSecrets>;
     }
   // The secure store failed and the fallback holds no nsec; renders as signed out for now.
   | { readonly _tag: "SecretsUnavailable"; readonly cause: string };
+
+export type SignedInSession = Extract<
+  SessionState,
+  { readonly _tag: "SignedIn" }
+>;
 
 const SECRET_KEYS = {
   nsec: NOSTR_NSEC_STORAGE_KEY,
@@ -66,6 +73,7 @@ const readWithTimeout = async (
 };
 
 interface KeyRead {
+  readonly name: keyof SessionSecrets;
   readonly key: string;
   readonly value: string | null;
   /** Why the secure store could not answer; the value then comes from the fallback. */
@@ -74,11 +82,14 @@ interface KeyRead {
 
 const readKey = async (
   { secrets, kv }: PlatformPorts,
-  key: string,
+  name: keyof SessionSecrets,
 ): Promise<KeyRead> => {
+  const key = SECRET_KEYS[name];
   const read = await readWithTimeout(secrets, key);
-  if (read._tag === "Found") return { key, value: read.value, failure: null };
+  if (read._tag === "Found")
+    return { name, key, value: read.value, failure: null };
   return {
+    name,
     key,
     value: asNonEmptyString(kv.getItem(key)),
     failure: read._tag === "Unavailable" ? read.cause : null,
@@ -96,10 +107,10 @@ export const loadSession = async (
   ports: PlatformPorts,
 ): Promise<SessionState> => {
   const [nsec, appMnemonic, cashuMnemonic, slip39Seed] = await Promise.all([
-    readKey(ports, SECRET_KEYS.nsec),
-    readKey(ports, SECRET_KEYS.appMnemonic),
-    readKey(ports, SECRET_KEYS.cashuMnemonic),
-    readKey(ports, SECRET_KEYS.slip39Seed),
+    readKey(ports, "nsec"),
+    readKey(ports, "appMnemonic"),
+    readKey(ports, "cashuMnemonic"),
+    readKey(ports, "slip39Seed"),
   ]);
   const failed = [nsec, appMnemonic, cashuMnemonic, slip39Seed].filter(
     (read) => read.failure !== null,
@@ -122,16 +133,18 @@ export const loadSession = async (
   };
   if (failed.length === 0)
     return { _tag: "SignedIn", secrets, degraded: false };
+  const unreadable = failed.filter((read) => read.value === null);
   reportAppLog({
     tag: "session.secretsDegraded",
     summary: `Secure storage failed for ${failed.length} secrets; using their localStorage copies`,
-    payload: { keys },
+    payload: { keys, unreadable: unreadable.map((read) => read.key) },
   });
   return {
     _tag: "SignedIn",
     secrets,
     degraded: true,
     cause: describeFailures(failed),
+    unreadable: new Set(unreadable.map((read) => read.name)),
   };
 };
 

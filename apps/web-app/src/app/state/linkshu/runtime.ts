@@ -32,17 +32,24 @@ export class LinkshuNotConfigured extends Schema.TaggedError<LinkshuNotConfigure
 /**
  * The session's wallet seed. Computed once per page load: on an nsec-only
  * login it generates and persists a cashu mnemonic, which a second
- * resolution must not replace.
+ * resolution must not replace. Not configured while the session could not
+ * read the mnemonic it would come from.
  */
 export const linkshuSeedAtom = Atom.keepAlive(
   Atom.make((get) => {
-    const secrets = sessionSecrets(get.once(sessionAtom));
-    if (secrets === null) return Effect.fail(new LinkshuNotConfigured());
+    const session = get.once(sessionAtom);
+    if (session._tag !== "SignedIn")
+      return Effect.fail(new LinkshuNotConfigured());
     return Effect.suspend(() => {
       // Before the seed, so the runtime sees the copied counters. Removal gate in app/migrations/AGENTS.md.
       migrateLegacyCashuLocalState();
-      return Effect.promise(() => resolveLinkshuSeed(secrets));
+      return Effect.promise(() => resolveLinkshuSeed(session));
     }).pipe(
+      Effect.flatMap((seed) =>
+        seed === null
+          ? Effect.fail(new LinkshuNotConfigured())
+          : Effect.succeed(seed),
+      ),
       Effect.tapDefect((defect) =>
         Effect.sync(() =>
           console.warn("[linky] linkshu seed resolution failed", defect),

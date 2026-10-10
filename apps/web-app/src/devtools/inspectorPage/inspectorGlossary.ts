@@ -239,7 +239,7 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "relayList.syncFailed":
     "Fetching the user's relay lists from the relays at startup failed; the app keeps using its cached list.",
   "session.secretsDegraded":
-    "At boot the native secure storage failed (an error or no answer within 5 s) for the listed secrets, and the app runs on their localStorage copies. The payload names the keys, never the values.",
+    "At boot the native secure storage failed (an error or no answer within 5 s) for the listed secrets, and the app runs on their localStorage copies. Keys under unreadable have no copy either, so the app treats them as unknown rather than missing: when the wallet seed would come from one, the wallet stays unconfigured for this launch instead of generating a new seed. The payload names the keys, never the values.",
   "session.secretsUnavailable":
     "At boot the native secure storage failed and localStorage holds no identity, so the app shows the signed-out screen without touching the stored account. The payload names the keys that failed.",
   "secrets.nativeWriteRolledBack":
