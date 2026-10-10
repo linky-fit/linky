@@ -40,9 +40,12 @@ import { COLOR_MODE_PREFERENCE_LABEL_KEYS } from "../utils/colorMode";
 import { pickFile } from "../utils/pickFile";
 import { RECEIVE_METHOD_LABEL_KEYS } from "../utils/receiveMethod";
 
+type SecurityAction = "copyNostr" | "defaultIdentity" | "pasteNostr";
+
 export function AdvancedPage(): React.ReactElement {
   const {
     answerPendingIdentitySwitch,
+    canSwitchToDefaultIdentity,
     copyNostrKeys,
     dedupeContacts,
     dedupeContactsIsBusy,
@@ -63,6 +66,7 @@ export function AdvancedPage(): React.ReactElement {
     requestPasteNostrKeys,
     seedMnemonic,
     setPayWithCashuEnabled,
+    switchToDefaultIdentity,
   } = useAdvancedSettingsContext();
   const { allowTestMints, setAllowTestMints } = useMintSettingsContext();
   const { experimentalFeatures, setExperimentalFeatures } =
@@ -85,9 +89,8 @@ export function AdvancedPage(): React.ReactElement {
   } = useAppShellActions();
   const notifications = usePushNotificationsSetting();
   const colorModePreference = useColorModePreference();
-  const [armedSecurityAction, setArmedSecurityAction] = useState<
-    "copyNostr" | "pasteNostr" | null
-  >(null);
+  const [armedSecurityAction, setArmedSecurityAction] =
+    useState<SecurityAction | null>(null);
   const armTimeoutRef = useRef<number | null>(null);
   const hasSeedMnemonic = (seedMnemonic ?? "").trim().length > 0;
   const hasCurrentNsec = (currentNsec ?? "").trim().length > 0;
@@ -131,7 +134,7 @@ export function AdvancedPage(): React.ReactElement {
 
   const requestSecurityAction = useCallback(
     (
-      action: "copyNostr" | "pasteNostr",
+      action: SecurityAction,
       run: () => void | Promise<void>,
       hintKey: I18nKey = "sensitiveActionArmedHint",
     ) => {
@@ -374,6 +377,20 @@ export function AdvancedPage(): React.ReactElement {
           }
           disabled={!hasCurrentNsec || !hasSeedMnemonic}
         />
+        {canSwitchToDefaultIdentity ? (
+          <ListRow
+            icon="Repeat"
+            title={t("switchToDefaultIdentity")}
+            destructive={armedSecurityAction === "defaultIdentity"}
+            onPress={() =>
+              requestSecurityAction(
+                "defaultIdentity",
+                switchToDefaultIdentity,
+                "defaultIdentityArmedHint",
+              )
+            }
+          />
+        ) : null}
         <ListRow
           icon="LogOut"
           title={t("logout")}

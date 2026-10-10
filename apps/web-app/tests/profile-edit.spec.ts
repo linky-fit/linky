@@ -101,6 +101,10 @@ test("profile edits save after switching to a custom identity", async ({
   await paste.click();
   await paste.click();
   await expect(page).toHaveURL(/#contacts$/);
+  await page.goto("/#advanced");
+  await expect(
+    page.getByRole("button", { name: "Switch back to default identity" }),
+  ).toBeVisible();
   await expect
     .poll(() =>
       page.evaluate(() =>
@@ -166,6 +170,31 @@ test("profile edits save after switching to a custom identity", async ({
       } finally {
         await reader.close();
       }
+    });
+
+    await test.step("switching back to the default identity hides the row again", async () => {
+      await page.goto("/#advanced");
+      const switchBack = page.getByRole("button", {
+        name: "Switch back to default identity",
+      });
+      await switchBack.click();
+      await switchBack.click();
+      // The default identity has its onboarding profile, so Linky asks.
+      await expect(page.getByTestId("identity-profile-preview")).toBeVisible();
+      await page.getByRole("button", { name: "Switch identity" }).click();
+      await expect(page).toHaveURL(/#contacts$/);
+      await expect
+        .poll(() =>
+          page.evaluate(() =>
+            localStorage.getItem("linky.nostr_identity_source.v1"),
+          ),
+        )
+        .toBe("derived");
+      await page.goto("/#advanced");
+      await expect(
+        page.getByRole("button", { name: "Paste custom nostr keys" }),
+      ).toBeVisible();
+      await expect(switchBack).toHaveCount(0);
     });
   } finally {
     pool.close([NOSTR_RELAY_URL]);

@@ -14,6 +14,9 @@ export type IdentityProfileCheck =
   | { kind: "found"; metadata: ProfileMetadata }
   | { kind: "unchecked" };
 
+/** A pasted custom identity, or the identity the recovery seed derives. */
+export type IdentitySwitchTarget = "custom" | "default";
+
 /** Whose name, picture and about the switched-to identity publishes. */
 export type IdentityProfileSource = "linky" | "nostr";
 
@@ -33,6 +36,7 @@ export const checkIdentityForSwitch = async ({
   lookupOwnedAddress,
   npub,
   pubkey,
+  target,
 }: {
   fetchProfile: (
     pubkey: Pubkey,
@@ -40,6 +44,7 @@ export const checkIdentityForSwitch = async ({
   lookupOwnedAddress: () => Promise<string | null>;
   npub: string;
   pubkey: Pubkey;
+  target: IdentitySwitchTarget;
 }): Promise<IdentitySwitchCheck> => {
   const [profileExit, ownedAddress] = await Promise.all([
     fetchProfile(pubkey),
@@ -66,7 +71,7 @@ export const checkIdentityForSwitch = async ({
     tag: "identitySwitch.profileChecked",
     summary: `Identity to switch to: profile ${check.kind}, bought name ${boughtName}`,
     links: { pubkey },
-    payload: { boughtName, profile: check.kind },
+    payload: { boughtName, profile: check.kind, target },
   });
   return {
     check,

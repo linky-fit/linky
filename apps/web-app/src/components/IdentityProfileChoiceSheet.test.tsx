@@ -12,8 +12,10 @@ if (!pubkey) throw new Error("test npub must decode");
 
 const t = (key: string) => key;
 
+type ChoosingSwitch = Extract<PendingIdentitySwitch, { phase: "choosing" }>;
+
 const renderSheet = (
-  check: PendingIdentitySwitch["check"],
+  check: ChoosingSwitch["check"],
   onAnswer = vi.fn<(source: IdentityProfileSource | null) => Promise<void>>(
     async () => {},
   ),
@@ -22,12 +24,14 @@ const renderSheet = (
     <IdentityProfileChoiceSheet
       onAnswer={onAnswer}
       pending={{
+        phase: "choosing",
         check,
         lightningAddress: "bob@linky.fit",
         linkyProfile: new ProfileMetadata({ name: "Alice" }),
         npub: NPUB,
         nsec: "nsec1test",
         pubkey,
+        target: "custom",
       }}
       t={t}
     />,
@@ -82,6 +86,26 @@ describe("IdentityProfileChoiceSheet", () => {
       "identityProfileChoiceUnchecked",
     );
     expect(document.body.querySelector('[role="radiogroup"]')).toBeNull();
+    await press("identityProfileCancel");
+    expect(onAnswer).toHaveBeenLastCalledWith(null);
+    await view.unmount();
+  });
+
+  it("shows the check while it runs and lets the user cancel it", async () => {
+    const onAnswer = vi.fn<
+      (source: IdentityProfileSource | null) => Promise<void>
+    >(async () => {});
+    const view = await renderIntoDocument(
+      <IdentityProfileChoiceSheet
+        onAnswer={onAnswer}
+        pending={{ phase: "checking", npub: NPUB, pubkey, target: "custom" }}
+        t={t}
+      />,
+    );
+
+    expect(document.body.textContent).toContain("identityProfileChecking");
+    expect(document.body.querySelector('[role="progressbar"]')).not.toBeNull();
+    expect(previewText()).toBe("");
     await press("identityProfileCancel");
     expect(onAnswer).toHaveBeenLastCalledWith(null);
     await view.unmount();
