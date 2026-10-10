@@ -24,7 +24,7 @@ bun run native:apk:debug
 # apps/native-shell/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Native push works in the debug APK only when `android/app/google-services.json` has a client for `fit.linky.app.debug`. Otherwise the build skips the Google Services plugin and push stays disabled.
+FCM push works in the debug APK only when `android/app/google-services.json` has a client for `fit.linky.app.debug`. Otherwise the build skips the Google Services plugin and push goes through UnifiedPush.
 
 ## Android release APK
 
@@ -99,7 +99,8 @@ export CAP_SERVER_URL=http://127.0.0.1:5174
 
 Android:
 
-- Push: Capacitor Push Notifications + FCM. Data-only messages are rendered by `LinkyFirebaseMessagingService`, so notifications show while the app is closed. Needs `android/app/google-services.json`.
+- Push: Capacitor Push Notifications + FCM where Google Play Services is installed and the build has `android/app/google-services.json`. Data-only messages are rendered by `LinkyFirebaseMessagingService`, so notifications show while the app is closed.
+- Push without Google Play Services (GrapheneOS, LineageOS without microG, or a build without `google-services.json`): UnifiedPush. The user's distributor (ntfy, Sunup, ...) hands out a Web Push endpoint that the web app registers through the push service's `/subscribe`, like a browser subscription. `LinkyUnifiedPushService` renders the decrypted payload. Without a distributor, enabling notifications asks the user to install one.
 - Encrypted secret storage for identity material (`LinkySecretStorageBridge`).
 - Native QR scanning when WebKit camera APIs are unavailable.
 - `nostr://`, `cashu://` and `nostrconnect://` URLs are forwarded to the web app: `nostr://npub...` opens or creates the contact, `cashu://cashu...` imports the token, `nostrconnect://...` is handed over whole as a Nostr Connect login request.

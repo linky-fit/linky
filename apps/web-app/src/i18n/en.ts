@@ -142,6 +142,8 @@ export const en = {
   notifications: "Notifications",
   notificationsRegistering: "Registering...",
   notificationsUnsupported: "Notifications are not supported",
+  notificationsNoPushDistributor:
+    "This phone has no Google Play Services. Install a UnifiedPush app such as ntfy to get notifications.",
   notificationsNotLoggedIn: "You are not logged in",
   notificationsRegistered: "Registered",
   notificationsDisabled: "Notifications disabled",

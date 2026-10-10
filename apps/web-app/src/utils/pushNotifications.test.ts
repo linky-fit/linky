@@ -287,3 +287,109 @@ describe("unregisterPushNotifications native lifecycle", () => {
     expect(localStorage.getItem("linky.push_notifications_disabled")).toBe("1");
   });
 });
+
+describe("native UnifiedPush lifecycle", () => {
+  const registerUnifiedPush = vi.fn();
+  const unregisterUnifiedPush = vi.fn();
+
+  const installUnifiedPushBridge = (detail: Record<string, string>) => {
+    registerUnifiedPush.mockImplementation(() => {
+      window.dispatchEvent(
+        new CustomEvent("linky-native-unifiedpush", { detail }),
+      );
+    });
+    vi.stubGlobal("LinkyNativeNotifications", {
+      areSupported: () => true,
+      getPermissionState: () => "granted",
+      getPushTransport: () => "unifiedpush",
+      registerUnifiedPush,
+      requestPermission: vi.fn(),
+      unregisterUnifiedPush,
+    });
+  };
+
+  beforeEach(() => {
+    runtimeMocks.isNativePlatform.mockReturnValue(true);
+    registerUnifiedPush.mockReset();
+    unregisterUnifiedPush.mockReset();
+  });
+
+  it("subscribes the distributor's endpoint as a Web Push subscription", async () => {
+    installUnifiedPushBridge({
+      status: "endpoint",
+      endpoint: "https://ntfy.example/upAbc?up=1",
+      p256dh: "p256dh-key",
+      auth: "auth-secret",
+    });
+
+    await expect(registerPushNotifications(NSEC)).resolves.toEqual({
+      success: true,
+    });
+
+    expect(registerUnifiedPush).toHaveBeenCalledWith(VAPID_KEY);
+    expect(readField(getSubscribeRequests()[0]?.body, "subscription")).toEqual({
+      endpoint: "https://ntfy.example/upAbc?up=1",
+      expirationTime: null,
+      keys: { p256dh: "p256dh-key", auth: "auth-secret" },
+    });
+    expect(localStorage.getItem("linky.push_subscription_endpoint")).toBe(
+      "https://ntfy.example/upAbc?up=1",
+    );
+  });
+
+  it("drops the FCM token left from when the device had Play Services", async () => {
+    localStorage.setItem("linky.push_native_token", "old-fcm-token");
+    localStorage.setItem("linky.push_native_pubkey", PUBKEY);
+    installUnifiedPushBridge({
+      status: "endpoint",
+      endpoint: "https://ntfy.example/upAbc?up=1",
+      p256dh: "p256dh-key",
+      auth: "auth-secret",
+    });
+
+    await registerPushNotifications(NSEC);
+
+    expect(
+      recordedRequests.some(
+        ({ body, url }) =>
+          url.endsWith("/native/unsubscribe") &&
+          readField(body, "token") === "old-fcm-token",
+      ),
+    ).toBe(true);
+    expect(localStorage.getItem("linky.push_native_token")).toBeNull();
+  });
+
+  it("reports a missing distributor without contacting the push service", async () => {
+    installUnifiedPushBridge({ status: "failed", reason: "NO_DISTRIBUTOR" });
+
+    const result = await registerPushNotifications(NSEC);
+
+    expect(result).toMatchObject({
+      success: false,
+      reason: "no_push_distributor",
+    });
+    expect(getSubscribeRequests()).toHaveLength(0);
+  });
+
+  it("unsubscribes the stored endpoint and leaves the distributor", async () => {
+    localStorage.setItem(
+      "linky.push_subscription_endpoint",
+      "https://ntfy.example/upAbc?up=1",
+    );
+    localStorage.setItem("linky.push_subscription_pubkey", PUBKEY);
+    installUnifiedPushBridge({ status: "failed", reason: "unused" });
+
+    await expect(unregisterPushNotifications(NSEC)).resolves.toBe(true);
+
+    expect(
+      recordedRequests.some(
+        ({ body, url }) =>
+          url.endsWith("/unsubscribe") &&
+          !url.endsWith("/native/unsubscribe") &&
+          readField(body, "endpoint") === "https://ntfy.example/upAbc?up=1",
+      ),
+    ).toBe(true);
+    expect(unregisterUnifiedPush).toHaveBeenCalledOnce();
+    expect(localStorage.getItem("linky.push_subscription_endpoint")).toBeNull();
+  });
+});

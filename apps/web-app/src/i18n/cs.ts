@@ -139,6 +139,8 @@ export const cs = {
   notifications: "Notifikace",
   notificationsRegistering: "Registruji...",
   notificationsUnsupported: "Notifikace nejsou podporovány",
+  notificationsNoPushDistributor:
+    "Tento telefon nemá Google Play Services. Pro notifikace nainstaluj UnifiedPush aplikaci, třeba ntfy.",
   notificationsNotLoggedIn: "Nejste přihlášeni",
   notificationsRegistered: "Zaregistrováno",
   notificationsDisabled: "Notifikace vypnuty",

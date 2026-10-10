@@ -1,5 +1,7 @@
 package fit.linky.app;
 
+import static org.unifiedpush.android.connector.ConstantsKt.INSTANCE_DEFAULT;
+
 import android.Manifest;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -41,6 +43,7 @@ import com.journeyapps.barcodescanner.DefaultDecoderFactory;
 import com.journeyapps.barcodescanner.camera.CameraSettings;
 
 import org.json.JSONObject;
+import org.unifiedpush.android.connector.UnifiedPush;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -51,6 +54,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+
+import kotlin.Unit;
 
 public class MainActivity extends BridgeActivity {
 	private static final String SCAN_LOG_TAG = "LinkyScan";
@@ -65,6 +70,7 @@ public class MainActivity extends BridgeActivity {
 	private static final String EVENT_NFC_WRITE = "linky-native-nfc-write";
 	private static final String EVENT_NOTIFICATION_PERMISSION = "linky-native-notification-permission";
 	private static final String EVENT_SCAN_RESULT = "linky-native-scan-result";
+	private static final String EVENT_UNIFIED_PUSH = "linky-native-unifiedpush";
 	private static final String EXTRA_NOTIFICATION_ROUTE = "linky_notification_route";
 	private static final String EXTRA_NOTIFICATION_OUTER_EVENT_ID = "outerEventId";
 	private static final String EXTRA_NOTIFICATION_RECIPIENT_PUBKEY = "recipientPubkey";
@@ -75,6 +81,7 @@ public class MainActivity extends BridgeActivity {
 	private static final String PREF_PENDING_NOTIFICATION_ROUTE = "pending_notification_route";
 	private static final String PREF_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested";
 	private static final String FIREBASE_GOOGLE_APP_ID_RESOURCE = "google_app_id";
+	private static final String GOOGLE_PLAY_SERVICES_PACKAGE = "com.google.android.gms";
 	private long lastNativeQrScanAtMs = 0L;
 	private String lastNativeQrValue = null;
 	private DecoratedBarcodeView nativeQrScannerView;
@@ -360,6 +367,24 @@ public class MainActivity extends BridgeActivity {
 		}
 
 		activity.dispatchWindowEvent(EVENT_SCAN_RESULT, detail);
+	}
+
+	static void dispatchUnifiedPushEvent(JSONObject detail) {
+		MainActivity activity = activeInstanceRef.get();
+		if (activity != null) {
+			activity.dispatchWindowEvent(EVENT_UNIFIED_PUSH, detail);
+		}
+	}
+
+	static void dispatchUnifiedPushFailure(String reason) {
+		JSONObject detail = new JSONObject();
+		try {
+			detail.put("status", "failed");
+			detail.put("reason", reason);
+		} catch (Exception ignored) {
+			return;
+		}
+		dispatchUnifiedPushEvent(detail);
 	}
 
 	static void dispatchBeaconEvent(String eventName, JSONObject detail) {
@@ -1056,10 +1081,6 @@ public class MainActivity extends BridgeActivity {
 	}
 
 	private String getNotificationPermissionState() {
-		if (!isNativePushSupported()) {
-			return "unsupported";
-		}
-
 		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
 			return "granted";
 		}
@@ -1073,12 +1094,37 @@ public class MainActivity extends BridgeActivity {
 		return wasRequested ? "denied" : "prompt";
 	}
 
-	private boolean isNativePushSupported() {
-		return getResources().getIdentifier(
+	private String getPushTransport() {
+		boolean hasFirebaseConfig = getResources().getIdentifier(
 			FIREBASE_GOOGLE_APP_ID_RESOURCE,
 			"string",
 			getPackageName()
 		) != 0;
+		return hasFirebaseConfig && isPackageInstalled(GOOGLE_PLAY_SERVICES_PACKAGE) ? "fcm" : "unifiedpush";
+	}
+
+	private boolean isPackageInstalled(String packageName) {
+		try {
+			getPackageManager().getPackageInfo(packageName, 0);
+			return true;
+		} catch (PackageManager.NameNotFoundException error) {
+			return false;
+		}
+	}
+
+	private void registerUnifiedPush(String vapidPublicKey) {
+		UnifiedPush.tryUseCurrentOrDefaultDistributor(this, hasDistributor -> {
+			if (!hasDistributor) {
+				dispatchUnifiedPushFailure("NO_DISTRIBUTOR");
+				return Unit.INSTANCE;
+			}
+			try {
+				UnifiedPush.register(this, INSTANCE_DEFAULT, getString(R.string.app_name), vapidPublicKey);
+			} catch (Exception error) {
+				dispatchUnifiedPushFailure("INTERNAL_ERROR");
+			}
+			return Unit.INSTANCE;
+		});
 	}
 
 	private final class LinkyNativeScannerBridge {
@@ -1115,7 +1161,22 @@ public class MainActivity extends BridgeActivity {
 	private final class LinkyNativeNotificationsBridge {
 		@JavascriptInterface
 		public boolean areSupported() {
-			return isNativePushSupported();
+			return true;
+		}
+
+		@JavascriptInterface
+		public String getPushTransport() {
+			return MainActivity.this.getPushTransport();
+		}
+
+		@JavascriptInterface
+		public void registerUnifiedPush(String vapidPublicKey) {
+			runOnUiThread(() -> MainActivity.this.registerUnifiedPush(vapidPublicKey));
+		}
+
+		@JavascriptInterface
+		public void unregisterUnifiedPush() {
+			UnifiedPush.unregister(MainActivity.this, INSTANCE_DEFAULT);
 		}
 
 		@JavascriptInterface
@@ -1125,14 +1186,6 @@ public class MainActivity extends BridgeActivity {
 
 		@JavascriptInterface
 		public void requestPermission() {
-			if (!isNativePushSupported()) {
-				dispatchWindowEvent(
-					EVENT_NOTIFICATION_PERMISSION,
-					createPermissionDetail("unsupported")
-				);
-				return;
-			}
-
 			if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
 				dispatchWindowEvent(
 					EVENT_NOTIFICATION_PERMISSION,

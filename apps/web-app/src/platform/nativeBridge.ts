@@ -12,6 +12,7 @@ import {
 } from "./runtime";
 import { isRecord } from "../utils/unknown";
 import { asNonEmptyString } from "../utils/validation";
+import { NonBlankString } from "../utils/schema";
 
 type NativeNotificationPermissionState =
   | "denied"
@@ -115,7 +116,10 @@ const NATIVE_SCAN_VIEWPORT_MAX_FRAMES = 30;
 interface AndroidNotificationsBridge {
   areSupported?: () => boolean;
   getPermissionState?: () => string;
+  getPushTransport?: () => string;
+  registerUnifiedPush?: (vapidPublicKey: string) => void;
   requestPermission?: () => void;
+  unregisterUnifiedPush?: () => void;
 }
 
 interface AndroidWindowInsetsBridge {
@@ -622,6 +626,60 @@ export const requestNativeNotificationPermission = async (): Promise<
     },
     timeoutMs: 30_000,
   });
+};
+
+export type NativePushTransport = "fcm" | "unifiedpush";
+
+/** Shells built before UnifiedPush support lack `getPushTransport` and speak only FCM. */
+export const getNativePushTransport = (): NativePushTransport =>
+  getAndroidNotificationsBridge()?.getPushTransport?.() === "unifiedpush"
+    ? "unifiedpush"
+    : "fcm";
+
+const UnifiedPushRegistration = Schema.Union(
+  Schema.Struct({
+    status: Schema.Literal("endpoint"),
+    endpoint: NonBlankString,
+    p256dh: NonBlankString,
+    auth: NonBlankString,
+  }),
+  Schema.Struct({
+    status: Schema.Literal("failed"),
+    reason: Schema.String,
+  }),
+);
+export type UnifiedPushRegistration = typeof UnifiedPushRegistration.Type;
+const decodeUnifiedPushRegistration = Schema.decodeUnknownOption(
+  UnifiedPushRegistration,
+);
+
+/**
+ * Registers with the user's UnifiedPush distributor and resolves with the Web
+ * Push endpoint it hands out. The OS may first ask the user to pick a
+ * distributor, hence the long timeout.
+ */
+export const requestNativeUnifiedPushEndpoint = (
+  vapidPublicKey: string,
+): Promise<UnifiedPushRegistration> => {
+  const bridge = getAndroidNotificationsBridge();
+  return requestNativeBridgeEvent<UnifiedPushRegistration>({
+    eventName: "linky-native-unifiedpush",
+    fallback: { status: "failed", reason: "TIMEOUT" },
+    invoke: () => {
+      if (!bridge?.registerUnifiedPush) return false;
+      bridge.registerUnifiedPush(vapidPublicKey);
+      return true;
+    },
+    parse: (event) =>
+      event instanceof CustomEvent
+        ? Option.getOrNull(decodeUnifiedPushRegistration(event.detail))
+        : null,
+    timeoutMs: 120_000,
+  });
+};
+
+export const unregisterNativeUnifiedPush = (): void => {
+  getAndroidNotificationsBridge()?.unregisterUnifiedPush?.();
 };
 
 export const supportsNativeNfcWrite = (): boolean => {

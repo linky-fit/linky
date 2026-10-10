@@ -1,6 +1,6 @@
 # Linky push service
 
-Bun HTTP service that sends Web Push and Android FCM notifications when a push-marked NIP-17 wrap (`kind: 1059`) arrives for a subscribed pubkey. It watches the configured relays through linkstr's `PushInbox` and never decrypts anything. Every notification has a fixed body and a title with the recipient's shortened npub, so a device subscribed for several identities can tell them apart.
+Bun HTTP service that sends Web Push (browsers, and Android without Google Play Services through a UnifiedPush distributor) and Android FCM notifications when a push-marked NIP-17 wrap (`kind: 1059`) arrives for a subscribed pubkey. It watches the configured relays through linkstr's `PushInbox` and never decrypts anything. Every notification has a fixed body and a title with the recipient's shortened npub, so a device subscribed for several identities can tell them apart.
 
 A client proves it owns a pubkey by signing a short-lived challenge: `POST /auth/challenge`, then `POST /subscribe` or `POST /native/subscribe` with one proof per pubkey. `/unsubscribe` and `/native/unsubscribe` work the same way. Other endpoints: `GET /vapid-public-key`, `GET /health` and `GET /` (build commit). Subscriptions, native tokens and challenges live in SQLite. A subscription the provider reports as gone (`404`, `410`, VAPID mismatch, unregistered FCM token) is deleted.
 
