@@ -2,14 +2,14 @@
 
 How each Linky target ships, what you do for it, and how to recover when a run fails.
 
-| Target                                                 | Ships                                  | You do                              |
-| ------------------------------------------------------ | -------------------------------------- | ----------------------------------- |
-| Nightly `nightly.app.linky.fit`                        | every push to `main`                   | nothing                             |
-| App: `app.linky.fit`, Google Play, macOS DMG, Zapstore | a new version merged to `main`         | [release PR](#app)                  |
-| Site `linky.fit`                                       | every push to `main`, after its checks | nothing                             |
-| Error tracker                                          | every push to `main`, after its checks | nothing                             |
-| Push server `push.linky.fit`                           | a manual run                           | [run Release · push](#push-server)  |
-| npm `@linky-fit/linkshu`, `@linky-fit/linkstr`         | a `packages-v*` tag                    | [version PR and tag](#npm-packages) |
+| Target                                                                | Ships                                  | You do                              |
+| --------------------------------------------------------------------- | -------------------------------------- | ----------------------------------- |
+| Nightly `nightly.app.linky.fit`                                       | every push to `main`                   | nothing                             |
+| App: `app.linky.fit`, Google Play, macOS DMG, Zapstore                | a new version merged to `main`         | [release PR](#app)                  |
+| Site `linky.fit`                                                      | every push to `main`, after its checks | nothing                             |
+| Error tracker                                                         | every push to `main`, after its checks | nothing                             |
+| Push server `push.linky.fit`                                          | a manual run                           | [run Release · push](#push-server)  |
+| npm `@linky-fit/linkshu`, `@linky-fit/linkstr`, `@linky-fit/linkauth` | a `packages-v*` tag                    | [version PR and tag](#npm-packages) |
 
 The desktop shell loads `app.linky.fit`, so it follows the app release.
 
@@ -78,9 +78,9 @@ Like the site, the push server ships ahead of the app and must keep working with
 
 ## npm packages
 
-`@linky-fit/linkshu` and `@linky-fit/linkstr` share one SemVer version and publish together; [npm-releases.md](./npm-releases.md) has the details.
+`@linky-fit/linkshu`, `@linky-fit/linkstr` and `@linky-fit/linkauth` share one SemVer version and publish together; [npm-releases.md](./npm-releases.md) has the details.
 
-1. Set the same `version` in both packages' `package.json` and in their `bun.lock` entries, and merge to `main`.
+1. Set the same `version` in all three packages' `package.json` and in their `bun.lock` entries, and merge to `main`.
 2. Tag the merged commit and push the tag:
 
    ```bash

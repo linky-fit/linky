@@ -94,6 +94,7 @@ jobs:
           set -euo pipefail
           version=$(node -p "require('./packages/linkshu/package.json').version")
           test "$version" = "$(node -p "require('./packages/linkstr/package.json').version")"
+          test "$version" = "$(node -p "require('./packages/linkauth/package.json').version")"
           if [[ ! "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
             echo "Expected a shared stable package version such as 0.1.0"
             exit 1
@@ -225,8 +226,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Start relay and mints
-        run: docker compose -f docker-compose.dev.yml --profile e2e up -d --wait nostr-relay cashu-mint cashu-mint-target
+      # web-app is the Linky the demo-auth spec logs in with; its image is built here.
+      - name: Start relay, mints and web app
+        run: docker compose -f docker-compose.dev.yml --profile e2e up -d --build --wait nostr-relay cashu-mint cashu-mint-target web-app
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
@@ -256,7 +258,7 @@ jobs:
 
       - name: Dump service logs
         if: failure()
-        run: docker compose -f docker-compose.dev.yml --profile e2e logs nostr-relay cashu-mint cashu-mint-target
+        run: docker compose -f docker-compose.dev.yml --profile e2e logs nostr-relay cashu-mint cashu-mint-target web-app
 
       - name: Upload traces
         if: failure()

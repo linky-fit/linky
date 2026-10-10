@@ -39,7 +39,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [linkshu, linkstr]
+        package: [linkshu, linkstr, linkauth]
     concurrency:
       group: npm-publish-${{ matrix.package }}-${{ github.ref_name }}
       cancel-in-progress: false
@@ -61,6 +61,18 @@ jobs:
           path: dist/npm
           run-id: ${{ needs.ci-passed.outputs.run_id }}
           github-token: ${{ github.token }}
+      # The linkstr tarball pins linkauth at this exact version.
+      - name: Wait for linkauth on npm
+        if: matrix.package == 'linkstr'
+        shell: bash
+        run: |
+          version=$(node -p "require('./packages/linkauth/package.json').version")
+          for _ in $(seq 60); do
+            npm view "@linky-fit/linkauth@$version" version && exit 0
+            sleep 10
+          done
+          echo "::error::@linky-fit/linkauth@$version is not on npm"
+          exit 1
       - name: Publish the tested tarball from main history
         env:
           PACKAGE: ${{ matrix.package }}

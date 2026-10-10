@@ -84,6 +84,7 @@
       "name": "@linky-fit/site",
       "version": "0.1.0",
       "dependencies": {
+        "@linky-fit/linkauth": "workspace:*",
         "@linky-fit/linkshu": "workspace:*",
         "@linky-fit/linkstr": "workspace:*",
         "@linky-fit/proxy-payment": "workspace:*",
@@ -155,6 +156,7 @@
         "@gandlaf21/bc-ur": "1.1.12",
         "@linky-fit/identity": "workspace:*",
         "@linky-fit/keryx": "workspace:*",
+        "@linky-fit/linkauth": "workspace:*",
         "@linky-fit/linkshu": "workspace:*",
         "@linky-fit/linkstr": "workspace:*",
         "@linky-fit/linkstr-react": "workspace:*",
@@ -175,6 +177,7 @@
         "effect": "^3.19.19",
         "fflate": "^0.8.3",
         "jsqr": "^1.4.0",
+        "nostr-tools": "^2.25.2",
         "pdfjs-dist": "^6.2.108",
         "qrcode": "^1.5.4",
         "react": "^19.2.3",
@@ -202,7 +205,6 @@
         "eslint": "^9.39.1",
         "fake-indexeddb": "^6.2.5",
         "jsdom": "^28.1.0",
-        "nostr-tools": "^2.25.2",
         "prettier": "^3.4.2",
         "typescript": "~5.9.3",
         "vite": "^7.2.4",
@@ -278,6 +280,23 @@
         "vitest": "^4.0.18",
       },
     },
+    "packages/linkauth": {
+      "name": "@linky-fit/linkauth",
+      "version": "0.4.0",
+      "dependencies": {
+        "@noble/hashes": "^2.0.1",
+        "nostr-tools": "^2.25.2",
+      },
+      "devDependencies": {
+        "@linky-fit/config": "workspace:*",
+        "@types/node": "^24.10.1",
+        "eslint": "^9.39.1",
+        "prettier": "^3.4.2",
+        "tsdown": "0.23.0",
+        "typescript": "~5.9.3",
+        "vitest": "^4.0.18",
+      },
+    },
     "packages/linkshu": {
       "name": "@linky-fit/linkshu",
       "version": "0.4.0",
@@ -306,6 +325,7 @@
       "version": "0.4.0",
       "dependencies": {
         "@cashu/cashu-ts": "^4.0.0",
+        "@linky-fit/linkauth": "workspace:*",
         "@noble/curves": "^1.4.1",
         "@noble/hashes": "^2.0.1",
         "effect": "^3.19.19",
@@ -1040,6 +1060,8 @@
     "@linky-fit/identity": ["@linky-fit/identity@workspace:packages/identity"],
 
     "@linky-fit/keryx": ["@linky-fit/keryx@workspace:packages/keryx"],
+
+    "@linky-fit/linkauth": ["@linky-fit/linkauth@workspace:packages/linkauth"],
 
     "@linky-fit/linkshu": ["@linky-fit/linkshu@workspace:packages/linkshu"],
 

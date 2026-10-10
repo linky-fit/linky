@@ -6,6 +6,7 @@
 [![push.linky.fit](https://img.shields.io/github/deployments/linky-fit/linky/push?label=push.linky.fit)](https://github.com/linky-fit/linky/deployments/push)
 [![@linky-fit/linkshu](https://img.shields.io/npm/v/@linky-fit/linkshu?label=%40linky-fit%2Flinkshu)](https://www.npmjs.com/package/@linky-fit/linkshu)
 [![@linky-fit/linkstr](https://img.shields.io/npm/v/@linky-fit/linkstr?label=%40linky-fit%2Flinkstr)](https://www.npmjs.com/package/@linky-fit/linkstr)
+[![@linky-fit/linkauth](https://img.shields.io/npm/v/@linky-fit/linkauth?label=%40linky-fit%2Flinkauth)](https://www.npmjs.com/package/@linky-fit/linkauth)
 [![npm release](https://img.shields.io/github/deployments/linky-fit/linky/npm?label=npm%20release)](https://github.com/linky-fit/linky/deployments/npm)
 
 Linky is a mobile-first PWA for contacts, private Nostr messaging and Lightning/Cashu payments. Data lives in Evolu (SQLite) on the device and syncs between devices through an Evolu relay. The app runs at `app.linky.fit` and as an Android app; `nightly.app.linky.fit` runs `main` ahead of the last release (see [`docs/releases.md`](./docs/releases.md)). `apps/site/` is the public website `linky.fit`, with the `/cashu/` token redemption page.
@@ -36,6 +37,7 @@ Apps: `apps/web-app` (the product), `apps/site`, `apps/push` (Web Push and FCM s
 Packages:
 
 - [`packages/linkstr`](./packages/linkstr/README.md): Nostr protocol library; guides in [`docs/`](./packages/linkstr/docs/), which also cover `@linky-fit/linkstr-react`
+- [`packages/linkauth`](./packages/linkauth/README.md): Nostr authentication SDK (client, server and signer); guides in [`docs/`](./packages/linkauth/docs/)
 - [`packages/linkshu`](./packages/linkshu/README.md): cashu wallet library; guides in [`docs/`](./packages/linkshu/docs/)
 - [`packages/linksync`](./packages/linksync/README.md): synced storage (Evolu schema, repositories, shards); guides in [`docs/`](./packages/linksync/docs/)
 - [`packages/proxy-payment`](./packages/proxy-payment/README.md): proxy bank payments (bank QR parsing, offer rules); guides in [`docs/`](./packages/proxy-payment/docs/)
@@ -46,7 +48,7 @@ Packages:
 - `packages/identity`: key derivation (SLIP-39, Nostr, LNURL auth) shared by the app and the error tracker
 - `packages/config`: shared eslint, prettier, tsconfig and npm packaging
 
-`@linky-fit/linkshu` and `@linky-fit/linkstr` publish to npm together; see [`docs/npm-releases.md`](./docs/npm-releases.md).
+`@linky-fit/linkshu`, `@linky-fit/linkstr` and `@linky-fit/linkauth` publish to npm together; see [`docs/npm-releases.md`](./docs/npm-releases.md).
 
 Further reading:
 

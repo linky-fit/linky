@@ -16,6 +16,13 @@ interface SourceManifest {
   peerDependenciesMeta?: Record<string, { optional: boolean }>;
 }
 
+/** Published together at one version, so a workspace dependency on one is that exact version. */
+const PUBLISHED_PACKAGES: ReadonlySet<string> = new Set([
+  "@linky-fit/linkshu",
+  "@linky-fit/linkstr",
+  "@linky-fit/linkauth",
+]);
+
 export async function prepareNpmPackage(source: SourceManifest) {
   const exports = Object.fromEntries(
     Object.entries(source.exports).map(([key, path]) => {
@@ -23,11 +30,15 @@ export async function prepareNpmPackage(source: SourceManifest) {
       return [key, { types: `${output}.d.ts`, import: `${output}.js` }];
     }),
   );
-  for (const version of Object.values(source.dependencies)) {
-    if (version.startsWith("workspace:")) {
-      throw new Error("Published dependencies must exist on npm");
-    }
-  }
+  const dependencies = Object.fromEntries(
+    Object.entries(source.dependencies).map(([name, range]) => {
+      if (!range.startsWith("workspace:")) return [name, range];
+      if (!PUBLISHED_PACKAGES.has(name)) {
+        throw new Error(`${name} is not published to npm`);
+      }
+      return [name, source.version];
+    }),
+  );
   const manifest = {
     name: source.name,
     version: source.version,
@@ -42,7 +53,7 @@ export async function prepareNpmPackage(source: SourceManifest) {
     types: "./index.d.ts",
     exports,
     files: ["**/*.js", "**/*.d.ts", "README.md", "LICENSE", "docs"],
-    dependencies: source.dependencies,
+    dependencies,
     peerDependencies: source.peerDependencies,
     peerDependenciesMeta: source.peerDependenciesMeta,
     publishConfig: { access: "public", registry: "https://registry.npmjs.org" },
