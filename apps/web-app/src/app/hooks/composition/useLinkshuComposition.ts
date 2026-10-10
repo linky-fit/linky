@@ -14,6 +14,7 @@ import {
   MeltDraft,
   NonNegativeAmount,
   OperationId,
+  P2pkUnlockingKey,
   PaidQuoteDraft,
   QuoteLockingKey,
   Receive,
@@ -359,16 +360,18 @@ const decodeEnvelopeMeltDraft = Schema.decodeUnknownSync(EnvelopeMeltDraft);
 const decodeEnvelopeSendDraft = Schema.decodeUnknownSync(EnvelopeSendDraft);
 
 /**
- * NUT-20 quotes are locked to the nostr key: topups lock new quotes to it,
- * npub.cash locks its quotes to it, and the same secret unlocks both after a
- * restart. It reaches linkshu only as a mint-call argument.
+ * The nostr key locks NUT-20 quotes (topups and npub.cash lock theirs to it)
+ * and signs for tokens P2PK-locked to the user's npub (NUT-11). It reaches
+ * linkshu only as a mint-call argument.
  */
-const quoteLockingKeyOf = (nsec: string | null): QuoteLockingKey | null => {
-  if (!nsec) return null;
-  const secretKey = decodeNsec(nsec);
-  return secretKey === null
-    ? null
-    : QuoteLockingKey.make(bytesToHex(secretKey));
+export const nostrKeyOptionsOf = (nsec: string | null) => {
+  const secretKey = nsec ? decodeNsec(nsec) : null;
+  if (secretKey === null) return { lockingOptions: {}, unlockOptions: {} };
+  const hex = bytesToHex(secretKey);
+  return {
+    lockingOptions: { lockingKey: QuoteLockingKey.make(hex) },
+    unlockOptions: { unlockingKey: P2pkUnlockingKey.make(hex) },
+  };
 };
 
 /**
@@ -479,8 +482,7 @@ export const useLinkshuComposition = ({
     const runtime = linkshuRuntime;
     type Env = ManagedRuntime.ManagedRuntime.Services<typeof runtime>;
 
-    const lockingKey = quoteLockingKeyOf(currentNsec);
-    const lockingOptions = lockingKey === null ? {} : { lockingKey };
+    const { lockingOptions, unlockOptions } = nostrKeyOptionsOf(currentNsec);
 
     const run = <A, E>(effect: Effect.Effect<A, E, Env>): Promise<A> =>
       runtime.runPromise(effect);
@@ -502,12 +504,17 @@ export const useLinkshuComposition = ({
         Effect.flatMap(Receive, (receive) =>
           receive.receive(
             new ReceiveDraft({ text, automatic: options?.automatic === true }),
+            unlockOptions,
           ),
         ),
       );
 
     const resumeDeferredCashuReceives: ResumeDeferredCashuReceives = () =>
-      run(Effect.flatMap(Receive, (receive) => receive.resumeDeferred));
+      run(
+        Effect.flatMap(Receive, (receive) =>
+          receive.resumeDeferred(unlockOptions),
+        ),
+      );
 
     const sendCashuToken: SendCashuToken = ({
       amountSat,

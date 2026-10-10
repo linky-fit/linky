@@ -50,6 +50,8 @@ export const describeTaggedCashuError = (error: unknown): string | null => {
       return withDetail("Invalid token", detail);
     case "TokenAlreadySpent":
       return "Token already spent";
+    case "TokenLocked":
+      return "Token is locked to another key";
     case "MintUnreachable":
       return withDetail("Mint unreachable", detail);
     case "ReceiveDeferred":

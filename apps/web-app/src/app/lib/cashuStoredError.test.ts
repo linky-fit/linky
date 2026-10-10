@@ -11,6 +11,9 @@ describe("describeTaggedCashuError", () => {
       describeTaggedCashuError({ _tag: "TokenAlreadySpent", mint: "m" }),
     ).toBe("Token already spent");
     expect(
+      describeTaggedCashuError({ _tag: "TokenLocked", mint: "m", pubkeys: [] }),
+    ).toBe("Token is locked to another key");
+    expect(
       describeTaggedCashuError({
         _tag: "MintUnreachable",
         mint: "m",
