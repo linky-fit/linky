@@ -7,6 +7,13 @@ description: Use whenever you run tests, unit or Playwright e2e.
 
 `bun run test` runs Vitest in every workspace; `bun run --filter <package> test` runs one.
 
+Keep the loop tight while iterating, from inside the workspace you changed:
+
+- `bunx vitest related <changed files> --run` runs every test that imports those files, directly or transitively. Name the test files instead when you know them.
+- `bun run typecheck` checks that workspace's types; keep `check-code` for the end.
+
+Run the full `bun run test` once before you commit.
+
 ## E2E tests
 
 Run every Playwright suite through `bun run e2e`. It starts a Docker stack owned by this checkout, on ports derived from its path, so other worktrees can run e2e at the same time. It passes `--build` every run; layer caching turns that into a no-op unless app code changed, and editing specs never triggers a rebuild.
