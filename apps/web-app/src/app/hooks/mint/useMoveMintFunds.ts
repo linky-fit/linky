@@ -9,6 +9,7 @@ import { describeTaggedCashuError } from "../../lib/cashuStoredError";
 import type {
   AutoswapCashu,
   EstimateAutoswapCashu,
+  ResolveAutoswapSource,
 } from "../composition/useLinkshuComposition";
 
 export interface MintMove {
@@ -24,6 +25,7 @@ interface UseMoveMintFundsParams {
   estimateAutoswapCashu: EstimateAutoswapCashu | null;
   formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
   rememberSeenMint: (mintUrl: string | null | undefined) => void;
+  resolveAutoswapSource: ResolveAutoswapSource | null;
   setCashuIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   t: Translate;
@@ -32,13 +34,18 @@ interface UseMoveMintFundsParams {
 const describeError = (error: unknown): string =>
   describeTaggedCashuError(error) ?? getUnknownErrorMessage(error, "unknown");
 
-/** Moving funds between mints (linkshu Autoswap), priced first. */
+/**
+ * Moving funds between mints (linkshu Autoswap), priced first. The estimate
+ * resolves the source to its stored spelling; the move takes the source the
+ * estimate priced, so both draw from one spelling.
+ */
 export const useMoveMintFunds = ({
   autoswapCashu,
   cashuIsBusy,
   estimateAutoswapCashu,
   formatDisplayedAmountParts,
   rememberSeenMint,
+  resolveAutoswapSource,
   setCashuIsBusy,
   setStatus,
   t,
@@ -53,12 +60,15 @@ export const useMoveMintFunds = ({
 
   const estimateMintMove = React.useCallback(
     async (move: MintMove): Promise<AutoswapEstimate | null> => {
-      if (estimateAutoswapCashu === null) {
+      if (estimateAutoswapCashu === null || resolveAutoswapSource === null) {
         setStatus(t("mintMoveUnavailable"));
         return null;
       }
       try {
-        const outcome = await estimateAutoswapCashu(move);
+        const outcome = await estimateAutoswapCashu({
+          ...move,
+          sourceMint: await resolveAutoswapSource(move.sourceMint),
+        });
         if (Result.isSuccess(outcome)) return outcome.success;
         setStatus(
           `${t("mintMoveEstimateFailed")}: ${describeError(outcome.failure)}`,
@@ -68,10 +78,13 @@ export const useMoveMintFunds = ({
       }
       return null;
     },
-    [estimateAutoswapCashu, setStatus, t],
+    [estimateAutoswapCashu, resolveAutoswapSource, setStatus, t],
   );
 
-  /** Resolves true once the funds left the source (arrived, or claim pending). */
+  /**
+   * Moves from `move.sourceMint` as given, the spelling its estimate priced.
+   * Resolves true once the funds left the source (arrived, or claim pending).
+   */
   const moveMintFunds = React.useCallback(
     async (move: MintMove): Promise<boolean> => {
       if (cashuIsBusy) return false;

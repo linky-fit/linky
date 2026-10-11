@@ -261,6 +261,12 @@ interface AutoswapCashuArgs {
   readonly amountSat?: number;
 }
 
+/**
+ * The spelling linkshu holds a mint's funds under. A move resolves it once
+ * and hands the same source to the estimate and the claim.
+ */
+export type ResolveAutoswapSource = (mint: string) => Promise<string>;
+
 /** linkshu Autoswap claim; invalid mint/amount input and defects reject. */
 export type AutoswapCashu = (
   args: AutoswapCashuArgs,
@@ -360,23 +366,11 @@ const decodeEnvelopeOpenDraft = Schema.decodeUnknownSync(EnvelopeOpenDraft);
 const decodeEnvelopeMeltDraft = Schema.decodeUnknownSync(EnvelopeMeltDraft);
 const decodeEnvelopeSendDraft = Schema.decodeUnknownSync(EnvelopeSendDraft);
 
-/**
- * The move named by the app's mint urls, its source read back as the
- * spelling linkshu stored the funds under.
- */
-export const autoswapDraftOf = ({
-  sourceMint,
-  targetMint,
-  amountSat,
-}: AutoswapCashuArgs) =>
+/** `mint` as the spelling linkshu stored its funds under (`storedMintSpelling`). */
+export const storedSourceMint = (mint: string) =>
   Effect.map(
     Effect.flatMap(Tokens, (tokens) => tokens.balances),
-    ({ perMint }) =>
-      decodeAutoswapDraft({
-        sourceMint: storedMintSpelling(perMint, sourceMint),
-        targetMint,
-        ...(amountSat === undefined ? {} : { amount: amountSat }),
-      }),
+    ({ perMint }) => storedMintSpelling(perMint, mint),
   );
 
 /**
@@ -614,18 +608,41 @@ export const useLinkshuComposition = ({
         }),
       );
 
-    const autoswapCashu: AutoswapCashu = (args) =>
+    const resolveAutoswapSource: ResolveAutoswapSource = (mint) =>
+      run(storedSourceMint(mint));
+
+    const autoswapCashu: AutoswapCashu = ({
+      sourceMint,
+      targetMint,
+      amountSat,
+    }) =>
       runResult(
-        Effect.flatMap(autoswapDraftOf(args), (draft) =>
-          Effect.flatMap(Autoswap, (autoswap) => autoswap.claim(draft)),
-        ),
+        Effect.suspend(() => {
+          const draft = decodeAutoswapDraft({
+            sourceMint,
+            targetMint,
+            ...(amountSat === undefined ? {} : { amount: amountSat }),
+          });
+          return Effect.flatMap(Autoswap, (autoswap) => autoswap.claim(draft));
+        }),
       );
 
-    const estimateAutoswapCashu: EstimateAutoswapCashu = (args) =>
+    const estimateAutoswapCashu: EstimateAutoswapCashu = ({
+      sourceMint,
+      targetMint,
+      amountSat,
+    }) =>
       runResult(
-        Effect.flatMap(autoswapDraftOf(args), (draft) =>
-          Effect.flatMap(Autoswap, (autoswap) => autoswap.estimate(draft)),
-        ),
+        Effect.suspend(() => {
+          const draft = decodeAutoswapDraft({
+            sourceMint,
+            targetMint,
+            ...(amountSat === undefined ? {} : { amount: amountSat }),
+          });
+          return Effect.flatMap(Autoswap, (autoswap) =>
+            autoswap.estimate(draft),
+          );
+        }),
       );
 
     const resumePendingCashuAutoswapClaims: ResumePendingCashuAutoswapClaims =
@@ -810,6 +827,7 @@ export const useLinkshuComposition = ({
       resumeDeferredCashuReceives,
       resumePendingCashuAutoswapClaims,
       resumePendingCashuMelts,
+      resolveAutoswapSource,
       resumePendingCashuTopups,
       sendCashuToken,
       startCashuTopup,
@@ -851,6 +869,7 @@ export const useLinkshuComposition = ({
     receiveCashuToken: operations?.receiveCashuToken ?? null,
     restoreCashuTokens: operations?.restoreCashuTokens ?? null,
     reclaimCashuTokens: operations?.reclaimCashuTokens ?? null,
+    resolveAutoswapSource: operations?.resolveAutoswapSource ?? null,
     resumeDeferredCashuReceives:
       operations?.resumeDeferredCashuReceives ?? null,
     resumePendingCashuAutoswapClaims:

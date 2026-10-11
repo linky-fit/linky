@@ -1,13 +1,9 @@
 import { assert, describe, expect, it } from "vitest";
 import {
   Bip39Seed,
-  KeyValueStore,
   linkshuServices,
-  makeInMemoryKeyValueStore,
-  makeInMemoryOperationStore,
   makeInMemoryProofStore,
   NewProof,
-  OperationStore,
   p2pkPubkeyOf,
   parseP2pkPubkey,
   ProofStore,
@@ -16,7 +12,7 @@ import { encodeNpub, encodeNsec } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { Effect, Layer, Schema } from "effect";
 import { normalizeMintUrl } from "../../../utils/mint";
-import { autoswapDraftOf, nostrKeyOptionsOf } from "./useLinkshuComposition";
+import { nostrKeyOptionsOf, storedSourceMint } from "./useLinkshuComposition";
 
 const xOnly = (pubkey: string) => pubkey.slice(2);
 
@@ -37,29 +33,12 @@ describe("nostrKeyOptionsOf", () => {
   });
 });
 
-describe("autoswapDraftOf", () => {
-  const counterKey = (mint: string) =>
-    `linkshu.detCounter.${encodeURIComponent(mint)}.sat.009a1f293253e41e`;
-
-  const walletHolding = (storedMint: string) => {
-    const kv = makeInMemoryKeyValueStore();
-    const proofs = makeInMemoryProofStore();
-    const operations = makeInMemoryOperationStore();
-    const layer = linkshuServices({
-      bip39Seed: Bip39Seed.make(new Uint8Array(64)),
-      keyValueStore: Layer.succeed(KeyValueStore, kv),
-      proofStore: Layer.succeed(ProofStore, proofs),
-      operationStore: Layer.succeed(OperationStore, operations),
-    });
-    const snapshot = Effect.all({
-      keys: kv.listKeys(""),
-      counter: kv.get(counterKey(storedMint)),
-      proofs: proofs.loadAll,
-      operations: operations.loadAll,
-    });
-    Effect.runSync(
-      Effect.andThen(
-        kv.set(counterKey(storedMint), "7"),
+describe("storedSourceMint", () => {
+  it.each(["https://Mint.Example.com", "https://mint.minibits.cash"])(
+    "reads %s back from the app's spelling of the mint",
+    async (storedMint) => {
+      const proofs = makeInMemoryProofStore();
+      Effect.runSync(
         proofs.insert([
           Schema.decodeUnknownSync(NewProof)({
             mint: storedMint,
@@ -73,30 +52,22 @@ describe("autoswapDraftOf", () => {
             operationId: null,
           }),
         ]),
-      ),
-    );
-    return { layer, snapshot };
-  };
+      );
+      const appSpelling = normalizeMintUrl(storedMint);
+      expect(appSpelling).not.toBe(storedMint);
 
-  it.each(["https://Mint.Example.com", "https://mint.minibits.cash"])(
-    "moves %s's funds when the app names the mint by its own spelling",
-    async (storedMint) => {
-      const { layer, snapshot } = walletHolding(storedMint);
-      const before = Effect.runSync(snapshot);
-
-      const draft = await Effect.runPromise(
-        autoswapDraftOf({
-          sourceMint: normalizeMintUrl(storedMint),
-          targetMint: "https://cashu.cz",
-        }).pipe(Effect.provide(layer)),
+      const source = await Effect.runPromise(
+        storedSourceMint(appSpelling).pipe(
+          Effect.provide(
+            linkshuServices({
+              bip39Seed: Bip39Seed.make(new Uint8Array(64)),
+              proofStore: Layer.succeed(ProofStore, proofs),
+            }),
+          ),
+        ),
       );
 
-      expect(normalizeMintUrl(storedMint)).not.toBe(storedMint);
-      expect(draft.sourceMint).toBe(storedMint);
-      expect(draft.targetMint).toBe("https://cashu.cz");
-      // Resolving the source neither moves funds nor re-keys counters.
-      expect(Effect.runSync(snapshot)).toEqual(before);
-      expect(before.counter).toBe("7");
+      expect(source).toBe(storedMint);
     },
   );
 });
