@@ -45,6 +45,7 @@ import {
 import { reportAppLog } from "../../devtools/inspector/appLog";
 import { markAwaitingFirstHydration } from "@linky-fit/linksync/evolu";
 import { markLogoutPending } from "../../platform/logoutWipe";
+import { stopBeaconForIdentityChange } from "../lib/beaconStore";
 import { triggerPasswordManagerSeedSave } from "../../platform/passwordManager";
 import { CASHU_ONBOARDING_SET_MAIN_MINT_STORAGE_KEY } from "../../utils/constants";
 import { getDefaultNip05IdentifierFromAddress } from "../../utils/nostrNip05";
@@ -542,6 +543,7 @@ export const useProfileAuthDomain = ({
       setCashuSeedMnemonic(derivedCashuMnemonic);
 
       navigateTo({ route: "contacts" });
+      stopBeaconForIdentityChange();
       // The next boot creates the Evolu instance from the app mnemonic saved
       // above. Resetting the currently open instance here is both unnecessary
       // and unsafe: Evolu's restore promise stays pending when its DB reset
@@ -1165,6 +1167,7 @@ export const useProfileAuthDomain = ({
             "User logged out; every tab reloads to erase this device's data",
           payload: { evoluConnected },
         });
+        stopBeaconForIdentityChange();
         // Native secret storage lives outside the site data the wipe deletes.
         await clearIdentitySecrets();
         markLogoutPending();

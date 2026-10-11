@@ -256,6 +256,8 @@ final class BeaconEngine: NSObject, CBCentralManagerDelegate, CBPeripheralManage
 
     func stop() {
         running = false
+        contacts = []
+        identity = nil
         UserDefaults.standard.removeObject(forKey: Self.runningDefaultsKey)
         updatePeripheral()
         updateScan()

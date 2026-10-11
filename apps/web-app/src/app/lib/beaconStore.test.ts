@@ -232,3 +232,21 @@ describe("beacon store at launch", () => {
     expect((await launch()).enabled).toBe(true);
   });
 });
+
+describe("beacon store before an identity change", () => {
+  it("stops native even when this page never started it, and starts nothing again", async () => {
+    vi.resetModules();
+    const store = await import("./beaconStore");
+    bridgeCalls.length = 0;
+
+    store.stopBeaconForIdentityChange();
+    store.setBeaconPeers({ supported: true, peers, ownPubkey: carol });
+    store.setBeaconKeyTable([
+      { pubkey: alice, beaconKeyHex: "11".repeat(32), priority: 0, name: "" },
+    ]);
+    store.setBeaconEnabled(true);
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    expect(bridgeCalls).toEqual([["stop"]]);
+  });
+});

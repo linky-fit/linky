@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   persistIdentitySecrets: vi.fn(),
   publishProfile: vi.fn(),
   readClipboardText: vi.fn(),
+  calls: new Array<string>(),
   atomValues: new Map<unknown, unknown>(),
 }));
 
@@ -52,8 +53,18 @@ vi.mock("../../platform/clipboard", () => ({
   readClipboardText: mocks.readClipboardText,
 }));
 
+vi.mock("../lib/beaconStore", () => ({
+  stopBeaconForIdentityChange: () => mocks.calls.push("stopBeacon"),
+}));
+
+vi.mock("../../platform/logoutWipe", () => ({
+  markLogoutPending: () => mocks.calls.push("markLogoutPending"),
+}));
+
 vi.mock("../../platform/identitySecrets", () => ({
-  clearIdentitySecrets: vi.fn(),
+  clearIdentitySecrets: async () => {
+    mocks.calls.push("clearIdentitySecrets");
+  },
   persistIdentitySecrets: mocks.persistIdentitySecrets,
   readStoredCashuMnemonic: async () => "cashu mnemonic",
   readStoredSlip39Seed: async () => "slip39 seed",
@@ -84,12 +95,57 @@ const deferredCheck = () => {
   return resolve;
 };
 
-describe("switching to a custom identity", () => {
-  let unmount: (() => Promise<void>) | undefined;
-  afterEach(async () => {
-    await unmount?.();
-  });
+let unmount: (() => Promise<void>) | undefined;
+afterEach(async () => {
+  await unmount?.();
+  vi.unstubAllGlobals();
+});
 
+const setup = async () => {
+  const domain: { current: AuthDomain | null } = { current: null };
+  const Probe = () => {
+    const value = useProfileAuthDomain({
+      currentNsec,
+      identityRepository: null,
+      inboxCursors: null,
+      lang: "en",
+      pushToast: vi.fn(),
+      t: (key) => key,
+    });
+    useEffect(() => {
+      domain.current = value;
+    }, [value]);
+    return null;
+  };
+  ({ unmount } = await renderIntoDocument(
+    <RegistryContext.Provider value={AtomRegistry.make()}>
+      <Probe />
+    </RegistryContext.Provider>,
+  ));
+  return domain;
+};
+
+describe("logging out", () => {
+  it("stops the beacon before anything else, so the signed-out app never advertises", async () => {
+    mocks.calls.length = 0;
+    vi.stubGlobal("location", { reload: () => mocks.calls.push("reload") });
+    const domain = await setup();
+    const confirm = () =>
+      act(async () => domain.current?.requestLogout({ evoluConnected: true }));
+
+    await confirm();
+    expect(mocks.calls).toEqual([]);
+    await confirm();
+    expect(mocks.calls).toEqual([
+      "stopBeacon",
+      "clearIdentitySecrets",
+      "markLogoutPending",
+      "reload",
+    ]);
+  });
+});
+
+describe("switching to a custom identity", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // The seed derives the current identity, so no derived switch starts.
@@ -102,30 +158,6 @@ describe("switching to a custom identity", () => {
     );
     mocks.atomValues.set(messagesCommandsAtom, AsyncResult.initial());
   });
-
-  const setup = async () => {
-    const domain: { current: AuthDomain | null } = { current: null };
-    const Probe = () => {
-      const value = useProfileAuthDomain({
-        currentNsec,
-        identityRepository: null,
-        inboxCursors: null,
-        lang: "en",
-        pushToast: vi.fn(),
-        t: (key) => key,
-      });
-      useEffect(() => {
-        domain.current = value;
-      }, [value]);
-      return null;
-    };
-    ({ unmount } = await renderIntoDocument(
-      <RegistryContext.Provider value={AtomRegistry.make()}>
-        <Probe />
-      </RegistryContext.Provider>,
-    ));
-    return domain;
-  };
 
   it("shows the check while it runs and leaves the identity alone when cancelled", async () => {
     const resolveCheck = deferredCheck();
