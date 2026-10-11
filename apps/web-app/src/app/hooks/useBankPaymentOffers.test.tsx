@@ -47,6 +47,7 @@ vi.mock("@linky-fit/linkstr-react", async (importOriginal) => ({
 import { AtomRegistry, RegistryContext } from "@linky-fit/linkstr-react";
 import { mergeBankPaymentOffersIntoChatMessages } from "../lib/bankPaymentOfferRows";
 import { contactsAtom } from "../state/contacts/readModel";
+import { bankPaymentOfferMessagesAtom } from "../state/messages/bankOffers";
 import { sessionAtom } from "../state/session/session";
 import { signedInSession } from "../../testUtils/appRegistry";
 import { useBankPaymentOffers } from "./useBankPaymentOffers";
@@ -189,7 +190,10 @@ const setup = async ({
   unmounts.push(mounted.unmount);
   return () => {
     if (!value) throw new Error("hook did not render");
-    return value;
+    return {
+      ...value,
+      bankPaymentOfferMessages: registry.get(bankPaymentOfferMessagesAtom),
+    };
   };
 };
 
@@ -661,6 +665,56 @@ describe("useBankPaymentOffers", () => {
     // The first try, the retry on the echo, and the timer's retry.
     expect(detailsTo.length).toBeGreaterThanOrEqual(3);
     expect(new Set(detailsTo)).toEqual(new Set([recipient.pubkey]));
+  });
+
+  it("follows an offer update during a responder pass right after it, without the retry timer", async () => {
+    await rememberBankPaymentOfferSpdPayload({
+      offerId: BankOfferId.make("offer-1"),
+      ownerPubkey: owner.pubkey,
+      spdPayload: SPD,
+    });
+    let failFirstDetails = () => {};
+    sendBankOfferMock.mockImplementation(async (draft) => {
+      if (
+        draft.status !== "bank_details_sent" ||
+        sendBankOfferMock.mock.calls.length > 1
+      ) {
+        return Exit.succeed(receipt(draft));
+      }
+      return new Promise((resolve) => {
+        failFirstDetails = () => resolve(Exit.fail(new Error("relay timeout")));
+      });
+    });
+    const current = await setup();
+    await act(async () => {
+      current().applyBankPaymentOfferSnapshot(snapshot("offered"));
+      current().applyBankPaymentOfferSnapshot(
+        snapshot("offered", second.pubkey),
+      );
+      current().applyBankPaymentOfferSnapshot(snapshot("accepted"));
+    });
+    await settle();
+    await act(async () => {
+      current().applyBankPaymentOfferSnapshot(
+        snapshot("accepted", second.pubkey, NOW + 1),
+      );
+    });
+    await settle();
+    // The update waits for the pass holding the offer's lock.
+    expect(sendBankOfferMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => failFirstDetails());
+    await settle();
+    expect(
+      sendBankOfferMock.mock.calls.map(([draft]) => [draft.status, draft.to]),
+    ).toEqual([
+      ["bank_details_sent", recipient.pubkey],
+      ["bank_details_sent", recipient.pubkey],
+      ["accepted_by_other", second.pubkey],
+    ]);
+    await act(async () => vi.advanceTimersByTimeAsync(30_000));
+    await settle();
+    expect(sendBankOfferMock).toHaveBeenCalledTimes(3);
   });
 
   it("sends no bank details without this device's record of the offer", async () => {

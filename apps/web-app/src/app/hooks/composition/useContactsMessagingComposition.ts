@@ -62,6 +62,7 @@ import {
   contactNewPrefillAtom,
   recentlyAddedContactIdAtom,
 } from "../../state/contacts/contactForm";
+import { bankPaymentOfferMessagesAtom } from "../../state/messages/bankOffers";
 import { chatDraftAtom } from "../../state/messages/chat";
 import { messagesVisibleSinceSecAtom } from "../../state/messages/readModel";
 import { currentPubkeyAtom } from "../../state/session/session";
@@ -411,7 +412,6 @@ export const useContactsMessagingComposition = ({
   const {
     activeBankPaymentOfferContacts,
     applyBankPaymentOfferSnapshot,
-    bankPaymentOfferMessages,
     bankPaymentOfferRecipientCount,
     bankPaymentOfferStaggerDelaySec,
     getBankPaymentOfferForSettlement,
@@ -424,6 +424,7 @@ export const useContactsMessagingComposition = ({
     setStatus,
     t,
   });
+  const bankPaymentOfferMessages = useAtomValue(bankPaymentOfferMessagesAtom);
   const chatMessagesWithBankPaymentOffers = React.useMemo(
     () => withChatOffers(route, chatMessages, bankPaymentOfferMessages),
     [bankPaymentOfferMessages, chatMessages, route],
