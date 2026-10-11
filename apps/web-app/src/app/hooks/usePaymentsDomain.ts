@@ -1,9 +1,7 @@
 import { reportAppLog } from "../../devtools/inspector/appLog";
 import { decodeNpub, encodeNpub } from "@linky-fit/linkstr";
 import { useLatest } from "../../hooks/useLatest";
-import { Option } from "effect";
 import React from "react";
-import type { RunExclusiveTask } from "../state/wallet/opQueue";
 import type {
   ContactIdentityRowLike,
   LocalPendingPayment,
@@ -36,16 +34,8 @@ interface UsePaymentsDomainParams<TContact extends ContactIdentityRowLike> {
   pendingPaymentsKey: string | null;
   updateLocalNostrMessage: UpdateLocalNostrMessage;
   pushToast: (message: string) => void;
-  runExclusive: RunExclusiveTask;
   t: Translate;
 }
-
-const WALLET_BUSY: CashuMessagePaymentHookResult = {
-  error: "wallet busy",
-  ok: false,
-  queued: false,
-  retryable: true,
-};
 
 const paymentLinks = (pending: LocalPendingPayment) => ({
   payment: pending.id,
@@ -68,7 +58,6 @@ export const usePaymentsDomain = <TContact extends ContactIdentityRowLike>({
   pendingPaymentsKey,
   updateLocalNostrMessage,
   pushToast,
-  runExclusive,
   t,
 }: UsePaymentsDomainParams<TContact>) => {
   const contactsLatestRef = useLatest(contacts);
@@ -115,20 +104,13 @@ export const usePaymentsDomain = <TContact extends ContactIdentityRowLike>({
 
       let result: CashuMessagePaymentHookResult;
       try {
-        const paid = await runExclusive(() =>
-          payContactWithCashuMessage({
-            contact: { ...contact, npub: encodeNpub(approvedPubkey) },
-            amountSat: pending.amountSat,
-            isPaymentAuthorized,
-            fromQueue: true,
-            ...(pending.messageId
-              ? { pendingMessageId: pending.messageId }
-              : {}),
-          }),
-        );
-        // Claimed from storage already; another wallet operation won the
-        // queue, so it goes back for the next flush.
-        result = Option.getOrElse(paid, () => WALLET_BUSY);
+        result = await payContactWithCashuMessage({
+          contact: { ...contact, npub: encodeNpub(approvedPubkey) },
+          amountSat: pending.amountSat,
+          isPaymentAuthorized,
+          fromQueue: true,
+          ...(pending.messageId ? { pendingMessageId: pending.messageId } : {}),
+        });
       } catch (error) {
         result = {
           error: getUnknownErrorMessage(error, "unknown"),
@@ -151,13 +133,7 @@ export const usePaymentsDomain = <TContact extends ContactIdentityRowLike>({
       });
       cancelPendingPayment(pending, `${t("payFailed")}: ${error}`);
     },
-    [
-      cancelPendingPayment,
-      contactsLatestRef,
-      payContactWithCashuMessage,
-      runExclusive,
-      t,
-    ],
+    [cancelPendingPayment, contactsLatestRef, payContactWithCashuMessage, t],
   );
 
   const flushPendingPayments = React.useCallback(async () => {
