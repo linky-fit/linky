@@ -19,11 +19,7 @@ import {
   type SendReceipt,
   type WalletBalances,
 } from "@linky-fit/linkshu";
-import {
-  decodeNpub,
-  type PaymentNoticeContext,
-  type Pubkey,
-} from "@linky-fit/linkstr";
+import { decodeNpub, type PaymentNoticeContext } from "@linky-fit/linkstr";
 import { Option, Result } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
@@ -45,15 +41,13 @@ import { isSpellingOf } from "../../lib/mintSpelling";
 import type { CashuPaymentRequestMessageInfo } from "../../lib/paymentRequestMessage";
 import { visibleWalletBalances } from "../../lib/testMintGate";
 import type {
-  AppendLocalNostrMessage,
   ContactPayRowLike,
   ContactRowLike,
-  LocalNostrMessage,
   PaymentTelemetryMethod,
   PaymentTelemetryPaymentType,
-  UpdateLocalNostrMessage,
 } from "../../types/appTypes";
 import { linkshuCommandsAtom, type LinkshuCommands } from "../linkshu/commands";
+import { chatWritesAtom, type ChatWrites } from "../messages/chatWrites";
 import {
   linkstrCommands,
   type LinkstrCommands,
@@ -132,19 +126,6 @@ export interface ContactPayment {
   readonly offlineNotice: string;
 }
 
-/** The chat's local message writes, owned by the messaging hooks. */
-export interface ChatWrites {
-  readonly appendLocalNostrMessage: AppendLocalNostrMessage;
-  readonly updateLocalNostrMessage: UpdateLocalNostrMessage;
-  readonly nostrMessagesLocal: readonly LocalNostrMessage[];
-  readonly enqueuePendingPayment: (payload: {
-    amountSat: number;
-    contactId: ContactId;
-    recipientPubkey: Pubkey;
-    messageId?: string;
-  }) => void;
-}
-
 export type PayContactOutcome =
   | {
       readonly _tag: "Sent";
@@ -211,7 +192,6 @@ export interface PaymentsCommands {
   ) => Promise<PayLightningAddressOutcome>;
   readonly payContact: (
     payment: ContactPayment,
-    chat: ChatWrites,
     options?: SendingOptions,
   ) => Promise<PayContactOutcome>;
   /** NUT-18 POST transport; plain http only in development builds. */
@@ -224,6 +204,13 @@ export interface PaymentsDeps {
   /** Accepts plain-http payment request POST targets (development builds). */
   readonly allowHttpPost: boolean;
   readonly allowTestMints: boolean;
+  readonly chat: Pick<
+    ChatWrites,
+    | "appendLocalNostrMessage"
+    | "enqueuePendingPayment"
+    | "latestMessages"
+    | "updateLocalNostrMessage"
+  >;
   readonly defaultMint: string | null;
   readonly currentNpub: string | null;
   readonly currentNsec: string | null;
@@ -649,9 +636,9 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
 
   const payContactNow = async (
     payment: ContactPayment,
-    chat: ChatWrites,
     options: SendingOptions | undefined,
   ): Promise<PayContactOutcome> => {
+    const { chat } = deps;
     const {
       amountSat,
       contact,
@@ -825,7 +812,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
         currentNpub,
         enqueueOutbox: deps.linkstr.enqueueOutbox,
         logPayStep,
-        nostrMessagesLocal: chat.nostrMessagesLocal,
+        nostrMessagesLocal: chat.latestMessages(),
         ...(paymentNoticeContext ? { paymentNoticeContext } : {}),
         ...(paymentNoticeOfferId ? { paymentNoticeOfferId } : {}),
         pendingMessageId: pendingMessageId?.trim() || null,
@@ -884,11 +871,10 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
 
   const payContact: PaymentsCommands["payContact"] = async (
     payment,
-    chat,
     options,
   ) => {
     const paid = await ops.runExclusiveTask(() =>
-      payContactNow(payment, chat, options),
+      payContactNow(payment, options),
     );
     return Option.getOrElse(paid, () => BUSY);
   };
@@ -1055,13 +1041,15 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
 export const paymentsCommandsAtom = Atom.readable((get) =>
   AsyncResult.map(
     AsyncResult.all({
+      chat: get(chatWritesAtom),
       linkshu: get(linkshuCommandsAtom),
       paymentLog: get(paymentLogAtom),
     }),
-    ({ linkshu, paymentLog }) =>
+    ({ chat, linkshu, paymentLog }) =>
       makePaymentsCommands({
         allowHttpPost: get(platformAtom).config.isDev,
         allowTestMints: get(allowTestMintsAtom),
+        chat,
         currentNpub: get(currentNpubAtom),
         currentNsec: get(currentNsecAtom),
         defaultMint: get(defaultMintAtom),

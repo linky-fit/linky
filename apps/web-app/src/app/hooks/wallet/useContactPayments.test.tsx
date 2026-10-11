@@ -46,7 +46,7 @@ const receipt = new SendReceipt({
 
 const commandsPaying = (outcome: PayContactOutcome) => {
   const payContact = vi.fn<PaymentsCommands["payContact"]>(
-    async (_payment, _chat, options) => {
+    async (_payment, options) => {
       options?.onSending?.();
       return outcome;
     },
@@ -78,12 +78,6 @@ const render = async () => {
     const payments = useContactPayments({
       ...ui,
       cashuBalance: 1_000,
-      chat: {
-        appendLocalNostrMessage: () => ({ id: "m", written: NO_WRITE }),
-        updateLocalNostrMessage: () => NO_WRITE,
-        nostrMessagesLocal: [],
-        enqueuePendingPayment: () => {},
-      },
       contactPayMethod: "cashu",
       contacts: [contact],
       currentNpub: "npub1me",
@@ -102,6 +96,7 @@ const render = async () => {
       selectedContact: null,
       setLnAddressPay: () => {},
       t: (key) => key,
+      updateLocalNostrMessage: () => NO_WRITE,
       walletOpRunning: false,
     });
     useEffect(() => {

@@ -16,7 +16,6 @@ import { AtomRegistry, RegistryContext } from "@linky-fit/linkstr-react";
 import { act, useEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
-import { NO_WRITE } from "../../lib/storeWrite";
 import type {
   RecoverTokensOutcome,
   TokensCommands,
@@ -78,10 +77,6 @@ const render = async () => {
     ReturnType<typeof useTokenRecovery> &
     ReturnType<typeof useTokenContactSend>;
   const hook: { current: Hooks | null } = { current: null };
-  const chat = {
-    appendLocalNostrMessage: () => ({ id: "m", written: NO_WRITE }),
-    updateLocalNostrMessage: () => NO_WRITE,
-  };
   const Probe = () => {
     const tokens = {
       ...useWalletTokens(),
@@ -95,7 +90,7 @@ const render = async () => {
         rememberSeenMint: () => {},
         walletMints: ["https://mint-a.example"],
       }),
-      ...useTokenContactSend({ chat, walletTransfers: [] }),
+      ...useTokenContactSend({ walletTransfers: [] }),
     };
     useEffect(() => {
       hook.current = tokens;

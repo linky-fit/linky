@@ -43,7 +43,6 @@ import { makeWalletOps } from "./opQueue";
 import {
   makePaymentsCommands,
   paymentResultOf,
-  type ChatWrites,
   type ContactPayment,
   type PaymentsDeps,
 } from "./payments";
@@ -144,13 +143,28 @@ const delivered = (wrapIdHex: string) =>
     rejectedBy: [],
   });
 
+const chatWrites = (
+  overrides: Partial<PaymentsDeps["chat"]> = {},
+): PaymentsDeps["chat"] => ({
+  appendLocalNostrMessage: vi.fn(() => ({
+    id: "local-message",
+    written: NO_WRITE,
+  })),
+  updateLocalNostrMessage: vi.fn(() => NO_WRITE),
+  latestMessages: () => [],
+  enqueuePendingPayment: vi.fn(),
+  ...overrides,
+});
+
 const setup = ({
   balances = { [MINT_URL]: 1_000 },
+  chat = chatWrites(),
   online = true,
   lifecycle = transferLifecycle(),
   ...overrides
 }: {
   balances?: Record<string, number>;
+  chat?: PaymentsDeps["chat"];
   online?: boolean;
   lifecycle?: CashuTransferLifecycle;
 } & Partial<
@@ -197,6 +211,7 @@ const setup = ({
   const commands = makePaymentsCommands({
     allowHttpPost: false,
     allowTestMints: true,
+    chat,
     defaultMint: MINT_URL,
     currentNpub,
     currentNsec: "nsec-test",
@@ -208,17 +223,6 @@ const setup = ({
   });
   return { commands, linkshu, linkstr, logPaymentEvent, ops };
 };
-
-const chatWrites = (overrides: Partial<ChatWrites> = {}): ChatWrites => ({
-  appendLocalNostrMessage: vi.fn(() => ({
-    id: "local-message",
-    written: NO_WRITE,
-  })),
-  updateLocalNostrMessage: vi.fn(() => NO_WRITE),
-  nostrMessagesLocal: [],
-  enqueuePendingPayment: vi.fn(),
-  ...overrides,
-});
 
 const alicePayment = (
   overrides: Partial<ContactPayment> = {},
@@ -590,7 +594,6 @@ describe("payContact", () => {
 
     const outcome = await harness.commands.payContact(
       alicePayment({ memo: " lunch " }),
-      chatWrites(),
       { onSending },
     );
 
@@ -630,16 +633,12 @@ describe("payContact", () => {
         paymentNoticeContext: "bank_payment_offer",
         paymentNoticeOfferId: "offer-1",
       }),
-      chatWrites(),
     );
     expect(logPaymentEvent).toHaveBeenLastCalledWith(
       expect.objectContaining({ paymentType: "proxy", status: "ok" }),
     );
 
-    await commands.payContact(
-      alicePayment({ paymentRequestId: "request-1" }),
-      chatWrites(),
-    );
+    await commands.payContact(alicePayment({ paymentRequestId: "request-1" }));
     expect(logPaymentEvent).toHaveBeenLastCalledWith(
       expect.objectContaining({ paymentType: "request", status: "ok" }),
     );
@@ -651,7 +650,7 @@ describe("payContact", () => {
       Exit.fail(new LinkstrNotConfigured()),
     );
 
-    const outcome = await commands.payContact(alicePayment(), chatWrites());
+    const outcome = await commands.payContact(alicePayment());
 
     expect(outcome).toMatchObject({
       _tag: "Sent",
@@ -667,7 +666,6 @@ describe("payContact", () => {
 
     const outcome = await commands.payContact(
       alicePayment({ isPaymentAuthorized: () => false }),
-      chatWrites(),
     );
 
     expect(outcome).toEqual({ _tag: "AuthorizationChanged" });
@@ -691,7 +689,6 @@ describe("payContact", () => {
     expect(
       await commands.payContact(
         alicePayment({ isPaymentAuthorized: () => approved }),
-        chatWrites(),
       ),
     ).toEqual({ _tag: "AuthorizationChanged" });
     expect(linkshu.cashuTransferLifecycle.returnToWallet).toHaveBeenCalledWith(
@@ -720,7 +717,6 @@ describe("payContact", () => {
 
     await commands.payContact(
       alicePayment({ isPaymentAuthorized: () => approved }),
-      chatWrites(),
     );
 
     expect(linkshu.cashuTransferLifecycle.forget).not.toHaveBeenCalled();
@@ -738,9 +734,9 @@ describe("payContact", () => {
         written: stored,
       })),
     });
-    const { commands, linkshu } = setup({ online: false });
+    const { commands, linkshu } = setup({ chat, online: false });
 
-    const paying = commands.payContact(alicePayment(), chat);
+    const paying = commands.payContact(alicePayment());
     await Promise.resolve();
     expect(chat.enqueuePendingPayment).not.toHaveBeenCalled();
     store({ ok: true });
@@ -770,9 +766,12 @@ describe("payContact", () => {
           written: Promise.resolve({ ok: false, error: "storage unavailable" }),
         }),
       });
-      const { commands, linkshu, linkstr } = setup({ online: !offline });
+      const { commands, linkshu, linkstr } = setup({
+        chat,
+        online: !offline,
+      });
 
-      const outcome = await commands.payContact(alicePayment(), chat);
+      const outcome = await commands.payContact(alicePayment());
 
       expect(paymentResultOf(outcome)).toMatchObject({
         ok: false,
@@ -790,7 +789,7 @@ describe("payContact", () => {
       sendCashuToken: async () => Result.fail(insufficientFunds(600, 10)),
     });
 
-    const outcome = await commands.payContact(alicePayment(), chatWrites());
+    const outcome = await commands.payContact(alicePayment());
 
     expect(outcome).toEqual({
       _tag: "Failed",
@@ -807,18 +806,12 @@ describe("payContact", () => {
 
   it("keeps a payment no mint covers, a missing identity or a busy wallet retryable", async () => {
     const short = setup({ balances: { [MINT_URL]: 100 } });
-    const insufficient = await short.commands.payContact(
-      alicePayment(),
-      chatWrites(),
-    );
+    const insufficient = await short.commands.payContact(alicePayment());
     expect(insufficient).toEqual({ _tag: "Insufficient" });
 
     const busy = setup();
     const release = holdWallet(busy.ops);
-    const dropped = await busy.commands.payContact(
-      alicePayment(),
-      chatWrites(),
-    );
+    const dropped = await busy.commands.payContact(alicePayment());
     await release();
     expect(dropped).toEqual({ _tag: "Busy" });
 
@@ -831,13 +824,11 @@ describe("payContact", () => {
     expect(
       await commands.payContact(
         alicePayment({ contact: { id: CONTACT_ID, npub: "" } }),
-        chatWrites(),
       ),
     ).toEqual({ _tag: "MissingContactNpub" });
     expect(
       await commands.payContact(
         alicePayment({ contact: { id: "", npub: contactNpub } }),
-        chatWrites(),
       ),
     ).toEqual({ _tag: "InvalidContact" });
   });

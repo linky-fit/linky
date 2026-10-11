@@ -4,14 +4,12 @@ import {
   type Pubkey,
   type RumorId,
 } from "@linky-fit/linkstr";
-import { enqueueStoredPendingPayment } from "../lib/pendingPayments";
 import {
   ContactId,
   createId,
   directConversationIdFor,
   MessageId,
   NonEmptyString1000,
-  nostrMessageIdFor,
   nostrReactionIdFor,
   ReactionId,
   RowNotFound,
@@ -21,14 +19,12 @@ import {
   type UnknownSendersRepository,
 } from "@linky-fit/linksync";
 import { useLiveValue, useRepositoryRows } from "@linky-fit/linksync/react";
+import { useAtomSuspense } from "@linky-fit/linkstr-react";
 import { Effect, Schema } from "effect";
 import React from "react";
 import { useLatest } from "../../hooks/useLatest";
 import type { Route } from "../../types/route";
-import {
-  LOCAL_NOSTR_MESSAGES_STORAGE_KEY_PREFIX,
-  LOCAL_PENDING_PAYMENTS_STORAGE_KEY_PREFIX,
-} from "../../utils/constants";
+import { LOCAL_NOSTR_MESSAGES_STORAGE_KEY_PREFIX } from "../../utils/constants";
 import { reportAppLog } from "../../devtools/inspector/appLog";
 import { UnknownRecord } from "../../utils/schema";
 import {
@@ -39,23 +35,18 @@ import {
   safeLocalStorageSet,
 } from "../../utils/storage";
 import { makeLocalId, trimString } from "../../utils/validation";
-import { nowSeconds } from "../../utils/time";
 import { isIdentityChangeMessageContent } from "../lib/identityChangeMessage";
+import { allWrites, NO_WRITE, type WriteOutcome } from "../lib/storeWrite";
 import {
-  allWrites,
-  NO_WRITE,
-  runWrite,
-  type WriteOutcome,
-} from "../lib/storeWrite";
+  chatWritesAtom,
+  pendingPaymentsKeyFor,
+} from "../state/messages/chatWrites";
 import { useUnknownSenderOverlayMigration } from "../migrations/useUnknownSenderOverlayMigration";
 import type {
   AppendedRow,
-  AppendLocalNostrMessage,
   AppendLocalNostrReaction,
   LocalNostrMessage,
   LocalNostrReaction,
-  NewLocalNostrMessage,
-  UpdateLocalNostrMessage,
   UpdateLocalNostrReaction,
 } from "../types/appTypes";
 import {
@@ -71,20 +62,13 @@ import {
 } from "./messages/messageHelpers";
 import {
   contactIdByConversationId,
-  localMessageFrom,
   normalizeLegacyLocalMessage,
   toLocalNostrMessage,
   toLocalNostrReaction,
-  toMessagePatch,
-  toMessageWriteRow,
   toReactionPatch,
   toReactionWriteRow,
-  toUnknownSenderWriteRow,
 } from "./messages/messageRows";
-import {
-  buildMessageUpdate,
-  buildReactionUpdate,
-} from "./messages/messageUpdates";
+import { buildReactionUpdate } from "./messages/messageUpdates";
 import { reactionKey, storedReactionKey } from "./messages/reactionInbox";
 import { useConversationRows } from "./useLinksync";
 
@@ -149,17 +133,6 @@ const NO_ROWS: ReadonlyArray<never> = [];
 
 const NOT_APPENDED: AppendedRow = { id: "", written: NO_WRITE };
 
-interface StoredMessage {
-  readonly message: LocalNostrMessage;
-  readonly written: Promise<WriteOutcome>;
-}
-
-/** The id every device gives a message from Nostr; null for a send that has no rumor yet. */
-const nostrMessageIdOf = (message: NewLocalNostrMessage): MessageId | null => {
-  const rumorId = trimString(message.rumorId);
-  return isRumorId(rumorId) ? nostrMessageIdFor(rumorId) : null;
-};
-
 export const useMessagesDomain = ({
   appOwnerId,
   chatForceScrollToBottomRef,
@@ -219,23 +192,8 @@ export const useMessagesDomain = ({
     [contacts, conversationRows],
   );
 
-  // Writes run one after another: an update issued right after an insert
-  // (the send flow stamps the rumor id on its pending row) must find the row.
-  const writeQueueRef = React.useRef(Promise.resolve());
-  const write = React.useCallback(
-    (
-      what: string,
-      effect: Effect.Effect<void, unknown>,
-    ): Promise<WriteOutcome> => {
-      const outcome = writeQueueRef.current.then(() => runWrite(effect));
-      writeQueueRef.current = outcome.then((settled) => {
-        if (settled.ok) return;
-        console.warn(`[linky][messages] ${what} write failed`, settled);
-      });
-      return outcome;
-    },
-    [],
-  );
+  const chatWrites = useAtomSuspense(chatWritesAtom).value;
+  const write = chatWrites.queueWrite;
 
   const normalizedReactionRows = React.useMemo(() => {
     const keyOf = (row: ReactionRow): string | null =>
@@ -317,91 +275,16 @@ export const useMessagesDomain = ({
     return parsed;
   }, [normalizedReactionRows]);
 
-  const nostrMessagesLatestRef = React.useRef<LocalNostrMessage[]>([]);
   const knownReactionKeysRef = React.useRef<Set<string>>(new Set());
   const nostrReactionsLatestRef = useLatest(nostrReactionsLocal);
 
   React.useEffect(() => {
-    nostrMessagesLatestRef.current = nostrMessagesLocal;
-  }, [nostrMessagesLocal]);
+    chatWrites.syncLatestMessages(nostrMessagesLocal);
+  }, [chatWrites, nostrMessagesLocal]);
 
   React.useEffect(() => {
     knownReactionKeysRef.current = new Set(normalizedReactionRows.seenKeys);
   }, [normalizedReactionRows]);
-
-  /** Stores a message for a saved contact; null when the payload is not storable. */
-  const insertNostrMessage = React.useCallback(
-    (
-      message: NewLocalNostrMessage,
-      id: MessageId,
-      wrapId: string,
-    ): StoredMessage | null => {
-      const contactId = parseContactId(trimString(message.contactId));
-      if (!contactId) return null;
-      const row = toMessageWriteRow(
-        id,
-        directConversationIdFor(contactId),
-        message,
-        wrapId,
-      );
-      if (!row) return null;
-      return {
-        message: localMessageFrom(message, id, wrapId),
-        written: write(
-          "message",
-          Effect.flatMap(conversations.ensureDirect(contactId), () =>
-            conversations.messages.insertIfAbsent(row),
-          ),
-        ),
-      };
-    },
-    [conversations, write],
-  );
-
-  /** Stores a message in a conversation with an unknown sender; null when the payload is not storable. */
-  const insertUnknownSenderMessage = React.useCallback(
-    (
-      message: NewLocalNostrMessage,
-      id: MessageId,
-      wrapId: string,
-    ): StoredMessage | null => {
-      const peerPubkey = readUnknownContactIdPubkey(message.contactId);
-      if (!peerPubkey) return null;
-      const row = toUnknownSenderWriteRow(id, peerPubkey, message, wrapId);
-      if (!row) return null;
-      const written = write(
-        "unknown sender message",
-        Effect.flatMap(unknownSenders.insertIfAbsent(row), (stored) =>
-          Effect.sync(() => {
-            if (!stored) return;
-            reportAppLog({
-              tag: "unknownSenders.messageStored",
-              summary: `Stored ${row.direction === "in" ? "a message from" : "a message to"} an unknown sender`,
-              links: {
-                message: id,
-                pubkey: peerPubkey,
-                ...(row.rumorId ? { rumor: row.rumorId } : {}),
-              },
-              payload: { direction: row.direction, status: row.status ?? null },
-            });
-          }),
-        ),
-      );
-      return { message: localMessageFrom(message, id, wrapId), written };
-    },
-    [unknownSenders, write],
-  );
-
-  const storeMessage = React.useCallback(
-    (message: NewLocalNostrMessage): StoredMessage | null => {
-      const id = nostrMessageIdOf(message) ?? createId<"Message">();
-      const wrapId = trimString(message.wrapId) || `pending:${makeLocalId()}`;
-      return isUnknownContactId(message.contactId)
-        ? insertUnknownSenderMessage(message, id, wrapId)
-        : insertNostrMessage(message, id, wrapId);
-    },
-    [insertNostrMessage, insertUnknownSenderMessage],
-  );
 
   const removeNostrMessage = React.useCallback(
     (message: LocalNostrMessage) => {
@@ -466,7 +349,7 @@ export const useMessagesDomain = ({
           if (clientKey && seenClientKeys.has(clientKey)) continue;
           if (rumorKey && seenRumorKeys.has(rumorKey)) continue;
           if (
-            !storeMessage({
+            !chatWrites.storeMessage({
               ...legacyMessage,
               status: toMessageStatus(legacyMessage.status),
             })
@@ -480,7 +363,7 @@ export const useMessagesDomain = ({
       }
       safeLocalStorageRemove(storageKey);
     }
-  }, [hydrated, loadedMessageRows, nostrMessagesLocal, storeMessage]);
+  }, [chatWrites, hydrated, loadedMessageRows, nostrMessagesLocal]);
 
   const scrollActiveChatToBottom = React.useCallback(
     (contactId: string) => {
@@ -498,68 +381,13 @@ export const useMessagesDomain = ({
     [activeChatRouteId, chatForceScrollToBottomRef, chatMessagesRef],
   );
 
-  const appendLocalNostrMessage = React.useCallback<AppendLocalNostrMessage>(
-    (message) => {
-      const contactId = trimString(message.contactId);
-      const direction = trimString(message.direction);
-      const content = toText(message.content);
-      if (!contactId || !direction || !content.trim()) return NOT_APPENDED;
-      const wrapId = trimString(message.wrapId);
-      const clientKey = getLocalNostrMessageClientKey(message);
-      const rumorId = trimString(message.rumorId);
-
-      const existing = nostrMessagesLatestRef.current.find((current) => {
-        if (clientKey && getLocalNostrMessageClientKey(current) === clientKey)
-          return true;
-        if (wrapId && trimString(current.wrapId) === wrapId) return true;
-        if (rumorId && trimString(current.rumorId) === rumorId) return true;
-        return (
-          trimString(current.contactId) === contactId &&
-          trimString(current.direction) === direction &&
-          toText(current.content) === content &&
-          current.createdAtSec === message.createdAtSec
-        );
-      });
-      if (existing) return { id: trimString(existing.id), written: NO_WRITE };
-
-      const stored = storeMessage(message);
-      if (!stored) return NOT_APPENDED;
-      // Messages arriving in one burst read the ref before React re-renders.
-      nostrMessagesLatestRef.current = dedupeNostrMessagesByPriority([
-        ...nostrMessagesLatestRef.current,
-        stored.message,
-      ]);
-      scrollActiveChatToBottom(contactId);
-      return { id: stored.message.id, written: stored.written };
-    },
-    [scrollActiveChatToBottom, storeMessage],
-  );
-
-  const updateLocalNostrMessage = React.useCallback<UpdateLocalNostrMessage>(
-    (id, updates) => {
-      const messageId = parseMessageId(trimString(id));
-      if (!messageId) return NO_WRITE;
-      return write(
-        "message update",
-        Effect.gen(function* () {
-          const unknownSenderRow = yield* unknownSenders.byId(messageId);
-          const repository =
-            unknownSenderRow === null ? conversations.messages : unknownSenders;
-          const current =
-            unknownSenderRow ?? (yield* conversations.messages.byId(messageId));
-          if (current === null)
-            return yield* new RowNotFound({
-              scope: "messages",
-              table: "message",
-              id: messageId,
-            });
-          const payload = buildMessageUpdate(messageId, updates, current);
-          if (payload === null) return;
-          yield* repository.update(messageId, toMessagePatch(payload));
-        }),
-      );
-    },
-    [conversations, unknownSenders, write],
+  const scrollActiveChatToBottomRef = useLatest(scrollActiveChatToBottom);
+  React.useEffect(
+    () =>
+      chatWrites.onMessageAppended((contactId) =>
+        scrollActiveChatToBottomRef.current(contactId),
+      ),
+    [chatWrites, scrollActiveChatToBottomRef],
   );
 
   const appendLocalNostrReaction = React.useCallback<AppendLocalNostrReaction>(
@@ -584,9 +412,9 @@ export const useMessagesDomain = ({
       if (existing) return { id: trimString(existing.id), written: NO_WRITE };
 
       // A reaction belongs to the conversation of the message it targets.
-      const target = nostrMessagesLatestRef.current.find(
-        (message) => trimString(message.rumorId) === messageId,
-      );
+      const target = chatWrites
+        .latestMessages()
+        .find((message) => trimString(message.rumorId) === messageId);
       const contactId = target ? parseContactId(target.contactId) : null;
       if (!contactId) return NOT_APPENDED;
       const id =
@@ -610,7 +438,7 @@ export const useMessagesDomain = ({
         ),
       };
     },
-    [conversations, nostrReactionsLatestRef, write],
+    [chatWrites, conversations, nostrReactionsLatestRef, write],
   );
 
   const updateLocalNostrReaction = React.useCallback<UpdateLocalNostrReaction>(
@@ -859,34 +687,7 @@ export const useMessagesDomain = ({
     };
   }, []);
 
-  const pendingPaymentsKey = appOwnerId
-    ? `${LOCAL_PENDING_PAYMENTS_STORAGE_KEY_PREFIX}.${appOwnerId}`
-    : null;
-
-  const enqueuePendingPayment = React.useCallback(
-    (payload: {
-      amountSat: number;
-      recipientPubkey: Pubkey;
-      contactId: ContactId;
-      messageId?: string;
-    }) => {
-      const amountSat =
-        Number.isFinite(payload.amountSat) && payload.amountSat > 0
-          ? Math.trunc(payload.amountSat)
-          : 0;
-      if (!pendingPaymentsKey || amountSat <= 0) return;
-
-      void enqueueStoredPendingPayment(pendingPaymentsKey, {
-        id: makeLocalId(),
-        contactId: toText(payload.contactId),
-        amountSat,
-        recipientPubkey: payload.recipientPubkey,
-        createdAtSec: nowSeconds(),
-        ...(payload.messageId ? { messageId: payload.messageId } : {}),
-      });
-    },
-    [pendingPaymentsKey],
-  );
+  const pendingPaymentsKey = pendingPaymentsKeyFor(appOwnerId);
 
   const chatContactId = activeChatRouteId;
 
@@ -941,12 +742,12 @@ export const useMessagesDomain = ({
   }, [chatContactId, messagesByContactId]);
 
   return {
-    appendLocalNostrMessage,
+    appendLocalNostrMessage: chatWrites.appendLocalNostrMessage,
     appendLocalNostrReaction,
     chatMessages,
-    enqueuePendingPayment,
+    enqueuePendingPayment: chatWrites.enqueuePendingPayment,
     lastMessageByContactId,
-    nostrMessagesLatestRef,
+    latestMessages: chatWrites.latestMessages,
     nostrMessagesLocal,
     nostrMessagesRecent,
     knownReactionKeysRef,
@@ -957,7 +758,7 @@ export const useMessagesDomain = ({
     softDeleteLocalNostrReaction,
     softDeleteLocalNostrReactionsByWrapIds,
     storeRetractedReaction,
-    updateLocalNostrMessage,
+    updateLocalNostrMessage: chatWrites.updateLocalNostrMessage,
     updateLocalNostrReaction,
   };
 };

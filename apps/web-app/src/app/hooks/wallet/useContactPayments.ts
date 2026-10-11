@@ -9,10 +9,13 @@ import {
 } from "../../lib/paidOverlay";
 import {
   paymentResultOf,
-  type ChatWrites,
   type ContactPayment,
 } from "../../state/wallet/payments";
-import type { ContactRowLike, LocalNostrMessage } from "../../types/appTypes";
+import type {
+  ContactRowLike,
+  LocalNostrMessage,
+  UpdateLocalNostrMessage,
+} from "../../types/appTypes";
 import type { CashuMessagePaymentHookResult } from "../payments/cashuMessagePaymentTypes";
 import type { useContactsMessagingComposition } from "../composition/useContactsMessagingComposition";
 import type { useBankPaymentOffers } from "../useBankPaymentOffers";
@@ -29,7 +32,6 @@ export type PayContactWithCashuMessage = (
 
 interface UseContactPaymentsParams {
   cashuBalance: number;
-  chat: ChatWrites;
   contactPayMethod: "cashu" | "lightning" | null;
   contacts: readonly ContactRowLike[];
   currentNpub: string | null;
@@ -57,6 +59,7 @@ interface UseContactPaymentsParams {
   showPaidOverlay: (title?: string, details?: PaidOverlayDetails) => void;
   showPaymentSending: (details: PaidOverlayDetails) => void;
   t: Translate;
+  updateLocalNostrMessage: UpdateLocalNostrMessage;
   walletOpRunning: boolean;
 }
 
@@ -74,7 +77,6 @@ const NOT_READY: CashuMessagePaymentHookResult = {
  */
 export const useContactPayments = ({
   cashuBalance,
-  chat,
   contactPayMethod,
   contacts,
   currentNpub,
@@ -96,6 +98,7 @@ export const useContactPayments = ({
   showPaidOverlay,
   showPaymentSending,
   t,
+  updateLocalNostrMessage,
   walletOpRunning,
 }: UseContactPaymentsParams) => {
   const commands = usePaymentsCommands();
@@ -124,7 +127,6 @@ export const useContactPayments = ({
               displayName,
             ),
           },
-          chat,
           notify
             ? {
                 onSending: () =>
@@ -200,7 +202,6 @@ export const useContactPayments = ({
         return paymentResultOf(outcome);
       },
       [
-        chat,
         commands,
         dismissPaymentSending,
         formatDisplayedAmountParts,
@@ -333,7 +334,7 @@ export const useContactPayments = ({
     currentNsec,
     payContactWithCashuMessage,
     pendingPaymentsKey,
-    updateLocalNostrMessage: chat.updateLocalNostrMessage,
+    updateLocalNostrMessage,
     pushToast,
     t,
   });

@@ -91,7 +91,8 @@ interface UseLinkstrInboxSyncParams {
     body: string,
     tag?: string,
   ) => Promise<void>;
-  nostrMessagesLatestRef: React.MutableRefObject<LocalNostrMessage[]>;
+  /** The stored messages plus what was appended since the last read. */
+  latestMessages: () => readonly LocalNostrMessage[];
   nostrMessagesLocal: readonly LocalNostrMessage[];
   knownReactionKeysRef: React.MutableRefObject<Set<string>>;
   nostrReactionsLocal: readonly LocalNostrReaction[];
@@ -166,7 +167,7 @@ export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
       identitySinceSec: identitySinceSecRef.current,
       isBlockedPubkey,
       knownReactionKeys: latest.knownReactionKeysRef.current,
-      messages: latest.nostrMessagesLatestRef.current,
+      messages: latest.latestMessages(),
       myPubkey: myPubkeyHex,
       reactions: latest.nostrReactionsLocal,
       softDeleteLocalNostrReactionsByWrapIds:
@@ -182,7 +183,7 @@ export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
       identitySinceSec: identitySinceSecRef.current,
       isBlockedPubkey,
       logPayStep: latest.logPayStep,
-      messages: latest.nostrMessagesLatestRef.current,
+      messages: latest.latestMessages(),
       resolveContactId: (peerPubkey) => findContact(peerPubkey)?.id ?? null,
       updateLocalNostrMessage: latest.updateLocalNostrMessage,
       visibleSinceSec: latest.messagesVisibleSinceSec,
@@ -202,7 +203,7 @@ export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
       findContact,
       formatDisplayedAmountText: latest.formatDisplayedAmountText,
       maybeShowPwaNotification: latest.maybeShowPwaNotification,
-      messages: latest.nostrMessagesLatestRef.current,
+      messages: latest.latestMessages(),
       onOpenInboxMessageToast: latest.onOpenInboxMessageToast,
       pushToast: latest.pushToast,
       route: latest.route,

@@ -20,13 +20,11 @@ interface UseWalletPaymentsParams {
   contactPayBackToChatRef: React.MutableRefObject<ContactId | null>;
   contactsMessaging: Pick<
     ContactsMessaging,
-    | "appendLocalNostrMessage"
     | "chatMessages"
     | "contacts"
-    | "enqueuePendingPayment"
     | "getBankPaymentOfferForSettlement"
     | "isBankPaymentOfferCanceled"
-    | "nostrMessagesLatestRef"
+    | "latestMessages"
     | "nostrMessagesLocal"
     | "nostrMessagesRecent"
     | "nostrPictureByNpub"
@@ -92,15 +90,8 @@ export const useWalletPayments = ({
   t,
   walletOpRunning,
 }: UseWalletPaymentsParams) => {
-  const {
-    appendLocalNostrMessage,
-    contacts,
-    enqueuePendingPayment,
-    nostrMessagesLocal,
-    selectedContact,
-    setContactsOnboardingHasPaid,
-    updateLocalNostrMessage,
-  } = contactsMessaging;
+  const { contacts, selectedContact, setContactsOnboardingHasPaid } =
+    contactsMessaging;
   const [lnAddressPayAmount, setLnAddressPayAmount] = React.useState("");
   const [lnAddressPayNote, setLnAddressPayNote] = React.useState("");
   const [lnAddressPayContactId, setLnAddressPayContactId] =
@@ -135,20 +126,6 @@ export const useWalletPayments = ({
     t,
     walletOpRunning,
   });
-  const chat = React.useMemo(
-    () => ({
-      appendLocalNostrMessage,
-      enqueuePendingPayment,
-      nostrMessagesLocal,
-      updateLocalNostrMessage,
-    }),
-    [
-      appendLocalNostrMessage,
-      enqueuePendingPayment,
-      nostrMessagesLocal,
-      updateLocalNostrMessage,
-    ],
-  );
   const setLnAddressPay = React.useCallback(
     (pay: { amount: string; note: string; contactId: ContactId }) => {
       setLnAddressPayAmount(pay.amount);
@@ -172,7 +149,6 @@ export const useWalletPayments = ({
     ...ui,
     ...contactsMessaging,
     cashuBalance,
-    chat,
     contactPayMethod,
     currentNpub,
     currentNsec,

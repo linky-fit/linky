@@ -9,9 +9,10 @@ import { MAIN_MINT_URL, normalizeMintUrl } from "../../../utils/mint";
 import type { PaidOverlayDetails } from "../../lib/paidOverlay";
 import type { CashuEnvelopes } from "../../state/linkshu/commands";
 import { logPayStep } from "../../state/wallet/paymentLog";
-import type { ChatWrites } from "../../state/wallet/payments";
+import type { ChatWrites } from "../../state/messages/chatWrites";
 import type {
   ContactRowLike,
+  LocalNostrMessage,
   LoggedPaymentEventParams,
 } from "../../types/appTypes";
 import { useRecurringPaymentOrders } from "../payments/useRecurringPaymentOrders";
@@ -25,7 +26,12 @@ import {
 } from "../useLinksync";
 
 interface UseRecurringPaymentsParams {
-  chat: Omit<ChatWrites, "enqueuePendingPayment">;
+  chat: Pick<
+    ChatWrites,
+    "appendLocalNostrMessage" | "updateLocalNostrMessage"
+  > & {
+    readonly nostrMessagesLocal: readonly LocalNostrMessage[];
+  };
   contacts: readonly ContactRowLike[];
   currentNpub: string | null;
   currentNsec: string | null;

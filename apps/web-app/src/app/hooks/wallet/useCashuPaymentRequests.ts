@@ -45,7 +45,7 @@ interface UseCashuPaymentRequestsParams {
   defaultMintUrl: string | null;
   formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
   logPaymentEvent: (event: LoggedPaymentEventParams) => void;
-  nostrMessagesLatestRef: ContactsMessaging["nostrMessagesLatestRef"];
+  latestMessages: ContactsMessaging["latestMessages"];
   nostrMessagesLocal: readonly LocalNostrMessage[];
   nostrMessagesRecent: readonly LocalNostrMessage[];
   openScannedContactPendingNpubRef: ContactsMessaging["openScannedContactPendingNpubRef"];
@@ -78,7 +78,7 @@ export const useCashuPaymentRequests = ({
   defaultMintUrl,
   formatDisplayedAmountParts,
   logPaymentEvent,
-  nostrMessagesLatestRef,
+  latestMessages,
   nostrMessagesLocal,
   nostrMessagesRecent,
   openScannedContactPendingNpubRef,
@@ -296,7 +296,7 @@ export const useCashuPaymentRequests = ({
             reviewedMessage,
             reviewedRequest,
             reviewedRecipient,
-            nostrMessagesLatestRef.current,
+            latestMessages(),
             contactsRef.current.find(
               (contact) => contact.id === reviewedRecipient.id,
             ) ?? null,
@@ -322,7 +322,7 @@ export const useCashuPaymentRequests = ({
       }),
     [
       contactsRef,
-      nostrMessagesLatestRef,
+      latestMessages,
       payContactWithCashuMessage,
       runExclusively,
       selectedChatContact,
