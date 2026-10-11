@@ -87,6 +87,7 @@ import type { Result } from "effect";
 import React from "react";
 import { linkshuAppInspector } from "../../../devtools/inspector/linkshuInspector";
 import { isShownDeferredReceive } from "../../lib/cashuTransfers";
+import { storedMintSpelling } from "../../lib/paymentMintSelection";
 import {
   visibleWalletBalances,
   withoutHiddenTestMints,
@@ -360,6 +361,25 @@ const decodeEnvelopeMeltDraft = Schema.decodeUnknownSync(EnvelopeMeltDraft);
 const decodeEnvelopeSendDraft = Schema.decodeUnknownSync(EnvelopeSendDraft);
 
 /**
+ * The move named by the app's mint urls, its source read back as the
+ * spelling linkshu stored the funds under.
+ */
+export const autoswapDraftOf = ({
+  sourceMint,
+  targetMint,
+  amountSat,
+}: AutoswapCashuArgs) =>
+  Effect.map(
+    Effect.flatMap(Tokens, (tokens) => tokens.balances),
+    ({ perMint }) =>
+      decodeAutoswapDraft({
+        sourceMint: storedMintSpelling(perMint, sourceMint),
+        targetMint,
+        ...(amountSat === undefined ? {} : { amount: amountSat }),
+      }),
+  );
+
+/**
  * The nostr key locks NUT-20 quotes (topups and npub.cash lock theirs to it)
  * and signs for tokens P2PK-locked to the user's npub (NUT-11). It reaches
  * linkshu only as a mint-call argument.
@@ -594,38 +614,18 @@ export const useLinkshuComposition = ({
         }),
       );
 
-    const autoswapCashu: AutoswapCashu = ({
-      sourceMint,
-      targetMint,
-      amountSat,
-    }) =>
+    const autoswapCashu: AutoswapCashu = (args) =>
       runResult(
-        Effect.suspend(() => {
-          const draft = decodeAutoswapDraft({
-            sourceMint,
-            targetMint,
-            ...(amountSat === undefined ? {} : { amount: amountSat }),
-          });
-          return Effect.flatMap(Autoswap, (autoswap) => autoswap.claim(draft));
-        }),
+        Effect.flatMap(autoswapDraftOf(args), (draft) =>
+          Effect.flatMap(Autoswap, (autoswap) => autoswap.claim(draft)),
+        ),
       );
 
-    const estimateAutoswapCashu: EstimateAutoswapCashu = ({
-      sourceMint,
-      targetMint,
-      amountSat,
-    }) =>
+    const estimateAutoswapCashu: EstimateAutoswapCashu = (args) =>
       runResult(
-        Effect.suspend(() => {
-          const draft = decodeAutoswapDraft({
-            sourceMint,
-            targetMint,
-            ...(amountSat === undefined ? {} : { amount: amountSat }),
-          });
-          return Effect.flatMap(Autoswap, (autoswap) =>
-            autoswap.estimate(draft),
-          );
-        }),
+        Effect.flatMap(autoswapDraftOf(args), (draft) =>
+          Effect.flatMap(Autoswap, (autoswap) => autoswap.estimate(draft)),
+        ),
       );
 
     const resumePendingCashuAutoswapClaims: ResumePendingCashuAutoswapClaims =
