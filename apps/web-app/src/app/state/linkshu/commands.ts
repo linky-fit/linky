@@ -248,7 +248,7 @@ export type EstimateAutoswapCashu = (
 ) => Promise<Result.Result<AutoswapEstimate, AutoswapEstimateError>>;
 
 /** Drains persisted pending claims (linkshu `Autoswap.resumePendingClaims`). */
-type ResumePendingCashuAutoswapClaims = () => Promise<
+export type ResumePendingCashuAutoswapClaims = () => Promise<
   ReadonlyArray<AutoswapClaimResult>
 >;
 
