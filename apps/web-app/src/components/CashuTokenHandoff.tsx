@@ -1,6 +1,6 @@
 import type { TokenTransfer } from "@linky-fit/linkshu";
 import { Button, Stack, Text } from "@linky-fit/ui";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useTranslation } from "../app/hooks/shell";
 import type { LocalNostrMessage } from "../app/types/appTypes";
 import type { ContactId } from "../evolu";
 import { navigateTo } from "../hooks/useRouting";
@@ -16,7 +16,7 @@ export const CashuTokenHandoff = ({
   chats,
   contacts,
 }: CashuTokenHandoffProps) => {
-  const { t } = useAppShellCore();
+  const { t } = useTranslation();
   const location =
     transfer.status === "externalized"
       ? "cashuHandoffNfc"

@@ -1,3 +1,4 @@
+import { useAtomValue } from "@linky-fit/linkstr-react";
 import type { RecurringPaymentId } from "@linky-fit/linksync";
 import {
   currentTimeZone,
@@ -21,7 +22,8 @@ import {
   TextField,
 } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
+import { walletOpRunningAtom } from "../app/state/wallet/opQueue";
 import { useRecurringPaymentsContext } from "../app/context/RecurringPaymentsContext";
 import {
   contactSummaryLabel,
@@ -96,7 +98,8 @@ interface RecurringPaymentFormPageProps {
 export function RecurringPaymentFormPage({
   editId,
 }: RecurringPaymentFormPageProps): React.ReactElement | null {
-  const { displayCurrency, fiatRates, t } = useAppShellCore();
+  const { t } = useTranslation();
+  const { displayCurrency, fiatRates } = useDisplayAmounts();
   const orders = useRecurringPaymentOrders();
   const order = editId
     ? (orders.find((candidate) => candidate.id === editId) ?? null)
@@ -148,8 +151,9 @@ function RecurringPaymentForm({
   initial,
   order,
 }: RecurringPaymentFormProps): React.ReactElement {
-  const { cashuIsBusy, displayCurrency, fiatRates, lang, t } =
-    useAppShellCore();
+  const { lang, t } = useTranslation();
+  const { displayCurrency, fiatRates } = useDisplayAmounts();
+  const cashuIsBusy = useAtomValue(walletOpRunningAtom);
   const { createRecurringPayment, defaultMintUrl, updateRecurringPayment } =
     useRecurringPaymentsContext();
   const mintUrl = order ? order.mintUrl : defaultMintUrl;
@@ -375,7 +379,7 @@ function ContactPicker({
   onSearch,
   search,
 }: ContactPickerProps): React.ReactElement {
-  const { t } = useAppShellCore();
+  const { t } = useTranslation();
   return (
     <Stack gap="$md">
       <TextField

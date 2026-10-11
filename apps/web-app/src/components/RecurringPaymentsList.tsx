@@ -13,7 +13,7 @@ import {
 } from "@linky-fit/ui";
 import type { FC } from "react";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import { useRecurringPaymentsContext } from "../app/context/RecurringPaymentsContext";
 import {
   recurringRecipientLabel,
@@ -30,8 +30,9 @@ import { RecurringContactAvatar } from "./RecurringContactAvatar";
 /** Every recurring payment with its interval pill, amount, and next due date. */
 export const RecurringPaymentsList: FC = () => {
   const { mintBalanceSat } = useRecurringPaymentsContext();
-  const { displayCurrency, fiatRates, formatDisplayedAmountParts, lang, t } =
-    useAppShellCore();
+  const { lang, t } = useTranslation();
+  const { displayCurrency, fiatRates, formatDisplayedAmountParts } =
+    useDisplayAmounts();
   const orders = useRecurringPaymentOrders();
   const contacts = useRecurringContactSummaries();
   const dateFormatter = React.useMemo(

@@ -12,19 +12,9 @@ import { ANIMATED_QR_FRAME_MS } from "../utils/animatedQr";
 import { CashuTokenPage } from "./CashuTokenPage";
 import { createStoredProofFixture } from "../testUtils/cashuInventory";
 
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellCore: () => ({
-    t: (key: string) => key,
-    allowedDisplayCurrencies: ["sat"],
-    formatDisplayedAmountText: (amount: number) => `${amount} sat`,
-    formatDisplayedAmountParts: (amount: number) => ({
-      approxPrefix: "",
-      amountText: String(amount),
-      unitLabel: "sat",
-    }),
-  }),
-  useAppShellActions: () => ({ cycleDisplayCurrency: vi.fn() }),
-}));
+vi.mock("../app/hooks/shell", async () =>
+  (await import("../testUtils/shellHooks")).shellHooksMock(),
+);
 
 vi.mock("../hooks/useRouting", () => ({ navigateTo: vi.fn() }));
 

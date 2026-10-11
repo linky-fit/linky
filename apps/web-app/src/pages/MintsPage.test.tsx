@@ -17,12 +17,9 @@ vi.mock("../hooks/useRouting", () => ({
   navigateTo: mockNavigate,
 }));
 
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellCore: () => ({
-    formatDisplayedAmountText: (amount: number) => `${amount} sat`,
-    t: (key: string) => key,
-  }),
-}));
+vi.mock("../app/hooks/shell", async () =>
+  (await import("../testUtils/shellHooks")).shellHooksMock(),
+);
 
 vi.mock("../app/context/SystemSettingsContexts", () => ({
   useMintSettingsContext: () => mintSettings,

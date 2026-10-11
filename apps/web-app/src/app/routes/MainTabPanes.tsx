@@ -20,7 +20,6 @@ type ActiveBankPaymentOfferContacts = (nowSec: number) => {
 
 export interface MainTabRouteProps {
   activeGroup: string | null;
-  cashuTotalBalance: number;
   activeBankPaymentOfferContacts: ActiveBankPaymentOfferContacts;
   contactsOnboardingCelebrating: boolean;
   contactsOnboardingTasks: {
@@ -35,6 +34,7 @@ export interface MainTabRouteProps {
   contactFilterOptions: Array<{ count: number; label: string; value: string }>;
   conversationsLabel: string;
   dismissContactsOnboarding: () => void;
+  openFeedbackContact: () => void;
   openNewContactPage: () => void;
   openWalletScan: () => void;
   otherContactsLabel: string;
@@ -44,7 +44,6 @@ export interface MainTabRouteProps {
   setActiveGroup: (group: string | null) => void;
   setContactsSearch: (value: string) => void;
   showContactsOnboarding: boolean;
-  showWalletWarning: boolean;
   showGroupFilter: boolean;
   startContactsGuide: (task: ContactsGuideKey) => void;
   t: Translate;
@@ -53,7 +52,6 @@ export interface MainTabRouteProps {
     others: ContactRowLike[];
     pinned: ContactRowLike[];
   };
-  dismissWalletWarning: () => void;
 }
 
 const isContactsGuideKey = (value: string): value is ContactsGuideKey =>
@@ -214,23 +212,13 @@ export const DesktopContactsPane = (): React.ReactElement => (
 
 export const WalletPane = (): React.ReactElement => {
   const { mainTabProps } = useMainTabRoutes();
-  const {
-    cashuTotalBalance,
-    dismissWalletWarning,
-    openWalletScan,
-    scanIsOpen,
-    showWalletWarning,
-    t,
-  } = mainTabProps;
+  const { openFeedbackContact, openWalletScan, scanIsOpen } = mainTabProps;
 
   return (
     <WalletPage
-      cashuTotalBalance={cashuTotalBalance}
+      openFeedbackContact={openFeedbackContact}
       openScan={openWalletScan}
       scanIsOpen={scanIsOpen}
-      dismissWalletWarning={dismissWalletWarning}
-      showWalletWarning={showWalletWarning}
-      t={t}
     />
   );
 };

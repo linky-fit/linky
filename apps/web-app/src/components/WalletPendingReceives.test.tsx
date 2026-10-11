@@ -1,12 +1,11 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { MintSettingsContextValue } from "../app/context/SystemSettingsContexts";
 import { createTransferFixture } from "../testUtils/cashuInventory";
-import { createMintSettings } from "../testUtils/mintSettings";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { WalletPendingReceives } from "./WalletPendingReceives";
 
-let mintSettings: MintSettingsContextValue;
+let deferredReceives: ReadonlyArray<ReturnType<typeof createTransferFixture>> =
+  [];
 
 const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
 
@@ -14,16 +13,14 @@ vi.mock("../hooks/useRouting", () => ({
   navigateTo: mockNavigate,
 }));
 
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellCore: () => ({
-    formatDisplayedAmountText: (amount: number) => `${amount} sat`,
-    t: (key: string) =>
-      key === "mintPendingAmount" ? "{amount} pending" : key,
+vi.mock("../app/hooks/shell", async () =>
+  (await import("../testUtils/shellHooks")).shellHooksMock({
+    t: (key) => (key === "mintPendingAmount" ? "{amount} pending" : key),
   }),
-}));
+);
 
-vi.mock("../app/context/SystemSettingsContexts", () => ({
-  useMintSettingsContext: () => mintSettings,
+vi.mock("../app/hooks/wallet/useWalletInventory", () => ({
+  useWalletInventory: () => ({ deferredReceives }),
 }));
 
 const deferral = (id: string, mint: string, amount: number) =>
@@ -50,7 +47,7 @@ describe("WalletPendingReceives", () => {
   });
 
   it("renders nothing while no token waits for its mint", async () => {
-    mintSettings = createMintSettings();
+    deferredReceives = [];
 
     const { container, unmount } = await renderLine();
 
@@ -59,12 +56,10 @@ describe("WalletPendingReceives", () => {
   });
 
   it("sums every pending deferral and opens their mint when there is one", async () => {
-    mintSettings = createMintSettings({
-      cashuDeferredReceives: [
-        deferral("AQEBAQEBAQEBAQEBAQEBAQ", "https://cashu.cz", 21),
-        deferral("AgICAgICAgICAgICAgICAg", "https://cashu.cz", 5),
-      ],
-    });
+    deferredReceives = [
+      deferral("AQEBAQEBAQEBAQEBAQEBAQ", "https://cashu.cz", 21),
+      deferral("AgICAgICAgICAgICAgICAg", "https://cashu.cz", 5),
+    ];
 
     const { button, unmount } = await renderLine();
     if (!(button instanceof HTMLButtonElement)) throw new Error("line missing");
@@ -81,12 +76,10 @@ describe("WalletPendingReceives", () => {
   });
 
   it("opens the mints page when deferrals wait at several mints", async () => {
-    mintSettings = createMintSettings({
-      cashuDeferredReceives: [
-        deferral("AQEBAQEBAQEBAQEBAQEBAQ", "https://cashu.cz", 21),
-        deferral("AgICAgICAgICAgICAgICAg", "https://offline.example", 5),
-      ],
-    });
+    deferredReceives = [
+      deferral("AQEBAQEBAQEBAQEBAQEBAQ", "https://cashu.cz", 21),
+      deferral("AgICAgICAgICAgICAgICAg", "https://offline.example", 5),
+    ];
 
     const { button, unmount } = await renderLine();
     if (!(button instanceof HTMLButtonElement)) throw new Error("line missing");

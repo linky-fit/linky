@@ -1,6 +1,7 @@
 import { createContactNameFormatter } from "../utils/contactName";
 import { useMemoizedRouteBuilder } from "./hooks/composition/useMemoizedRouteBundle";
 import { ContactId as ContactIdType } from "@linky-fit/linksync";
+import { useAtom } from "@linky-fit/linkstr-react";
 import React, { useMemo, useState } from "react";
 import type { MessageContactsGroupAssignment } from "../components/ChatMessage";
 import { ContactCard } from "../components/ContactCard";
@@ -14,7 +15,6 @@ import {
 import { useRouting } from "../hooks/useRouting";
 import { useToasts } from "../hooks/useToasts";
 import { reportAppLog } from "../devtools/inspector/appLog";
-import { writeClipboardText } from "../platform/clipboard";
 import {
   requestDeviceMotionPermission,
   requiresDeviceMotionPermission,
@@ -28,21 +28,9 @@ import {
   CONTACTS_ONBOARDING_HAS_BACKUPED_KEYS_STORAGE_KEY,
   FEEDBACK_CONTACT_NPUB,
 } from "../utils/constants";
-import {
-  applyAmountInputKey,
-  applyAmountInputKeyWithDraft,
-  formatDisplayAmountParts,
-  formatDisplayAmountText,
-  getDisplayUnitLabel,
-  getNextDisplayCurrency,
-  isFiatDisplayCurrency,
-  type DisplayCurrency,
-} from "../utils/displayAmounts";
-import { MAIN_MINT_URL, normalizeMintUrl } from "../utils/mint";
+import type { DisplayCurrency } from "../utils/displayAmounts";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 import {
-  getInitialDecimalAmountInputEnabled,
-  getInitialDisplayCurrency,
   getInitialSeenReceiptsEnabledAtSec,
   getInitialShowProfileQrOnTiltEnabled,
   safeLocalStorageGet,
@@ -69,7 +57,10 @@ import { useAppLanguage } from "./hooks/useAppLanguage";
 import { useAllowedDisplayCurrencies } from "./hooks/useAllowedDisplayCurrencies";
 import { useAppPreferences } from "./hooks/useAppPreferences";
 import { useTopDownTilt } from "./hooks/useTopDownTilt";
-import { useFiatRates } from "./hooks/useFiatRates";
+import { useFiatRatesSync } from "./hooks/useFiatRates";
+import { useCopyText, useDisplayAmounts, useSetStatus } from "./hooks/shell";
+import { displayPrefsAtom } from "./state/shell/displayPrefs";
+import { hiddenTransactionsShownAtom } from "./state/shell/topbar";
 import { useLnurlAuth } from "./hooks/useLnurlAuth";
 import { useSiteLogin } from "./hooks/useSiteLogin";
 import {
@@ -154,16 +145,18 @@ export const useAppShellComposition = ({
 
   const [newEvoluServerUrl, setNewEvoluServerUrl] = useState("");
 
-  const [status, setStatus] = useState<string | null>(null);
+  const setStatus = useSetStatus();
   const importDataFileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const { allowedDisplayCurrencies, toggleAllowedDisplayCurrency } =
     useAllowedDisplayCurrencies();
-  const [displayCurrency, setDisplayCurrency] = useState<DisplayCurrency>(() =>
-    getInitialDisplayCurrency(),
+  const [{ decimalAmountInputEnabled, displayCurrency }, setDisplayPrefs] =
+    useAtom(displayPrefsAtom);
+  const setDisplayCurrency = React.useCallback(
+    (currency: DisplayCurrency) =>
+      setDisplayPrefs((prefs) => ({ ...prefs, displayCurrency: currency })),
+    [setDisplayPrefs],
   );
-  const [decimalAmountInputEnabled, setDecimalAmountInputEnabled] =
-    useState<boolean>(getInitialDecimalAmountInputEnabled);
   const [seenReceiptsEnabledAtSec, setSeenReceiptsEnabledAtSec] = useState<
     number | null
   >(getInitialSeenReceiptsEnabledAtSec);
@@ -180,25 +173,22 @@ export const useAppShellComposition = ({
   React.useEffect(() => {
     if (allowedDisplayCurrencies.includes(displayCurrency)) return;
     setDisplayCurrency(allowedDisplayCurrencies[0] ?? "sat");
-  }, [allowedDisplayCurrencies, displayCurrency]);
+  }, [allowedDisplayCurrencies, displayCurrency, setDisplayCurrency]);
 
   const setDisplayCurrencyIfAllowed = React.useCallback(
     (currency: DisplayCurrency) => {
       if (!allowedDisplayCurrencies.includes(currency)) return;
       setDisplayCurrency(currency);
     },
-    [allowedDisplayCurrencies],
+    [allowedDisplayCurrencies, setDisplayCurrency],
   );
 
-  const cycleDisplayCurrency = React.useCallback(() => {
-    setDisplayCurrency((current) =>
-      getNextDisplayCurrency(current, allowedDisplayCurrencies),
-    );
-  }, [allowedDisplayCurrencies]);
-
   const toggleDecimalAmountInput = React.useCallback(() => {
-    setDecimalAmountInputEnabled((current) => !current);
-  }, []);
+    setDisplayPrefs((prefs) => ({
+      ...prefs,
+      decimalAmountInputEnabled: !prefs.decimalAmountInputEnabled,
+    }));
+  }, [setDisplayPrefs]);
 
   const toggleShowProfileQrOnTilt = React.useCallback(async () => {
     if (motionPermissionPendingRef.current) return;
@@ -232,50 +222,13 @@ export const useAppShellComposition = ({
     );
   }, []);
 
-  const fiatRates = useFiatRates();
-  const displayUnit = getDisplayUnitLabel(displayCurrency, lang);
-  const decimalAmountInputKeyVisible =
-    decimalAmountInputEnabled &&
-    isFiatDisplayCurrency(displayCurrency) &&
-    fiatRates !== null;
-  const applyDisplayedAmountInputKey = React.useCallback(
-    (currentAmount: string, key: string) =>
-      applyAmountInputKey(currentAmount, key, {
-        displayCurrency,
-        fiatRates,
-        lang,
-      }),
-    [displayCurrency, fiatRates, lang],
-  );
-  const applyDisplayedAmountInputKeyWithDraft = React.useCallback(
-    (currentAmount: string, currentDisplayValue: string | null, key: string) =>
-      applyAmountInputKeyWithDraft(
-        currentAmount,
-        currentDisplayValue,
-        key,
-        { displayCurrency, fiatRates, lang },
-        decimalAmountInputKeyVisible,
-      ),
-    [decimalAmountInputKeyVisible, displayCurrency, fiatRates, lang],
-  );
-  const formatDisplayedAmountParts = React.useCallback(
-    (amountSat: number) =>
-      formatDisplayAmountParts(amountSat, {
-        displayCurrency,
-        fiatRates,
-        lang,
-      }),
-    [displayCurrency, fiatRates, lang],
-  );
-  const formatDisplayedAmountText = React.useCallback(
-    (amountSat: number) =>
-      formatDisplayAmountText(amountSat, {
-        displayCurrency,
-        fiatRates,
-        lang,
-      }),
-    [displayCurrency, fiatRates, lang],
-  );
+  useFiatRatesSync();
+  const {
+    displayUnit,
+    fiatRates,
+    formatDisplayedAmountParts,
+    formatDisplayedAmountText,
+  } = useDisplayAmounts();
 
   const evoluLastError = useEvoluLastError({ logToConsole: true });
   const wipeEvoluStorageImpl = useWipeEvoluStorage();
@@ -387,27 +340,9 @@ export const useAppShellComposition = ({
 
   const contactPayBackToChatRef = React.useRef<ContactId | null>(null);
 
-  useStatusToasts({
-    pushToast,
-    setStatus,
-    status,
-  });
+  useStatusToasts();
 
-  const copyText = React.useCallback(
-    async (value: string) => {
-      try {
-        const copied = await writeClipboardText(value);
-        if (!copied) {
-          pushToast(t("copyFailed"));
-          return;
-        }
-        pushToast(t("copiedToClipboard"));
-      } catch {
-        pushToast(t("copyFailed"));
-      }
-    },
-    [pushToast, t],
-  );
+  const copyText = useCopyText();
 
   const {
     saveNpubContact,
@@ -608,29 +543,17 @@ export const useAppShellComposition = ({
     allCashuProofs,
     allowTestMints,
     applyDefaultMintSelection,
-    canPayWithCashu,
     cancelPendingCashuContactSend,
     cashuBalance,
     cashuBalanceAfterMelt,
-    cashuBulkCheckIsBusy,
-    cashuDraft,
-    cashuDraftRef,
-    cashuEmitAmount,
-    cashuHasMultipleAcceptedMints,
     cashuIsBusy,
     cashuDeferredReceives,
     cashuMeltToMainMintButtonLabel,
     cashuOperations,
     cashuProofs,
     cashuTokensHydratedRef,
-    cashuTotalBalance,
     cashuTransferLifecycle,
     cashuTransfers,
-    checkAllCashuTokensAndDeleteInvalid,
-    inspectCashuProofStates,
-    checkAndRefreshCashuToken,
-    checkIssuedCashuTokensAndDeleteClaimed,
-    checkSingleIssuedCashuTokenIsClaimed,
     closeCashuPaymentRequestConfirmation,
     closeLightningInvoiceConfirmation,
     closeLnurlWithdrawConfirmation,
@@ -643,8 +566,6 @@ export const useAppShellComposition = ({
     defaultMintDisplay,
     defaultMintUrl,
     discardCashuDeferredReceive,
-    dismissWalletWarning,
-    emitCashuToken,
     estimateMintMove,
     getCashuTokenMessageInfo,
     getMintIconUrl,
@@ -684,17 +605,12 @@ export const useAppShellComposition = ({
     probeLightningFee,
     receiveMethod,
     refreshMintInfo,
-    deleteCashuToken,
     requestSelectedContact,
     restoreMissingTokens,
     reclaimHandedOutTokens,
     restoreAndReclaimAllTokens,
-    reclaimCashuTransfer,
-    returnCashuTokenToWallet,
     saveCashuFromText,
     sendCashuTokenToContact,
-    setCashuDraft,
-    setCashuEmitAmount,
     setAllowTestMints,
     setContactPayMethod,
     setLightningInvoiceAutoPayLimit,
@@ -706,23 +622,7 @@ export const useAppShellComposition = ({
     setPendingLightningInvoiceConfirmation,
     setPendingLnurlWithdrawConfirmation,
     setPostPaySaveContact,
-    setTopupAmount,
-    setTopupNote,
     settleBankPaymentOffer,
-    showPaidOverlay,
-    startSendCashuTokenToContact,
-    tokensRestoreIsBusy,
-    tokensRestoreProgress,
-    topupAmount,
-    topupNote,
-    topupInvoice,
-    topupInvoiceCashuRequest,
-    topupInvoiceError,
-    topupInvoiceIsBusy,
-    topupInvoiceQrPayload,
-    topupMintUrl,
-    walletWarningApplies,
-    walletWarningDismissed,
     recurringPaymentsContext,
   } = useCashuWalletComposition({
     contactPayBackToChatRef,
@@ -751,7 +651,6 @@ export const useAppShellComposition = ({
     },
     fiatRates,
     formatDisplayedAmountParts,
-    formatDisplayedAmountText,
     identity: {
       appOwnerId,
       currentNpub,
@@ -778,13 +677,10 @@ export const useAppShellComposition = ({
 
   useAppPreferences({
     allowedDisplayCurrencies,
-    decimalAmountInputEnabled,
-    displayCurrency,
     bankPaymentOfferRecipientCount,
     bankPaymentOfferStaggerDelaySec,
     lightningInvoiceAutoPayLimit,
     payWithCashuEnabled,
-    receiveMethod,
     seenReceiptsEnabledAtSec,
     showProfileQrOnTiltEnabled,
   });
@@ -1111,11 +1007,12 @@ export const useAppShellComposition = ({
       : null;
   const contactsFilterIsActive =
     contactsSearch.trim() !== "" || activeGroup !== null;
-  const [showHiddenTransactions, setShowHiddenTransactions] =
-    React.useState(false);
+  const [showHiddenTransactions, setShowHiddenTransactions] = useAtom(
+    hiddenTransactionsShownAtom,
+  );
   const toggleHiddenTransactions = React.useCallback(() => {
     setShowHiddenTransactions((shown) => !shown);
-  }, []);
+  }, [setShowHiddenTransactions]);
   const topbarRight = React.useMemo(
     () =>
       buildTopbarRight({
@@ -1189,79 +1086,37 @@ export const useAppShellComposition = ({
 
   const moneyRouteProps = useMemoizedRouteBuilder(
     {
-      canRestoreTokens: (seedMnemonic ?? "").trim().length > 0,
-      canSendCashuTokenToContact: contacts.length > 0,
-      canWriteNfc,
-      canPayWithCashu,
-      cashuBalance,
-      cashuBalanceAfterMelt,
-      cashuTotalBalance,
-      cashuBulkCheckIsBusy,
-      cashuDraft,
-      cashuDraftRef,
-      cashuEmitAmount,
-      cashuHasMultipleAcceptedMints,
-      cashuIsBusy,
-      cashuMeltToMainMintButtonLabel,
-      cashuProofs,
-      cashuTransfers,
       bankPaymentOfferContacts,
       bankPaymentOfferRecipientCount,
       bankPaymentOfferStaggerDelaySec,
-      checkAllCashuTokensAndDeleteInvalid,
-      inspectCashuProofStates,
-      checkAndRefreshCashuToken,
-      checkIssuedCashuTokensAndDeleteClaimed,
-      checkSingleIssuedCashuTokenIsClaimed,
-      showPaidOverlay,
-      copyText,
-      currentNpub,
-      displayUnit,
-      emitCashuToken,
-      getMintIconUrl,
+      canRestoreTokens: (seedMnemonic ?? "").trim().length > 0,
+      canSendCashuTokenToContact: contacts.length > 0,
+      canWriteNfc,
+      contacts,
+      effectiveMyLightningAddress,
       knownLnAddressPayContact,
       knownLnAddressPayContactPictureUrl,
       lnAddressPayAmount,
       lnAddressPayNote,
-      tokenMessages: nostrMessagesLocal,
-      manualPayContacts: contacts,
-      manualPayNostrPictureByNpub: nostrPictureByNpub,
+      nostrPictureByNpub,
       onRequestBankPaymentOffer: requestBankPaymentOffer,
       onSubmitManualPayText,
-      meltLargestForeignMintToMainMint,
+      openWalletScan,
+      pasteScanValue,
       payLightningAddressWithCashu,
-      restoreMissingTokens,
+      profileStatusIsSaving,
+      proxyPaymentPayerContacts,
       reclaimHandedOutTokens,
       restoreAndReclaimAllTokens,
-      deleteCashuToken,
-      setStatus,
-      reclaimCashuTransfer,
-      returnCashuTokenToWallet,
-      startSendCashuTokenToContact,
-      route,
+      restoreMissingTokens,
       saveCashuFromText,
-      setCashuEmitAmount,
-      setCashuDraft,
+      selectedProfileStatusCurrencies,
       setLnAddressPayAmount,
       setLnAddressPayNote,
       shareCashuTokenText,
-      setTopupAmount,
-      setTopupNote,
       t,
-      topupAmount,
-      topupNote,
-      topupInvoice,
-      topupInvoiceError,
-      topupInvoiceIsBusy,
-      topupInvoiceCashuRequest,
-      topupMintUrl:
-        topupMintUrl ??
-        normalizeMintUrl(defaultMintUrl ?? MAIN_MINT_URL) ??
-        MAIN_MINT_URL,
-      topupInvoiceQrPayload,
-      receiveMethod,
-      tokensRestoreIsBusy,
-      tokensRestoreProgress,
+      tokenMessages: nostrMessagesLocal,
+      toggleProfileStatusCurrency,
       writeCashuTokenToNfc,
     },
     buildMoneyRouteProps,
@@ -1454,7 +1309,6 @@ export const useAppShellComposition = ({
     mainTabRouteBuilderInput: {
       activeBankPaymentOfferContacts,
       activeGroup,
-      cashuTotalBalance,
       contactsOnboardingCelebrating,
       contactsOnboardingTasks,
       contactsFilterOpen,
@@ -1463,7 +1317,7 @@ export const useAppShellComposition = ({
       contactFilterOptions,
       conversationsLabel,
       dismissContactsOnboarding,
-      dismissWalletWarning,
+      openFeedbackContact,
       openNewContactPage,
       openWalletScan,
       otherContactsLabel,
@@ -1473,7 +1327,6 @@ export const useAppShellComposition = ({
       setActiveGroup,
       setContactsSearch,
       showContactsOnboarding,
-      showWalletWarning: walletWarningApplies && !walletWarningDismissed,
       startContactsGuide,
       t,
       visibleContacts,
@@ -1583,8 +1436,6 @@ export const useAppShellComposition = ({
   const appState = React.useMemo(
     () => ({
       allowedDisplayCurrencies,
-      applyAmountInputKey: applyDisplayedAmountInputKey,
-      applyAmountInputKeyWithDraft: applyDisplayedAmountInputKeyWithDraft,
       cashuBalance,
       cashuBalanceAfterMelt,
       cashuIsBusy,
@@ -1596,7 +1447,6 @@ export const useAppShellComposition = ({
       currentNpub,
       currentNsec,
       decimalAmountInputEnabled,
-      decimalAmountInputKeyVisible,
       sendReadReceiptsEnabled: seenReceiptsEnabledAtSec !== null,
       displayCurrency,
       derivedProfile,
@@ -1633,10 +1483,7 @@ export const useAppShellComposition = ({
       profileIsSaving,
       profileStatus: myProfileStatus,
       profileStatusCurrencies,
-      proxyPaymentPayerContacts,
-      profileStatusIsSaving,
       profilePhotoInputRef,
-      selectedProfileStatusCurrencies,
       profileSelectedPictureKind,
       profileShareOverlayIsOpen,
       route,
@@ -1646,7 +1493,6 @@ export const useAppShellComposition = ({
       scanEntryPoint,
       scanIsOpen,
       shareOptionsText,
-      showHiddenTransactions,
       showProfileQrOnTiltEnabled,
       scanVideoRef,
       t,
@@ -1661,8 +1507,6 @@ export const useAppShellComposition = ({
     }),
     [
       allowedDisplayCurrencies,
-      applyDisplayedAmountInputKey,
-      applyDisplayedAmountInputKeyWithDraft,
       appOwnerId,
       cashuBalance,
       cashuBalanceAfterMelt,
@@ -1675,7 +1519,6 @@ export const useAppShellComposition = ({
       currentNpub,
       currentNsec,
       decimalAmountInputEnabled,
-      decimalAmountInputKeyVisible,
       seenReceiptsEnabledAtSec,
       derivedProfile,
       displayCurrency,
@@ -1718,8 +1561,6 @@ export const useAppShellComposition = ({
       profilePhotoInputRef,
       profileSelectedPictureKind,
       profileStatusCurrencies,
-      proxyPaymentPayerContacts,
-      profileStatusIsSaving,
       route,
       scanAllowsManualContact,
       scanDiagnostics,
@@ -1727,9 +1568,7 @@ export const useAppShellComposition = ({
       scanEntryPoint,
       scanIsOpen,
       scanVideoRef,
-      selectedProfileStatusCurrencies,
       shareOptionsText,
-      showHiddenTransactions,
       showProfileQrOnTiltEnabled,
       profileShareOverlayIsOpen,
       t,
@@ -1761,7 +1600,6 @@ export const useAppShellComposition = ({
       copyShareOptionsText,
       copyText,
       cycleScanCamera,
-      cycleDisplayCurrency,
       shuffleProfileAvatar,
       onPickProfilePhoto,
       onPickScanImage,
@@ -1773,7 +1611,6 @@ export const useAppShellComposition = ({
       openManualPayFromScan,
       openProfileQr,
       openReceiveScan,
-      openWalletScan,
       pasteScanValue,
       saveProfileEdits,
       setContactNewPrefill,
@@ -1792,7 +1629,6 @@ export const useAppShellComposition = ({
       toggleAllowedDisplayCurrency,
       toggleDecimalAmountInput,
       toggleProfileEditing,
-      toggleProfileStatusCurrency,
       toggleSendReadReceipts,
       toggleShowProfileQrOnTilt,
       writeCurrentNpubToNfc,
@@ -1818,7 +1654,6 @@ export const useAppShellComposition = ({
       copyShareOptionsText,
       copyText,
       cycleScanCamera,
-      cycleDisplayCurrency,
       shuffleProfileAvatar,
       onPickProfilePhoto,
       onPickScanImage,
@@ -1830,7 +1665,6 @@ export const useAppShellComposition = ({
       openManualPayFromScan,
       openProfileQr,
       openReceiveScan,
-      openWalletScan,
       pasteScanValue,
       saveProfileEdits,
       setContactNewPrefill,
@@ -1849,7 +1683,6 @@ export const useAppShellComposition = ({
       toggleAllowedDisplayCurrency,
       toggleDecimalAmountInput,
       toggleProfileEditing,
-      toggleProfileStatusCurrency,
       toggleSendReadReceipts,
       toggleShowProfileQrOnTilt,
       writeCurrentNpubToNfc,

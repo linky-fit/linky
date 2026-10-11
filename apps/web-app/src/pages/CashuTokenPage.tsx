@@ -10,7 +10,18 @@ import { Button, LoadingState, Notice, Stack, Text } from "@linky-fit/ui";
 import type { FC } from "react";
 import { useArmedAction } from "../hooks/useArmedAction";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import {
+  useCopyText,
+  useDisplayAmounts,
+  usePaidOverlayCommands,
+  useSetStatus,
+  useTranslation,
+} from "../app/hooks/shell";
+import { useWalletInventory } from "../app/hooks/wallet/useWalletInventory";
+import {
+  useInspectCashuProofStates,
+  useWalletTokens,
+} from "../app/hooks/wallet/useWalletTokens";
 import { CashuTokenQr } from "../components/CashuTokenQr";
 import { formatStoredCashuError } from "../app/lib/cashuStoredError";
 import { canReturnTransfer } from "../app/lib/cashuTransfers";
@@ -101,7 +112,8 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
   startSendCashuTokenToContact,
   writeToNfc,
 }) => {
-  const { formatDisplayedAmountText, lang, t } = useAppShellCore();
+  const { lang, t } = useTranslation();
+  const { formatDisplayedAmountText } = useDisplayAmounts();
   const deleteAction = useArmedAction(() => setStatus(t("deleteArmedHint")));
 
   const transfer = cashuTransfers.find(
@@ -360,5 +372,45 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
         </Button>
       ) : null}
     </Stack>
+  );
+};
+
+type CashuTokenRouteProps = Pick<
+  CashuTokenPageProps,
+  | "canSendToContact"
+  | "canWriteToNfc"
+  | "contacts"
+  | "messages"
+  | "routeId"
+  | "shareTokenText"
+  | "writeToNfc"
+>;
+
+export const CashuTokenRoute: FC<CashuTokenRouteProps> = (props) => {
+  const { proofs, transfers } = useWalletInventory();
+  const tokens = useWalletTokens();
+  const inspectCashuProofStates = useInspectCashuProofStates();
+  const copyText = useCopyText();
+  const setStatus = useSetStatus();
+  const { showPaidOverlay } = usePaidOverlayCommands();
+  return (
+    <CashuTokenPage
+      {...props}
+      cashuIsBusy={tokens.tokenWorkIsBusy}
+      cashuProofs={proofs}
+      cashuTransfers={transfers}
+      checkAndRefreshCashuToken={tokens.checkAndRefreshCashuToken}
+      checkSingleIssuedCashuTokenIsClaimed={
+        tokens.checkSingleIssuedCashuTokenIsClaimed
+      }
+      copyText={copyText}
+      deleteCashuToken={tokens.deleteCashuToken}
+      inspectCashuProofStates={inspectCashuProofStates}
+      reclaimCashuTransfer={tokens.reclaimCashuTransfer}
+      returnCashuTokenToWallet={tokens.returnCashuTokenToWallet}
+      setStatus={setStatus}
+      showPaidOverlay={showPaidOverlay}
+      startSendCashuTokenToContact={tokens.startSendCashuTokenToContact}
+    />
   );
 };

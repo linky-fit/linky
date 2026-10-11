@@ -9,7 +9,7 @@ import {
   ListRow,
 } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import type { MintMove } from "../app/hooks/mint/useMoveMintFunds";
 import type { MintIcon as MintIconSource } from "../utils/mint";
 import { formatMintLabel, mintKindBadge } from "../utils/mint";
@@ -67,7 +67,8 @@ export function MintMoveFundsForm({
   sourceMint,
   targets,
 }: MintMoveFundsFormProps) {
-  const { formatDisplayedAmountText, t } = useAppShellCore();
+  const { t } = useTranslation();
+  const { formatDisplayedAmountText } = useDisplayAmounts();
   const [targetMint, setTargetMint] = React.useState(targets[0] ?? "");
   // Sat, as every keypad-driven amount in the app; null until edited means the whole balance.
   const [editedAmount, setEditedAmount] = React.useState<string | null>(null);

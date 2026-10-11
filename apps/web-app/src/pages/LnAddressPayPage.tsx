@@ -1,6 +1,7 @@
 import { Avatar, Button, Row, Stack, Text } from "@linky-fit/ui";
 import { useEffect, type FC } from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
+import { useWalletBalance } from "../app/hooks/wallet/useWalletInventory";
 import { LnurlPayPreviewNotices } from "../components/LnurlPayPreviewNotices";
 import { PaymentAmountPanel } from "../components/PaymentAmountPanel";
 import {
@@ -19,11 +20,6 @@ interface LnAddressPayKnownContact {
 }
 
 interface LnAddressPayPageProps {
-  canPayWithCashu: boolean;
-  cashuBalance: number;
-  cashuBalanceAfterMelt: number;
-  cashuIsBusy: boolean;
-  displayUnit: string;
   knownContact: LnAddressPayKnownContact | null;
   knownContactPictureUrl: string | null;
   lnAddress: string;
@@ -39,10 +35,6 @@ interface LnAddressPayPageProps {
 }
 
 export const LnAddressPayPage: FC<LnAddressPayPageProps> = ({
-  canPayWithCashu,
-  cashuBalance,
-  cashuBalanceAfterMelt,
-  cashuIsBusy,
   knownContact,
   knownContactPictureUrl,
   lnAddress,
@@ -52,7 +44,10 @@ export const LnAddressPayPage: FC<LnAddressPayPageProps> = ({
   setLnAddressPayAmount,
   setLnAddressPayNote,
 }) => {
-  const { formatDisplayedAmountText, t } = useAppShellCore();
+  const { t } = useTranslation();
+  const { formatDisplayedAmountText } = useDisplayAmounts();
+  const { canPayWithCashu, cashuBalance, cashuBalanceAfterMelt, cashuIsBusy } =
+    useWalletBalance();
   const {
     error: previewError,
     fixedAmountSat,

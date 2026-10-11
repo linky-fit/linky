@@ -16,8 +16,13 @@ import {
   Text,
   Pill,
 } from "@linky-fit/ui";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useEffect, useMemo, useRef, useState, type FC } from "react";
+import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
+import {
+  useWalletBalance,
+  useWalletInventory,
+} from "../app/hooks/wallet/useWalletInventory";
+import { useWalletTokens } from "../app/hooks/wallet/useWalletTokens";
 import {
   pendingTokenTransfers,
   tokenChatMessages,
@@ -65,7 +70,8 @@ export const CashuTokensPage = ({
   messages,
   checkIssuedCashuTokensAndDeleteClaimed,
 }: CashuTokensPageProps) => {
-  const { formatDisplayedAmountText, t } = useAppShellCore();
+  const { t } = useTranslation();
+  const { formatDisplayedAmountText } = useDisplayAmounts();
   const scanProgress =
     tokensRestoreProgress?.phase === "scanning" &&
     tokensRestoreProgress.totalKeysets > 0
@@ -317,5 +323,30 @@ export const CashuTokensPage = ({
         onPress={() => navigateTo({ route: "cashuTokenNew" })}
       />
     </>
+  );
+};
+
+type CashuTokensRouteProps = Pick<
+  CashuTokensPageProps,
+  "canRestoreTokens" | "contacts" | "messages" | "restoreMissingTokens"
+>;
+
+export const CashuTokensRoute: FC<CashuTokensRouteProps> = (props) => {
+  const { proofs, transfers } = useWalletInventory();
+  const { cashuIsBusy } = useWalletBalance();
+  const tokens = useWalletTokens();
+  return (
+    <CashuTokensPage
+      {...props}
+      cashuBulkCheckIsBusy={tokens.cashuBulkCheckIsBusy}
+      cashuIsBusy={cashuIsBusy}
+      cashuProofs={proofs}
+      cashuTransfers={transfers}
+      checkIssuedCashuTokensAndDeleteClaimed={
+        tokens.checkIssuedCashuTokensAndDeleteClaimed
+      }
+      tokensRestoreIsBusy={tokens.tokensRestoreIsBusy}
+      tokensRestoreProgress={tokens.tokensRestoreProgress}
+    />
   );
 };

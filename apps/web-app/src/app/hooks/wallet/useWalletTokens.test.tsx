@@ -21,13 +21,31 @@ import type {
   RecoverTokensOutcome,
   TokensCommands,
 } from "../../state/wallet/tokens";
-import { useWalletTokens } from "./useWalletTokens";
+import {
+  useTokenContactSend,
+  useTokenRecovery,
+  useWalletTokens,
+} from "./useWalletTokens";
 
-const { fake, navigateTo } = vi.hoisted(() => {
+const { fake, navigateTo, ui } = vi.hoisted(() => {
   const fake: { current: Partial<TokensCommands> | null } = { current: null };
-  return { fake, navigateTo: vi.fn() };
+  return {
+    fake,
+    navigateTo: vi.fn(),
+    ui: { pushToast: vi.fn(), setStatus: vi.fn() },
+  };
 });
 vi.mock("../../../hooks/useRouting", () => ({ navigateTo }));
+vi.mock("../shell", async () =>
+  (await import("../../../testUtils/shellHooks")).shellHooksMock({
+    pushToast: ui.pushToast,
+    setStatus: ui.setStatus,
+    t: (key) => key,
+  }),
+);
+vi.mock("./useWalletInventory", () => ({
+  useWalletBalance: () => ({ cashuBalance: 100 }),
+}));
 vi.mock("../../state/wallet/tokens", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("../../state/wallet/tokens")>();
@@ -56,38 +74,32 @@ const reclaimed = (
 const tokenId = CashuOperationId.orThrow("AQEBAQEBAQEBAQEBAQEBAQ");
 
 const render = async () => {
-  const ui = {
-    pushToast: vi.fn(),
-    setStatus: vi.fn(),
-  };
-  const hook: { current: ReturnType<typeof useWalletTokens> | null } = {
-    current: null,
+  type Hooks = ReturnType<typeof useWalletTokens> &
+    ReturnType<typeof useTokenRecovery> &
+    ReturnType<typeof useTokenContactSend>;
+  const hook: { current: Hooks | null } = { current: null };
+  const chat = {
+    appendLocalNostrMessage: () => ({ id: "m", written: NO_WRITE }),
+    updateLocalNostrMessage: () => NO_WRITE,
   };
   const Probe = () => {
-    const tokens = useWalletTokens({
-      ...ui,
-      allowTestMints: true,
-      cashuBalance: 100,
-      chat: {
-        appendLocalNostrMessage: () => ({ id: "m", written: NO_WRITE }),
-        updateLocalNostrMessage: () => NO_WRITE,
-      },
-      defaultMintUrl: null,
-      formatDisplayedAmountText: (amount) => `${amount} sat`,
-      isMintDeleted: () => false,
-      mintInfoDeduped: [],
-      readSeenMints: () => [],
-      recoverEnvelopes: async () => {},
-      rememberSeenMint: () => {},
-      t: (key) => key,
-      walletMints: ["https://mint-a.example"],
-      walletOpRunning: false,
-      walletProofs: [],
-      walletTransfers: [],
-    });
+    const tokens = {
+      ...useWalletTokens(),
+      ...useTokenRecovery({
+        allowTestMints: true,
+        defaultMintUrl: null,
+        isMintDeleted: () => false,
+        mintInfoDeduped: [],
+        readSeenMints: () => [],
+        recoverEnvelopes: async () => {},
+        rememberSeenMint: () => {},
+        walletMints: ["https://mint-a.example"],
+      }),
+      ...useTokenContactSend({ chat, walletTransfers: [] }),
+    };
     useEffect(() => {
       hook.current = tokens;
-    }, [tokens]);
+    });
     return null;
   };
   const view = await renderIntoDocument(

@@ -37,6 +37,16 @@ vi.mock("../app/context/AppShellContexts", () => ({
   }),
 }));
 
+vi.mock("../app/hooks/shell", async () => ({
+  ...(await import("../testUtils/shellHooks")).shellHooksMock({
+    t: (key) => appShellMock.t(key),
+  }),
+  useDisplayCurrencyCycle: () => ({
+    allowedDisplayCurrencies: appShellMock.allowedDisplayCurrencies,
+    cycleDisplayCurrency: appShellMock.cycleDisplayCurrency,
+  }),
+}));
+
 vi.mock("../utils/pickFile", () => ({ pickFile: vi.fn() }));
 
 vi.mock("../components/PrivateImageBubble", () => ({

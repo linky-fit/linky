@@ -7,19 +7,11 @@ const { navigateTo } = vi.hoisted(() => ({ navigateTo: vi.fn() }));
 
 vi.mock("../hooks/useRouting", () => ({ navigateTo }));
 
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellActions: () => ({
-    cycleDisplayCurrency: () => undefined,
+vi.mock("../app/hooks/shell", async () =>
+  (await import("../testUtils/shellHooks")).shellHooksMock({
+    t: (key) => translate(key),
   }),
-  useAppShellCore: () => ({
-    allowedDisplayCurrencies: ["sat"],
-    displayCurrency: "sat",
-    displayUnit: "sat",
-    formatDisplayedAmountText: (amountSat: number) => `${amountSat} sat`,
-    lang: "en",
-    t: (key: string) => translate(key),
-  }),
-}));
+);
 
 vi.mock("../app/hooks/useFiatRates", () => ({
   useFiatRates: () => ({

@@ -1,3 +1,4 @@
+import { useAtomValue, useAtomSet } from "@linky-fit/linkstr-react";
 import React from "react";
 import { useDeferredOnlineReady } from "../../hooks/useDeferredOnlineReady";
 import {
@@ -11,14 +12,17 @@ import {
   isFiatRatesStale,
   fetchFiatRates,
 } from "@linky-fit/linkshu";
+import { fiatRatesAtom } from "../state/shell/displayPrefs";
 
 const readCachedFiatRates = () =>
   decodeFiatRates(safeLocalStorageGet(FIAT_RATES_CACHE_STORAGE_KEY));
-export const useFiatRates = (): FiatRates | null => {
+
+export const useFiatRates = (): FiatRates | null => useAtomValue(fiatRatesAtom);
+
+/** Refreshes the cached fiat rates once they are stale; the app shell runs it once. */
+export const useFiatRatesSync = (): void => {
   const canRunNetworkWork = useDeferredOnlineReady();
-  const [fiatRates, setFiatRates] = React.useState<FiatRates | null>(() =>
-    readCachedFiatRates(),
-  );
+  const setFiatRates = useAtomSet(fiatRatesAtom);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -55,16 +59,14 @@ export const useFiatRates = (): FiatRates | null => {
     };
 
     void syncRates();
-    const intervalId = window.setInterval(() => {
+    const intervalId = setInterval(() => {
       void syncRates();
     }, FIAT_RATES_TTL_MS);
 
     return () => {
       cancelled = true;
       if (activeController) activeController.abort();
-      window.clearInterval(intervalId);
+      clearInterval(intervalId);
     };
-  }, [canRunNetworkWork]);
-
-  return fiatRates;
+  }, [canRunNetworkWork, setFiatRates]);
 };

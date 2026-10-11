@@ -1,21 +1,19 @@
+import { useAtomSet } from "@linky-fit/linkstr-react";
 import React from "react";
-import {
-  getInitialLang,
-  persistLang,
-  translations,
-  type I18nKey,
-  type Lang,
-} from "../../i18n";
+import type { Lang } from "../../i18n";
+import { displayPrefsAtom } from "../state/shell/displayPrefs";
+import { useTranslation } from "./shell";
 
+/** The UI language with its setter; the language is set on the document. */
 export const useAppLanguage = () => {
-  const [lang, setLang] = React.useState<Lang>(() => getInitialLang());
-  const t = React.useCallback(
-    (key: I18nKey) => translations[lang][key],
-    [lang],
+  const { lang, t } = useTranslation();
+  const setPrefs = useAtomSet(displayPrefsAtom);
+  const setLang = React.useCallback(
+    (next: Lang) => setPrefs((prefs) => ({ ...prefs, lang: next })),
+    [setPrefs],
   );
 
   React.useEffect(() => {
-    persistLang(lang);
     try {
       document.documentElement.lang = lang;
       document.documentElement.setAttribute("translate", "no");

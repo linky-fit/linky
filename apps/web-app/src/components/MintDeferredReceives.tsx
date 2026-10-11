@@ -2,9 +2,10 @@ import type { StoredOperation, TokenText } from "@linky-fit/linkshu";
 import { Button, Dialog, Divider, Row, Section, Stack } from "@linky-fit/ui";
 import React from "react";
 import {
-  useAppShellActions,
-  useAppShellCore,
-} from "../app/context/AppShellContexts";
+  useCopyText,
+  useDisplayAmounts,
+  useTranslation,
+} from "../app/hooks/shell";
 import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
 import { normalizeMintUrl } from "../utils/mint";
 import { MintPendingPill } from "./MintPendingPill";
@@ -19,8 +20,9 @@ export function MintDeferredReceives({
 }: MintDeferredReceivesProps): React.ReactElement | null {
   const { cashuDeferredReceives, discardCashuDeferredReceive } =
     useMintSettingsContext();
-  const { formatDisplayedAmountText, t } = useAppShellCore();
-  const { copyText } = useAppShellActions();
+  const { t } = useTranslation();
+  const { formatDisplayedAmountText } = useDisplayAmounts();
+  const copyText = useCopyText();
   const [discarding, setDiscarding] = React.useState<StoredOperation | null>(
     null,
   );

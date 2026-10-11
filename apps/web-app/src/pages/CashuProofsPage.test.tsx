@@ -6,13 +6,12 @@ import { createStoredProofFixture } from "../testUtils/cashuInventory";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { CashuProofsPage } from "./CashuProofsPage";
 
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellCore: () => ({
-    t: (key: string) =>
+vi.mock("../app/hooks/shell", async () =>
+  (await import("../testUtils/shellHooks")).shellHooksMock({
+    t: (key) =>
       key === "cashuSpentProofsKept" ? "cashuSpentProofsKept {count}" : key,
-    formatDisplayedAmountText: (amount: number) => `${amount} sat`,
   }),
-}));
+);
 vi.mock("../hooks/useRouting", () => ({ navigateTo: vi.fn() }));
 
 const available = createStoredProofFixture({

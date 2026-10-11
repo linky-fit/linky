@@ -3,28 +3,20 @@ import type { AutoswapEstimate } from "@linky-fit/linkshu";
 import { Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import React from "react";
-import type { Translate } from "../../../i18n";
-import type { DisplayAmountParts } from "../../../utils/displayAmounts";
 import { formatMintHost } from "../../../utils/mint";
 import {
   moveFundsCommandsAtom,
   type MintMove,
 } from "../../state/wallet/moveFunds";
+import { useDisplayAmounts, useSetStatus, useTranslation } from "../shell";
 
 export type { MintMove } from "../../state/wallet/moveFunds";
 
-interface UseMoveMintFundsParams {
-  formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
-  setStatus: React.Dispatch<React.SetStateAction<string | null>>;
-  t: Translate;
-}
-
 /** Moving funds between mints (linkshu Autoswap), with its status lines. */
-export const useMoveMintFunds = ({
-  formatDisplayedAmountParts,
-  setStatus,
-  t,
-}: UseMoveMintFundsParams) => {
+export const useMoveMintFunds = () => {
+  const { formatDisplayedAmountParts } = useDisplayAmounts();
+  const setStatus = useSetStatus();
+  const { t } = useTranslation();
   const commands = Option.getOrNull(
     AsyncResult.value(useAtomValue(moveFundsCommandsAtom)),
   );

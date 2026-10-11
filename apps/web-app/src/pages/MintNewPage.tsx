@@ -1,6 +1,6 @@
 import { Button, Stack, TextField } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useTranslation } from "../app/hooks/shell";
 import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
 import { navigateTo } from "../hooks/useRouting";
 import {
@@ -26,7 +26,7 @@ const parseMintUrlInput = (value: string): string | null => {
 export function MintNewPage(): React.ReactElement {
   const { allowTestMints, applyDefaultMintSelection, cashuIsBusy, setStatus } =
     useMintSettingsContext();
-  const { t } = useAppShellCore();
+  const { t } = useTranslation();
   const [mintUrl, setMintUrl] = React.useState("");
   const [isSaving, setIsSaving] = React.useState(false);
 

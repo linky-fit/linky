@@ -4,40 +4,11 @@ import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MintMove } from "../app/hooks/mint/useMoveMintFunds";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
-import { applyAmountInputKeyWithDraft } from "../utils/displayAmounts";
 import { MintMoveFundsForm } from "./MintMoveFundsForm";
 
-const satOptions = { displayCurrency: "sat", fiatRates: null } as const;
-
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellCore: () => ({
-    allowedDisplayCurrencies: ["sat"],
-    applyAmountInputKeyWithDraft: (
-      currentAmount: string,
-      currentDisplayValue: string | null,
-      key: string,
-    ) =>
-      applyAmountInputKeyWithDraft(
-        currentAmount,
-        currentDisplayValue,
-        key,
-        satOptions,
-        false,
-      ),
-    decimalAmountInputKeyVisible: false,
-    displayCurrency: "sat",
-    displayUnit: "sat",
-    formatDisplayedAmountParts: (amountSat: number) => ({
-      amountText: String(amountSat),
-      approxPrefix: "",
-      unitLabel: "sat",
-    }),
-    formatDisplayedAmountText: (amountSat: number) => `${amountSat} sat`,
-    lang: "en",
-    t: (key: string) => key,
-  }),
-  useAppShellActions: () => ({ cycleDisplayCurrency: vi.fn() }),
-}));
+vi.mock("../app/hooks/shell", async () =>
+  (await import("../testUtils/shellHooks")).shellHooksMock(),
+);
 
 const decodeEstimate = Schema.decodeUnknownSync(AutoswapEstimate);
 

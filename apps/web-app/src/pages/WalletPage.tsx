@@ -1,20 +1,18 @@
 import { Button, Row, Stack } from "@linky-fit/ui";
 import type { IconName } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellActions } from "../app/context/AppShellContexts";
+import { useTranslation } from "../app/hooks/shell";
+import { useWalletBalance } from "../app/hooks/wallet/useWalletInventory";
+import { useWalletWarning } from "../app/hooks/wallet/useWalletWarning";
 import { DisplayAmount } from "../components/DisplayAmount";
 import { WalletPendingReceives } from "../components/WalletPendingReceives";
 import { WalletWarning } from "../components/WalletWarning";
 import { navigateTo } from "../hooks/useRouting";
-import type { Translate } from "../i18n";
 
 interface WalletPageProps {
-  cashuTotalBalance: number;
-  dismissWalletWarning: () => void;
+  openFeedbackContact: () => void;
   openScan: () => void;
   scanIsOpen: boolean;
-  showWalletWarning: boolean;
-  t: Translate;
 }
 
 interface WalletActionProps {
@@ -48,15 +46,10 @@ const WalletAction = ({
 );
 
 export const WalletPage: React.FC<WalletPageProps> = React.memo(
-  ({
-    cashuTotalBalance,
-    dismissWalletWarning,
-    openScan,
-    scanIsOpen,
-    showWalletWarning,
-    t,
-  }) => {
-    const { openFeedbackContact } = useAppShellActions();
+  ({ openFeedbackContact, openScan, scanIsOpen }) => {
+    const { t } = useTranslation();
+    const { cashuTotalBalance } = useWalletBalance();
+    const { dismissWalletWarning, showWalletWarning } = useWalletWarning();
     return (
       <Stack flex={1} gap="$lg">
         <WalletWarning

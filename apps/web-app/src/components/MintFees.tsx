@@ -2,7 +2,7 @@ import type { LightningFeeProbeResult } from "@linky-fit/linkshu";
 import { Stack, ListRow } from "@linky-fit/ui";
 import { Result } from "effect";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useTranslation } from "../app/hooks/shell";
 import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
 import type { ProbeLightningFee } from "../app/hooks/composition/useLinkshuComposition";
 import { getMintFeePpk } from "../app/hooks/mint/mintInfoHelpers";
@@ -114,7 +114,7 @@ interface MintFeesProps {
 
 export function MintFees({ mint }: MintFeesProps) {
   const { probeLightningFee } = useMintSettingsContext();
-  const { lang, t } = useAppShellCore();
+  const { lang, t } = useTranslation();
   const mintUrl = normalizeMintUrl(mint);
   const ppk = useKeysetFeePpk(mintUrl);
   const lightningFee = useLightningFeeProbe(probeLightningFee, mintUrl);

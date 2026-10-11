@@ -11,7 +11,7 @@ import {
   ListRow,
 } from "@linky-fit/ui";
 import { useArmedAction } from "../hooks/useArmedAction";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
 import { holdingOf, mintHoldings } from "../app/lib/mintHoldings";
 import { MintBadge } from "../components/MintBadge";
@@ -48,7 +48,11 @@ const moveTargets = (
         !isHiddenTestMint(mint, allowTestMints),
     );
 
-export function MintDetailPage() {
+interface MintDetailPageProps {
+  mintUrl: string;
+}
+
+export function MintDetailPage({ mintUrl }: MintDetailPageProps) {
   const {
     allowTestMints,
     appOwnerIdRef,
@@ -65,9 +69,9 @@ export function MintDetailPage() {
     setMintInfoAll,
     setStatus,
   } = useMintSettingsContext();
-  const { formatDisplayedAmountText, lang, route, t } = useAppShellCore();
+  const { lang, t } = useTranslation();
+  const { formatDisplayedAmountText } = useDisplayAmounts();
   const deleteAction = useArmedAction(() => setStatus(t("deleteArmedHint")));
-  const mintUrl = route.kind === "mint" ? route.mintUrl : "";
 
   const cleaned = normalizeMintUrl(mintUrl);
   const row = mintInfoByUrl.get(cleaned) ?? null;

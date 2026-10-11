@@ -13,12 +13,9 @@ import {
   Text,
   type IconName,
 } from "@linky-fit/ui";
+import { useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
-import {
-  useAppShellActions,
-  useAppShellCore,
-} from "../app/context/AppShellContexts";
-import { useAdvancedSettingsContext } from "../app/context/SystemSettingsContexts";
+import { usePushToast, useTranslation } from "../app/hooks/shell";
 import {
   useBeacon,
   useBeaconSupport,
@@ -33,6 +30,7 @@ import {
   type ProfileStatusCurrency,
 } from "../nostrStatus";
 import { getPlatformTarget } from "../platform/runtime";
+import { currentNsecAtom } from "../app/state/session/session";
 const CURRENCY_LABEL_KEYS: Record<ProfileStatusCurrency, I18nKey> = {
   BRL: "proxyPaymentsProvideBrl",
   CZK: "proxyPaymentsProvideCzk",
@@ -225,16 +223,26 @@ export function NearbyBeaconSection({
   );
 }
 
-export function ProxyPaymentsPage(): React.ReactElement {
-  const {
-    currentNsec,
-    profileStatusIsSaving,
-    proxyPaymentPayerContacts,
-    selectedProfileStatusCurrencies,
-    t,
-  } = useAppShellCore();
-  const { openWalletScan, toggleProfileStatusCurrency } = useAppShellActions();
-  const { pushToast } = useAdvancedSettingsContext();
+interface ProxyPaymentsPageProps {
+  openWalletScan: () => void;
+  profileStatusIsSaving: boolean;
+  proxyPaymentPayerContacts: readonly ProxyPaymentPayerContact[];
+  selectedProfileStatusCurrencies: readonly ProfileStatusCurrency[];
+  toggleProfileStatusCurrency: (
+    currency: ProfileStatusCurrency,
+  ) => Promise<void>;
+}
+
+export function ProxyPaymentsPage({
+  openWalletScan,
+  profileStatusIsSaving,
+  proxyPaymentPayerContacts,
+  selectedProfileStatusCurrencies,
+  toggleProfileStatusCurrency,
+}: ProxyPaymentsPageProps): React.ReactElement {
+  const currentNsec = useAtomValue(currentNsecAtom);
+  const { t } = useTranslation();
+  const pushToast = usePushToast();
   const notifications = usePushNotificationsSetting();
   const beaconSupported = useBeaconSupport();
   // The currency whose switch waits for the user to confirm enabling

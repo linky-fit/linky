@@ -9,7 +9,7 @@ import {
 } from "@linky-fit/ui";
 import { useMemo } from "react";
 import type { InspectCashuProofStates } from "../app/hooks/composition/useLinkshuComposition";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import { useTokenProofStates } from "../hooks/useTokenProofStates";
 import { normalizeLocale } from "../utils/formatting";
 
@@ -43,7 +43,8 @@ export const CashuTokenProofStatus = ({
   inspect,
   busy,
 }: CashuTokenProofStatusProps) => {
-  const { t, lang, formatDisplayedAmountText } = useAppShellCore();
+  const { t, lang } = useTranslation();
+  const { formatDisplayedAmountText } = useDisplayAmounts();
   const tokens = useMemo(() => proofs, [proofs]);
   const { reports, loading, refresh, checkedAt } = useTokenProofStates(
     tokens,

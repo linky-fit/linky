@@ -1,7 +1,13 @@
+import { useAtomValue } from "@linky-fit/linkstr-react";
 import { Button, LoadingState, Notice, QRCode, Stack } from "@linky-fit/ui";
 import { type FC } from "react";
+import { useCopyText, useTranslation } from "../app/hooks/shell";
+import { useTopupInvoice } from "../app/hooks/topup/useTopupFlow";
+import { defaultMintAtom } from "../app/state/wallet/defaultMint";
+import { receiveMethodAtom } from "../app/state/wallet/prefs";
 import { DisplayAmount } from "../components/DisplayAmount";
 import type { Translate } from "../i18n";
+import { MAIN_MINT_URL, normalizeMintUrl } from "../utils/mint";
 import { optimizeCaseInsensitiveQrPayload } from "../utils/qrPayload";
 import type { ReceiveMethod } from "../utils/receiveMethod";
 
@@ -95,5 +101,31 @@ export const TopupInvoicePage: FC<TopupInvoicePageProps> = ({
         <LoadingState label={t("topupFetchingInvoice")} />
       )}
     </Stack>
+  );
+};
+
+export const TopupInvoiceRoute: FC = () => {
+  const { t } = useTranslation();
+  const copyText = useCopyText();
+  const receiveMethod = useAtomValue(receiveMethodAtom);
+  const defaultMintUrl = useAtomValue(defaultMintAtom);
+  const topup = useTopupInvoice();
+  return (
+    <TopupInvoicePage
+      copyText={copyText}
+      receiveMethod={receiveMethod}
+      t={t}
+      topupAmount={topup.topupAmount}
+      topupInvoice={topup.topupInvoice}
+      topupInvoiceCashuRequest={topup.topupInvoiceCashuRequest}
+      topupInvoiceError={topup.topupInvoiceError}
+      topupInvoiceIsBusy={topup.topupInvoiceIsBusy}
+      topupInvoiceQrPayload={topup.topupInvoiceQrPayload}
+      topupMintUrl={
+        topup.topupMintUrl ??
+        normalizeMintUrl(defaultMintUrl ?? MAIN_MINT_URL) ??
+        MAIN_MINT_URL
+      }
+    />
   );
 };

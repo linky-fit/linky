@@ -1,12 +1,12 @@
 import type React from "react";
-import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
+import { useWalletInventory } from "../app/hooks/wallet/useWalletInventory";
 import { navigateTo } from "../hooks/useRouting";
 import { normalizeMintUrl } from "../utils/mint";
 import { MintPendingPill } from "./MintPendingPill";
 
 /** Tokens waiting for their mint; they are not part of the balance above. */
 export const WalletPendingReceives = (): React.ReactElement | null => {
-  const { cashuDeferredReceives } = useMintSettingsContext();
+  const { deferredReceives: cashuDeferredReceives } = useWalletInventory();
   if (cashuDeferredReceives.length === 0) return null;
 
   const total = cashuDeferredReceives.reduce(

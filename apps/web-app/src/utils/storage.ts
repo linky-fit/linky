@@ -273,26 +273,31 @@ const readStoredInt = (key: string): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-const getLegacyDefaultDisplayCurrency = (): DisplayCurrency =>
-  safeLocalStorageGet(UNIT_TOGGLE_STORAGE_KEY) === "1"
+const getLegacyDefaultDisplayCurrency = (
+  kv: KeyValueStorage,
+): DisplayCurrency =>
+  kv.getItem(UNIT_TOGGLE_STORAGE_KEY) === "1"
     ? "btc"
     : getDefaultDisplayCurrency();
 
-export const getInitialDisplayCurrency = (): DisplayCurrency => {
-  const allowedCurrencies = getInitialAllowedDisplayCurrencies();
-  const stored = parseDisplayCurrency(
-    safeLocalStorageGet(DISPLAY_CURRENCY_STORAGE_KEY),
-  );
+export const getInitialDisplayCurrency = (
+  kv: KeyValueStorage = localStorageKv,
+): DisplayCurrency => {
+  const allowedCurrencies = getInitialAllowedDisplayCurrencies(kv);
+  const stored = parseDisplayCurrency(kv.getItem(DISPLAY_CURRENCY_STORAGE_KEY));
   if (stored && allowedCurrencies.includes(stored)) return stored;
 
-  const legacyDefault = getLegacyDefaultDisplayCurrency();
+  const legacyDefault = getLegacyDefaultDisplayCurrency(kv);
   if (allowedCurrencies.includes(legacyDefault)) return legacyDefault;
 
   return allowedCurrencies[0] ?? legacyDefault;
 };
 
-export const getInitialAllowedDisplayCurrencies = (): DisplayCurrency[] => {
-  const stored = safeLocalStorageGetJson(
+export const getInitialAllowedDisplayCurrencies = (
+  kv: KeyValueStorage = localStorageKv,
+): DisplayCurrency[] => {
+  const stored = readKvJson(
+    kv,
     DISPLAY_ALLOWED_CURRENCIES_STORAGE_KEY,
     Schema.NullOr(Schema.Array(Schema.String)),
     null,
@@ -305,8 +310,8 @@ export const getInitialAllowedDisplayCurrencies = (): DisplayCurrency[] => {
   }
 
   const legacyDefault =
-    parseDisplayCurrency(safeLocalStorageGet(DISPLAY_CURRENCY_STORAGE_KEY)) ??
-    getLegacyDefaultDisplayCurrency();
+    parseDisplayCurrency(kv.getItem(DISPLAY_CURRENCY_STORAGE_KEY)) ??
+    getLegacyDefaultDisplayCurrency(kv);
 
   return normalizeAllowedDisplayCurrencies(
     getDefaultAllowedDisplayCurrencies().concat(legacyDefault),
@@ -314,8 +319,9 @@ export const getInitialAllowedDisplayCurrencies = (): DisplayCurrency[] => {
   );
 };
 
-export const getInitialDecimalAmountInputEnabled = (): boolean =>
-  safeLocalStorageGet(DECIMAL_AMOUNT_INPUT_STORAGE_KEY) === "1";
+export const getInitialDecimalAmountInputEnabled = (
+  kv: KeyValueStorage = localStorageKv,
+): boolean => kv.getItem(DECIMAL_AMOUNT_INPUT_STORAGE_KEY) === "1";
 
 // Default ON: an absent key self-initializes to "enabled now", so both fresh
 // installs and updated ones start sending receipts with a baseline of first
@@ -336,8 +342,10 @@ export const getInitialPayWithCashuEnabled = (): boolean => {
   return !stored || stored === "1";
 };
 
-export const getInitialReceiveMethod = (): ReceiveMethod =>
-  parseReceiveMethod(safeLocalStorageGet(RECEIVE_METHOD_STORAGE_KEY)) ??
+export const getInitialReceiveMethod = (
+  kv: KeyValueStorage = localStorageKv,
+): ReceiveMethod =>
+  parseReceiveMethod(kv.getItem(RECEIVE_METHOD_STORAGE_KEY)) ??
   DEFAULT_RECEIVE_METHOD;
 
 export const getInitialShowProfileQrOnTiltEnabled = (): boolean =>

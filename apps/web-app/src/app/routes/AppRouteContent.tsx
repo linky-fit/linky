@@ -20,9 +20,9 @@ import {
   BankPaymentOfferDetailPage,
   CashuTokenEmitPage,
   CashuTokenNewPage,
-  CashuTokenPage,
-  CashuTokensPage,
-  CashuProofsPage,
+  CashuTokenRoute,
+  CashuTokensRoute,
+  CashuProofsRoute,
   ChatPage,
   ContactEditPage,
   ContactNewPage,
@@ -56,8 +56,8 @@ import {
   ProxyPaymentsPage,
   PushDebugPage,
   SettingsPage,
-  SpdPaymentPage,
-  TopupInvoicePage,
+  SpdPaymentRoute,
+  TopupInvoiceRoute,
   TopupNoAmountPage,
   TopupPage,
   RecurringPaymentFormPage,
@@ -96,15 +96,24 @@ export interface PeopleRoutesProps {
 }
 
 export interface MoneyRoutesProps {
-  cashuTokenEmitProps: React.ComponentProps<typeof CashuTokenEmitPage>;
   cashuTokenNewProps: React.ComponentProps<typeof CashuTokenNewPage>;
-  cashuTokenProps: () => React.ComponentProps<typeof CashuTokenPage>;
-  cashuProofsProps: React.ComponentProps<typeof CashuProofsPage>;
-  cashuTokensProps: React.ComponentProps<typeof CashuTokensPage>;
-  lnAddressPayProps: React.ComponentProps<typeof LnAddressPayPage>;
+  cashuTokenProps: Omit<
+    React.ComponentProps<typeof CashuTokenRoute>,
+    "routeId"
+  >;
+  cashuProofsProps: React.ComponentProps<typeof CashuProofsRoute>;
+  cashuTokensProps: React.ComponentProps<typeof CashuTokensRoute>;
+  lnAddressPayProps: Omit<
+    React.ComponentProps<typeof LnAddressPayPage>,
+    "lnAddress"
+  >;
   manualPayProps: React.ComponentProps<typeof ManualPayPage>;
-  spdPaymentProps: React.ComponentProps<typeof SpdPaymentPage>;
-  topupInvoiceProps: React.ComponentProps<typeof TopupInvoicePage>;
+  proxyPaymentsProps: React.ComponentProps<typeof ProxyPaymentsPage>;
+  spdPaymentProps: Omit<
+    React.ComponentProps<typeof SpdPaymentRoute>,
+    "isEditing" | "isManualEntry" | "spdPayload"
+  >;
+  topupNoAmountProps: React.ComponentProps<typeof TopupNoAmountPage>;
   topupProps: React.ComponentProps<typeof TopupPage>;
 }
 
@@ -150,7 +159,7 @@ const RoutePage = (): React.ReactElement => {
         <KeryxAnnouncementPage id={route.id} announcementKey={route.key} />
       );
     case "proxyPayments":
-      return <ProxyPaymentsPage />;
+      return <ProxyPaymentsPage {...moneyRoutes.proxyPaymentsProps} />;
     case "advancedAutoPayLimit":
       return <AdvancedAutoPayLimitPage />;
     case "advancedInspector":
@@ -168,7 +177,7 @@ const RoutePage = (): React.ReactElement => {
     case "mintNew":
       return <MintNewPage />;
     case "mint":
-      return <MintDetailPage />;
+      return <MintDetailPage mintUrl={route.mintUrl} />;
     case "chatStorage":
       return <ChatStoragePage />;
     case "evoluServers":
@@ -202,30 +211,52 @@ const RoutePage = (): React.ReactElement => {
     case "recurringPayment":
       return <RecurringPaymentPage id={route.id} />;
     case "topupNoAmount":
-      return <TopupNoAmountPage />;
+      return <TopupNoAmountPage {...moneyRoutes.topupNoAmountProps} />;
     case "topupInvoice":
-      return <TopupInvoicePage {...moneyRoutes.topupInvoiceProps} />;
+      return <TopupInvoiceRoute />;
     case "cashuProofs":
-      return <CashuProofsPage {...moneyRoutes.cashuProofsProps} />;
+      return <CashuProofsRoute {...moneyRoutes.cashuProofsProps} />;
     case "cashuTokens":
-      return <CashuTokensPage {...moneyRoutes.cashuTokensProps} />;
+      return <CashuTokensRoute {...moneyRoutes.cashuTokensProps} />;
     case "cashuTokenNew":
       return <CashuTokenNewPage {...moneyRoutes.cashuTokenNewProps} />;
     case "cashuTokenEmit":
-      return <CashuTokenEmitPage {...moneyRoutes.cashuTokenEmitProps} />;
+      return <CashuTokenEmitPage />;
     case "cashuToken":
-      return <CashuTokenPage {...moneyRoutes.cashuTokenProps()} />;
+      return (
+        <CashuTokenRoute {...moneyRoutes.cashuTokenProps} routeId={route.id} />
+      );
     case "contact":
       return <ContactPage {...peopleRoutes.contactProps} />;
     case "contactPay":
       return <ContactPayPage {...peopleRoutes.contactPayProps} />;
     case "lnAddressPay":
-      return <LnAddressPayPage {...moneyRoutes.lnAddressPayProps} />;
+      return (
+        <LnAddressPayPage
+          {...moneyRoutes.lnAddressPayProps}
+          lnAddress={route.lnAddress}
+        />
+      );
     case "manualPay":
       return <ManualPayPage {...moneyRoutes.manualPayProps} />;
     case "bankPayment":
+      return (
+        <SpdPaymentRoute
+          {...moneyRoutes.spdPaymentProps}
+          isEditing={route.editing === true}
+          isManualEntry={false}
+          spdPayload={route.spdPayload}
+        />
+      );
     case "bankPaymentNew":
-      return <SpdPaymentPage {...moneyRoutes.spdPaymentProps} />;
+      return (
+        <SpdPaymentRoute
+          {...moneyRoutes.spdPaymentProps}
+          isEditing
+          isManualEntry
+          spdPayload=""
+        />
+      );
     case "bankPaymentOffer":
       return (
         <BankPaymentOfferDetailPage
@@ -297,6 +328,7 @@ const desktopPanesWidth = size.appWidth - size.hero - space.lg;
 
 export const AppRouteContent = (): React.ReactElement => {
   const { route, scanIsOpen, t } = useAppShellCore();
+  const moneyRoutes = useMoneyRoutes();
   const isDesktopSplitView = useDesktopSplitView();
 
   if (!isDesktopSplitView) return <PhoneRouteContent />;
@@ -336,7 +368,7 @@ export const AppRouteContent = (): React.ReactElement => {
             ) : section === "wallet" ? (
               <WalletPane />
             ) : section === "proxy" ? (
-              <ProxyPaymentsPage />
+              <ProxyPaymentsPage {...moneyRoutes.proxyPaymentsProps} />
             ) : (
               <AdvancedPage />
             )}

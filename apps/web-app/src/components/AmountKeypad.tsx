@@ -1,6 +1,6 @@
 import { Card, Keypad } from "@linky-fit/ui";
 import type { ReactNode } from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import { DisplayAmount } from "./DisplayAmount";
 import type { AmountInput } from "./useAmountInputKeypad";
 
@@ -20,7 +20,8 @@ export function AmountKeypad({
   disabled,
   below,
 }: AmountKeypadProps) {
-  const { displayUnit, t } = useAppShellCore();
+  const { t } = useTranslation();
+  const { displayUnit } = useDisplayAmounts();
   const amountSat = Number.parseInt(amount.trim(), 10);
   return (
     <>

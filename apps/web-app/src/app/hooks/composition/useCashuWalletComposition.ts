@@ -1,9 +1,8 @@
-import type { TextField } from "@linky-fit/ui";
+import { useAtom } from "@linky-fit/linkstr-react";
 import type { PushToastOptions } from "../../../hooks/useToasts";
-import type { ReceiveMethod } from "../../../utils/receiveMethod";
 import { paidOverlayContact } from "../../lib/paidOverlay";
 import { decodeNpub, encodeNprofile } from "@linky-fit/linkstr";
-import React, { type ComponentRef, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import type { ContactId } from "../../../evolu";
 import { useRouting } from "../../../hooks/useRouting";
 import { recommendedNostrRelays } from "../../../utils/nostrRelays";
@@ -13,14 +12,8 @@ import {
 } from "../../../utils/displayAmounts";
 import { type TransactionsRepository } from "@linky-fit/linksync";
 import {
-  formatMintHost,
-  MAIN_MINT_URL,
-  normalizeMintUrl,
-} from "../../../utils/mint";
-import {
   getInitialLightningInvoiceAutoPayLimit,
   getInitialPayWithCashuEnabled,
-  getInitialReceiveMethod,
 } from "../../../utils/storage";
 import { useSaveCashuFromText } from "../cashu/useSaveCashuFromText";
 import { useDeferredReceiveRetry } from "../cashu/useDeferredReceiveRetry";
@@ -30,7 +23,8 @@ import { useCashuDomain } from "../useCashuDomain";
 import { useMintDomain } from "../useMintDomain";
 import { useAllowTestMints } from "../useAllowTestMints";
 import { useMoveMintFunds } from "../mint/useMoveMintFunds";
-import { planDefaultMintMove } from "../../state/wallet/moveFunds";
+import { receiveMethodAtom } from "../../state/wallet/prefs";
+import { receiveTokenDraftAtom } from "../../state/wallet/tokenActivity";
 import { useDefaultMint } from "../wallet/useDefaultMint";
 import { useNpubCash } from "../wallet/useNpubCash";
 import { useLnurlWithdraw } from "../wallet/useLnurlWithdraw";
@@ -39,12 +33,16 @@ import { useTransferCleanup } from "../wallet/useTransferCleanup";
 import { useWalletOps } from "../wallet/useWalletOps";
 import { useWalletPayments } from "../wallet/useWalletPayments";
 import { useWalletResumes } from "../wallet/useWalletResumes";
-import { useWalletWarning } from "../wallet/useWalletWarning";
-import { useWalletTokens } from "../wallet/useWalletTokens";
-import { useOwnerStorage, usePaymentLog } from "../wallet/useWalletStorage";
-import { usePaidOverlayState } from "../usePaidOverlayState";
+import { useWalletBalance } from "../wallet/useWalletInventory";
 import {
-  isOpenTransfer,
+  useIssuedTokenClaimWatch,
+  useTokenContactSend,
+  useTokenRecovery,
+  useWalletTokens,
+} from "../wallet/useWalletTokens";
+import { useOwnerStorage, usePaymentLog } from "../wallet/useWalletStorage";
+import { usePaidOverlay, usePaidOverlayCommands } from "../shell";
+import {
   isPendingDeferredReceive,
   takenTokenTexts,
 } from "../../lib/cashuTransfers";
@@ -94,7 +92,6 @@ interface UseCashuWalletCompositionParams {
   formatDisplayedAmountParts: (
     amountSat: number,
   ) => ReturnType<typeof formatDisplayAmountParts>;
-  formatDisplayedAmountText: (amountSat: number) => string;
   identity: Pick<
     IdentityOwnersCompositionResult,
     "appOwnerId" | "currentNpub" | "currentNsec"
@@ -131,7 +128,6 @@ export const useCashuWalletComposition = ({
   contactsMessaging,
   fiatRates,
   formatDisplayedAmountParts,
-  formatDisplayedAmountText,
   identity,
   maybeShowPwaNotification,
   payAmount,
@@ -174,31 +170,19 @@ export const useCashuWalletComposition = ({
   );
   const [lightningInvoiceAutoPayLimit, setLightningInvoiceAutoPayLimit] =
     useState<number>(() => getInitialLightningInvoiceAutoPayLimit());
-  const [receiveMethod, setReceiveMethod] = useState<ReceiveMethod>(() =>
-    getInitialReceiveMethod(),
-  );
+  const [receiveMethod, setReceiveMethod] = useAtom(receiveMethodAtom);
 
   useAnonymousPaymentTelemetry({
     appOwnerId,
     makeLocalStorageKey,
   });
 
-  const [cashuDraft, setCashuDraft] = useState("");
-  const cashuDraftRef = React.useRef<ComponentRef<typeof TextField>>(null);
+  const [, setCashuDraft] = useAtom(receiveTokenDraftAtom);
   const { runQueued, walletOpRunning: cashuIsBusy } = useWalletOps();
 
-  const {
-    dismissPaymentSending,
-    paidOverlayDetails,
-    paidOverlayIsOpen,
-    paidOverlayPhase,
-    paidOverlayTitle,
-    showPaidOverlay,
-    showPaymentSending,
-    topupPaidNavTimerRef,
-  } = usePaidOverlayState({
-    t,
-  });
+  const { dismissPaymentSending, showPaidOverlay, showPaymentSending } =
+    usePaidOverlayCommands();
+  const paidOverlay = usePaidOverlay();
 
   React.useEffect(() => {
     migrateLegacyPaymentEvents();
@@ -213,7 +197,6 @@ export const useCashuWalletComposition = ({
     allWalletProofs,
     cashuEnvelopes,
     cashuTransferLifecycle,
-    inspectCashuProofStates,
     fetchMintInfo,
     meltCashuInvoice,
     probeLightningFee,
@@ -230,12 +213,7 @@ export const useCashuWalletComposition = ({
     walletOperations,
     walletProofs,
     walletTransfers,
-  } = useLinkshuComposition({ allowTestMints });
-
-  const cashuOpenTransfers = React.useMemo(
-    () => walletTransfers.filter(isOpenTransfer),
-    [walletTransfers],
-  );
+  } = useLinkshuComposition();
 
   const {
     cashuTokensHydratedRef,
@@ -281,41 +259,17 @@ export const useCashuWalletComposition = ({
     transactions,
   });
 
-  const cashuTotalBalance: number = walletBalances.total;
-  const cashuBalance: number = walletBalances.spendable;
-
-  const paymentMintMeltPlan = React.useMemo(
-    () => planDefaultMintMove(walletBalances.perMint, defaultMintUrl),
-    [defaultMintUrl, walletBalances.perMint],
-  );
+  const {
+    cashuBalance,
+    cashuBalanceAfterMelt,
+    cashuMeltToMainMintButtonLabel,
+    cashuTotalBalance,
+  } = useWalletBalance();
 
   const { estimateMintMove, meltToDefaultMint, moveMintFunds } =
-    useMoveMintFunds({ formatDisplayedAmountParts, setStatus, t });
+    useMoveMintFunds();
 
-  const cashuBalanceAfterMelt = Math.max(
-    cashuBalance,
-    paymentMintMeltPlan?.maxBalanceAfterMove ?? 0,
-  );
-
-  const cashuHasMultipleAcceptedMints =
-    new Set(walletBalances.perMint.map(({ mint }) => normalizeMintUrl(mint)))
-      .size > 1;
-
-  const canPayWithCashu = cashuBalance > 0;
-
-  const {
-    setTopupAmount,
-    setTopupNote,
-    startBackgroundTopup,
-    topupAmount,
-    topupNote,
-    topupInvoice,
-    topupInvoiceCashuRequest,
-    topupInvoiceError,
-    topupInvoiceIsBusy,
-    topupInvoiceQrPayload,
-    topupMintUrl,
-  } = useTopupFlow({
+  const { startBackgroundTopup } = useTopupFlow({
     cashuTotalBalance,
     defaultMintUrl,
     formatDisplayedAmountParts,
@@ -325,7 +279,6 @@ export const useCashuWalletComposition = ({
     showPaidOverlay,
     startCashuTopup,
     t,
-    topupPaidNavTimerRef,
     topupRecipientNprofile,
   });
 
@@ -393,7 +346,6 @@ export const useCashuWalletComposition = ({
     startBackgroundTopup,
     t,
   });
-  const walletWarning = useWalletWarning(cashuBalance);
 
   const findPaidOverlayContact = React.useCallback(
     (contactId: string) =>
@@ -467,38 +419,23 @@ export const useCashuWalletComposition = ({
     walletReady: sendCashuToken !== null && meltCashuInvoice !== null,
   });
 
-  const walletTokens = useWalletTokens({
+  const {
+    discardCashuDeferredReceive,
+    markCashuTokenExternalized,
+    markCashuTokenIssued,
+  } = useWalletTokens();
+  const tokenRecovery = useTokenRecovery({
     allowTestMints,
-    cashuBalance,
-    chat,
     defaultMintUrl,
-    formatDisplayedAmountText,
     isMintDeleted,
     mintInfoDeduped,
-    pushToast,
     readSeenMints: readSeenMintsFromStorage,
     recoverEnvelopes,
     rememberSeenMint,
-    setStatus,
-    t,
     walletMints,
-    walletOpRunning: cashuIsBusy,
-    walletProofs,
-    walletTransfers,
   });
-
-  const mainMintForTokenList = React.useMemo(
-    () => normalizeMintUrl(defaultMintUrl ?? MAIN_MINT_URL),
-    [defaultMintUrl],
-  );
-
-  const cashuMeltToMainMintButtonLabel =
-    mainMintForTokenList && paymentMintMeltPlan
-      ? t("cashuMeltToMainMint").replace(
-          "{mint}",
-          formatMintHost(mainMintForTokenList),
-        )
-      : null;
+  const tokenContactSend = useTokenContactSend({ chat, walletTransfers });
+  useIssuedTokenClaimWatch({ walletProofs, walletTransfers });
 
   useDeferredReceiveRetry({
     // Hidden test-mint deferrals are retried too, so they keep the backoff running.
@@ -528,9 +465,13 @@ export const useCashuWalletComposition = ({
 
   return {
     ...walletPayments,
-    ...walletTokens,
+    ...tokenRecovery,
+    ...tokenContactSend,
     ...lnurlWithdraw,
-    ...walletWarning,
+    ...paidOverlay,
+    discardCashuDeferredReceive,
+    markCashuTokenExternalized,
+    markCashuTokenIssued,
     recurringPaymentsContext,
     cashuTransferLifecycle,
     // Backup export and the Nostr bootstrap snapshot need every proof,
@@ -538,22 +479,15 @@ export const useCashuWalletComposition = ({
     allCashuProofs: allWalletProofs,
     allowTestMints,
     applyDefaultMintSelection,
-    canPayWithCashu,
     cashuBalance,
     cashuBalanceAfterMelt,
-    cashuDraft,
-    cashuDraftRef,
-    cashuHasMultipleAcceptedMints,
     cashuIsBusy,
     cashuMeltToMainMintButtonLabel,
-    cashuOpenTransfers,
     cashuDeferredReceives: walletDeferredReceives,
     cashuProofs: walletProofs,
     cashuOperations: walletOperations,
     cashuTokensHydratedRef,
-    cashuTotalBalance,
     cashuTransfers: walletTransfers,
-    inspectCashuProofStates,
     defaultMintDisplay,
     defaultMintUrl,
     estimateMintMove,
@@ -568,31 +502,15 @@ export const useCashuWalletComposition = ({
     meltLargestForeignMintToMainMint: meltToDefaultMint,
     mintInfoByUrl,
     moveMintFunds,
-    paidOverlayDetails,
-    paidOverlayIsOpen,
-    paidOverlayPhase,
-    paidOverlayTitle,
     payWithCashuEnabled,
     receiveMethod,
     probeLightningFee,
     refreshMintInfo,
     saveCashuFromText,
-    setCashuDraft,
     setLightningInvoiceAutoPayLimit,
     setMintInfoAll,
     setAllowTestMints,
     setPayWithCashuEnabled,
     setReceiveMethod,
-    setTopupAmount,
-    setTopupNote,
-    showPaidOverlay,
-    topupAmount,
-    topupNote,
-    topupInvoice,
-    topupInvoiceCashuRequest,
-    topupInvoiceError,
-    topupInvoiceIsBusy,
-    topupInvoiceQrPayload,
-    topupMintUrl,
   };
 };

@@ -1,6 +1,7 @@
 import { transactionIdForQuote } from "@linky-fit/linksync";
 import type { TopupError, TopupQuote } from "@linky-fit/linkshu";
 import type { PaidOverlayDetails } from "../../lib/paidOverlay";
+import { useAtom, useAtomSet, useAtomValue } from "@linky-fit/linkstr-react";
 import { Result } from "effect";
 import React from "react";
 import { useLatest } from "../../../hooks/useLatest";
@@ -20,16 +21,18 @@ import type {
   StartCashuTopup,
 } from "../composition/useLinkshuComposition";
 import type { Translate } from "../../../i18n";
+import {
+  activeTopupAtom,
+  topupAmountAtom,
+  topupInvoiceBusyAtom,
+  topupInvoiceCashuRequestAtom,
+  topupInvoiceErrorAtom,
+  topupInvoiceQrPayloadAtom,
+  topupNoteAtom,
+} from "../../state/wallet/topup";
 
 const describeTopupError = (error: TopupError): string =>
   describeTaggedCashuError(error) ?? error._tag;
-
-interface ActiveTopup {
-  readonly amountSat: number;
-  readonly mint: string;
-  readonly note: string | null;
-  readonly quote: TopupQuote;
-}
 
 interface UseTopupFlowParams {
   cashuTotalBalance: number;
@@ -43,7 +46,6 @@ interface UseTopupFlowParams {
   /** Null until the linkshu runtime is composed (seed + owners resolved). */
   startCashuTopup: StartCashuTopup | null;
   t: Translate;
-  topupPaidNavTimerRef: React.MutableRefObject<number | null>;
   topupRecipientNprofile: string | null;
 }
 
@@ -65,23 +67,26 @@ export const useTopupFlow = ({
   showPaidOverlay,
   startCashuTopup,
   t,
-  topupPaidNavTimerRef,
   topupRecipientNprofile,
 }: UseTopupFlowParams) => {
-  const [activeTopup, setActiveTopup] = React.useState<ActiveTopup | null>(
-    null,
+  const [activeTopup, setActiveTopup] = useAtom(activeTopupAtom);
+  const [topupAmount, setTopupAmount] = useAtom(topupAmountAtom);
+  const [topupNote, setTopupNote] = useAtom(topupNoteAtom);
+  const setTopupInvoiceError = useAtomSet(topupInvoiceErrorAtom);
+  const setTopupInvoiceIsBusy = useAtomSet(topupInvoiceBusyAtom);
+  const setTopupInvoiceQrPayload = useAtomSet(topupInvoiceQrPayloadAtom);
+  const setTopupInvoiceCashuRequest = useAtomSet(topupInvoiceCashuRequestAtom);
+  const topupPaidNavTimerRef = React.useRef<number | null>(null);
+
+  React.useEffect(
+    () => () => {
+      if (topupPaidNavTimerRef.current !== null) {
+        window.clearTimeout(topupPaidNavTimerRef.current);
+      }
+      topupPaidNavTimerRef.current = null;
+    },
+    [],
   );
-  const [topupAmount, setTopupAmount] = React.useState<string>("");
-  const [topupNote, setTopupNote] = React.useState<string>("");
-  const [topupInvoiceError, setTopupInvoiceError] = React.useState<
-    string | null
-  >(null);
-  const [topupInvoiceIsBusy, setTopupInvoiceIsBusy] = React.useState(false);
-  const [topupInvoiceQrPayload, setTopupInvoiceQrPayload] = React.useState<
-    string | null
-  >(null);
-  const [topupInvoiceCashuRequest, setTopupInvoiceCashuRequest] =
-    React.useState<string | null>(null);
 
   const activeTopupRef = useLatest(activeTopup);
   const routeKindRef = useLatest(routeKind);
@@ -160,9 +165,11 @@ export const useTopupFlow = ({
       formatDisplayedAmountParts,
       logPaymentEvent,
       routeKindRef,
+      setActiveTopup,
+      setTopupAmount,
+      setTopupNote,
       showPaidOverlay,
       t,
-      topupPaidNavTimerRef,
     ],
   );
 
@@ -188,7 +195,7 @@ export const useTopupFlow = ({
         );
       }
     },
-    [activeTopupRef, t],
+    [activeTopupRef, setActiveTopup, setTopupInvoiceError, t],
   );
 
   const completeTopupRef = useLatest(completeTopup);
@@ -306,6 +313,9 @@ export const useTopupFlow = ({
     activeTopup,
     defaultMintUrl,
     routeKind,
+    setActiveTopup,
+    setTopupInvoiceError,
+    setTopupInvoiceIsBusy,
     startCashuTopup,
     tRef,
     topupAmount,
@@ -335,7 +345,13 @@ export const useTopupFlow = ({
       : invoice;
     setTopupInvoiceCashuRequest(cashuRequest);
     setTopupInvoiceQrPayload(payload);
-  }, [activeTopup, routeKind, topupRecipientNprofile]);
+  }, [
+    activeTopup,
+    routeKind,
+    setTopupInvoiceCashuRequest,
+    setTopupInvoiceQrPayload,
+    topupRecipientNprofile,
+  ]);
 
   React.useEffect(() => {
     if (routeKind === "topupInvoice") return;
@@ -347,7 +363,14 @@ export const useTopupFlow = ({
       setTopupAmount("");
       setTopupNote("");
     }
-  }, [activeTopupRef, routeKind]);
+  }, [
+    activeTopupRef,
+    routeKind,
+    setTopupAmount,
+    setTopupInvoiceError,
+    setTopupInvoiceIsBusy,
+    setTopupNote,
+  ]);
 
   // The QR also carries a cashu payment request, so the sats can arrive as a
   // token instead of an invoice payment: a balance jump by the requested
@@ -387,10 +410,21 @@ export const useTopupFlow = ({
     [startCashuTopup, t, watchTopup],
   );
 
+  return { startBackgroundTopup };
+};
+
+/** The topup screens' view of the flow `useTopupFlow` runs. */
+export const useTopupInvoice = () => {
+  const [topupAmount, setTopupAmount] = useAtom(topupAmountAtom);
+  const [topupNote, setTopupNote] = useAtom(topupNoteAtom);
+  const activeTopup = useAtomValue(activeTopupAtom);
+  const topupInvoiceCashuRequest = useAtomValue(topupInvoiceCashuRequestAtom);
+  const topupInvoiceError = useAtomValue(topupInvoiceErrorAtom);
+  const topupInvoiceIsBusy = useAtomValue(topupInvoiceBusyAtom);
+  const topupInvoiceQrPayload = useAtomValue(topupInvoiceQrPayloadAtom);
   return {
     setTopupAmount,
     setTopupNote,
-    startBackgroundTopup,
     topupAmount,
     topupNote,
     topupInvoice: activeTopup?.quote.invoice ?? null,
