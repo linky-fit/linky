@@ -40,9 +40,12 @@ export const makeWebPlatformPorts = (): PlatformPorts => ({
       import.meta.env.VITE_EVOLU_SERVER_URLS,
     ),
     isE2e: import.meta.env.VITE_E2E === "1",
+    isDev: import.meta.env.DEV,
   },
   lifecycle: {
     reload: () => globalThis.location.reload(),
     deferUpdateWhile: deferPwaUpdateWhile,
+    isOnline: () =>
+      typeof navigator === "undefined" || navigator.onLine !== false,
   },
 });

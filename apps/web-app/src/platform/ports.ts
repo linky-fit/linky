@@ -21,12 +21,16 @@ export interface AppConfig {
   /** Evolu relays the build pins for a fresh origin. */
   readonly evoluRelayDefaults: ReadonlyArray<string>;
   readonly isE2e: boolean;
+  /** A development build, which may talk to local services over plain http. */
+  readonly isDev: boolean;
 }
 
 export interface LifecyclePort {
   readonly reload: () => void;
   /** Holds back an app update's reload until `work` settles. */
   readonly deferUpdateWhile: (work: Promise<void>) => void;
+  /** False only while the device reports no network connection. */
+  readonly isOnline: () => boolean;
 }
 
 export interface PlatformPorts {

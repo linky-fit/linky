@@ -1,26 +1,19 @@
 import type { TextField } from "@linky-fit/ui";
 import type { PushToastOptions } from "../../../hooks/useToasts";
-import {
-  transactionIdForOperation,
-  transactionIdForRequest,
-} from "@linky-fit/linksync";
-import { isCurrentChatPaymentRequest } from "../../lib/chatPaymentRequestAuthorization";
+import { transactionIdForOperation } from "@linky-fit/linksync";
 import type { ReceiveMethod } from "../../../utils/receiveMethod";
 import type { RestoreProgress } from "@linky-fit/linkshu";
 import { useReclaimCashuTransfer } from "../cashu/useReclaimCashuTransfer";
 import { paidOverlayContact } from "../../lib/paidOverlay";
 import { useLatest } from "../../../hooks/useLatest";
-import { useExclusiveRun } from "../../../hooks/useExclusiveRun";
 import {
   CashuTokenText,
   ClientId,
   decodeNpub,
   encodeNprofile,
-  encodeNpub,
   identityFromNsec,
   OutboxRef,
   PaymentNoticeDraft,
-  parsePubkey,
   Pubkey,
   TokenMessageDraft,
 } from "@linky-fit/linkstr";
@@ -37,7 +30,6 @@ import {
 } from "../../../lnurlPay";
 import { recommendedNostrRelays } from "../../../utils/nostrRelays";
 import {
-  CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY,
   WALLET_WARNING_BALANCE_THRESHOLD_SAT,
   WALLET_WARNING_DISMISSED_STORAGE_KEY,
 } from "../../../utils/constants";
@@ -49,16 +41,7 @@ import {
   isNpubCashDisabled,
   NPUB_CASH_SERVER_BASE_URL,
 } from "../../../utils/npubCashServer";
-import {
-  getLightningInvoicePreview,
-  isAllowedPaymentRequestPostUrl,
-  mintMoveCovers,
-  planSendMint,
-  postPaymentRequestPayload,
-  type LightningInvoicePreview,
-  type OperationId,
-  type PostPaymentRequestPayloadOutcome,
-} from "@linky-fit/linkshu";
+import { planSendMint, type OperationId } from "@linky-fit/linkshu";
 import {
   CashuOperationId as CashuOperationIdType,
   type TransactionsRepository,
@@ -86,25 +69,28 @@ import { useSaveCashuFromText } from "../cashu/useSaveCashuFromText";
 import { useDeferredReceiveRetry } from "../cashu/useDeferredReceiveRetry";
 import { normalizePubkeyHex } from "../messages/contactIdentity";
 import { useNpubCashMintSelection } from "../mint/useNpubCashMintSelection";
-import { useCashuPaymentRequestConfirmation } from "../payments/useCashuPaymentRequestConfirmation";
 import { useContactPayMethod } from "../payments/useContactPayMethod";
-import { usePayContactWithCashuMessage } from "../payments/usePayContactWithCashuMessage";
 import { useRouteAmountResetEffects } from "../payments/useRouteAmountResetEffects";
 import { useTopupFlow } from "../topup/useTopupFlow";
 import { useAnonymousPaymentTelemetry } from "../useAnonymousPaymentTelemetry";
 import { useCashuDomain } from "../useCashuDomain";
-import { useLightningPaymentsDomain } from "../useLightningPaymentsDomain";
 import { useMintDomain } from "../useMintDomain";
 import { useAllowTestMints } from "../useAllowTestMints";
 import { useMoveMintFunds } from "../mint/useMoveMintFunds";
 import { planDefaultMintMove } from "../../state/wallet/moveFunds";
 import { useDefaultMint } from "../wallet/useDefaultMint";
+import { useCashuPaymentRequests } from "../wallet/useCashuPaymentRequests";
+import { useContactPayments } from "../wallet/useContactPayments";
+import { useLightningPayments } from "../wallet/useLightningPayments";
+import {
+  usePaymentMintMove,
+  useRememberFirstPayment,
+} from "../wallet/paymentUi";
 import { useWalletOps } from "../wallet/useWalletOps";
+import { logPayStep } from "../../state/wallet/paymentLog";
 import { useOwnerStorage, usePaymentLog } from "../wallet/useWalletStorage";
 import { usePaidOverlayState } from "../usePaidOverlayState";
-import { usePaymentsDomain } from "../usePaymentsDomain";
 import { useProfileNpubCashEffects } from "../useProfileNpubCashEffects";
-import { reportCashuSendForgotten } from "../../lib/cashuSendInspector";
 import { describeTaggedCashuError } from "../../lib/cashuStoredError";
 import { isSpellingOf } from "../../lib/mintSpelling";
 import {
@@ -114,19 +100,9 @@ import {
   takenTokenTexts,
 } from "../../lib/cashuTransfers";
 import {
-  buildCashuPaymentRequestMessage,
-  parseCashuPaymentRequestMessage,
-  type CashuPaymentRequestMessageInfo,
-} from "../../lib/paymentRequestMessage";
-import {
   getCashuTokenMessageInfo as getCashuTokenMessageInfoBase,
   readCashuTokenMemo,
 } from "../../lib/tokenMessageInfo";
-import type {
-  ContactRowLike,
-  LocalNostrMessage,
-  PaymentLogData,
-} from "../../types/appTypes";
 import {
   useContactsMessagingComposition,
   type DisplayContact,
@@ -147,23 +123,8 @@ import { useResumeOnLaunchAndOnline } from "../useResumeOnLaunchAndOnline";
 import { useProfileComposition } from "./useProfileComposition";
 import type { Translate } from "../../../i18n";
 
-import { reportAppLog } from "../../../devtools/inspector/appLog";
 const isPubkey = Schema.is(Pubkey);
 const decodeCashuTokenText = Schema.decodeUnknownResult(CashuTokenText);
-
-export const logPayStep = (step: string, data?: PaymentLogData): void => {
-  const clientId = data?.clientId;
-  const messageId = data?.messageId;
-  reportAppLog({
-    tag: "pay.step",
-    summary: `Contact payment: ${step}`,
-    links: {
-      ...(typeof clientId === "string" ? { client: clientId } : {}),
-      ...(typeof messageId === "string" ? { message: messageId } : {}),
-    },
-    payload: { step, ...data },
-  });
-};
 
 type IdentityOwnersCompositionResult = ReturnType<
   typeof useIdentityOwnersComposition
@@ -233,19 +194,6 @@ interface UseCashuWalletCompositionParams {
   t: Translate;
   transactions: Pick<TransactionsRepository, "all" | "update">;
 }
-
-const describePaymentRequestPostFailure = (
-  outcome: Exclude<PostPaymentRequestPayloadOutcome, { _tag: "Delivered" }>,
-): string => {
-  switch (outcome._tag) {
-    case "HttpError":
-      return `Payment request POST ${outcome.status}`;
-    case "NetworkError":
-      return outcome.detail;
-    case "InsecureUrl":
-      return "Payment request POST url is not https";
-  }
-};
 
 export const useCashuWalletComposition = ({
   contactPayBackToChatRef,
@@ -337,7 +285,6 @@ export const useCashuWalletComposition = ({
     runQueued,
     walletOpRunning: cashuIsBusy,
   } = useWalletOps();
-  const runPaymentRequestExclusively = useExclusiveRun();
   const [cashuBulkCheckIsBusy, setCashuBulkCheckIsBusy] = useState(false);
   const [tokensRestoreIsBusy, setTokensRestoreIsBusy] = useState(false);
   const [tokensRestoreProgress, setTokensRestoreProgress] =
@@ -352,20 +299,9 @@ export const useCashuWalletComposition = ({
     useState<CashuOperationId | null>(null);
 
   const [
-    pendingLightningInvoiceConfirmation,
-    setPendingLightningInvoiceConfirmation,
-  ] = useState<LightningInvoicePreview | null>(null);
-  const [
     pendingLnurlWithdrawConfirmation,
     setPendingLnurlWithdrawConfirmation,
   ] = useState<LnurlWithdrawPreview | null>(null);
-  const [
-    pendingPaymentMintMeltConfirmation,
-    setPendingPaymentMintMeltConfirmation,
-  ] = useState<{
-    fromMint: string;
-    toMint: string;
-  } | null>(null);
   const [lnurlWithdrawIsBusy, setLnurlWithdrawIsBusy] = useState(false);
 
   const npubCashClaimInFlightRef = React.useRef(false);
@@ -553,38 +489,11 @@ export const useCashuWalletComposition = ({
     paymentMintMeltPlan?.maxBalanceAfterMove ?? 0,
   );
 
-  const requestPaymentMintMelt = React.useCallback(
-    (amountSat: number): boolean => {
-      if (
-        !mintMoveCovers({
-          plan: paymentMintMeltPlan,
-          amount: amountSat,
-          spendable: cashuBalance,
-        }) ||
-        !paymentMintMeltPlan
-      ) {
-        return false;
-      }
-
-      setPendingPaymentMintMeltConfirmation({
-        fromMint: paymentMintMeltPlan.fromMint,
-        toMint: paymentMintMeltPlan.toMint,
-      });
-      return true;
-    },
-    [cashuBalance, paymentMintMeltPlan],
-  );
-
   const cashuHasMultipleAcceptedMints =
     new Set(walletBalances.perMint.map(({ mint }) => normalizeMintUrl(mint)))
       .size > 1;
 
   const canPayWithCashu = cashuBalance > 0;
-
-  const [postPaySaveContact, setPostPaySaveContact] = React.useState<null | {
-    lnAddress: string;
-    amountSat: number;
-  }>(null);
 
   const {
     setTopupAmount,
@@ -745,671 +654,104 @@ export const useCashuWalletComposition = ({
     setContactPayMethod,
   });
 
-  const payContactWithCashuMessage =
-    usePayContactWithCashuMessage<ContactRowLike>({
-      appendLocalNostrMessage,
-      cashuBalance,
-      cashuTransferLifecycle,
-      currentNpub,
-      currentNsec,
-      defaultMintUrl,
-      dismissPaymentSending,
-      enqueuePendingPayment,
-      formatDisplayedAmountParts,
-      logPayStep,
-      logPaymentEvent,
-      nostrMessagesLocal,
-      payWithCashuEnabled,
-      pushToast,
-      sendCashuToken,
-      setContactsOnboardingHasPaid,
-      setStatus,
-      showPaidOverlay,
-      showPaymentSending,
-      t,
-      updateLocalNostrMessage,
-      walletMintBalances: walletBalances.perMint,
-    });
-
-  const settleBankPaymentOffer = React.useCallback(
-    async (message: LocalNostrMessage) => {
-      if (cashuIsBusy) return;
-
-      const offer = getBankPaymentOfferForSettlement(message);
-      if (!offer) {
-        setStatus(t("spdPaymentOfferFailed"));
-        return;
-      }
-      if (isBankPaymentOfferCanceled(offer.offerId)) {
-        setStatus(t("bankPaymentOfferStatusCanceled"));
-        return;
-      }
-      const amountSat = offer.amountSat;
-      if (!amountSat) {
-        setStatus(t("payInvalidAmount"));
-        return;
-      }
-
-      const contactId = message.contactId.trim();
-      const contact =
-        contacts.find((candidate) => candidate.id.trim() === contactId) ?? null;
-      if (!contact) {
-        setStatus(t("contactNotFound"));
-        return;
-      }
-
-      await runExclusive(async () => {
-        const result = await payContactWithCashuMessage({
-          contact,
-          amountSat,
-          logCompletedOnly: true,
-          paymentNoticeContext: "bank_payment_offer",
-          paymentNoticeOfferId: offer.offerId,
-        });
-        if (!result.ok) return;
-
-        await respondToBankPaymentOfferWithGroupState(message, "settled");
-      });
-    },
-    [
-      cashuIsBusy,
-      contacts,
-      getBankPaymentOfferForSettlement,
-      isBankPaymentOfferCanceled,
-      payContactWithCashuMessage,
-      respondToBankPaymentOfferWithGroupState,
-      runExclusive,
-      setStatus,
-      t,
-    ],
+  const rememberFirstPayment = useRememberFirstPayment(
+    setContactsOnboardingHasPaid,
   );
-
-  usePaymentsDomain({
-    cashuBalance,
-    cashuIsBusy,
-    cashuReady: sendCashuToken !== null && cashuTransferLifecycle !== null,
-    contacts,
-    currentNpub,
-    currentNsec,
-    payContactWithCashuMessage,
-    pendingPaymentsKey,
-    updateLocalNostrMessage,
-    pushToast,
-    runExclusive,
-    t,
-  });
-
-  const paySelectedContact = React.useCallback(
-    async (options?: { note?: string | null }) => {
-      if (cashuIsBusy) return;
-      if (route.kind !== "contactPay") return;
-      if (!selectedContact) return;
-
-      const note = (options?.note ?? "").trim() || null;
-      const amountSat = Number.parseInt(payAmount.trim(), 10);
-      if (!Number.isFinite(amountSat) || amountSat <= 0) {
-        setStatus(t("payInvalidAmount"));
-        return;
-      }
-
-      if (amountSat > cashuBalance) {
-        if (!requestPaymentMintMelt(amountSat)) {
-          setStatus(t("payInsufficient"));
-        }
-        return;
-      }
-
-      const normalizedMethod =
-        contactPayMethod === "lightning" || contactPayMethod === "cashu"
-          ? contactPayMethod
-          : "cashu";
-
-      if (normalizedMethod === "lightning") {
-        const lnAddress = (selectedContact.lnAddress ?? "").trim();
-        if (!lnAddress) {
-          setStatus(t("payMissingLn"));
-          return;
-        }
-        setLnAddressPayAmount(String(amountSat));
-        setLnAddressPayNote(note ?? "");
-        setLnAddressPayContactId(selectedContact.id);
-        navigateTo({ route: "lnAddressPay", lnAddress });
-        return;
-      }
-
-      await runExclusive(async () => {
-        await payContactWithCashuMessage({
-          contact: selectedContact,
-          amountSat,
-          memo: note,
-        });
-      });
-    },
-    [
-      cashuIsBusy,
-      cashuBalance,
-      contactPayMethod,
-      payAmount,
-      payContactWithCashuMessage,
-      requestPaymentMintMelt,
-      route.kind,
-      selectedContact,
-      runExclusive,
-      setLnAddressPayAmount,
-      setStatus,
-      t,
-    ],
-  );
-
-  const findContactForCashuPaymentRequest = React.useCallback(
-    (requestInfo: CashuPaymentRequestMessageInfo) => {
-      const requestPubkeyHex = normalizePubkeyHex(
-        requestInfo.transportPubkeyHex,
-      );
-      if (!requestPubkeyHex) return null;
-
-      for (const contact of contacts) {
-        const normalizedNpub = normalizeNpubIdentifier(contact.npub ?? "");
-        if (!normalizedNpub) continue;
-
-        if (decodeNpub(normalizedNpub) === requestPubkeyHex) return contact;
-      }
-
-      return null;
-    },
-    [contacts],
-  );
-
-  const ensureContactForCashuPaymentRequest = React.useCallback(
-    (requestInfo: CashuPaymentRequestMessageInfo): ContactRowLike | null => {
-      const existing = findContactForCashuPaymentRequest(requestInfo);
-      if (existing?.id) return existing;
-
-      const requestPubkeyHex = normalizePubkeyHex(
-        requestInfo.transportPubkeyHex,
-      );
-      if (!requestPubkeyHex) return null;
-
-      const pubkey = parsePubkey(requestPubkeyHex);
-      if (!pubkey) return null;
-      const npub = encodeNpub(pubkey);
-
-      const saved = saveNpubContact(npub);
-      if (!saved) return null;
-      if (saved.created) openScannedContactPendingNpubRef.current = saved.npub;
-      return saved.contact;
-    },
-    [
-      findContactForCashuPaymentRequest,
-      openScannedContactPendingNpubRef,
-      saveNpubContact,
-    ],
-  );
-
-  const findPreviousCashuPaymentRequestMessage = React.useCallback(
-    (
-      requestInfo: CashuPaymentRequestMessageInfo,
-      contactId: string,
-    ): LocalNostrMessage | null => {
-      const normalizedContactId = contactId.trim();
-      if (!normalizedContactId) return null;
-
-      const requestId = (requestInfo.requestId ?? "").trim();
-      const encodedRequest = requestInfo.encodedRequest.trim();
-      if (!requestId && !encodedRequest) return null;
-
-      const candidates = [
-        ...chatMessages,
-        ...nostrMessagesRecent,
-        ...nostrMessagesLocal,
-      ];
-
-      for (let index = candidates.length - 1; index >= 0; index -= 1) {
-        const message = candidates[index];
-        if (message.contactId.trim() !== normalizedContactId) {
-          continue;
-        }
-        if (message.direction.trim() !== "in") continue;
-
-        const rumorId = (message.rumorId ?? "").trim();
-        if (!rumorId) continue;
-
-        const previousInfo = parseCashuPaymentRequestMessage(message.content);
-        if (!previousInfo) continue;
-
-        const previousRequestId = (previousInfo.requestId ?? "").trim();
-        if (requestId && previousRequestId === requestId) return message;
-
-        if (
-          !requestId &&
-          previousInfo.encodedRequest.trim() === encodedRequest
-        ) {
-          return message;
-        }
-      }
-
-      return null;
-    },
-    [chatMessages, nostrMessagesLocal, nostrMessagesRecent],
-  );
-
-  const payCashuPaymentRequestViaPost = React.useCallback(
-    async (requestInfo: CashuPaymentRequestMessageInfo): Promise<boolean> => {
-      const postUrlRaw = (requestInfo.transportPostUrl ?? "").trim();
-      if (!postUrlRaw) return false;
-
-      let postUrl: URL;
-      try {
-        postUrl = new URL(postUrlRaw);
-      } catch {
-        setStatus(t("paymentRequestUnknownContact"));
-        return false;
-      }
-
-      // An `http:` POST target exposes the bearer proofs to anyone on the
-      // network path, so it is only accepted in development builds.
-      if (
-        !isAllowedPaymentRequestPostUrl(postUrlRaw, {
-          allowHttp: import.meta.env.DEV,
-        })
-      ) {
-        setStatus(t("paymentRequestInsecureTransport"));
-        return false;
-      }
-
-      if (cashuBalance < requestInfo.amount) {
-        setStatus(t("payInsufficient"));
-        return true;
-      }
-
-      if (sendCashuToken === null || cashuTransferLifecycle === null) {
-        setStatus(`${t("errorPrefix")}: Cashu storage is not ready`);
-        return true;
-      }
-
-      const ran = await runExclusive(async (): Promise<boolean> => {
-        let sentMint: string | null = null;
-        const logFailure = (
-          error: string,
-          mint: string | null,
-          phase: "publish" | "swap",
-        ): void => {
-          logPaymentEvent({
-            direction: "out",
-            status: "error",
-            amount: requestInfo.amount,
-            fee: null,
-            mint,
-            unit: "sat",
-            error,
-            contactId: null,
-            method: "cashu_chat",
-            paymentType: "request",
-            phase,
-          });
-        };
-
-        try {
-          const requestedMints = new Set<string>();
-          for (const mintUrl of requestInfo.mintUrls) {
-            const normalizedMint = normalizeMintUrl(mintUrl);
-            if (normalizedMint) requestedMints.add(normalizedMint);
-          }
-
-          const eligibleBalances =
-            requestedMints.size > 0
-              ? walletBalances.perMint.filter((entry) =>
-                  requestedMints.has(normalizeMintUrl(entry.mint)),
-                )
-              : walletBalances.perMint;
-          const preferredMint =
-            requestInfo.mintUrls
-              .map((mintUrl) => normalizeMintUrl(mintUrl))
-              .find((mintUrl) => Boolean(mintUrl)) ??
-            normalizeMintUrl(defaultMintUrl ?? "");
-          const mint = planSendMint({
-            balances: eligibleBalances,
-            isPreferredMint: isSpellingOf(preferredMint),
-            amount: requestInfo.amount,
-          });
-          if (mint === null) {
-            setStatus(t("payInsufficient"));
-            return true;
-          }
-
-          const sendOutcome = await sendCashuToken({
-            amountSat: requestInfo.amount,
-            memo: requestInfo.description,
-            mint,
-            produceAs: "pending",
-          });
-          if (Result.isFailure(sendOutcome)) {
-            const sendError = sendOutcome.failure;
-            const errorMessage =
-              describeTaggedCashuError(sendError) ?? sendError._tag;
-            logFailure(errorMessage, mint, "swap");
-            setStatus(
-              sendError._tag === "InsufficientFunds"
-                ? t("payInsufficient")
-                : `${t("payFailed")}: ${errorMessage}`,
-            );
-            return true;
-          }
-          const receipt = sendOutcome.success;
-          sentMint = receipt.mint;
-
-          const delivery = await postPaymentRequestPayload({
-            url: postUrl.toString(),
-            payload: {
-              id: requestInfo.requestId,
-              memo: requestInfo.description,
-              mint: receipt.mint,
-              unit: receipt.unit,
-              proofs: receipt.proofs,
-            },
-            allowHttp: import.meta.env.DEV,
-          });
-          if (delivery._tag !== "Delivered") {
-            // The POST recipient may hold the proofs now; re-receiving kills
-            // that encoding at the mint before the funds return to balance.
-            const restored = await cashuTransferLifecycle.returnToWallet(
-              receipt.operationId,
-            );
-            if (Result.isFailure(restored)) {
-              console.warn("[linky][payment-request] return-to-wallet failed", {
-                error: restored.failure._tag,
-              });
-            }
-            throw new Error(describePaymentRequestPostFailure(delivery));
-          }
-
-          await cashuTransferLifecycle.forget(receipt.operationId);
-          reportCashuSendForgotten({
-            mint: receipt.mint,
-            reason: "payment-request-posted",
-            operationId: receipt.operationId,
-          });
-
-          logPaymentEvent({
-            direction: "out",
-            status: "ok",
-            transactionId: transactionIdForOperation(receipt.operationId),
-            amount: receipt.amount,
-            details: {
-              issuedToken: receipt.tokenText,
-              ...(requestInfo.requestId
-                ? { requestId: requestInfo.requestId }
-                : {}),
-              postUrl: postUrl.toString(),
-            },
-            fee: null,
-            mint: receipt.mint,
-            note: requestInfo.description,
-            unit: receipt.unit,
-            error: null,
-            contactId: null,
-            method: "cashu_chat",
-            paymentType: "request",
-            phase: "complete",
-          });
-
-          const displayAmount = formatDisplayedAmountParts(receipt.amount);
-          showPaidOverlay(
-            t("paidSentTo")
-              .replace(
-                "{amount}",
-                `${displayAmount.approxPrefix}${displayAmount.amountText}`,
-              )
-              .replace("{unit}", displayAmount.unitLabel)
-              .replace(
-                "{name}",
-                requestInfo.description || postUrl.hostname || t("appTitle"),
-              ),
-            { direction: "out", amountSat: receipt.amount },
-          );
-          safeLocalStorageSet(CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY, "1");
-          setContactsOnboardingHasPaid(true);
-          return true;
-        } catch (error) {
-          const errorMessage = getUnknownErrorMessage(error, "unknown");
-          logFailure(errorMessage, sentMint, "publish");
-          setStatus(`${t("payFailed")}: ${errorMessage}`);
-          return true;
-        }
-      });
-      return Option.getOrElse(ran, () => true);
-    },
-    [
-      cashuBalance,
-      cashuTransferLifecycle,
-      defaultMintUrl,
-      formatDisplayedAmountParts,
-      logPaymentEvent,
-      sendCashuToken,
-      runExclusive,
-      setContactsOnboardingHasPaid,
-      setStatus,
-      showPaidOverlay,
-      t,
-      walletBalances.perMint,
-    ],
-  );
-
-  const runCashuPaymentRequest = React.useCallback(
-    (requestInfo: CashuPaymentRequestMessageInfo) =>
-      runPaymentRequestExclusively(async () => {
-        if (cashuIsBusy) return;
-
-        // A request addressed to our own key is already satisfied by the funds in
-        // this wallet. Complete it locally as a success instead of gift-wrapping a
-        // cashu token to ourselves over nostr, which the inbox treats as an
-        // own-echo and never auto-claims — that is what stranded the token as an
-        // unclaimable "awaiting claim" transfer.
-        const ownPubkeyHex = normalizePubkeyHex(decodeNpub(currentNpub ?? ""));
-        const targetPubkeyHex = normalizePubkeyHex(
-          requestInfo.transportPubkeyHex,
-        );
-        if (
-          ownPubkeyHex &&
-          targetPubkeyHex &&
-          ownPubkeyHex === targetPubkeyHex
-        ) {
-          const displayAmount = formatDisplayedAmountParts(requestInfo.amount);
-          showPaidOverlay(
-            t("paymentRequestSelfPayment")
-              .replace(
-                "{amount}",
-                `${displayAmount.approxPrefix}${displayAmount.amountText}`,
-              )
-              .replace("{unit}", displayAmount.unitLabel),
-          );
-          return;
-        }
-
-        if (requestInfo.amount > cashuBalance) {
-          const requestedMints = requestInfo.mintUrls.flatMap((mintUrl) => {
-            const normalizedMint = normalizeMintUrl(mintUrl);
-            return normalizedMint ? [normalizedMint] : [];
-          });
-          const targetMainMint = paymentMintMeltPlan?.toMint ?? "";
-          const mainMintIsAccepted =
-            requestedMints.length === 0 ||
-            (Boolean(targetMainMint) &&
-              requestedMints.includes(targetMainMint));
-          if (
-            !mainMintIsAccepted ||
-            !requestPaymentMintMelt(requestInfo.amount)
-          ) {
-            setStatus(t("payInsufficient"));
-          }
-          return;
-        }
-
-        const contact = ensureContactForCashuPaymentRequest(requestInfo);
-        const contactId = contact?.id;
-        if (!contact || !contactId) {
-          if (await payCashuPaymentRequestViaPost(requestInfo)) return;
-          setStatus(t("paymentRequestUnknownContact"));
-          return;
-        }
-
-        await runExclusive(async () => {
-          const previousRequestMessage = findPreviousCashuPaymentRequestMessage(
-            requestInfo,
-            contactId,
-          );
-          const previousRequestRumorId = (
-            previousRequestMessage?.rumorId ?? ""
-          ).trim();
-
-          await payContactWithCashuMessage({
-            contact,
-            amountSat: requestInfo.amount,
-            memo: requestInfo.description,
-            paymentRequestId: requestInfo.requestId,
-            ...(previousRequestRumorId
-              ? {
-                  replyContext: {
-                    replyToId: previousRequestRumorId,
-                    rootMessageId:
-                      (previousRequestMessage?.rootMessageId ?? "").trim() ||
-                      previousRequestRumorId,
-                    replyToContent:
-                      (previousRequestMessage?.content ?? "").trim() || null,
-                  },
-                }
-              : {}),
-          });
-        });
-      }),
-    [
-      cashuIsBusy,
-      cashuBalance,
-      currentNpub,
-      ensureContactForCashuPaymentRequest,
-      findPreviousCashuPaymentRequestMessage,
-      formatDisplayedAmountParts,
-      payCashuPaymentRequestViaPost,
-      payContactWithCashuMessage,
-      paymentMintMeltPlan?.toMint,
-      requestPaymentMintMelt,
-      runPaymentRequestExclusively,
-      runExclusive,
-      setStatus,
-      showPaidOverlay,
-      t,
-    ],
-  );
-
   const {
-    payLightningAddressWithCashu: payLightningAddressWithCashuBase,
-    payLightningInvoiceWithCashu: payLightningInvoiceWithCashuBase,
-  } = useLightningPaymentsDomain({
-    canPayWithCashu,
-    cashuBalance,
-    defaultMintUrl,
+    closePaymentMintMeltConfirmation,
+    confirmPaymentMintMelt,
+    pendingPaymentMintMeltConfirmation,
+    reportShortfall,
+  } = usePaymentMintMove({
+    meltToDefaultMint,
+    setStatus,
+    t,
+    walletOpRunning: cashuIsBusy,
+  });
+  const chat = useMemo(
+    () => ({
+      appendLocalNostrMessage,
+      enqueuePendingPayment,
+      nostrMessagesLocal,
+      updateLocalNostrMessage,
+    }),
+    [
+      appendLocalNostrMessage,
+      enqueuePendingPayment,
+      nostrMessagesLocal,
+      updateLocalNostrMessage,
+    ],
+  );
+  const setLnAddressPay = React.useCallback(
+    (pay: { amount: string; note: string; contactId: ContactId }) => {
+      setLnAddressPayAmount(pay.amount);
+      setLnAddressPayNote(pay.note);
+      setLnAddressPayContactId(pay.contactId);
+    },
+    [],
+  );
+  const paymentOverlay = {
     dismissPaymentSending,
     formatDisplayedAmountParts,
-    logPaymentEvent,
-    meltCashuInvoice,
-    runExclusive,
-    setContactsOnboardingHasPaid,
-    setPostPaySaveContact,
+    rememberFirstPayment,
+    reportShortfall,
     setStatus,
     showPaidOverlay,
     showPaymentSending,
     t,
-    walletMintBalances: walletBalances.perMint,
-  });
-
-  // Only a contact the user chose to pay; a lightning address never identifies one.
-  const knownLnAddressPayContact = React.useMemo(
-    () =>
-      route.kind === "lnAddressPay" && lnAddressPayContactId
-        ? (contacts.find((contact) => contact.id === lnAddressPayContactId) ??
-          null)
-        : null,
-    [contacts, lnAddressPayContactId, route.kind],
-  );
-
-  const payLightningAddressWithCashu = React.useCallback(
-    async (
-      lnAddress: string,
-      amountSat: number,
-      comment?: string | null,
-    ): Promise<void> => {
-      if (amountSat > cashuBalance) {
-        if (!requestPaymentMintMelt(amountSat)) {
-          setStatus(t("payInsufficient"));
-        }
-        return;
-      }
-      const paid = await payLightningAddressWithCashuBase(
-        lnAddress,
-        amountSat,
-        knownLnAddressPayContact,
-        comment,
-      );
-      if (paid) navigateTo({ route: "wallet" });
-    },
-    [
-      cashuBalance,
-      knownLnAddressPayContact,
-      payLightningAddressWithCashuBase,
-      requestPaymentMintMelt,
-      setStatus,
-      t,
-    ],
-  );
-
-  const payLightningInvoiceWithCashu = React.useCallback(
-    async (invoice: string): Promise<boolean> => {
-      const amountSat = getLightningInvoicePreview(invoice)?.amountSat ?? null;
-      if (amountSat !== null && amountSat > cashuBalance) {
-        if (!requestPaymentMintMelt(amountSat)) {
-          setStatus(t("payInsufficient"));
-        }
-        return false;
-      }
-      const paid = await payLightningInvoiceWithCashuBase(invoice);
-      if (paid && route.kind === "manualPay") {
-        navigateTo({ route: "wallet" });
-      }
-      return paid;
-    },
-    [
-      cashuBalance,
-      payLightningInvoiceWithCashuBase,
-      requestPaymentMintMelt,
-      route.kind,
-      setStatus,
-      t,
-    ],
-  );
-
-  const closeLightningInvoiceConfirmation = React.useCallback(() => {
-    setPendingLightningInvoiceConfirmation(null);
-  }, []);
-
+  };
   const {
-    closeCashuPaymentRequestConfirmation,
-    confirmCashuPaymentRequest,
-    payCashuPaymentRequest,
-    pendingCashuPaymentRequestConfirmation,
-  } = useCashuPaymentRequestConfirmation({
-    cashuIsBusy,
+    payContactWithCashuMessage,
+    paySelectedContact,
+    settleBankPaymentOffer,
+  } = useContactPayments({
+    ...paymentOverlay,
+    cashuBalance,
+    chat,
+    contactPayMethod,
+    contacts,
     currentNpub,
-    autoPayLimit: lightningInvoiceAutoPayLimit,
-    runCashuPaymentRequest,
+    currentNsec,
+    getBankPaymentOfferForSettlement,
+    isBankPaymentOfferCanceled,
+    payAmount,
+    pendingPaymentsKey,
+    pushToast,
+    respondToBankPaymentOfferWithGroupState,
+    route,
+    selectedContact,
+    setLnAddressPay,
+    walletOpRunning: cashuIsBusy,
   });
-
-  const confirmLightningInvoicePayment = React.useCallback(async () => {
-    const pending = pendingLightningInvoiceConfirmation;
-    if (!pending) return;
-
-    const ok = await payLightningInvoiceWithCashu(pending.invoice);
-    if (ok) setPendingLightningInvoiceConfirmation(null);
-  }, [payLightningInvoiceWithCashu, pendingLightningInvoiceConfirmation]);
+  const lightningPayments = useLightningPayments({
+    ...paymentOverlay,
+    contacts,
+    lnAddressPayContactId,
+    nostrPictureByNpub,
+    routeKind: route.kind,
+  });
+  const paymentRequests = useCashuPaymentRequests({
+    ...paymentOverlay,
+    autoPayLimit: lightningInvoiceAutoPayLimit,
+    chatMessages,
+    contactPayBackToChatRef,
+    contacts,
+    currentNpub,
+    defaultMintUrl,
+    logPaymentEvent,
+    nostrMessagesLatestRef,
+    nostrMessagesLocal,
+    nostrMessagesRecent,
+    openScannedContactPendingNpubRef,
+    payAmount,
+    payContactWithCashuMessage,
+    route,
+    saveNpubContact,
+    selectedChatContact,
+    selectedContact,
+    sendChatMessage,
+    walletOpRunning: cashuIsBusy,
+  });
 
   const closeLnurlWithdrawConfirmation = React.useCallback(() => {
     if (lnurlWithdrawIsBusy) return;
@@ -2138,17 +1480,6 @@ export const useCashuWalletComposition = ({
     ],
   );
 
-  const closePaymentMintMeltConfirmation = React.useCallback(() => {
-    if (cashuIsBusy) return;
-    setPendingPaymentMintMeltConfirmation(null);
-  }, [cashuIsBusy]);
-
-  const confirmPaymentMintMelt = React.useCallback(async () => {
-    if (cashuIsBusy) return;
-    setPendingPaymentMintMeltConfirmation(null);
-    await meltToDefaultMint();
-  }, [cashuIsBusy, meltToDefaultMint]);
-
   useResumeOnLaunchAndOnline(
     React.useMemo(() => {
       if (resumePendingCashuAutoswapClaims === null) return null;
@@ -2182,151 +1513,6 @@ export const useCashuWalletComposition = ({
     t,
     touchMintInfo,
   });
-
-  const requestSelectedContact = React.useCallback(
-    async (options?: { note?: string | null }) => {
-      if (route.kind !== "contactPay") return;
-      if (!selectedContact) return;
-
-      const note = (options?.note ?? "").trim() || null;
-      const amountSat = Number.parseInt(payAmount.trim(), 10);
-      if (!Number.isFinite(amountSat) || amountSat <= 0) {
-        setStatus(t("payInvalidAmount"));
-        return;
-      }
-
-      const normalizedNpub = normalizeNpubIdentifier(
-        selectedContact.npub ?? "",
-      );
-      if (!normalizedNpub) {
-        setStatus(t("chatMissingContactNpub"));
-        return;
-      }
-
-      const recipientPubkeyHex = decodeNpub(currentNpub ?? "");
-
-      if (!recipientPubkeyHex) {
-        setStatus(t("profileMissingNpub"));
-        return;
-      }
-
-      const recipientNprofile = encodeNprofile(
-        recipientPubkeyHex,
-        recommendedNostrRelays(),
-      );
-      const preferredMint =
-        normalizeMintUrl(defaultMintUrl ?? MAIN_MINT_URL) ?? MAIN_MINT_URL;
-      const requestId = makeLocalId();
-      const requestText = buildCashuPaymentRequestMessage({
-        amount: amountSat,
-        description: note,
-        mintUrls: [preferredMint],
-        recipientNprofile,
-        requestId,
-      });
-
-      const outcome = await sendChatMessage({
-        clearDraft: false,
-        text: requestText,
-      });
-      if (outcome !== "enqueued") return;
-
-      logPaymentEvent({
-        amount: amountSat,
-        contactId: route.id,
-        details: {
-          mintUrls: [preferredMint],
-          recipientNprofile,
-          requestId,
-          requestText,
-        },
-        direction: "in",
-        method: "cashu_chat",
-        mint: preferredMint,
-        note,
-        status: "ok",
-        transactionId: transactionIdForRequest(requestId),
-        unit: "sat",
-      });
-
-      if ((contactPayBackToChatRef.current ?? "") === route.id) {
-        navigateTo({ route: "chat", id: route.id });
-        return;
-      }
-
-      navigateTo({ route: "contact", id: route.id });
-    },
-    [
-      contactPayBackToChatRef,
-      currentNpub,
-      defaultMintUrl,
-      payAmount,
-      route,
-      selectedContact,
-      sendChatMessage,
-      logPaymentEvent,
-      setStatus,
-      t,
-    ],
-  );
-
-  const paymentRequestContactsRef = useLatest(contacts);
-  const onPayChatPaymentRequest = React.useCallback(
-    (message: LocalNostrMessage, requestInfo: CashuPaymentRequestMessageInfo) =>
-      runPaymentRequestExclusively(async () => {
-        if (cashuIsBusy) return;
-        if (!selectedChatContact || selectedChatContact.isUnknownContact)
-          return;
-        if (!selectedContact) return;
-
-        const reviewedMessage = { ...message };
-        const reviewedRequest = { ...requestInfo };
-        const reviewedRecipient = { ...selectedContact };
-        const isPaymentAuthorized = () =>
-          isCurrentChatPaymentRequest(
-            reviewedMessage,
-            reviewedRequest,
-            reviewedRecipient,
-            nostrMessagesLatestRef.current,
-            paymentRequestContactsRef.current.find(
-              (contact) => contact.id === reviewedRecipient.id,
-            ) ?? null,
-          );
-        if (!isPaymentAuthorized()) {
-          setStatus(t("paymentRequestChanged"));
-          return;
-        }
-        const requestRumorId = (reviewedMessage.rumorId ?? "").trim();
-
-        await runExclusive(async () => {
-          await payContactWithCashuMessage({
-            contact: reviewedRecipient,
-            amountSat: reviewedRequest.amount,
-            memo: reviewedRequest.description,
-            paymentRequestId: reviewedRequest.requestId,
-            isPaymentAuthorized,
-            replyContext: {
-              replyToId: requestRumorId,
-              rootMessageId:
-                (reviewedMessage.rootMessageId ?? "").trim() || requestRumorId,
-              replyToContent: reviewedMessage.content.trim() || null,
-            },
-          });
-        });
-      }),
-    [
-      cashuIsBusy,
-      payContactWithCashuMessage,
-      runPaymentRequestExclusively,
-      selectedChatContact,
-      selectedContact,
-      runExclusive,
-      nostrMessagesLatestRef,
-      paymentRequestContactsRef,
-      setStatus,
-      t,
-    ],
-  );
 
   const recurringDefaultMintUrl = normalizeMintUrl(
     defaultMintUrl ?? MAIN_MINT_URL,
@@ -2378,12 +1564,9 @@ export const useCashuWalletComposition = ({
     orders: recurringOrders,
   });
 
-  const knownLnAddressPayContactPictureUrl = React.useMemo(() => {
-    const npub = normalizeNpubIdentifier(knownLnAddressPayContact?.npub ?? "");
-    return npub ? (nostrPictureByNpub[npub] ?? null) : null;
-  }, [knownLnAddressPayContact, nostrPictureByNpub]);
-
   return {
+    ...lightningPayments,
+    ...paymentRequests,
     recurringPaymentsContext,
     reclaimCashuTransfer,
     cashuTransferLifecycle,
@@ -2416,10 +1599,8 @@ export const useCashuWalletComposition = ({
     checkAndRefreshCashuToken,
     checkIssuedCashuTokensAndDeleteClaimed,
     checkSingleIssuedCashuTokenIsClaimed,
-    closeLightningInvoiceConfirmation,
     closeLnurlWithdrawConfirmation,
     closePaymentMintMeltConfirmation,
-    confirmLightningInvoicePayment,
     confirmLnurlWithdraw,
     confirmPaymentMintMelt,
     contactPayMethod,
@@ -2433,8 +1614,6 @@ export const useCashuWalletComposition = ({
     getMintRuntime,
     isCashuTokenKnownAny,
     isCashuTokenStored,
-    knownLnAddressPayContact,
-    knownLnAddressPayContactPictureUrl,
     lightningInvoiceAutoPayLimit,
     lnAddressPayAmount,
     lnAddressPayNote,
@@ -2446,30 +1625,20 @@ export const useCashuWalletComposition = ({
     meltLargestForeignMintToMainMint: meltToDefaultMint,
     mintInfoByUrl,
     moveMintFunds,
-    closeCashuPaymentRequestConfirmation,
-    confirmCashuPaymentRequest,
-    onPayChatPaymentRequest,
     paidOverlayDetails,
     paidOverlayIsOpen,
     paidOverlayPhase,
     paidOverlayTitle,
-    payCashuPaymentRequest,
-    pendingCashuPaymentRequestConfirmation,
-    payLightningAddressWithCashu,
-    payLightningInvoiceWithCashu,
     paySelectedContact,
     payWithCashuEnabled,
     pendingCashuContactSend,
     pendingCashuTokenContactPickId,
     receiveMethod,
-    pendingLightningInvoiceConfirmation,
     pendingLnurlWithdrawConfirmation,
     pendingPaymentMintMeltConfirmation,
-    postPaySaveContact,
     probeLightningFee,
     refreshMintInfo,
     deleteCashuToken,
-    requestSelectedContact,
     restoreMissingTokens,
     reclaimHandedOutTokens,
     restoreAndReclaimAllTokens,
@@ -2486,9 +1655,7 @@ export const useCashuWalletComposition = ({
     setAllowTestMints,
     setPayWithCashuEnabled,
     setReceiveMethod,
-    setPendingLightningInvoiceConfirmation,
     setPendingLnurlWithdrawConfirmation,
-    setPostPaySaveContact,
     setTopupAmount,
     setTopupNote,
     settleBankPaymentOffer,

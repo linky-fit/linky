@@ -33,7 +33,9 @@ import {
 import type {
   LocalPaymentEvent,
   LoggedPaymentEventParams,
+  PaymentLogData,
 } from "../../types/appTypes";
+import { reportAppLog } from "../../../devtools/inspector/appLog";
 import { platformAtom } from "../platform";
 import { appOwnerIdAtom, transactionsRepositoryAtom } from "../session/store";
 import { ownerStorageKey } from "./ownerStorage";
@@ -292,6 +294,21 @@ export const mergeTransactionWrite = (
   };
 };
 
+/** An app log row for one step of a contact payment. */
+export const logPayStep = (step: string, data?: PaymentLogData): void => {
+  const clientId = data?.clientId;
+  const messageId = data?.messageId;
+  reportAppLog({
+    tag: "pay.step",
+    summary: `Contact payment: ${step}`,
+    links: {
+      ...(typeof clientId === "string" ? { client: clientId } : {}),
+      ...(typeof messageId === "string" ? { message: messageId } : {}),
+    },
+    payload: { step, ...data },
+  });
+};
+
 export interface PaymentLog {
   /**
    * Records a payment step: an `ok` step becomes (or extends) its transaction
@@ -334,46 +351,51 @@ export const makePaymentLog = ({
   );
   let legacyMigrated = false;
 
+  const logEvent = (event: LoggedPaymentEventParams): void => {
+    const nowSec = nowSeconds();
+    if (event.status === "ok") {
+      insertTransaction(
+        event.transactionId,
+        buildTransactionInsertPayload({
+          createdAtSec: nowSec,
+          event: {
+            amount: event.amount ?? null,
+            contactId: event.contactId ? event.contactId : null,
+            details: event.details ?? null,
+            direction: event.direction,
+            error: event.error ?? null,
+            fee: event.fee ?? null,
+            method: event.method ?? null,
+            mint: event.mint ?? null,
+            note: event.note ?? null,
+            phase: event.phase ?? null,
+            status: event.status,
+            unit: event.unit ?? null,
+          },
+        }),
+      );
+    }
+
+    const queue = readKvJson(
+      kv,
+      telemetryKey,
+      Schema.Array(Schema.Unknown),
+      [],
+    ).filter(isLocalPaymentTelemetryEvent);
+    writeKvJson(
+      kv,
+      telemetryKey,
+      [createLocalPaymentTelemetryEvent(event, nowSec), ...queue].slice(0, 250),
+    );
+  };
+
   return {
     logPaymentEvent: (event) => {
-      const nowSec = nowSeconds();
-      if (event.status === "ok") {
-        insertTransaction(
-          event.transactionId,
-          buildTransactionInsertPayload({
-            createdAtSec: nowSec,
-            event: {
-              amount: event.amount ?? null,
-              contactId: event.contactId ? event.contactId : null,
-              details: event.details ?? null,
-              direction: event.direction,
-              error: event.error ?? null,
-              fee: event.fee ?? null,
-              method: event.method ?? null,
-              mint: event.mint ?? null,
-              note: event.note ?? null,
-              phase: event.phase ?? null,
-              status: event.status,
-              unit: event.unit ?? null,
-            },
-          }),
-        );
+      try {
+        logEvent(event);
+      } catch (error) {
+        console.warn("[linky][transactions] payment log failed", error);
       }
-
-      const queue = readKvJson(
-        kv,
-        telemetryKey,
-        Schema.Array(Schema.Unknown),
-        [],
-      ).filter(isLocalPaymentTelemetryEvent);
-      writeKvJson(
-        kv,
-        telemetryKey,
-        [createLocalPaymentTelemetryEvent(event, nowSec), ...queue].slice(
-          0,
-          250,
-        ),
-      );
     },
     migrateLegacyPaymentEvents: () => {
       if (legacyMigrated) return;

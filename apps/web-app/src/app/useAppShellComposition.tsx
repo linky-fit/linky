@@ -48,10 +48,8 @@ import {
   safeLocalStorageGet,
   safeLocalStorageSet,
 } from "../utils/storage";
-import {
-  logPayStep,
-  useCashuWalletComposition,
-} from "./hooks/composition/useCashuWalletComposition";
+import { useCashuWalletComposition } from "./hooks/composition/useCashuWalletComposition";
+import { logPayStep } from "./state/wallet/paymentLog";
 import {
   useContactsMessagingComposition,
   type DisplayContact,

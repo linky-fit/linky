@@ -19,8 +19,13 @@ export const testPlatformPorts = (
   secrets: {
     read: (): Promise<SecretRead> => Promise.resolve({ _tag: "Missing" }),
   },
-  config: { evoluRelayDefaults: [], isE2e: false },
-  lifecycle: { reload: () => {}, deferUpdateWhile: () => {} },
+  config: { evoluRelayDefaults: [], isE2e: false, isDev: false },
+  lifecycle: {
+    reload: () => {},
+    deferUpdateWhile: () => {},
+    isOnline: () =>
+      typeof navigator === "undefined" || navigator.onLine !== false,
+  },
   ...overrides,
 });
 
