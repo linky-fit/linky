@@ -206,7 +206,7 @@ export default defineConfig({
       "@scure/base",
       "@scure/bip32",
       "@scure/bip39",
-      "@scure/bip39/wordlists/english",
+      "@scure/bip39/wordlists/english.js",
       "buffer",
       "cbor-x",
       "effect",

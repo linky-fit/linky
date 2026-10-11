@@ -1,5 +1,5 @@
 import { generateMnemonic } from "@scure/bip39";
-import { wordlist } from "@scure/bip39/wordlists/english";
+import { wordlist } from "@scure/bip39/wordlists/english.js";
 import type { Page } from "@playwright/test";
 import { generateSecretKey, nip19 } from "nostr-tools";
 import {

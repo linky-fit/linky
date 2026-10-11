@@ -1,7 +1,7 @@
 import { bip39MnemonicToSeed } from "@linky-fit/identity";
 import { Bip39Seed } from "@linky-fit/linkshu";
 import { generateMnemonic, validateMnemonic } from "@scure/bip39";
-import { wordlist } from "@scure/bip39/wordlists/english";
+import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { Effect } from "effect";
 import type { SessionSecrets, SignedInSession } from "../session";
 import {
