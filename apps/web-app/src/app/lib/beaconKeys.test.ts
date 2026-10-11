@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { derivePubkey, NostrSecretKey } from "@linky-fit/linkstr";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {

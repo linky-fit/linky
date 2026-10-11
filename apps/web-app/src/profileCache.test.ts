@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { ProfileMetadata } from "@linky-fit/linkstr";
 import { beforeEach, describe, expect, it } from "vitest";
 import {

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { derivePubkey, NostrSecretKey } from "@linky-fit/linkstr";
 import { createIdFromString } from "@linky-fit/linksync";
 import type { BeaconPeers } from "./beaconStore";

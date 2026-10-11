@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { InboxCursorStore, Pubkey, UnixSeconds } from "@linky-fit/linkstr";
 import type { InboxCursorsRepository } from "@linky-fit/linksync";

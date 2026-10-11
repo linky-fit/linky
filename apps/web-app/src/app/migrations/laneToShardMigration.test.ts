@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import * as Evolu from "@evolu/common";
 import type { LegacyTokenRow } from "@linky-fit/linkshu";
 import {

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {

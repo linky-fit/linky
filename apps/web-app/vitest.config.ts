@@ -5,7 +5,6 @@ import { configDefaults, defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [linkyUi(), react()],
   test: {
-    environment: "jsdom",
     globals: true,
     setupFiles: "./vitest.setup.ts",
     css: true,
@@ -16,5 +15,25 @@ export default defineConfig({
     // tests/ holds the Playwright suites and their helpers; unit tests sit
     // next to their subject under src/.
     exclude: [...configDefaults.exclude, "tests/**"],
+    // jsdom setup costs more than most DOM-free files take to run; a .test.ts
+    // that needs the DOM opts in with a `// @vitest-environment jsdom` docblock.
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "node",
+          include: ["**/*.test.{ts,js}"],
+          environment: "node",
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "jsdom",
+          include: ["**/*.test.tsx"],
+          environment: "jsdom",
+        },
+      },
+    ],
   },
 });

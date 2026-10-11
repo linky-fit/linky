@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { mnemonicToSeedSync, validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { afterEach, describe, expect, it, vi } from "vitest";

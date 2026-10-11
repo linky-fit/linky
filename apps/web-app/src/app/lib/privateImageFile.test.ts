@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { InspectorRow } from "../../devtools/inspector/inspectorRows";
 import { reportInspectorRows } from "../../devtools/inspector/reportInspectorRows";

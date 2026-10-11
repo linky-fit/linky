@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { BankOfferId } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import type { BankPaymentOfferStaggerRecord } from "@linky-fit/proxy-payment";

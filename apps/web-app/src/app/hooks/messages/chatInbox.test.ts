@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { encodeNprofile } from "@linky-fit/linkstr";
 import { buildCashuPaymentRequestMessage } from "../../lib/paymentRequestMessage";
 import {

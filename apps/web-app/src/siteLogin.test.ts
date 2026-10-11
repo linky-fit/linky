@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { isLinkauthLink } from "@linky-fit/linkauth/signer";
 import { parseNostrConnectUri } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
