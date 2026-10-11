@@ -8,21 +8,16 @@ import { getLnurlPayDisplayText } from "../../../lnurlPay";
 import { navigateTo } from "../../../hooks/useRouting";
 import type { Route } from "../../../types/route";
 import type { DisplayAmountParts } from "../../../utils/displayAmounts";
-import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import {
   paidOverlayContact,
   type PaidOverlayDetails,
 } from "../../lib/paidOverlay";
-import type { ContactRowLike } from "../../types/appTypes";
-import type { ContactId } from "../../../evolu";
+import { useKnownLnAddressPayContact } from "./usePaymentDrafts";
 import { paymentCopy, usePaymentsCommands, type Shortfall } from "./paymentUi";
 
 interface UseLightningPaymentsParams {
-  contacts: readonly ContactRowLike[];
   dismissPaymentSending: () => void;
   formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
-  lnAddressPayContactId: ContactId | null;
-  nostrPictureByNpub: Record<string, string | null>;
   rememberFirstPayment: () => void;
   reportShortfall: (shortfall: Shortfall) => void;
   routeKind: Route["kind"];
@@ -40,11 +35,8 @@ const NOT_READY = "Cashu storage is not ready";
  * has not settled shows as pending; `useMeltRecovery` finishes it.
  */
 export const useLightningPayments = ({
-  contacts,
   dismissPaymentSending,
   formatDisplayedAmountParts,
-  lnAddressPayContactId,
-  nostrPictureByNpub,
   rememberFirstPayment,
   reportShortfall,
   routeKind,
@@ -63,19 +55,7 @@ export const useLightningPayments = ({
     amountSat: number;
   }>(null);
 
-  // Only a contact the user chose to pay; a lightning address never identifies one.
-  const knownLnAddressPayContact = React.useMemo(
-    () =>
-      routeKind === "lnAddressPay" && lnAddressPayContactId
-        ? (contacts.find((contact) => contact.id === lnAddressPayContactId) ??
-          null)
-        : null,
-    [contacts, lnAddressPayContactId, routeKind],
-  );
-  const knownLnAddressPayContactPictureUrl = React.useMemo(() => {
-    const npub = normalizeNpubIdentifier(knownLnAddressPayContact?.npub ?? "");
-    return npub ? (nostrPictureByNpub[npub] ?? null) : null;
-  }, [knownLnAddressPayContact, nostrPictureByNpub]);
+  const { knownLnAddressPayContact } = useKnownLnAddressPayContact(routeKind);
 
   const payLightningInvoiceWithCashu = React.useCallback(
     async (invoice: string): Promise<boolean> => {
@@ -244,8 +224,6 @@ export const useLightningPayments = ({
   return {
     closeLightningInvoiceConfirmation,
     confirmLightningInvoicePayment,
-    knownLnAddressPayContact,
-    knownLnAddressPayContactPictureUrl,
     payLightningAddressWithCashu,
     payLightningInvoiceWithCashu,
     pendingLightningInvoiceConfirmation,

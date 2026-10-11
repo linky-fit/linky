@@ -10,7 +10,12 @@ import {
   type ProfileMetadata,
   type ProfileSearchHit,
 } from "@linky-fit/linkstr";
-import { useLinkstrCommands } from "@linky-fit/linkstr-react";
+import {
+  useAtom,
+  useAtomSet,
+  useAtomValue,
+  useLinkstrCommands,
+} from "@linky-fit/linkstr-react";
 import { createId, type ContactsRepository } from "@linky-fit/linksync";
 import { Exit } from "effect";
 import React from "react";
@@ -41,16 +46,24 @@ import {
 } from "../../lib/contactProfile";
 import { getContactQueryPrefill } from "../../lib/contactQueryPrefill";
 import { runWrite } from "../../lib/storeWrite";
+import {
+  contactFormAtom,
+  contactNewPrefillAtom,
+  contactSuggestionsAtom,
+  makeEmptyContactForm,
+  recentlyAddedContactIdAtom,
+  type ContactFormDraft,
+} from "../../state/contacts/contactForm";
+import { profileCacheAtom } from "../../state/contacts/profiles";
+import { currentNpubAtom } from "../../state/session/session";
 import type { ContactFormState, ContactRowLike } from "../../types/appTypes";
+import { useSetStatus, useTranslation } from "../shell";
+import { useReadNavIntent, useSetNavIntent } from "../shell/navIntents";
 import { fetchAndCacheProfile } from "../useLinkstrProfileSync";
+import { useContactsRepository } from "../useLinksync";
+import { useContacts, useRouteContact } from "./useDisplayContacts";
 import { useContactSuggestions } from "./useContactSuggestions";
 import type { Translate } from "../../../i18n";
-
-interface ContactNewPrefill {
-  lnAddress: string;
-  npub: string | null;
-  suggestedName: string | null;
-}
 
 export interface ContactSearchCandidate {
   existingContactId?: string;
@@ -100,20 +113,13 @@ type ContactFieldsPatch = {
 >;
 
 interface UseContactEditorParams {
-  contactNewPrefill: ContactNewPrefill | null;
   contacts: readonly ContactRow[];
   contactsRepository: Pick<ContactsRepository, "insert" | "update">;
   currentNpub: string | null;
   route: Route;
   selectedContactMetadata: ProfileMetadata | null | undefined;
   selectedContact: SelectedContactRow | null;
-  setContactNewPrefill: React.Dispatch<
-    React.SetStateAction<ContactNewPrefill | null>
-  >;
-  setRecentlyAddedContactId: React.Dispatch<
-    React.SetStateAction<ContactId | null>
-  >;
-  setStatus: React.Dispatch<React.SetStateAction<string | null>>;
+  setStatus: (status: string) => void;
   t: Translate;
 }
 
@@ -126,52 +132,100 @@ const decodeDirectNpubIdentifier = async (
   return decodeNpub(normalized) ? normalized : null;
 };
 
-const makeEmptyContactForm = (): ContactFormState => ({
-  name: "",
-  npub: "",
-  lnAddress: "",
-  groups: [],
-});
+/** The contact form's fields in `contactFormAtom`, with a setter per field. */
+const useContactFormState = () => {
+  const [draft, setDraft] = useAtom(contactFormAtom);
+  const setters = React.useMemo(
+    () => ({
+      setContactEditInitial: (
+        action: React.SetStateAction<ContactFormDraft["initial"]>,
+      ) =>
+        setDraft((current) => ({
+          ...current,
+          initial:
+            typeof action === "function" ? action(current.initial) : action,
+        })),
+      setEditingId: (editingId: ContactFormDraft["editingId"]) =>
+        setDraft((current) => ({ ...current, editingId })),
+      setForm: (action: React.SetStateAction<ContactFormState>) =>
+        setDraft((current) => ({
+          ...current,
+          form: typeof action === "function" ? action(current.form) : action,
+        })),
+      setIsSavingContact: (saving: boolean) =>
+        setDraft((current) => ({ ...current, saving })),
+    }),
+    [setDraft],
+  );
+  return {
+    contactEditInitial: draft.initial,
+    editingId: draft.editingId,
+    form: draft.form,
+    isSavingContact: draft.saving,
+    ...setters,
+  };
+};
 
-export const useContactEditor = ({
-  contactNewPrefill,
+/** The editor's inputs for the contact the route is about. */
+export const useContactEditorParams = (
+  route: Route,
+): UseContactEditorParams => {
+  const contacts = useContacts();
+  const contactsRepository = useContactsRepository();
+  const currentNpub = useAtomValue(currentNpubAtom);
+  const selectedContact = useRouteContact(route);
+  const metadataByNpub = useAtomValue(
+    profileCacheAtom,
+    (cache) => cache.metadataByNpub,
+  );
+  const selectedContactNpub = normalizeNpubIdentifier(
+    selectedContact?.npub ?? "",
+  );
+  // Memoized for identity stability: the cache fallback would otherwise
+  // produce a fresh object every render and retrigger effects downstream.
+  const selectedContactMetadata = React.useMemo(() => {
+    if (!selectedContactNpub) return undefined;
+    if (
+      Object.prototype.hasOwnProperty.call(metadataByNpub, selectedContactNpub)
+    ) {
+      return metadataByNpub[selectedContactNpub];
+    }
+    return loadCachedProfile(selectedContactNpub)?.metadata ?? undefined;
+  }, [metadataByNpub, selectedContactNpub]);
+  const setStatus = useSetStatus();
+  const { t } = useTranslation();
+  return {
+    contacts,
+    contactsRepository,
+    currentNpub,
+    route,
+    selectedContact,
+    selectedContactMetadata,
+    setStatus,
+    t,
+  };
+};
+
+/**
+ * Seeds the form when the new/edit contact screens open, opens a just-saved
+ * contact once its row is read back, and fetches the new-contact
+ * suggestions. Mounted once, in the composition.
+ */
+export const useContactEditorWatchers = ({
   contacts,
-  contactsRepository,
   currentNpub,
   route,
   selectedContactMetadata,
   selectedContact,
-  setContactNewPrefill,
-  setRecentlyAddedContactId,
-  setStatus,
-  t,
 }: UseContactEditorParams) => {
-  const [form, setForm] = React.useState<ContactFormState>(
-    makeEmptyContactForm(),
+  const { setContactEditInitial, setEditingId, setForm } =
+    useContactFormState();
+  const [contactNewPrefill, setContactNewPrefill] = useAtom(
+    contactNewPrefillAtom,
   );
-  const [editingId, setEditingId] = React.useState<ContactId | null>(null);
-  const [isSavingContact, setIsSavingContact] = React.useState(false);
-  const [contactEditInitial, setContactEditInitial] = React.useState<{
-    groups: string[];
-    id: ContactId;
-    lnAddress: string;
-    name: string;
-    npub: string;
-  } | null>(null);
   const previousRouteKindRef = React.useRef<Route["kind"] | null>(null);
-
-  const openScannedContactPendingNpubRef = React.useRef<string | null>(null);
-
-  const {
-    fetchProfile: fetchProfileOneShot,
-    searchProfiles: searchProfilesOneShot,
-  } = useLinkstrCommands();
-
-  const clearContactForm = React.useCallback(() => {
-    setForm(makeEmptyContactForm());
-    setEditingId(null);
-    setContactEditInitial(null);
-  }, []);
+  const readSavedContactNpub = useReadNavIntent("openSavedContactNpub");
+  const setSavedContactNpub = useSetNavIntent("openSavedContactNpub");
 
   const contactSuggestionKnownNpubsKey = Array.from(
     new Set(
@@ -185,15 +239,9 @@ export const useContactEditor = ({
   )
     .sort()
     .join("\n");
-  const contactSuggestions = useContactSuggestions(
+  useContactSuggestions(
     route.kind === "contactNew",
     contactSuggestionKnownNpubsKey,
-  );
-
-  const updateContactFields = React.useCallback(
-    ({ id, ...patch }: ContactFieldsPatch) =>
-      runWrite(contactsRepository.update(id, patch)),
-    [contactsRepository],
   );
 
   const seededEditContactIdRef = React.useRef<ContactId | null>(null);
@@ -261,8 +309,66 @@ export const useContactEditor = ({
     route.kind,
     selectedContactMetadata,
     selectedContact,
+    setContactEditInitial,
     setContactNewPrefill,
+    setEditingId,
+    setForm,
   ]);
+
+  React.useEffect(() => {
+    const targetNpub = readSavedContactNpub();
+    if (!targetNpub) return;
+    const normalizedTarget = normalizeNpubIdentifier(targetNpub);
+    if (!normalizedTarget) return;
+    const existing = contacts.find(
+      (c) => normalizeNpubIdentifier(c.npub ?? "") === normalizedTarget,
+    );
+    if (!existing?.id) return;
+    setSavedContactNpub(null);
+    navigateTo({ route: "contact", id: ContactId.orThrow(existing.id) });
+  }, [contacts, readSavedContactNpub, setSavedContactNpub]);
+};
+
+/** The new/edit contact form and its actions; free of effects, so any screen may use it. */
+export const useContactEditor = ({
+  contacts,
+  contactsRepository,
+  currentNpub,
+  route,
+  selectedContactMetadata,
+  selectedContact,
+  setStatus,
+  t,
+}: UseContactEditorParams) => {
+  const {
+    contactEditInitial,
+    editingId,
+    form,
+    isSavingContact,
+    setContactEditInitial,
+    setEditingId,
+    setForm,
+    setIsSavingContact,
+  } = useContactFormState();
+  const setRecentlyAddedContactId = useAtomSet(recentlyAddedContactIdAtom);
+  const contactSuggestions = useAtomValue(contactSuggestionsAtom);
+
+  const {
+    fetchProfile: fetchProfileOneShot,
+    searchProfiles: searchProfilesOneShot,
+  } = useLinkstrCommands();
+
+  const clearContactForm = React.useCallback(() => {
+    setForm(makeEmptyContactForm());
+    setEditingId(null);
+    setContactEditInitial(null);
+  }, [setContactEditInitial, setEditingId, setForm]);
+
+  const updateContactFields = React.useCallback(
+    ({ id, ...patch }: ContactFieldsPatch) =>
+      runWrite(contactsRepository.update(id, patch)),
+    [contactsRepository],
+  );
 
   const selectedContactPublicProfile = React.useMemo(() => {
     const npub = normalizeNpubIdentifier(form.npub);
@@ -521,6 +627,7 @@ export const useContactEditor = ({
     navigateTo({ route: "contacts" });
     setIsSavingContact(false);
   }, [
+    setIsSavingContact,
     clearContactForm,
     contactEditInitial,
     contacts,
@@ -788,6 +895,7 @@ export const useContactEditor = ({
       setIsSavingContact(false);
     },
     [
+      setIsSavingContact,
       clearContactForm,
       contacts,
       contactsRepository,
@@ -821,19 +929,6 @@ export const useContactEditor = ({
     },
     [addNewContactFromSearchResult, searchNewContact, setStatus, t],
   );
-
-  React.useEffect(() => {
-    const targetNpub = openScannedContactPendingNpubRef.current;
-    if (!targetNpub) return;
-    const normalizedTarget = normalizeNpubIdentifier(targetNpub);
-    if (!normalizedTarget) return;
-    const existing = contacts.find(
-      (c) => normalizeNpubIdentifier(c.npub ?? "") === normalizedTarget,
-    );
-    if (!existing?.id) return;
-    openScannedContactPendingNpubRef.current = null;
-    navigateTo({ route: "contact", id: ContactId.orThrow(existing.id) });
-  }, [contacts]);
 
   // Drops the local override: writes the watch-fed cached profile value into
   // the row (the pubkey is watched, so the cache is as fresh as the relays)
@@ -873,7 +968,14 @@ export const useContactEditor = ({
         prev && prev.id === editingId ? { ...prev, [field]: "" } : prev,
       );
     },
-    [editingId, form.npub, route.kind, updateContactFields],
+    [
+      editingId,
+      form.npub,
+      route.kind,
+      setContactEditInitial,
+      setForm,
+      updateContactFields,
+    ],
   );
 
   const contactEditsSavable = React.useMemo(() => {
@@ -917,7 +1019,6 @@ export const useContactEditor = ({
     form,
     handleSaveContact,
     isSavingContact,
-    openScannedContactPendingNpubRef,
     selectedContactPublicProfile,
     resetEditedContactFieldFromNostr,
     searchNewContact,

@@ -1,7 +1,7 @@
 import { Button, Dialog } from "@linky-fit/ui";
 import React from "react";
 import { flushSync } from "react-dom";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import { parseDefaultLightningAddressNpub } from "../derivedProfile";
 import { navigateTo } from "../hooks/useRouting";
 
@@ -22,7 +22,8 @@ export function SaveContactPromptModal({
   onClose,
   setContactNewPrefill,
 }: SaveContactPromptModalProps): React.ReactElement {
-  const { formatDisplayedAmountParts, t } = useAppShellCore();
+  const { t } = useTranslation();
+  const { formatDisplayedAmountParts } = useDisplayAmounts();
 
   const displayAmount = formatDisplayedAmountParts(amountSat);
 

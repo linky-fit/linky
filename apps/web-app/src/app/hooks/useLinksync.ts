@@ -69,19 +69,6 @@ export const useConversationsRepository = (): ConversationsRepository =>
 export const useConversationRows = (): ReadonlyArray<ConversationRow> =>
   useRepositoryRows(useConversationsRepository());
 
-/** See `ConversationsRepository.visibleSinceSec`; null until read. */
-export const useMessagesVisibleSinceSec = (): number | null => {
-  const conversations = useConversationsRepository();
-  const source = React.useMemo(
-    () => ({
-      all: conversations.visibleSinceSec,
-      subscribe: conversations.subscribe,
-    }),
-    [conversations],
-  );
-  return useLiveValue<number | null>(source, null);
-};
-
 export const useInboxCursorsRepository = (): InboxCursorsRepository =>
   useAtomSuspense(inboxCursorsRepositoryAtom).value;
 

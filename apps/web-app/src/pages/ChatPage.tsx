@@ -23,7 +23,35 @@ import {
   type FC,
 } from "react";
 import { parsePubkey } from "@linky-fit/linkstr";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useAtomValue } from "@linky-fit/linkstr-react";
+import {
+  useChatContact,
+  useMentionContacts,
+  useNpubMessageContactInfo,
+} from "../app/hooks/contacts/useDisplayContacts";
+import {
+  useNpubMessageContacts,
+  useOpenContactPay,
+  useOpenNpubMessageContact,
+  useUnknownSenderActions,
+} from "../app/hooks/contacts/useContactActions";
+import { useChatScroll } from "../app/hooks/messages/chatScroll";
+import {
+  useChatComposer,
+  useChatMessages,
+  useChatReactions,
+  useChatSend,
+  useCopyChatMessage,
+} from "../app/hooks/messages/useChat";
+import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
+import {
+  useCashuTokenMessageInfo,
+  useWalletBalance,
+} from "../app/hooks/wallet/useWalletInventory";
+import { currentPubkeyAtom } from "../app/state/session/session";
+import { payWithCashuEnabledAtom } from "../app/state/wallet/prefs";
+import type { Route } from "../types/route";
+import { FEEDBACK_CONTACT_NPUB } from "../utils/constants";
 import { useNearbyContact } from "../app/hooks/useBeacon";
 import { aggregateReactions } from "../app/hooks/messages/chatReactions";
 import type { EditChatContext } from "../app/hooks/messages/useEditChatMessage";
@@ -1199,7 +1227,8 @@ export const ChatPage: FC<ChatPageProps> = ({
   setChatDraft,
   markMintIconFailed,
 }) => {
-  const { formatDisplayedAmountText, t } = useAppShellCore();
+  const { t } = useTranslation();
+  const { formatDisplayedAmountText } = useDisplayAmounts();
   const composeInputRef = useRef<HTMLDivElement | null>(null);
   const npub = selectedContact
     ? normalizeNpubIdentifier(selectedContact.npub ?? "")
@@ -1348,5 +1377,84 @@ export const ChatPage: FC<ChatPageProps> = ({
         t={t}
       />
     </Stack>
+  );
+};
+
+type ChatRouteProps = Pick<
+  ChatPageProps,
+  | "getMintIconUrl"
+  | "markMintIconFailed"
+  | "onPayPaymentRequest"
+  | "onSettleBankPaymentOffer"
+> & { route: Route };
+
+export const ChatRoute: FC<ChatRouteProps> = ({ route, ...props }) => {
+  const { lang } = useTranslation();
+  const selectedContact = useChatContact(route);
+  const composer = useChatComposer();
+  const send = useChatSend(route, selectedContact);
+  const { onReactToChatMessage, reactionsByMessageId } = useChatReactions(
+    route,
+    selectedContact,
+  );
+  const onCopy = useCopyChatMessage();
+  const { addUnknownContactFromChat, blockUnknownContactFromChat } =
+    useUnknownSenderActions(route, selectedContact);
+  const { addNpubMessageContacts, contactsGroupAssignment } =
+    useNpubMessageContacts();
+  const { bankPaymentOfferMessages, chatMessages } = useChatMessages(route);
+  const { chatMessageElByIdRef, chatMessagesRef } = useChatScroll();
+  const { cashuBalance, cashuBalanceAfterMelt, cashuIsBusy } =
+    useWalletBalance();
+  const chatOwnPubkeyHex = useAtomValue(currentPubkeyAtom);
+  const payWithCashuEnabled = useAtomValue(payWithCashuEnabledAtom);
+  const getCashuTokenMessageInfo = useCashuTokenMessageInfo();
+  const getNpubMessageContactInfo = useNpubMessageContactInfo();
+  const mentionContacts = useMentionContacts();
+  const onOpenNpubContact = useOpenNpubMessageContact();
+  const openContactPay = useOpenContactPay();
+  return (
+    <ChatPage
+      {...props}
+      addChatAttachments={composer.addChatAttachments}
+      bankPaymentOfferMessages={bankPaymentOfferMessages}
+      cashuBalance={cashuBalance}
+      cashuBalanceAfterMelt={cashuBalanceAfterMelt}
+      cashuIsBusy={cashuIsBusy}
+      chatAttachments={composer.chatAttachments}
+      chatDraft={composer.chatDraft}
+      chatMessageElByIdRef={chatMessageElByIdRef}
+      chatMessages={chatMessages}
+      chatMessagesRef={chatMessagesRef}
+      chatOwnPubkeyHex={chatOwnPubkeyHex}
+      chatSendIsBusy={composer.chatSendIsBusy}
+      contactsGroupAssignment={contactsGroupAssignment}
+      editContext={composer.editContext}
+      feedbackContactNpub={FEEDBACK_CONTACT_NPUB}
+      getCashuTokenMessageInfo={getCashuTokenMessageInfo}
+      getNpubMessageContactInfo={getNpubMessageContactInfo}
+      lang={lang}
+      mentionContacts={mentionContacts}
+      onAddNpubContacts={addNpubMessageContacts}
+      onAddUnknownContact={addUnknownContactFromChat}
+      onBlockUnknownContact={blockUnknownContactFromChat}
+      onCancelEdit={composer.onCancelEdit}
+      onCancelReply={composer.onCancelReply}
+      onCopy={onCopy}
+      onDeclinePaymentRequest={send.onDeclineChatPaymentRequest}
+      onEdit={composer.onEditChatMessage}
+      onOpenNpubContact={onOpenNpubContact}
+      onReact={onReactToChatMessage}
+      onReply={composer.onReplyToChatMessage}
+      openContactPay={openContactPay}
+      payWithCashuEnabled={payWithCashuEnabled}
+      reactionsByMessageId={reactionsByMessageId}
+      removeChatAttachment={composer.removeChatAttachment}
+      replyContext={composer.replyContext}
+      selectedContact={selectedContact}
+      sendChatImage={send.sendChatImage}
+      sendChatMessage={send.sendChatOrEditMessage}
+      setChatDraft={composer.setChatDraft}
+    />
   );
 };

@@ -1,12 +1,6 @@
-import { getContactName } from "../../utils/contactName";
 import { toContactTextFields } from "../lib/contactFields";
-import {
-  NonEmptyString1000,
-  type ContactId,
-  type ContactsRepository,
-  type ConversationsRepository,
-} from "@linky-fit/linksync";
-import { useRepositoryRows } from "@linky-fit/linksync/react";
+import type { ContactId, ContactsRepository } from "@linky-fit/linksync";
+import { useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
 import { isStatusFilterValue } from "../../nostrStatus";
 import type { Route } from "../../types/route";
@@ -16,29 +10,21 @@ import {
   normalizeContactGroups,
   serializeContactGroups,
 } from "../../utils/contactGroups";
-import {
-  joinContactChatState,
-  type ContactWithChatState,
-} from "../lib/contactChatState";
 import { runWrite } from "../lib/storeWrite";
+import {
+  contactGroupsAtom,
+  contactRowsAtom,
+  contactsAtom,
+  conversationRowsAtom,
+} from "../state/contacts/readModel";
 import { useConversationArchiveMigration } from "../migrations/useConversationArchiveMigration";
 import type { Translate } from "../../i18n";
 
 import { reportAppLog } from "../../devtools/inspector/appLog";
 
-const withNormalizedName = (
-  row: ContactWithChatState,
-): ContactWithChatState => {
-  const name = getContactName(row);
-  if (name === (row.name ?? "")) return row;
-  const parsed = NonEmptyString1000.fromUnknown(name);
-  return { ...row, name: parsed.ok ? parsed.value : null };
-};
-
 interface UseContactsDomainParams {
   accountHydrated: boolean;
   contacts: ContactsRepository;
-  conversations: ConversationsRepository;
   noGroupFilterValue: string;
   pushToast: (message: string) => void;
   reassignContactMessages: (
@@ -52,7 +38,6 @@ interface UseContactsDomainParams {
 export const useContactsDomain = ({
   accountHydrated,
   contacts: contactsRepository,
-  conversations,
   noGroupFilterValue,
   pushToast,
   reassignContactMessages,
@@ -74,8 +59,8 @@ export const useContactsDomain = ({
     });
   }, [contactsFilterOpen]);
 
-  const contactRows = useRepositoryRows(contactsRepository);
-  const conversationRows = useRepositoryRows(conversations);
+  const contactRows = useAtomValue(contactRowsAtom);
+  const conversationRows = useAtomValue(conversationRowsAtom);
   useConversationArchiveMigration({
     contactRows,
     contactsRepository,
@@ -83,13 +68,7 @@ export const useContactsDomain = ({
     hydrated: accountHydrated,
   });
 
-  const contacts = React.useMemo(
-    () =>
-      joinContactChatState(contactRows, conversationRows)
-        .map(withNormalizedName)
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    [contactRows, conversationRows],
-  );
+  const contacts = useAtomValue(contactsAtom);
 
   const dedupeContacts = React.useCallback(async () => {
     if (dedupeContactsIsBusy) return;
@@ -250,37 +229,8 @@ export const useContactsDomain = ({
     t,
   ]);
 
-  const { groupCounts, groupNames, ungroupedCount } = React.useMemo(() => {
-    const counts = new Map<string, number>();
-    let ungrouped = 0;
-
-    for (const contact of contacts) {
-      const archivedAtSec = contact.archivedAtSec ?? 0;
-      if (Number.isFinite(archivedAtSec) && archivedAtSec > 0) continue;
-
-      const groups = getContactGroups(contact);
-      if (groups.length === 0) {
-        ungrouped += 1;
-        continue;
-      }
-      for (const group of groups) {
-        counts.set(group, (counts.get(group) ?? 0) + 1);
-      }
-    }
-
-    const names = Array.from(counts.entries())
-      .sort((a, b) => {
-        if (b[1] !== a[1]) return b[1] - a[1];
-        return a[0].localeCompare(b[0]);
-      })
-      .map(([name]) => name);
-
-    return {
-      groupCounts: counts,
-      groupNames: names,
-      ungroupedCount: ungrouped,
-    };
-  }, [contacts]);
+  const { groupCounts, groupNames, ungroupedCount } =
+    useAtomValue(contactGroupsAtom);
 
   React.useEffect(() => {
     if (!activeGroup) return;

@@ -1,15 +1,26 @@
 import {
   createId,
   makeContactsRepository,
-  makeConversationsRepository,
   NonEmptyString1000,
 } from "@linky-fit/linksync";
+import { RegistryContext } from "@linky-fit/linkstr-react";
 import { Effect } from "effect";
 import { act, useEffect } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { makeTestAppRegistry } from "../../testUtils/appRegistry";
 import { makeTestLinkyStore } from "../../testUtils/linkyStore";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import { useContactsDomain } from "./useContactsDomain";
+
+vi.mock("@evolu/common", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@evolu/common")>()),
+  createEvolu: () => () => ({}),
+}));
+const openLinkyStore = vi.hoisted(() => vi.fn());
+vi.mock("@linky-fit/linksync/evolu", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@linky-fit/linksync/evolu")>()),
+  openLinkyStore,
+}));
 
 const text = NonEmptyString1000.orThrow;
 const SHARED_ADDRESS = text("shared@pay.test");
@@ -20,8 +31,8 @@ const CAROL_NPUB = text(
 describe("useContactsDomain dedupe", () => {
   it("merges contacts by npub and never by a shared lightning address", async () => {
     const { store } = makeTestLinkyStore();
+    openLinkyStore.mockResolvedValue(store);
     const contacts = makeContactsRepository(store);
-    const conversations = makeConversationsRepository(store);
     const bob = createId<"Contact">();
     const bobby = createId<"Contact">();
     const carol = createId<"Contact">();
@@ -45,7 +56,6 @@ describe("useContactsDomain dedupe", () => {
       const { dedupeContacts } = useContactsDomain({
         accountHydrated: true,
         contacts,
-        conversations,
         noGroupFilterValue: "",
         pushToast,
         reassignContactMessages: () => Promise.resolve(0),
@@ -57,7 +67,11 @@ describe("useContactsDomain dedupe", () => {
       }, [dedupeContacts]);
       return null;
     };
-    const view = await renderIntoDocument(<Probe />);
+    const view = await renderIntoDocument(
+      <RegistryContext.Provider value={makeTestAppRegistry()}>
+        <Probe />
+      </RegistryContext.Provider>,
+    );
     await act(() => dedupe.current?.());
 
     const remaining = await Effect.runPromise(contacts.all);

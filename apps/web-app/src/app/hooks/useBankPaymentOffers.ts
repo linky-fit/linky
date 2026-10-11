@@ -1,12 +1,15 @@
 import {
   BankOfferId,
-  decodeNpub,
   identityFromNsec,
   type BankOfferDraft,
   type BankOfferInboxEvent,
   type Pubkey,
 } from "@linky-fit/linkstr";
-import { useLinkstrCommands } from "@linky-fit/linkstr-react";
+import {
+  useAtomSet,
+  useAtomValue,
+  useLinkstrCommands,
+} from "@linky-fit/linkstr-react";
 import {
   activeBankPaymentOffers,
   applyBankPaymentOfferReceipt,
@@ -42,9 +45,7 @@ import { Exit } from "effect";
 import React, { useState } from "react";
 import { reportInspectorRows } from "../../devtools/inspector/reportInspectorRows";
 import { getInspectorEmissionEnabled } from "../../devtools/inspector/inspectorEnabled";
-import type { useRouting } from "../../hooks/useRouting";
 import type { Translate } from "../../i18n";
-import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
 import {
   canLockAcrossTabs,
   getInitialBankPaymentOfferRecipientCount,
@@ -54,11 +55,6 @@ import {
 import { nowSeconds } from "../../utils/time";
 import { getUnknownErrorMessage } from "../../utils/unknown";
 import { makeLocalId } from "../../utils/validation";
-import {
-  bankPaymentOfferMessageRow,
-  compareBankPaymentOfferRows,
-  mergeBankPaymentOffersIntoChatMessages,
-} from "../lib/bankPaymentOfferRows";
 import {
   BANK_PAYMENT_OFFER_DETAILS_LOCK_KEY_PREFIX,
   BANK_PAYMENT_OFFER_STAGGER_LOCK_KEY_PREFIX,
@@ -73,11 +69,15 @@ import {
   rememberBankPaymentOfferStaggerQueue,
   removeBankPaymentOfferStaggerRecipients,
 } from "../lib/bankPaymentOfferStorage";
-import type { ContactRowLike, LocalNostrMessage } from "../types/appTypes";
 import {
-  buildUnknownContactId,
-  readUnknownContactIdPubkey,
-} from "./messages/contactIdentity";
+  bankPaymentOfferMessageRow,
+  compareBankPaymentOfferRows,
+} from "../lib/bankPaymentOfferRows";
+import {
+  bankPaymentOfferStateAtom,
+  contactPubkeysAtom,
+} from "../state/messages/bankOffers";
+import type { ContactRowLike, LocalNostrMessage } from "../types/appTypes";
 
 const RESPONDER_RETRY_MS = 30_000;
 // Three dots say how a contact has been doing lately; more would be noise.
@@ -99,42 +99,13 @@ interface RequestedBankPaymentOffer {
 }
 
 interface UseBankPaymentOffersParams {
-  chatMessages: LocalNostrMessage[];
-  contacts: readonly ContactRowLike[];
   currentNsec: string | null;
-  route: ReturnType<typeof useRouting>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   t: Translate;
 }
 
-// Offers are keyed by peer pubkey; the contact id is a display concern, so an
-// unknown peer saved as a contact moves its offers without any bookkeeping.
-const useContactPubkeys = (contacts: readonly ContactRowLike[]) =>
-  React.useMemo(() => {
-    const contactIdByPubkey = new Map<Pubkey, string>();
-    const pubkeyByContactId = new Map<string, Pubkey>();
-    for (const contact of contacts) {
-      const id = (contact.id ?? "").trim();
-      const npub = normalizeNpubIdentifier(contact.npub ?? "");
-      const pubkey = npub ? decodeNpub(npub) : null;
-      if (!id || !pubkey) continue;
-      if (!contactIdByPubkey.has(pubkey)) contactIdByPubkey.set(pubkey, id);
-      pubkeyByContactId.set(id, pubkey);
-    }
-    return {
-      contactIdFor: (pubkey: Pubkey): string | null =>
-        contactIdByPubkey.get(pubkey) ?? buildUnknownContactId(pubkey),
-      pubkeyFor: (contactId: string): Pubkey | null =>
-        pubkeyByContactId.get(contactId.trim()) ??
-        readUnknownContactIdPubkey(contactId),
-    };
-  }, [contacts]);
-
 export const useBankPaymentOffers = ({
-  chatMessages,
-  contacts,
   currentNsec,
-  route,
   setStatus,
   t,
 }: UseBankPaymentOffersParams) => {
@@ -144,7 +115,7 @@ export const useBankPaymentOffers = ({
       currentNsec ? (identityFromNsec(currentNsec)?.pubkey ?? null) : null,
     [currentNsec],
   );
-  const { contactIdFor, pubkeyFor } = useContactPubkeys(contacts);
+  const { contactIdFor, pubkeyFor } = useAtomValue(contactPubkeysAtom);
 
   const [recipientCount, setRecipientCountState] = useState(() =>
     clampBankPaymentOfferRecipientCount(
@@ -171,6 +142,12 @@ export const useBankPaymentOffers = ({
     stateRef.current = next;
     setState(next);
   }, []);
+  // Published after the commit: an atom write inside `update` would re-render
+  // this composition early and rerun the offer watchers below off schedule.
+  const setPublishedState = useAtomSet(bankPaymentOfferStateAtom);
+  React.useEffect(() => {
+    setPublishedState(state);
+  }, [setPublishedState, state]);
   React.useEffect(() => {
     update(emptyBankPaymentOfferState);
   }, [myPubHex, update]);
@@ -844,17 +821,6 @@ export const useBankPaymentOffers = ({
     [contactIdFor, myPubHex, offers],
   );
 
-  const chatMessagesWithBankPaymentOffers = React.useMemo(() => {
-    if (route.kind !== "chat") return chatMessages;
-    const activeContactId = route.id.trim();
-    const offerMessages = bankPaymentOfferMessages.filter(
-      (message) => message.contactId === activeContactId,
-    );
-    return offerMessages.length === 0
-      ? chatMessages
-      : mergeBankPaymentOffersIntoChatMessages(chatMessages, offerMessages);
-  }, [bankPaymentOfferMessages, chatMessages, route]);
-
   const activeBankPaymentOfferContacts = React.useCallback(
     (nowSec: number) => {
       const active = activeBankPaymentOffers(offers, nowSec);
@@ -889,7 +855,6 @@ export const useBankPaymentOffers = ({
     bankPaymentOfferMessages,
     bankPaymentOfferRecipientCount: recipientCount,
     bankPaymentOfferStaggerDelaySec: staggerDelaySec,
-    chatMessagesWithBankPaymentOffers,
     getBankPaymentOfferForSettlement,
     isBankPaymentOfferCanceled: React.useCallback(
       (offerId: BankOfferId) => isBankPaymentOfferCanceled(offers, offerId),

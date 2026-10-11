@@ -2,11 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { MessageEntityPreview } from "./MessageEntityPreview";
 
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellCore: () => ({
-    formatDisplayedAmountText: (amountSat: number) => `${amountSat} sat`,
-  }),
-}));
+vi.mock("../app/hooks/shell", async () =>
+  (await import("../testUtils/shellHooks")).shellHooksMock(),
+);
 
 describe("MessageEntityPreview", () => {
   afterEach(() => {

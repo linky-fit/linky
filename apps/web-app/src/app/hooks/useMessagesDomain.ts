@@ -1,25 +1,11 @@
+import type { Pubkey, RumorId } from "@linky-fit/linkstr";
 import {
-  isPubkey,
-  isRumorId,
-  type Pubkey,
-  type RumorId,
-} from "@linky-fit/linkstr";
-import {
-  ContactId,
-  createId,
-  directConversationIdFor,
-  MessageId,
   NonEmptyString1000,
   nostrReactionIdFor,
-  ReactionId,
-  RowNotFound,
   type ConversationsRepository,
-  type MessageRow,
-  type ReactionRow,
   type UnknownSendersRepository,
 } from "@linky-fit/linksync";
-import { useLiveValue, useRepositoryRows } from "@linky-fit/linksync/react";
-import { useAtomSuspense } from "@linky-fit/linkstr-react";
+import { useAtomSuspense, useAtomValue } from "@linky-fit/linkstr-react";
 import { Effect, Schema } from "effect";
 import React from "react";
 import { useLatest } from "../../hooks/useLatest";
@@ -34,49 +20,36 @@ import {
   safeLocalStorageRemove,
   safeLocalStorageSet,
 } from "../../utils/storage";
-import { makeLocalId, trimString } from "../../utils/validation";
-import { isIdentityChangeMessageContent } from "../lib/identityChangeMessage";
-import { allWrites, NO_WRITE, type WriteOutcome } from "../lib/storeWrite";
+import { trimString } from "../../utils/validation";
+import { allWrites, type WriteOutcome } from "../lib/storeWrite";
 import {
   chatWritesAtom,
   pendingPaymentsKeyFor,
 } from "../state/messages/chatWrites";
+import {
+  chatMessagesFor,
+  localMessagesAtom,
+  localReactionsAtom,
+  messageRowsAtom,
+  messagesByContactAtom,
+  reactionsByMessageIdAtom,
+  storedReactionsAtom,
+} from "../state/messages/readModel";
+import { useMessageWrites } from "./messages/useMessageWrites";
 import { useUnknownSenderOverlayMigration } from "../migrations/useUnknownSenderOverlayMigration";
-import type {
-  AppendedRow,
-  AppendLocalNostrReaction,
-  LocalNostrMessage,
-  LocalNostrReaction,
-  UpdateLocalNostrReaction,
-} from "../types/appTypes";
+import type { LocalNostrMessage } from "../types/appTypes";
 import {
-  buildUnknownContactId,
-  isUnknownContactId,
-  readUnknownContactIdPubkey,
-} from "./messages/contactIdentity";
-import {
-  dedupeChatMessages,
   dedupeNostrMessagesByPriority,
   getLocalNostrMessageClientKey,
   getLocalNostrMessageRumorKey,
 } from "./messages/messageHelpers";
-import {
-  contactIdByConversationId,
-  normalizeLegacyLocalMessage,
-  toLocalNostrMessage,
-  toLocalNostrReaction,
-  toReactionPatch,
-  toReactionWriteRow,
-} from "./messages/messageRows";
-import { buildReactionUpdate } from "./messages/messageUpdates";
+import { normalizeLegacyLocalMessage } from "./messages/messageRows";
 import { reactionKey, storedReactionKey } from "./messages/reactionInbox";
-import { useConversationRows } from "./useLinksync";
 
 interface UseMessagesDomainParams {
   appOwnerId: string | null;
   chatForceScrollToBottomRef: React.MutableRefObject<boolean>;
   chatMessagesRef: React.RefObject<HTMLDivElement | null>;
-  contacts: ReadonlyArray<{ readonly id: ContactId }>;
   conversations: ConversationsRepository;
   /** Background writes (legacy import, retention prune) wait until the account is hydrated. */
   hydrated: boolean;
@@ -90,9 +63,6 @@ const MESSAGE_RETENTION_PER_CONTACT = 500;
 const MESSAGE_RETENTION_GLOBAL = 3000;
 const REACTION_RETENTION_GLOBAL = 5000;
 const RETENTION_PRUNE_THROTTLE_MS = 900;
-
-const toText = (value: unknown): string =>
-  typeof value === "string" ? value : "";
 
 const toMessageStatus = (value: unknown): "pending" | "sent" =>
   trimString(value) === "pending" ? "pending" : "sent";
@@ -114,30 +84,10 @@ const legacyLocalMessageOwnerIds = (): string[] =>
     .map((key) => key.slice(LEGACY_MESSAGES_KEY_PREFIX.length))
     .filter(Boolean);
 
-const parseContactId = (value: string): ContactId | null => {
-  const result = ContactId.fromUnknown(value);
-  return result.ok ? result.value : null;
-};
-
-const parseMessageId = (value: string): MessageId | null => {
-  const result = MessageId.fromUnknown(value);
-  return result.ok ? result.value : null;
-};
-
-const parseReactionId = (value: string): ReactionId | null => {
-  const result = ReactionId.fromUnknown(value);
-  return result.ok ? result.value : null;
-};
-
-const NO_ROWS: ReadonlyArray<never> = [];
-
-const NOT_APPENDED: AppendedRow = { id: "", written: NO_WRITE };
-
 export const useMessagesDomain = ({
   appOwnerId,
   chatForceScrollToBottomRef,
   chatMessagesRef,
-  contacts,
   conversations,
   hydrated,
   route,
@@ -151,129 +101,23 @@ export const useMessagesDomain = ({
         : null;
   // Null until the first read answers, so the legacy import below cannot
   // duplicate rows it has not seen yet.
-  const messageSource = React.useMemo(
-    () => ({
-      all: conversations.messages.all,
-      subscribe: conversations.messages.subscribe,
-    }),
-    [conversations],
-  );
-  const loadedMessageRows = useLiveValue<ReadonlyArray<MessageRow> | null>(
-    messageSource,
-    null,
-  );
-  const messageRows = loadedMessageRows ?? NO_ROWS;
-  const reactionSource = React.useMemo(
-    () => ({
-      all: conversations.reactions.all,
-      subscribe: conversations.reactions.subscribe,
-    }),
-    [conversations],
-  );
-  const reactionRows = useLiveValue<ReadonlyArray<ReactionRow>>(
-    reactionSource,
-    NO_ROWS,
-  );
-  const removedReactionSource = React.useMemo(
-    () => ({
-      all: conversations.removedReactions,
-      subscribe: conversations.reactions.subscribe,
-    }),
-    [conversations],
-  );
-  const removedReactionRows = useLiveValue<ReadonlyArray<ReactionRow>>(
-    removedReactionSource,
-    NO_ROWS,
-  );
-  const conversationRows = useConversationRows();
-
-  const contactByConversation = React.useMemo(
-    () => contactIdByConversationId(conversationRows, contacts),
-    [contacts, conversationRows],
-  );
+  const loadedMessageRows = useAtomValue(messageRowsAtom);
+  const nostrMessagesLocal = useAtomValue(localMessagesAtom);
+  const normalizedReactionRows = useAtomValue(storedReactionsAtom);
+  const nostrReactionsLocal = useAtomValue(localReactionsAtom);
 
   const chatWrites = useAtomSuspense(chatWritesAtom).value;
   const write = chatWrites.queueWrite;
 
-  const normalizedReactionRows = React.useMemo(() => {
-    const keyOf = (row: ReactionRow): string | null =>
-      storedReactionKey(row.reactorPubkey, row.wrapId);
-    const deletedKeys = new Set<string>();
-    const seenKeys = new Set<string>();
-    for (const row of removedReactionRows) {
-      const key = keyOf(row);
-      if (!key) continue;
-      deletedKeys.add(key);
-      seenKeys.add(key);
-    }
-    const reactions: LocalNostrReaction[] = [];
-    for (const row of reactionRows) {
-      const key = keyOf(row);
-      if (key) seenKeys.add(key);
-      const normalized = toLocalNostrReaction(row);
-      if (normalized) reactions.push(normalized);
-    }
-    return { deletedKeys, reactions, seenKeys };
-  }, [reactionRows, removedReactionRows]);
-
-  const evoluNostrMessagesLocal = React.useMemo(() => {
-    const parsed: LocalNostrMessage[] = [];
-    for (const row of messageRows) {
-      const normalized = toLocalNostrMessage(
-        row,
-        row.conversationId === null
-          ? undefined
-          : contactByConversation.get(row.conversationId),
-      );
-      if (normalized) parsed.push(normalized);
-    }
-    return dedupeNostrMessagesByPriority(parsed).sort(
-      (a, b) => a.createdAtSec - b.createdAtSec,
-    );
-  }, [contactByConversation, messageRows]);
-
   useUnknownSenderOverlayMigration({ appOwnerId, hydrated, unknownSenders });
-  const unknownSenderRows = useRepositoryRows(unknownSenders);
-  const unknownSenderMessagesLocal = React.useMemo(
-    () =>
-      unknownSenderRows.flatMap((row) => {
-        const message = toLocalNostrMessage(
-          row,
-          buildUnknownContactId(row.peerPubkey) ?? undefined,
-        );
-        return message ? [message] : [];
-      }),
-    [unknownSenderRows],
-  );
-
-  const nostrMessagesLocal = React.useMemo(() => {
-    const combined = dedupeNostrMessagesByPriority([
-      ...evoluNostrMessagesLocal,
-      ...unknownSenderMessagesLocal,
-    ]);
-    return combined.sort((a, b) => a.createdAtSec - b.createdAtSec);
-  }, [evoluNostrMessagesLocal, unknownSenderMessagesLocal]);
-
-  const nostrReactionsLocal = React.useMemo(() => {
-    const parsed: LocalNostrReaction[] = [];
-    const seenWrapIds = new Set<string>();
-    const seenClientIds = new Set<string>();
-    for (const normalized of normalizedReactionRows.reactions) {
-      const wrapId = trimString(normalized.wrapId);
-      const key = storedReactionKey(normalized.reactorPubkey, wrapId);
-      if (key !== null && normalizedReactionRows.deletedKeys.has(key)) continue;
-      if (wrapId && seenWrapIds.has(wrapId)) continue;
-      if (wrapId) seenWrapIds.add(wrapId);
-
-      const clientId = trimString(normalized.clientId);
-      if (clientId && seenClientIds.has(clientId)) continue;
-      if (clientId) seenClientIds.add(clientId);
-
-      parsed.push(normalized);
-    }
-    parsed.sort((a, b) => a.createdAtSec - b.createdAtSec);
-    return parsed;
-  }, [normalizedReactionRows]);
+  const {
+    appendLocalNostrReaction,
+    removeLocalNostrMessagesByContactId,
+    removeNostrMessage,
+    removeNostrReaction,
+    softDeleteLocalNostrReaction,
+    updateLocalNostrReaction,
+  } = useMessageWrites({ conversations, unknownSenders });
 
   const knownReactionKeysRef = React.useRef<Set<string>>(new Set());
   const nostrReactionsLatestRef = useLatest(nostrReactionsLocal);
@@ -285,30 +129,6 @@ export const useMessagesDomain = ({
   React.useEffect(() => {
     knownReactionKeysRef.current = new Set(normalizedReactionRows.seenKeys);
   }, [normalizedReactionRows]);
-
-  const removeNostrMessage = React.useCallback(
-    (message: LocalNostrMessage) => {
-      const messageId = parseMessageId(message.id);
-      if (!messageId) return;
-      void write(
-        "message removal",
-        isUnknownContactId(message.contactId)
-          ? unknownSenders.remove(messageId)
-          : conversations.messages.remove(messageId),
-      );
-    },
-    [conversations, unknownSenders, write],
-  );
-
-  const removeNostrReaction = React.useCallback(
-    (id: string): Promise<WriteOutcome> => {
-      const reactionId = parseReactionId(id);
-      return reactionId
-        ? write("reaction removal", conversations.reactions.remove(reactionId))
-        : NO_WRITE;
-    },
-    [conversations, write],
-  );
 
   const legacyImportDoneRef = React.useRef(false);
 
@@ -390,91 +210,6 @@ export const useMessagesDomain = ({
     [chatWrites, scrollActiveChatToBottomRef],
   );
 
-  const appendLocalNostrReaction = React.useCallback<AppendLocalNostrReaction>(
-    (reaction) => {
-      const messageId = trimString(reaction.messageId);
-      const reactorPubkey = trimString(reaction.reactorPubkey);
-      const emoji = toText(reaction.emoji).trim();
-      if (!messageId || !reactorPubkey || !emoji) return NOT_APPENDED;
-      const wrapId = trimString(reaction.wrapId);
-      const clientId = trimString(reaction.clientId);
-
-      const existing = nostrReactionsLatestRef.current.find((current) => {
-        if (clientId && trimString(current.clientId) === clientId) return true;
-        if (wrapId && trimString(current.wrapId) === wrapId) return true;
-        return (
-          trimString(current.messageId) === messageId &&
-          trimString(current.reactorPubkey) === reactorPubkey &&
-          trimString(current.emoji) === emoji &&
-          current.createdAtSec === reaction.createdAtSec
-        );
-      });
-      if (existing) return { id: trimString(existing.id), written: NO_WRITE };
-
-      // A reaction belongs to the conversation of the message it targets.
-      const target = chatWrites
-        .latestMessages()
-        .find((message) => trimString(message.rumorId) === messageId);
-      const contactId = target ? parseContactId(target.contactId) : null;
-      if (!contactId) return NOT_APPENDED;
-      const id =
-        isRumorId(wrapId) && isPubkey(reactorPubkey)
-          ? nostrReactionIdFor(wrapId, reactorPubkey)
-          : createId<"Reaction">();
-      const row = toReactionWriteRow(
-        id,
-        directConversationIdFor(contactId),
-        reaction,
-        wrapId || `pending:${makeLocalId()}`,
-      );
-      if (!row) return NOT_APPENDED;
-      return {
-        id,
-        written: write(
-          "reaction",
-          Effect.flatMap(conversations.ensureDirect(contactId), () =>
-            conversations.reactions.insertIfAbsent(row),
-          ),
-        ),
-      };
-    },
-    [chatWrites, conversations, nostrReactionsLatestRef, write],
-  );
-
-  const updateLocalNostrReaction = React.useCallback<UpdateLocalNostrReaction>(
-    (id, updates) => {
-      const reactionId = parseReactionId(trimString(id));
-      if (!reactionId) return NO_WRITE;
-      return write(
-        "reaction update",
-        Effect.gen(function* () {
-          const current = yield* conversations.reactions.byId(reactionId);
-          if (current === null)
-            return yield* new RowNotFound({
-              scope: "messages",
-              table: "reaction",
-              id: reactionId,
-            });
-          const payload = buildReactionUpdate(reactionId, updates, current);
-          if (payload === null) return;
-          yield* conversations.reactions.update(
-            reactionId,
-            toReactionPatch(payload),
-          );
-        }),
-      );
-    },
-    [conversations, write],
-  );
-
-  const softDeleteLocalNostrReaction = React.useCallback(
-    (id: string) => {
-      const normalizedId = trimString(id);
-      if (normalizedId) void removeNostrReaction(normalizedId);
-    },
-    [removeNostrReaction],
-  );
-
   const softDeleteLocalNostrReactionsByWrapIds = React.useCallback(
     (wrapIds: readonly string[]): Promise<WriteOutcome> => {
       const targetWrapIds = new Set(
@@ -523,37 +258,6 @@ export const useMessagesDomain = ({
       );
     },
     [conversations, write],
-  );
-
-  const removeLocalNostrMessagesByContactId = React.useCallback(
-    (contactId: string) => {
-      const normalizedContactId = trimString(contactId);
-      if (!normalizedContactId) return;
-      const unknownPubkey = readUnknownContactIdPubkey(normalizedContactId);
-      if (unknownPubkey) {
-        void write(
-          "unknown sender removal",
-          Effect.flatMap(
-            unknownSenders.removeSender(unknownPubkey),
-            (removed) =>
-              Effect.sync(() =>
-                reportAppLog({
-                  tag: "unknownSenders.removed",
-                  summary: `Removed ${removed} messages of an unknown sender`,
-                  links: { pubkey: unknownPubkey },
-                  payload: { removed },
-                }),
-              ),
-          ),
-        );
-        return;
-      }
-      for (const message of evoluNostrMessagesLocal) {
-        if (trimString(message.contactId) !== normalizedContactId) continue;
-        removeNostrMessage(message);
-      }
-    },
-    [evoluNostrMessagesLocal, removeNostrMessage, unknownSenders, write],
   );
 
   const retentionPruneTimerRef = React.useRef<number | null>(null);
@@ -689,57 +393,14 @@ export const useMessagesDomain = ({
 
   const pendingPaymentsKey = pendingPaymentsKeyFor(appOwnerId);
 
-  const chatContactId = activeChatRouteId;
-
-  const { messagesByContactId, lastMessageByContactId, nostrMessagesRecent } =
-    React.useMemo(() => {
-      const byContact = new Map<string, LocalNostrMessage[]>();
-      const lastBy = new Map<string, LocalNostrMessage>();
-
-      for (const message of nostrMessagesLocal) {
-        const id = trimString(message.contactId);
-        if (!id) continue;
-
-        const list = byContact.get(id);
-        if (list) list.push(message);
-        else byContact.set(id, [message]);
-
-        if (!isIdentityChangeMessageContent(message.content)) {
-          lastBy.set(id, message);
-        }
-      }
-
-      const recentSlice =
-        nostrMessagesLocal.length > 100
-          ? nostrMessagesLocal.slice(-100)
-          : [...nostrMessagesLocal];
-
-      return {
-        messagesByContactId: byContact,
-        lastMessageByContactId: lastBy,
-        nostrMessagesRecent: [...recentSlice].reverse(),
-      };
-    }, [nostrMessagesLocal]);
-
-  const reactionsByMessageId = React.useMemo(() => {
-    const byMessage = new Map<string, LocalNostrReaction[]>();
-    for (const reaction of nostrReactionsLocal) {
-      const messageId = trimString(reaction.messageId);
-      if (!messageId) continue;
-      const list = byMessage.get(messageId);
-      if (list) list.push(reaction);
-      else byMessage.set(messageId, [reaction]);
-    }
-    return byMessage;
-  }, [nostrReactionsLocal]);
-
-  const chatMessages = React.useMemo<LocalNostrMessage[]>(() => {
-    const id = trimString(chatContactId);
-    if (!id) return [];
-
-    const list = messagesByContactId.get(id) ?? [];
-    return dedupeChatMessages(list);
-  }, [chatContactId, messagesByContactId]);
+  const messagesByContact = useAtomValue(messagesByContactAtom);
+  const { lastMessageByContactId, recentMessages: nostrMessagesRecent } =
+    messagesByContact;
+  const reactionsByMessageId = useAtomValue(reactionsByMessageIdAtom);
+  const chatMessages = React.useMemo(
+    () => chatMessagesFor(messagesByContact, activeChatRouteId),
+    [activeChatRouteId, messagesByContact],
+  );
 
   return {
     appendLocalNostrMessage: chatWrites.appendLocalNostrMessage,

@@ -6,6 +6,7 @@ import {
 } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { Exit } from "effect";
+import { AtomRegistry } from "effect/reactivity";
 import React, { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
@@ -22,13 +23,15 @@ const { fetchMock, publishMock } = vi.hoisted(() => ({
     vi.fn<(pubkeys: ReadonlyArray<Pubkey>) => Promise<Exit.Exit<void>>>(),
 }));
 
-vi.mock("@linky-fit/linkstr-react", () => ({
-  useLinkstrCommands: () => ({
+vi.mock("@linky-fit/linkstr-react", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@linky-fit/linkstr-react")>()),
+  linkstrCommands: () => ({
     fetchOwnMuteList: fetchMock,
     publishMuteList: publishMock,
   }),
 }));
 
+import { RegistryContext } from "@linky-fit/linkstr-react";
 import { useMuteListSync } from "./useMuteListSync";
 
 const [me, blockedElsewhere, blockedHere] = [
@@ -49,10 +52,17 @@ const render = async (enabled: boolean) => {
     }, [muteListSynced]);
     return null;
   };
-  const view = await renderIntoDocument(<Probe on={enabled} />);
+  // A fresh registry per mount: an earlier test's sync must not hold this one's queue.
+  const registry = AtomRegistry.make();
+  const withRegistry = (on: boolean) => (
+    <RegistryContext.Provider value={registry}>
+      <Probe on={on} />
+    </RegistryContext.Provider>
+  );
+  const view = await renderIntoDocument(withRegistry(enabled));
   return {
     synced,
-    enable: () => view.rerender(<Probe on />),
+    enable: () => view.rerender(withRegistry(true)),
     unmount: () => view.unmount(),
   };
 };

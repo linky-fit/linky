@@ -1,13 +1,11 @@
 /* eslint-disable react-refresh/only-export-components */
 import React from "react";
-import type { DerivedProfileDefaults } from "../../derivedProfile";
 import type { ContactId } from "../../evolu";
 import type { ScanDiagnostics } from "../hooks/useGuideScannerDomain";
 import type { Lang } from "../../i18n";
 import type { LnurlAuthPreview } from "../../lnurlAuth";
 import type { LnurlWithdrawPreview } from "../../lnurlPay";
 import type { PendingSiteLogin } from "../../siteLogin";
-import type { ProfileStatusCurrency } from "../../nostrStatus";
 import type { Route } from "../../types/route";
 import type {
   DisplayAmountParts,
@@ -31,7 +29,6 @@ import {
   type RelaySettingsContextValue,
 } from "./SystemSettingsContexts";
 import type { Translate } from "../../i18n";
-import type { FilePickerHandle } from "../../utils/pickFile";
 
 interface ChatContact {
   contactId: ContactId | null;
@@ -45,7 +42,6 @@ export interface AppShellCoreContextValue {
   cashuBalance: number;
   cashuBalanceAfterMelt: number;
   cashuIsBusy: boolean;
-  canWriteNfc: boolean;
   chatTopbarContact: ChatContact | null;
   contactsGuide: { step: number; task: string } | null;
   contactsGuideActiveStep: {
@@ -64,16 +60,11 @@ export interface AppShellCoreContextValue {
   decimalAmountInputEnabled: boolean;
   sendReadReceiptsEnabled: boolean;
   displayCurrency: DisplayCurrency;
-  derivedProfile: DerivedProfileDefaults | null;
-  displayUnit: string;
-  effectiveMyLightningAddress: string | null;
   effectiveProfileName: string | null;
   effectiveProfilePicture: string | null;
   evoluAppOwnerId: string | null;
   fiatRates: FiatRates | null;
   formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
-  formatDisplayedAmountText: (amountSat: number) => string;
-  isProfileEditing: boolean;
   lang: Lang;
   nfcWritePromptKind: "profile" | "token" | null;
   nostrPictureByNpub: Record<string, string | null>;
@@ -94,22 +85,6 @@ export interface AppShellCoreContextValue {
     amountSat: number;
     lnAddress: string;
   } | null;
-  profileEditInitialRef: React.MutableRefObject<{
-    lnAddress: string;
-    name: string;
-    picture: string;
-  } | null>;
-  profileCustomPictureUrl: string;
-  profileEditLnAddress: string;
-  profileEditName: string;
-  profileEditPicture: string;
-  profileEditStatus: string;
-  profileEditsSavable: boolean;
-  profileIsSaving: boolean;
-  profileStatus: string | null;
-  profileStatusCurrencies: readonly ProfileStatusCurrency[];
-  profilePhotoInputRef: React.RefObject<FilePickerHandle | null>;
-  profileSelectedPictureKind: "custom" | "generated";
   profileShareOverlayIsOpen: boolean;
   route: Route;
   scanAllowsManualContact: boolean;
@@ -154,10 +129,6 @@ export interface AppShellActionsContextValue {
   };
   copyText: (text: string) => Promise<void>;
   cycleScanCamera: () => void;
-  shuffleProfileAvatar: () => void;
-  onPickProfilePhoto: () => void;
-  onProfilePhotoError: (error: unknown) => void;
-  onProfilePhotoSelected: (dataUrl: string) => void;
   onPickScanImage: () => void;
   openFeedbackContact: () => void;
   openIssueTokenFromScan: () => void;
@@ -167,14 +138,12 @@ export interface AppShellActionsContextValue {
   openReceiveScan: () => void;
   pasteScanValue: () => Promise<void>;
   copyShareOptionsText: () => Promise<void>;
-  saveProfileEdits: () => void;
   setDisplayCurrency: (currency: DisplayCurrency) => void;
   setContactNewPrefill: (prefill: {
     lnAddress: string;
     npub: string | null;
     suggestedName: string | null;
   }) => void;
-  setIsProfileEditing: (editing: boolean) => void;
   setLang: (lang: Lang) => void;
   setPostPaySaveContact: (
     value: {
@@ -182,9 +151,6 @@ export interface AppShellActionsContextValue {
       lnAddress: string;
     } | null,
   ) => void;
-  setProfileEditLnAddress: (value: string) => void;
-  setProfileEditName: (value: string) => void;
-  setProfileEditStatus: (value: string) => void;
   stopContactsGuide: () => void;
   shareOptionsViaEmail: () => void;
   shareOptionsViaSms: () => void;
@@ -193,8 +159,6 @@ export interface AppShellActionsContextValue {
   toggleDecimalAmountInput: () => void;
   toggleSendReadReceipts: () => void;
   toggleShowProfileQrOnTilt: () => void;
-  toggleProfileEditing: () => void;
-  writeCurrentNpubToNfc: () => Promise<void>;
 }
 
 export interface AppShellRouteContextValue {

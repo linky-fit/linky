@@ -18,7 +18,7 @@ import {
 } from "@linky-fit/ui";
 import type { Tone } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import {
   bankPaymentOfferStatusTones,
   formatRemainingTime,
@@ -236,8 +236,9 @@ function ChatMessageComponent({
   replyQuoteText,
   settleBankPaymentOfferBusy,
 }: ChatMessageProps) {
-  const { formatDisplayedAmountParts, formatDisplayedAmountText, t } =
-    useAppShellCore();
+  const { t } = useTranslation();
+  const { formatDisplayedAmountParts, formatDisplayedAmountText } =
+    useDisplayAmounts();
   const paymentCardAmount = (amountSat: number): PaymentCardAmount => {
     const parts = formatDisplayedAmountParts(amountSat);
     return {

@@ -6,6 +6,7 @@ import {
 } from "@linky-fit/linkstr";
 import {
   linkstrConfigAtom,
+  useAtomSet,
   useAtomValue,
   useLinkstrCommands,
 } from "@linky-fit/linkstr-react";
@@ -14,6 +15,7 @@ import React from "react";
 import { omitSyntheticContactLightningAddress } from "../../../derivedProfile";
 import { getProfilePictureUrl } from "../../../profileCache";
 import { formatShortNpub, getBestNostrName } from "../../../utils/formatting";
+import { contactSuggestionsAtom } from "../../state/contacts/contactForm";
 
 const CONTACT_SUGGESTION_LIMIT = 3;
 const CONTACT_SUGGESTION_WINDOW_SECONDS = 60 * 60;
@@ -82,13 +84,12 @@ export const selectContactSuggestions = (
   return suggestions;
 };
 
+/** Keeps `contactSuggestionsAtom` filled while enabled and empty otherwise. */
 export const useContactSuggestions = (
   enabled: boolean,
   knownNpubsKey: string,
-): ContactSuggestionCandidate[] => {
-  const [suggestions, setSuggestions] = React.useState<
-    ContactSuggestionCandidate[]
-  >([]);
+): void => {
+  const setSuggestions = useAtomSet(contactSuggestionsAtom);
   const linkstrConfig = useAtomValue(linkstrConfigAtom);
   const { discoverActiveProfiles } = useLinkstrCommands();
   const canDiscover = (linkstrConfig?.readRelays.length ?? 0) > 0;
@@ -120,7 +121,11 @@ export const useContactSuggestions = (
     return () => {
       cancelled = true;
     };
-  }, [canDiscover, discoverActiveProfiles, enabled, knownNpubsKey]);
-
-  return suggestions;
+  }, [
+    canDiscover,
+    discoverActiveProfiles,
+    enabled,
+    knownNpubsKey,
+    setSuggestions,
+  ]);
 };

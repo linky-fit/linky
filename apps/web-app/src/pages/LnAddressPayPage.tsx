@@ -2,6 +2,10 @@ import { Avatar, Button, Row, Stack, Text } from "@linky-fit/ui";
 import { useEffect, type FC } from "react";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import { useWalletBalance } from "../app/hooks/wallet/useWalletInventory";
+import {
+  useKnownLnAddressPayContact,
+  useLnAddressPayDraft,
+} from "../app/hooks/wallet/usePaymentDrafts";
 import { LnurlPayPreviewNotices } from "../components/LnurlPayPreviewNotices";
 import { PaymentAmountPanel } from "../components/PaymentAmountPanel";
 import {
@@ -157,6 +161,28 @@ export const LnAddressPayPage: FC<LnAddressPayPageProps> = ({
       submitDisabled={invalid}
       submitBlockedReason={submitBlockedReason}
       t={t}
+    />
+  );
+};
+
+type LnAddressPayRouteProps = Pick<
+  LnAddressPayPageProps,
+  "lnAddress" | "payLightningAddressWithCashu"
+>;
+
+export const LnAddressPayRoute: FC<LnAddressPayRouteProps> = (props) => {
+  const { knownLnAddressPayContact, knownLnAddressPayContactPictureUrl } =
+    useKnownLnAddressPayContact("lnAddressPay");
+  const draft = useLnAddressPayDraft();
+  return (
+    <LnAddressPayPage
+      {...props}
+      knownContact={knownLnAddressPayContact}
+      knownContactPictureUrl={knownLnAddressPayContactPictureUrl}
+      lnAddressPayAmount={draft.lnAddressPayAmount}
+      lnAddressPayNote={draft.lnAddressPayNote}
+      setLnAddressPayAmount={draft.setLnAddressPayAmount}
+      setLnAddressPayNote={draft.setLnAddressPayNote}
     />
   );
 };

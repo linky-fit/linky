@@ -1,7 +1,7 @@
 import { ContactRow, Row, Stack, Text } from "@linky-fit/ui";
 import type { MintIcon } from "../utils/mint";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import { formatChatMessagePreviewText } from "../app/lib/chatMessageDisplay";
 import { hasMessageEntityPreview } from "../app/lib/messageEntityPreview";
 import type { CashuTokenMessageInfo } from "../app/lib/tokenMessageInfo";
@@ -51,7 +51,8 @@ export const ContactCard: React.FC<ContactCardProps> = React.memo(
     tokenInfo,
     isUnknownContact = false,
   }) => {
-    const { formatDisplayedAmountText, t } = useAppShellCore();
+    const { t } = useTranslation();
+    const { formatDisplayedAmountText } = useDisplayAmounts();
     // The offered currencies belong on the contact's page, not in the list.
     const contactStatus = parseProfileGeneralStatus(statusText).text;
     const lastText = (lastMessage?.content ?? "").trim();

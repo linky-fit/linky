@@ -116,7 +116,7 @@ const setup = async (options: SetupOptions = {}) => {
       currentNsec: CURRENT_NSEC,
       route: { kind: "chat" },
       replyContext,
-      replyContextRef: { current: replyContext },
+      readReplyContext: () => replyContext,
       selectedContact: {
         id: "contact-1",
         npub: CONTACT_NPUB,

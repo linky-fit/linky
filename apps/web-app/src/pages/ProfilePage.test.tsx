@@ -10,20 +10,14 @@ import {
 } from "../testUtils/lightningInvoice";
 import { ProfilePage } from "./ProfilePage";
 
-const core = vi.hoisted(() => ({
-  t: (key: string) =>
-    key === "claimOwnLightningAddressPurchaseFor"
-      ? "Purchase for {amount}"
-      : key,
-  formatDisplayedAmountParts: (amount: number) => ({
-    approxPrefix: "",
-    amountText: String(amount),
-    unitLabel: "sat",
+vi.mock("../app/hooks/shell", async () =>
+  (await import("../testUtils/shellHooks")).shellHooksMock({
+    t: (key) =>
+      key === "claimOwnLightningAddressPurchaseFor"
+        ? "Purchase for {amount}"
+        : key,
   }),
-}));
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellCore: () => core,
-}));
+);
 vi.mock("../components/ProfileAvatarEditor", () => ({
   ProfileAvatarEditor: () => null,
 }));

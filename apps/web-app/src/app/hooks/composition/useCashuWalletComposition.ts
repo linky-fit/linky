@@ -3,7 +3,6 @@ import type { PushToastOptions } from "../../../hooks/useToasts";
 import { paidOverlayContact } from "../../lib/paidOverlay";
 import { decodeNpub, encodeNprofile } from "@linky-fit/linkstr";
 import React, { useMemo, useState } from "react";
-import type { ContactId } from "../../../evolu";
 import { useRouting } from "../../../hooks/useRouting";
 import { recommendedNostrRelays } from "../../../utils/nostrRelays";
 import {
@@ -11,10 +10,7 @@ import {
   type FiatRates,
 } from "../../../utils/displayAmounts";
 import { type TransactionsRepository } from "@linky-fit/linksync";
-import {
-  getInitialLightningInvoiceAutoPayLimit,
-  getInitialPayWithCashuEnabled,
-} from "../../../utils/storage";
+import { getInitialLightningInvoiceAutoPayLimit } from "../../../utils/storage";
 import { useSaveCashuFromText } from "../cashu/useSaveCashuFromText";
 import { useDeferredReceiveRetry } from "../cashu/useDeferredReceiveRetry";
 import { useTopupFlow } from "../topup/useTopupFlow";
@@ -23,7 +19,10 @@ import { useCashuDomain } from "../useCashuDomain";
 import { useMintDomain } from "../useMintDomain";
 import { useAllowTestMints } from "../useAllowTestMints";
 import { useMoveMintFunds } from "../mint/useMoveMintFunds";
-import { receiveMethodAtom } from "../../state/wallet/prefs";
+import {
+  payWithCashuEnabledAtom,
+  receiveMethodAtom,
+} from "../../state/wallet/prefs";
 import { receiveTokenDraftAtom } from "../../state/wallet/tokenActivity";
 import { useDefaultMint } from "../wallet/useDefaultMint";
 import { useNpubCash } from "../wallet/useNpubCash";
@@ -33,7 +32,10 @@ import { useTransferCleanup } from "../wallet/useTransferCleanup";
 import { useWalletOps } from "../wallet/useWalletOps";
 import { useWalletPayments } from "../wallet/useWalletPayments";
 import { useWalletResumes } from "../wallet/useWalletResumes";
-import { useWalletBalance } from "../wallet/useWalletInventory";
+import {
+  useCashuTokenMessageInfo,
+  useWalletBalance,
+} from "../wallet/useWalletInventory";
 import {
   useIssuedTokenClaimWatch,
   useTokenContactSend,
@@ -42,11 +44,7 @@ import {
 } from "../wallet/useWalletTokens";
 import { useOwnerStorage, usePaymentLog } from "../wallet/useWalletStorage";
 import { usePaidOverlay, usePaidOverlayCommands } from "../shell";
-import {
-  isPendingDeferredReceive,
-  takenTokenTexts,
-} from "../../lib/cashuTransfers";
-import { getCashuTokenMessageInfo as getCashuTokenMessageInfoBase } from "../../lib/tokenMessageInfo";
+import { isPendingDeferredReceive } from "../../lib/cashuTransfers";
 import { useContactsMessagingComposition } from "./useContactsMessagingComposition";
 import { useIdentityOwnersComposition } from "./useIdentityOwnersComposition";
 import { useLinkshuComposition } from "./useLinkshuComposition";
@@ -63,7 +61,6 @@ type ContactsMessagingCompositionResult = ReturnType<
 type ProfileCompositionResult = ReturnType<typeof useProfileComposition>;
 
 interface UseCashuWalletCompositionParams {
-  contactPayBackToChatRef: React.MutableRefObject<ContactId | null>;
   copyText: (value: string) => Promise<void>;
   contactsMessaging: Pick<
     ContactsMessagingCompositionResult,
@@ -78,7 +75,6 @@ interface UseCashuWalletCompositionParams {
     | "nostrMessagesLocal"
     | "nostrMessagesRecent"
     | "nostrPictureByNpub"
-    | "openScannedContactPendingNpubRef"
     | "pendingPaymentsKey"
     | "respondToBankPaymentOfferWithGroupState"
     | "selectedChatContact"
@@ -100,7 +96,6 @@ interface UseCashuWalletCompositionParams {
     body: string,
     tag?: string,
   ) => Promise<void>;
-  payAmount: string;
   profile: Pick<
     ProfileCompositionResult,
     | "npubCashInfoInFlightRef"
@@ -112,29 +107,21 @@ interface UseCashuWalletCompositionParams {
   >;
   pushToast: (message: string, options?: PushToastOptions) => void;
   route: ReturnType<typeof useRouting>;
-  setContactPaymentIntent: React.Dispatch<
-    React.SetStateAction<"pay" | "request">
-  >;
-  setPayAmount: React.Dispatch<React.SetStateAction<string>>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   t: Translate;
   transactions: Pick<TransactionsRepository, "all" | "update">;
 }
 
 export const useCashuWalletComposition = ({
-  contactPayBackToChatRef,
   copyText,
   contactsMessaging,
   fiatRates,
   formatDisplayedAmountParts,
   identity,
   maybeShowPwaNotification,
-  payAmount,
   profile,
   pushToast,
   route,
-  setContactPaymentIntent,
-  setPayAmount,
   setStatus,
   t,
   transactions,
@@ -164,8 +151,8 @@ export const useCashuWalletComposition = ({
     suggestDefaultMint,
   } = useDefaultMint();
 
-  const [payWithCashuEnabled, setPayWithCashuEnabled] = useState<boolean>(() =>
-    getInitialPayWithCashuEnabled(),
+  const [payWithCashuEnabled, setPayWithCashuEnabled] = useAtom(
+    payWithCashuEnabledAtom,
   );
   const [lightningInvoiceAutoPayLimit, setLightningInvoiceAutoPayLimit] =
     useState<number>(() => getInitialLightningInvoiceAutoPayLimit());
@@ -291,7 +278,7 @@ export const useCashuWalletComposition = ({
     }
   }, [defaultMintUrl]);
 
-  const { applyDefaultMintSelection, makeNip98AuthHeader } = useNpubCash({
+  const { applyDefaultMintSelection } = useNpubCash({
     ...profile,
     copyText,
     currentNpub,
@@ -317,7 +304,6 @@ export const useCashuWalletComposition = ({
 
   const walletPayments = useWalletPayments({
     cashuBalance,
-    contactPayBackToChatRef,
     contactsMessaging,
     currentNpub,
     currentNsec,
@@ -327,12 +313,9 @@ export const useCashuWalletComposition = ({
     lightningInvoiceAutoPayLimit,
     logPaymentEvent,
     meltToDefaultMint,
-    payAmount,
     payWithCashuEnabled,
     pushToast,
     route,
-    setContactPaymentIntent,
-    setPayAmount,
     setStatus,
     showPaidOverlay,
     showPaymentSending,
@@ -452,15 +435,7 @@ export const useCashuWalletComposition = ({
     touchMintInfo,
   });
 
-  const knownTransferTexts = React.useMemo(
-    () => takenTokenTexts(walletTransfers, walletOperations),
-    [walletOperations, walletTransfers],
-  );
-  const getCashuTokenMessageInfo = React.useCallback(
-    (text: string) =>
-      getCashuTokenMessageInfoBase(text, knownTransferTexts, allowTestMints),
-    [allowTestMints, knownTransferTexts],
-  );
+  const getCashuTokenMessageInfo = useCashuTokenMessageInfo();
 
   return {
     ...walletPayments,
@@ -496,7 +471,6 @@ export const useCashuWalletComposition = ({
     isCashuTokenKnownAny,
     isCashuTokenStored,
     lightningInvoiceAutoPayLimit,
-    makeNip98AuthHeader,
     markMintIconFailed,
     meltLargestForeignMintToMainMint: meltToDefaultMint,
     mintInfoByUrl,

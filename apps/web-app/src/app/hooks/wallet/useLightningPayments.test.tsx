@@ -86,14 +86,11 @@ const render = async (routeKind: Route["kind"] = "manualPay") => {
   const Probe = () => {
     const payments = useLightningPayments({
       ...ui,
-      contacts: [],
       formatDisplayedAmountParts: (amount) => ({
         approxPrefix: "",
         amountText: String(amount),
         unitLabel: "sat",
       }),
-      lnAddressPayContactId: null,
-      nostrPictureByNpub: {},
       routeKind,
       t: (key) => key,
     });

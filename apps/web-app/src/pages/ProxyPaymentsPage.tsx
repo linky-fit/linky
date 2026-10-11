@@ -15,6 +15,8 @@ import {
 } from "@linky-fit/ui";
 import { useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
+import { useProxyPaymentPayerContacts } from "../app/hooks/contacts/useDisplayContacts";
+import { useProfileStatusEditor } from "../app/hooks/profile/useProfileStatusEditor";
 import { usePushToast, useTranslation } from "../app/hooks/shell";
 import {
   useBeacon,
@@ -225,22 +227,18 @@ export function NearbyBeaconSection({
 
 interface ProxyPaymentsPageProps {
   openWalletScan: () => void;
-  profileStatusIsSaving: boolean;
-  proxyPaymentPayerContacts: readonly ProxyPaymentPayerContact[];
-  selectedProfileStatusCurrencies: readonly ProfileStatusCurrency[];
-  toggleProfileStatusCurrency: (
-    currency: ProfileStatusCurrency,
-  ) => Promise<void>;
 }
 
 export function ProxyPaymentsPage({
   openWalletScan,
-  profileStatusIsSaving,
-  proxyPaymentPayerContacts,
-  selectedProfileStatusCurrencies,
-  toggleProfileStatusCurrency,
 }: ProxyPaymentsPageProps): React.ReactElement {
   const currentNsec = useAtomValue(currentNsecAtom);
+  const {
+    profileStatusIsSaving,
+    selectedProfileStatusCurrencies,
+    toggleProfileStatusCurrency,
+  } = useProfileStatusEditor();
+  const proxyPaymentPayerContacts = useProxyPaymentPayerContacts();
   const { t } = useTranslation();
   const pushToast = usePushToast();
   const notifications = usePushNotificationsSetting();

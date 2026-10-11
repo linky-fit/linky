@@ -98,7 +98,7 @@ const setup = async ({
       keryxEnabled,
       lightningInvoiceAutoPayLimit: autoPayLimit,
       onContactIdentifierScanned: null,
-      openScannedContactPendingNpubRef: { current: null },
+      openSavedContact: () => {},
       payCashuPaymentRequest: confirmation.payCashuPaymentRequest,
       payLightningInvoiceWithCashu,
       requestLightningInvoiceConfirmation,

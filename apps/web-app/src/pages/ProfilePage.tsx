@@ -14,7 +14,22 @@ import {
   useMedia,
 } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useAtomValue } from "@linky-fit/linkstr-react";
+import {
+  useCopyText,
+  useDisplayAmounts,
+  useTranslation,
+} from "../app/hooks/shell";
+import { useEffectiveProfile } from "../app/hooks/profile/useEffectiveProfile";
+import { useProfileEditor } from "../app/hooks/profile/useProfileEditor";
+import { useWalletBalance } from "../app/hooks/wallet/useWalletInventory";
+import { useNpubCashAuthHeader } from "../app/hooks/wallet/useNpubCash";
+import {
+  myProfileAtom,
+  ownedLightningAddressesAtom,
+} from "../app/state/contacts/profiles";
+import { currentNpubAtom } from "../app/state/session/session";
+import { NPUB_CASH_SERVER_BASE_URL } from "../utils/npubCashServer";
 import { ProfileAvatarEditor } from "../components/ProfileAvatarEditor";
 import { ProfileShareSheet } from "../components/ProfileShareSheet";
 import { parseProfileGeneralStatus } from "../nostrStatus";
@@ -118,7 +133,8 @@ export function ProfilePage({
   shareText,
   writeCurrentNpubToNfc,
 }: ProfilePageProps): React.ReactElement {
-  const { formatDisplayedAmountParts, t } = useAppShellCore();
+  const { t } = useTranslation();
+  const { formatDisplayedAmountParts } = useDisplayAmounts();
   const { wide } = useMedia();
   const [inlineClaimError, setInlineClaimError] = React.useState<string | null>(
     null,
@@ -480,5 +496,47 @@ export function ProfilePage({
 
       {canSaveProfileEdits ? saveAction : null}
     </PageCard>
+  );
+}
+
+type ProfileRouteProps = Pick<
+  ProfilePageProps,
+  | "canWriteToNfc"
+  | "payLightningInvoiceWithCashu"
+  | "shareText"
+  | "writeCurrentNpubToNfc"
+>;
+
+export function ProfileRoute(props: ProfileRouteProps): React.ReactElement {
+  const { cashuBalance, cashuBalanceAfterMelt, cashuIsBusy } =
+    useWalletBalance();
+  const copyText = useCopyText();
+  const currentNpub = useAtomValue(currentNpubAtom);
+  const profile = useEffectiveProfile();
+  const profileStatus = useAtomValue(myProfileAtom, (my) => my.status);
+  const ownedLightningAddresses = useAtomValue(
+    ownedLightningAddressesAtom,
+    (owned) => owned.addresses,
+  );
+  const makeNip98AuthHeader = useNpubCashAuthHeader();
+  const editor = useProfileEditor();
+  return (
+    <ProfilePage
+      {...props}
+      {...editor}
+      cashuBalance={cashuBalance}
+      cashuBalanceAfterMelt={cashuBalanceAfterMelt}
+      cashuIsBusy={cashuIsBusy}
+      copyText={copyText}
+      currentNpub={currentNpub}
+      derivedProfile={profile.derivedProfile}
+      effectiveMyLightningAddress={profile.effectiveMyLightningAddress}
+      effectiveProfileName={profile.effectiveProfileName}
+      effectiveProfilePicture={profile.effectiveProfilePicture}
+      makeNip98AuthHeader={makeNip98AuthHeader}
+      ownedLightningAddresses={ownedLightningAddresses}
+      profileStatus={profileStatus}
+      serverBaseUrl={NPUB_CASH_SERVER_BASE_URL}
+    />
   );
 }

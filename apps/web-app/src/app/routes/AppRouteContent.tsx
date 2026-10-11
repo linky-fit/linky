@@ -17,17 +17,17 @@ import { useDesktopSplitView } from "../../hooks/useDesktopSplitView";
 import {
   AdvancedAutoPayLimitPage,
   AdvancedPage,
-  BankPaymentOfferDetailPage,
+  BankPaymentOfferDetailRoute,
   CashuTokenEmitPage,
   CashuTokenNewPage,
   CashuTokenRoute,
   CashuTokensRoute,
   CashuProofsRoute,
-  ChatPage,
-  ContactEditPage,
-  ContactNewPage,
-  ContactPage,
-  ContactPayPage,
+  ChatRoute,
+  ContactEditRoute,
+  ContactNewRoute,
+  ContactRoute,
+  ContactPayRoute,
   ChatStoragePage,
   EvoluCurrentDataPage,
   EvoluDataDetailPage,
@@ -43,8 +43,8 @@ import {
   LanguagePage,
   AppearancePage,
   ReceiveMethodPage,
-  LnAddressPayPage,
-  ManualPayPage,
+  LnAddressPayRoute,
+  ManualPayRoute,
   MasterKeysPage,
   MintDetailPage,
   MintNewPage,
@@ -52,7 +52,7 @@ import {
   NostrRelayNewPage,
   NostrRelayPage,
   NostrRelaysPage,
-  ProfilePage,
+  ProfileRoute,
   ProxyPaymentsPage,
   PushDebugPage,
   SettingsPage,
@@ -84,15 +84,13 @@ import {
 const InspectorPage = React.lazy(() => import("../../pages/InspectorPage"));
 
 export interface PeopleRoutesProps {
-  bankPaymentOfferDetailProps: () => React.ComponentProps<
-    typeof BankPaymentOfferDetailPage
+  bankPaymentOfferDetailProps: Omit<
+    React.ComponentProps<typeof BankPaymentOfferDetailRoute>,
+    "route"
   >;
-  chatProps: React.ComponentProps<typeof ChatPage>;
-  contactEditProps: React.ComponentProps<typeof ContactEditPage>;
-  contactNewProps: React.ComponentProps<typeof ContactNewPage>;
-  contactPayProps: React.ComponentProps<typeof ContactPayPage>;
-  contactProps: React.ComponentProps<typeof ContactPage>;
-  profileProps: React.ComponentProps<typeof ProfilePage>;
+  chatProps: Omit<React.ComponentProps<typeof ChatRoute>, "route">;
+  contactPayProps: Omit<React.ComponentProps<typeof ContactPayRoute>, "route">;
+  profileProps: React.ComponentProps<typeof ProfileRoute>;
 }
 
 export interface MoneyRoutesProps {
@@ -104,16 +102,15 @@ export interface MoneyRoutesProps {
   cashuProofsProps: React.ComponentProps<typeof CashuProofsRoute>;
   cashuTokensProps: React.ComponentProps<typeof CashuTokensRoute>;
   lnAddressPayProps: Omit<
-    React.ComponentProps<typeof LnAddressPayPage>,
+    React.ComponentProps<typeof LnAddressPayRoute>,
     "lnAddress"
   >;
-  manualPayProps: React.ComponentProps<typeof ManualPayPage>;
+  manualPayProps: React.ComponentProps<typeof ManualPayRoute>;
   proxyPaymentsProps: React.ComponentProps<typeof ProxyPaymentsPage>;
   spdPaymentProps: Omit<
     React.ComponentProps<typeof SpdPaymentRoute>,
     "isEditing" | "isManualEntry" | "spdPayload"
   >;
-  topupNoAmountProps: React.ComponentProps<typeof TopupNoAmountPage>;
   topupProps: React.ComponentProps<typeof TopupPage>;
 }
 
@@ -211,7 +208,7 @@ const RoutePage = (): React.ReactElement => {
     case "recurringPayment":
       return <RecurringPaymentPage id={route.id} />;
     case "topupNoAmount":
-      return <TopupNoAmountPage {...moneyRoutes.topupNoAmountProps} />;
+      return <TopupNoAmountPage />;
     case "topupInvoice":
       return <TopupInvoiceRoute />;
     case "cashuProofs":
@@ -227,18 +224,20 @@ const RoutePage = (): React.ReactElement => {
         <CashuTokenRoute {...moneyRoutes.cashuTokenProps} routeId={route.id} />
       );
     case "contact":
-      return <ContactPage {...peopleRoutes.contactProps} />;
+      return <ContactRoute route={route} />;
     case "contactPay":
-      return <ContactPayPage {...peopleRoutes.contactPayProps} />;
+      return (
+        <ContactPayRoute {...peopleRoutes.contactPayProps} route={route} />
+      );
     case "lnAddressPay":
       return (
-        <LnAddressPayPage
+        <LnAddressPayRoute
           {...moneyRoutes.lnAddressPayProps}
           lnAddress={route.lnAddress}
         />
       );
     case "manualPay":
-      return <ManualPayPage {...moneyRoutes.manualPayProps} />;
+      return <ManualPayRoute {...moneyRoutes.manualPayProps} />;
     case "bankPayment":
       return (
         <SpdPaymentRoute
@@ -259,19 +258,20 @@ const RoutePage = (): React.ReactElement => {
       );
     case "bankPaymentOffer":
       return (
-        <BankPaymentOfferDetailPage
-          {...peopleRoutes.bankPaymentOfferDetailProps()}
+        <BankPaymentOfferDetailRoute
+          {...peopleRoutes.bankPaymentOfferDetailProps}
+          route={route}
         />
       );
     case "chat":
-      return <ChatPage {...peopleRoutes.chatProps} />;
+      return <ChatRoute {...peopleRoutes.chatProps} route={route} />;
     case "contactEdit":
-      return <ContactEditPage {...peopleRoutes.contactEditProps} />;
+      return <ContactEditRoute route={route} />;
     case "contactNew":
-      return <ContactNewPage {...peopleRoutes.contactNewProps} />;
+      return <ContactNewRoute route={route} />;
     case "profile":
     case "profileEdit":
-      return <ProfilePage {...peopleRoutes.profileProps} />;
+      return <ProfileRoute {...peopleRoutes.profileProps} />;
     default:
       return assertNever(route satisfies never);
   }

@@ -24,6 +24,7 @@ import type {
   ContactIdentityRowLike,
   UpdateLocalNostrMessage,
 } from "../../types/appTypes";
+import type { ReplyContext } from "../../state/messages/chat";
 import { resolveNostrChatIdentity } from "./contactIdentity";
 import type { Translate } from "../../../i18n";
 
@@ -32,11 +33,7 @@ const isRumorId = Schema.is(RumorId);
 const decodeMessageText = Schema.decodeUnknownResult(MessageText);
 const decodePrivateImage = Schema.decodeUnknownResult(PrivateImage);
 
-export interface ReplyContext {
-  rootMessageId: string | null;
-  replyToContent: string | null;
-  replyToId: string;
-}
+export type { ReplyContext };
 
 interface SendChatMessageOptions {
   clearDraft?: boolean;
@@ -56,7 +53,8 @@ interface UseSendChatMessageParams<
   currentNsec: string | null;
   route: TRoute;
   replyContext: ReplyContext | null;
-  replyContextRef: React.MutableRefObject<ReplyContext | null>;
+  /** The reply context as just set, which the rendered one may lag behind. */
+  readReplyContext: () => ReplyContext | null;
   selectedContact: TContact | null;
   setReplyContext: React.Dispatch<React.SetStateAction<ReplyContext | null>>;
   setChatDraft: React.Dispatch<React.SetStateAction<string>>;
@@ -80,7 +78,7 @@ export const useSendChatMessage = <
   currentNsec,
   route,
   replyContext,
-  replyContextRef,
+  readReplyContext,
   selectedContact,
   setReplyContext,
   setChatDraft,
@@ -143,10 +141,7 @@ export const useSendChatMessage = <
         const messageContent = imagePayload?.content ?? text;
         const mediaInfo = parsePrivateImageMessage(messageContent);
         const activeReplyContext =
-          options?.replyContext ??
-          replyContextRef.current ??
-          replyContext ??
-          null;
+          options?.replyContext ?? readReplyContext() ?? replyContext ?? null;
         const activeReplyToId = (activeReplyContext?.replyToId ?? "").trim();
         const replyTo = isRumorId(activeReplyToId)
           ? activeReplyToId
@@ -265,8 +260,8 @@ export const useSendChatMessage = <
       chatDraft,
       chatSendIsBusy,
       currentNsec,
+      readReplyContext,
       replyContext,
-      replyContextRef,
       route.kind,
       selectedContact,
       enqueueOutbox,

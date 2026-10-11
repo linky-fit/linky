@@ -9,7 +9,18 @@ import {
   Text,
 } from "@linky-fit/ui";
 import { useEffect, useState, type FC } from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useAtom, useAtomValue } from "@linky-fit/linkstr-react";
+import { useRoutePeopleContact } from "../app/hooks/contacts/useDisplayContacts";
+import { useNostrPictureByNpub } from "../app/hooks/contacts/useProfileCache";
+import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
+import { useWalletBalance } from "../app/hooks/wallet/useWalletInventory";
+import {
+  contactPayMethodAtom,
+  contactPaymentIntentAtom,
+  payAmountAtom,
+} from "../app/state/wallet/contactPay";
+import { payWithCashuEnabledAtom } from "../app/state/wallet/prefs";
+import type { Route } from "../types/route";
 import { LnurlPayPreviewNotices } from "../components/LnurlPayPreviewNotices";
 import { PaymentAmountPanel } from "../components/PaymentAmountPanel";
 import type { ContactId } from "../evolu";
@@ -60,7 +71,8 @@ export const ContactPayPage: FC<ContactPayPageProps> = ({
   setContactPayMethod,
   setPayAmount,
 }) => {
-  const { formatDisplayedAmountText, t } = useAppShellCore();
+  const { t } = useTranslation();
+  const { formatDisplayedAmountText } = useDisplayAmounts();
   const [note, setNote] = useState("");
 
   const ln = (selectedContact?.lnAddress ?? "").trim();
@@ -226,6 +238,43 @@ export const ContactPayPage: FC<ContactPayPageProps> = ({
           : (lnurlRangeError ?? undefined)
       }
       t={t}
+    />
+  );
+};
+
+type ContactPayRouteProps = Pick<
+  ContactPayPageProps,
+  "paySelectedContact" | "requestSelectedContact"
+> & { route: Route };
+
+export const ContactPayRoute: FC<ContactPayRouteProps> = ({
+  route,
+  ...props
+}) => {
+  const selectedContact = useRoutePeopleContact(route);
+  const nostrPictureByNpub = useNostrPictureByNpub();
+  const { cashuBalance, cashuBalanceAfterMelt, cashuIsBusy } =
+    useWalletBalance();
+  const { displayUnit } = useDisplayAmounts();
+  const payWithCashuEnabled = useAtomValue(payWithCashuEnabledAtom);
+  const contactPaymentIntent = useAtomValue(contactPaymentIntentAtom);
+  const [contactPayMethod, setContactPayMethod] = useAtom(contactPayMethodAtom);
+  const [payAmount, setPayAmount] = useAtom(payAmountAtom);
+  return (
+    <ContactPayPage
+      {...props}
+      cashuBalance={cashuBalance}
+      cashuBalanceAfterMelt={cashuBalanceAfterMelt}
+      cashuIsBusy={cashuIsBusy}
+      contactPaymentIntent={contactPaymentIntent}
+      contactPayMethod={contactPayMethod}
+      displayUnit={displayUnit}
+      nostrPictureByNpub={nostrPictureByNpub}
+      payAmount={payAmount}
+      payWithCashuEnabled={payWithCashuEnabled}
+      selectedContact={selectedContact}
+      setContactPayMethod={setContactPayMethod}
+      setPayAmount={setPayAmount}
     />
   );
 };

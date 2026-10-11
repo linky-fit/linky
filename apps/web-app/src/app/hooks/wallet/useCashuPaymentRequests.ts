@@ -10,7 +10,6 @@ import { useExclusiveRun } from "../../../hooks/useExclusiveRun";
 import { useLatest } from "../../../hooks/useLatest";
 import { navigateTo, type useRouting } from "../../../hooks/useRouting";
 import type { Translate } from "../../../i18n";
-import type { ContactId } from "../../../evolu";
 import type { DisplayAmountParts } from "../../../utils/displayAmounts";
 import { MAIN_MINT_URL, normalizeMintUrl } from "../../../utils/mint";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
@@ -31,6 +30,7 @@ import type {
 import type { useContactsMessagingComposition } from "../composition/useContactsMessagingComposition";
 import { normalizePubkeyHex } from "../messages/contactIdentity";
 import { useCashuPaymentRequestConfirmation } from "../payments/useCashuPaymentRequestConfirmation";
+import { useReadNavIntent, useSetNavIntent } from "../shell/navIntents";
 import type { PayContactWithCashuMessage } from "./useContactPayments";
 import { paymentCopy, usePaymentsCommands, type Shortfall } from "./paymentUi";
 
@@ -39,7 +39,6 @@ type ContactsMessaging = ReturnType<typeof useContactsMessagingComposition>;
 interface UseCashuPaymentRequestsParams {
   autoPayLimit: number;
   chatMessages: readonly LocalNostrMessage[];
-  contactPayBackToChatRef: React.RefObject<ContactId | null>;
   contacts: readonly ContactRowLike[];
   currentNpub: string | null;
   defaultMintUrl: string | null;
@@ -48,7 +47,6 @@ interface UseCashuPaymentRequestsParams {
   latestMessages: ContactsMessaging["latestMessages"];
   nostrMessagesLocal: readonly LocalNostrMessage[];
   nostrMessagesRecent: readonly LocalNostrMessage[];
-  openScannedContactPendingNpubRef: ContactsMessaging["openScannedContactPendingNpubRef"];
   payAmount: string;
   payContactWithCashuMessage: PayContactWithCashuMessage;
   rememberFirstPayment: () => void;
@@ -72,7 +70,6 @@ interface UseCashuPaymentRequestsParams {
 export const useCashuPaymentRequests = ({
   autoPayLimit,
   chatMessages,
-  contactPayBackToChatRef,
   contacts,
   currentNpub,
   defaultMintUrl,
@@ -81,7 +78,6 @@ export const useCashuPaymentRequests = ({
   latestMessages,
   nostrMessagesLocal,
   nostrMessagesRecent,
-  openScannedContactPendingNpubRef,
   payAmount,
   payContactWithCashuMessage,
   rememberFirstPayment,
@@ -99,6 +95,8 @@ export const useCashuPaymentRequests = ({
   const commands = usePaymentsCommands();
   const runExclusively = useExclusiveRun();
   const contactsRef = useLatest(contacts);
+  const openSavedContact = useSetNavIntent("openSavedContactNpub");
+  const readContactPayBackToChat = useReadNavIntent("contactPayBackToChat");
 
   const ensureContactFor = React.useCallback(
     (request: CashuPaymentRequestMessageInfo): ContactRowLike | null => {
@@ -115,10 +113,10 @@ export const useCashuPaymentRequests = ({
       if (!pubkey) return null;
       const saved = saveNpubContact(encodeNpub(pubkey));
       if (!saved) return null;
-      if (saved.created) openScannedContactPendingNpubRef.current = saved.npub;
+      if (saved.created) openSavedContact(saved.npub);
       return saved.contact;
     },
-    [contacts, openScannedContactPendingNpubRef, saveNpubContact],
+    [contacts, openSavedContact, saveNpubContact],
   );
 
   /** The incoming message that carried this request, to reply to. */
@@ -393,17 +391,17 @@ export const useCashuPaymentRequests = ({
         unit: "sat",
       });
       navigateTo(
-        (contactPayBackToChatRef.current ?? "") === route.id
+        (readContactPayBackToChat() ?? "") === route.id
           ? { route: "chat", id: route.id }
           : { route: "contact", id: route.id },
       );
     },
     [
-      contactPayBackToChatRef,
       currentNpub,
       defaultMintUrl,
       logPaymentEvent,
       payAmount,
+      readContactPayBackToChat,
       route,
       selectedContact,
       sendChatMessage,

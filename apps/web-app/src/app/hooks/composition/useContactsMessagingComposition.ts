@@ -1,33 +1,22 @@
-import { useSaveNpubContact } from "../contacts/useSaveNpubContact";
-import { useSharedProfileLink } from "../contacts/useSharedProfileLink";
-import {
-  useAccountHydrated,
-  useMessagesVisibleSinceSec,
-  useUnknownSendersRepository,
-} from "../useLinksync";
 import type { ProfileMetadata } from "@linky-fit/linkstr";
 import {
   ContactId,
-  NonEmptyString1000,
   PositiveInt,
   type ContactsRepository,
   type ConversationsRepository,
 } from "@linky-fit/linksync";
+import { decodeNpub } from "@linky-fit/linkstr";
 import {
-  decodeNpub,
-  encodeNpub,
-  identityFromNsec,
-  Pubkey,
-} from "@linky-fit/linkstr";
-import {
+  RegistryContext,
+  useAtom,
+  useAtomSet,
   useAtomSuspense,
+  useAtomValue,
   useLinkstrCommands,
   useOutboxResults,
 } from "@linky-fit/linkstr-react";
 import { Effect } from "effect";
 import React, { useMemo, useState } from "react";
-import { deriveDefaultProfile } from "../../../derivedProfile";
-import { reportAppLog } from "../../../devtools/inspector/appLog";
 import { useLinkstrInspectorBridge } from "../../../devtools/inspector/useLinkstrInspectorBridge";
 import { useDeferredOnlineReady } from "../../../hooks/useDeferredOnlineReady";
 import { useDocumentVisible } from "../../../hooks/useDocumentVisible";
@@ -46,65 +35,72 @@ import {
   loadCachedProfile,
   releaseAllAvatarObjectUrls,
 } from "../../../profileCache";
-import { useProfileCache } from "../contacts/useProfileCache";
-import { useMessagesCommands } from "../messages/useMessagesCommands";
-import { contactsCommandsAtom } from "../../state/contacts/commands";
 import {
   ARCHIVED_CONTACTS_FILTER,
   CONTACTS_ONBOARDING_HAS_BACKUPED_KEYS_STORAGE_KEY,
   CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY,
   NO_GROUP_FILTER,
 } from "../../../utils/constants";
-import {
-  getContactGroups,
-  normalizeContactGroups,
-  serializeContactGroups,
-} from "../../../utils/contactGroups";
-import { formatShortNpub, getBestNostrName } from "../../../utils/formatting";
+import { getContactGroups } from "../../../utils/contactGroups";
+import { getBestNostrName } from "../../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import { setStoredPushContactNames } from "../../../utils/pushContactNamesStorage";
+import { safeLocalStorageGet } from "../../../utils/storage";
 import { getBankPaymentOfferCurrency } from "@linky-fit/proxy-payment";
 import { mergeBankPaymentOffersIntoLastMessageByContactId } from "../../lib/bankPaymentOfferRows";
-import { useBankPaymentOffers } from "../useBankPaymentOffers";
 import {
   collectUnreadNewestIncomingByContactId,
   contactsToUnarchive,
 } from "../../lib/chatUnread";
-import { buildLinkyPaymentRequestDeclineMessage } from "../../lib/paymentRequestMessage";
-import { getChatAttachmentRejection } from "../../lib/privateImageMessage";
-import {
-  parsePrivateImageMessage,
-  privateImagePreviewText,
-} from "../../lib/privateImageMessage";
-import type {
-  ContactRowLike,
-  LocalNostrMessage,
-  PaymentLogData,
-  ProxyPaymentPayerContact,
-} from "../../types/appTypes";
-import { useContactEditor } from "../contacts/useContactEditor";
-import { useVisibleContacts } from "../contacts/useVisibleContacts";
-import {
-  isUnknownContactId,
-  normalizePubkeyHex,
-  readUnknownContactIdPubkey,
-} from "../messages/contactIdentity";
-import type { PeerSeenWindow } from "../messages/seenReceiptInbox";
 import { NO_WRITE, runWrite, type WriteOutcome } from "../../lib/storeWrite";
-import { useChatReadCursorSync } from "../messages/useChatReadCursorSync";
-import { useUnknownSenderReassignment } from "../messages/useUnknownSenderReassignment";
+import {
+  pendingUnknownContactAddAtom,
+  unknownNamesAtom,
+} from "../../state/contacts/chatContacts";
+import { contactsCommandsAtom } from "../../state/contacts/commands";
+import {
+  contactNewPrefillAtom,
+  recentlyAddedContactIdAtom,
+} from "../../state/contacts/contactForm";
+import { chatDraftAtom } from "../../state/messages/chat";
+import { messagesVisibleSinceSecAtom } from "../../state/messages/readModel";
+import { currentPubkeyAtom } from "../../state/session/session";
+import { payAmountAtom } from "../../state/wallet/contactPay";
+import type { PaymentLogData } from "../../types/appTypes";
+import {
+  useContactEditor,
+  useContactEditorParams,
+  useContactEditorWatchers,
+} from "../contacts/useContactEditor";
+import {
+  useCloseContactDetail,
+  useOpenContactPay,
+} from "../contacts/useContactActions";
+import {
+  useChatContact,
+  useDisplayContacts,
+  type DisplayContact,
+} from "../contacts/useDisplayContacts";
+import { useProfileCache } from "../contacts/useProfileCache";
+import { useSaveNpubContact } from "../contacts/useSaveNpubContact";
+import { useSharedProfileLink } from "../contacts/useSharedProfileLink";
+import { useVisibleContacts } from "../contacts/useVisibleContacts";
+import { useChatScroll } from "../messages/chatScroll";
 import { applyOutboxResult } from "../messages/outboxResults";
+import type { PeerSeenWindow } from "../messages/seenReceiptInbox";
+import {
+  useChatSend,
+  useResetChatContexts,
+  withChatOffers,
+} from "../messages/useChat";
+import { useChatReadCursorSync } from "../messages/useChatReadCursorSync";
 import { useChatSeenReceiptSync } from "../messages/useChatSeenReceiptSync";
-import {
-  useEditChatMessage,
-  type EditChatContext,
-} from "../messages/useEditChatMessage";
 import { useLinkstrInboxSync } from "../messages/useLinkstrInboxSync";
-import {
-  useSendChatMessage,
-  type ReplyContext,
-} from "../messages/useSendChatMessage";
-import { useSendReaction } from "../messages/useSendReaction";
+import { useMessagesCommands } from "../messages/useMessagesCommands";
+import { useMuteListSync } from "../messages/useMuteListSync";
+import { useUnknownSenderReassignment } from "../messages/useUnknownSenderReassignment";
+import { useSetNavIntent } from "../shell/navIntents";
+import { useBankPaymentOffers } from "../useBankPaymentOffers";
 import { useContactsDomain } from "../useContactsDomain";
 import { useFeedbackContact } from "../useFeedbackContact";
 import { useLinkstrConfigSync } from "../useLinkstrConfigSync";
@@ -112,15 +108,18 @@ import {
   fetchAndCacheProfiles,
   useLinkstrProfileSync,
 } from "../useLinkstrProfileSync";
-import { blockPubkey, isBlockedPubkey } from "../../lib/blockList";
-import { useMuteListSync } from "../messages/useMuteListSync";
+import {
+  useAccountHydrated,
+  useUnknownSendersRepository,
+} from "../useLinksync";
 import { useMessagesDomain } from "../useMessagesDomain";
 import { usePushRegistrationLifecycle } from "../usePushRegistrationLifecycle";
 import { useRelayDomain } from "../useRelayDomain";
 import { useIdentityOwnersComposition } from "./useIdentityOwnersComposition";
-import { safeLocalStorageGet } from "../../../utils/storage";
 import type { Translate } from "../../../i18n";
 import type { PushToastOptions } from "../../../hooks/useToasts";
+
+export type { DisplayContact };
 
 const INLINE_NPUB_PATTERN =
   /(?:nostr:)?npub1[023456789acdefghjklmnpqrstuvwxyz]+(?:@npub\.cash)?/gi;
@@ -142,66 +141,14 @@ const extractMentionedNpubs = (content: string): string[] => {
   return npubs;
 };
 
-interface UnknownChatContact extends ContactRowLike {
-  id: string;
-  isUnknownContact: true;
-  unknownPubkeyHex: string | null;
-}
-
-export type DisplayContact = ContactRowLike & {
-  isUnknownContact?: boolean;
-  unknownPubkeyHex?: string | null;
-};
-
-interface ChatSelectedContact {
-  chatPeerSeenAtSec?: number | null;
-  chatPeerSeenSinceSec?: number | null;
-  groupName?: string | null;
-  id: string;
-  isUnknownContact?: boolean;
-  lnAddress?: string | null;
-  name?: string | null;
-  npub?: string | null;
-  unknownPubkeyHex?: string | null;
-}
-
-const hasOwnProperty = (value: object, key: string): boolean =>
-  Object.prototype.hasOwnProperty.call(value, key);
-
-const encodeUnknownNpub = (pubkeyHex: string | null): string | null => {
-  if (!pubkeyHex) return null;
-  const pubkey = normalizePubkeyHex(pubkeyHex);
-  return pubkey ? encodeNpub(Pubkey.make(pubkey)) : null;
-};
-
 type IdentityOwnersCompositionResult = ReturnType<
   typeof useIdentityOwnersComposition
 >;
 
-interface PendingContactsGroupAssignment {
-  messageId: string;
-  savedContactIds: ContactId[];
-}
-
-const reportContactsAddedToGroup = (
-  pending: PendingContactsGroupAssignment,
-  group: string,
-): void => {
-  const contactIds = pending.savedContactIds;
-  reportAppLog({
-    tag: "contacts.addToGroup",
-    summary: `${contactIds.length} contacts from a chat message added to group "${group}"`,
-    links: { contact: contactIds, message: pending.messageId },
-    payload: { contactIds, group, messageId: pending.messageId },
-  });
-};
-
 interface UseContactsMessagingCompositionParams {
   appOwnerId: IdentityOwnersCompositionResult["appOwnerId"];
-  contactPayBackToChatRef: React.MutableRefObject<ContactId | null>;
   contactsRepository: ContactsRepository;
   conversationsRepository: ConversationsRepository;
-  copyText: (value: string) => Promise<void>;
   currentNpub: string | null;
   currentNsec: string | null;
   formatDisplayedAmountText: (amountSat: number) => string;
@@ -217,21 +164,20 @@ interface UseContactsMessagingCompositionParams {
   route: ReturnType<typeof useRouting>;
   /** Receipts-enabled baseline; null means "send read receipts" is off. */
   seenReceiptsEnabledAtSec: number | null;
-  setContactPaymentIntent: React.Dispatch<
-    React.SetStateAction<"pay" | "request">
-  >;
-  setPayAmount: React.Dispatch<React.SetStateAction<string>>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   syncedNostrIdentityMatchesLocal: boolean;
   t: Translate;
 }
 
+/**
+ * The people watchers: Nostr inbox, profile and mute-list sync, read
+ * cursors and receipts, proxy payment offers, and the contact list's
+ * filters. Screens read contacts, messages and drafts from the state atoms.
+ */
 export const useContactsMessagingComposition = ({
   appOwnerId,
-  contactPayBackToChatRef,
   contactsRepository,
   conversationsRepository,
-  copyText,
   currentNpub,
   currentNsec,
   formatDisplayedAmountText,
@@ -242,14 +188,12 @@ export const useContactsMessagingComposition = ({
   pushToast,
   route,
   seenReceiptsEnabledAtSec,
-  setContactPaymentIntent,
-  setPayAmount,
   setStatus,
   syncedNostrIdentityMatchesLocal,
   t,
 }: UseContactsMessagingCompositionParams) => {
-  const [recentlyAddedContactId, setRecentlyAddedContactId] =
-    useState<ContactId | null>(null);
+  const registry = React.useContext(RegistryContext);
+  const recentlyAddedContactId = useAtomValue(recentlyAddedContactIdAtom);
 
   const [contactsOnboardingHasPaid, setContactsOnboardingHasPaid] =
     useState<boolean>(
@@ -266,11 +210,7 @@ export const useContactsMessagingComposition = ({
       "1",
   );
 
-  const chatOwnPubkeyHex = React.useMemo(
-    () =>
-      currentNsec ? (identityFromNsec(currentNsec)?.pubkey ?? null) : null,
-    [currentNsec],
-  );
+  const chatOwnPubkeyHex = useAtomValue(currentPubkeyAtom);
 
   const {
     cache: {
@@ -292,34 +232,8 @@ export const useContactsMessagingComposition = ({
     };
   }, [currentNsec, resetProfileCache]);
 
-  const [chatDraft, setChatDraft] = useState<string>("");
-  const [chatAttachments, setChatAttachments] = useState<File[]>([]);
-  const addChatAttachments = React.useCallback(
-    (files: readonly File[]) => {
-      const accepted: File[] = [];
-      for (const file of files) {
-        const rejectionKey = getChatAttachmentRejection(file);
-        if (rejectionKey) setStatus(t(rejectionKey));
-        else accepted.push(file);
-      }
-      if (accepted.length === 0) return;
-      setChatAttachments((previous) => [...previous, ...accepted]);
-    },
-    [setStatus, t],
-  );
-  const removeChatAttachment = React.useCallback((file: File) => {
-    setChatAttachments((previous) =>
-      previous.filter((candidate) => candidate !== file),
-    );
-  }, []);
-
-  const [chatSendIsBusy, setChatSendIsBusy] = useState(false);
-
-  const [replyContext, setReplyContext] = useState<ReplyContext | null>(null);
-
-  const replyContextRef = React.useRef<ReplyContext | null>(null);
-
-  const [editContext, setEditContext] = useState<EditChatContext | null>(null);
+  const setChatDraft = useAtomSet(chatDraftAtom);
+  const resetChatContexts = useResetChatContexts();
 
   const autoAcceptedChatMessageIdsRef = React.useRef<Set<string>>(new Set());
 
@@ -327,65 +241,25 @@ export const useContactsMessagingComposition = ({
 
   React.useEffect(() => {
     if (route.kind === "chat") return;
-    setReplyContext(null);
-    setEditContext(null);
-  }, [route.kind]);
+    resetChatContexts();
+  }, [resetChatContexts, route.kind]);
 
   React.useEffect(() => {
     if (!activeChatRouteId) return;
-    setReplyContext(null);
-    setEditContext(null);
-  }, [activeChatRouteId]);
+    resetChatContexts();
+  }, [activeChatRouteId, resetChatContexts]);
 
-  React.useEffect(() => {
-    replyContextRef.current = replyContext;
-  }, [replyContext]);
-
-  const chatMessagesRef = React.useRef<HTMLDivElement | null>(null);
-
-  const chatMessageElByIdRef = React.useRef<Map<string, HTMLDivElement>>(
-    new Map(),
-  );
-
-  const chatDidInitialScrollForContactRef = React.useRef<string | null>(null);
-
-  const chatForceScrollToBottomRef = React.useRef(false);
-
-  const chatScrollTargetIdRef = React.useRef<string | null>(null);
-
-  const chatLastMessageCountRef = React.useRef<Record<string, number>>({});
-
-  const triggerChatScrollToBottom = React.useCallback((messageId?: string) => {
-    chatForceScrollToBottomRef.current = true;
-    if (messageId) chatScrollTargetIdRef.current = messageId;
-
-    const tryScroll = (attempt: number) => {
-      const targetId = chatScrollTargetIdRef.current;
-      if (targetId) {
-        const el = chatMessageElByIdRef.current.get(targetId);
-        if (el) {
-          el.scrollIntoView({ block: "end" });
-          return;
-        }
-      }
-
-      const c = chatMessagesRef.current;
-      if (c) c.scrollTop = c.scrollHeight;
-
-      if (attempt < 6) {
-        requestAnimationFrame(() => tryScroll(attempt + 1));
-      }
-    };
-
-    requestAnimationFrame(() => tryScroll(0));
-  }, []);
+  const {
+    chatDidInitialScrollForContactRef,
+    chatForceScrollToBottomRef,
+    chatLastMessageCountRef,
+    chatMessageElByIdRef,
+    chatMessagesRef,
+    chatScrollTargetIdRef,
+    triggerChatScrollToBottom,
+  } = useChatScroll();
 
   const nostrMetadataInFlight = React.useRef<Set<string>>(new Set());
-
-  const pendingUnknownContactAddRef = React.useRef<{
-    sourceContactId: string;
-    targetNpub: string;
-  } | null>(null);
 
   const contactNameCollator = useMemo(
     () =>
@@ -425,7 +299,6 @@ export const useContactsMessagingComposition = ({
   } = useContactsDomain({
     accountHydrated,
     contacts: contactsRepository,
-    conversations: conversationsRepository,
     noGroupFilterValue: NO_GROUP_FILTER,
     pushToast,
     reassignContactMessages,
@@ -468,9 +341,6 @@ export const useContactsMessagingComposition = ({
     knownReactionKeysRef,
     nostrReactionsLocal,
     pendingPaymentsKey,
-    reactionsByMessageId,
-    removeLocalNostrMessagesByContactId,
-    softDeleteLocalNostrReaction,
     softDeleteLocalNostrReactionsByWrapIds,
     storeRetractedReaction,
     updateLocalNostrMessage,
@@ -479,7 +349,6 @@ export const useContactsMessagingComposition = ({
     appOwnerId,
     chatForceScrollToBottomRef,
     chatMessagesRef,
-    contacts,
     conversations: conversationsRepository,
     hydrated: accountHydrated,
     route,
@@ -496,7 +365,7 @@ export const useContactsMessagingComposition = ({
     (!isSeedLogin || syncedNostrIdentityMatchesLocal);
   const deferredOnlineReady = useDeferredOnlineReady();
   const canRunNostrNetworkWork = deferredOnlineReady && nostrBootstrapReady;
-  const { muteListSynced, syncMuteList } = useMuteListSync({
+  const { muteListSynced } = useMuteListSync({
     enabled: nostrBootstrapReady,
     pubkey: chatOwnPubkeyHex,
   });
@@ -545,20 +414,20 @@ export const useContactsMessagingComposition = ({
     bankPaymentOfferMessages,
     bankPaymentOfferRecipientCount,
     bankPaymentOfferStaggerDelaySec,
-    chatMessagesWithBankPaymentOffers,
     getBankPaymentOfferForSettlement,
     isBankPaymentOfferCanceled,
     recentBankPaymentOfferOutcomesByContactId,
     requestBankPaymentOffer,
     respondToBankPaymentOfferWithGroupState,
   } = useBankPaymentOffers({
-    chatMessages,
-    contacts,
     currentNsec,
-    route,
     setStatus,
     t,
   });
+  const chatMessagesWithBankPaymentOffers = React.useMemo(
+    () => withChatOffers(route, chatMessages, bankPaymentOfferMessages),
+    [bankPaymentOfferMessages, chatMessages, route],
+  );
 
   const lastVisibleMessageByContactId = React.useMemo(
     () =>
@@ -569,46 +438,9 @@ export const useContactsMessagingComposition = ({
     [bankPaymentOfferMessages, lastMessageByContactId],
   );
 
-  const [contactNewPrefill, setContactNewPrefill] = React.useState<null | {
-    lnAddress: string;
-    npub: string | null;
-    suggestedName: string | null;
-  }>(null);
+  const [unknownNames, setUnknownNames] = useAtom(unknownNamesAtom);
 
-  const [unknownNameByNpub, setUnknownNameByNpub] = useState<
-    Record<string, string | null>
-  >({});
-
-  const buildUnknownDisplayName = React.useCallback(
-    (name: string | null, npub: string | null) => {
-      const prefix = t("unknownContactNamePrefix");
-      const normalizedName = (name ?? "").trim();
-      const fallback = npub ? formatShortNpub(npub) : t("unknownContactTitle");
-      return `${prefix} ${normalizedName || fallback}`.trim();
-    },
-    [t],
-  );
-
-  const buildSavedContactName = React.useCallback(
-    (name: string | null, npub: string | null) => {
-      const normalizedName = (name ?? "").trim();
-      return (
-        normalizedName ||
-        (npub ? formatShortNpub(npub) : t("unknownContactTitle"))
-      );
-    },
-    [t],
-  );
-
-  const saveNpubContact = useSaveNpubContact({
-    contacts,
-    contactsRepository,
-    buildSavedContactName,
-    unknownNameByNpub,
-    lang,
-    setStatus,
-    t,
-  });
+  const saveNpubContact = useSaveNpubContact();
 
   useSharedProfileLink({
     accountHydrated,
@@ -620,63 +452,8 @@ export const useContactsMessagingComposition = ({
     t,
   });
 
-  const unknownContacts = React.useMemo<UnknownChatContact[]>(() => {
-    const unknownById = new Map<string, UnknownChatContact>();
-
-    for (const [contactId, lastMessage] of lastVisibleMessageByContactId) {
-      const normalizedContactId = contactId.trim();
-      if (!normalizedContactId) continue;
-      if (!isUnknownContactId(normalizedContactId)) continue;
-
-      const candidatePubkeyFromLast = normalizePubkeyHex(lastMessage.pubkey);
-      const candidatePubkeyFromId =
-        readUnknownContactIdPubkey(normalizedContactId);
-      const candidatePubkeyFromThread = nostrMessagesLocal
-        .filter((message) => message.contactId.trim() === normalizedContactId)
-        .map((message) => normalizePubkeyHex(message.pubkey))
-        .find((pubkey) => {
-          if (!pubkey) return false;
-          if (isBlockedPubkey(pubkey)) return false;
-          const ownPubkey = normalizePubkeyHex(chatOwnPubkeyHex);
-          if (ownPubkey && ownPubkey === pubkey) return false;
-          return true;
-        });
-
-      const unknownPubkeyHex =
-        candidatePubkeyFromId ??
-        candidatePubkeyFromThread ??
-        candidatePubkeyFromLast ??
-        null;
-      if (unknownPubkeyHex && isBlockedPubkey(unknownPubkeyHex)) continue;
-      const ownPubkey = normalizePubkeyHex(chatOwnPubkeyHex);
-      if (unknownPubkeyHex && ownPubkey && unknownPubkeyHex === ownPubkey) {
-        continue;
-      }
-
-      const unknownNpub = encodeUnknownNpub(unknownPubkeyHex);
-      const bestName = unknownNpub
-        ? (unknownNameByNpub[unknownNpub] ?? null)
-        : null;
-
-      unknownById.set(normalizedContactId, {
-        id: normalizedContactId,
-        name: buildUnknownDisplayName(bestName, unknownNpub),
-        npub: unknownNpub,
-        lnAddress: null,
-        groupName: null,
-        isUnknownContact: true,
-        unknownPubkeyHex,
-      });
-    }
-
-    return Array.from(unknownById.values());
-  }, [
-    buildUnknownDisplayName,
-    chatOwnPubkeyHex,
-    lastVisibleMessageByContactId,
-    nostrMessagesLocal,
-    unknownNameByNpub,
-  ]);
+  const { displayContactById, displayContacts, unknownContacts } =
+    useDisplayContacts();
 
   useUnknownSenderReassignment({
     contacts,
@@ -744,7 +521,7 @@ export const useContactsMessagingComposition = ({
     const applyMetadata = (npub: string, metadata: ProfileMetadata | null) => {
       if (cancelled) return;
       const name = metadata ? getBestNostrName(metadata) : null;
-      setUnknownNameByNpub((prev) =>
+      setUnknownNames((prev) =>
         prev[npub] !== undefined ? prev : { ...prev, [npub]: name },
       );
       const url = getProfilePictureUrl(metadata);
@@ -758,7 +535,7 @@ export const useContactsMessagingComposition = ({
     const run = async () => {
       const uncached: string[] = [];
       for (const npub of prefetchedMessageNpubs) {
-        if (unknownNameByNpub[npub] !== undefined) continue;
+        if (unknownNames[npub] !== undefined) continue;
 
         const cached = loadCachedProfile(npub);
         if (cached) {
@@ -794,65 +571,11 @@ export const useContactsMessagingComposition = ({
     nostrBootstrapReady,
     prefetchedMessageNpubs,
     setNostrPictureByNpub,
-    unknownNameByNpub,
+    setUnknownNames,
+    unknownNames,
   ]);
 
-  const displayContacts = React.useMemo<DisplayContact[]>(() => {
-    return [...contacts, ...unknownContacts];
-  }, [contacts, unknownContacts]);
-
-  const displayContactById = React.useMemo(() => {
-    const byId = new Map<string, DisplayContact>();
-    for (const contact of displayContacts) {
-      const id = (contact.id ?? "").trim();
-      if (!id) continue;
-      byId.set(id, contact);
-    }
-    return byId;
-  }, [displayContacts]);
-
-  const selectedChatContact = React.useMemo<ChatSelectedContact | null>(() => {
-    if (route.kind !== "chat" && route.kind !== "bankPaymentOffer") return null;
-
-    const chatId = (route.kind === "chat" ? route.id : route.chatId).trim();
-    if (!chatId) return null;
-
-    const source = displayContactById.get(chatId) ?? null;
-    if (!source) return null;
-
-    const normalizedId = (source.id ?? "").trim();
-    if (!normalizedId) return null;
-
-    const normalizedNpub = normalizeNpubIdentifier(source.npub ?? "");
-    const normalizedUnknownPubkeyHex = normalizePubkeyHex(
-      source.unknownPubkeyHex,
-    );
-    const sourceGroupName = (source.groupName ?? "").trim();
-    const isUnknownContact = source.isUnknownContact === true;
-
-    return {
-      id: normalizedId,
-      ...(sourceGroupName ? { groupName: sourceGroupName } : {}),
-      ...(source.name !== undefined
-        ? { name: (source.name ?? "").trim() || null }
-        : {}),
-      ...(source.lnAddress !== undefined
-        ? { lnAddress: (source.lnAddress ?? "").trim() || null }
-        : {}),
-      ...(normalizedNpub ? { npub: normalizedNpub } : {}),
-      ...(normalizedUnknownPubkeyHex
-        ? { unknownPubkeyHex: normalizedUnknownPubkeyHex }
-        : {}),
-      ...(isUnknownContact ? { isUnknownContact: true } : {}),
-      ...(selectedContact?.chatPeerSeenSinceSec != null &&
-      selectedContact.chatPeerSeenAtSec != null
-        ? {
-            chatPeerSeenSinceSec: selectedContact.chatPeerSeenSinceSec,
-            chatPeerSeenAtSec: selectedContact.chatPeerSeenAtSec,
-          }
-        : {}),
-    };
-  }, [displayContactById, route, selectedContact]);
+  const selectedChatContact = useChatContact(route);
 
   const displayContactsSearchData = React.useMemo(() => {
     return displayContacts.map((contact) => {
@@ -1002,7 +725,7 @@ export const useContactsMessagingComposition = ({
     return byContactId;
   }, [contacts]);
 
-  const messagesVisibleSinceSec = useMessagesVisibleSinceSec();
+  const messagesVisibleSinceSec = useAtomValue(messagesVisibleSinceSecAtom);
   const unreadByContactId = React.useMemo(
     () =>
       collectUnreadNewestIncomingByContactId(
@@ -1028,32 +751,6 @@ export const useContactsMessagingComposition = ({
     pinnedContactId: recentlyAddedContactId,
     unreadByContactId,
   });
-
-  const proxyPaymentPayerContacts = React.useMemo<ProxyPaymentPayerContact[]>(
-    () =>
-      displayContactsSearchData
-        .filter(
-          ({ contact, statusFilterValues }) =>
-            statusFilterValues.length > 0 &&
-            contact.isUnknownContact !== true &&
-            (contact.archivedAtSec ?? 0) <= 0,
-        )
-        .map(({ contact, statusFilterValues }) => {
-          const npub = normalizeNpubIdentifier(contact.npub ?? "");
-          return {
-            contact,
-            currencies: statusFilterValues,
-            pictureUrl: npub ? (nostrPictureByNpub[npub] ?? null) : null,
-          };
-        })
-        .sort((left, right) =>
-          contactNameCollator.compare(
-            left.contact.name ?? "",
-            right.contact.name ?? "",
-          ),
-        ),
-    [contactNameCollator, displayContactsSearchData, nostrPictureByNpub],
-  );
 
   const bankPaymentOfferCurrency =
     route.kind === "bankPayment"
@@ -1100,53 +797,16 @@ export const useContactsMessagingComposition = ({
     visibleContacts.others,
   ]);
 
-  const selectedContactNpub = normalizeNpubIdentifier(
-    selectedContact?.npub ?? "",
+  const contactEditorParams = useContactEditorParams(route);
+  useContactEditorWatchers(contactEditorParams);
+  const { addNewContactFromIdentifier, clearContactForm, setForm } =
+    useContactEditor(contactEditorParams);
+  const closeContactDetail = useCloseContactDetail();
+
+  const setPayAmount = useAtomSet(payAmountAtom);
+  const [contactNewPrefill, setContactNewPrefill] = useAtom(
+    contactNewPrefillAtom,
   );
-  // Memoized for identity stability: the cache fallback would otherwise
-  // produce a fresh object every render and retrigger effects downstream.
-  const selectedContactMetadata = React.useMemo(() => {
-    if (!selectedContactNpub) return undefined;
-    if (hasOwnProperty(nostrMetadataByNpub, selectedContactNpub)) {
-      return nostrMetadataByNpub[selectedContactNpub];
-    }
-    return loadCachedProfile(selectedContactNpub)?.metadata ?? undefined;
-  }, [nostrMetadataByNpub, selectedContactNpub]);
-
-  const {
-    addNewContactFromIdentifier,
-    addNewContactFromSearchResult,
-    clearContactForm,
-    contactEditsSavable,
-    contactSuggestions,
-    editingId,
-    form,
-    handleSaveContact,
-    isSavingContact,
-    openScannedContactPendingNpubRef,
-    selectedContactPublicProfile,
-    resetEditedContactFieldFromNostr,
-    searchNewContact,
-    setForm,
-  } = useContactEditor({
-    contactNewPrefill,
-    contacts,
-    contactsRepository,
-    currentNpub,
-    route,
-    selectedContactMetadata,
-    selectedContact,
-    setContactNewPrefill,
-    setRecentlyAddedContactId,
-    setStatus,
-    t,
-  });
-
-  const closeContactDetail = React.useCallback(() => {
-    clearContactForm();
-    navigateTo({ route: "contacts" });
-  }, [clearContactForm]);
-
   const openNewContactPage = React.useCallback(() => {
     setPayAmount("");
     clearContactForm();
@@ -1180,80 +840,7 @@ export const useContactsMessagingComposition = ({
     return nostrMessagesRecent.some((m) => m.direction === "out");
   }, [nostrMessagesRecent]);
 
-  const contactsCommands = useAtomSuspense(contactsCommandsAtom).value;
-  const unarchiveContact = contactsCommands.unarchiveContact;
-
-  const restoreArchivedContact = React.useCallback(
-    async (id: ContactId) => {
-      const result = await unarchiveContact(id);
-      if (result.ok) {
-        setStatus(t("contactRestored"));
-        closeContactDetail();
-        return;
-      }
-      setStatus(`${t("errorPrefix")}: ${result.error}`);
-    },
-    [closeContactDetail, setStatus, t, unarchiveContact],
-  );
-
-  const undoArchiveContact = React.useCallback(
-    async (id: ContactId) => {
-      const result = await unarchiveContact(id);
-      setStatus(
-        result.ok
-          ? t("contactRestored")
-          : `${t("errorPrefix")}: ${result.error}`,
-      );
-    },
-    [setStatus, t, unarchiveContact],
-  );
-
-  // Archiving marks the chat read; the messages stay on this contact and a
-  // newer incoming message restores it. It runs on one click; the toast offers
-  // to undo it.
-  const archiveContact = React.useCallback(
-    async (id: ContactId) => {
-      const result = await contactsCommands.archiveContact(id);
-      if (!result.ok) {
-        setStatus(`${t("errorPrefix")}: ${result.error}`);
-        return;
-      }
-      closeContactDetail();
-      pushToast(t("contactArchived"), {
-        action: {
-          label: t("undoArchiveContact"),
-          onClick: () => {
-            void undoArchiveContact(id);
-          },
-        },
-      });
-    },
-    [
-      closeContactDetail,
-      contactsCommands,
-      pushToast,
-      setStatus,
-      t,
-      undoArchiveContact,
-    ],
-  );
-
-  const blockPubkeyAndPublishMuteList = React.useCallback(
-    async (pubkeyHex: string): Promise<boolean> => {
-      const pubkey = normalizePubkeyHex(pubkeyHex);
-      if (!pubkey) return false;
-      blockPubkey(pubkey);
-      // Local blocklist applies either way; the mute list is best effort.
-      if (currentNsec) void syncMuteList();
-      return true;
-    },
-    [currentNsec, syncMuteList],
-  );
-
-  const archiveCurrentContact = React.useCallback(() => {
-    if (!editingId) return;
-    void archiveContact(editingId);
-  }, [archiveContact, editingId]);
+  const { unarchiveContact } = useAtomSuspense(contactsCommandsAtom).value;
 
   const { openFeedbackContact } = useFeedbackContact<(typeof contacts)[number]>(
     { contacts, contactsRepository, pushToast, t },
@@ -1274,75 +861,15 @@ export const useContactsMessagingComposition = ({
     }
   }, [accountHydrated, contacts, unarchiveContact, unreadByContactId]);
 
-  const blockArchivedContact = React.useCallback(async () => {
-    if (route.kind !== "contactEdit") return;
-    if (!selectedContact?.id) return;
-
-    const normalizedNpub = normalizeNpubIdentifier(selectedContact.npub ?? "");
-    if (!normalizedNpub) {
-      setStatus(t("chatMissingContactNpub"));
-      return;
-    }
-
-    const blockedPubkey = decodeNpub(normalizedNpub);
-
-    if (!blockedPubkey) {
-      setStatus(t("chatMissingContactNpub"));
-      return;
-    }
-
-    await blockPubkeyAndPublishMuteList(blockedPubkey);
-
-    const contactId = selectedContact.id.trim();
-    if (contactId) {
-      removeLocalNostrMessagesByContactId(contactId);
-    }
-
-    const result = await runWrite(
-      contactsRepository.remove(selectedContact.id),
-    );
-
-    if (result.ok) {
-      setStatus(t("contactBlocked"));
-      closeContactDetail();
-      return;
-    }
-
-    setStatus(`${t("errorPrefix")}: ${result.error}`);
-  }, [
-    blockPubkeyAndPublishMuteList,
-    closeContactDetail,
-    contactsRepository,
-    removeLocalNostrMessagesByContactId,
-    route.kind,
-    selectedContact,
-    setStatus,
-    t,
-  ]);
-
-  const openContactPay = React.useCallback(
-    (
-      contactId: string,
-      fromChat = false,
-      intent: "pay" | "request" = "pay",
-    ) => {
-      const knownContact =
-        contacts.find((row) => row.id.trim() === contactId) ?? null;
-      if (!knownContact) return;
-
-      contactPayBackToChatRef.current = fromChat ? knownContact.id : null;
-      setContactPaymentIntent(intent);
-      navigateTo({ route: "contactPay", id: knownContact.id });
-    },
-    [contactPayBackToChatRef, contacts, setContactPaymentIntent],
-  );
+  const openContactPay = useOpenContactPay();
+  const setContactPayBackToChat = useSetNavIntent("contactPayBackToChat");
 
   const openContactDetail = React.useCallback(
     (contact: DisplayContact) => {
       const contactId = (contact.id ?? "").trim();
       if (!contactId) return;
 
-      contactPayBackToChatRef.current = null;
+      setContactPayBackToChat(null);
 
       if (contact.isUnknownContact) {
         navigateTo({ route: "chat", id: contactId });
@@ -1368,255 +895,13 @@ export const useContactsMessagingComposition = ({
       }
       navigateTo({ route: "chat", id: knownContact.id });
     },
-    [contactPayBackToChatRef, contacts, openContactPay],
+    [contacts, openContactPay, setContactPayBackToChat],
   );
 
-  const addUnknownContactFromChat = React.useCallback(async () => {
-    if (route.kind !== "chat") return;
-    if (!selectedChatContact?.isUnknownContact) return;
-
-    const contactId = selectedChatContact.id.trim();
-    const npub = normalizeNpubIdentifier(selectedChatContact.npub ?? "");
-    if (!contactId || !npub) {
-      setStatus(t("chatUnknownContactAddFailed"));
-      return;
-    }
-
-    const saved = saveNpubContact(npub);
-    if (!saved) return;
-    if (!saved.created) {
-      void reassignContactMessages(contactId, saved.contact.id);
-      setStatus(t("contactSaved"));
-      navigateTo({ route: "chat", id: saved.contact.id });
-      return;
-    }
-    pendingUnknownContactAddRef.current = {
-      sourceContactId: contactId,
-      targetNpub: npub,
-    };
-  }, [
-    reassignContactMessages,
-    route.kind,
-    saveNpubContact,
-    selectedChatContact,
-    setStatus,
-    t,
-  ]);
-
-  const blockUnknownContactFromChat = React.useCallback(async () => {
-    if (route.kind !== "chat") return;
-    if (!selectedChatContact?.isUnknownContact) return;
-
-    const contactId = selectedChatContact.id.trim();
-    if (!contactId) return;
-
-    const unknownPubkeyHex = (() => {
-      const directPubkey = normalizePubkeyHex(
-        selectedChatContact.unknownPubkeyHex,
-      );
-      if (directPubkey) return directPubkey;
-
-      const normalizedNpub = normalizeNpubIdentifier(
-        selectedChatContact.npub ?? "",
-      );
-      if (!normalizedNpub) return null;
-
-      return decodeNpub(normalizedNpub);
-    })();
-
-    if (!unknownPubkeyHex) return;
-
-    await blockPubkeyAndPublishMuteList(unknownPubkeyHex);
-
-    removeLocalNostrMessagesByContactId(contactId);
-    setStatus(t("chatUnknownContactBlocked"));
-    navigateTo({ route: "contacts" });
-  }, [
-    blockPubkeyAndPublishMuteList,
-    removeLocalNostrMessagesByContactId,
-    route.kind,
-    selectedChatContact,
-    setStatus,
-    t,
-  ]);
-
-  const getNpubMessageContactInfo = React.useCallback(
-    (rawNpub: string) => {
-      const npub = normalizeNpubIdentifier(rawNpub);
-      if (!npub) return null;
-
-      const knownContact =
-        contacts.find(
-          (contact) => normalizeNpubIdentifier(contact.npub ?? "") === npub,
-        ) ?? null;
-      const derivedProfile = deriveDefaultProfile(npub, lang);
-      const displayName = buildSavedContactName(
-        (knownContact?.name ?? "").trim() || unknownNameByNpub[npub] || null,
-        npub,
-      );
-      const pictureUrl =
-        nostrPictureByNpub[npub] ?? derivedProfile.pictureUrl ?? null;
-
-      return {
-        displayName,
-        isSaved:
-          Boolean(knownContact) ||
-          normalizeNpubIdentifier(currentNpub ?? "") === npub,
-        npub,
-        pictureUrl,
-      };
-    },
-    [
-      buildSavedContactName,
-      unknownNameByNpub,
-      contacts,
-      currentNpub,
-      lang,
-      nostrPictureByNpub,
-    ],
-  );
-
-  const mentionContacts = React.useMemo(
-    () =>
-      contacts.flatMap((contact) => {
-        const name = (contact.name ?? "").trim();
-        const npub = normalizeNpubIdentifier(contact.npub ?? "");
-        if (!name || !npub) return [];
-        const groupName = (contact.groupName ?? "").trim();
-        const groupNames = getContactGroups(contact);
-        return [
-          {
-            name,
-            npub,
-            groupName: groupName || null,
-            groupNames,
-            statusNames: parseProfileGeneralStatus(nostrStatusByNpub[npub])
-              .currencies,
-          },
-        ];
-      }),
-    [contacts, nostrStatusByNpub],
-  );
-
-  const openNpubMessageContact = React.useCallback(
-    (rawNpub: string) => {
-      const npub = normalizeNpubIdentifier(rawNpub);
-      if (!npub) return;
-
-      const existing = contacts.find(
-        (contact) => normalizeNpubIdentifier(contact.npub ?? "") === npub,
-      );
-      if (existing?.id) {
-        navigateTo({ route: "contact", id: existing.id });
-        return;
-      }
-
-      const myNpub = normalizeNpubIdentifier(currentNpub ?? "");
-      if (myNpub && myNpub === npub) {
-        navigateTo({ route: "profile" });
-        return;
-      }
-
-      const saved = saveNpubContact(npub);
-      if (!saved) return;
-      openScannedContactPendingNpubRef.current = saved.npub;
-      setStatus(t("contactSaved"));
-    },
-    [
-      contacts,
-      currentNpub,
-      openScannedContactPendingNpubRef,
-      saveNpubContact,
-      setStatus,
-      t,
-    ],
-  );
-
-  const [pendingContactsGroupAssignment, setPendingContactsGroupAssignment] =
-    React.useState<PendingContactsGroupAssignment | null>(null);
-
-  const addNpubMessageContacts = React.useCallback(
-    (rawNpubs: readonly string[], messageId: string) => {
-      const savedNpubs = new Set(
-        contacts.flatMap((contact) => {
-          const npub = normalizeNpubIdentifier(contact.npub ?? "");
-          return npub ? [npub] : [];
-        }),
-      );
-      const myNpub = normalizeNpubIdentifier(currentNpub ?? "");
-      if (myNpub) savedNpubs.add(myNpub);
-
-      const newNpubs: string[] = [];
-      for (const rawNpub of rawNpubs) {
-        const npub = normalizeNpubIdentifier(rawNpub);
-        if (!npub || savedNpubs.has(npub)) continue;
-        savedNpubs.add(npub);
-        newNpubs.push(npub);
-      }
-      if (newNpubs.length === 0) return;
-
-      const savedContactIds: ContactId[] = [];
-      for (const npub of newNpubs) {
-        const saved = saveNpubContact(npub);
-        if (!saved) return;
-        savedContactIds.push(saved.contact.id);
-      }
-
-      setPendingContactsGroupAssignment({ messageId, savedContactIds });
-      setStatus(
-        t("contactsSaved").replace("{count}", String(savedContactIds.length)),
-      );
-    },
-    [contacts, currentNpub, saveNpubContact, setStatus, t],
-  );
-
-  const closeContactsGroupAssignment = React.useCallback(() => {
-    setPendingContactsGroupAssignment(null);
-  }, []);
-
-  const assignPendingContactsToGroup = React.useCallback(
-    async (rawGroup: string) => {
-      const pending = pendingContactsGroupAssignment;
-      if (!pending) return;
-
-      const groups = normalizeContactGroups([rawGroup]);
-      if (groups.length === 0) return;
-
-      const groupName = NonEmptyString1000.fromUnknown(groups[0]);
-      const groupNamesJson = NonEmptyString1000.fromUnknown(
-        serializeContactGroups(groups),
-      );
-      if (!groupName.ok || !groupNamesJson.ok) {
-        setStatus(`${t("errorPrefix")}: ${t("group")}`);
-        return;
-      }
-
-      for (const id of pending.savedContactIds) {
-        const result = await runWrite(
-          contactsRepository.update(id, {
-            groupName: groupName.value,
-            groupNamesJson: groupNamesJson.value,
-          }),
-        );
-        if (!result.ok) {
-          setStatus(`${t("errorPrefix")}: ${result.error}`);
-          return;
-        }
-      }
-
-      setPendingContactsGroupAssignment(null);
-      reportContactsAddedToGroup(pending, groups[0] ?? rawGroup);
-      setStatus(
-        t("contactsAddedToGroup")
-          .replace("{count}", String(pending.savedContactIds.length))
-          .replace("{group}", groups.join(", ")),
-      );
-    },
-    [contactsRepository, pendingContactsGroupAssignment, setStatus, t],
-  );
-
+  // Only a contacts change re-checks the pending add, so it is read here
+  // rather than subscribed to.
   React.useEffect(() => {
-    const pending = pendingUnknownContactAddRef.current;
+    const pending = registry.get(pendingUnknownContactAddAtom);
     if (!pending) return;
 
     const existing = contacts.find(
@@ -1626,179 +911,18 @@ export const useContactsMessagingComposition = ({
     );
     if (!existing?.id) return;
 
-    pendingUnknownContactAddRef.current = null;
+    registry.set(pendingUnknownContactAddAtom, null);
     void reassignContactMessages(pending.sourceContactId, existing.id);
     setStatus(t("contactSaved"));
     navigateTo({ route: "chat", id: existing.id });
-  }, [contacts, reassignContactMessages, setStatus, t]);
+  }, [contacts, reassignContactMessages, registry, setStatus, t]);
 
-  const sendChatMessage = useSendChatMessage({
-    appendLocalNostrMessage,
-    chatDraft,
-    chatSendIsBusy,
-    currentNsec,
+  const { sendChatMessage } = useChatSend(
     route,
-    replyContext,
-    replyContextRef,
-    selectedContact:
-      route.kind === "chat" || route.kind === "bankPaymentOffer"
-        ? selectedChatContact
-        : selectedContact,
-    setReplyContext,
-    setChatDraft,
-    setChatSendIsBusy,
-    setStatus,
-    t,
-    triggerChatScrollToBottom,
-    updateLocalNostrMessage,
-  });
-
-  const editChatMessage = useEditChatMessage({
-    chatDraft,
-    chatSendIsBusy,
-    currentNsec,
-    editContext,
-    route,
-    selectedContact: selectedChatContact,
-    setChatDraft,
-    setChatSendIsBusy,
-    setEditContext,
-    setStatus,
-    t,
-    updateLocalNostrMessage,
-  });
-
-  const sendReaction = useSendReaction({
-    appendLocalNostrReaction,
-    currentNsec,
-    reactionsByMessageId,
-    route,
-    selectedContact: selectedChatContact,
-    setStatus,
-    softDeleteLocalNostrReaction,
-    t,
-    updateLocalNostrReaction,
-  });
-
-  const sendChatOrEditMessage = React.useCallback(async () => {
-    if (editContext) {
-      await editChatMessage();
-      return;
-    }
-    await sendChatMessage();
-  }, [editChatMessage, editContext, sendChatMessage]);
-
-  const sendChatImage = React.useCallback(
-    async (file: File, replyToMessage?: LocalNostrMessage) => {
-      if (editContext) return false;
-      const replyToId = (replyToMessage?.rumorId ?? "").trim();
-      const outcome = await sendChatMessage({
-        clearDraft: false,
-        clearReplyContext: true,
-        imageFile: file,
-        ...(replyToId
-          ? {
-              replyContext: {
-                replyToId,
-                rootMessageId:
-                  (replyToMessage?.rootMessageId ?? "").trim() || replyToId,
-                replyToContent: (replyToMessage?.content ?? "").trim() || null,
-              },
-            }
-          : {}),
-      });
-      return outcome !== "failed";
-    },
-    [editContext, sendChatMessage],
+    route.kind === "chat" || route.kind === "bankPaymentOffer"
+      ? selectedChatContact
+      : selectedContact,
   );
-
-  const onReplyToChatMessage = React.useCallback(
-    (message: LocalNostrMessage) => {
-      const rumorId = (message.rumorId ?? "").trim();
-      if (!rumorId) return;
-      setEditContext(null);
-      setReplyContext({
-        replyToId: rumorId,
-        rootMessageId: (message.rootMessageId ?? "").trim() || rumorId,
-        replyToContent: message.content.trim() || null,
-      });
-    },
-    [],
-  );
-
-  const onEditChatMessage = React.useCallback((message: LocalNostrMessage) => {
-    const isOut = message.direction === "out";
-    if (!isOut) return;
-    const rumorId = (message.rumorId ?? "").trim();
-    if (!rumorId) return;
-    const messageId = message.id.trim();
-    if (!messageId) return;
-
-    setReplyContext(null);
-    const content = message.content;
-    setEditContext({
-      messageId,
-      rumorId,
-      originalContent: (message.originalContent ?? "").trim() || content || "",
-    });
-    setChatDraft(content);
-  }, []);
-
-  const onReactToChatMessage = React.useCallback(
-    (message: LocalNostrMessage, emoji: string) => {
-      const messageRumorId = (message.rumorId ?? "").trim();
-      const messageAuthorPubkey = message.pubkey.trim();
-      if (!messageRumorId || !messageAuthorPubkey) return;
-      void sendReaction({
-        emoji,
-        messageAuthorPubkey,
-        messageRumorId,
-        targetKind: parsePrivateImageMessage(message.content)
-          ? "image"
-          : "text",
-      });
-    },
-    [sendReaction],
-  );
-
-  const onCopyChatMessage = React.useCallback(
-    (message: LocalNostrMessage) => {
-      const content = message.content;
-      const privateImage = parsePrivateImageMessage(content);
-      const copyContent = privateImage
-        ? privateImagePreviewText(t, privateImage)
-        : content;
-      void copyText(copyContent);
-    },
-    [copyText, t],
-  );
-
-  const onDeclineChatPaymentRequest = React.useCallback(
-    async (message: LocalNostrMessage) => {
-      const requestRumorId = (message.rumorId ?? "").trim();
-      if (!requestRumorId) return;
-
-      await sendChatMessage({
-        clearDraft: false,
-        replyContext: {
-          replyToId: requestRumorId,
-          rootMessageId: (message.rootMessageId ?? "").trim() || requestRumorId,
-          replyToContent: message.content.trim() || null,
-        },
-        text: buildLinkyPaymentRequestDeclineMessage(requestRumorId),
-      });
-    },
-    [sendChatMessage],
-  );
-
-  const onCancelReply = React.useCallback(() => {
-    setReplyContext(null);
-  }, []);
-
-  const onCancelEdit = React.useCallback(() => {
-    setEditContext(null);
-    setChatDraft("");
-  }, []);
 
   const openInboxMessageToast = React.useCallback(
     (params: { contactId: string; messageId?: string }) => {
@@ -1923,119 +1047,72 @@ export const useContactsMessagingComposition = ({
   });
 
   return {
-    saveNpubContact,
+    activeBankPaymentOfferContacts,
     activeGroup,
     addNewContactFromIdentifier,
-    addNewContactFromSearchResult,
-    addNpubMessageContacts,
-    addUnknownContactFromChat,
     appendLocalNostrMessage,
-    assignPendingContactsToGroup,
-    closeContactsGroupAssignment,
-    pendingContactsGroupAssignment,
     autoAcceptedChatMessageIdsRef,
-    activeBankPaymentOfferContacts,
     bankPaymentOfferContacts,
-    bankPaymentOfferMessages,
     bankPaymentOfferRecipientCount,
     bankPaymentOfferStaggerDelaySec,
-    blockArchivedContact,
-    proxyPaymentPayerContacts,
-    blockUnknownContactFromChat,
-    addChatAttachments,
     canSaveNewRelay,
-    chatAttachments,
     chatDidInitialScrollForContactRef,
-    chatDraft,
     chatForceScrollToBottomRef,
     chatLastMessageCountRef,
     chatMessageElByIdRef,
     chatMessages,
     chatMessagesRef,
     chatMessagesWithBankPaymentOffers,
-    chatOwnPubkeyHex,
     chatScrollTargetIdRef,
-    chatSendIsBusy,
     closeContactDetail,
-    contactEditsSavable,
     contactFilterOptions,
-    contactSuggestions,
     contacts,
+    contactsFilterOpen,
     contactsLatestRef,
     contactsOnboardingHasBackedUpKeys,
     contactsOnboardingHasPaid,
     contactsOnboardingHasSentMessage,
-    contactsFilterOpen,
     contactsSearch,
     contactsSearchInputRef,
     dedupeContacts,
     dedupeContactsIsBusy,
     dispatchInboxEvent,
     displayContactById,
-    editContext,
-    editingId,
-    form,
-    getNpubMessageContactInfo,
-    groupNames,
-    handleSaveContact,
     getBankPaymentOfferForSettlement,
+    groupNames,
     isBankPaymentOfferCanceled,
     isRecommendedRelay,
-    isSavingContact,
     lastMessageByContactId: lastVisibleMessageByContactId,
-    mentionContacts,
+    latestMessages,
     newRelayUrl,
     nostrBootstrapReady,
-    latestMessages,
     nostrMessagesLocal,
     nostrMessagesRecent,
     nostrMetadataByNpub,
     nostrPictureByNpub,
     nostrStatusByNpub,
-    onCancelEdit,
-    onCancelReply,
-    onCopyChatMessage,
-    onDeclineChatPaymentRequest,
-    onEditChatMessage,
-    onReactToChatMessage,
-    onReplyToChatMessage,
     openContactDetail,
-    openContactPay,
     openFeedbackContact,
     openNewContactPage,
-    openNpubMessageContact,
-    openScannedContactPendingNpubRef,
     pendingPaymentsKey,
     pendingRelayDeleteUrl,
-    reactionsByMessageId,
     relayUrls,
-    replyContext,
     requestBankPaymentOffer,
-    archiveCurrentContact,
     requestDeleteSelectedRelay,
-    resetEditedContactFieldFromNostr,
     respondToBankPaymentOfferWithGroupState,
-    restoreArchivedContact,
     saveNewRelay,
-    searchNewContact,
+    saveNpubContact,
     selectedChatContact,
     selectedContact,
-    selectedContactPublicProfile,
     selectedRelayUrl,
-    sendChatImage,
     sendChatMessage,
-    sendChatOrEditMessage,
-    removeChatAttachment,
     setActiveGroup,
-    setChatDraft,
-    setContactNewPrefill,
     setContactsOnboardingHasBackedUpKeys,
     setContactsOnboardingHasPaid,
     setContactsSearch,
-    toggleContactsFilter,
-    setForm,
     setNewRelayUrl,
     statusFilterCurrencies,
+    toggleContactsFilter,
     ungroupedCount,
     unreadByContactId,
     updateLocalNostrMessage,

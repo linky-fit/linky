@@ -1,6 +1,19 @@
 import { Button, Row, Text } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useAtomValue } from "@linky-fit/linkstr-react";
+import {
+  useChatContact,
+  useContacts,
+} from "../app/hooks/contacts/useDisplayContacts";
+import { useNostrPictureByNpub } from "../app/hooks/contacts/useProfileCache";
+import { useChatMessages, useChatSend } from "../app/hooks/messages/useChat";
+import {
+  useCopyText,
+  useDisplayAmounts,
+  useTranslation,
+} from "../app/hooks/shell";
+import { currentPubkeyAtom } from "../app/state/session/session";
+import type { Route } from "../types/route";
 import { formatRemainingTime } from "../app/lib/bankPaymentOfferLabels";
 import {
   BANK_PAYMENT_OFFER_EXTENSION_SEC,
@@ -222,8 +235,9 @@ export const BankPaymentOfferDetailPage: React.FC<
   onSendChatImage,
   onSettleBankPaymentOffer,
 }) => {
-  const { formatDisplayedAmountText, nostrPictureByNpub, t } =
-    useAppShellCore();
+  const { t } = useTranslation();
+  const { formatDisplayedAmountText } = useDisplayAmounts();
+  const nostrPictureByNpub = useNostrPictureByNpub();
   const [isAttachingConfirmation, setIsAttachingConfirmation] =
     React.useState(false);
   const [isOpening, setIsOpening] = React.useState(false);
@@ -705,6 +719,35 @@ export const BankPaymentOfferDetailPage: React.FC<
       isSharingJpeg={isSharingJpeg}
       openWithJpeg={openWithJpeg}
       errorText={errorText}
+    />
+  );
+};
+
+type BankPaymentOfferDetailRouteProps = Pick<
+  BankPaymentOfferDetailPageProps,
+  "onRespondBankPaymentOffer" | "onSettleBankPaymentOffer"
+> & { route: Extract<Route, { kind: "bankPaymentOffer" }> };
+
+export const BankPaymentOfferDetailRoute: React.FC<
+  BankPaymentOfferDetailRouteProps
+> = ({ route, ...props }) => {
+  const contacts = useContacts();
+  const copyText = useCopyText();
+  const chatOwnPubkeyHex = useAtomValue(currentPubkeyAtom);
+  const { bankPaymentOfferMessages, chatMessages } = useChatMessages(route);
+  const selectedChatContact = useChatContact(route);
+  const { sendChatImage } = useChatSend(route, selectedChatContact);
+  return (
+    <BankPaymentOfferDetailPage
+      {...props}
+      bankPaymentOfferMessages={bankPaymentOfferMessages}
+      chatId={route.chatId}
+      chatMessages={chatMessages}
+      chatOwnPubkeyHex={chatOwnPubkeyHex}
+      contacts={contacts}
+      offerId={route.offerId}
+      onCopyText={copyText}
+      onSendChatImage={sendChatImage}
     />
   );
 };

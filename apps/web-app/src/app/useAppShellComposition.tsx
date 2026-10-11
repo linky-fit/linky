@@ -1,9 +1,8 @@
 import { createContactNameFormatter } from "../utils/contactName";
 import { useMemoizedRouteBuilder } from "./hooks/composition/useMemoizedRouteBundle";
 import { ContactId as ContactIdType } from "@linky-fit/linksync";
-import { useAtom } from "@linky-fit/linkstr-react";
+import { useAtom, useAtomSet } from "@linky-fit/linkstr-react";
 import React, { useMemo, useState } from "react";
-import type { MessageContactsGroupAssignment } from "../components/ChatMessage";
 import { ContactCard } from "../components/ContactCard";
 import {
   useEvoluDatabaseInfoState,
@@ -12,7 +11,7 @@ import {
   useWipeEvoluStorage,
   type ContactId,
 } from "../evolu";
-import { useRouting } from "../hooks/useRouting";
+import { navigateTo, useRouting } from "../hooks/useRouting";
 import { useToasts } from "../hooks/useToasts";
 import { reportAppLog } from "../devtools/inspector/appLog";
 import {
@@ -24,10 +23,7 @@ import {
   triggerPasswordManagerSeedSave,
   type PasswordManagerSaveResult,
 } from "../platform/passwordManager";
-import {
-  CONTACTS_ONBOARDING_HAS_BACKUPED_KEYS_STORAGE_KEY,
-  FEEDBACK_CONTACT_NPUB,
-} from "../utils/constants";
+import { CONTACTS_ONBOARDING_HAS_BACKUPED_KEYS_STORAGE_KEY } from "../utils/constants";
 import type { DisplayCurrency } from "../utils/displayAmounts";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 import {
@@ -38,10 +34,13 @@ import {
 } from "../utils/storage";
 import { useCashuWalletComposition } from "./hooks/composition/useCashuWalletComposition";
 import { logPayStep } from "./state/wallet/paymentLog";
+import { useContactsMessagingComposition } from "./hooks/composition/useContactsMessagingComposition";
 import {
-  useContactsMessagingComposition,
+  useNpubMessageContactInfo,
   type DisplayContact,
-} from "./hooks/composition/useContactsMessagingComposition";
+} from "./hooks/contacts/useDisplayContacts";
+import { useEffectiveProfile } from "./hooks/profile/useEffectiveProfile";
+import { contactNewPrefillAtom } from "./state/contacts/contactForm";
 import { useIdentityOwnersComposition } from "./hooks/composition/useIdentityOwnersComposition";
 import { buildMoneyRouteProps } from "./routes/props/buildMoneyRouteProps";
 import { useProfileComposition } from "./hooks/composition/useProfileComposition";
@@ -59,6 +58,7 @@ import { useAppPreferences } from "./hooks/useAppPreferences";
 import { useTopDownTilt } from "./hooks/useTopDownTilt";
 import { useFiatRatesSync } from "./hooks/useFiatRates";
 import { useCopyText, useDisplayAmounts, useSetStatus } from "./hooks/shell";
+import { useNavIntent } from "./hooks/shell/navIntents";
 import { displayPrefsAtom } from "./state/shell/displayPrefs";
 import { hiddenTransactionsShownAtom } from "./state/shell/topbar";
 import { useLnurlAuth } from "./hooks/useLnurlAuth";
@@ -313,10 +313,6 @@ export const useAppShellComposition = ({
     wipeEvoluStorageImpl,
   ]);
 
-  const [contactPaymentIntent, setContactPaymentIntent] = useState<
-    "pay" | "request"
-  >("pay");
-  const [payAmount, setPayAmount] = useState<string>("");
   const contactsOnboardingDismissedSynced =
     useSetting("onboardingTutorial") === "dismissed";
   const persistContactsOnboardingDismissed = React.useCallback(() => {
@@ -338,123 +334,74 @@ export const useAppShellComposition = ({
     [t],
   );
 
-  const contactPayBackToChatRef = React.useRef<ContactId | null>(null);
-
   useStatusToasts();
 
   const copyText = useCopyText();
 
   const {
-    saveNpubContact,
+    activeBankPaymentOfferContacts,
     activeGroup,
     addNewContactFromIdentifier,
-    addNewContactFromSearchResult,
-    addNpubMessageContacts,
-    addUnknownContactFromChat,
     appendLocalNostrMessage,
-    assignPendingContactsToGroup,
     autoAcceptedChatMessageIdsRef,
-    closeContactsGroupAssignment,
-    pendingContactsGroupAssignment,
-    activeBankPaymentOfferContacts,
     bankPaymentOfferContacts,
-    bankPaymentOfferMessages,
-    proxyPaymentPayerContacts,
-    getBankPaymentOfferForSettlement,
     bankPaymentOfferRecipientCount,
     bankPaymentOfferStaggerDelaySec,
-    blockArchivedContact,
-    blockUnknownContactFromChat,
-    addChatAttachments,
     canSaveNewRelay,
-    chatAttachments,
     chatDidInitialScrollForContactRef,
-    chatDraft,
     chatForceScrollToBottomRef,
     chatLastMessageCountRef,
     chatMessageElByIdRef,
     chatMessages,
     chatMessagesRef,
     chatMessagesWithBankPaymentOffers,
-    chatOwnPubkeyHex,
     chatScrollTargetIdRef,
-    chatSendIsBusy,
     closeContactDetail,
-    contactEditsSavable,
     contactFilterOptions,
-    contactSuggestions,
     contacts,
+    contactsFilterOpen,
     contactsLatestRef,
     contactsOnboardingHasBackedUpKeys,
     contactsOnboardingHasPaid,
     contactsOnboardingHasSentMessage,
-    contactsFilterOpen,
     contactsSearch,
     contactsSearchInputRef,
     dedupeContacts,
     dedupeContactsIsBusy,
     dispatchInboxEvent,
     displayContactById,
-    editContext,
-    editingId,
-    form,
-    getNpubMessageContactInfo,
+    getBankPaymentOfferForSettlement,
     groupNames,
-    handleSaveContact,
     isBankPaymentOfferCanceled,
     isRecommendedRelay,
-    isSavingContact,
     lastMessageByContactId,
-    mentionContacts,
+    latestMessages,
     newRelayUrl,
     nostrBootstrapReady,
-    latestMessages,
     nostrMessagesLocal,
     nostrMessagesRecent,
     nostrMetadataByNpub,
     nostrPictureByNpub,
     nostrStatusByNpub,
-    onCancelEdit,
-    onCancelReply,
-    onCopyChatMessage,
-    onDeclineChatPaymentRequest,
-    onEditChatMessage,
-    onReactToChatMessage,
-    onReplyToChatMessage,
     openContactDetail,
-    openContactPay,
     openFeedbackContact,
     openNewContactPage,
-    openNpubMessageContact,
-    openScannedContactPendingNpubRef,
     pendingPaymentsKey,
     pendingRelayDeleteUrl,
-    reactionsByMessageId,
     relayUrls,
-    replyContext,
     requestBankPaymentOffer,
-    archiveCurrentContact,
     requestDeleteSelectedRelay,
-    resetEditedContactFieldFromNostr,
     respondToBankPaymentOfferWithGroupState,
-    restoreArchivedContact,
     saveNewRelay,
-    searchNewContact,
+    saveNpubContact,
     selectedChatContact,
     selectedContact,
-    selectedContactPublicProfile,
     selectedRelayUrl,
-    sendChatImage,
     sendChatMessage,
-    sendChatOrEditMessage,
-    removeChatAttachment,
     setActiveGroup,
-    setChatDraft,
-    setContactNewPrefill,
     setContactsOnboardingHasBackedUpKeys,
     setContactsOnboardingHasPaid,
     setContactsSearch,
-    setForm,
     setNewRelayUrl,
     statusFilterCurrencies,
     toggleContactsFilter,
@@ -464,10 +411,8 @@ export const useAppShellComposition = ({
     visibleContacts,
   } = useContactsMessagingComposition({
     appOwnerId,
-    contactPayBackToChatRef,
     contactsRepository,
     conversationsRepository,
-    copyText,
     currentNpub,
     currentNsec,
     formatDisplayedAmountText,
@@ -478,65 +423,33 @@ export const useAppShellComposition = ({
     pushToast,
     route,
     seenReceiptsEnabledAtSec,
-    setContactPaymentIntent,
-    setPayAmount,
     setStatus,
     syncedNostrIdentityMatchesLocal,
     t,
   });
 
   const {
-    shuffleProfileAvatar,
-    derivedProfile,
-    effectiveMyLightningAddress,
-    effectiveProfileName,
-    effectiveProfilePicture,
     isProfileEditing,
-    myProfileStatus,
     npubCashInfoInFlightRef,
     npubCashInfoLoadedAtMsRef,
     npubCashInfoLoadedForNpubRef,
-    onPickProfilePhoto,
-    onProfilePhotoError,
-    onProfilePhotoSelected,
-    openProfileQr,
-    ownedProfileLightningAddresses,
-    profileCustomPictureUrl,
-    profileEditInitialRef,
-    profileEditLnAddress,
-    profileEditName,
-    profileEditPicture,
-    profileEditStatus,
-    profileEditsSavable,
-    profileIsSaving,
-    profilePhotoInputRef,
-    profileSelectedPictureKind,
-    profileStatusCurrencies,
-    profileStatusIsSaving,
-    saveClaimedLightningAddress,
-    saveProfileEdits,
-    selectedProfileStatusCurrencies,
     setIsProfileEditing,
     setOwnedProfileLightningAddresses,
     setOwnedProfileLightningAddressesLoading,
-    setProfileEditLnAddress,
-    setProfileEditName,
-    setProfileEditStatus,
-    toggleProfileEditing,
-    toggleProfileStatusCurrency,
-    unregisteredOwnLightningAddress,
   } = useProfileComposition({
     currentNpub,
-    currentNsec,
-    lang,
     nostrMetadataByNpub,
     nostrPictureByNpub,
     nostrStatusByNpub,
     nostrBootstrapReady,
     route,
-    setStatus,
-    t,
   });
+  const { effectiveProfileName, effectiveProfilePicture } =
+    useEffectiveProfile();
+  const openProfileQr = React.useCallback(() => {
+    navigateTo({ route: "profile" });
+  }, []);
+  const setContactNewPrefill = useAtomSet(contactNewPrefillAtom);
 
   const {
     allCashuProofs,
@@ -561,7 +474,6 @@ export const useAppShellComposition = ({
     confirmLightningInvoicePayment,
     confirmLnurlWithdraw,
     confirmPaymentMintMelt,
-    contactPayMethod,
     defaultMintDisplay,
     defaultMintUrl,
     discardCashuDeferredReceive,
@@ -571,13 +483,8 @@ export const useAppShellComposition = ({
     getMintRuntime,
     isCashuTokenKnownAny,
     isCashuTokenStored,
-    knownLnAddressPayContact,
-    knownLnAddressPayContactPictureUrl,
     lightningInvoiceAutoPayLimit,
-    lnAddressPayAmount,
-    lnAddressPayNote,
     lnurlWithdrawIsBusy,
-    makeNip98AuthHeader,
     markCashuTokenExternalized,
     markCashuTokenIssued,
     markMintIconFailed,
@@ -611,10 +518,7 @@ export const useAppShellComposition = ({
     saveCashuFromText,
     sendCashuTokenToContact,
     setAllowTestMints,
-    setContactPayMethod,
     setLightningInvoiceAutoPayLimit,
-    setLnAddressPayAmount,
-    setLnAddressPayNote,
     setMintInfoAll,
     setPayWithCashuEnabled,
     setReceiveMethod,
@@ -624,7 +528,6 @@ export const useAppShellComposition = ({
     settleBankPaymentOffer,
     recurringPaymentsContext,
   } = useCashuWalletComposition({
-    contactPayBackToChatRef,
     copyText,
     contactsMessaging: {
       saveNpubContact,
@@ -638,7 +541,6 @@ export const useAppShellComposition = ({
       nostrMessagesLocal,
       nostrMessagesRecent,
       nostrPictureByNpub,
-      openScannedContactPendingNpubRef,
       pendingPaymentsKey,
       respondToBankPaymentOfferWithGroupState,
       selectedChatContact,
@@ -655,7 +557,6 @@ export const useAppShellComposition = ({
       currentNsec,
     },
     maybeShowPwaNotification,
-    payAmount,
     profile: {
       npubCashInfoInFlightRef,
       npubCashInfoLoadedAtMsRef,
@@ -666,8 +567,6 @@ export const useAppShellComposition = ({
     },
     pushToast,
     route,
-    setContactPaymentIntent,
-    setPayAmount,
     setStatus,
     t,
     transactions,
@@ -678,7 +577,6 @@ export const useAppShellComposition = ({
     bankPaymentOfferRecipientCount,
     bankPaymentOfferStaggerDelaySec,
     lightningInvoiceAutoPayLimit,
-    payWithCashuEnabled,
     seenReceiptsEnabledAtSec,
     showProfileQrOnTiltEnabled,
   });
@@ -765,7 +663,6 @@ export const useAppShellComposition = ({
     markCashuTokenIssued,
     nostrBootstrapReady,
     openNewContactPage,
-    openScannedContactPendingNpubRef,
     payCashuPaymentRequest,
     payLightningInvoiceWithCashu,
     persistContactsOnboardingDismissed,
@@ -796,6 +693,8 @@ export const useAppShellComposition = ({
       sendCashuTokenToContact,
     ],
   );
+
+  const getNpubMessageContactInfo = useNpubMessageContactInfo();
 
   const formatContactName = React.useMemo(
     () => createContactNameFormatter(Array.from(displayContactById.values())),
@@ -912,7 +811,7 @@ export const useAppShellComposition = ({
       });
     };
 
-  const contactPayBackToChatId = contactPayBackToChatRef.current;
+  const contactPayBackToChatId = useNavIntent("contactPayBackToChat");
   const topbar = React.useMemo(
     () =>
       buildTopbar({
@@ -1088,215 +987,34 @@ export const useAppShellComposition = ({
       bankPaymentOfferRecipientCount,
       bankPaymentOfferStaggerDelaySec,
       canRestoreTokens: (seedMnemonic ?? "").trim().length > 0,
-      canSendCashuTokenToContact: contacts.length > 0,
       canWriteNfc,
-      contacts,
-      effectiveMyLightningAddress,
-      knownLnAddressPayContact,
-      knownLnAddressPayContactPictureUrl,
-      lnAddressPayAmount,
-      lnAddressPayNote,
-      nostrPictureByNpub,
       onRequestBankPaymentOffer: requestBankPaymentOffer,
       onSubmitManualPayText,
       openWalletScan,
       pasteScanValue,
       payLightningAddressWithCashu,
-      profileStatusIsSaving,
-      proxyPaymentPayerContacts,
       reclaimHandedOutTokens,
       restoreAndReclaimAllTokens,
       restoreMissingTokens,
       saveCashuFromText,
-      selectedProfileStatusCurrencies,
-      setLnAddressPayAmount,
-      setLnAddressPayNote,
       shareCashuTokenText,
-      t,
-      tokenMessages: nostrMessagesLocal,
-      toggleProfileStatusCurrency,
       writeCashuTokenToNfc,
     },
     buildMoneyRouteProps,
   );
 
-  const restoreEditingContact = React.useCallback(() => {
-    if (!editingId) return;
-    restoreArchivedContact(editingId);
-  }, [editingId, restoreArchivedContact]);
-
-  const restoreCurrentContact = React.useCallback(() => {
-    if (route.kind !== "contact") return;
-    restoreArchivedContact(route.id);
-  }, [restoreArchivedContact, route]);
-
-  const peopleSelectedContact = React.useMemo(() => {
-    const routeContactId =
-      route.kind === "contact" ||
-      route.kind === "contactEdit" ||
-      route.kind === "contactPay"
-        ? route.id
-        : null;
-    if (!selectedContact || !routeContactId) return null;
-
-    return {
-      archivedAtSec:
-        typeof selectedContact.archivedAtSec === "number" ||
-        typeof selectedContact.archivedAtSec === "string"
-          ? selectedContact.archivedAtSec
-          : null,
-      groupName:
-        typeof selectedContact.groupName === "string"
-          ? selectedContact.groupName
-          : null,
-      groupNamesJson:
-        typeof selectedContact.groupNamesJson === "string"
-          ? selectedContact.groupNamesJson
-          : null,
-      id: routeContactId,
-      lnAddress:
-        typeof selectedContact.lnAddress === "string"
-          ? selectedContact.lnAddress
-          : null,
-      name:
-        typeof selectedContact.name === "string" ? selectedContact.name : null,
-      npub:
-        typeof selectedContact.npub === "string" ? selectedContact.npub : null,
-    };
-  }, [route, selectedContact]);
-
-  const chatContactsGroupAssignment =
-    React.useMemo<MessageContactsGroupAssignment | null>(
-      () =>
-        pendingContactsGroupAssignment
-          ? {
-              messageId: pendingContactsGroupAssignment.messageId,
-              contactCount:
-                pendingContactsGroupAssignment.savedContactIds.length,
-              groupNames,
-              onAssign: assignPendingContactsToGroup,
-              onDismiss: closeContactsGroupAssignment,
-            }
-          : null,
-      [
-        assignPendingContactsToGroup,
-        closeContactsGroupAssignment,
-        groupNames,
-        pendingContactsGroupAssignment,
-      ],
-    );
-
   const peopleRouteProps = useMemoizedRouteBuilder(
     {
-      cashuBalance,
-      cashuBalanceAfterMelt,
-      cashuIsBusy,
-      chatSelectedContact: selectedChatContact,
-      addChatAttachments,
-      chatAttachments,
-      chatDraft,
-      chatMessageElByIdRef,
-      chatMessages: chatMessagesWithBankPaymentOffers,
-      bankPaymentOfferMessages,
-      chatMessagesRef,
-      chatOwnPubkeyHex,
-      chatSendIsBusy,
       canWriteNfc,
-      contactEditsSavable,
-      contactPaymentIntent,
-      contactPayMethod,
-      addNewContactFromSearchResult,
-      contactSuggestions,
-      contacts,
-      copyText,
-      currentNpub,
-      derivedProfile,
-      displayUnit,
-      editingId,
-      editContext,
-      effectiveMyLightningAddress,
-      effectiveProfileName,
-      effectiveProfilePicture,
-      feedbackContactNpub: FEEDBACK_CONTACT_NPUB,
-      form,
-      getCashuTokenMessageInfo,
       getMintIconUrl,
-      getNpubMessageContactInfo,
-      groupNames,
-      handleSaveContact,
-      isProfileEditing,
-      isSavingContact,
-      lang,
-      mentionContacts,
-      makeNip98AuthHeader,
-      nostrPictureByNpub,
-      onCancelEdit,
-      onCancelReply,
-      onAddUnknownContact: addUnknownContactFromChat,
-      onAddNpubContacts: addNpubMessageContacts,
-      contactsGroupAssignment: chatContactsGroupAssignment,
-      onBlockUnknownContact: blockUnknownContactFromChat,
-      onCopy: onCopyChatMessage,
-      onDeclinePaymentRequest: onDeclineChatPaymentRequest,
-      onEdit: onEditChatMessage,
-      onOpenNpubContact: openNpubMessageContact,
+      markMintIconFailed,
       onPayPaymentRequest: onPayChatPaymentRequest,
       onRespondBankPaymentOffer: respondToBankPaymentOfferWithGroupState,
       onSettleBankPaymentOffer: settleBankPaymentOffer,
-      shuffleProfileAvatar,
-      onPickProfilePhoto,
-      onProfilePhotoError,
-      onProfilePhotoSelected,
-      onReact: onReactToChatMessage,
-      onReply: onReplyToChatMessage,
-      openContactPay,
-      searchNewContact,
-      payAmount,
       payLightningInvoiceWithCashu,
       paySelectedContact,
       requestSelectedContact,
-      payWithCashuEnabled,
-      ownedLightningAddresses: ownedProfileLightningAddresses,
-      route,
-      selectedContactStatusText: (() => {
-        const npub = normalizeNpubIdentifier(peopleSelectedContact?.npub ?? "");
-        return npub ? (nostrStatusByNpub[npub] ?? null) : null;
-      })(),
-      reactionsByMessageId,
-      profileCustomPictureUrl,
-      profileEditLnAddress,
-      profileEditName,
-      profileEditPicture,
-      profileEditStatus,
-      profileEditsSavable,
-      profileIsSaving,
-      unregisteredOwnLightningAddress,
-      profileStatus: myProfileStatus,
-      profilePhotoInputRef,
-      profileSelectedPictureKind,
-      blockArchivedContact,
-      restoreArchivedContact: restoreEditingContact,
-      restoreSelectedContact: restoreCurrentContact,
-      archiveCurrentContact,
-      resetEditedContactFieldFromNostr,
-      replyContext,
-      saveClaimedLightningAddress,
-      saveProfileEdits,
-      selectedContact: peopleSelectedContact,
-      selectedContactPublicProfile,
-      sendChatImage,
-      sendChatMessage: sendChatOrEditMessage,
-      removeChatAttachment,
-      setChatDraft,
-      setContactPayMethod,
-      setForm,
-      markMintIconFailed,
-      setPayAmount,
-      setProfileEditLnAddress,
-      setProfileEditName,
-      setProfileEditStatus,
       shareText,
-      t,
       writeCurrentNpubToNfc,
     },
     buildPeopleRouteProps,
@@ -1437,7 +1155,6 @@ export const useAppShellComposition = ({
       cashuBalance,
       cashuBalanceAfterMelt,
       cashuIsBusy,
-      canWriteNfc,
       chatTopbarContact,
       contactsGuide,
       contactsGuideActiveStep,
@@ -1447,16 +1164,11 @@ export const useAppShellComposition = ({
       decimalAmountInputEnabled,
       sendReadReceiptsEnabled: seenReceiptsEnabledAtSec !== null,
       displayCurrency,
-      derivedProfile,
-      displayUnit,
-      effectiveMyLightningAddress,
       effectiveProfileName,
       effectiveProfilePicture,
       evoluAppOwnerId: appOwnerId ? appOwnerId : null,
       fiatRates,
       formatDisplayedAmountParts,
-      formatDisplayedAmountText,
-      isProfileEditing,
       lang,
       nfcWritePromptKind,
       nostrPictureByNpub,
@@ -1471,18 +1183,6 @@ export const useAppShellComposition = ({
       pendingLightningInvoiceConfirmation,
       pendingCashuPaymentRequestConfirmation,
       postPaySaveContact,
-      profileCustomPictureUrl,
-      profileEditInitialRef,
-      profileEditLnAddress,
-      profileEditName,
-      profileEditPicture,
-      profileEditStatus,
-      profileEditsSavable,
-      profileIsSaving,
-      profileStatus: myProfileStatus,
-      profileStatusCurrencies,
-      profilePhotoInputRef,
-      profileSelectedPictureKind,
       profileShareOverlayIsOpen,
       route,
       scanAllowsManualContact,
@@ -1509,7 +1209,6 @@ export const useAppShellComposition = ({
       cashuBalance,
       cashuBalanceAfterMelt,
       cashuIsBusy,
-      canWriteNfc,
       chatTopbarContact,
       contactsGuide,
       contactsGuideActiveStep,
@@ -1518,21 +1217,15 @@ export const useAppShellComposition = ({
       currentNsec,
       decimalAmountInputEnabled,
       seenReceiptsEnabledAtSec,
-      derivedProfile,
       displayCurrency,
-      displayUnit,
-      effectiveMyLightningAddress,
       effectiveProfileName,
       effectiveProfilePicture,
       fiatRates,
       formatDisplayedAmountParts,
-      formatDisplayedAmountText,
-      isProfileEditing,
       lang,
       lnurlAuthIsBusy,
       lnurlAuthIsDone,
       lnurlWithdrawIsBusy,
-      myProfileStatus,
       siteLoginIsBusy,
       siteLoginIsDone,
       nfcWritePromptKind,
@@ -1548,17 +1241,6 @@ export const useAppShellComposition = ({
       pendingSiteLoginConfirmation,
       pendingPaymentMintMeltConfirmation,
       postPaySaveContact,
-      profileCustomPictureUrl,
-      profileEditInitialRef,
-      profileEditLnAddress,
-      profileEditName,
-      profileEditPicture,
-      profileEditStatus,
-      profileEditsSavable,
-      profileIsSaving,
-      profilePhotoInputRef,
-      profileSelectedPictureKind,
-      profileStatusCurrencies,
       route,
       scanAllowsManualContact,
       scanDiagnostics,
@@ -1598,11 +1280,7 @@ export const useAppShellComposition = ({
       copyShareOptionsText,
       copyText,
       cycleScanCamera,
-      shuffleProfileAvatar,
-      onPickProfilePhoto,
       onPickScanImage,
-      onProfilePhotoError,
-      onProfilePhotoSelected,
       openFeedbackContact,
       openIssueTokenFromScan,
       openManualContactFromScan,
@@ -1610,15 +1288,10 @@ export const useAppShellComposition = ({
       openProfileQr,
       openReceiveScan,
       pasteScanValue,
-      saveProfileEdits,
       setContactNewPrefill,
-      setIsProfileEditing,
       setLang,
       setLightningInvoiceAutoPayLimit,
       setPostPaySaveContact,
-      setProfileEditLnAddress,
-      setProfileEditName,
-      setProfileEditStatus,
       setDisplayCurrency: setDisplayCurrencyIfAllowed,
       stopContactsGuide,
       shareOptionsViaEmail,
@@ -1626,10 +1299,8 @@ export const useAppShellComposition = ({
       shareOptionsViaWhatsApp,
       toggleAllowedDisplayCurrency,
       toggleDecimalAmountInput,
-      toggleProfileEditing,
       toggleSendReadReceipts,
       toggleShowProfileQrOnTilt,
-      writeCurrentNpubToNfc,
     }),
     [
       cancelPendingNfcWrite,
@@ -1652,11 +1323,7 @@ export const useAppShellComposition = ({
       copyShareOptionsText,
       copyText,
       cycleScanCamera,
-      shuffleProfileAvatar,
-      onPickProfilePhoto,
       onPickScanImage,
-      onProfilePhotoError,
-      onProfilePhotoSelected,
       openFeedbackContact,
       openIssueTokenFromScan,
       openManualContactFromScan,
@@ -1664,26 +1331,19 @@ export const useAppShellComposition = ({
       openProfileQr,
       openReceiveScan,
       pasteScanValue,
-      saveProfileEdits,
       setContactNewPrefill,
       setDisplayCurrencyIfAllowed,
-      setIsProfileEditing,
       setLang,
       setLightningInvoiceAutoPayLimit,
       setPostPaySaveContact,
-      setProfileEditLnAddress,
-      setProfileEditName,
-      setProfileEditStatus,
       shareOptionsViaEmail,
       shareOptionsViaSms,
       shareOptionsViaWhatsApp,
       stopContactsGuide,
       toggleAllowedDisplayCurrency,
       toggleDecimalAmountInput,
-      toggleProfileEditing,
       toggleSendReadReceipts,
       toggleShowProfileQrOnTilt,
-      writeCurrentNpubToNfc,
     ],
   );
 

@@ -18,22 +18,9 @@ const { appShellMock } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellActions: () => ({
-    cycleDisplayCurrency: appShellMock.cycleDisplayCurrency,
-  }),
-  useAppShellCore: () => ({
-    allowedDisplayCurrencies: appShellMock.allowedDisplayCurrencies,
-    formatDisplayedAmountText: (amountSat: number) => `${amountSat} sat`,
-    formatDisplayedAmountParts: (amountSat: number) => ({
-      approxPrefix: "",
-      amountText: String(amountSat),
-      unitLabel: "sat",
-    }),
-    nostrPictureByNpub: {
-      npub1alice: "https://example.com/alice.jpg",
-    },
-    t: (key: string) => appShellMock.t(key),
+vi.mock("../app/hooks/contacts/useProfileCache", () => ({
+  useNostrPictureByNpub: () => ({
+    npub1alice: "https://example.com/alice.jpg",
   }),
 }));
 

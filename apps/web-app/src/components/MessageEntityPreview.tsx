@@ -1,6 +1,6 @@
 import { Icon, Row, Text } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useDisplayAmounts } from "../app/hooks/shell";
 import type { CashuTokenMessageInfo } from "../app/lib/tokenMessageInfo";
 import { isStandaloneCashuTokenMessage } from "../app/lib/tokenText";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
@@ -51,7 +51,7 @@ export const MessageEntityPreview: React.FC<MessageEntityPreviewProps> = ({
   getNpubMessageContactInfo,
   onOpenNpubContact,
 }) => {
-  const { formatDisplayedAmountText } = useAppShellCore();
+  const { formatDisplayedAmountText } = useDisplayAmounts();
   const standaloneTokenInfo = isStandaloneCashuTokenMessage(content)
     ? getCashuTokenMessageInfo(content)
     : null;

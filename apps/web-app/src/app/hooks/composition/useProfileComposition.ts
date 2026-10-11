@@ -1,129 +1,54 @@
 import type { ProfileMetadata } from "@linky-fit/linkstr";
 import { useAtomSet, useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
-import {
-  deriveDefaultLightningAddress,
-  deriveDefaultProfile,
-} from "../../../derivedProfile";
-import type { Lang } from "../../../i18n";
-import { navigateTo, type useRouting } from "../../../hooks/useRouting";
+import type { useRouting } from "../../../hooks/useRouting";
 import { getBestNostrName } from "../../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import { useNpubNip05Cleanup } from "../profile/useNpubNip05Cleanup";
-import { useProfileEditor } from "../profile/useProfileEditor";
-import { useProfileStatusEditor } from "../profile/useProfileStatusEditor";
-import { myProfileMetadataAtom } from "../../state/contacts/profiles";
-import type { Translate } from "../../../i18n";
+import {
+  useProfileEditing,
+  useUpdateMyProfile,
+} from "../profile/useProfileEditor";
+import {
+  myProfileMetadataAtom,
+  ownedLightningAddressesAtom,
+} from "../../state/contacts/profiles";
 
 interface UseProfileCompositionParams {
   currentNpub: string | null;
-  currentNsec: string | null;
-  lang: Lang;
   /** Watch-fed per-npub maps from the messaging composition. */
   nostrMetadataByNpub: Record<string, ProfileMetadata | null>;
   nostrPictureByNpub: Record<string, string | null>;
   nostrStatusByNpub: Record<string, string | null>;
   nostrBootstrapReady: boolean;
   route: ReturnType<typeof useRouting>;
-  setStatus: React.Dispatch<React.SetStateAction<string | null>>;
-  t: Translate;
 }
 
+/**
+ * Keeps the own profile atoms current from the profile watch and opens the
+ * edit form on the profile-edit route; screens read the atoms themselves.
+ */
 export const useProfileComposition = ({
   currentNpub,
-  currentNsec,
-  lang,
   nostrMetadataByNpub,
   nostrPictureByNpub,
   nostrStatusByNpub,
   nostrBootstrapReady,
   route,
-  setStatus,
-  t,
 }: UseProfileCompositionParams) => {
-  const [myProfileName, setMyProfileName] = React.useState<string | null>(null);
-  const [myProfilePicture, setMyProfilePicture] = React.useState<string | null>(
-    null,
-  );
-  const [myProfileLnAddress, setMyProfileLnAddress] = React.useState<
-    string | null
-  >(null);
-  const [ownedProfileLightningAddresses, setOwnedProfileLightningAddresses] =
-    React.useState<string[]>([]);
-  const [
-    ownedProfileLightningAddressesLoading,
-    setOwnedProfileLightningAddressesLoading,
-  ] = React.useState(true);
-  const [myProfileStatus, setMyProfileStatus] = React.useState<string | null>(
-    null,
-  );
-  const myProfileMetadata = useAtomValue(myProfileMetadataAtom);
+  const updateMyProfile = useUpdateMyProfile();
   const setMyProfileMetadata = useAtomSet(myProfileMetadataAtom);
+  const setOwned = useAtomSet(ownedLightningAddressesAtom);
+  const ownedProfileLightningAddresses = useAtomValue(
+    ownedLightningAddressesAtom,
+    (owned) => owned.addresses,
+  );
+  const { isProfileEditing, setIsProfileEditing, toggleProfileEditing } =
+    useProfileEditing();
 
   const npubCashInfoInFlightRef = React.useRef(false);
   const npubCashInfoLoadedForNpubRef = React.useRef<string | null>(null);
   const npubCashInfoLoadedAtMsRef = React.useRef<number>(0);
-
-  const defaultLightningAddress = React.useMemo(() => {
-    if (!currentNpub) return null;
-    return deriveDefaultLightningAddress(currentNpub);
-  }, [currentNpub]);
-
-  const derivedProfile = React.useMemo(() => {
-    if (!currentNpub) return null;
-    return deriveDefaultProfile(currentNpub, lang);
-  }, [currentNpub, lang]);
-
-  const effectiveProfileName = myProfileName ?? derivedProfile?.name ?? null;
-  const effectiveProfilePicture =
-    myProfilePicture ?? derivedProfile?.pictureUrl ?? null;
-
-  const effectiveMyLightningAddress =
-    myProfileLnAddress ?? defaultLightningAddress;
-
-  const {
-    shuffleProfileAvatar,
-    isProfileEditing,
-    onPickProfilePhoto,
-    onProfilePhotoError,
-    onProfilePhotoSelected,
-    profileCustomPictureUrl,
-    profileEditInitialRef,
-    profileEditLnAddress,
-    profileEditName,
-    profileEditPicture,
-    profileEditStatus,
-    profileEditsSavable,
-    profileIsSaving,
-    profilePhotoInputRef,
-    profileSelectedPictureKind,
-    saveClaimedLightningAddress,
-    saveProfileEdits,
-    setIsProfileEditing,
-    setProfileEditLnAddress,
-    setProfileEditName,
-    setProfileEditStatus,
-    toggleProfileEditing,
-    unregisteredOwnLightningAddress,
-  } = useProfileEditor({
-    currentNpub,
-    currentNsec,
-    defaultLightningAddress,
-    effectiveMyLightningAddress,
-    effectiveProfileName,
-    effectiveProfilePicture,
-    myProfileMetadata,
-    myProfileStatus,
-    ownedLightningAddresses: ownedProfileLightningAddresses,
-    ownedLightningAddressesLoading: ownedProfileLightningAddressesLoading,
-    setMyProfileLnAddress,
-    setMyProfileMetadata,
-    setMyProfileName,
-    setMyProfilePicture,
-    setMyProfileStatus,
-    setStatus,
-    t,
-  });
 
   // The own pubkey is part of the profile watch; mirror its map entries into
   // the my-profile state the editor also writes optimistically.
@@ -147,46 +72,29 @@ export const useProfileComposition = ({
     if (!watchedMetadata) return;
     setMyProfileMetadata(watchedMetadata);
     const bestName = getBestNostrName(watchedMetadata);
-    if (bestName) setMyProfileName(bestName);
     const ln =
       (watchedMetadata.lud16 ?? "").trim() ||
       (watchedMetadata.lud06 ?? "").trim();
-    setMyProfileLnAddress(ln || null);
-  }, [
-    setMyProfileLnAddress,
-    setMyProfileMetadata,
-    setMyProfileName,
-    watchedMetadata,
-  ]);
+    updateMyProfile({
+      ...(bestName ? { name: bestName } : {}),
+      lnAddress: ln || null,
+    });
+  }, [setMyProfileMetadata, updateMyProfile, watchedMetadata]);
 
   React.useEffect(() => {
     if (watchedPicture === undefined) return;
-    setMyProfilePicture(watchedPicture);
-  }, [setMyProfilePicture, watchedPicture]);
+    updateMyProfile({ picture: watchedPicture });
+  }, [updateMyProfile, watchedPicture]);
 
   React.useEffect(() => {
     if (watchedStatus === undefined) return;
-    setMyProfileStatus(watchedStatus);
-  }, [setMyProfileStatus, watchedStatus]);
+    updateMyProfile({ status: watchedStatus });
+  }, [updateMyProfile, watchedStatus]);
 
   useNpubNip05Cleanup({
     currentNpub,
     enabled: nostrBootstrapReady,
     setMyProfileMetadata,
-  });
-
-  const {
-    profileStatusCurrencies,
-    profileStatusIsSaving,
-    selectedProfileStatusCurrencies,
-    toggleProfileStatusCurrency,
-  } = useProfileStatusEditor({
-    currentNpub,
-    currentNsec,
-    myProfileStatus,
-    setMyProfileStatus,
-    setStatus,
-    t,
   });
 
   React.useEffect(() => {
@@ -199,51 +107,23 @@ export const useProfileComposition = ({
     }
   }, [isProfileEditing, route.kind, toggleProfileEditing]);
 
-  const openProfileQr = React.useCallback(() => {
-    navigateTo({ route: "profile" });
-  }, []);
+  const setOwnedProfileLightningAddresses = React.useCallback(
+    (addresses: string[]) => setOwned((owned) => ({ ...owned, addresses })),
+    [setOwned],
+  );
+  const setOwnedProfileLightningAddressesLoading = React.useCallback(
+    (loading: boolean) => setOwned((owned) => ({ ...owned, loading })),
+    [setOwned],
+  );
 
   return {
-    shuffleProfileAvatar,
-    derivedProfile,
-    effectiveMyLightningAddress,
-    effectiveProfileName,
-    effectiveProfilePicture,
     isProfileEditing,
-    myProfileMetadata,
-    myProfileStatus,
     npubCashInfoInFlightRef,
     npubCashInfoLoadedAtMsRef,
     npubCashInfoLoadedForNpubRef,
-    onPickProfilePhoto,
-    onProfilePhotoError,
-    onProfilePhotoSelected,
-    openProfileQr,
     ownedProfileLightningAddresses,
-    ownedProfileLightningAddressesLoading,
-    profileCustomPictureUrl,
-    profileEditInitialRef,
-    profileEditLnAddress,
-    profileEditName,
-    profileEditPicture,
-    profileEditStatus,
-    profileEditsSavable,
-    profileIsSaving,
-    profilePhotoInputRef,
-    profileSelectedPictureKind,
-    profileStatusCurrencies,
-    profileStatusIsSaving,
-    saveClaimedLightningAddress,
-    saveProfileEdits,
-    selectedProfileStatusCurrencies,
     setIsProfileEditing,
     setOwnedProfileLightningAddresses,
     setOwnedProfileLightningAddressesLoading,
-    setProfileEditLnAddress,
-    setProfileEditName,
-    setProfileEditStatus,
-    toggleProfileEditing,
-    toggleProfileStatusCurrency,
-    unregisteredOwnLightningAddress,
   };
 };

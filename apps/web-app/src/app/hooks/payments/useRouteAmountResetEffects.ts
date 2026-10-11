@@ -1,23 +1,18 @@
 import React from "react";
 import type { ContactId } from "../../../evolu";
 import type { Route } from "../../../types/route";
+import { useSetNavIntent } from "../shell/navIntents";
 
 interface UseRouteAmountResetEffectsParams {
-  contactPayBackToChatRef: React.MutableRefObject<ContactId | null>;
   routeKind: Route["kind"];
-  setContactPaymentIntent: React.Dispatch<
-    React.SetStateAction<"pay" | "request">
-  >;
-  setLnAddressPayAmount: React.Dispatch<React.SetStateAction<string>>;
-  setLnAddressPayNote: React.Dispatch<React.SetStateAction<string>>;
-  setLnAddressPayContactId: React.Dispatch<
-    React.SetStateAction<ContactId | null>
-  >;
-  setPayAmount: React.Dispatch<React.SetStateAction<string>>;
+  setContactPaymentIntent: (intent: "pay" | "request") => void;
+  setLnAddressPayAmount: (amount: string) => void;
+  setLnAddressPayNote: (note: string) => void;
+  setLnAddressPayContactId: (contactId: ContactId | null) => void;
+  setPayAmount: (amount: string) => void;
 }
 
 export const useRouteAmountResetEffects = ({
-  contactPayBackToChatRef,
   routeKind,
   setContactPaymentIntent,
   setLnAddressPayAmount,
@@ -25,16 +20,17 @@ export const useRouteAmountResetEffects = ({
   setLnAddressPayContactId,
   setPayAmount,
 }: UseRouteAmountResetEffectsParams): void => {
+  const setContactPayBackToChat = useSetNavIntent("contactPayBackToChat");
   React.useEffect(() => {
     // Reset pay amount when leaving the pay page.
     if (routeKind !== "contactPay") {
-      contactPayBackToChatRef.current = null;
+      setContactPayBackToChat(null);
       setContactPaymentIntent("pay");
       setPayAmount("");
     }
   }, [
-    contactPayBackToChatRef,
     routeKind,
+    setContactPayBackToChat,
     setContactPaymentIntent,
     setPayAmount,
   ]);

@@ -14,8 +14,16 @@ import {
   Text,
   TextField,
 } from "@linky-fit/ui";
+import { useAtomValue } from "@linky-fit/linkstr-react";
 import type { FC } from "react";
 import React from "react";
+import {
+  useContactEditor,
+  useContactEditorParams,
+} from "../app/hooks/contacts/useContactEditor";
+import { useTranslation } from "../app/hooks/shell";
+import { contactGroupsAtom } from "../app/state/contacts/readModel";
+import type { Route } from "../types/route";
 import { useIdentityScan, useNearbyIdentities } from "../app/hooks/useBeacon";
 import { getContactQueryPrefill } from "../app/lib/contactQueryPrefill";
 
@@ -667,5 +675,24 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
         </>
       )}
     </Stack>
+  );
+};
+
+export const ContactNewRoute: FC<{ route: Route }> = ({ route }) => {
+  const { t } = useTranslation();
+  const { groupNames } = useAtomValue(contactGroupsAtom);
+  const editor = useContactEditor(useContactEditorParams(route));
+  return (
+    <ContactNewPage
+      addNewContactFromSearchResult={editor.addNewContactFromSearchResult}
+      contactSuggestions={editor.contactSuggestions}
+      form={editor.form}
+      groupNames={groupNames}
+      handleSaveContact={editor.handleSaveContact}
+      isSavingContact={editor.isSavingContact}
+      searchNewContact={editor.searchNewContact}
+      setForm={editor.setForm}
+      t={t}
+    />
   );
 };

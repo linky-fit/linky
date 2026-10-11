@@ -8,6 +8,21 @@ import {
   Text,
 } from "@linky-fit/ui";
 import { useEffect, useState, type FC } from "react";
+import { useAtomValue } from "@linky-fit/linkstr-react";
+import {
+  useOpenContactPay,
+  useRestoreArchivedContact,
+} from "../app/hooks/contacts/useContactActions";
+import {
+  useNostrStatusByNpub,
+  useRoutePeopleContact,
+} from "../app/hooks/contacts/useDisplayContacts";
+import { useNostrPictureByNpub } from "../app/hooks/contacts/useProfileCache";
+import { useCopyText, useTranslation } from "../app/hooks/shell";
+import { useWalletBalance } from "../app/hooks/wallet/useWalletInventory";
+import { payWithCashuEnabledAtom } from "../app/state/wallet/prefs";
+import type { Route } from "../types/route";
+import { FEEDBACK_CONTACT_NPUB } from "../utils/constants";
 
 import type { ContactId } from "../evolu";
 import { navigateTo } from "../hooks/useRouting";
@@ -212,5 +227,35 @@ export const ContactPage: FC<ContactPageProps> = ({
         </Button>
       )}
     </PageCard>
+  );
+};
+
+export const ContactRoute: FC<{ route: Route }> = ({ route }) => {
+  const { t } = useTranslation();
+  const copyText = useCopyText();
+  const selectedContact = useRoutePeopleContact(route);
+  const nostrPictureByNpub = useNostrPictureByNpub();
+  const statusByNpub = useNostrStatusByNpub();
+  const { cashuBalance, cashuIsBusy } = useWalletBalance();
+  const payWithCashuEnabled = useAtomValue(payWithCashuEnabledAtom);
+  const openContactPay = useOpenContactPay();
+  const restoreArchivedContact = useRestoreArchivedContact();
+  const npub = normalizeNpubIdentifier(selectedContact?.npub ?? "");
+  return (
+    <ContactPage
+      cashuBalance={cashuBalance}
+      cashuIsBusy={cashuIsBusy}
+      copyText={copyText}
+      feedbackContactNpub={FEEDBACK_CONTACT_NPUB}
+      nostrPictureByNpub={nostrPictureByNpub}
+      openContactPay={openContactPay}
+      payWithCashuEnabled={payWithCashuEnabled}
+      restoreArchivedContact={() => {
+        if (route.kind === "contact") void restoreArchivedContact(route.id);
+      }}
+      selectedContact={selectedContact}
+      statusText={npub ? (statusByNpub[npub] ?? null) : null}
+      t={t}
+    />
   );
 };

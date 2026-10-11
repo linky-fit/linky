@@ -16,6 +16,12 @@ export const currentNsecAtom = Atom.make(
   (get) => sessionSecrets(get(sessionAtom))?.nsec ?? null,
 );
 
+/** The session identity's public key, hex. */
+export const currentPubkeyAtom = Atom.make((get) => {
+  const nsec = get(currentNsecAtom);
+  return nsec ? (identityFromNsec(nsec)?.pubkey ?? null) : null;
+});
+
 export const currentNpubAtom = Atom.make((get) => {
   const nsec = get(currentNsecAtom)?.trim();
   const identity = nsec ? identityFromNsec(nsec) : null;

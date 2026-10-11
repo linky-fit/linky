@@ -8,7 +8,7 @@ import {
   typography,
 } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useDisplayAmounts } from "../app/hooks/shell";
 import {
   getMessageEditorCaret,
   getMessageEditorEntityRanges,
@@ -175,7 +175,7 @@ export const ChatMessageEditor = React.forwardRef<
   },
   forwardedRef,
 ) {
-  const { formatDisplayedAmountText } = useAppShellCore();
+  const { formatDisplayedAmountText } = useDisplayAmounts();
   const localRef = React.useRef<HTMLDivElement | null>(null);
   const pendingCaretRef = React.useRef<number | null>(null);
   const lastRenderedValueRef = React.useRef<string | null>(null);

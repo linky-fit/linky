@@ -3,17 +3,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { SaveContactPromptModal } from "./SaveContactPromptModal";
 
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellCore: () => ({
-    formatDisplayedAmountParts: (amount: number) => ({
-      amountText: String(amount),
-      approxPrefix: "",
-      unitLabel: "sat",
-    }),
-    t: (key: string) =>
+vi.mock("../app/hooks/shell", async () =>
+  (await import("../testUtils/shellHooks")).shellHooksMock({
+    t: (key) =>
       key === "saveContactPromptBody" ? "{amount} {unit} to {lnAddress}" : key,
   }),
-}));
+);
 
 afterEach(() => {
   document.body.innerHTML = "";

@@ -1,24 +1,44 @@
 import { ProfileMetadata } from "@linky-fit/linkstr";
+import { RegistryContext } from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
+import type { AtomRegistry } from "effect/reactivity";
+import { nip19 } from "nostr-tools";
 import { act, useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  makeTestAppRegistry,
+  signedInSession,
+} from "../../../testUtils/appRegistry";
+import { createSecretKey } from "../../../testUtils/nostrKeys";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
+import {
+  myProfileAtom,
+  myProfileMetadataAtom,
+  ownedLightningAddressesAtom,
+} from "../../state/contacts/profiles";
 import { useProfileEditor } from "./useProfileEditor";
 
 const mocks = vi.hoisted(() => ({
   publishProfile: vi.fn(),
   publishStatus: vi.fn(),
   prepareProfilePicture: vi.fn(),
-  setMyProfilePicture: vi.fn(),
   setStatus: vi.fn(),
 }));
 
-vi.mock("@linky-fit/linkstr-react", () => ({
+vi.mock("@linky-fit/linkstr-react", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@linky-fit/linkstr-react")>()),
   useLinkstrCommands: () => ({
     publishProfile: mocks.publishProfile,
     publishStatus: mocks.publishStatus,
   }),
 }));
+vi.mock("../shell", async () =>
+  (await import("../../../testUtils/shellHooks")).shellHooksMock({
+    setStatus: mocks.setStatus,
+  }),
+);
+
+const nsec = nip19.nsecEncode(createSecretKey(3));
 
 vi.mock("../../lib/profilePicture", () => ({
   prepareProfilePicture: mocks.prepareProfilePicture,
@@ -47,39 +67,39 @@ describe("profile editor", () => {
     );
   });
 
+  let registry: AtomRegistry.AtomRegistry;
+
   const setup = async (
     lightningAddress: string,
     myProfileMetadata = new ProfileMetadata({ lud16: lightningAddress }),
   ) => {
+    registry = makeTestAppRegistry({ session: signedInSession({ nsec }) });
+    registry.set(myProfileMetadataAtom, myProfileMetadata);
+    registry.set(myProfileAtom, {
+      name: "Alice",
+      picture: null,
+      lnAddress: lightningAddress,
+      status: null,
+    });
+    registry.set(ownedLightningAddressesAtom, {
+      addresses: [],
+      loading: false,
+    });
     const editor: { current: ReturnType<typeof useProfileEditor> | null } = {
       current: null,
     };
     const Probe = () => {
-      const value = useProfileEditor({
-        currentNpub: "npub1current",
-        currentNsec: "nsec1custom",
-        defaultLightningAddress: "npub1current@linky.fit",
-        effectiveMyLightningAddress: lightningAddress,
-        effectiveProfileName: "Alice",
-        effectiveProfilePicture: null,
-        myProfileMetadata,
-        myProfileStatus: null,
-        ownedLightningAddresses: [],
-        ownedLightningAddressesLoading: false,
-        setMyProfileLnAddress: vi.fn(),
-        setMyProfileMetadata: vi.fn(),
-        setMyProfileName: vi.fn(),
-        setMyProfilePicture: mocks.setMyProfilePicture,
-        setMyProfileStatus: vi.fn(),
-        setStatus: mocks.setStatus,
-        t: (key) => key,
-      });
+      const value = useProfileEditor();
       useEffect(() => {
         editor.current = value;
       }, [value]);
       return null;
     };
-    ({ unmount } = await renderIntoDocument(<Probe />));
+    ({ unmount } = await renderIntoDocument(
+      <RegistryContext.Provider value={registry}>
+        <Probe />
+      </RegistryContext.Provider>,
+    ));
     await act(async () => editor.current?.toggleProfileEditing());
     return editor;
   };
@@ -112,16 +132,13 @@ describe("profile editor", () => {
     await act(async () => editor.current?.onProfilePhotoSelected(preview));
     await act(async () => editor.current?.saveProfileEdits());
 
-    expect(mocks.prepareProfilePicture).toHaveBeenCalledWith(
-      preview,
-      "nsec1custom",
-    );
+    expect(mocks.prepareProfilePicture).toHaveBeenCalledWith(preview, nsec);
     expect(mocks.publishProfile).toHaveBeenCalledWith(
       expect.objectContaining({
         picture: "https://blossom.primal.net/photo.jpg",
       }),
     );
-    expect(mocks.setMyProfilePicture).toHaveBeenCalledWith(
+    expect(registry.get(myProfileAtom).picture).toBe(
       "https://blossom.primal.net/photo.jpg",
     );
   });
@@ -138,7 +155,7 @@ describe("profile editor", () => {
 
     expect(mocks.publishProfile).not.toHaveBeenCalled();
     expect(mocks.publishStatus).not.toHaveBeenCalled();
-    expect(mocks.setMyProfilePicture).not.toHaveBeenCalled();
+    expect(registry.get(myProfileAtom).picture).toBeNull();
     expect(editor.current?.isProfileEditing).toBe(true);
     expect(mocks.setStatus).toHaveBeenCalledWith(
       expect.stringContaining("upload-failed:503"),

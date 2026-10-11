@@ -1,5 +1,10 @@
 import { ProfileMetadata, StatusDraft } from "@linky-fit/linkstr";
-import { useLinkstrCommands } from "@linky-fit/linkstr-react";
+import {
+  RegistryContext,
+  useAtomSet,
+  useAtomValue,
+  useLinkstrCommands,
+} from "@linky-fit/linkstr-react";
 import { Exit, Struct } from "effect";
 import React from "react";
 import { buildLoreleiAvatarUrl } from "../../../derivedProfile";
@@ -24,31 +29,19 @@ import {
 import { isHttpUrl } from "../../../utils/validation";
 import { applyLightningAddressToProfileMetadata } from "../../lib/profileMetadata";
 import { prepareProfilePicture } from "../../lib/profilePicture";
+import {
+  effectiveProfileAtom,
+  myProfileAtom,
+  myProfileMetadataAtom,
+  ownedLightningAddressesAtom,
+  profileDraftAtom,
+  type MyProfile,
+  type ProfileDraft,
+} from "../../state/contacts/profiles";
+import { currentNpubAtom, currentNsecAtom } from "../../state/session/session";
 import type { FilePickerHandle } from "../../../utils/pickFile";
 import { nowSeconds } from "../../../utils/time";
-import type { Translate } from "../../../i18n";
-
-interface UseProfileEditorParams {
-  currentNpub: string | null;
-  currentNsec: string | null;
-  defaultLightningAddress: string | null;
-  effectiveMyLightningAddress: string | null;
-  effectiveProfileName: string | null;
-  effectiveProfilePicture: string | null;
-  myProfileMetadata: ProfileMetadata | null;
-  myProfileStatus: string | null;
-  ownedLightningAddresses: readonly string[];
-  ownedLightningAddressesLoading: boolean;
-  setMyProfileLnAddress: React.Dispatch<React.SetStateAction<string | null>>;
-  setMyProfileMetadata: React.Dispatch<
-    React.SetStateAction<ProfileMetadata | null>
-  >;
-  setMyProfileName: React.Dispatch<React.SetStateAction<string | null>>;
-  setMyProfilePicture: React.Dispatch<React.SetStateAction<string | null>>;
-  setMyProfileStatus: React.Dispatch<React.SetStateAction<string | null>>;
-  setStatus: React.Dispatch<React.SetStateAction<string | null>>;
-  t: Translate;
-}
+import { useSetStatus, useTranslation } from "../shell";
 
 interface PersistProfileValuesArgs {
   lightningAddress: string;
@@ -58,51 +51,49 @@ interface PersistProfileValuesArgs {
   status: string;
 }
 
-export const useProfileEditor = ({
-  currentNpub,
-  currentNsec,
-  defaultLightningAddress,
-  effectiveMyLightningAddress,
-  effectiveProfileName,
-  effectiveProfilePicture,
-  myProfileMetadata,
-  myProfileStatus,
-  ownedLightningAddresses,
-  ownedLightningAddressesLoading,
-  setMyProfileLnAddress,
-  setMyProfileMetadata,
-  setMyProfileName,
-  setMyProfilePicture,
-  setMyProfileStatus,
-  setStatus,
-  t,
-}: UseProfileEditorParams) => {
-  const [isProfileEditing, setIsProfileEditing] = React.useState(false);
-  const [profileEditName, setProfileEditName] = React.useState("");
-  const [profileEditLnAddress, setProfileEditLnAddress] = React.useState("");
-  const [profileEditStatus, setProfileEditStatus] = React.useState("");
-  const [profileEditPicture, setProfileEditPicture] = React.useState("");
-  const [profileCustomPictureUrl, setProfileCustomPictureUrl] =
-    React.useState("");
-  const [profileSelectedPictureKind, setProfileSelectedPictureKind] =
-    React.useState<"custom" | "generated">("generated");
-  const [profileIsSaving, setProfileIsSaving] = React.useState(false);
-  // State lags a render behind, so a second tap during the first one's
-  // publish is turned away by the ref.
-  const profileIsSavingRef = React.useRef(false);
+const useUpdateDraft = () => {
+  const setDraft = useAtomSet(profileDraftAtom);
+  return React.useCallback(
+    (patch: Partial<ProfileDraft>) =>
+      setDraft((draft) => ({ ...draft, ...patch })),
+    [setDraft],
+  );
+};
 
-  const profilePhotoInputRef = React.useRef<FilePickerHandle | null>(null);
-  const profileEditInitialRef = React.useRef<{
-    lnAddress: string;
-    name: string;
-    picture: string;
-    status: string;
-  } | null>(null);
+/** Updates the own profile's fields as just published or watched. */
+export const useUpdateMyProfile = () => {
+  const setMyProfile = useAtomSet(myProfileAtom);
+  return React.useCallback(
+    (patch: Partial<MyProfile>) =>
+      setMyProfile((profile) => ({ ...profile, ...patch })),
+    [setMyProfile],
+  );
+};
+
+/** Whether the profile form is open, and opening or closing it. */
+export const useProfileEditing = () => {
+  const isProfileEditing = useAtomValue(
+    profileDraftAtom,
+    (draft) => draft.editing,
+  );
+  const updateDraft = useUpdateDraft();
+  const currentNpub = useAtomValue(currentNpubAtom);
+  const myProfileMetadata = useAtomValue(myProfileMetadataAtom);
+  const myProfileStatus = useAtomValue(myProfileAtom, (my) => my.status);
+  const {
+    effectiveMyLightningAddress,
+    effectiveProfileName,
+    effectiveProfilePicture,
+  } = useAtomValue(effectiveProfileAtom);
+
+  const setIsProfileEditing = React.useCallback(
+    (editing: boolean) => updateDraft({ editing }),
+    [updateDraft],
+  );
 
   const toggleProfileEditing = React.useCallback(() => {
     if (isProfileEditing) {
-      setIsProfileEditing(false);
-      profileEditInitialRef.current = null;
+      updateDraft({ editing: false, initial: null });
       return;
     }
 
@@ -124,21 +115,19 @@ export const useProfileEditor = ({
       metaPic && metaPic !== generatedPicture ? metaPic : "";
     const initialStatus = parseProfileGeneralStatus(myProfileStatus).text ?? "";
 
-    setProfileCustomPictureUrl(customPicture);
-    setProfileSelectedPictureKind(customPicture ? "custom" : "generated");
-    setProfileEditName(initialName);
-    setProfileEditLnAddress(initialLn);
-    setProfileEditStatus(initialStatus);
-    setProfileEditPicture(initialPicture);
-
-    profileEditInitialRef.current = {
+    const initial = {
       name: initialName,
       lnAddress: initialLn,
       picture: initialPicture,
       status: initialStatus,
     };
-
-    setIsProfileEditing(true);
+    updateDraft({
+      ...initial,
+      customPictureUrl: customPicture,
+      editing: true,
+      initial,
+      pictureKind: customPicture ? "custom" : "generated",
+    });
   }, [
     effectiveMyLightningAddress,
     effectiveProfileName,
@@ -147,39 +136,57 @@ export const useProfileEditor = ({
     myProfileMetadata,
     myProfileStatus,
     currentNpub,
+    updateDraft,
   ]);
+
+  return { isProfileEditing, setIsProfileEditing, toggleProfileEditing };
+};
+
+/** The profile edit form: its fields, the photo picker, and publishing the result. */
+export const useProfileEditor = () => {
+  const { t } = useTranslation();
+  const setStatus = useSetStatus();
+  const registry = React.useContext(RegistryContext);
+  const draft = useAtomValue(profileDraftAtom);
+  const updateDraft = useUpdateDraft();
+  const updateMyProfile = useUpdateMyProfile();
+  const setMyProfileMetadata = useAtomSet(myProfileMetadataAtom);
+  const currentNpub = useAtomValue(currentNpubAtom);
+  const currentNsec = useAtomValue(currentNsecAtom);
+  const myProfileMetadata = useAtomValue(myProfileMetadataAtom);
+  const myProfileStatus = useAtomValue(myProfileAtom, (my) => my.status);
+  const {
+    defaultLightningAddress,
+    effectiveMyLightningAddress,
+    effectiveProfileName,
+    effectiveProfilePicture,
+  } = useAtomValue(effectiveProfileAtom);
+  const owned = useAtomValue(ownedLightningAddressesAtom);
+  const { isProfileEditing, setIsProfileEditing, toggleProfileEditing } =
+    useProfileEditing();
+
+  const profilePhotoInputRef = React.useRef<FilePickerHandle | null>(null);
 
   const profileEditsDirty = React.useMemo(() => {
-    if (!isProfileEditing) return false;
-    if (!profileEditInitialRef.current) return false;
+    if (!draft.editing) return false;
+    if (!draft.initial) return false;
 
-    const initial = profileEditInitialRef.current;
-    const name = profileEditName.trim();
-    const ln = profileEditLnAddress.trim();
-    const pic = profileEditPicture.trim();
-    const status = profileEditStatus.trim();
-
+    const initial = draft.initial;
     return (
-      name !== initial.name.trim() ||
-      ln !== initial.lnAddress.trim() ||
-      pic !== initial.picture.trim() ||
-      status !== initial.status.trim()
+      draft.name.trim() !== initial.name.trim() ||
+      draft.lnAddress.trim() !== initial.lnAddress.trim() ||
+      draft.picture.trim() !== initial.picture.trim() ||
+      draft.status.trim() !== initial.status.trim()
     );
-  }, [
-    isProfileEditing,
-    profileEditLnAddress,
-    profileEditName,
-    profileEditPicture,
-    profileEditStatus,
-  ]);
+  }, [draft]);
 
   const profileEditsSavable =
     profileEditsDirty && Boolean(currentNpub && currentNsec);
 
   const ownLightningAddressInputCandidate = React.useMemo(() => {
-    if (ownedLightningAddressesLoading) return null;
-    return getOwnLightningAddressInputCandidate(profileEditLnAddress);
-  }, [ownedLightningAddressesLoading, profileEditLnAddress]);
+    if (owned.loading) return null;
+    return getOwnLightningAddressInputCandidate(draft.lnAddress);
+  }, [owned.loading, draft.lnAddress]);
 
   const ownLightningAddressMatchesCurrentIdentity = React.useCallback(
     (candidate: OwnLightningAddressInputCandidate): boolean => {
@@ -193,7 +200,7 @@ export const useProfileEditor = ({
         return true;
       }
 
-      for (const lightningAddress of ownedLightningAddresses) {
+      for (const lightningAddress of owned.addresses) {
         const normalizedOwned = lightningAddress.trim().toLowerCase();
         if (normalizedOwned && candidate.lightningAddress === normalizedOwned) {
           return true;
@@ -202,7 +209,7 @@ export const useProfileEditor = ({
 
       return false;
     },
-    [defaultLightningAddress, ownedLightningAddresses],
+    [defaultLightningAddress, owned.addresses],
   );
 
   const unregisteredOwnLightningAddress = React.useMemo(() => {
@@ -237,11 +244,11 @@ export const useProfileEditor = ({
       return ownLightningAddressInputCandidate.lightningAddress;
     }
 
-    return profileEditLnAddress;
+    return draft.lnAddress;
   }, [
     ownLightningAddressInputCandidate,
     ownLightningAddressMatchesCurrentIdentity,
-    profileEditLnAddress,
+    draft.lnAddress,
   ]);
 
   const { publishProfile, publishStatus } = useLinkstrCommands();
@@ -254,9 +261,9 @@ export const useProfileEditor = ({
       picture,
       status,
     }: PersistProfileValuesArgs): Promise<boolean> => {
-      if (profileIsSavingRef.current) return false;
-      profileIsSavingRef.current = true;
-      setProfileIsSaving(true);
+      // Read at call time, so a second tap during the first one's publish is turned away.
+      if (registry.get(profileDraftAtom).saving) return false;
+      updateDraft({ saving: true });
       try {
         if (!currentNpub || !currentNsec) {
           setStatus(t("profileMissingNpub"));
@@ -318,21 +325,19 @@ export const useProfileEditor = ({
         saveCachedProfile(currentNpub, nextMetadata, nowSec);
         saveCachedStatus(currentNpub, nextStatus ?? "", nowSec);
         setMyProfileMetadata(nextMetadata);
-        setMyProfileName(trimmedName || null);
-        setMyProfileLnAddress(trimmedLightningAddress || null);
-        setMyProfilePicture(trimmedPicture || null);
-        setMyProfileStatus(nextStatus);
-        setProfileEditName(trimmedName);
-        setProfileEditLnAddress(trimmedLightningAddress);
-        setProfileEditPicture(trimmedPicture);
-        setProfileEditStatus(trimmedStatus);
-
-        profileEditInitialRef.current = {
+        updateMyProfile({
+          name: trimmedName || null,
+          lnAddress: trimmedLightningAddress || null,
+          picture: trimmedPicture || null,
+          status: nextStatus,
+        });
+        const saved = {
           lnAddress: trimmedLightningAddress,
           name: trimmedName,
           picture: trimmedPicture,
           status: trimmedStatus,
         };
+        updateDraft({ ...saved, initial: saved });
 
         if (!trimmedPicture || !isHttpUrl(trimmedPicture)) {
           void deleteCachedProfileAvatar(currentNpub);
@@ -341,8 +346,7 @@ export const useProfileEditor = ({
         }
 
         if (navigateToProfile) {
-          setIsProfileEditing(false);
-          profileEditInitialRef.current = null;
+          updateDraft({ editing: false, initial: null });
           navigateTo({ route: "profile" });
         }
 
@@ -351,8 +355,7 @@ export const useProfileEditor = ({
         setStatus(`${t("errorPrefix")}: ${String(error ?? "unknown")}`);
         return false;
       } finally {
-        profileIsSavingRef.current = false;
-        setProfileIsSaving(false);
+        updateDraft({ saving: false });
       }
     },
     [
@@ -362,13 +365,12 @@ export const useProfileEditor = ({
       myProfileStatus,
       publishProfile,
       publishStatus,
-      setMyProfileLnAddress,
+      registry,
       setMyProfileMetadata,
-      setMyProfileName,
-      setMyProfilePicture,
-      setMyProfileStatus,
       setStatus,
       t,
+      updateDraft,
+      updateMyProfile,
     ],
   );
 
@@ -379,16 +381,16 @@ export const useProfileEditor = ({
 
     await persistProfileValues({
       lightningAddress: profileLightningAddressToPersist,
-      name: profileEditName,
+      name: draft.name,
       navigateToProfile: true,
-      picture: profileEditPicture,
-      status: profileEditStatus,
+      picture: draft.picture,
+      status: draft.status,
     });
   }, [
     profileLightningAddressToPersist,
-    profileEditName,
-    profileEditPicture,
-    profileEditStatus,
+    draft.name,
+    draft.picture,
+    draft.status,
     persistProfileValues,
     unregisteredOwnLightningAddress,
   ]);
@@ -424,20 +426,19 @@ export const useProfileEditor = ({
 
         saveCachedProfile(currentNpub, next.metadata, nowSeconds());
         setMyProfileMetadata(next.metadata);
-        setMyProfileLnAddress(next.lightningAddress || null);
-        setMyProfileName(bestName ?? effectiveProfileName);
-        setMyProfilePicture(picture || effectiveProfilePicture);
+        updateMyProfile({
+          lnAddress: next.lightningAddress || null,
+          name: bestName ?? effectiveProfileName,
+          picture: picture || effectiveProfilePicture,
+        });
 
-        setProfileEditName(bestName ?? effectiveProfileName ?? "");
-        setProfileEditLnAddress(next.lightningAddress);
-        setProfileEditPicture(picture);
-        setProfileEditStatus(statusText);
-        profileEditInitialRef.current = {
+        const saved = {
           lnAddress: next.lightningAddress,
           name: bestName ?? effectiveProfileName ?? "",
           picture,
           status: statusText,
         };
+        updateDraft({ ...saved, initial: saved });
 
         return true;
       } catch (error) {
@@ -453,12 +454,11 @@ export const useProfileEditor = ({
       myProfileMetadata,
       myProfileStatus,
       publishProfile,
-      setMyProfileLnAddress,
       setMyProfileMetadata,
-      setMyProfileName,
-      setMyProfilePicture,
       setStatus,
       t,
+      updateDraft,
+      updateMyProfile,
     ],
   );
 
@@ -467,15 +467,22 @@ export const useProfileEditor = ({
   }, []);
 
   const shuffleProfileAvatar = React.useCallback(() => {
-    setProfileSelectedPictureKind("generated");
-    setProfileEditPicture(buildLoreleiAvatarUrl(crypto.randomUUID()));
-  }, []);
+    updateDraft({
+      pictureKind: "generated",
+      picture: buildLoreleiAvatarUrl(crypto.randomUUID()),
+    });
+  }, [updateDraft]);
 
-  const onProfilePhotoSelected = React.useCallback((dataUrl: string) => {
-    setProfileCustomPictureUrl(dataUrl);
-    setProfileSelectedPictureKind("custom");
-    setProfileEditPicture(dataUrl);
-  }, []);
+  const onProfilePhotoSelected = React.useCallback(
+    (dataUrl: string) => {
+      updateDraft({
+        customPictureUrl: dataUrl,
+        pictureKind: "custom",
+        picture: dataUrl,
+      });
+    },
+    [updateDraft],
+  );
 
   const onProfilePhotoError = React.useCallback(
     (error: unknown) => {
@@ -484,23 +491,35 @@ export const useProfileEditor = ({
     [setStatus, t],
   );
 
+  const setProfileEditName = React.useCallback(
+    (name: string) => updateDraft({ name }),
+    [updateDraft],
+  );
+  const setProfileEditLnAddress = React.useCallback(
+    (lnAddress: string) => updateDraft({ lnAddress }),
+    [updateDraft],
+  );
+  const setProfileEditStatus = React.useCallback(
+    (status: string) => updateDraft({ status }),
+    [updateDraft],
+  );
+
   return {
     shuffleProfileAvatar,
     isProfileEditing,
     onPickProfilePhoto,
     onProfilePhotoError,
     onProfilePhotoSelected,
-    profileCustomPictureUrl,
-    profileEditInitialRef,
-    profileEditLnAddress,
-    profileEditName,
-    profileEditPicture,
-    profileEditStatus,
+    profileCustomPictureUrl: draft.customPictureUrl,
+    profileEditLnAddress: draft.lnAddress,
+    profileEditName: draft.name,
+    profileEditPicture: draft.picture,
+    profileEditStatus: draft.status,
     profileEditsSavable,
-    profileIsSaving,
+    profileIsSaving: draft.saving,
     unregisteredOwnLightningAddress,
     profilePhotoInputRef,
-    profileSelectedPictureKind,
+    profileSelectedPictureKind: draft.pictureKind,
     saveClaimedLightningAddress,
     saveProfileEdits,
     setIsProfileEditing,

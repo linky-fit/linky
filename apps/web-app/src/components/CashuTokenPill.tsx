@@ -2,7 +2,7 @@ import type { OperationId, TokenTransfer } from "@linky-fit/linkshu";
 import { Avatar, Pill, Text } from "@linky-fit/ui";
 import type { PillProps } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useDisplayAmounts } from "../app/hooks/shell";
 import type { MintIcon } from "../utils/mint";
 
 interface TransferPillProps {
@@ -21,7 +21,7 @@ export const TransferPill = React.memo(function TransferPill({
   onOpenTransfer,
   transfer,
 }: TransferPillProps) {
-  const { formatDisplayedAmountText } = useAppShellCore();
+  const { formatDisplayedAmountText } = useDisplayAmounts();
   return (
     <CashuTokenPill
       mintIcon={getMintIconUrl(transfer.mint)}

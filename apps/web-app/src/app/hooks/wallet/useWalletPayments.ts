@@ -1,5 +1,5 @@
+import { useAtom, useAtomSet } from "@linky-fit/linkstr-react";
 import React from "react";
-import type { ContactId } from "../../../evolu";
 import type { useRouting } from "../../../hooks/useRouting";
 import type { Translate } from "../../../i18n";
 import type { DisplayAmountParts } from "../../../utils/displayAmounts";
@@ -11,13 +11,18 @@ import { useRouteAmountResetEffects } from "../payments/useRouteAmountResetEffec
 import { usePaymentMintMove, useRememberFirstPayment } from "./paymentUi";
 import { useCashuPaymentRequests } from "./useCashuPaymentRequests";
 import { useContactPayments } from "./useContactPayments";
+import {
+  contactPayMethodAtom,
+  contactPaymentIntentAtom,
+  payAmountAtom,
+} from "../../state/wallet/contactPay";
 import { useLightningPayments } from "./useLightningPayments";
+import { useLnAddressPayDraft } from "./usePaymentDrafts";
 
 type ContactsMessaging = ReturnType<typeof useContactsMessagingComposition>;
 
 interface UseWalletPaymentsParams {
   cashuBalance: number;
-  contactPayBackToChatRef: React.MutableRefObject<ContactId | null>;
   contactsMessaging: Pick<
     ContactsMessaging,
     | "chatMessages"
@@ -28,7 +33,6 @@ interface UseWalletPaymentsParams {
     | "nostrMessagesLocal"
     | "nostrMessagesRecent"
     | "nostrPictureByNpub"
-    | "openScannedContactPendingNpubRef"
     | "pendingPaymentsKey"
     | "respondToBankPaymentOfferWithGroupState"
     | "saveNpubContact"
@@ -46,14 +50,9 @@ interface UseWalletPaymentsParams {
   lightningInvoiceAutoPayLimit: number;
   logPaymentEvent: (event: LoggedPaymentEventParams) => void;
   meltToDefaultMint: () => Promise<void>;
-  payAmount: string;
   payWithCashuEnabled: boolean;
   pushToast: (message: string) => void;
   route: ReturnType<typeof useRouting>;
-  setContactPaymentIntent: React.Dispatch<
-    React.SetStateAction<"pay" | "request">
-  >;
-  setPayAmount: React.Dispatch<React.SetStateAction<string>>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   showPaidOverlay: (title?: string, details?: PaidOverlayDetails) => void;
   showPaymentSending: (details: PaidOverlayDetails) => void;
@@ -68,7 +67,6 @@ interface UseWalletPaymentsParams {
  */
 export const useWalletPayments = ({
   cashuBalance,
-  contactPayBackToChatRef,
   contactsMessaging,
   currentNpub,
   currentNsec,
@@ -78,30 +76,27 @@ export const useWalletPayments = ({
   lightningInvoiceAutoPayLimit,
   logPaymentEvent,
   meltToDefaultMint,
-  payAmount,
   payWithCashuEnabled,
   pushToast,
   route,
-  setContactPaymentIntent,
-  setPayAmount,
   setStatus,
   showPaidOverlay,
   showPaymentSending,
   t,
   walletOpRunning,
 }: UseWalletPaymentsParams) => {
-  const { contacts, selectedContact, setContactsOnboardingHasPaid } =
-    contactsMessaging;
-  const [lnAddressPayAmount, setLnAddressPayAmount] = React.useState("");
-  const [lnAddressPayNote, setLnAddressPayNote] = React.useState("");
-  const [lnAddressPayContactId, setLnAddressPayContactId] =
-    React.useState<ContactId | null>(null);
-  const [contactPayMethod, setContactPayMethod] = React.useState<
-    null | "cashu" | "lightning"
-  >(null);
+  const { selectedContact, setContactsOnboardingHasPaid } = contactsMessaging;
+  const [payAmount, setPayAmount] = useAtom(payAmountAtom);
+  const setContactPaymentIntent = useAtomSet(contactPaymentIntentAtom);
+  const [contactPayMethod, setContactPayMethod] = useAtom(contactPayMethodAtom);
+  const {
+    setLnAddressPay,
+    setLnAddressPayAmount,
+    setLnAddressPayContactId,
+    setLnAddressPayNote,
+  } = useLnAddressPayDraft();
 
   useRouteAmountResetEffects({
-    contactPayBackToChatRef,
     routeKind: route.kind,
     setContactPaymentIntent,
     setLnAddressPayAmount,
@@ -126,14 +121,6 @@ export const useWalletPayments = ({
     t,
     walletOpRunning,
   });
-  const setLnAddressPay = React.useCallback(
-    (pay: { amount: string; note: string; contactId: ContactId }) => {
-      setLnAddressPayAmount(pay.amount);
-      setLnAddressPayNote(pay.note);
-      setLnAddressPayContactId(pay.contactId);
-    },
-    [],
-  );
   const ui = {
     dismissPaymentSending,
     formatDisplayedAmountParts,
@@ -160,16 +147,12 @@ export const useWalletPayments = ({
   });
   const lightningPayments = useLightningPayments({
     ...ui,
-    contacts,
-    lnAddressPayContactId,
-    nostrPictureByNpub: contactsMessaging.nostrPictureByNpub,
     routeKind: route.kind,
   });
   const paymentRequests = useCashuPaymentRequests({
     ...ui,
     ...contactsMessaging,
     autoPayLimit: lightningInvoiceAutoPayLimit,
-    contactPayBackToChatRef,
     currentNpub,
     defaultMintUrl,
     logPaymentEvent,
@@ -184,15 +167,9 @@ export const useWalletPayments = ({
     ...paymentRequests,
     closePaymentMintMeltConfirmation: mintMove.closePaymentMintMeltConfirmation,
     confirmPaymentMintMelt: mintMove.confirmPaymentMintMelt,
-    contactPayMethod,
-    lnAddressPayAmount,
-    lnAddressPayNote,
     paySelectedContact: contactPayments.paySelectedContact,
     pendingPaymentMintMeltConfirmation:
       mintMove.pendingPaymentMintMeltConfirmation,
-    setContactPayMethod,
-    setLnAddressPayAmount,
-    setLnAddressPayNote,
     settleBankPaymentOffer: contactPayments.settleBankPaymentOffer,
   };
 };

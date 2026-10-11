@@ -1,5 +1,19 @@
 import { Button, EmptyState, IconButton, Row } from "@linky-fit/ui";
+import { useAtomValue } from "@linky-fit/linkstr-react";
 import type { FC } from "react";
+import {
+  useArchiveContact,
+  useBlockEditedContact,
+  useRestoreArchivedContact,
+} from "../app/hooks/contacts/useContactActions";
+import {
+  useContactEditor,
+  useContactEditorParams,
+} from "../app/hooks/contacts/useContactEditor";
+import { useRoutePeopleContact } from "../app/hooks/contacts/useDisplayContacts";
+import { useTranslation } from "../app/hooks/shell";
+import { contactGroupsAtom } from "../app/state/contacts/readModel";
+import type { Route } from "../types/route";
 import { BlockContactButton } from "../components/BlockContactButton";
 import type { ContactId } from "../evolu";
 import { ContactFields, type ContactFormData } from "./ContactNewPage";
@@ -141,5 +155,39 @@ export const ContactEditPage: FC<ContactEditPageProps> = ({
         )}
       </Row>
     </PageCard>
+  );
+};
+
+export const ContactEditRoute: FC<{ route: Route }> = ({ route }) => {
+  const { t } = useTranslation();
+  const selectedContact = useRoutePeopleContact(route);
+  const { groupNames } = useAtomValue(contactGroupsAtom);
+  const editor = useContactEditor(useContactEditorParams(route));
+  const archiveContact = useArchiveContact();
+  const restoreArchivedContact = useRestoreArchivedContact();
+  const blockArchivedContact = useBlockEditedContact(route, selectedContact);
+  const { editingId } = editor;
+  return (
+    <ContactEditPage
+      archiveCurrentContact={() => {
+        if (editingId) void archiveContact(editingId);
+      }}
+      blockArchivedContact={blockArchivedContact}
+      contactEditsSavable={editor.contactEditsSavable}
+      editingId={editingId}
+      form={editor.form}
+      groupNames={groupNames}
+      handleSaveContact={editor.handleSaveContact}
+      isSavingContact={editor.isSavingContact}
+      publicLnAddress={editor.selectedContactPublicProfile.lnAddress}
+      publicName={editor.selectedContactPublicProfile.name}
+      resetEditedContactFieldFromNostr={editor.resetEditedContactFieldFromNostr}
+      restoreArchivedContact={() => {
+        if (editingId) void restoreArchivedContact(editingId);
+      }}
+      selectedContact={selectedContact}
+      setForm={editor.setForm}
+      t={t}
+    />
   );
 };
