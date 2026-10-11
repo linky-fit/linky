@@ -39,10 +39,16 @@ type SendBankOffer = (
 const { sendBankOfferMock } = vi.hoisted(() => ({
   sendBankOfferMock: vi.fn<SendBankOffer>(),
 }));
-vi.mock("@linky-fit/linkstr-react", () => ({
+vi.mock("@linky-fit/linkstr-react", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@linky-fit/linkstr-react")>()),
   useLinkstrCommands: () => ({ sendBankOffer: sendBankOfferMock }),
 }));
 
+import { AtomRegistry, RegistryContext } from "@linky-fit/linkstr-react";
+import { mergeBankPaymentOffersIntoChatMessages } from "../lib/bankPaymentOfferRows";
+import { contactsAtom } from "../state/contacts/readModel";
+import { sessionAtom } from "../state/session/session";
+import { signedInSession } from "../../testUtils/appRegistry";
 import { useBankPaymentOffers } from "./useBankPaymentOffers";
 
 const owner = makeIdentity();
@@ -152,19 +158,22 @@ const receipt = (draft: BankOfferDraft): BankOfferReceipt => {
 };
 
 const unmounts: (() => Promise<void>)[] = [];
-const setup = async (
-  overrides: Partial<Parameters<typeof useBankPaymentOffers>[0]> = {},
-) => {
+const setup = async ({
+  contacts: savedContacts = contacts,
+}: { contacts?: readonly ContactRowLike[] } = {}) => {
   let value: ReturnType<typeof useBankPaymentOffers> | undefined;
+  const currentNsec = nip19.nsecEncode(owner.secretKey);
   const params: Parameters<typeof useBankPaymentOffers>[0] = {
-    chatMessages: [],
-    contacts,
-    currentNsec: nip19.nsecEncode(owner.secretKey),
-    route: { kind: "chat", id: "contact-1" },
+    currentNsec,
     setStatus: vi.fn(),
     t: (key) => key,
-    ...overrides,
   };
+  const registry = AtomRegistry.make({
+    initialValues: [
+      [contactsAtom, savedContacts],
+      [sessionAtom, signedInSession({ nsec: currentNsec })],
+    ],
+  });
   const Harness = () => {
     const offers = useBankPaymentOffers(params);
     useEffect(() => {
@@ -172,7 +181,11 @@ const setup = async (
     }, [offers]);
     return null;
   };
-  const mounted = await renderIntoDocument(<Harness />);
+  const mounted = await renderIntoDocument(
+    <RegistryContext.Provider value={registry}>
+      <Harness />
+    </RegistryContext.Provider>,
+  );
   unmounts.push(mounted.unmount);
   return () => {
     if (!value) throw new Error("hook did not render");
@@ -227,7 +240,7 @@ describe("useBankPaymentOffers", () => {
 
   it("does not authorize persisted chat snapshots after reload or act on them", async () => {
     const forged = persistedRow("contact-1", "bank_paid");
-    const current = await setup({ chatMessages: [forged] });
+    const current = await setup();
     expect(current().bankPaymentOfferMessages).toEqual([]);
     expect(current().getBankPaymentOfferForSettlement(forged)).toBeNull();
     await act(async () => {
@@ -288,7 +301,7 @@ describe("useBankPaymentOffers", () => {
 
   it("keeps one row per recipient with the latest status and dedupes persisted chat rows", async () => {
     const persisted = persistedRow("contact-1", "offered");
-    const current = await setup({ chatMessages: [persisted] });
+    const current = await setup();
     await act(async () => {
       current().applyBankPaymentOfferSnapshot(snapshot("offered"));
       current().applyBankPaymentOfferSnapshot(
@@ -312,7 +325,12 @@ describe("useBankPaymentOffers", () => {
       direction: "out",
       id: "bank-payment-offer:contact-1:offer-1",
     });
-    expect(current().chatMessagesWithBankPaymentOffers).toEqual([persisted]);
+    expect(
+      mergeBankPaymentOffersIntoChatMessages(
+        [persisted],
+        rows.filter((row) => row.contactId === "contact-1"),
+      ),
+    ).toEqual([persisted]);
   });
 
   it("moves an unknown peer's offer to the contact once it is saved", async () => {

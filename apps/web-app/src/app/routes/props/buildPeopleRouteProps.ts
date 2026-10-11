@@ -1,393 +1,55 @@
-import type { Translate } from "../../../i18n";
-import type { Route } from "../../../types/route";
-import { NPUB_CASH_SERVER_BASE_URL } from "../../../utils/npubCashServer";
 import type { PeopleRoutesProps } from "../AppRouteContent";
 
+type ChatProps = PeopleRoutesProps["chatProps"];
+type ContactPayProps = PeopleRoutesProps["contactPayProps"];
+type ProfileProps = PeopleRoutesProps["profileProps"];
+
+/**
+ * What the people screens still take from the wallet, mint, scan and offer
+ * compositions; contacts, messages, drafts and profile come from hooks.
+ */
 interface BuildPeopleRoutePropsParams {
-  cashuBalance: PeopleRoutesProps["chatProps"]["cashuBalance"];
-  cashuBalanceAfterMelt: PeopleRoutesProps["chatProps"]["cashuBalanceAfterMelt"];
-  cashuIsBusy: PeopleRoutesProps["chatProps"]["cashuIsBusy"];
-  canWriteNfc: PeopleRoutesProps["profileProps"]["canWriteToNfc"];
-  chatSelectedContact: PeopleRoutesProps["chatProps"]["selectedContact"];
-  addChatAttachments: PeopleRoutesProps["chatProps"]["addChatAttachments"];
-  chatAttachments: PeopleRoutesProps["chatProps"]["chatAttachments"];
-  chatDraft: PeopleRoutesProps["chatProps"]["chatDraft"];
-  chatMessageElByIdRef: PeopleRoutesProps["chatProps"]["chatMessageElByIdRef"];
-  chatMessages: PeopleRoutesProps["chatProps"]["chatMessages"];
-  bankPaymentOfferMessages: PeopleRoutesProps["chatProps"]["bankPaymentOfferMessages"];
-  chatMessagesRef: PeopleRoutesProps["chatProps"]["chatMessagesRef"];
-  chatOwnPubkeyHex: PeopleRoutesProps["chatProps"]["chatOwnPubkeyHex"];
-  chatSendIsBusy: PeopleRoutesProps["chatProps"]["chatSendIsBusy"];
-  contactEditsSavable: PeopleRoutesProps["contactEditProps"]["contactEditsSavable"];
-  contactPaymentIntent: PeopleRoutesProps["contactPayProps"]["contactPaymentIntent"];
-  contactPayMethod: PeopleRoutesProps["contactPayProps"]["contactPayMethod"];
-  addNewContactFromSearchResult: PeopleRoutesProps["contactNewProps"]["addNewContactFromSearchResult"];
-  contactSuggestions: PeopleRoutesProps["contactNewProps"]["contactSuggestions"];
-  contacts: ReturnType<
-    PeopleRoutesProps["bankPaymentOfferDetailProps"]
-  >["contacts"];
-  copyText: PeopleRoutesProps["profileProps"]["copyText"];
-  currentNpub: PeopleRoutesProps["profileProps"]["currentNpub"];
-  shuffleProfileAvatar: PeopleRoutesProps["profileProps"]["shuffleProfileAvatar"];
-  derivedProfile: PeopleRoutesProps["profileProps"]["derivedProfile"];
-  displayUnit: PeopleRoutesProps["contactPayProps"]["displayUnit"];
-  editingId: PeopleRoutesProps["contactEditProps"]["editingId"];
-  editContext: PeopleRoutesProps["chatProps"]["editContext"];
-  effectiveMyLightningAddress: PeopleRoutesProps["profileProps"]["effectiveMyLightningAddress"];
-  effectiveProfileName: PeopleRoutesProps["profileProps"]["effectiveProfileName"];
-  effectiveProfilePicture: PeopleRoutesProps["profileProps"]["effectiveProfilePicture"];
-  feedbackContactNpub: PeopleRoutesProps["chatProps"]["feedbackContactNpub"];
-  form: PeopleRoutesProps["contactEditProps"]["form"];
-  getCashuTokenMessageInfo: PeopleRoutesProps["chatProps"]["getCashuTokenMessageInfo"];
-  getMintIconUrl: PeopleRoutesProps["chatProps"]["getMintIconUrl"];
-  getNpubMessageContactInfo: PeopleRoutesProps["chatProps"]["getNpubMessageContactInfo"];
-  groupNames: PeopleRoutesProps["contactEditProps"]["groupNames"];
-  handleSaveContact: PeopleRoutesProps["contactEditProps"]["handleSaveContact"];
-  isProfileEditing: PeopleRoutesProps["profileProps"]["isProfileEditing"];
-  isSavingContact: PeopleRoutesProps["contactEditProps"]["isSavingContact"];
-  blockArchivedContact: PeopleRoutesProps["contactEditProps"]["blockArchivedContact"];
-  lang: PeopleRoutesProps["chatProps"]["lang"];
-  mentionContacts: PeopleRoutesProps["chatProps"]["mentionContacts"];
-  makeNip98AuthHeader: PeopleRoutesProps["profileProps"]["makeNip98AuthHeader"];
-  nostrPictureByNpub: PeopleRoutesProps["contactProps"]["nostrPictureByNpub"];
-  onBlockUnknownContact: PeopleRoutesProps["chatProps"]["onBlockUnknownContact"];
-  onCancelEdit: PeopleRoutesProps["chatProps"]["onCancelEdit"];
-  onCancelReply: PeopleRoutesProps["chatProps"]["onCancelReply"];
-  onAddUnknownContact: PeopleRoutesProps["chatProps"]["onAddUnknownContact"];
-  onAddNpubContacts: PeopleRoutesProps["chatProps"]["onAddNpubContacts"];
-  contactsGroupAssignment: PeopleRoutesProps["chatProps"]["contactsGroupAssignment"];
-  onCopy: PeopleRoutesProps["chatProps"]["onCopy"];
-  onDeclinePaymentRequest: PeopleRoutesProps["chatProps"]["onDeclinePaymentRequest"];
-  onRespondBankPaymentOffer: ReturnType<
-    PeopleRoutesProps["bankPaymentOfferDetailProps"]
-  >["onRespondBankPaymentOffer"];
-  onSettleBankPaymentOffer: PeopleRoutesProps["chatProps"]["onSettleBankPaymentOffer"];
-  onEdit: PeopleRoutesProps["chatProps"]["onEdit"];
-  onOpenNpubContact: PeopleRoutesProps["chatProps"]["onOpenNpubContact"];
-  onPayPaymentRequest: PeopleRoutesProps["chatProps"]["onPayPaymentRequest"];
-  onPickProfilePhoto: PeopleRoutesProps["profileProps"]["onPickProfilePhoto"];
-  onProfilePhotoError: PeopleRoutesProps["profileProps"]["onProfilePhotoError"];
-  onProfilePhotoSelected: PeopleRoutesProps["profileProps"]["onProfilePhotoSelected"];
-  onReact: PeopleRoutesProps["chatProps"]["onReact"];
-  onReply: PeopleRoutesProps["chatProps"]["onReply"];
-  openContactPay: PeopleRoutesProps["chatProps"]["openContactPay"];
-  ownedLightningAddresses: PeopleRoutesProps["profileProps"]["ownedLightningAddresses"];
-  payAmount: PeopleRoutesProps["contactPayProps"]["payAmount"];
-  payLightningInvoiceWithCashu: PeopleRoutesProps["profileProps"]["payLightningInvoiceWithCashu"];
-  paySelectedContact: PeopleRoutesProps["contactPayProps"]["paySelectedContact"];
-  payWithCashuEnabled: PeopleRoutesProps["chatProps"]["payWithCashuEnabled"];
-  reactionsByMessageId: PeopleRoutesProps["chatProps"]["reactionsByMessageId"];
-  route: Route;
-  selectedContactStatusText: PeopleRoutesProps["contactProps"]["statusText"];
-  profileCustomPictureUrl: PeopleRoutesProps["profileProps"]["profileCustomPictureUrl"];
-  profileEditLnAddress: PeopleRoutesProps["profileProps"]["profileEditLnAddress"];
-  profileEditName: PeopleRoutesProps["profileProps"]["profileEditName"];
-  profileEditPicture: PeopleRoutesProps["profileProps"]["profileEditPicture"];
-  profileEditStatus: PeopleRoutesProps["profileProps"]["profileEditStatus"];
-  profileEditsSavable: PeopleRoutesProps["profileProps"]["profileEditsSavable"];
-  profileIsSaving: PeopleRoutesProps["profileProps"]["profileIsSaving"];
-  unregisteredOwnLightningAddress: PeopleRoutesProps["profileProps"]["unregisteredOwnLightningAddress"];
-  profileStatus: PeopleRoutesProps["profileProps"]["profileStatus"];
-  profilePhotoInputRef: PeopleRoutesProps["profileProps"]["profilePhotoInputRef"];
-  profileSelectedPictureKind: PeopleRoutesProps["profileProps"]["profileSelectedPictureKind"];
-  restoreArchivedContact: PeopleRoutesProps["contactEditProps"]["restoreArchivedContact"];
-  restoreSelectedContact: PeopleRoutesProps["contactProps"]["restoreArchivedContact"];
-  archiveCurrentContact: PeopleRoutesProps["contactEditProps"]["archiveCurrentContact"];
-  requestSelectedContact: PeopleRoutesProps["contactPayProps"]["requestSelectedContact"];
-  resetEditedContactFieldFromNostr: PeopleRoutesProps["contactEditProps"]["resetEditedContactFieldFromNostr"];
-  saveClaimedLightningAddress: PeopleRoutesProps["profileProps"]["saveClaimedLightningAddress"];
-  saveProfileEdits: PeopleRoutesProps["profileProps"]["saveProfileEdits"];
-  searchNewContact: PeopleRoutesProps["contactNewProps"]["searchNewContact"];
-  replyContext: PeopleRoutesProps["chatProps"]["replyContext"];
-  selectedContact: PeopleRoutesProps["contactProps"]["selectedContact"];
-  selectedContactPublicProfile: {
-    lnAddress: string;
-    name: string;
-  };
-  sendChatImage: PeopleRoutesProps["chatProps"]["sendChatImage"];
-  sendChatMessage: PeopleRoutesProps["chatProps"]["sendChatMessage"];
-  removeChatAttachment: PeopleRoutesProps["chatProps"]["removeChatAttachment"];
-  setChatDraft: PeopleRoutesProps["chatProps"]["setChatDraft"];
-  setContactPayMethod: PeopleRoutesProps["contactPayProps"]["setContactPayMethod"];
-  setForm: PeopleRoutesProps["contactEditProps"]["setForm"];
-  markMintIconFailed: PeopleRoutesProps["chatProps"]["markMintIconFailed"];
-  setPayAmount: PeopleRoutesProps["contactPayProps"]["setPayAmount"];
-  setProfileEditLnAddress: PeopleRoutesProps["profileProps"]["setProfileEditLnAddress"];
-  setProfileEditName: PeopleRoutesProps["profileProps"]["setProfileEditName"];
-  setProfileEditStatus: PeopleRoutesProps["profileProps"]["setProfileEditStatus"];
-  shareText: PeopleRoutesProps["profileProps"]["shareText"];
-  t: Translate;
-  writeCurrentNpubToNfc: PeopleRoutesProps["profileProps"]["writeCurrentNpubToNfc"];
+  canWriteNfc: ProfileProps["canWriteToNfc"];
+  getMintIconUrl: ChatProps["getMintIconUrl"];
+  markMintIconFailed: ChatProps["markMintIconFailed"];
+  onPayPaymentRequest: ChatProps["onPayPaymentRequest"];
+  onRespondBankPaymentOffer: PeopleRoutesProps["bankPaymentOfferDetailProps"]["onRespondBankPaymentOffer"];
+  onSettleBankPaymentOffer: ChatProps["onSettleBankPaymentOffer"];
+  payLightningInvoiceWithCashu: ProfileProps["payLightningInvoiceWithCashu"];
+  paySelectedContact: ContactPayProps["paySelectedContact"];
+  requestSelectedContact: ContactPayProps["requestSelectedContact"];
+  shareText: ProfileProps["shareText"];
+  writeCurrentNpubToNfc: ProfileProps["writeCurrentNpubToNfc"];
 }
 
 export const buildPeopleRouteProps = ({
-  cashuBalance,
-  cashuBalanceAfterMelt,
-  cashuIsBusy,
   canWriteNfc,
-  chatSelectedContact,
-  addChatAttachments,
-  chatAttachments,
-  chatDraft,
-  chatMessageElByIdRef,
-  chatMessages,
-  bankPaymentOfferMessages,
-  chatMessagesRef,
-  chatOwnPubkeyHex,
-  chatSendIsBusy,
-  contactEditsSavable,
-  contactPaymentIntent,
-  contactPayMethod,
-  addNewContactFromSearchResult,
-  contactSuggestions,
-  contacts,
-  copyText,
-  currentNpub,
-  shuffleProfileAvatar,
-  derivedProfile,
-  displayUnit,
-  editingId,
-  editContext,
-  effectiveMyLightningAddress,
-  effectiveProfileName,
-  effectiveProfilePicture,
-  feedbackContactNpub,
-  form,
-  getCashuTokenMessageInfo,
   getMintIconUrl,
-  getNpubMessageContactInfo,
-  groupNames,
-  handleSaveContact,
-  isProfileEditing,
-  isSavingContact,
-  blockArchivedContact,
-  lang,
-  mentionContacts,
-  makeNip98AuthHeader,
-  nostrPictureByNpub,
-  onBlockUnknownContact,
-  onCancelEdit,
-  onCancelReply,
-  onAddUnknownContact,
-  onAddNpubContacts,
-  contactsGroupAssignment,
-  onCopy,
-  onDeclinePaymentRequest,
+  markMintIconFailed,
+  onPayPaymentRequest,
   onRespondBankPaymentOffer,
   onSettleBankPaymentOffer,
-  onEdit,
-  onOpenNpubContact,
-  onPayPaymentRequest,
-  onPickProfilePhoto,
-  onProfilePhotoError,
-  onProfilePhotoSelected,
-  onReact,
-  onReply,
-  openContactPay,
-  ownedLightningAddresses,
-  payAmount,
   payLightningInvoiceWithCashu,
   paySelectedContact,
-  payWithCashuEnabled,
-  reactionsByMessageId,
-  route,
-  selectedContactStatusText,
-  profileCustomPictureUrl,
-  profileEditLnAddress,
-  profileEditName,
-  profileEditPicture,
-  profileEditStatus,
-  profileEditsSavable,
-  profileIsSaving,
-  unregisteredOwnLightningAddress,
-  profileStatus,
-  profilePhotoInputRef,
-  profileSelectedPictureKind,
-  restoreArchivedContact,
-  restoreSelectedContact,
-  archiveCurrentContact,
   requestSelectedContact,
-  resetEditedContactFieldFromNostr,
-  saveClaimedLightningAddress,
-  saveProfileEdits,
-  searchNewContact,
-  replyContext,
-  selectedContact,
-  selectedContactPublicProfile,
-  sendChatImage,
-  sendChatMessage,
-  removeChatAttachment,
-  setChatDraft,
-  setContactPayMethod,
-  setForm,
-  markMintIconFailed,
-  setPayAmount,
-  setProfileEditLnAddress,
-  setProfileEditName,
-  setProfileEditStatus,
   shareText,
-  t,
   writeCurrentNpubToNfc,
-}: BuildPeopleRoutePropsParams): PeopleRoutesProps => {
-  return {
-    bankPaymentOfferDetailProps: () => {
-      if (route.kind !== "bankPaymentOffer") {
-        throw new Error("invalid route for bank payment offer");
-      }
-
-      return {
-        bankPaymentOfferMessages,
-        chatId: route.chatId,
-        chatMessages,
-        chatOwnPubkeyHex,
-        contacts,
-        offerId: route.offerId,
-        onCopyText: copyText,
-        onRespondBankPaymentOffer,
-        onSendChatImage: sendChatImage,
-        onSettleBankPaymentOffer,
-      };
-    },
-    chatProps: {
-      selectedContact: chatSelectedContact,
-      chatMessages,
-      bankPaymentOfferMessages,
-      chatMessagesRef,
-      chatOwnPubkeyHex,
-      addChatAttachments,
-      chatAttachments,
-      removeChatAttachment,
-      chatDraft,
-      setChatDraft,
-      chatSendIsBusy,
-      editContext,
-      replyContext,
-      cashuBalance,
-      cashuBalanceAfterMelt,
-      cashuIsBusy,
-      payWithCashuEnabled,
-      feedbackContactNpub,
-      lang,
-      mentionContacts,
-      reactionsByMessageId,
-      markMintIconFailed,
-      chatMessageElByIdRef,
-      getCashuTokenMessageInfo,
-      getMintIconUrl,
-      getNpubMessageContactInfo,
-      onReply,
-      onEdit,
-      onReact,
-      onCopy,
-      onCancelReply,
-      onCancelEdit,
-      onAddUnknownContact,
-      onAddNpubContacts,
-      contactsGroupAssignment,
-      onBlockUnknownContact,
-      sendChatImage,
-      sendChatMessage,
-      openContactPay,
-      onOpenNpubContact,
-      onPayPaymentRequest,
-      onDeclinePaymentRequest,
-      onSettleBankPaymentOffer,
-    },
-    contactEditProps: {
-      selectedContact,
-      form,
-      setForm,
-      groupNames,
-      editingId,
-      contactEditsSavable,
-      publicLnAddress: selectedContactPublicProfile.lnAddress,
-      publicName: selectedContactPublicProfile.name,
-      handleSaveContact,
-      isSavingContact,
-      blockArchivedContact,
-      restoreArchivedContact,
-      archiveCurrentContact,
-      resetEditedContactFieldFromNostr,
-      t,
-    },
-    contactNewProps: {
-      addNewContactFromSearchResult,
-      contactSuggestions,
-      form,
-      setForm,
-      groupNames,
-      handleSaveContact,
-      isSavingContact,
-      searchNewContact,
-      t,
-    },
-    contactPayProps: {
-      selectedContact,
-      nostrPictureByNpub,
-      cashuBalance,
-      cashuBalanceAfterMelt,
-      cashuIsBusy,
-      payWithCashuEnabled,
-      contactPaymentIntent,
-      contactPayMethod,
-      setContactPayMethod,
-      payAmount,
-      setPayAmount,
-      displayUnit,
-      paySelectedContact,
-      requestSelectedContact,
-    },
-    contactProps: {
-      selectedContact,
-      nostrPictureByNpub,
-      cashuBalance,
-      cashuIsBusy,
-      copyText,
-      payWithCashuEnabled,
-      feedbackContactNpub,
-      openContactPay,
-      restoreArchivedContact: restoreSelectedContact,
-      statusText: selectedContactStatusText,
-      t,
-    },
-    profileProps: {
-      cashuBalance,
-      cashuBalanceAfterMelt,
-      cashuIsBusy,
-      canWriteToNfc: canWriteNfc,
-      currentNpub,
-      shuffleProfileAvatar,
-      isProfileEditing,
-      profileCustomPictureUrl,
-      profileEditPicture,
-      effectiveProfilePicture,
-      effectiveProfileName,
-      profileEditName,
-      profileEditLnAddress,
-      profileEditStatus,
-      derivedProfile,
-      profileEditsSavable,
-      profileIsSaving,
-      unregisteredOwnLightningAddress,
-      profileStatus,
-      effectiveMyLightningAddress,
-      makeNip98AuthHeader,
-      profilePhotoInputRef,
-      profileSelectedPictureKind,
-      payLightningInvoiceWithCashu,
-      saveClaimedLightningAddress,
-      serverBaseUrl: NPUB_CASH_SERVER_BASE_URL,
-      setProfileEditName,
-      setProfileEditLnAddress,
-      setProfileEditStatus,
-      onProfilePhotoSelected,
-      onProfilePhotoError,
-      onPickProfilePhoto,
-      ownedLightningAddresses,
-      saveProfileEdits,
-      copyText,
-      shareText,
-      writeCurrentNpubToNfc,
-    },
-  };
-};
+}: BuildPeopleRoutePropsParams): PeopleRoutesProps => ({
+  bankPaymentOfferDetailProps: {
+    onRespondBankPaymentOffer,
+    onSettleBankPaymentOffer,
+  },
+  chatProps: {
+    getMintIconUrl,
+    markMintIconFailed,
+    onPayPaymentRequest,
+    onSettleBankPaymentOffer,
+  },
+  contactPayProps: { paySelectedContact, requestSelectedContact },
+  profileProps: {
+    canWriteToNfc: canWriteNfc,
+    payLightningInvoiceWithCashu,
+    shareText,
+    writeCurrentNpubToNfc,
+  },
+});

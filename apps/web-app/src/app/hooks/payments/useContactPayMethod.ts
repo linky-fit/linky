@@ -6,9 +6,7 @@ interface UseContactPayMethodParams {
   routeKind: Route["kind"];
   selectedContactLnAddress: string;
   selectedContactNpub: string;
-  setContactPayMethod: React.Dispatch<
-    React.SetStateAction<null | "cashu" | "lightning">
-  >;
+  setContactPayMethod: (method: null | "cashu" | "lightning") => void;
 }
 
 export const useContactPayMethod = ({

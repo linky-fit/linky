@@ -41,6 +41,7 @@ import type { SiteLoginResult } from "../useSiteLogin";
 import { takeSiteLoginHashLink } from "../../../siteLogin";
 import { isAnimatedQrFrame } from "../../../utils/animatedQr";
 import { useExperimentalFeatures } from "../useExperimentalFeatures";
+import { useSetNavIntent } from "../shell/navIntents";
 import { useGuideScannerDomain } from "../useGuideScannerDomain";
 import { useScannedTextHandler } from "../useScannedTextHandler";
 import {
@@ -110,7 +111,6 @@ interface UseScanNativeCompositionParams {
   markCashuTokenIssued: CashuWalletCompositionResult["markCashuTokenIssued"];
   nostrBootstrapReady: ContactsMessagingCompositionResult["nostrBootstrapReady"];
   openNewContactPage: ContactsMessagingCompositionResult["openNewContactPage"];
-  openScannedContactPendingNpubRef: ContactsMessagingCompositionResult["openScannedContactPendingNpubRef"];
   payCashuPaymentRequest: CashuWalletCompositionResult["payCashuPaymentRequest"];
   payLightningInvoiceWithCashu: CashuWalletCompositionResult["payLightningInvoiceWithCashu"];
   persistContactsOnboardingDismissed: () => void;
@@ -146,7 +146,6 @@ export const useScanNativeComposition = ({
   markCashuTokenIssued,
   nostrBootstrapReady,
   openNewContactPage,
-  openScannedContactPendingNpubRef,
   payCashuPaymentRequest,
   payLightningInvoiceWithCashu,
   persistContactsOnboardingDismissed,
@@ -600,6 +599,7 @@ export const useScanNativeComposition = ({
   );
 
   const { experimentalFeatures } = useExperimentalFeatures();
+  const openSavedContact = useSetNavIntent("openSavedContactNpub");
   const handleScannedText = useScannedTextHandler<(typeof contacts)[number]>({
     closeScan,
     contacts,
@@ -610,7 +610,7 @@ export const useScanNativeComposition = ({
     lightningInvoiceAutoPayLimit,
     onContactIdentifierScanned:
       route.kind === "contactNew" ? handleContactIdentifierScanned : null,
-    openScannedContactPendingNpubRef,
+    openSavedContact,
     payCashuPaymentRequest,
     payLightningInvoiceWithCashu,
     requestLightningInvoiceConfirmation: setPendingLightningInvoiceConfirmation,

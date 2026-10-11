@@ -15,7 +15,8 @@ import {
 } from "@linky-fit/ui";
 import type { FC } from "react";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useNostrPictureByNpub } from "../app/hooks/contacts/useProfileCache";
+import { useEffectiveProfile } from "../app/hooks/profile/useEffectiveProfile";
 import {
   useBeacon,
   useBeaconSupport,
@@ -62,8 +63,9 @@ function NearbyContactsSection({ t }: { t: Translate }) {
   const ownTrade = enabled && status.running ? trade : "none";
   const nearby = useNearbyContacts();
   const contactRows = useContactRows();
-  const { effectiveProfileName, effectiveProfilePicture, nostrPictureByNpub } =
-    useAppShellCore();
+  const { effectiveProfileName, effectiveProfilePicture } =
+    useEffectiveProfile();
+  const nostrPictureByNpub = useNostrPictureByNpub();
 
   if (nearby.length === 0 && ownTrade === "none") return null;
 

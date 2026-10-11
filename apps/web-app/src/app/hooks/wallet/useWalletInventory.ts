@@ -7,7 +7,11 @@ import {
   MAIN_MINT_URL,
   normalizeMintUrl,
 } from "../../../utils/mint";
-import { isShownDeferredReceive } from "../../lib/cashuTransfers";
+import {
+  isShownDeferredReceive,
+  takenTokenTexts,
+} from "../../lib/cashuTransfers";
+import { getCashuTokenMessageInfo } from "../../lib/tokenMessageInfo";
 import {
   visibleWalletBalances,
   withoutHiddenTestMints,
@@ -96,4 +100,19 @@ export const useWalletBalance = () => {
     cashuTotalBalance,
     mintBalances: balances.perMint,
   };
+};
+
+/** What a token in a message is worth and whether the wallet already took it. */
+export const useCashuTokenMessageInfo = () => {
+  const allowTestMints = useAtomValue(allowTestMintsAtom);
+  const { operations, transfers } = useWalletInventory();
+  const knownTransferTexts = React.useMemo(
+    () => takenTokenTexts(transfers, operations),
+    [operations, transfers],
+  );
+  return React.useCallback(
+    (text: string) =>
+      getCashuTokenMessageInfo(text, knownTransferTexts, allowTestMints),
+    [allowTestMints, knownTransferTexts],
+  );
 };

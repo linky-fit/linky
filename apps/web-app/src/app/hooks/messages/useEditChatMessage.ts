@@ -14,6 +14,7 @@ import type {
   ContactIdentityRowLike,
   UpdateLocalNostrMessage,
 } from "../../types/appTypes";
+import type { EditChatContext } from "../../state/messages/chat";
 import { resolveNostrChatIdentity } from "./contactIdentity";
 import type { Translate } from "../../../i18n";
 
@@ -21,11 +22,7 @@ const isPubkey = Schema.is(Pubkey);
 const isRumorId = Schema.is(RumorId);
 const decodeMessageText = Schema.decodeUnknownResult(MessageText);
 
-export interface EditChatContext {
-  messageId: string;
-  originalContent: string;
-  rumorId: string;
-}
+export type { EditChatContext };
 
 interface UseEditChatMessageParams<
   TRoute extends { kind: string },

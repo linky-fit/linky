@@ -28,17 +28,9 @@ vi.mock("../devtools/inspector", () => ({
   reportInspectorRows: vi.fn(),
 }));
 
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellCore: () => ({
-    formatDisplayedAmountParts: (amountSat: number) => ({
-      amountText: String(amountSat),
-      approxPrefix: "",
-      unitLabel: "sat",
-    }),
-    formatDisplayedAmountText: (amountSat: number) => `${amountSat} sat`,
-    t: (key: string) => key,
-  }),
-}));
+vi.mock("../app/hooks/shell", async () =>
+  (await import("../testUtils/shellHooks")).shellHooksMock(),
+);
 
 const makeMessage = (
   content: string,

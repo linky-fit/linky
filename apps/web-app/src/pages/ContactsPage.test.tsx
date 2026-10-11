@@ -33,12 +33,14 @@ vi.mock("../app/hooks/useLinksync", () => ({
   useContactRows: () => beacon.rows,
 }));
 
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellCore: () => ({
+vi.mock("../app/hooks/profile/useEffectiveProfile", () => ({
+  useEffectiveProfile: () => ({
     effectiveProfileName: "Alex Rivers",
     effectiveProfilePicture: null,
-    nostrPictureByNpub: {},
   }),
+}));
+vi.mock("../app/hooks/contacts/useProfileCache", () => ({
+  useNostrPictureByNpub: () => ({}),
 }));
 
 vi.mock("../hooks/useRouting", () => ({ navigateTo: vi.fn() }));

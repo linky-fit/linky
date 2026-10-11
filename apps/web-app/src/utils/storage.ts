@@ -337,8 +337,10 @@ export const getInitialSeenReceiptsEnabledAtSec = (): number | null => {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : nowSeconds();
 };
 
-export const getInitialPayWithCashuEnabled = (): boolean => {
-  const stored = trimString(safeLocalStorageGet(PAY_WITH_CASHU_STORAGE_KEY));
+export const getInitialPayWithCashuEnabled = (
+  kv: KeyValueStorage = localStorageKv,
+): boolean => {
+  const stored = trimString(kv.getItem(PAY_WITH_CASHU_STORAGE_KEY));
   return !stored || stored === "1";
 };
 

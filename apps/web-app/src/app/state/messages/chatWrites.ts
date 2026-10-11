@@ -59,7 +59,7 @@ export interface StoredMessage {
   readonly written: Promise<WriteOutcome>;
 }
 
-/** The chat's local message writes; the messaging hooks and wallet commands share them. */
+/** Local message writes, shared by the messaging hooks and the wallet commands. */
 export interface ChatWrites {
   /** Stores a message unless the latest messages already hold it. */
   readonly appendLocalNostrMessage: AppendLocalNostrMessage;
@@ -293,7 +293,7 @@ const makeChatWrites = ({
 };
 
 /**
- * The chat writes over the session's conversations, kept for the page: the
+ * The message writes over the session's conversations, kept for the page: the
  * write queue and the latest messages outlive every screen. Signed out it
  * fails before reading the store, like `messagesCommandsAtom`.
  */

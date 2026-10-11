@@ -1,14 +1,25 @@
 import {
+  PAY_WITH_CASHU_STORAGE_KEY,
   RECEIVE_METHOD_STORAGE_KEY,
   WALLET_WARNING_DISMISSED_STORAGE_KEY,
 } from "../../../utils/constants";
-import { getInitialReceiveMethod } from "../../../utils/storage";
+import {
+  getInitialPayWithCashuEnabled,
+  getInitialReceiveMethod,
+} from "../../../utils/storage";
 import { kvSeededAtom } from "../platform";
 
 /** How the topup QR asks to be paid. */
 export const receiveMethodAtom = kvSeededAtom(
   getInitialReceiveMethod,
   (kv, method) => kv.setItem(RECEIVE_METHOD_STORAGE_KEY, method),
+  { persistSeed: true },
+);
+
+/** Contacts with an npub are paid with cashu over messages; off leaves only Lightning. */
+export const payWithCashuEnabledAtom = kvSeededAtom(
+  getInitialPayWithCashuEnabled,
+  (kv, enabled) => kv.setItem(PAY_WITH_CASHU_STORAGE_KEY, enabled ? "1" : "0"),
   { persistSeed: true },
 );
 

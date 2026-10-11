@@ -4,11 +4,9 @@ import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { setMessageEditorCaret } from "../app/lib/messageEditorDom";
 import { ChatMessageEditor } from "./ChatMessageEditor";
 
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellCore: () => ({
-    formatDisplayedAmountText: (amountSat: number) => `${amountSat} sat`,
-  }),
-}));
+vi.mock("../app/hooks/shell", async () =>
+  (await import("../testUtils/shellHooks")).shellHooksMock(),
+);
 
 const FIRST_NPUB =
   "npub180cvv07tqw7jwr9wnh4hp24w3wl74x64l0n6ms4qxp2vj8qz9c8sv96q8j";

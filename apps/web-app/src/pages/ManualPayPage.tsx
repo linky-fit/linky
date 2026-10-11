@@ -1,5 +1,8 @@
 import { Button, ContactRow, Section, Stack, TextField } from "@linky-fit/ui";
 import React, { type FC } from "react";
+import { useContacts } from "../app/hooks/contacts/useDisplayContacts";
+import { useNostrPictureByNpub } from "../app/hooks/contacts/useProfileCache";
+import { useTranslation } from "../app/hooks/shell";
 import type { ContactId } from "../evolu";
 import { navigateTo } from "../hooks/useRouting";
 import type { Translate } from "../i18n";
@@ -167,5 +170,21 @@ export const ManualPayPage: FC<ManualPayPageProps> = ({
         </Section>
       ) : null}
     </Stack>
+  );
+};
+
+export const ManualPayRoute: FC<Pick<ManualPayPageProps, "onSubmitText">> = ({
+  onSubmitText,
+}) => {
+  const { t } = useTranslation();
+  const contacts = useContacts();
+  const nostrPictureByNpub = useNostrPictureByNpub();
+  return (
+    <ManualPayPage
+      contacts={contacts}
+      nostrPictureByNpub={nostrPictureByNpub}
+      onSubmitText={onSubmitText}
+      t={t}
+    />
   );
 };

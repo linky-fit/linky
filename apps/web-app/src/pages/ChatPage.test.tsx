@@ -18,11 +18,9 @@ vi.mock("../app/hooks/useBeacon", () => ({
     (pubkey && nearby.states.get(pubkey)) ?? null,
 }));
 
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellCore: () => ({
-    formatDisplayedAmountText: (amountSat: number) => `${amountSat} sat`,
-  }),
-}));
+vi.mock("../app/hooks/shell", async () =>
+  (await import("../testUtils/shellHooks")).shellHooksMock(),
+);
 
 type Props = ComponentProps<typeof ChatComposer>;
 

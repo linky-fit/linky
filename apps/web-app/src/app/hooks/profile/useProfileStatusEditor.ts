@@ -1,5 +1,9 @@
 import { StatusDraft } from "@linky-fit/linkstr";
-import { useLinkstrCommands } from "@linky-fit/linkstr-react";
+import {
+  useAtom,
+  useAtomValue,
+  useLinkstrCommands,
+} from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 import React from "react";
 import {
@@ -10,16 +14,13 @@ import {
 } from "../../../nostrStatus";
 import { saveCachedStatus } from "../../../profileCache";
 import { nowSeconds } from "../../../utils/time";
-import type { Translate } from "../../../i18n";
-
-interface UseProfileStatusEditorParams {
-  currentNpub: string | null;
-  currentNsec: string | null;
-  myProfileStatus: string | null;
-  setMyProfileStatus: React.Dispatch<React.SetStateAction<string | null>>;
-  setStatus: React.Dispatch<React.SetStateAction<string | null>>;
-  t: Translate;
-}
+import {
+  myProfileAtom,
+  profileStatusSavingAtom,
+} from "../../state/contacts/profiles";
+import { currentNpubAtom, currentNsecAtom } from "../../state/session/session";
+import { useSetStatus, useTranslation } from "../shell";
+import { useUpdateMyProfile } from "./useProfileEditor";
 
 interface UseProfileStatusEditorResult {
   profileStatusCurrencies: readonly ProfileStatusCurrency[];
@@ -30,16 +31,21 @@ interface UseProfileStatusEditorResult {
   ) => Promise<void>;
 }
 
-export const useProfileStatusEditor = ({
-  currentNpub,
-  currentNsec,
-  myProfileStatus,
-  setMyProfileStatus,
-  setStatus,
-  t,
-}: UseProfileStatusEditorParams): UseProfileStatusEditorResult => {
-  const [profileStatusIsSaving, setProfileStatusIsSaving] =
-    React.useState(false);
+/** The currencies the own status offers, and toggling one, which publishes the status. */
+export const useProfileStatusEditor = (): UseProfileStatusEditorResult => {
+  const { t } = useTranslation();
+  const setStatus = useSetStatus();
+  const currentNpub = useAtomValue(currentNpubAtom);
+  const currentNsec = useAtomValue(currentNsecAtom);
+  const myProfileStatus = useAtomValue(myProfileAtom, (my) => my.status);
+  const updateMyProfile = useUpdateMyProfile();
+  const setMyProfileStatus = React.useCallback(
+    (status: string | null) => updateMyProfile({ status }),
+    [updateMyProfile],
+  );
+  const [profileStatusIsSaving, setProfileStatusIsSaving] = useAtom(
+    profileStatusSavingAtom,
+  );
 
   const { publishStatus } = useLinkstrCommands();
 
@@ -90,6 +96,7 @@ export const useProfileStatusEditor = ({
       profileStatusIsSaving,
       publishStatus,
       setMyProfileStatus,
+      setProfileStatusIsSaving,
       setStatus,
       t,
     ],

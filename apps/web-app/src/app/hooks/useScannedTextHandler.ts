@@ -51,7 +51,8 @@ interface UseScannedTextHandlerParams<TContact extends ContactRowLike> {
   contactsRepository: Pick<ContactsRepository, "insert">;
   lightningInvoiceAutoPayLimit: number;
   onContactIdentifierScanned: ((identifier: string) => Promise<void>) | null;
-  openScannedContactPendingNpubRef: React.MutableRefObject<string | null>;
+  /** Opens the contact's page once the just-saved row is read back. */
+  openSavedContact: (npub: string) => void;
   payCashuPaymentRequest: (
     requestInfo: CashuPaymentRequestMessageInfo,
   ) => Promise<void>;
@@ -86,7 +87,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
   contactsRepository,
   lightningInvoiceAutoPayLimit,
   onContactIdentifierScanned,
-  openScannedContactPendingNpubRef,
+  openSavedContact,
   payCashuPaymentRequest,
   payLightningInvoiceWithCashu,
   requestLightningInvoiceConfirmation,
@@ -256,7 +257,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
 
           if (result.ok) {
             setStatus(t("contactSaved"));
-            openScannedContactPendingNpubRef.current = npub;
+            openSavedContact(npub);
           } else setStatus(`${t("errorPrefix")}: ${result.error}`);
 
           closeScan();
@@ -372,7 +373,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
       scanEntryPoint,
       setStatus,
       t,
-      openScannedContactPendingNpubRef,
+      openSavedContact,
       payCashuPaymentRequest,
     ],
   );

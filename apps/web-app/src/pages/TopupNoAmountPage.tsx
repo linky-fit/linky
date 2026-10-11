@@ -1,18 +1,15 @@
 import { Button, CodeBlock, EmptyState, QRCode, Stack } from "@linky-fit/ui";
 import React from "react";
+import { useEffectiveProfile } from "../app/hooks/profile/useEffectiveProfile";
 import { useCopyText, useTranslation } from "../app/hooks/shell";
 
-interface TopupNoAmountPageProps {
-  /** The user's own lightning address, which takes any amount. */
-  lightningAddress: string | null;
-}
-
-export function TopupNoAmountPage({
-  lightningAddress,
-}: TopupNoAmountPageProps): React.ReactElement {
+/** The user's own lightning address, which takes any amount. */
+export function TopupNoAmountPage(): React.ReactElement {
   const copyText = useCopyText();
   const { t } = useTranslation();
-  const target = (lightningAddress ?? "").trim();
+  const target = (
+    useEffectiveProfile().effectiveMyLightningAddress ?? ""
+  ).trim();
 
   return (
     <Stack gap="$lg">

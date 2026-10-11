@@ -18,6 +18,9 @@ import {
   useTranslation,
 } from "../app/hooks/shell";
 import { useWalletInventory } from "../app/hooks/wallet/useWalletInventory";
+import { useAtomValue } from "@linky-fit/linkstr-react";
+import { useContacts } from "../app/hooks/contacts/useDisplayContacts";
+import { localMessagesAtom } from "../app/state/messages/readModel";
 import {
   useInspectCashuProofStates,
   useWalletTokens,
@@ -377,16 +380,12 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
 
 type CashuTokenRouteProps = Pick<
   CashuTokenPageProps,
-  | "canSendToContact"
-  | "canWriteToNfc"
-  | "contacts"
-  | "messages"
-  | "routeId"
-  | "shareTokenText"
-  | "writeToNfc"
+  "canWriteToNfc" | "routeId" | "shareTokenText" | "writeToNfc"
 >;
 
 export const CashuTokenRoute: FC<CashuTokenRouteProps> = (props) => {
+  const contacts = useContacts();
+  const messages = useAtomValue(localMessagesAtom);
   const { proofs, transfers } = useWalletInventory();
   const tokens = useWalletTokens();
   const inspectCashuProofStates = useInspectCashuProofStates();
@@ -396,6 +395,7 @@ export const CashuTokenRoute: FC<CashuTokenRouteProps> = (props) => {
   return (
     <CashuTokenPage
       {...props}
+      canSendToContact={contacts.length > 0}
       cashuIsBusy={tokens.tokenWorkIsBusy}
       cashuProofs={proofs}
       cashuTransfers={transfers}
@@ -403,9 +403,11 @@ export const CashuTokenRoute: FC<CashuTokenRouteProps> = (props) => {
       checkSingleIssuedCashuTokenIsClaimed={
         tokens.checkSingleIssuedCashuTokenIsClaimed
       }
+      contacts={contacts}
       copyText={copyText}
       deleteCashuToken={tokens.deleteCashuToken}
       inspectCashuProofStates={inspectCashuProofStates}
+      messages={messages}
       reclaimCashuTransfer={tokens.reclaimCashuTransfer}
       returnCashuTokenToWallet={tokens.returnCashuTokenToWallet}
       setStatus={setStatus}

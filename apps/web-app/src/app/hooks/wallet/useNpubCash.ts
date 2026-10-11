@@ -22,7 +22,18 @@ import {
   updateNpubCashMint,
   type NpubCashClaimEvents,
 } from "../../state/wallet/npubCash";
+import { currentNsecAtom } from "../../state/session/session";
 import type { LocalMintInfoRow } from "../../types/appTypes";
+
+/** Signs npub.cash calls with the session's nostr key. */
+export const useNpubCashAuthHeader = () => {
+  const currentNsec = useAtomValue(currentNsecAtom);
+  return React.useCallback(
+    (url: string, method: string, payload?: Record<string, string>) =>
+      makeNpubCashAuthHeader(currentNsec, url, method, payload),
+    [currentNsec],
+  );
+};
 
 const INFO_REFRESH_MS = 10 * 60_000;
 const CLAIM_POLL_MS = 30_000;
@@ -51,7 +62,7 @@ interface UseNpubCashParams {
   rememberCashuTokenKnown: (...tokens: readonly string[]) => void;
   routeKind: Route["kind"];
   setDefaultMint: (mint: string) => Promise<WriteOutcome>;
-  setIsProfileEditing: React.Dispatch<React.SetStateAction<boolean>>;
+  setIsProfileEditing: (editing: boolean) => void;
   setOwnedProfileLightningAddresses: (addresses: string[]) => void;
   setOwnedProfileLightningAddressesLoading: (loading: boolean) => void;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
@@ -115,12 +126,6 @@ export const useNpubCash = ({
     AsyncResult.value(useAtomValue(npubCashCommandsAtom)),
   );
   const npubCashMintSyncRef = React.useRef<string | null>(null);
-
-  const makeNip98AuthHeader = React.useCallback(
-    (url: string, method: string, payload?: Record<string, string>) =>
-      makeNpubCashAuthHeader(currentNsec, url, method, payload),
-    [currentNsec],
-  );
 
   const applyDefaultMintSelection = React.useCallback(
     async (mintUrl: string): Promise<boolean> => {
@@ -317,5 +322,5 @@ export const useNpubCash = ({
     return () => clearInterval(intervalId);
   }, [claimNpubCashOnce, networkEnabled, routeKind]);
 
-  return { applyDefaultMintSelection, makeNip98AuthHeader };
+  return { applyDefaultMintSelection };
 };

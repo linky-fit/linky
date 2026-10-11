@@ -23,6 +23,9 @@ import {
   useWalletInventory,
 } from "../app/hooks/wallet/useWalletInventory";
 import { useWalletTokens } from "../app/hooks/wallet/useWalletTokens";
+import { useAtomValue } from "@linky-fit/linkstr-react";
+import { useContacts } from "../app/hooks/contacts/useDisplayContacts";
+import { localMessagesAtom } from "../app/state/messages/readModel";
 import {
   pendingTokenTransfers,
   tokenChatMessages,
@@ -328,10 +331,12 @@ export const CashuTokensPage = ({
 
 type CashuTokensRouteProps = Pick<
   CashuTokensPageProps,
-  "canRestoreTokens" | "contacts" | "messages" | "restoreMissingTokens"
+  "canRestoreTokens" | "restoreMissingTokens"
 >;
 
 export const CashuTokensRoute: FC<CashuTokensRouteProps> = (props) => {
+  const contacts = useContacts();
+  const messages = useAtomValue(localMessagesAtom);
   const { proofs, transfers } = useWalletInventory();
   const { cashuIsBusy } = useWalletBalance();
   const tokens = useWalletTokens();
@@ -345,6 +350,8 @@ export const CashuTokensRoute: FC<CashuTokensRouteProps> = (props) => {
       checkIssuedCashuTokensAndDeleteClaimed={
         tokens.checkIssuedCashuTokensAndDeleteClaimed
       }
+      contacts={contacts}
+      messages={messages}
       tokensRestoreIsBusy={tokens.tokensRestoreIsBusy}
       tokensRestoreProgress={tokens.tokensRestoreProgress}
     />

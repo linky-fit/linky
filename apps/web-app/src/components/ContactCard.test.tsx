@@ -3,12 +3,11 @@ import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { createContactNameFormatter } from "../utils/contactName";
 import { ContactCard } from "./ContactCard";
 
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellCore: () => ({
+vi.mock("../app/hooks/shell", async () =>
+  (await import("../testUtils/shellHooks")).shellHooksMock({
     formatDisplayedAmountText: String,
-    t: (key: string) => key,
   }),
-}));
+);
 
 afterEach(() => {
   document.body.innerHTML = "";

@@ -2,6 +2,7 @@ import { makeIdentity } from "@linky-fit/linkstr/testing";
 import {
   createId,
   directConversationIdFor,
+  makeContactsRepository,
   makeConversationsRepository,
   makeUnknownSendersRepository,
   NonEmptyString,
@@ -36,7 +37,6 @@ import type { NewLocalNostrMessage } from "../types/appTypes";
 import { chatWritesAtom } from "../state/messages/chatWrites";
 import { applyChatMessageReceived } from "./messages/chatInbox";
 
-vi.mock("./useLinksync", () => ({ useConversationRows: () => [] }));
 vi.mock("@evolu/common", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@evolu/common")>()),
   createEvolu: () => () => ({}),
@@ -69,12 +69,10 @@ const fromUnknownSender = (
 
 const domainParams = (
   store: LinkyStore,
-  contacts: ReadonlyArray<{ readonly id: ContactId }> = [],
 ): Parameters<typeof useMessagesDomain>[0] => ({
   appOwnerId: null,
   chatForceScrollToBottomRef: { current: false },
   chatMessagesRef: { current: null },
-  contacts,
   conversations: makeConversationsRepository(store),
   hydrated: true,
   route: { kind: "contacts" },
@@ -96,7 +94,14 @@ const renderDomain = async (
   contacts: ReadonlyArray<{ readonly id: ContactId }> = [],
 ) => {
   const domainRef: { current: MessagesDomain | null } = { current: null };
-  const params = domainParams(store, contacts);
+  const params = domainParams(store);
+  for (const { id } of contacts)
+    await Effect.runPromise(
+      makeContactsRepository(store).insert({
+        id,
+        name: NonEmptyString1000.orThrow("Contact"),
+      }),
+    );
   const { chatWrites, registry } = await storeRegistry(store);
   const Probe = () => {
     const domain = useMessagesDomain(params);

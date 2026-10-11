@@ -4,7 +4,7 @@ import { Effect, Exit } from "effect";
 import React, { act } from "react";
 import { expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
-import { useContactEditor } from "./useContactEditor";
+import { useContactEditor, useContactEditorWatchers } from "./useContactEditor";
 
 const relays = vi.hoisted(() => ({
   fetchProfile: vi.fn(async () => Exit.succeed({ profile: null })),
@@ -23,7 +23,7 @@ vi.mock("@linky-fit/linkstr-react", async (importOriginal) => {
   };
 });
 vi.mock("./useContactSuggestions", () => ({
-  useContactSuggestions: () => [],
+  useContactSuggestions: () => {},
 }));
 
 type Params = Parameters<typeof useContactEditor>[0];
@@ -31,7 +31,6 @@ const contactId = createId<"Contact">();
 const otherId = createId<"Contact">();
 const initialContact = { id: contactId, name: "Alice" };
 const params: Params = {
-  contactNewPrefill: null,
   contacts: [initialContact],
   contactsRepository: {
     insert: () => Effect.void,
@@ -41,8 +40,6 @@ const params: Params = {
   route: { kind: "contactEdit", id: contactId },
   selectedContactMetadata: null,
   selectedContact: initialContact,
-  setContactNewPrefill: vi.fn(),
-  setRecentlyAddedContactId: vi.fn(),
   setStatus: vi.fn(),
   t: (key) => key,
 };
@@ -53,11 +50,9 @@ interface EditorProps {
 }
 
 const Editor = ({ selectedContact, route }: EditorProps) => {
-  const { editingId, form, setForm } = useContactEditor({
-    ...params,
-    selectedContact,
-    route,
-  });
+  const editorParams = { ...params, selectedContact, route };
+  useContactEditorWatchers(editorParams);
+  const { editingId, form, setForm } = useContactEditor(editorParams);
   return (
     <>
       <button onClick={() => setForm({ ...form, name: "Unsaved name" })}>
