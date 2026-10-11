@@ -13,8 +13,7 @@ import {
   Stack,
 } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
-import { useAdvancedSettingsContext } from "../app/context/SystemSettingsContexts";
+import { usePushToast, useTranslation } from "../app/hooks/shell";
 import { useKeryx, useRefreshOnOpen } from "../app/hooks/useKeryx";
 import { useKeryxMediaUrl } from "../app/hooks/useKeryxMedia";
 import {
@@ -36,8 +35,8 @@ export function KeryxCompanyPage({
 }: {
   id: KeryxSubscriptionId;
 }): React.ReactElement {
-  const { lang, t } = useAppShellCore();
-  const { pushToast } = useAdvancedSettingsContext();
+  const { lang, t } = useTranslation();
+  const pushToast = usePushToast();
   const keryx = useKeryx();
   const company = keryx.companies.find((candidate) => candidate.id === id);
   const opened = React.useMemo(() => (company ? [company] : []), [company]);

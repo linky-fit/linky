@@ -15,8 +15,8 @@ import { EvoluHistoryTable } from "../components/EvoluHistoryTable";
 import { EvoluCurrentTable } from "../components/EvoluCurrentTable";
 import type { LinkyScope } from "@linky-fit/linksync";
 import React, { useEffect, useState } from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
-import { useEvoluSettingsContext } from "../app/context/SystemSettingsContexts";
+import { useTranslation } from "../app/hooks/shell";
+import { useEvoluSettings } from "../app/hooks/settings/useEvoluSettings";
 import { readRowOwnerId } from "../app/lib/rowOwnerId";
 import {
   filterRowsToVisibleShards,
@@ -58,8 +58,8 @@ const rowValue = (value: string) => (
 );
 
 function CurrentDataTables({ inScopeView }: { inScopeView: InScopeView }) {
-  const { evoluShards } = useEvoluSettingsContext();
-  const { t } = useAppShellCore();
+  const { evoluShards } = useEvoluSettings();
+  const { t } = useTranslation();
   const evolu = useLinkyEvolu();
   const [currentData, setCurrentData] = useState<Awaited<
     ReturnType<typeof loadEvoluCurrentData>
@@ -90,8 +90,8 @@ function CurrentDataTables({ inScopeView }: { inScopeView: InScopeView }) {
 }
 
 function HistoryDataTable({ inScopeView }: { inScopeView: InScopeView }) {
-  const { evoluShards } = useEvoluSettingsContext();
-  const { t } = useAppShellCore();
+  const { evoluShards } = useEvoluSettings();
+  const { t } = useTranslation();
   const evolu = useLinkyEvolu();
   const [historyData, setHistoryData] = useState<EvoluHistoryRow[] | null>(
     null,
@@ -123,8 +123,8 @@ export function EvoluDataDetailPage(): React.ReactElement {
     evoluTableCounts,
     evoluWipeStorageIsBusy,
     requestClearDatabase,
-  } = useEvoluSettingsContext();
-  const { t } = useAppShellCore();
+  } = useEvoluSettings();
+  const { t } = useTranslation();
   const [scopeView, setScopeView] = useState<LinkyScope | "all">("all");
   const inScopeView = React.useCallback(
     (tableName: string): boolean =>

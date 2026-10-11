@@ -16,7 +16,7 @@ import {
   useOutboxResults,
 } from "@linky-fit/linkstr-react";
 import { Effect } from "effect";
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { useLinkstrInspectorBridge } from "../../../devtools/inspector/useLinkstrInspectorBridge";
 import { useDeferredOnlineReady } from "../../../hooks/useDeferredOnlineReady";
 import { useDocumentVisible } from "../../../hooks/useDocumentVisible";
@@ -37,15 +37,12 @@ import {
 } from "../../../profileCache";
 import {
   ARCHIVED_CONTACTS_FILTER,
-  CONTACTS_ONBOARDING_HAS_BACKUPED_KEYS_STORAGE_KEY,
-  CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY,
   NO_GROUP_FILTER,
 } from "../../../utils/constants";
 import { getContactGroups } from "../../../utils/contactGroups";
 import { getBestNostrName } from "../../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import { setStoredPushContactNames } from "../../../utils/pushContactNamesStorage";
-import { safeLocalStorageGet } from "../../../utils/storage";
 import { getBankPaymentOfferCurrency } from "@linky-fit/proxy-payment";
 import { mergeBankPaymentOffersIntoLastMessageByContactId } from "../../lib/bankPaymentOfferRows";
 import {
@@ -59,6 +56,10 @@ import {
 } from "../../state/contacts/chatContacts";
 import { contactsCommandsAtom } from "../../state/contacts/commands";
 import {
+  contactsOnboardingHasBackedUpKeysAtom,
+  contactsOnboardingHasPaidAtom,
+} from "../../state/contacts/onboarding";
+import {
   contactNewPrefillAtom,
   recentlyAddedContactIdAtom,
 } from "../../state/contacts/contactForm";
@@ -66,6 +67,7 @@ import { bankPaymentOfferMessagesAtom } from "../../state/messages/bankOffers";
 import { chatDraftAtom } from "../../state/messages/chat";
 import { messagesVisibleSinceSecAtom } from "../../state/messages/readModel";
 import { currentPubkeyAtom } from "../../state/session/session";
+import { seenReceiptsEnabledAtSecAtom } from "../../state/shell/devicePrefs";
 import { payAmountAtom } from "../../state/wallet/contactPay";
 import type { PaymentLogData } from "../../types/appTypes";
 import {
@@ -103,7 +105,10 @@ import { useUnknownSenderReassignment } from "../messages/useUnknownSenderReassi
 import { useSetNavIntent } from "../shell/navIntents";
 import { useBankPaymentOffers } from "../useBankPaymentOffers";
 import { useContactsDomain } from "../useContactsDomain";
-import { useFeedbackContact } from "../useFeedbackContact";
+import {
+  useFeedbackContactWatcher,
+  useOpenFeedbackContact,
+} from "../useFeedbackContact";
 import { useLinkstrConfigSync } from "../useLinkstrConfigSync";
 import {
   fetchAndCacheProfiles,
@@ -164,7 +169,6 @@ interface UseContactsMessagingCompositionParams {
   pushToast: (message: string, options?: PushToastOptions) => void;
   route: ReturnType<typeof useRouting>;
   /** Receipts-enabled baseline; null means "send read receipts" is off. */
-  seenReceiptsEnabledAtSec: number | null;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   syncedNostrIdentityMatchesLocal: boolean;
   t: Translate;
@@ -188,7 +192,6 @@ export const useContactsMessagingComposition = ({
   maybeShowPwaNotification,
   pushToast,
   route,
-  seenReceiptsEnabledAtSec,
   setStatus,
   syncedNostrIdentityMatchesLocal,
   t,
@@ -196,20 +199,13 @@ export const useContactsMessagingComposition = ({
   const registry = React.useContext(RegistryContext);
   const recentlyAddedContactId = useAtomValue(recentlyAddedContactIdAtom);
 
-  const [contactsOnboardingHasPaid, setContactsOnboardingHasPaid] =
-    useState<boolean>(
-      () =>
-        safeLocalStorageGet(CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY) === "1",
-    );
-
+  const [contactsOnboardingHasPaid, setContactsOnboardingHasPaid] = useAtom(
+    contactsOnboardingHasPaidAtom,
+  );
   const [
     contactsOnboardingHasBackedUpKeys,
     setContactsOnboardingHasBackedUpKeys,
-  ] = useState<boolean>(
-    () =>
-      safeLocalStorageGet(CONTACTS_ONBOARDING_HAS_BACKUPED_KEYS_STORAGE_KEY) ===
-      "1",
-  );
+  ] = useAtom(contactsOnboardingHasBackedUpKeysAtom);
 
   const chatOwnPubkeyHex = useAtomValue(currentPubkeyAtom);
 
@@ -288,8 +284,6 @@ export const useContactsMessagingComposition = ({
     contactsSearch,
     contactsSearchInputRef,
     contactsSearchParts,
-    dedupeContacts,
-    dedupeContactsIsBusy,
     groupCounts,
     groupNames,
     selectedContact,
@@ -301,10 +295,7 @@ export const useContactsMessagingComposition = ({
     accountHydrated,
     contacts: contactsRepository,
     noGroupFilterValue: NO_GROUP_FILTER,
-    pushToast,
-    reassignContactMessages,
     route,
-    t,
   });
 
   const contactsLatestRef = useLatest(contacts);
@@ -727,6 +718,7 @@ export const useContactsMessagingComposition = ({
   }, [contacts]);
 
   const messagesVisibleSinceSec = useAtomValue(messagesVisibleSinceSecAtom);
+  const seenReceiptsEnabledAtSec = useAtomValue(seenReceiptsEnabledAtSecAtom);
   const unreadByContactId = React.useMemo(
     () =>
       collectUnreadNewestIncomingByContactId(
@@ -843,9 +835,8 @@ export const useContactsMessagingComposition = ({
 
   const { unarchiveContact } = useAtomSuspense(contactsCommandsAtom).value;
 
-  const { openFeedbackContact } = useFeedbackContact<(typeof contacts)[number]>(
-    { contacts, contactsRepository, pushToast, t },
-  );
+  useFeedbackContactWatcher(contacts);
+  const openFeedbackContact = useOpenFeedbackContact();
 
   // The in-flight set keeps the effect from repeating the write before the
   // restored row is read back.
@@ -1075,8 +1066,6 @@ export const useContactsMessagingComposition = ({
     contactsOnboardingHasSentMessage,
     contactsSearch,
     contactsSearchInputRef,
-    dedupeContacts,
-    dedupeContactsIsBusy,
     dispatchInboxEvent,
     displayContactById,
     getBankPaymentOfferForSettlement,

@@ -1,6 +1,6 @@
 import { Stack, ListRow } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useTranslation } from "../app/hooks/shell";
 import { useColorModePreference } from "../hooks/useColorMode";
 import {
   COLOR_MODE_PREFERENCE_LABEL_KEYS,
@@ -9,7 +9,7 @@ import {
 } from "../utils/colorMode";
 
 export function AppearancePage(): React.ReactElement {
-  const { t } = useAppShellCore();
+  const { t } = useTranslation();
   const preference = useColorModePreference();
 
   return (

@@ -1,13 +1,13 @@
 import { EmptyState, Stack } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
-import { useRelaySettingsContext } from "../app/context/SystemSettingsContexts";
+import { useTranslation } from "../app/hooks/shell";
+import { useRelaySettings } from "../app/hooks/settings/useRelaySettings";
 import { relayDotState, useRelayHealth } from "../app/hooks/useRelayHealth";
 import { NostrRelayRow } from "../components/NostrRelayRow";
 export function NostrRelaysPage(): React.ReactElement {
-  const { isRecommendedRelay, relayUrls } = useRelaySettingsContext();
+  const { isRecommendedRelay, relayUrls } = useRelaySettings();
   const relayHealth = useRelayHealth();
-  const { t } = useAppShellCore();
+  const { t } = useTranslation();
   return (
     <Stack gap="$lg">
       {relayUrls.length === 0 ? (

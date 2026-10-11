@@ -14,7 +14,7 @@ import {
   markAwaitingFirstHydration,
   normalizeEvoluRelayUrl,
 } from "@linky-fit/linksync/evolu";
-import { useAtomValue } from "@linky-fit/linkstr-react";
+import { useAtom, useAtomSet, useAtomValue } from "@linky-fit/linkstr-react";
 import { Effect } from "effect";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDeferredOnlineReady } from "./hooks/useDeferredOnlineReady";
@@ -27,17 +27,18 @@ import { reportInspectorRows } from "./devtools/inspector/reportInspectorRows";
 import { reportAppLog } from "./devtools/inspector/appLog";
 import { reportShardsSubscribed } from "./app/state/session/evoluInspector";
 import { evoluAtom, evoluRelaySettingsAtom } from "./app/state/session/evolu";
+import {
+  emptyEvoluDatabaseInfo,
+  evoluDatabaseInfoAtom,
+  evoluLastErrorAtom,
+  evoluServerProbesReadyAtom,
+  evoluServersAtom,
+} from "./app/state/session/evoluSettings";
 import { sessionAtom, sessionSecrets } from "./app/state/session/session";
 
 export type EvoluServerStatus = "checking" | "connected" | "disconnected";
+export type EvoluError = Evolu.EvoluError;
 export type EvoluErrorType = Evolu.EvoluError["type"];
-
-interface EvoluDatabaseInfo {
-  bytes: number | null;
-  tableCounts: Record<string, number | null>;
-  historyCount: number | null;
-  updatedAtMs: number | null;
-}
 
 const isJsonValue = (value: unknown): value is JsonValue => {
   if (
@@ -304,14 +305,13 @@ export type NostrIdentityRow = Evolu.InferRow<
   ReturnType<typeof createNostrIdentitiesAllQuery>
 >;
 
+/** Keeps `evoluLastErrorAtom` current and reports each error; mounted once by the shell. */
 export const useEvoluLastError = (opts?: {
   logToConsole?: boolean;
 }): Evolu.EvoluError | null => {
   const logToConsole = opts?.logToConsole ?? false;
   const evolu = useLinkyEvolu();
-  const [lastError, setLastError] = useState<Evolu.EvoluError | null>(() =>
-    evolu.getError(),
-  );
+  const [lastError, setLastError] = useAtom(evoluLastErrorAtom);
 
   useEffect(() => {
     const unsub = evolu.subscribeError(() => {
@@ -340,7 +340,7 @@ export const useEvoluLastError = (opts?: {
         // ignore
       }
     };
-  }, [evolu, logToConsole]);
+  }, [evolu, logToConsole, setLastError]);
 
   return lastError;
 };
@@ -605,12 +605,7 @@ export const useEvoluDatabaseInfoState = (opts?: {
   const evolu = useLinkyEvolu();
   const mnemonic = useAppMnemonic();
 
-  const [info, setInfo] = useState<EvoluDatabaseInfo>(() => ({
-    bytes: null,
-    tableCounts: {},
-    historyCount: null,
-    updatedAtMs: null,
-  }));
+  const [info, setInfo] = useAtom(evoluDatabaseInfoAtom);
   const [isBusy, setIsBusy] = useState(false);
   const refreshing = useRef(false);
   const refreshRequested = useRef(false);
@@ -643,7 +638,7 @@ export const useEvoluDatabaseInfoState = (opts?: {
         setIsBusy(false);
       }
     }
-  }, [enabled, evolu, mnemonic, onError]);
+  }, [enabled, evolu, mnemonic, onError, setInfo]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -662,12 +657,7 @@ export const useEvoluDatabaseInfoState = (opts?: {
       queryFailed.current = true;
       unsubscribe();
       cancelRefresh();
-      setInfo({
-        bytes: null,
-        tableCounts: {},
-        historyCount: null,
-        updatedAtMs: null,
-      });
+      setInfo(emptyEvoluDatabaseInfo);
       onError?.(error);
     });
     unsubscribe = subscribeEvoluHistoryMutationVersion(evolu, () => {
@@ -679,7 +669,7 @@ export const useEvoluDatabaseInfoState = (opts?: {
       unsubscribeError();
       cancelRefresh();
     };
-  }, [enabled, evolu, onError, refresh]);
+  }, [enabled, evolu, onError, refresh, setInfo]);
 
   return {
     info,
@@ -688,31 +678,17 @@ export const useEvoluDatabaseInfoState = (opts?: {
   } as const;
 };
 
-export const useEvoluServersManager = (opts?: {
-  probeIntervalMs?: number;
-  probeTimeoutMs?: number;
-}) => {
-  const probeIntervalMs = opts?.probeIntervalMs ?? 15000;
-  const probeTimeoutMs = opts?.probeTimeoutMs ?? 3500;
-  const canRunNetworkWork = useDeferredOnlineReady();
+/** The device's Evolu relays and their last probe, with the edits Settings makes. */
+export const useEvoluServers = () => {
   const evoluRelaySettings = useAtomValue(evoluRelaySettingsAtom);
-
-  const [configuredUrls, setConfiguredUrlsState] = useState<string[]>(() => [
-    ...evoluRelaySettings.configuredUrls(),
-  ]);
-  const [disabledUrls, setDisabledUrlsState] = useState<string[]>(() => [
-    ...evoluRelaySettings.disabledUrls(),
-  ]);
-  const [statusByUrl, setStatusByUrl] = useState<
-    Record<string, EvoluServerStatus>
-  >(() => ({}));
-  const [reloadRequired, setReloadRequired] = useState(false);
+  const [servers, setServers] = useAtom(evoluServersAtom);
+  const canRunNetworkWork = useAtomValue(evoluServerProbesReadyAtom);
 
   const disabledLower = useMemo(() => {
     const s = new Set<string>();
-    for (const u of disabledUrls) s.add(u.toLowerCase());
+    for (const u of servers.disabledUrls) s.add(u.toLowerCase());
     return s;
-  }, [disabledUrls]);
+  }, [servers.disabledUrls]);
 
   const isOffline = useCallback(
     (url: string): boolean => disabledLower.has(url.toLowerCase()),
@@ -720,48 +696,101 @@ export const useEvoluServersManager = (opts?: {
   );
 
   const activeUrls = useMemo(
-    () => configuredUrls.filter((u) => !isOffline(u)),
-    [configuredUrls, isOffline],
+    () => servers.configuredUrls.filter((u) => !isOffline(u)),
+    [isOffline, servers.configuredUrls],
   );
 
-  const refreshFromStorage = useCallback(() => {
-    setConfiguredUrlsState([...evoluRelaySettings.configuredUrls()]);
-    setDisabledUrlsState([...evoluRelaySettings.disabledUrls()]);
-  }, [evoluRelaySettings]);
+  const changeServers = useCallback(
+    (apply: () => void) => {
+      apply();
+      setServers((current) => ({
+        ...current,
+        configuredUrls: [...evoluRelaySettings.configuredUrls()],
+        disabledUrls: [...evoluRelaySettings.disabledUrls()],
+        reloadRequired: true,
+      }));
+    },
+    [evoluRelaySettings, setServers],
+  );
 
   const setServerUrls = useCallback(
-    (nextUrls: string[]) => {
-      evoluRelaySettings.setUrls(nextUrls);
-      if (getInspectorEmissionEnabled()) {
-        reportAppLog({
-          tag: "evolu.serversChanged",
-          summary: "Updated Evolu servers; reload required",
-          payload: {
-            configuredUrls: evoluRelaySettings.configuredUrls(),
-            activeUrls: evoluRelaySettings.activeUrls(),
-          },
-        });
-      }
-      refreshFromStorage();
-      setReloadRequired(true);
-    },
-    [evoluRelaySettings, refreshFromStorage],
+    (nextUrls: string[]) =>
+      changeServers(() => {
+        evoluRelaySettings.setUrls(nextUrls);
+        if (getInspectorEmissionEnabled()) {
+          reportAppLog({
+            tag: "evolu.serversChanged",
+            summary: "Updated Evolu servers; reload required",
+            payload: {
+              configuredUrls: evoluRelaySettings.configuredUrls(),
+              activeUrls: evoluRelaySettings.activeUrls(),
+            },
+          });
+        }
+      }),
+    [changeServers, evoluRelaySettings],
   );
 
   const setServerOffline = useCallback(
-    (url: string, offline: boolean) => {
-      evoluRelaySettings.setDisabled(url, offline);
-      refreshFromStorage();
-      setReloadRequired(true);
-    },
-    [evoluRelaySettings, refreshFromStorage],
+    (url: string, offline: boolean) =>
+      changeServers(() => evoluRelaySettings.setDisabled(url, offline)),
+    [changeServers, evoluRelaySettings],
   );
+
+  const effectiveStatusByUrl = useMemo(() => {
+    if (canRunNetworkWork) return servers.statusByUrl;
+
+    const next = { ...servers.statusByUrl };
+    for (const url of activeUrls) {
+      next[url] = "disconnected";
+    }
+    return next;
+  }, [activeUrls, canRunNetworkWork, servers.statusByUrl]);
+
+  return {
+    configuredUrls: servers.configuredUrls,
+    activeUrls,
+    statusByUrl: effectiveStatusByUrl,
+    reloadRequired: servers.reloadRequired,
+    setServerUrls,
+    isOffline,
+    isRecommended: evoluRelaySettings.isRecommended,
+    setServerOffline,
+  } as const;
+};
+
+/** Probes the active Evolu relays every 15 s; mounted once by the shell. */
+export const useEvoluServerProbes = (opts?: {
+  probeIntervalMs?: number;
+  probeTimeoutMs?: number;
+}): void => {
+  const probeIntervalMs = opts?.probeIntervalMs ?? 15000;
+  const probeTimeoutMs = opts?.probeTimeoutMs ?? 3500;
+  const canRunNetworkWork = useDeferredOnlineReady();
+  const { activeUrls } = useEvoluServers();
+  const setServers = useAtomSet(evoluServersAtom);
+  const setProbesReady = useAtomSet(evoluServerProbesReadyAtom);
+
+  useEffect(() => {
+    setProbesReady(canRunNetworkWork);
+  }, [canRunNetworkWork, setProbesReady]);
 
   useEffect(() => {
     if (activeUrls.length === 0) return;
     if (!canRunNetworkWork) return;
 
     let cancelled = false;
+    const setStatusByUrl = (
+      update: (
+        prev: Readonly<Record<string, EvoluServerStatus>>,
+      ) => Readonly<Record<string, EvoluServerStatus>>,
+    ) =>
+      setServers((current) => {
+        const statusByUrl = update(current.statusByUrl);
+        return statusByUrl === current.statusByUrl
+          ? current
+          : { ...current, statusByUrl };
+      });
 
     const run = async () => {
       // Only urls with no known status get a visible "checking" state; known
@@ -801,28 +830,11 @@ export const useEvoluServersManager = (opts?: {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [activeUrls, canRunNetworkWork, probeIntervalMs, probeTimeoutMs]);
-
-  const effectiveStatusByUrl = useMemo(() => {
-    if (canRunNetworkWork) return statusByUrl;
-
-    const next = { ...statusByUrl };
-    for (const url of activeUrls) {
-      next[url] = "disconnected";
-    }
-    return next;
-  }, [activeUrls, canRunNetworkWork, statusByUrl]);
-
-  return {
-    configuredUrls,
-    disabledUrls,
+  }, [
     activeUrls,
-    statusByUrl: effectiveStatusByUrl,
-    reloadRequired,
-    refreshFromStorage,
-    setServerUrls,
-    isOffline,
-    isRecommended: evoluRelaySettings.isRecommended,
-    setServerOffline,
-  } as const;
+    canRunNetworkWork,
+    probeIntervalMs,
+    probeTimeoutMs,
+    setServers,
+  ]);
 };

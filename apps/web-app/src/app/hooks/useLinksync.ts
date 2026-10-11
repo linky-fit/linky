@@ -29,7 +29,7 @@ import {
   useRepositoryRows,
 } from "@linky-fit/linksync/react";
 import type { StoredOperation } from "@linky-fit/linkshu";
-import { useAtomSuspense } from "@linky-fit/linkstr-react";
+import { useAtom, useAtomSuspense } from "@linky-fit/linkstr-react";
 import { Effect } from "effect";
 import React from "react";
 import { reportAppLog } from "../../devtools/inspector/appLog";
@@ -48,6 +48,7 @@ import {
   unknownSendersRepositoryAtom,
   walletRepositoryAtom,
 } from "../state/session/store";
+import { rotatingShardScopeAtom } from "../state/session/evoluSettings";
 
 /** The session's shard store; suspends until the local database has answered. */
 export const useLinkyStore = (): LinkyStore =>
@@ -204,7 +205,7 @@ export const useSyncOwnerIds = (): ReadonlyArray<string> => {
 /** The debug page's manual rotation of a scope's shard. */
 export const useShardRotation = () => {
   const store = useLinkyStore();
-  const [busyScope, setBusyScope] = React.useState<LinkyScope | null>(null);
+  const [busyScope, setBusyScope] = useAtom(rotatingShardScopeAtom);
   const rotate = React.useCallback(
     async (scope: LinkyScope) => {
       setBusyScope(scope);
@@ -220,7 +221,7 @@ export const useShardRotation = () => {
         setBusyScope(null);
       }
     },
-    [store],
+    [setBusyScope, store],
   );
   return { busyScope, rotate };
 };

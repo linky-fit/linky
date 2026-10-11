@@ -1,24 +1,21 @@
 import { Stack, Text, Row, ListRow, Switch, Pill } from "@linky-fit/ui";
 import React from "react";
-import {
-  useAppShellActions,
-  useAppShellCore,
-} from "../app/context/AppShellContexts";
+import { useTranslation } from "../app/hooks/shell";
+import { useDisplaySettings } from "../app/hooks/settings/useDeviceSettings";
 import {
   DISPLAY_CURRENCIES,
   getDisplayUnitLabel,
 } from "../utils/displayAmounts";
 
 export function SettingsPage(): React.ReactElement {
+  const { lang, t } = useTranslation();
   const {
     allowedDisplayCurrencies,
     decimalAmountInputEnabled,
     displayCurrency,
-    lang,
-    t,
-  } = useAppShellCore();
-  const { toggleAllowedDisplayCurrency, toggleDecimalAmountInput } =
-    useAppShellActions();
+    toggleAllowedDisplayCurrency,
+    toggleDecimalAmountInput,
+  } = useDisplaySettings();
 
   return (
     <Stack>

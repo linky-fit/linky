@@ -13,8 +13,7 @@ import {
   Text,
 } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
-import { useAdvancedSettingsContext } from "../app/context/SystemSettingsContexts";
+import { usePushToast, useTranslation } from "../app/hooks/shell";
 import { useKeryx } from "../app/hooks/useKeryx";
 import {
   openKeryxAttachment,
@@ -64,8 +63,8 @@ export function KeryxAnnouncementPage({
   id: KeryxSubscriptionId;
   announcementKey: string;
 }): React.ReactElement {
-  const { lang, t } = useAppShellCore();
-  const { pushToast } = useAdvancedSettingsContext();
+  const { lang, t } = useTranslation();
+  const pushToast = usePushToast();
   const keryx = useKeryx();
   const [opening, setOpening] = React.useState<string | null>(null);
   const company = keryx.companies.find((candidate) => candidate.id === id);

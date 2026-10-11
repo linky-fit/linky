@@ -1,12 +1,16 @@
 import { Button, EmptyState, Row, Stack, Text } from "@linky-fit/ui";
 import React, { useCallback, useMemo, useState } from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
-import { useAdvancedSettingsContext } from "../app/context/SystemSettingsContexts";
+import {
+  useSeedBackup,
+  useSeedMnemonic,
+} from "../app/hooks/settings/useIdentitySettings";
+import { usePushToast, useTranslation } from "../app/hooks/shell";
 
 export function MasterKeysPage(): React.ReactElement {
-  const { copySeed, pushToast, saveSeedToPasswordManager, seedMnemonic } =
-    useAdvancedSettingsContext();
-  const { t } = useAppShellCore();
+  const { copySeed, saveSeedToPasswordManager } = useSeedBackup();
+  const seedMnemonic = useSeedMnemonic();
+  const pushToast = usePushToast();
+  const { t } = useTranslation();
   const [isVisible, setIsVisible] = useState(false);
   const seedWords = useMemo(
     () =>

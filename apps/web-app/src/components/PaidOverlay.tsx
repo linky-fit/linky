@@ -1,6 +1,7 @@
 import { SuccessOverlay } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useNostrPictureByNpub } from "../app/hooks/contacts/useProfileCache";
+import { useDisplayAmounts } from "../app/hooks/shell";
 import type {
   PaidOverlayDetails,
   PaidOverlayPhase,
@@ -22,7 +23,8 @@ export function PaidOverlay({
   phase,
   t,
 }: PaidOverlayProps): React.ReactElement {
-  const { formatDisplayedAmountParts, nostrPictureByNpub } = useAppShellCore();
+  const { formatDisplayedAmountParts } = useDisplayAmounts();
+  const nostrPictureByNpub = useNostrPictureByNpub();
   const contact = details?.contact ?? null;
   const npub = contact?.npub ?? null;
   const pictureUrl = npub

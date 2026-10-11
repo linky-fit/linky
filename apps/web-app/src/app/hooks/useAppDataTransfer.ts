@@ -11,6 +11,7 @@ import {
   type ContactId,
   type ContactsRepository,
 } from "@linky-fit/linksync";
+import { useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
 import { reportAppLog } from "../../devtools/inspector/appLog";
 import {
@@ -28,7 +29,14 @@ import {
 } from "../lib/cashuTokenState";
 import { runWrite } from "../lib/storeWrite";
 import type { ContactRowLike } from "../types/appTypes";
-import type { CashuTransferLifecycle } from "./composition/useLinkshuComposition";
+import { contactsAtom } from "../state/contacts/readModel";
+import {
+  useLinkshuCommands,
+  type CashuTransferLifecycle,
+} from "./composition/useLinkshuComposition";
+import { usePushToast, useTranslation } from "./shell";
+import { useContactsRepository } from "./useLinksync";
+import { useWalletInventory } from "./wallet/useWalletInventory";
 import type { Translate } from "../../i18n";
 
 type ImportableContact = ContactRowLike & { id: ContactId };
@@ -99,7 +107,6 @@ interface UseAppDataTransferParams<TContact extends ImportableContact> {
   importCashuLegacyRows: CashuTransferLifecycle["importLegacyRows"] | null;
   importCashuOperation: CashuTransferLifecycle["importOperation"] | null;
   importCashuProofs: CashuTransferLifecycle["importProofs"] | null;
-  importDataFileInputRef: React.RefObject<HTMLInputElement | null>;
   pushToast: (message: string) => void;
   t: Translate;
 }
@@ -112,7 +119,6 @@ export const useAppDataTransfer = <TContact extends ImportableContact>({
   importCashuLegacyRows,
   importCashuOperation,
   importCashuProofs,
-  importDataFileInputRef,
   pushToast,
   t,
 }: UseAppDataTransferParams<TContact>) => {
@@ -147,16 +153,6 @@ export const useAppDataTransfer = <TContact extends ImportableContact>({
       pushToast(t("exportFailed"));
     });
   }, [cashuOperations, cashuProofs, contacts, pushToast, t]);
-
-  const requestImportAppData = React.useCallback(() => {
-    const element = importDataFileInputRef.current;
-    if (!element) return;
-    try {
-      element.click();
-    } catch {
-      // ignore
-    }
-  }, [importDataFileInputRef]);
 
   const importAppDataFromText = React.useCallback(
     async (text: string) => {
@@ -371,9 +367,23 @@ export const useAppDataTransfer = <TContact extends ImportableContact>({
     [importAppDataFromText, pushToast, t],
   );
 
-  return {
-    exportAppData,
-    handleImportAppDataFilePicked,
-    requestImportAppData,
-  };
+  return { exportAppData, handleImportAppDataFilePicked };
+};
+
+/** Backup export and import of contacts and wallet rows, for Settings. */
+export const useAppDataActions = () => {
+  const { allProofs, operations } = useWalletInventory();
+  const lifecycle = useLinkshuCommands()?.cashuTransferLifecycle ?? null;
+  return useAppDataTransfer({
+    cashuOperations: operations,
+    // Backups need every proof, including hidden test-mint proofs.
+    cashuProofs: allProofs,
+    contacts: useAtomValue(contactsAtom),
+    contactsRepository: useContactsRepository(),
+    importCashuLegacyRows: lifecycle?.importLegacyRows ?? null,
+    importCashuOperation: lifecycle?.importOperation ?? null,
+    importCashuProofs: lifecycle?.importProofs ?? null,
+    pushToast: usePushToast(),
+    t: useTranslation().t,
+  });
 };

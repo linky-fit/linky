@@ -10,6 +10,17 @@ import { useSetting } from "../useLinksync";
 /** The mint new funds arrive at. */
 export const useDefaultMintUrl = () => useAtomValue(defaultMintAtom);
 
+/** The default mint's host, as Settings lists it. */
+export const useDefaultMintDisplay = (): string | null => {
+  const defaultMintUrl = useDefaultMintUrl();
+  if (!defaultMintUrl) return null;
+  try {
+    return new URL(defaultMintUrl).host;
+  } catch {
+    return defaultMintUrl;
+  }
+};
+
 /**
  * The default mint and its writes. Seeds a new account's default mint once
  * and takes over a choice synced from another device; only that direction

@@ -9,7 +9,7 @@ import {
 } from "@linky-fit/linkshu";
 import { createId } from "@linky-fit/linksync";
 import { Effect, Schema } from "effect";
-import { act, createRef, useEffect } from "react";
+import { act, useEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { en } from "../../i18n/en";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
@@ -65,7 +65,6 @@ const mount = async (
       },
       ...stored,
       ...wallet,
-      importDataFileInputRef: createRef<HTMLInputElement>(),
       pushToast,
       t: (key) => en[key],
     });

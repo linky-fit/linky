@@ -268,8 +268,11 @@ export const withTabLockIfFree = async <T>(args: {
   );
 };
 
-const readStoredInt = (key: string): number | null => {
-  const parsed = Number.parseInt(trimString(safeLocalStorageGet(key)), 10);
+const readStoredInt = (
+  key: string,
+  kv: KeyValueStorage = localStorageKv,
+): number | null => {
+  const parsed = Number.parseInt(trimString(kv.getItem(key)), 10);
   return Number.isFinite(parsed) ? parsed : null;
 };
 
@@ -328,10 +331,10 @@ export const getInitialDecimalAmountInputEnabled = (
 // launch — history older than the feature is still never reported. "0" is the
 // explicit off state.
 // Only an explicit "0" disables seen receipts; removing the key re-enables them.
-export const getInitialSeenReceiptsEnabledAtSec = (): number | null => {
-  const raw = trimString(
-    safeLocalStorageGet(SEEN_RECEIPTS_ENABLED_AT_SEC_STORAGE_KEY),
-  );
+export const getInitialSeenReceiptsEnabledAtSec = (
+  kv: KeyValueStorage = localStorageKv,
+): number | null => {
+  const raw = trimString(kv.getItem(SEEN_RECEIPTS_ENABLED_AT_SEC_STORAGE_KEY));
   if (raw === "0") return null;
   const parsed = Number(raw);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : nowSeconds();
@@ -350,11 +353,17 @@ export const getInitialReceiveMethod = (
   parseReceiveMethod(kv.getItem(RECEIVE_METHOD_STORAGE_KEY)) ??
   DEFAULT_RECEIVE_METHOD;
 
-export const getInitialShowProfileQrOnTiltEnabled = (): boolean =>
-  safeLocalStorageGet(SHOW_PROFILE_QR_ON_TILT_STORAGE_KEY) !== "0";
+export const getInitialShowProfileQrOnTiltEnabled = (
+  kv: KeyValueStorage = localStorageKv,
+): boolean => kv.getItem(SHOW_PROFILE_QR_ON_TILT_STORAGE_KEY) !== "0";
 
-export const getInitialLightningInvoiceAutoPayLimit = (): number => {
-  const stored = readStoredInt(LIGHTNING_INVOICE_AUTO_PAY_LIMIT_STORAGE_KEY);
+export const getInitialLightningInvoiceAutoPayLimit = (
+  kv: KeyValueStorage = localStorageKv,
+): number => {
+  const stored = readStoredInt(
+    LIGHTNING_INVOICE_AUTO_PAY_LIMIT_STORAGE_KEY,
+    kv,
+  );
   return stored !== null && stored >= 0
     ? stored
     : LIGHTNING_INVOICE_AUTO_PAY_LIMIT_SAT;
@@ -362,16 +371,22 @@ export const getInitialLightningInvoiceAutoPayLimit = (): number => {
 
 export const getInitialBankPaymentOfferRecipientCount = (
   fallback: number,
+  kv: KeyValueStorage = localStorageKv,
 ): number => {
-  const stored = readStoredInt(BANK_PAYMENT_OFFER_RECIPIENT_COUNT_STORAGE_KEY);
+  const stored = readStoredInt(
+    BANK_PAYMENT_OFFER_RECIPIENT_COUNT_STORAGE_KEY,
+    kv,
+  );
   return stored !== null && stored > 0 ? stored : fallback;
 };
 
 export const getInitialBankPaymentOfferStaggerDelaySec = (
   fallback: number,
+  kv: KeyValueStorage = localStorageKv,
 ): number => {
   const stored = readStoredInt(
     BANK_PAYMENT_OFFER_STAGGER_DELAY_SEC_STORAGE_KEY,
+    kv,
   );
   return stored !== null && stored >= 0 ? stored : fallback;
 };

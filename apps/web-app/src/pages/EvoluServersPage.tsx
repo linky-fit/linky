@@ -11,8 +11,8 @@ import {
 import { evoluSyncStatus } from "../utils/connectionStatus";
 
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
-import { useEvoluSettingsContext } from "../app/context/SystemSettingsContexts";
+import { useTranslation } from "../app/hooks/shell";
+import { useEvoluSettings } from "../app/hooks/settings/useEvoluSettings";
 import { deriveEvoluServerState } from "../app/lib/evoluServerState";
 import { navigateTo } from "../hooks/useRouting";
 import { formatEvoluRowCount } from "../utils/evoluRowCount";
@@ -34,8 +34,8 @@ export function EvoluServersPage(): React.ReactElement {
     isEvoluServerRecommended,
     requestClearDatabase,
     syncOwnerId,
-  } = useEvoluSettingsContext();
-  const { t } = useAppShellCore();
+  } = useEvoluSettings();
+  const { t } = useTranslation();
   const counts = Object.values(evoluTableCounts);
   const totalCurrentRows = counts.reduce<number | null>(
     (sum, count) => (sum === null || count === null ? null : sum + count),

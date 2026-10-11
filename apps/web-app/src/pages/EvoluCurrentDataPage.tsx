@@ -11,8 +11,8 @@ import {
   Text,
 } from "@linky-fit/ui";
 import React, { useEffect, useState } from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
-import { useEvoluSettingsContext } from "../app/context/SystemSettingsContexts";
+import { useTranslation } from "../app/hooks/shell";
+import { useEvoluSettings } from "../app/hooks/settings/useEvoluSettings";
 import { readRowOwnerId } from "../app/lib/rowOwnerId";
 import {
   filterRowsToVisibleShards,
@@ -25,8 +25,8 @@ const PREVIEW_ROW_COUNT = 2;
 
 export function EvoluCurrentDataPage(): React.ReactElement {
   const { evoluShards, requestRotateShard, rotatingShardScope } =
-    useEvoluSettingsContext();
-  const { t } = useAppShellCore();
+    useEvoluSettings();
+  const { t } = useTranslation();
   const evolu = useLinkyEvolu();
   const [currentData, setCurrentData] = useState<Awaited<
     ReturnType<typeof loadEvoluCurrentData>

@@ -23,14 +23,16 @@ const counts = vi.hoisted(() => {
   return state;
 });
 
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellCore: () => ({
-    t: (key: string) => (key === "evoluRowCount" ? "{count} rows" : key),
+vi.mock("../app/hooks/shell", async () =>
+  (await import("../testUtils/shellHooks")).shellHooksMock({
+    t: (key) => (key === "evoluRowCount" ? "{count} rows" : key),
   }),
-}));
+);
 
-vi.mock("../app/context/SystemSettingsContexts", () => ({
-  useEvoluSettingsContext: () => ({
+vi.mock("../app/hooks/settings/useEvoluSettings", () => ({
+  useEvoluErrorType: () => counts.errorType,
+  useEvoluReloadRequired: () => counts.reloadRequired,
+  useEvoluSettings: () => ({
     evoluTableCounts: counts.tables,
     evoluErrorType: counts.errorType,
     evoluServersReloadRequired: counts.reloadRequired,

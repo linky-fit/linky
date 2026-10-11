@@ -1,3 +1,4 @@
+import { useAtom } from "@linky-fit/linkstr-react";
 import { Schema } from "effect";
 import React from "react";
 import { reportAppLog } from "../../devtools/inspector/appLog";
@@ -8,6 +9,7 @@ import {
   withFetchedRecommendedRelays,
   type RecommendedRelays,
 } from "../../utils/recommendedRelays";
+import { recommendedRelaysAtom } from "../state/messages/relays";
 
 const RECOMMENDED_RELAYS_URL = "https://linky.fit/recommended-relays";
 const REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -49,7 +51,7 @@ export const useRecommendedRelays = (
   recommendedRelays: RecommendedRelays;
   unretireNostrRelay: (isSameRelay: (url: string) => boolean) => void;
 } => {
-  const [relays, setRelays] = React.useState(loadRecommendedRelays);
+  const [relays, setRelays] = useAtom(recommendedRelaysAtom);
 
   // A user may add a retired relay back on purpose.
   const unretireNostrRelay = React.useCallback(
@@ -63,7 +65,7 @@ export const useRecommendedRelays = (
       saveRecommendedRelays(next);
       setRelays(next);
     },
-    [],
+    [setRelays],
   );
 
   React.useEffect(() => {
@@ -84,7 +86,7 @@ export const useRecommendedRelays = (
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [networkEnabled]);
+  }, [networkEnabled, setRelays]);
 
   return { recommendedRelays: relays, unretireNostrRelay };
 };

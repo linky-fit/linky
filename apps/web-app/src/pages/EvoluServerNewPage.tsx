@@ -1,10 +1,7 @@
 import { Form, SubmitButton, TextField } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
-import {
-  useAdvancedSettingsContext,
-  useEvoluSettingsContext,
-} from "../app/context/SystemSettingsContexts";
+import { usePushToast, useTranslation } from "../app/hooks/shell";
+import { useEvoluSettings } from "../app/hooks/settings/useEvoluSettings";
 import { normalizeEvoluServerUrl } from "../evolu";
 import { navigateTo } from "../hooks/useRouting";
 
@@ -15,9 +12,9 @@ export function EvoluServerNewPage(): React.ReactElement {
     saveEvoluServerUrls,
     setNewEvoluServerUrl,
     setStatus,
-  } = useEvoluSettingsContext();
-  const { t } = useAppShellCore();
-  const { pushToast } = useAdvancedSettingsContext();
+  } = useEvoluSettings();
+  const { t } = useTranslation();
+  const pushToast = usePushToast();
 
   const addServer = () => {
     const normalized = normalizeEvoluServerUrl(newEvoluServerUrl);

@@ -2,77 +2,75 @@ import {
   createId,
   NonEmptyString1000,
   type ContactId,
-  type ContactsRepository,
 } from "@linky-fit/linksync";
+import { useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
 import { navigateTo } from "../../hooks/useRouting";
 import { FEEDBACK_CONTACT_NPUB } from "../../utils/constants";
 import { runWrite } from "../lib/storeWrite";
+import { contactsAtom } from "../state/contacts/readModel";
 import type { ContactNameRowLike } from "../types/appTypes";
-import type { Translate } from "../../i18n";
+import { usePushToast, useTranslation } from "./shell";
+import { useNavIntent, useSetNavIntent } from "./shell/navIntents";
+import { useContactsRepository } from "./useLinksync";
 
 type FeedbackContactRow = ContactNameRowLike & {
   id: ContactId;
   npub?: string | null | undefined;
 };
 
-interface UseFeedbackContactParams<TContact extends FeedbackContactRow> {
-  contacts: readonly TContact[];
-  contactsRepository: Pick<ContactsRepository, "insert" | "update">;
-  pushToast: (message: string) => void;
-  t: Translate;
-}
+const findFeedbackContact = <TContact extends FeedbackContactRow>(
+  contacts: readonly TContact[],
+) =>
+  contacts.find(
+    (contact) => (contact.npub ?? "").trim() === FEEDBACK_CONTACT_NPUB,
+  );
 
-export const useFeedbackContact = <TContact extends FeedbackContactRow>({
-  contacts,
-  contactsRepository,
-  pushToast,
-  t,
-}: UseFeedbackContactParams<TContact>) => {
-  const openFeedbackContactPendingRef = React.useRef(false);
+/** Opens the conversation with the Linky team, saving the contact first if needed. */
+export const useOpenFeedbackContact = () => {
+  const contacts = useAtomValue(contactsAtom);
+  const contactsRepository = useContactsRepository();
+  const pushToast = usePushToast();
+  const { t } = useTranslation();
+  const setPending = useSetNavIntent("openFeedbackChat");
 
-  const openFeedbackContact = React.useCallback(() => {
-    const targetNpub = FEEDBACK_CONTACT_NPUB;
-    const existing = contacts.find(
-      (contact) => (contact.npub ?? "").trim() === targetNpub,
-    );
+  return React.useCallback(() => {
+    const existing = findFeedbackContact(contacts);
 
     if (existing) {
       if ((existing.name ?? "") === "Feedback") {
         void runWrite(contactsRepository.update(existing.id, { name: null }));
       }
-      openFeedbackContactPendingRef.current = false;
+      setPending(false);
       navigateTo({ route: "chat", id: existing.id });
       return;
     }
 
-    openFeedbackContactPendingRef.current = true;
+    setPending(true);
     void runWrite(
       contactsRepository.insert({
         id: createId<"Contact">(),
-        npub: NonEmptyString1000.orThrow(targetNpub),
+        npub: NonEmptyString1000.orThrow(FEEDBACK_CONTACT_NPUB),
       }),
     ).then((outcome) => {
       if (outcome.ok) return;
-      openFeedbackContactPendingRef.current = false;
+      setPending(false);
       pushToast(`${t("errorPrefix")}: ${outcome.error}`);
     });
-  }, [contacts, contactsRepository, pushToast, t]);
+  }, [contacts, contactsRepository, pushToast, setPending, t]);
+};
 
+/** Opens the feedback conversation once its new contact is read back. Mounted once. */
+export const useFeedbackContactWatcher = <TContact extends FeedbackContactRow>(
+  contacts: readonly TContact[],
+): void => {
+  const pending = useNavIntent("openFeedbackChat");
+  const setPending = useSetNavIntent("openFeedbackChat");
   React.useEffect(() => {
-    if (!openFeedbackContactPendingRef.current) return;
-
-    const targetNpub = FEEDBACK_CONTACT_NPUB;
-    const existing = contacts.find(
-      (contact) => (contact.npub ?? "").trim() === targetNpub,
-    );
+    if (!pending) return;
+    const existing = findFeedbackContact(contacts);
     if (!existing) return;
-
-    openFeedbackContactPendingRef.current = false;
+    setPending(false);
     navigateTo({ route: "chat", id: existing.id });
-  }, [contacts]);
-
-  return {
-    openFeedbackContact,
-  };
+  }, [contacts, pending, setPending]);
 };

@@ -1,15 +1,16 @@
 import { Stack, ListRow } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
-import { useAdvancedSettingsContext } from "../app/context/SystemSettingsContexts";
+import { useTranslation } from "../app/hooks/shell";
+import { useAtom } from "@linky-fit/linkstr-react";
+import { receiveMethodAtom } from "../app/state/wallet/prefs";
 import {
   RECEIVE_METHOD_LABEL_KEYS,
   RECEIVE_METHODS,
 } from "../utils/receiveMethod";
 
 export function ReceiveMethodPage(): React.ReactElement {
-  const { t } = useAppShellCore();
-  const { receiveMethod, setReceiveMethod } = useAdvancedSettingsContext();
+  const { t } = useTranslation();
+  const [receiveMethod, setReceiveMethod] = useAtom(receiveMethodAtom);
 
   return (
     <Stack>

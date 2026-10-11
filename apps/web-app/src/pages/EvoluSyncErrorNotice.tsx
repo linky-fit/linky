@@ -1,11 +1,11 @@
 import { Notice } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
-import { useEvoluSettingsContext } from "../app/context/SystemSettingsContexts";
+import { useTranslation } from "../app/hooks/shell";
+import { useEvoluErrorType } from "../app/hooks/settings/useEvoluSettings";
 
 export function EvoluSyncErrorNotice(): React.ReactElement | null {
-  const { evoluErrorType } = useEvoluSettingsContext();
-  const { t } = useAppShellCore();
+  const evoluErrorType = useEvoluErrorType();
+  const { t } = useTranslation();
   if (!evoluErrorType) return null;
   return (
     <Notice

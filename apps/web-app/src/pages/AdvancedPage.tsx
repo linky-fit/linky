@@ -11,11 +11,32 @@ import {
 } from "@linky-fit/ui";
 import type { IconName } from "@linky-fit/ui";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useAtom, useAtomValue } from "@linky-fit/linkstr-react";
+import { useDedupeContacts } from "../app/hooks/contacts/useDedupeContacts";
+import { useEvoluStatusSummary } from "../app/hooks/settings/useEvoluSettings";
 import {
-  useAppShellActions,
-  useAppShellCore,
-} from "../app/context/AppShellContexts";
-import { useAdvancedSettingsContext } from "../app/context/SystemSettingsContexts";
+  useCopyNostrKeys,
+  useIdentitySettings,
+} from "../app/hooks/settings/useIdentitySettings";
+import {
+  useDisplayAmounts,
+  usePushToast,
+  useTranslation,
+} from "../app/hooks/shell";
+import { useAppDataActions } from "../app/hooks/useAppDataTransfer";
+import { useDefaultMintDisplay } from "../app/hooks/wallet/useDefaultMint";
+import { nostrRelayUrlsAtom } from "../app/state/messages/relays";
+import {
+  lightningInvoiceAutoPayLimitAtom,
+  payWithCashuEnabledAtom,
+  receiveMethodAtom,
+} from "../app/state/wallet/prefs";
+import {
+  useSeenReceiptsSetting,
+  useTiltSetting,
+} from "../app/hooks/settings/useDeviceSettings";
+import { useOpenFeedbackContact } from "../app/hooks/useFeedbackContact";
+import { currentNsecAtom } from "../app/state/session/session";
 import { useAllowTestMints } from "../app/hooks/useAllowTestMints";
 import {
   countConnectedRelays,
@@ -44,28 +65,28 @@ export function AdvancedPage(): React.ReactElement {
   const {
     answerPendingIdentitySwitch,
     canSwitchToDefaultIdentity,
-    copyNostrKeys,
-    dedupeContacts,
-    dedupeContactsIsBusy,
-    defaultMintDisplay,
-    evoluConnectedServerCount,
-    evoluOverallStatus,
-    evoluServerUrls,
-    exportAppData,
-    handleImportAppDataFilePicked,
-    lightningInvoiceAutoPayLimit,
     logoutArmed,
-    payWithCashuEnabled,
     pendingIdentitySwitch,
-    pushToast,
-    receiveMethod,
-    relayUrls,
     requestLogout,
     requestPasteNostrKeys,
     seedMnemonic,
-    setPayWithCashuEnabled,
     switchToDefaultIdentity,
-  } = useAdvancedSettingsContext();
+  } = useIdentitySettings();
+  const copyNostrKeys = useCopyNostrKeys();
+  const { dedupeContacts, dedupeContactsIsBusy } = useDedupeContacts();
+  const defaultMintDisplay = useDefaultMintDisplay();
+  const { evoluConnectedServerCount, evoluOverallStatus, evoluServerUrls } =
+    useEvoluStatusSummary();
+  const { exportAppData, handleImportAppDataFilePicked } = useAppDataActions();
+  const lightningInvoiceAutoPayLimit = useAtomValue(
+    lightningInvoiceAutoPayLimitAtom,
+  );
+  const [payWithCashuEnabled, setPayWithCashuEnabled] = useAtom(
+    payWithCashuEnabledAtom,
+  );
+  const pushToast = usePushToast();
+  const receiveMethod = useAtomValue(receiveMethodAtom);
+  const relayUrls = useAtomValue(nostrRelayUrlsAtom);
   const { allowTestMints, setAllowTestMints } = useAllowTestMints();
   const { experimentalFeatures, setExperimentalFeatures } =
     useExperimentalFeatures();
@@ -73,18 +94,14 @@ export function AdvancedPage(): React.ReactElement {
   const connectedRelayCount = countConnectedRelays(relayUrls, relayHealth);
   const nostrRelayOverallStatus = overallRelayStatus(relayUrls, relayHealth);
 
-  const {
-    currentNsec,
-    formatDisplayedAmountParts,
-    sendReadReceiptsEnabled,
-    showProfileQrOnTiltEnabled,
-    t,
-  } = useAppShellCore();
-  const {
-    openFeedbackContact,
-    toggleSendReadReceipts,
-    toggleShowProfileQrOnTilt,
-  } = useAppShellActions();
+  const currentNsec = useAtomValue(currentNsecAtom);
+  const { formatDisplayedAmountParts } = useDisplayAmounts();
+  const { t } = useTranslation();
+  const { sendReadReceiptsEnabled, toggleSendReadReceipts } =
+    useSeenReceiptsSetting();
+  const { showProfileQrOnTiltEnabled, toggleShowProfileQrOnTilt } =
+    useTiltSetting();
+  const openFeedbackContact = useOpenFeedbackContact();
   const notifications = usePushNotificationsSetting();
   const colorModePreference = useColorModePreference();
   const [armedSecurityAction, setArmedSecurityAction] =

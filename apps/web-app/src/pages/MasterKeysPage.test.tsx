@@ -9,17 +9,15 @@ const { pushToast, saveSeedToPasswordManager } = vi.hoisted(() => ({
   saveSeedToPasswordManager: vi.fn(),
 }));
 
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellCore: () => ({ t: (key: string) => key }),
-}));
-
-vi.mock("../app/context/SystemSettingsContexts", () => ({
-  useAdvancedSettingsContext: () => ({
-    copySeed: vi.fn(),
-    pushToast,
-    saveSeedToPasswordManager,
-    seedMnemonic: "academic acid acne",
+vi.mock("../app/hooks/shell", async () =>
+  (await import("../testUtils/shellHooks")).shellHooksMock({
+    pushToast: (message) => pushToast(message),
   }),
+);
+
+vi.mock("../app/hooks/settings/useIdentitySettings", () => ({
+  useSeedBackup: () => ({ copySeed: vi.fn(), saveSeedToPasswordManager }),
+  useSeedMnemonic: () => "academic acid acne",
 }));
 
 afterEach(() => {

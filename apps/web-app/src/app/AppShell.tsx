@@ -51,18 +51,15 @@ interface AuthenticatedAppShellProps {
 
 const AuthenticatedAppShell = ({ currentNsec }: AuthenticatedAppShellProps) => {
   const {
-    advancedSettingsContext,
     appActions,
     appState,
     cancelPendingCashuContactSend,
     dismissToast,
-    evoluSettingsContext,
     formatDisplayedAmountText,
     mainTabRouteProps,
     moneyRouteProps,
     peopleRouteProps,
     pendingCashuContactSend,
-    relaySettingsContext,
     t,
     toasts,
   } = useAppShellComposition({ currentNsec });
@@ -102,10 +99,7 @@ const AuthenticatedAppShell = ({ currentNsec }: AuthenticatedAppShellProps) => {
 
       <AppShellContextsProvider
         actions={actionsContextValue}
-        advancedSettings={advancedSettingsContext}
         core={coreContextValue}
-        evoluSettings={evoluSettingsContext}
-        relaySettings={relaySettingsContext}
         routes={routeContextValue}
       >
         <AuthenticatedLayout>

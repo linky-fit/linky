@@ -45,6 +45,17 @@ export const kvSeededAtom = <A>(
     ),
   );
 
+/** Page-lifetime state that starts from what `init` computes on first read. */
+export const lazyStateAtom = <A>(
+  init: (get: Atom.AtomContext) => A,
+): Atom.Writable<A> =>
+  Atom.keepAlive(
+    Atom.writable(
+      (get) => Option.getOrElse(get.self<A>(), () => init(get)),
+      (ctx, value: A) => ctx.setSelf(value),
+    ),
+  );
+
 /** Seeded only for a signed-in session, which is the only one that opens the database. */
 export const evoluPlatformAtom = seededAtom<EvoluPlatform | null>(
   "evoluPlatformAtom",

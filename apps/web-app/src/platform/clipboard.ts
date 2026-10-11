@@ -25,6 +25,13 @@ export const writeClipboardText = async (value: string): Promise<boolean> => {
   }
 };
 
+/** The browser clipboard only; rejects when the browser refuses the write. */
+export const writeBrowserClipboardText = async (
+  text: string,
+): Promise<void> => {
+  await navigator.clipboard?.writeText(text);
+};
+
 export const readClipboardText = async (): Promise<string | null> => {
   if (isNativePlatform()) {
     try {

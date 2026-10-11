@@ -1,9 +1,7 @@
 import { Stack, ListRow } from "@linky-fit/ui";
 import React from "react";
-import {
-  useAppShellActions,
-  useAppShellCore,
-} from "../app/context/AppShellContexts";
+import { useTranslation } from "../app/hooks/shell";
+import { useSetLang } from "../app/hooks/settings/useDeviceSettings";
 import type { Lang } from "../i18n";
 
 const LANGUAGES: ReadonlyArray<{
@@ -17,8 +15,8 @@ const LANGUAGES: ReadonlyArray<{
 ];
 
 export function LanguagePage(): React.ReactElement {
-  const { lang, t } = useAppShellCore();
-  const { setLang } = useAppShellActions();
+  const { lang, t } = useTranslation();
+  const setLang = useSetLang();
 
   return (
     <Stack>

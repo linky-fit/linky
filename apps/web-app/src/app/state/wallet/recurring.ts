@@ -1,5 +1,6 @@
 import type { RecurringPaymentId } from "@linky-fit/linksync";
 import { Atom } from "effect/reactivity";
+import { armAtoms } from "../shell/arm";
 
 /** A due payment waiting for the in-app countdown to end (or the user to decide). */
 export interface RecurringDueConfirmation {
@@ -31,39 +32,5 @@ export const recurringSchedulerAtom = Atom.keepAlive(
   Atom.make<RecurringSchedulerCommands | null>(null),
 );
 
-const DELETE_ARM_MS = 5000;
-
 /** The payment whose delete was tapped once; a second tap within 5 s deletes it. */
-export const armedRecurringDeleteAtom = Atom.keepAlive(
-  Atom.make<string | null>(null),
-);
-
-export interface RecurringDeleteArm {
-  readonly arm: (id: string) => void;
-  readonly disarm: () => void;
-}
-
-export const recurringDeleteArmAtom = Atom.keepAlive(
-  Atom.readable((get): RecurringDeleteArm => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const clearTimer = () => {
-      if (timer !== null) clearTimeout(timer);
-      timer = null;
-    };
-    get.addFinalizer(clearTimer);
-    return {
-      arm: (id) => {
-        clearTimer();
-        get.registry.set(armedRecurringDeleteAtom, id);
-        timer = setTimeout(() => {
-          timer = null;
-          get.registry.set(armedRecurringDeleteAtom, null);
-        }, DELETE_ARM_MS);
-      },
-      disarm: () => {
-        clearTimer();
-        get.registry.set(armedRecurringDeleteAtom, null);
-      },
-    };
-  }),
-);
+export const recurringDeleteArm = armAtoms<string>(5000);

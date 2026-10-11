@@ -1,13 +1,16 @@
 import { Notice } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
-import { useEvoluSettingsContext } from "../app/context/SystemSettingsContexts";
+import { useTranslation } from "../app/hooks/shell";
+import {
+  useEvoluErrorType,
+  useEvoluReloadRequired,
+} from "../app/hooks/settings/useEvoluSettings";
 import { reportAppLog } from "../devtools/inspector/appLog";
 
 export function EvoluReloadNotice(): React.ReactElement | null {
-  const { evoluErrorType, evoluServersReloadRequired } =
-    useEvoluSettingsContext();
-  const { t } = useAppShellCore();
+  const evoluErrorType = useEvoluErrorType();
+  const evoluServersReloadRequired = useEvoluReloadRequired();
+  const { t } = useTranslation();
   if (!evoluServersReloadRequired && evoluErrorType !== "ProtocolQuotaError") {
     return null;
   }

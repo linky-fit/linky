@@ -1,7 +1,8 @@
 import { RECURRING_CONFIRM_SEC } from "@linky-fit/recurring-payment";
 import { Pill, Stack, Text } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
+import { useWalletOps } from "../app/hooks/wallet/useWalletOps";
 import { useRecurringDue } from "../app/hooks/payments/useRecurringDue";
 import { useNowSeconds } from "../app/hooks/payments/useNowSeconds";
 import {
@@ -21,14 +22,10 @@ import { RecurringContactAvatar } from "./RecurringContactAvatar";
  * further input and the same sheet turns into the paid confirmation.
  */
 export function RecurringPaymentDueModal(): React.ReactElement | null {
-  const {
-    cashuIsBusy,
-    displayCurrency,
-    fiatRates,
-    formatDisplayedAmountParts,
-    lang,
-    t,
-  } = useAppShellCore();
+  const { walletOpRunning: cashuIsBusy } = useWalletOps();
+  const { displayCurrency, fiatRates, formatDisplayedAmountParts } =
+    useDisplayAmounts();
+  const { lang, t } = useTranslation();
   const { cancelDue, confirmDueNow, dueConfirmation } = useRecurringDue();
   const orders = useRecurringPaymentOrders();
   const contacts = useRecurringContactSummaries();

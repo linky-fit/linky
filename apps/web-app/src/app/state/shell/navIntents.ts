@@ -7,11 +7,14 @@ export interface NavIntents {
   readonly contactPayBackToChat: ContactId | null;
   /** The npub of a contact just saved, whose page opens once its row is read back. */
   readonly openSavedContactNpub: string | null;
+  /** The feedback contact was just saved; its conversation opens once its row is read back. */
+  readonly openFeedbackChat: boolean;
 }
 
 export const navIntentsAtom = Atom.keepAlive(
   Atom.make<NavIntents>({
     contactPayBackToChat: null,
+    openFeedbackChat: false,
     openSavedContactNpub: null,
   }),
 );

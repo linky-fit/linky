@@ -10,10 +10,10 @@ import {
 import { evoluSyncStatus } from "../utils/connectionStatus";
 import { useArmedAction } from "../hooks/useArmedAction";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
-import { useEvoluSettingsContext } from "../app/context/SystemSettingsContexts";
+import { useTranslation } from "../app/hooks/shell";
+import { useEvoluSettings } from "../app/hooks/settings/useEvoluSettings";
 import { deriveEvoluServerState } from "../app/lib/evoluServerState";
-import { navigateTo } from "../hooks/useRouting";
+import { navigateTo, useRouting } from "../hooks/useRouting";
 import { EvoluReloadNotice } from "./EvoluReloadNotice";
 import { EvoluSyncErrorNotice } from "./EvoluSyncErrorNotice";
 export function EvoluServerPage(): React.ReactElement {
@@ -27,8 +27,9 @@ export function EvoluServerPage(): React.ReactElement {
     setEvoluServerOffline,
     setStatus,
     syncOwnerId,
-  } = useEvoluSettingsContext();
-  const { route, t } = useAppShellCore();
+  } = useEvoluSettings();
+  const route = useRouting();
+  const { t } = useTranslation();
   const deleteAction = useArmedAction(() => setStatus(t("deleteArmedHint")));
   const url = route.kind === "evoluServer" ? route.id : null;
   if (!url) return <Notice tone="danger" title={t("errorPrefix")} />;

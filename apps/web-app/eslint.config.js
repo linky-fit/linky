@@ -87,7 +87,6 @@ export const platformSeamRatchet = [
   "src/app/hooks/cashu/useDeferredReceiveRetry.ts",
   "src/app/hooks/cashu/useTokenQr.ts",
   "src/app/hooks/composition/useScanNativeComposition.ts",
-  "src/app/hooks/composition/useSystemSettingsComposition.ts",
   "src/app/hooks/contacts/useSharedProfileLink.ts",
   "src/app/hooks/guide/useContactsGuide.ts",
   "src/app/hooks/guide/useContactsOnboardingProgress.ts",
@@ -131,7 +130,6 @@ export const platformSeamRatchet = [
   "src/app/lib/testMintGate.ts",
   "src/app/routes/AppRouteContent.tsx",
   "src/app/routes/MainTabPanes.tsx",
-  "src/app/useAppShellComposition.tsx",
   "src/components/ChatMessage.tsx",
   "src/components/ChatMessageEditor.tsx",
   "src/components/InstallPwaBanner.tsx",
@@ -272,7 +270,7 @@ export default defineConfig([
     },
   },
   {
-    files: ["src/app/useAppShellComposition.tsx"],
+    files: ["src/app/hooks/settings/useEvoluStorageWatchers.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
