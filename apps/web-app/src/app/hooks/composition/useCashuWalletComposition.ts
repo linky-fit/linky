@@ -1,27 +1,12 @@
 import type { TextField } from "@linky-fit/ui";
 import type { PushToastOptions } from "../../../hooks/useToasts";
-import { transactionIdForOperation } from "@linky-fit/linksync";
 import type { ReceiveMethod } from "../../../utils/receiveMethod";
-import type { RestoreProgress } from "@linky-fit/linkshu";
-import { useReclaimCashuTransfer } from "../cashu/useReclaimCashuTransfer";
 import { paidOverlayContact } from "../../lib/paidOverlay";
-import { useLatest } from "../../../hooks/useLatest";
-import {
-  CashuTokenText,
-  ClientId,
-  decodeNpub,
-  encodeNprofile,
-  identityFromNsec,
-  OutboxRef,
-  PaymentNoticeDraft,
-  Pubkey,
-  TokenMessageDraft,
-} from "@linky-fit/linkstr";
-import { useLinkstrCommands } from "@linky-fit/linkstr-react";
-import { Cause, Result, Exit, Option, Schema } from "effect";
+import { decodeNpub, encodeNprofile } from "@linky-fit/linkstr";
+import { Result } from "effect";
 import React, { type ComponentRef, useMemo, useState } from "react";
-import type { CashuOperationId, ContactId } from "../../../evolu";
-import { navigateTo, useRouting } from "../../../hooks/useRouting";
+import type { ContactId } from "../../../evolu";
+import { useRouting } from "../../../hooks/useRouting";
 import { useRecurringPaymentOrders } from "../payments/useRecurringPaymentOrders";
 import { useRecurringReminderSync } from "../payments/useRecurringReminderSync";
 import {
@@ -41,17 +26,12 @@ import {
   isNpubCashDisabled,
   NPUB_CASH_SERVER_BASE_URL,
 } from "../../../utils/npubCashServer";
-import { planSendMint, type OperationId } from "@linky-fit/linkshu";
-import {
-  CashuOperationId as CashuOperationIdType,
-  type TransactionsRepository,
-} from "@linky-fit/linksync";
+import { type TransactionsRepository } from "@linky-fit/linksync";
 import {
   formatMintHost,
   MAIN_MINT_URL,
   normalizeMintUrl,
 } from "../../../utils/mint";
-import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import { parseNpubCashProfileInfo } from "../../../utils/npubCashInfo";
 import {
   getInitialLightningInvoiceAutoPayLimit,
@@ -61,10 +41,7 @@ import {
   safeLocalStorageSet,
 } from "../../../utils/storage";
 import { getUnknownErrorMessage } from "../../../utils/unknown";
-import { makeLocalId } from "../../../utils/validation";
-import { useCashuTokenChecks } from "../cashu/useCashuTokenChecks";
 import { useNpubCashClaim } from "../cashu/useNpubCashClaim";
-import { useRestoreMissingTokens } from "../cashu/useRestoreMissingTokens";
 import { useSaveCashuFromText } from "../cashu/useSaveCashuFromText";
 import { useDeferredReceiveRetry } from "../cashu/useDeferredReceiveRetry";
 import { normalizePubkeyHex } from "../messages/contactIdentity";
@@ -87,26 +64,18 @@ import {
   useRememberFirstPayment,
 } from "../wallet/paymentUi";
 import { useWalletOps } from "../wallet/useWalletOps";
+import { useWalletTokens } from "../wallet/useWalletTokens";
 import { logPayStep } from "../../state/wallet/paymentLog";
 import { useOwnerStorage, usePaymentLog } from "../wallet/useWalletStorage";
 import { usePaidOverlayState } from "../usePaidOverlayState";
 import { useProfileNpubCashEffects } from "../useProfileNpubCashEffects";
-import { describeTaggedCashuError } from "../../lib/cashuStoredError";
-import { isSpellingOf } from "../../lib/mintSpelling";
 import {
-  isIssuedTransfer,
   isOpenTransfer,
   isPendingDeferredReceive,
   takenTokenTexts,
 } from "../../lib/cashuTransfers";
-import {
-  getCashuTokenMessageInfo as getCashuTokenMessageInfoBase,
-  readCashuTokenMemo,
-} from "../../lib/tokenMessageInfo";
-import {
-  useContactsMessagingComposition,
-  type DisplayContact,
-} from "./useContactsMessagingComposition";
+import { getCashuTokenMessageInfo as getCashuTokenMessageInfoBase } from "../../lib/tokenMessageInfo";
+import { useContactsMessagingComposition } from "./useContactsMessagingComposition";
 import { useIdentityOwnersComposition } from "./useIdentityOwnersComposition";
 import { drainLegacyAcceptedCashuToken } from "../../migrations/legacyAcceptedTokenDrain";
 import { useLinkshuComposition } from "./useLinkshuComposition";
@@ -122,9 +91,6 @@ import { useInterruptedReceiveRecovery } from "../cashu/useInterruptedReceiveRec
 import { useResumeOnLaunchAndOnline } from "../useResumeOnLaunchAndOnline";
 import { useProfileComposition } from "./useProfileComposition";
 import type { Translate } from "../../../i18n";
-
-const isPubkey = Schema.is(Pubkey);
-const decodeCashuTokenText = Schema.decodeUnknownResult(CashuTokenText);
 
 type IdentityOwnersCompositionResult = ReturnType<
   typeof useIdentityOwnersComposition
@@ -217,7 +183,6 @@ export const useCashuWalletComposition = ({
   const recurringPaymentsRepository = useRecurringPaymentsRepository();
   const accountHydrated = useAccountHydrated();
   const { allowTestMints, setAllowTestMints } = useAllowTestMints();
-  const { enqueueOutbox, sendPaymentNotice } = useLinkstrCommands();
   const { appOwnerId, currentNpub, currentNsec } = identity;
   const {
     saveNpubContact,
@@ -279,24 +244,12 @@ export const useCashuWalletComposition = ({
 
   const [cashuDraft, setCashuDraft] = useState("");
   const cashuDraftRef = React.useRef<ComponentRef<typeof TextField>>(null);
-  const [cashuEmitAmount, setCashuEmitAmount] = useState("");
-  const {
-    runExclusive,
-    runQueued,
-    walletOpRunning: cashuIsBusy,
-  } = useWalletOps();
-  const [cashuBulkCheckIsBusy, setCashuBulkCheckIsBusy] = useState(false);
-  const [tokensRestoreIsBusy, setTokensRestoreIsBusy] = useState(false);
-  const [tokensRestoreProgress, setTokensRestoreProgress] =
-    useState<RestoreProgress | null>(null);
+  const { runQueued, walletOpRunning: cashuIsBusy } = useWalletOps();
 
   const [lnAddressPayAmount, setLnAddressPayAmount] = useState<string>("");
   const [lnAddressPayNote, setLnAddressPayNote] = useState<string>("");
   const [lnAddressPayContactId, setLnAddressPayContactId] =
     useState<ContactId | null>(null);
-
-  const [pendingCashuTokenContactPickId, setPendingCashuTokenContactPickId] =
-    useState<CashuOperationId | null>(null);
 
   const [
     pendingLnurlWithdrawConfirmation,
@@ -344,15 +297,11 @@ export const useCashuWalletComposition = ({
     allWalletProofs,
     cashuEnvelopes,
     cashuTransferLifecycle,
-    checkAllCashuTokens,
     inspectCashuProofStates,
-    checkCashuTransfer,
     fetchMintInfo,
     meltCashuInvoice,
     probeLightningFee,
     receiveCashuToken,
-    restoreCashuTokens,
-    reclaimCashuTokens,
     resumeDeferredCashuReceives,
     resumePendingCashuAutoswapClaims,
     resumePendingCashuMelts,
@@ -848,440 +797,6 @@ export const useCashuWalletComposition = ({
     saveCashuFromText,
   });
 
-  const {
-    checkAllCashuTokensAndDeleteInvalid,
-    checkAndRefreshCashuToken,
-    deleteCashuToken,
-  } = useCashuTokenChecks({
-    cashuBulkCheckIsBusy,
-    checkAllCashuTokens,
-    checkCashuTransfer,
-    forgetCashuTransfer: cashuTransferLifecycle?.forget ?? null,
-    pushToast,
-    setCashuBulkCheckIsBusy,
-    runExclusive,
-    setStatus,
-    t,
-  });
-
-  // Issued-token claim detection over linkshu Validation.checkIssued: one
-  // passive NUT-07 batch per mint of handed-out proofs, claimed transfers
-  // closed by the package. A shared in-flight promise keeps the callers
-  // (list-page mount, manual button, token-page 10s poll, 60s background
-  // tick) from stacking redundant mint round-trips.
-  const checkIssuedInFlightRef = React.useRef<Promise<{
-    claimed: ReadonlyArray<{ amount: number; id: string }>;
-  }> | null>(null);
-  const checkIssuedCashuTokensAndDeleteClaimed = React.useCallback((): Promise<{
-    claimed: ReadonlyArray<{ amount: number; id: string }>;
-  }> => {
-    if (cashuTransferLifecycle === null) {
-      return Promise.resolve({ claimed: [] });
-    }
-    const inFlight = checkIssuedInFlightRef.current;
-    if (inFlight) return inFlight;
-
-    const run = cashuTransferLifecycle
-      .checkIssuedClaims()
-      .then((report) => ({
-        claimed: report.claimed.map((entry) => ({
-          amount: entry.amount,
-          id: entry.operationId,
-        })),
-      }))
-      .finally(() => {
-        checkIssuedInFlightRef.current = null;
-      });
-    checkIssuedInFlightRef.current = run;
-    return run;
-  }, [cashuTransferLifecycle]);
-
-  const checkSingleIssuedCashuTokenIsClaimed = React.useCallback(
-    async (id: CashuOperationId): Promise<boolean> => {
-      const outcome = await checkIssuedCashuTokensAndDeleteClaimed();
-      return outcome.claimed.some((entry) => entry.id === id);
-    },
-    [checkIssuedCashuTokensAndDeleteClaimed],
-  );
-
-  // Background check for issued-token claims (issue #86). Runs once on
-  // mount and every 60s thereafter while we have any issued tokens.
-  // Detection removes the row, so the issued list cleans up even when the
-  // user isn't sitting on #wallet/tokens; the ref keeps the 60s interval
-  // from being torn down whenever the callback identity churns.
-  const hasAnyIssuedTokensForBackgroundCheck =
-    cashuOpenTransfers.some(isIssuedTransfer) ||
-    walletProofs.some(
-      (proof) => proof.state === "handedOut" || proof.state === "externalized",
-    );
-  const checkIssuedCashuTokensRef = useLatest(
-    checkIssuedCashuTokensAndDeleteClaimed,
-  );
-  const formatDisplayedAmountTextRef = useLatest(formatDisplayedAmountText);
-  const pushToastRef = useLatest(pushToast);
-  const claimToastTRef = useLatest(t);
-  React.useEffect(() => {
-    if (!hasAnyIssuedTokensForBackgroundCheck) return;
-    let cancelled = false;
-    const tick = async () => {
-      if (cancelled) return;
-      try {
-        const outcome = await checkIssuedCashuTokensRef.current();
-        if (cancelled) return;
-        if (outcome.claimed.length === 0) return;
-        // Background detection — surface a toast so the user knows the
-        // issued token was redeemed even when they aren't on the QR
-        // screen (the CashuTokenPage poll handles the in-page UX with a
-        // checkmark overlay).
-        const formatter = formatDisplayedAmountTextRef.current;
-        const tt = claimToastTRef.current;
-        for (const entry of outcome.claimed) {
-          const message =
-            entry.amount > 0
-              ? tt("cashuTokenClaimedWithAmount").replace(
-                  "{amount}",
-                  formatter(entry.amount),
-                )
-              : tt("cashuTokenClaimed");
-          pushToastRef.current(message);
-        }
-      } catch {
-        // ignore — the helper already swallows mint-side errors.
-      }
-    };
-    void tick();
-    const intervalId = window.setInterval(() => {
-      void tick();
-    }, 60_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
-    };
-  }, [
-    checkIssuedCashuTokensRef,
-    claimToastTRef,
-    formatDisplayedAmountTextRef,
-    pushToastRef,
-    hasAnyIssuedTokensForBackgroundCheck,
-  ]);
-
-  const reclaimCashuTransfer = useReclaimCashuTransfer({
-    busy: cashuIsBusy || cashuBulkCheckIsBusy || tokensRestoreIsBusy,
-    reclaim: cashuTransferLifecycle?.reclaim ?? null,
-    runQueued,
-    pushToast,
-    t,
-  });
-
-  const returnCashuTokenToWallet = React.useCallback(
-    async (id: CashuOperationId) => {
-      if (cashuTransferLifecycle === null) {
-        setStatus(`${t("errorPrefix")}: Cashu storage is not ready`);
-        return;
-      }
-      const outcome = await cashuTransferLifecycle.returnToWallet(id);
-      if (Result.isFailure(outcome)) {
-        const message =
-          describeTaggedCashuError(outcome.failure) ?? outcome.failure._tag;
-        setStatus(`${t("errorPrefix")}: ${message}`);
-        return;
-      }
-
-      setStatus(t("cashuReturnedToWallet"));
-    },
-    [cashuTransferLifecycle, setStatus, t],
-  );
-
-  const pendingCashuContactSend = React.useMemo(() => {
-    if (!pendingCashuTokenContactPickId) return null;
-
-    const transfer = walletTransfers.find(
-      (candidate) =>
-        String(candidate.id) === pendingCashuTokenContactPickId &&
-        isIssuedTransfer(candidate),
-    );
-    if (!transfer) return null;
-
-    return {
-      amountSat: transfer.amount,
-      tokenId: pendingCashuTokenContactPickId,
-    };
-  }, [pendingCashuTokenContactPickId, walletTransfers]);
-
-  const cancelPendingCashuContactSend = React.useCallback(async () => {
-    const tokenId = pendingCashuContactSend?.tokenId ?? null;
-    setPendingCashuTokenContactPickId(null);
-    if (!tokenId) return;
-
-    await returnCashuTokenToWallet(tokenId);
-  }, [pendingCashuContactSend, returnCashuTokenToWallet]);
-
-  const runCashuTokenTransition = React.useCallback(
-    async (
-      id: CashuOperationId,
-      transition: "markExternalized" | "markIssued",
-    ): Promise<boolean> => {
-      if (cashuTransferLifecycle === null) {
-        setStatus(`${t("errorPrefix")}: Cashu storage is not ready`);
-        return false;
-      }
-      const outcome = await cashuTransferLifecycle[transition](id);
-      if (Result.isFailure(outcome)) {
-        const message =
-          describeTaggedCashuError(outcome.failure) ?? outcome.failure._tag;
-        setStatus(`${t("errorPrefix")}: ${message}`);
-        return false;
-      }
-      return true;
-    },
-    [cashuTransferLifecycle, setStatus, t],
-  );
-
-  const markCashuTokenIssued = React.useCallback(
-    (id: CashuOperationId): Promise<boolean> =>
-      runCashuTokenTransition(id, "markIssued"),
-    [runCashuTokenTransition],
-  );
-
-  const markCashuTokenExternalized = React.useCallback(
-    (id: CashuOperationId): Promise<boolean> =>
-      runCashuTokenTransition(id, "markExternalized"),
-    [runCashuTokenTransition],
-  );
-
-  /** Closes a transfer the user is done with; never a refund. */
-  const forgetCashuTransfer = React.useCallback(
-    async (id: CashuOperationId): Promise<boolean> => {
-      if (cashuTransferLifecycle === null) {
-        setStatus(`${t("errorPrefix")}: Cashu storage is not ready`);
-        return false;
-      }
-      try {
-        const outcome = await cashuTransferLifecycle.forget(id);
-        if (Result.isFailure(outcome)) {
-          setStatus(
-            `${t("errorPrefix")}: ${describeTaggedCashuError(outcome.failure) ?? outcome.failure._tag}`,
-          );
-          return false;
-        }
-      } catch (error) {
-        setStatus(
-          `${t("errorPrefix")}: ${getUnknownErrorMessage(error, "unknown")}`,
-        );
-        return false;
-      }
-      return true;
-    },
-    [cashuTransferLifecycle, setStatus, t],
-  );
-
-  /** Gives up on a token waiting for its mint; lost unless its text was kept. */
-  const discardCashuDeferredReceive = React.useCallback(
-    async (id: OperationId): Promise<void> => {
-      if (cashuTransferLifecycle === null) {
-        setStatus(`${t("errorPrefix")}: Cashu storage is not ready`);
-        return;
-      }
-      try {
-        const outcome = await cashuTransferLifecycle.forget(id);
-        if (Result.isFailure(outcome)) {
-          setStatus(
-            // A retry pass handed the token to its receive first.
-            outcome.failure._tag === "InvalidTransferTransition"
-              ? t("cashuDeferredAlreadyReceiving")
-              : `${t("errorPrefix")}: ${describeTaggedCashuError(outcome.failure) ?? outcome.failure._tag}`,
-          );
-          return;
-        }
-      } catch (error) {
-        setStatus(
-          `${t("errorPrefix")}: ${getUnknownErrorMessage(error, "unknown")}`,
-        );
-        return;
-      }
-      setStatus(t("cashuDeferredReceiveDiscarded"));
-    },
-    [cashuTransferLifecycle, setStatus, t],
-  );
-
-  const startSendCashuTokenToContact = React.useCallback(
-    async (id: CashuOperationId) => {
-      setPendingCashuTokenContactPickId(id);
-      setStatus(t("cashuSelectContactToSend"));
-      navigateTo({ route: "contacts" });
-    },
-    [setStatus, t],
-  );
-
-  const sendCashuTokenToContact = React.useCallback(
-    async (contact: DisplayContact, tokenId: CashuOperationId) => {
-      setPendingCashuTokenContactPickId(null);
-
-      const transfer = walletTransfers.find(
-        (candidate) =>
-          String(candidate.id) === tokenId && isIssuedTransfer(candidate),
-      );
-      const tokenText = transfer?.tokenText ?? "";
-
-      if (!transfer || !tokenText) {
-        setStatus(t("cashuInvalid"));
-        return;
-      }
-      const tokenMeta = {
-        amount: transfer.amount,
-        mint: transfer.mint,
-        unit: transfer.unit,
-      };
-
-      const contactId = (contact.id ?? "").trim();
-      if (!contactId) {
-        setStatus(t("contactNotFound"));
-        return;
-      }
-
-      if (!currentNsec) {
-        setStatus(t("profileMissingNpub"));
-        return;
-      }
-
-      let contactPubHex = normalizePubkeyHex(contact.unknownPubkeyHex);
-      const contactNpub = normalizeNpubIdentifier(contact.npub ?? "");
-
-      if (!contactPubHex && contactNpub) {
-        contactPubHex = decodeNpub(contactNpub);
-      }
-
-      if (!contactPubHex || !isPubkey(contactPubHex)) {
-        setStatus(t("chatMissingContactNpub"));
-        return;
-      }
-
-      const transactionNote = readCashuTokenMemo(tokenText);
-      const logIssuedTokenSendTransaction = (phase: "complete" | "publish") => {
-        logPaymentEvent({
-          amount: tokenMeta.amount,
-          contactId,
-          details: {
-            usedInputTokens: [tokenText],
-          },
-          direction: "out",
-          error: null,
-          fee: null,
-          method: "cashu_chat",
-          mint: tokenMeta.mint,
-          note: transactionNote,
-          paymentType: "contact",
-          phase,
-          status: "ok",
-          transactionId: transactionIdForOperation(tokenId),
-          unit: tokenMeta.unit,
-        });
-      };
-
-      try {
-        const identity = identityFromNsec(currentNsec);
-        if (!identity) throw new Error("invalid nsec");
-        const myPubHex = identity.pubkey;
-        const token = decodeCashuTokenText(tokenText);
-        if (Result.isFailure(token)) {
-          throw new Error("invalid cashu token");
-        }
-        const clientId = ClientId.make(makeLocalId());
-        const pendingId = appendLocalNostrMessage({
-          contactId,
-          direction: "out",
-          content: tokenText,
-          wrapId: `pending:${clientId}`,
-          rumorId: null,
-          pubkey: myPubHex,
-          createdAtSec: Math.ceil(Date.now() / 1e3),
-          status: "pending",
-          clientId,
-        }).id;
-        if (!pendingId) throw new Error("failed to persist message");
-
-        const closed = await forgetCashuTransfer(tokenId);
-        if (!closed) {
-          return;
-        }
-
-        navigateTo({ route: "chat", id: contactId });
-
-        const draft = new TokenMessageDraft({
-          to: contactPubHex,
-          token: token.success,
-          clientId,
-        });
-        const exit = await enqueueOutbox({
-          op: { _tag: "chat.token", draft },
-          ref: OutboxRef.make(`message:${pendingId}`),
-        });
-
-        if (Exit.isFailure(exit)) {
-          setStatus(`${t("errorPrefix")}: ${Cause.pretty(exit.cause)}`);
-          return;
-        }
-
-        updateLocalNostrMessage(pendingId, {
-          createdAtSec: exit.value.sentAt,
-          rumorId: exit.value.rumorId,
-        });
-
-        const isOffline =
-          typeof navigator !== "undefined" && navigator.onLine === false;
-        if (isOffline) {
-          logIssuedTokenSendTransaction("publish");
-          setStatus(t("chatQueued"));
-          return;
-        }
-
-        const noticeClientId = ClientId.make(makeLocalId());
-        try {
-          const noticeExit = await sendPaymentNotice(
-            new PaymentNoticeDraft({
-              to: contactPubHex,
-              clientId: noticeClientId,
-            }),
-          );
-          const failure = Exit.isFailure(noticeExit)
-            ? Cause.findErrorOption(noticeExit.cause)
-            : Option.none();
-          logPayStep("payment-notice-publish", {
-            anySuccess: Exit.isSuccess(noticeExit),
-            clientId: noticeClientId,
-            error: Option.isSome(failure) ? failure.value._tag : null,
-            wrapId: Exit.isSuccess(noticeExit)
-              ? noticeExit.value.recipientCopy.wrapId
-              : null,
-          });
-        } catch (error) {
-          logPayStep("payment-notice-publish", {
-            anySuccess: false,
-            clientId: noticeClientId,
-            error: getUnknownErrorMessage(error, "publish failed"),
-            wrapId: null,
-          });
-        }
-
-        logIssuedTokenSendTransaction("complete");
-      } catch (error) {
-        setStatus(`${t("errorPrefix")}: ${String(error ?? "unknown")}`);
-      }
-    },
-    [
-      appendLocalNostrMessage,
-      currentNsec,
-      enqueueOutbox,
-      forgetCashuTransfer,
-      logPaymentEvent,
-      sendPaymentNotice,
-      setStatus,
-      t,
-      updateLocalNostrMessage,
-      walletTransfers,
-    ],
-  );
-
   // Every mint the wallet ever touched, spent proofs included: a mint whose
   // proofs are all spent must still be offered to a recovery.
   const walletMints = React.useMemo(() => {
@@ -1317,39 +832,25 @@ export const useCashuWalletComposition = ({
     t,
   });
 
-  const recoverTokens = useRestoreMissingTokens({
+  const walletTokens = useWalletTokens({
     allowTestMints,
-    cashuIsBusy,
-    walletMints,
+    cashuBalance,
+    chat,
     defaultMintUrl,
+    formatDisplayedAmountText,
     isMintDeleted,
-    logPaymentEvent,
     mintInfoDeduped,
     pushToast,
-    readSeenMintsFromStorage,
+    readSeenMints: readSeenMintsFromStorage,
     recoverEnvelopes: recurringScheduler.recoverEnvelopes,
     rememberSeenMint,
-    restoreCashuTokens,
-    reclaimCashuTokens,
-    runQueued,
-    setTokensRestoreIsBusy,
-    setTokensRestoreProgress,
+    setStatus,
     t,
-    tokensRestoreIsBusy,
+    walletMints,
+    walletOpRunning: cashuIsBusy,
+    walletProofs,
+    walletTransfers,
   });
-
-  const restoreMissingTokens = React.useCallback(
-    () => recoverTokens("missing"),
-    [recoverTokens],
-  );
-  const reclaimHandedOutTokens = React.useCallback(
-    () => recoverTokens("reclaim"),
-    [recoverTokens],
-  );
-  const restoreAndReclaimAllTokens = React.useCallback(
-    () => recoverTokens("all"),
-    [recoverTokens],
-  );
 
   const mainMintForTokenList = React.useMemo(
     () => normalizeMintUrl(defaultMintUrl ?? MAIN_MINT_URL),
@@ -1363,122 +864,6 @@ export const useCashuWalletComposition = ({
           formatMintHost(mainMintForTokenList),
         )
       : null;
-
-  const emitCashuToken = React.useCallback(
-    async (options?: { note?: string | null }) => {
-      const note = (options?.note ?? "").trim() || null;
-      const amountSat = Number.parseInt(cashuEmitAmount.trim(), 10);
-      if (!Number.isFinite(amountSat) || amountSat <= 0) {
-        setStatus(t("payInvalidAmount"));
-        return;
-      }
-
-      if (cashuIsBusy) return;
-      if (cashuBalance < amountSat) {
-        setStatus(t("payInsufficient"));
-        return;
-      }
-      if (sendCashuToken === null) {
-        setStatus(`${t("errorPrefix")}: Cashu storage is not ready`);
-        return;
-      }
-
-      const logEmitFailure = (error: string, mint: string | null): void => {
-        logPaymentEvent({
-          direction: "out",
-          status: "error",
-          amount: amountSat,
-          fee: null,
-          mint,
-          unit: "sat",
-          error,
-          contactId: null,
-          method: "unknown",
-          phase: "swap",
-        });
-      };
-
-      await runExclusive(async () => {
-        setStatus(t("cashuEmitting"));
-
-        try {
-          const mint = planSendMint({
-            balances: walletBalances.perMint,
-            isPreferredMint: isSpellingOf(defaultMintUrl),
-            amount: amountSat,
-          });
-          if (mint === null) {
-            setStatus(t("payInsufficient"));
-            return;
-          }
-
-          const outcome = await sendCashuToken({
-            amountSat,
-            memo: note,
-            mint,
-            produceAs: "issued",
-          });
-          if (Result.isFailure(outcome)) {
-            const sendError = outcome.failure;
-            const errorMessage =
-              describeTaggedCashuError(sendError) ?? sendError._tag;
-            logEmitFailure(errorMessage, mint);
-            setStatus(
-              sendError._tag === "InsufficientFunds"
-                ? t("payInsufficient")
-                : `${t("payFailed")}: ${errorMessage}`,
-            );
-            return;
-          }
-
-          const receipt = outcome.success;
-          logPaymentEvent({
-            direction: "out",
-            status: "ok",
-            transactionId: transactionIdForOperation(receipt.operationId),
-            amount: receipt.amount,
-            details: {
-              issuedToken: receipt.tokenText,
-            },
-            fee: null,
-            mint: receipt.mint,
-            note,
-            unit: receipt.unit,
-            error: null,
-            contactId: null,
-            method: "unknown",
-            phase: "swap",
-          });
-
-          setCashuEmitAmount("");
-          setStatus(null);
-          const routeId = CashuOperationIdType.fromUnknown(receipt.operationId);
-          navigateTo(
-            routeId.ok
-              ? { route: "cashuToken", id: routeId.value }
-              : { route: "cashuTokens" },
-          );
-        } catch (error) {
-          const errorMessage = getUnknownErrorMessage(error, "unknown");
-          logEmitFailure(errorMessage, null);
-          setStatus(`${t("payFailed")}: ${errorMessage}`);
-        }
-      });
-    },
-    [
-      cashuBalance,
-      cashuEmitAmount,
-      cashuIsBusy,
-      defaultMintUrl,
-      logPaymentEvent,
-      runExclusive,
-      sendCashuToken,
-      setCashuEmitAmount,
-      setStatus,
-      t,
-      walletBalances.perMint,
-    ],
-  );
 
   useResumeOnLaunchAndOnline(
     React.useMemo(() => {
@@ -1566,9 +951,9 @@ export const useCashuWalletComposition = ({
 
   return {
     ...lightningPayments,
+    ...walletTokens,
     ...paymentRequests,
     recurringPaymentsContext,
-    reclaimCashuTransfer,
     cashuTransferLifecycle,
     // Backup export and the Nostr bootstrap snapshot need every proof,
     // including hidden test-mint proofs; keep this unfiltered.
@@ -1576,29 +961,21 @@ export const useCashuWalletComposition = ({
     allowTestMints,
     applyDefaultMintSelection,
     canPayWithCashu,
-    cancelPendingCashuContactSend,
     cashuBalance,
     cashuBalanceAfterMelt,
-    cashuBulkCheckIsBusy,
     cashuDraft,
     cashuDraftRef,
-    cashuEmitAmount,
     cashuHasMultipleAcceptedMints,
     cashuIsBusy,
     cashuMeltToMainMintButtonLabel,
     cashuOpenTransfers,
     cashuDeferredReceives: walletDeferredReceives,
-    discardCashuDeferredReceive,
     cashuProofs: walletProofs,
     cashuOperations: walletOperations,
     cashuTokensHydratedRef,
     cashuTotalBalance,
     cashuTransfers: walletTransfers,
-    checkAllCashuTokensAndDeleteInvalid,
     inspectCashuProofStates,
-    checkAndRefreshCashuToken,
-    checkIssuedCashuTokensAndDeleteClaimed,
-    checkSingleIssuedCashuTokenIsClaimed,
     closeLnurlWithdrawConfirmation,
     closePaymentMintMeltConfirmation,
     confirmLnurlWithdraw,
@@ -1607,7 +984,6 @@ export const useCashuWalletComposition = ({
     defaultMintDisplay,
     defaultMintUrl,
     dismissWalletWarning,
-    emitCashuToken,
     estimateMintMove,
     getCashuTokenMessageInfo,
     getMintIconUrl,
@@ -1619,8 +995,6 @@ export const useCashuWalletComposition = ({
     lnAddressPayNote,
     lnurlWithdrawIsBusy,
     makeNip98AuthHeader,
-    markCashuTokenExternalized,
-    markCashuTokenIssued,
     markMintIconFailed,
     meltLargestForeignMintToMainMint: meltToDefaultMint,
     mintInfoByUrl,
@@ -1631,22 +1005,13 @@ export const useCashuWalletComposition = ({
     paidOverlayTitle,
     paySelectedContact,
     payWithCashuEnabled,
-    pendingCashuContactSend,
-    pendingCashuTokenContactPickId,
     receiveMethod,
     pendingLnurlWithdrawConfirmation,
     pendingPaymentMintMeltConfirmation,
     probeLightningFee,
     refreshMintInfo,
-    deleteCashuToken,
-    restoreMissingTokens,
-    reclaimHandedOutTokens,
-    restoreAndReclaimAllTokens,
-    returnCashuTokenToWallet,
     saveCashuFromText,
-    sendCashuTokenToContact,
     setCashuDraft,
-    setCashuEmitAmount,
     setContactPayMethod,
     setLightningInvoiceAutoPayLimit,
     setLnAddressPayAmount,
@@ -1660,9 +1025,6 @@ export const useCashuWalletComposition = ({
     setTopupNote,
     settleBankPaymentOffer,
     showPaidOverlay,
-    startSendCashuTokenToContact,
-    tokensRestoreIsBusy,
-    tokensRestoreProgress,
     topupAmount,
     topupNote,
     topupInvoice,
