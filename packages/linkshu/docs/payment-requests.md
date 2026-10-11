@@ -1,6 +1,6 @@
 # Payment requests
 
-Helpers for asking to be paid: NUT-18 `creqA…` payment requests and BIP-321 `bitcoin:` URIs that offer a Lightning invoice and a Cashu request side by side. They are pure functions with no wallet runtime, also exported without cashu-ts from `@linky-fit/linkshu/payment-request`.
+Helpers for asking to be paid and for paying: NUT-18 `creqA…` payment requests, BIP-321 `bitcoin:` URIs that offer a Lightning invoice and a Cashu request side by side, and the NUT-18 `post` transport. They need no wallet runtime and are also exported without cashu-ts from `@linky-fit/linkshu/payment-request`.
 
 ## Building a request
 
@@ -58,3 +58,53 @@ const receiveForRequest = (messageText: string, paymentId: string) =>
 ```
 
 The receipt's `amount` is what reached the wallet, after the mint's input fee; compare it with what you asked for. Once one leg paid, close the topup's scope. The unpaid quote stays a `pending` topup; the handle a later `Topup.resumePending` returns for it fails with `QuoteExpired` once the mint reports it `UNPAID` past its expiry, and the operation closes `failed`.
+
+## Paying a request over POST
+
+A request whose transport is `post` (`transports[i].type === "post"`, the URL in `target`) is paid by POSTing the NUT-18 payment payload to that URL. Check the URL with `isAllowedPaymentRequestPostUrl(url, { allowHttp })` before creating the token: the payload carries bearer proofs, so only `https:` passes, and `allowHttp: true` admits `http:` for local development.
+
+```ts
+import { Effect, Result } from "effect";
+import { Send, SendDraft, Tokens } from "@linky-fit/linkshu";
+import type { Amount, MintUrl } from "@linky-fit/linkshu";
+import {
+  isAllowedPaymentRequestPostUrl,
+  postPaymentRequestPayload,
+} from "@linky-fit/linkshu/payment-request";
+
+const payOverPost = (
+  url: string,
+  requestId: string | null,
+  mint: MintUrl,
+  amount: Amount,
+) =>
+  Effect.gen(function* () {
+    if (!isAllowedPaymentRequestPostUrl(url, { allowHttp: false }))
+      return "insecure";
+    const receipt = yield* (yield* Send).send(
+      new SendDraft({ mint, amount, produceAs: "pending" }),
+    );
+    const delivery = yield* Effect.promise(() =>
+      postPaymentRequestPayload({
+        url,
+        payload: {
+          id: requestId,
+          mint: receipt.mint,
+          unit: receipt.unit,
+          proofs: receipt.proofs,
+        },
+      }),
+    );
+    const tokens = yield* Tokens;
+    if (delivery._tag === "Delivered") {
+      yield* Effect.result(tokens.forget(receipt.operationId));
+      return "paid";
+    }
+    const returned = yield* Effect.result(
+      tokens.returnToWallet(receipt.operationId),
+    );
+    return Result.isSuccess(returned) ? "returned" : "return failed";
+  });
+```
+
+`postPaymentRequestPayload({ url, payload, allowHttp, fetch })` sends `{mint, unit, proofs, id, memo}` as JSON (`id` and `memo` left out when empty) with no credentials, and resolves, never rejects, with `Delivered` for a 2xx answer, `HttpError` with the `status` otherwise, `NetworkError` with a `detail` when the request did not complete, and `InsecureUrl` without sending anything when the URL fails the check above. `fetch` defaults to the global one. Take `proofs` from `SendReceipt.proofs`, not from the token text, whose v4 encoding shortens keyset ids. Any outcome but `Delivered` may still have handed the proofs to the payee, so take the send back with `Tokens.returnToWallet`, which re-receives it and kills the payee's copy at the mint ([tokens.md](./tokens.md#returntowallet)).

@@ -3,7 +3,6 @@ import { GENERIC_MINT_ICON_DATA_URL } from "../../../utils/mint";
 import {
   getEncounteredMintUrls,
   getMintInfoIconUrl,
-  parseMintInfoPayload,
   repairStoredMintInfoRow,
   resolveMintIcon,
 } from "./mintInfoHelpers";
@@ -97,19 +96,6 @@ describe("getMintInfoIconUrl", () => {
 
   it("returns null for invalid JSON", () => {
     expect(getMintInfoIconUrl("https://cashu.example", "not-json")).toBe(null);
-  });
-});
-
-describe("parseMintInfoPayload", () => {
-  it("stores the complete info JSON, so a large payload still parses", () => {
-    const { infoJson, supportsMpp } = parseMintInfoPayload(nut06Info);
-
-    expect(infoJson).toBe(JSON.stringify(nut06Info));
-    expect(infoJson?.length).toBeGreaterThan(1000);
-    expect(supportsMpp).toBe("1");
-    expect(getMintInfoIconUrl("https://cashu.example", infoJson)).toBe(
-      "https://cashu.example/icon.png",
-    );
   });
 });
 

@@ -136,6 +136,7 @@ const makeHarness = (
         Layer.succeed(
           WalletInstances,
           WalletInstances.of({
+            loadFresh: () => Effect.die("not under test"),
             get: load ?? (() => Effect.succeed(wallet)),
           }),
         ),
@@ -1327,6 +1328,7 @@ describe("Receive.receive", () => {
               {
                 ...stores,
                 instances: WalletInstances.of({
+                  loadFresh: () => Effect.die("not under test"),
                   get: () => Effect.succeed(wallet),
                 }),
               },

@@ -52,8 +52,14 @@ import {
 } from "../../../utils/npubCashServer";
 import {
   getLightningInvoicePreview,
+  isAllowedPaymentRequestPostUrl,
+  mintMoveCovers,
+  planMintMove,
+  planSendMint,
+  postPaymentRequestPayload,
   type LightningInvoicePreview,
   type OperationId,
+  type PostPaymentRequestPayloadOutcome,
 } from "@linky-fit/linkshu";
 import {
   CashuOperationId as CashuOperationIdType,
@@ -65,6 +71,7 @@ import {
   formatMintHost,
   MAIN_MINT_URL,
   normalizeMintUrl,
+  toMintUrl,
 } from "../../../utils/mint";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import { parseNpubCashProfileInfo } from "../../../utils/npubCashInfo";
@@ -103,6 +110,7 @@ import { usePaymentsDomain } from "../usePaymentsDomain";
 import { useProfileNpubCashEffects } from "../useProfileNpubCashEffects";
 import { reportCashuSendForgotten } from "../../lib/cashuSendInspector";
 import { describeTaggedCashuError } from "../../lib/cashuStoredError";
+import { isSpellingOf } from "../../lib/mintSpelling";
 import {
   isIssuedTransfer,
   isOpenTransfer,
@@ -110,15 +118,9 @@ import {
   takenTokenTexts,
 } from "../../lib/cashuTransfers";
 import {
-  canOfferPaymentMintMelt,
-  getPaymentMintMeltPlan,
-} from "../../lib/paymentMintMelt";
-import { selectSendMintForAmount } from "../../lib/paymentMintSelection";
-import {
   buildCashuPaymentRequestMessage,
   parseCashuPaymentRequestMessage,
   type CashuPaymentRequestMessageInfo,
-  paymentRequestPostUrlIsAllowed,
 } from "../../lib/paymentRequestMessage";
 import {
   getCashuTokenMessageInfo as getCashuTokenMessageInfoBase,
@@ -247,6 +249,19 @@ interface UseCashuWalletCompositionParams {
   t: Translate;
   transactions: Pick<TransactionsRepository, "all" | "update">;
 }
+
+const describePaymentRequestPostFailure = (
+  outcome: Exclude<PostPaymentRequestPayloadOutcome, { _tag: "Delivered" }>,
+): string => {
+  switch (outcome._tag) {
+    case "HttpError":
+      return `Payment request POST ${outcome.status}`;
+    case "NetworkError":
+      return outcome.detail;
+    case "InsecureUrl":
+      return "Payment request POST url is not https";
+  }
+};
 
 export const useCashuWalletComposition = ({
   contactPayBackToChatRef,
@@ -528,6 +543,7 @@ export const useCashuWalletComposition = ({
     inspectCashuProofStates,
     checkCashuTransfer,
     estimateAutoswapCashu,
+    fetchMintInfo,
     meltCashuInvoice,
     probeLightningFee,
     receiveCashuToken,
@@ -582,6 +598,7 @@ export const useCashuWalletComposition = ({
     appOwnerIdRef,
     walletProofs,
     defaultMintUrl,
+    fetchMintInfo,
     rememberSeenMint,
   });
 
@@ -670,27 +687,31 @@ export const useCashuWalletComposition = ({
   }, [walletBalances]);
 
   const paymentMintMeltPlan = React.useMemo(() => {
-    return getPaymentMintMeltPlan({
-      mainMint: normalizeMintUrl(defaultMintUrl ?? MAIN_MINT_URL),
-      balances: Array.from(cashuAcceptedMintBalances, ([mint, sum]) => ({
-        mint,
-        sum,
-      })),
+    const toMint = toMintUrl(defaultMintUrl ?? MAIN_MINT_URL);
+    if (toMint === null) return null;
+    return planMintMove({
+      toMint,
+      balances: Array.from(cashuAcceptedMintBalances).flatMap(
+        ([key, amount]) => {
+          const mint = toMintUrl(key);
+          return mint === null ? [] : [{ mint, amount }];
+        },
+      ),
     });
   }, [cashuAcceptedMintBalances, defaultMintUrl]);
 
   const cashuBalanceAfterMelt = Math.max(
     cashuBalance,
-    paymentMintMeltPlan?.maxBalanceAfterMelt ?? 0,
+    paymentMintMeltPlan?.maxBalanceAfterMove ?? 0,
   );
 
   const requestPaymentMintMelt = React.useCallback(
     (amountSat: number): boolean => {
       if (
-        !canOfferPaymentMintMelt({
-          amountSat,
-          currentBalance: cashuBalance,
+        !mintMoveCovers({
           plan: paymentMintMeltPlan,
+          amount: amountSat,
+          spendable: cashuBalance,
         }) ||
         !paymentMintMeltPlan
       ) {
@@ -1162,7 +1183,7 @@ export const useCashuWalletComposition = ({
       // An `http:` POST target exposes the bearer proofs to anyone on the
       // network path, so it is only accepted in development builds.
       if (
-        !paymentRequestPostUrlIsAllowed(postUrlRaw, {
+        !isAllowedPaymentRequestPostUrl(postUrlRaw, {
           allowHttp: import.meta.env.DEV,
         })
       ) {
@@ -1221,11 +1242,11 @@ export const useCashuWalletComposition = ({
             .map((mintUrl) => normalizeMintUrl(mintUrl))
             .find((mintUrl) => Boolean(mintUrl)) ??
           normalizeMintUrl(defaultMintUrl ?? "");
-        const mint = selectSendMintForAmount(
-          eligibleBalances,
-          preferredMint,
-          requestInfo.amount,
-        );
+        const mint = planSendMint({
+          balances: eligibleBalances,
+          isPreferredMint: isSpellingOf(preferredMint),
+          amount: requestInfo.amount,
+        });
         if (mint === null) {
           setStatus(t("payInsufficient"));
           return true;
@@ -1252,31 +1273,18 @@ export const useCashuWalletComposition = ({
         const receipt = sendOutcome.success;
         sentMint = receipt.mint;
 
-        try {
-          const body: Record<string, unknown> = {
+        const delivery = await postPaymentRequestPayload({
+          url: postUrl.toString(),
+          payload: {
+            id: requestInfo.requestId,
+            memo: requestInfo.description,
             mint: receipt.mint,
             unit: receipt.unit,
             proofs: receipt.proofs,
-          };
-          if (requestInfo.requestId) body.id = requestInfo.requestId;
-          if (requestInfo.description) body.memo = requestInfo.description;
-
-          const response = await fetch(postUrl.toString(), {
-            method: "POST",
-            cache: "no-store",
-            credentials: "omit",
-            headers: {
-              Accept: "application/json",
-              "Content-Type": "application/json",
-            },
-            mode: "cors",
-            body: JSON.stringify(body),
-          });
-
-          if (!response.ok) {
-            throw new Error(`Payment request POST ${response.status}`);
-          }
-        } catch (error) {
+          },
+          allowHttp: import.meta.env.DEV,
+        });
+        if (delivery._tag !== "Delivered") {
           // The POST recipient may hold the proofs now; re-receiving kills
           // that encoding at the mint before the funds return to balance.
           const restored = await cashuTransferLifecycle.returnToWallet(
@@ -1287,7 +1295,7 @@ export const useCashuWalletComposition = ({
               error: restored.failure._tag,
             });
           }
-          throw error;
+          throw new Error(describePaymentRequestPostFailure(delivery));
         }
 
         await cashuTransferLifecycle.forget(receipt.operationId);
@@ -2188,22 +2196,8 @@ export const useCashuWalletComposition = ({
     [defaultMintUrl],
   );
 
-  const largestForeignMintForTokenList = React.useMemo(() => {
-    if (!mainMintForTokenList) return null;
-
-    let selected: { mint: string; sum: number } | null = null;
-    for (const [mint, sum] of cashuAcceptedMintBalances) {
-      if (mint === mainMintForTokenList || sum <= 0) continue;
-      if (!selected || sum > selected.sum) {
-        selected = { mint, sum };
-      }
-    }
-
-    return selected;
-  }, [cashuAcceptedMintBalances, mainMintForTokenList]);
-
   const cashuMeltToMainMintButtonLabel =
-    mainMintForTokenList && largestForeignMintForTokenList
+    mainMintForTokenList && paymentMintMeltPlan
       ? t("cashuMeltToMainMint").replace(
           "{mint}",
           formatMintHost(mainMintForTokenList),
@@ -2248,11 +2242,11 @@ export const useCashuWalletComposition = ({
       setStatus(t("cashuEmitting"));
 
       try {
-        const mint = selectSendMintForAmount(
-          walletBalances.perMint,
-          normalizeMintUrl(defaultMintUrl ?? ""),
-          amountSat,
-        );
+        const mint = planSendMint({
+          balances: walletBalances.perMint,
+          isPreferredMint: isSpellingOf(defaultMintUrl),
+          amount: amountSat,
+        });
         if (mint === null) {
           setStatus(t("payInsufficient"));
           return;
@@ -2335,8 +2329,8 @@ export const useCashuWalletComposition = ({
       return;
     }
 
-    const source = largestForeignMintForTokenList;
-    if (!source || autoswapCashu === null || resolveAutoswapSource === null) {
+    const plan = paymentMintMeltPlan;
+    if (!plan || autoswapCashu === null || resolveAutoswapSource === null) {
       setStatus(t("cashuMeltToMainMintUnavailable"));
       return;
     }
@@ -2346,7 +2340,7 @@ export const useCashuWalletComposition = ({
     try {
       rememberSeenMint(targetMint);
       const outcome = await autoswapCashu({
-        sourceMint: await resolveAutoswapSource(source.mint),
+        sourceMint: await resolveAutoswapSource(plan.fromMint),
         targetMint,
       });
 
@@ -2369,7 +2363,7 @@ export const useCashuWalletComposition = ({
         error._tag === "PaymentFailed" &&
         normalizeMintUrl(error.mint) === targetMint
       ) {
-        const pending = formatDisplayedAmountParts(source.sum);
+        const pending = formatDisplayedAmountParts(plan.sourceBalance);
         setStatus(
           t("cashuMeltToMainMintPending")
             .replace("{amount}", `${pending.approxPrefix}${pending.amountText}`)
@@ -2398,7 +2392,7 @@ export const useCashuWalletComposition = ({
     cashuIsBusy,
     defaultMintUrl,
     formatDisplayedAmountParts,
-    largestForeignMintForTokenList,
+    paymentMintMeltPlan,
     rememberSeenMint,
     resolveAutoswapSource,
     setCashuIsBusy,

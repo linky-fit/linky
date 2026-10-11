@@ -10,6 +10,9 @@ import {
   FeeProbeDraft,
   Melt,
   MeltDraft,
+  Mints,
+  MintUnreachable,
+  MintUrl,
   OperationId,
   PaidQuoteDraft,
   Receive,
@@ -50,8 +53,8 @@ import type {
   MeltError,
   MeltReceipt,
   MeltResumeResult,
+  MintInfo,
   MintRejected,
-  MintUnreachable,
   NewOperation,
   OperationNotFound,
   ProofStateSnapshot,
@@ -75,7 +78,7 @@ import type {
 import { Effect, Schema, Scope } from "effect";
 import type { Result } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
-import { storedMintSpelling } from "../../lib/paymentMintSelection";
+import { storedMintSpelling } from "../../lib/mintSpelling";
 import {
   linkshuRuntimeAtom,
   NostrKeyOptions,
@@ -163,6 +166,14 @@ interface ProbeLightningFeeArgs {
 export type ProbeLightningFee = (
   args: ProbeLightningFeeArgs,
 ) => Promise<Result.Result<LightningFeeProbeResult, FeeProbeError>>;
+
+/**
+ * linkshu `Mints.fetchInfo`, given up after 8 s; the mint stays out of the
+ * wallet's known mints. Invalid mint input and defects reject.
+ */
+export type FetchMintInfo = (
+  mint: string,
+) => Promise<Result.Result<MintInfo, MintUnreachable | MintRejected>>;
 
 interface StartCashuTopupArgs {
   readonly amountSat: number;
@@ -317,6 +328,7 @@ const decodeRestoreDraft = Schema.decodeUnknownSync(RestoreDraft);
 const decodeTopupDraft = Schema.decodeUnknownSync(TopupDraft);
 const decodePaidQuoteDraft = Schema.decodeUnknownSync(PaidQuoteDraft);
 const decodeEnvelopeRef = Schema.decodeUnknownSync(EnvelopeRef);
+const decodeMintUrl = Schema.decodeUnknownSync(MintUrl);
 const decodeEnvelopeOpenDraft = Schema.decodeUnknownSync(EnvelopeOpenDraft);
 const decodeEnvelopeMeltDraft = Schema.decodeUnknownSync(EnvelopeMeltDraft);
 const decodeEnvelopeSendDraft = Schema.decodeUnknownSync(EnvelopeSendDraft);
@@ -510,6 +522,25 @@ const makeLinkshuCommands = (run: LinkshuRun) => {
       }),
     );
 
+  const fetchMintInfo: FetchMintInfo = (mint) =>
+    runResult(
+      Effect.suspend(() => {
+        const url = decodeMintUrl(mint);
+        return Effect.flatMap(Mints, (mints) => mints.fetchInfo(url)).pipe(
+          Effect.timeoutOrElse({
+            duration: "8 seconds",
+            orElse: () =>
+              Effect.fail(
+                new MintUnreachable({
+                  mint: url,
+                  detail: "mint info did not arrive within 8 s",
+                }),
+              ),
+          }),
+        );
+      }),
+    );
+
   const inspectCashuProofStates: InspectCashuProofStates = () =>
     run(
       Effect.flatMap(Validation, (validation) => validation.inspectProofStates),
@@ -664,6 +695,7 @@ const makeLinkshuCommands = (run: LinkshuRun) => {
     inspectCashuProofStates,
     checkCashuTransfer,
     estimateAutoswapCashu,
+    fetchMintInfo,
     meltCashuInvoice,
     probeLightningFee,
     receiveCashuToken,

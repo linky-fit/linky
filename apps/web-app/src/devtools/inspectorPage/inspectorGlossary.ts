@@ -264,6 +264,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "User assigned the contacts just saved from a chat message to a group; the payload lists the contact ids and the group name.",
   ChatImageShareFailed:
     "System share of a chat image failed for a reason other than the user cancelling; the app fell back to a file download when triggered from the message menu.",
+  "mints.fetchInfo":
+    "linkshu loaded a mint's published info and keysets afresh for the mint's cached metadata (fee, icon, MPP) without adding it to the known mints. The payload names the mint; MintUnreachable or MintRejected means the refresh failed and the cached row stays as it was.",
   "mints.addKnownMint":
     "linkshu recorded a mint in its known-mint set without contacting it. The payload names the mint; repeating the operation leaves one entry.",
   "mints.removeKnownMint":

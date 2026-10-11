@@ -36,7 +36,7 @@ vi.mock("../../lnurlPay", () => ({
 
 import { useLightningPaymentsDomain } from "./useLightningPaymentsDomain";
 
-const MINT_URL = "https://mint.example";
+const MINT_URL = MintUrl.make("https://mint.example");
 
 const meltReceipt = (paidAmount: number): MeltReceipt =>
   new MeltReceipt({

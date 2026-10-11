@@ -1,67 +1,53 @@
+import { MintInfo, MintUrl } from "@linky-fit/linkshu";
 import { describe, expect, it } from "vitest";
 import {
-  extractActiveKeysetPpk,
   getMintFeePpk,
-  parseMintInfoPayload,
+  getMintInfoIconUrl,
+  mintInfoRowFields,
 } from "./mintInfoHelpers";
 
-const keysets = {
-  keysets: [
-    { id: "a", unit: "sat", active: false, input_fee_ppk: 100 },
-    { id: "b", unit: "sat", active: true, input_fee_ppk: 0 },
-    { id: "c", unit: "usd", active: true, input_fee_ppk: 500 },
-  ],
-};
-
-describe("mint fee parsing", () => {
-  it("decodes legacy NUT and fee aliases without assuming an object", () => {
-    expect(parseMintInfoPayload(null)).toEqual({
-      supportsMpp: null,
-      feesJson: null,
-      infoJson: null,
-    });
-    expect(
-      parseMintInfoPayload({
-        NUTS: { NUT15: { methods: [] } },
-        fee: { ppk: 50 },
-      }),
-    ).toMatchObject({
-      supportsMpp: "1",
-      feesJson: '{"ppk":50,"raw":{"ppk":50}}',
-    });
-    expect(
-      parseMintInfoPayload({ nuts: "invalid", fees: { ppk: "100" } }),
-    ).toMatchObject({
-      supportsMpp: null,
-      feesJson: '{"ppk":100,"raw":{"ppk":"100"}}',
-    });
+const info = (overrides: Partial<MintInfo> = {}) =>
+  new MintInfo({
+    url: MintUrl.make("https://cashu.example"),
+    name: "Cashu example",
+    inputFeePpk: 100,
+    supportsMpp: true,
+    supportsP2pk: false,
+    isFakeLightning: false,
+    iconUrl: "https://cashu.example/icon.png",
+    ...overrides,
   });
 
-  it("ignores malformed keysets while retaining valid fees", () => {
+describe("mintInfoRowFields", () => {
+  it("stores what the fee row, the icon and MPP read back", () => {
+    const fields = mintInfoRowFields(info());
+
+    expect(getMintFeePpk(fields.feesJson)).toBe(100);
+    expect(getMintInfoIconUrl("https://cashu.example", fields.infoJson)).toBe(
+      "https://cashu.example/icon.png",
+    );
+    expect(fields.supportsMpp).toBe("1");
+  });
+
+  it("stores a zero fee as known and a missing one as unknown", () => {
     expect(
-      extractActiveKeysetPpk({
-        keysets: [
-          null,
-          { active: true, unit: "sat", input_fee_ppk: -1 },
-          { active: true, unit: "sat", input_fee_ppk: 0.5 },
-          { active: true, unit: "sat", input_fee_ppk: 75 },
-        ],
-      }),
-    ).toBe(75);
-    expect(
-      extractActiveKeysetPpk({ keysets: [{ active: true, unit: "sat" }] }),
+      getMintFeePpk(mintInfoRowFields(info({ inputFeePpk: 0 })).feesJson),
     ).toBe(0);
+    expect(
+      mintInfoRowFields(info({ inputFeePpk: null, supportsMpp: false })),
+    ).toMatchObject({ feesJson: null, supportsMpp: null });
   });
 
-  it("prefers the active sat keyset fee over inactive ones", () => {
-    expect(extractActiveKeysetPpk(keysets)).toBe(0);
-    expect(extractActiveKeysetPpk({ keysets: [] })).toBeNull();
-    expect(extractActiveKeysetPpk(null)).toBeNull();
-  });
+  it("keeps infoJson without an icon", () => {
+    const { infoJson } = mintInfoRowFields(info({ iconUrl: null }));
 
-  it("stores the keyset ppk in feesJson and reads it back", () => {
-    const parsed = parseMintInfoPayload({ name: "mint" }, keysets);
-    expect(getMintFeePpk(parsed.feesJson)).toBe(0);
+    expect(infoJson).not.toBeNull();
+    expect(getMintInfoIconUrl("https://cashu.example", infoJson)).toBeNull();
+  });
+});
+
+describe("getMintFeePpk", () => {
+  it("reads null for a missing or broken blob", () => {
     expect(getMintFeePpk(null)).toBeNull();
     expect(getMintFeePpk("not json")).toBeNull();
   });

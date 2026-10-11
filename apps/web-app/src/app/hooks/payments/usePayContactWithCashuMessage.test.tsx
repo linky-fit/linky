@@ -68,7 +68,7 @@ vi.mock("@linky-fit/linkstr-react", () => ({
 import { usePayContactWithCashuMessage } from "./usePayContactWithCashuMessage";
 
 const CONTACT_ID = createIdFromString<"Contact">("contact");
-const MINT_URL = "https://mint.example";
+const MINT_URL = MintUrl.make("https://mint.example");
 
 const currentNpub = nip19.npubEncode(getPublicKey(createSecretKey(1)));
 const contactNpub = nip19.npubEncode(getPublicKey(createSecretKey(2)));

@@ -77,7 +77,10 @@ const makeHarness = (
       Layer.mergeAll(
         Layer.succeed(
           WalletInstances,
-          WalletInstances.of({ get: (url) => Effect.succeed(wallet(url)) }),
+          WalletInstances.of({
+            loadFresh: () => Effect.die("not under test"),
+            get: (url) => Effect.succeed(wallet(url)),
+          }),
         ),
         Layer.succeed(KeyValueStore, kv),
         inspector.layer,

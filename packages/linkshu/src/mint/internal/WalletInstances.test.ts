@@ -149,6 +149,32 @@ describe("makeWalletInstances", () => {
     expect(exit).toEqual(Exit.succeed(wallet));
     expect(calls).toBe(2);
   });
+
+  it("loads fresh past the cache without recording the mint as seen", async () => {
+    const sets: Array<[string, string]> = [];
+    let calls = 0;
+    const load: WalletLoader = () => {
+      calls += 1;
+      return calls === 3
+        ? Promise.reject(new TypeError("fetch failed"))
+        : Promise.resolve(fakeWallet(`01aa0${calls}`));
+    };
+    const instances = makeWalletInstances(stubKv(sets), load);
+
+    const first = await Effect.runPromise(instances.loadFresh(mint, sat));
+    const second = await Effect.runPromise(instances.loadFresh(mint, sat));
+    const failed = await Effect.runPromiseExit(instances.loadFresh(mint, sat));
+
+    expect(second).not.toBe(first);
+    expect(failed).toEqual(
+      Exit.fail(expect.objectContaining({ _tag: "MintUnreachable", mint })),
+    );
+    expect(sets).toEqual([]);
+    // A fresh load leaves the cache empty: the next `get` loads and records.
+    await Effect.runPromise(instances.get(mint, sat));
+    expect(calls).toBe(4);
+    expect(sets).toEqual([[seenMintKey(mint), mint]]);
+  });
 });
 
 describe("classifyMintError", () => {
