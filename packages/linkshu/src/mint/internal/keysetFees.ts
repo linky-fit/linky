@@ -5,9 +5,9 @@ import type { LoadedWallet } from "./WalletInstances";
 const boundKeyset = (wallet: LoadedWallet): Keyset | undefined =>
   wallet.keyChain.getKeysets().find((keyset) => keyset.id === wallet.keysetId);
 
-/** Fee of the keyset the wallet is bound to, as the mint published it. */
+/** Fee of the bound keyset (NUT-02: an omitted fee is 0); null without one. */
 export const boundKeysetInputFeePpk = (wallet: LoadedWallet): number | null =>
-  boundKeyset(wallet)?.toMintKeyset().input_fee_ppk ?? null;
+  boundKeyset(wallet)?.fee ?? null;
 
 /** NUT-02: the fee of a swap is the summed per-proof fee, rounded up. */
 const feeOfPpkSum = (ppkSum: number): number => Math.ceil(ppkSum / 1000);
@@ -35,9 +35,7 @@ export const inputFeeForProofs = (
   proofs: ReadonlyArray<{ readonly id: string }>,
 ): number => {
   const ppkByKeyset = new Map(
-    wallet.keyChain
-      .getKeysets()
-      .map((keyset) => [keyset.id, keyset.toMintKeyset().input_fee_ppk ?? 0]),
+    wallet.keyChain.getKeysets().map((keyset) => [keyset.id, keyset.fee]),
   );
   return feeOfPpkSum(
     proofs.reduce((sum, proof) => sum + (ppkByKeyset.get(proof.id) ?? 0), 0),
