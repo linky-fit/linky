@@ -1,14 +1,15 @@
 import type { PlanSendMintArgs } from "@linky-fit/linkshu";
+import { useAtomSet } from "@linky-fit/linkstr-react";
 import React from "react";
 import type { Translate } from "../../../i18n";
 import type {
   DisplayAmountParts,
   FiatRates,
 } from "../../../utils/displayAmounts";
-import { MAIN_MINT_URL, normalizeMintUrl } from "../../../utils/mint";
 import type { PaidOverlayDetails } from "../../lib/paidOverlay";
 import type { CashuEnvelopes } from "../../state/linkshu/commands";
 import { logPayStep } from "../../state/wallet/paymentLog";
+import { recurringSchedulerAtom } from "../../state/wallet/recurring";
 import type { ChatWrites } from "../../state/messages/chatWrites";
 import type {
   ContactRowLike,
@@ -16,7 +17,6 @@ import type {
   LoggedPaymentEventParams,
 } from "../../types/appTypes";
 import { useRecurringPaymentOrders } from "../payments/useRecurringPaymentOrders";
-import { useRecurringPaymentsActions } from "../payments/useRecurringPaymentsActions";
 import { useRecurringPaymentsScheduler } from "../payments/useRecurringPaymentsScheduler";
 import { useRecurringReminderSync } from "../payments/useRecurringReminderSync";
 import { useSendTokenMessage } from "../payments/useSendTokenMessage";
@@ -35,7 +35,6 @@ interface UseRecurringPaymentsParams {
   contacts: readonly ContactRowLike[];
   currentNpub: string | null;
   currentNsec: string | null;
-  defaultMintUrl: string | null;
   envelopes: CashuEnvelopes | null;
   fiatRates: FiatRates | null;
   formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
@@ -46,7 +45,6 @@ interface UseRecurringPaymentsParams {
     tag?: string,
   ) => Promise<void>;
   mintBalances: PlanSendMintArgs["balances"];
-  payWithCashuEnabled: boolean;
   pushToast: (message: string) => void;
   showPaidOverlay: (title: string, details: PaidOverlayDetails) => void;
   t: Translate;
@@ -54,20 +52,21 @@ interface UseRecurringPaymentsParams {
   walletReady: boolean;
 }
 
-/** Recurring payments: the scheduler, its screen actions and the due-payment reminders. */
+/**
+ * Recurring payments: the scheduler, which screens reach through
+ * `recurringSchedulerAtom`, and the due-payment reminders.
+ */
 export const useRecurringPayments = ({
   chat,
   contacts,
   currentNpub,
   currentNsec,
-  defaultMintUrl,
   envelopes,
   fiatRates,
   formatDisplayedAmountParts,
   logPaymentEvent,
   maybeShowPwaNotification,
   mintBalances,
-  payWithCashuEnabled,
   pushToast,
   showPaidOverlay,
   t,
@@ -94,46 +93,17 @@ export const useRecurringPayments = ({
     showPaidOverlay,
     t,
   });
-  const recurringDefaultMintUrl = normalizeMintUrl(
-    defaultMintUrl ?? MAIN_MINT_URL,
-  );
-  const actions = useRecurringPaymentsActions({
-    contacts,
-    defaultMintUrl: recurringDefaultMintUrl,
-    payWithCashuEnabled,
-    pushToast,
-    repository,
-    runNow: scheduler.runNow,
-    t,
-  });
+  const { cancelDue, confirmDueNow, runNow } = scheduler;
+  const setScheduler = useAtomSet(recurringSchedulerAtom);
+  React.useEffect(() => {
+    setScheduler({ cancelDue, confirmDueNow, runNow });
+    return () => setScheduler(null);
+  }, [cancelDue, confirmDueNow, runNow, setScheduler]);
   useRecurringReminderSync({
     currentNsec,
     enabled: walletReady,
     orders: useRecurringPaymentOrders(),
   });
 
-  const recurringPaymentsContext = React.useMemo(
-    () => ({
-      ...actions,
-      cancelDue: scheduler.cancelDue,
-      confirmDueNow: scheduler.confirmDueNow,
-      defaultMintUrl: recurringDefaultMintUrl,
-      dueConfirmation: scheduler.dueConfirmation,
-      mintBalanceSat: (mintUrl: string) =>
-        mintBalances.find((entry) => entry.mint === mintUrl)?.amount ?? 0,
-    }),
-    [
-      actions,
-      mintBalances,
-      recurringDefaultMintUrl,
-      scheduler.cancelDue,
-      scheduler.confirmDueNow,
-      scheduler.dueConfirmation,
-    ],
-  );
-
-  return {
-    recoverEnvelopes: scheduler.recoverEnvelopes,
-    recurringPaymentsContext,
-  };
+  return { recoverEnvelopes: scheduler.recoverEnvelopes };
 };

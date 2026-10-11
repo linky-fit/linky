@@ -16,7 +16,6 @@ import {
   type AppShellRouteContextValue,
 } from "./context/AppShellContexts";
 import { BeaconController } from "./BeaconController";
-import { RecurringPaymentsProvider } from "./context/RecurringPaymentsContext";
 import { useLaneToShardMigration } from "./migrations/useLaneToShardMigration";
 import { AppRouteContent } from "./routes/AppRouteContent";
 import { sessionAtom } from "./state/session/session";
@@ -60,11 +59,9 @@ const AuthenticatedAppShell = ({ currentNsec }: AuthenticatedAppShellProps) => {
     evoluSettingsContext,
     formatDisplayedAmountText,
     mainTabRouteProps,
-    mintSettingsContext,
     moneyRouteProps,
     peopleRouteProps,
     pendingCashuContactSend,
-    recurringPaymentsContext,
     relaySettingsContext,
     t,
     toasts,
@@ -108,15 +105,12 @@ const AuthenticatedAppShell = ({ currentNsec }: AuthenticatedAppShellProps) => {
         advancedSettings={advancedSettingsContext}
         core={coreContextValue}
         evoluSettings={evoluSettingsContext}
-        mintSettings={mintSettingsContext}
         relaySettings={relaySettingsContext}
         routes={routeContextValue}
       >
-        <RecurringPaymentsProvider value={recurringPaymentsContext}>
-          <AuthenticatedLayout>
-            <AppRouteContent />
-          </AuthenticatedLayout>
-        </RecurringPaymentsProvider>
+        <AuthenticatedLayout>
+          <AppRouteContent />
+        </AuthenticatedLayout>
       </AppShellContextsProvider>
     </AppFrame>
   );

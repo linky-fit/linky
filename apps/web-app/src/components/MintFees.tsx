@@ -3,7 +3,11 @@ import { Stack, ListRow } from "@linky-fit/ui";
 import { Result } from "effect";
 import React from "react";
 import { useTranslation } from "../app/hooks/shell";
-import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
+import { useLinkshuCommands } from "../app/hooks/composition/useLinkshuComposition";
+import {
+  useMintInfoByUrl,
+  useRefreshMintInfo,
+} from "../app/hooks/mint/useMintInfo";
 import type { ProbeLightningFee } from "../app/hooks/composition/useLinkshuComposition";
 import { getMintFeePpk } from "../app/hooks/mint/mintInfoHelpers";
 import {
@@ -51,7 +55,8 @@ const pickProbeMint = (mintUrl: string): string | null =>
 
 /** Fetches the mint's info once its keyset fee is unknown, at most once a minute. */
 const useKeysetFeePpk = (mintUrl: string): number | null => {
-  const { mintInfoByUrl, refreshMintInfo } = useMintSettingsContext();
+  const mintInfoByUrl = useMintInfoByUrl();
+  const refreshMintInfo = useRefreshMintInfo();
   const row = mintInfoByUrl.get(mintUrl);
   const ppk = getMintFeePpk(row?.feesJson);
   const checkedAtSec = row?.lastCheckedAtSec ?? 0;
@@ -113,7 +118,7 @@ interface MintFeesProps {
 }
 
 export function MintFees({ mint }: MintFeesProps) {
-  const { probeLightningFee } = useMintSettingsContext();
+  const probeLightningFee = useLinkshuCommands()?.probeLightningFee ?? null;
   const { lang, t } = useTranslation();
   const mintUrl = normalizeMintUrl(mint);
   const ppk = useKeysetFeePpk(mintUrl);

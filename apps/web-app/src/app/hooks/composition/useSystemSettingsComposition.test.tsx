@@ -4,7 +4,6 @@ import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import type {
   AdvancedSettingsContextValue,
   EvoluSettingsContextValue,
-  MintSettingsContextValue,
   RelaySettingsContextValue,
 } from "../../context/SystemSettingsContexts";
 import {
@@ -83,36 +82,6 @@ const createEvoluSettings = (
   wipeEvoluStorage,
 });
 
-const appOwnerIdRef = React.createRef<string>();
-
-const mintSettings: MintSettingsContextValue = {
-  allowTestMints: true,
-  appOwnerIdRef,
-  applyDefaultMintSelection: async () => true,
-  cashuIsBusy: false,
-  cashuDeferredReceives: [],
-  cashuMeltToMainMintButtonLabel: null,
-  cashuProofs: [],
-  defaultMintUrl: null,
-  discardCashuDeferredReceive: async () => undefined,
-  estimateMintMove: () => Promise.resolve(null),
-  getMintIconUrl: () => ({
-    failed: false,
-    host: null,
-    origin: null,
-    url: null,
-  }),
-  getMintRuntime: () => null,
-  meltLargestForeignMintToMainMint: noopAsync,
-  mintInfoByUrl: new Map(),
-  moveMintFunds: () => Promise.resolve(false),
-  probeLightningFee: null,
-  refreshMintInfo: noopAsync,
-  setAllowTestMints: () => Promise.resolve({ ok: true }),
-  setMintInfoAll: noop,
-  setStatus: noop,
-};
-
 const relaySettings: RelaySettingsContextValue = {
   canSaveNewRelay: false,
   isRecommendedRelay: () => false,
@@ -139,7 +108,6 @@ const Harness = ({
   const result = useSystemSettingsComposition({
     advancedSettingsInput,
     evoluSettingsInput,
-    mintSettingsInput: mintSettings,
     relaySettingsInput: relaySettings,
     t: translate,
   });

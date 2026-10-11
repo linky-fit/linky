@@ -2,7 +2,6 @@ import React from "react";
 import type {
   AdvancedSettingsContextValue,
   EvoluSettingsContextValue,
-  MintSettingsContextValue,
   RelaySettingsContextValue,
 } from "../../context/SystemSettingsContexts";
 import { useMemoizedContextValue } from "./useMemoizedRouteBundle";
@@ -16,7 +15,6 @@ type EvoluSettingsInput = Omit<
 interface UseSystemSettingsCompositionParams {
   advancedSettingsInput: AdvancedSettingsContextValue;
   evoluSettingsInput: EvoluSettingsInput;
-  mintSettingsInput: MintSettingsContextValue;
   relaySettingsInput: RelaySettingsContextValue;
   t: Translate;
 }
@@ -24,14 +22,12 @@ interface UseSystemSettingsCompositionParams {
 export interface SystemSettingsCompositionResult {
   advancedSettingsContext: AdvancedSettingsContextValue;
   evoluSettingsContext: EvoluSettingsContextValue;
-  mintSettingsContext: MintSettingsContextValue;
   relaySettingsContext: RelaySettingsContextValue;
 }
 
 export const useSystemSettingsComposition = ({
   advancedSettingsInput,
   evoluSettingsInput,
-  mintSettingsInput,
   relaySettingsInput,
   t,
 }: UseSystemSettingsCompositionParams): SystemSettingsCompositionResult => {
@@ -69,7 +65,6 @@ export const useSystemSettingsComposition = ({
       clearDatabaseArmed,
       requestClearDatabase,
     }),
-    mintSettingsContext: useMemoizedContextValue(mintSettingsInput),
     relaySettingsContext: useMemoizedContextValue(relaySettingsInput),
   };
 };

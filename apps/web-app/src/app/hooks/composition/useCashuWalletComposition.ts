@@ -16,7 +16,7 @@ import { useDeferredReceiveRetry } from "../cashu/useDeferredReceiveRetry";
 import { useTopupFlow } from "../topup/useTopupFlow";
 import { useAnonymousPaymentTelemetry } from "../useAnonymousPaymentTelemetry";
 import { useCashuDomain } from "../useCashuDomain";
-import { useMintDomain } from "../useMintDomain";
+import { useMintInfo, useMintInfoWatchers } from "../mint/useMintInfo";
 import { useAllowTestMints } from "../useAllowTestMints";
 import { useMoveMintFunds } from "../mint/useMoveMintFunds";
 import {
@@ -144,12 +144,8 @@ export const useCashuWalletComposition = ({
     rememberSeenMint,
   } = useOwnerStorage();
 
-  const {
-    defaultMintChoice,
-    defaultMintUrl,
-    setDefaultMint,
-    suggestDefaultMint,
-  } = useDefaultMint();
+  const { defaultMintChoice, defaultMintUrl, suggestDefaultMint } =
+    useDefaultMint();
 
   const [payWithCashuEnabled, setPayWithCashuEnabled] = useAtom(
     payWithCashuEnabledAtom,
@@ -183,7 +179,6 @@ export const useCashuWalletComposition = ({
     allWalletProofs,
     cashuEnvelopes,
     cashuTransferLifecycle,
-    fetchMintInfo,
     meltCashuInvoice,
     probeLightningFee,
     receiveCashuToken,
@@ -209,23 +204,13 @@ export const useCashuWalletComposition = ({
   } = useCashuDomain({ cashuTransfers: walletTransfers, walletLoaded });
 
   const {
-    getMintIconUrl,
-    getMintRuntime,
     isMintDeleted,
-    markMintIconFailed,
     mintInfoByUrl,
     mintInfoDeduped,
     refreshMintInfo,
-    setMintInfoAll,
     touchMintInfo,
-  } = useMintDomain({
-    allowTestMints,
-    appOwnerId,
-    walletProofs,
-    defaultMintUrl,
-    fetchMintInfo,
-    rememberSeenMint,
-  });
+  } = useMintInfo();
+  useMintInfoWatchers({ allowTestMints, defaultMintUrl, walletProofs });
 
   useTransferCleanup({
     chatMessages,
@@ -278,7 +263,7 @@ export const useCashuWalletComposition = ({
     }
   }, [defaultMintUrl]);
 
-  const { applyDefaultMintSelection } = useNpubCash({
+  useNpubCash({
     ...profile,
     copyText,
     currentNpub,
@@ -294,7 +279,6 @@ export const useCashuWalletComposition = ({
     refreshMintInfo,
     rememberCashuTokenKnown,
     routeKind: route.kind,
-    setDefaultMint,
     setStatus,
     showPaidOverlay,
     suggestDefaultMint,
@@ -382,19 +366,17 @@ export const useCashuWalletComposition = ({
     }),
     [appendLocalNostrMessage, nostrMessagesLocal, updateLocalNostrMessage],
   );
-  const { recoverEnvelopes, recurringPaymentsContext } = useRecurringPayments({
+  const { recoverEnvelopes } = useRecurringPayments({
     chat,
     contacts,
     currentNpub,
     currentNsec,
-    defaultMintUrl,
     envelopes: cashuEnvelopes,
     fiatRates,
     formatDisplayedAmountParts,
     logPaymentEvent,
     maybeShowPwaNotification,
     mintBalances: walletBalances.perMint,
-    payWithCashuEnabled,
     pushToast,
     showPaidOverlay,
     t,
@@ -446,13 +428,11 @@ export const useCashuWalletComposition = ({
     discardCashuDeferredReceive,
     markCashuTokenExternalized,
     markCashuTokenIssued,
-    recurringPaymentsContext,
     cashuTransferLifecycle,
     // Backup export and the Nostr bootstrap snapshot need every proof,
     // including hidden test-mint proofs; keep this unfiltered.
     allCashuProofs: allWalletProofs,
     allowTestMints,
-    applyDefaultMintSelection,
     cashuBalance,
     cashuBalanceAfterMelt,
     cashuIsBusy,
@@ -466,12 +446,9 @@ export const useCashuWalletComposition = ({
     defaultMintUrl,
     estimateMintMove,
     getCashuTokenMessageInfo,
-    getMintIconUrl,
-    getMintRuntime,
     isCashuTokenKnownAny,
     isCashuTokenStored,
     lightningInvoiceAutoPayLimit,
-    markMintIconFailed,
     meltLargestForeignMintToMainMint: meltToDefaultMint,
     mintInfoByUrl,
     moveMintFunds,
@@ -481,7 +458,6 @@ export const useCashuWalletComposition = ({
     refreshMintInfo,
     saveCashuFromText,
     setLightningInvoiceAutoPayLimit,
-    setMintInfoAll,
     setAllowTestMints,
     setPayWithCashuEnabled,
     setReceiveMethod,

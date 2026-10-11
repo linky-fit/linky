@@ -1,7 +1,9 @@
 import { Button, Stack, TextField } from "@linky-fit/ui";
 import React from "react";
-import { useTranslation } from "../app/hooks/shell";
-import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
+import { useSetStatus, useTranslation } from "../app/hooks/shell";
+import { useAllowTestMints } from "../app/hooks/useAllowTestMints";
+import { useApplyDefaultMint } from "../app/hooks/wallet/useNpubCash";
+import { useWalletOps } from "../app/hooks/wallet/useWalletOps";
 import { navigateTo } from "../hooks/useRouting";
 import {
   isHiddenTestMint,
@@ -24,8 +26,10 @@ const parseMintUrlInput = (value: string): string | null => {
 };
 
 export function MintNewPage(): React.ReactElement {
-  const { allowTestMints, applyDefaultMintSelection, cashuIsBusy, setStatus } =
-    useMintSettingsContext();
+  const { allowTestMints } = useAllowTestMints();
+  const applyDefaultMintSelection = useApplyDefaultMint();
+  const { walletOpRunning: cashuIsBusy } = useWalletOps();
+  const setStatus = useSetStatus();
   const { t } = useTranslation();
   const [mintUrl, setMintUrl] = React.useState("");
   const [isSaving, setIsSaving] = React.useState(false);

@@ -1,12 +1,14 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { MintSettingsContextValue } from "../app/context/SystemSettingsContexts";
 import { createTransferFixture } from "../testUtils/cashuInventory";
-import { createMintSettings } from "../testUtils/mintSettings";
+import {
+  createMintSettings,
+  type MintSettings,
+} from "../testUtils/mintSettings";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { MintDeferredReceives } from "./MintDeferredReceives";
 
-let mintSettings: MintSettingsContextValue;
+let mintSettings: MintSettings;
 
 const { copyText } = vi.hoisted(() => ({
   copyText: vi.fn<(text: string) => Promise<void>>(async () => {}),
@@ -19,9 +21,17 @@ vi.mock("../app/hooks/shell", async () =>
   }),
 );
 
-vi.mock("../app/context/SystemSettingsContexts", () => ({
-  useMintSettingsContext: () => mintSettings,
-}));
+vi.mock("../app/hooks/wallet/useWalletInventory", async () =>
+  (await import("../testUtils/mintSettings")).mintSettingsMocks.walletInventory(
+    () => mintSettings,
+  ),
+);
+
+vi.mock("../app/hooks/wallet/useWalletTokens", async () =>
+  (await import("../testUtils/mintSettings")).mintSettingsMocks.walletTokens(
+    () => mintSettings,
+  ),
+);
 
 const waiting = createTransferFixture({
   id: "AQEBAQEBAQEBAQEBAQEBAQ",

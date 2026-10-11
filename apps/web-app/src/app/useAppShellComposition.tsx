@@ -40,6 +40,7 @@ import {
   type DisplayContact,
 } from "./hooks/contacts/useDisplayContacts";
 import { useEffectiveProfile } from "./hooks/profile/useEffectiveProfile";
+import { useMintIcons } from "./hooks/mint/useMintInfo";
 import { contactNewPrefillAtom } from "./state/contacts/contactForm";
 import { useIdentityOwnersComposition } from "./hooks/composition/useIdentityOwnersComposition";
 import { buildMoneyRouteProps } from "./routes/props/buildMoneyRouteProps";
@@ -107,7 +108,6 @@ export const useAppShellComposition = ({
     answerPendingIdentitySwitch,
     canSwitchToDefaultIdentity,
     appOwnerId,
-    appOwnerIdRef,
     currentNpub,
     isSeedLogin,
     logoutArmed,
@@ -453,16 +453,11 @@ export const useAppShellComposition = ({
 
   const {
     allCashuProofs,
-    allowTestMints,
-    applyDefaultMintSelection,
     cancelPendingCashuContactSend,
     cashuBalance,
     cashuBalanceAfterMelt,
     cashuIsBusy,
-    cashuDeferredReceives,
-    cashuMeltToMainMintButtonLabel,
     cashuOperations,
-    cashuProofs,
     cashuTokensHydratedRef,
     cashuTransferLifecycle,
     cashuTransfers,
@@ -475,22 +470,13 @@ export const useAppShellComposition = ({
     confirmLnurlWithdraw,
     confirmPaymentMintMelt,
     defaultMintDisplay,
-    defaultMintUrl,
-    discardCashuDeferredReceive,
-    estimateMintMove,
     getCashuTokenMessageInfo,
-    getMintIconUrl,
-    getMintRuntime,
     isCashuTokenKnownAny,
     isCashuTokenStored,
     lightningInvoiceAutoPayLimit,
     lnurlWithdrawIsBusy,
     markCashuTokenExternalized,
     markCashuTokenIssued,
-    markMintIconFailed,
-    meltLargestForeignMintToMainMint,
-    mintInfoByUrl,
-    moveMintFunds,
     onPayChatPaymentRequest,
     paidOverlayDetails,
     paidOverlayIsOpen,
@@ -508,25 +494,20 @@ export const useAppShellComposition = ({
     pendingLnurlWithdrawConfirmation,
     pendingPaymentMintMeltConfirmation,
     postPaySaveContact,
-    probeLightningFee,
     receiveMethod,
-    refreshMintInfo,
     requestSelectedContact,
     restoreMissingTokens,
     reclaimHandedOutTokens,
     restoreAndReclaimAllTokens,
     saveCashuFromText,
     sendCashuTokenToContact,
-    setAllowTestMints,
     setLightningInvoiceAutoPayLimit,
-    setMintInfoAll,
     setPayWithCashuEnabled,
     setReceiveMethod,
     setPendingLightningInvoiceConfirmation,
     setPendingLnurlWithdrawConfirmation,
     setPostPaySaveContact,
     settleBankPaymentOffer,
-    recurringPaymentsContext,
   } = useCashuWalletComposition({
     copyText,
     contactsMessaging: {
@@ -695,6 +676,7 @@ export const useAppShellComposition = ({
   );
 
   const getNpubMessageContactInfo = useNpubMessageContactInfo();
+  const { getMintIconUrl, markMintIconFailed } = useMintIcons();
 
   const formatContactName = React.useMemo(
     () => createContactNameFormatter(Array.from(displayContactById.values())),
@@ -1054,7 +1036,6 @@ export const useAppShellComposition = ({
   const {
     advancedSettingsContext,
     evoluSettingsContext,
-    mintSettingsContext,
     relaySettingsContext,
   } = useSystemSettingsComposition({
     advancedSettingsInput: {
@@ -1112,28 +1093,6 @@ export const useAppShellComposition = ({
       setStatus,
       syncOwnerId: appOwnerId,
       wipeEvoluStorage,
-    },
-    mintSettingsInput: {
-      allowTestMints,
-      appOwnerIdRef,
-      applyDefaultMintSelection,
-      cashuIsBusy,
-      cashuDeferredReceives,
-      cashuMeltToMainMintButtonLabel,
-      cashuProofs,
-      defaultMintUrl,
-      discardCashuDeferredReceive,
-      estimateMintMove,
-      getMintIconUrl,
-      getMintRuntime,
-      meltLargestForeignMintToMainMint,
-      mintInfoByUrl,
-      moveMintFunds,
-      probeLightningFee,
-      refreshMintInfo,
-      setAllowTestMints,
-      setMintInfoAll,
-      setStatus,
     },
     relaySettingsInput: {
       canSaveNewRelay,
@@ -1365,8 +1324,6 @@ export const useAppShellComposition = ({
     setLang,
     advancedSettingsContext,
     evoluSettingsContext,
-    mintSettingsContext,
-    recurringPaymentsContext,
     relaySettingsContext,
     t,
     toasts,

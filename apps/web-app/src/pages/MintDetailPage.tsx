@@ -1,5 +1,4 @@
 import { parseMintUrl } from "@linky-fit/linkshu";
-import { sqliteTrue } from "@linky-fit/linksync";
 import {
   Button,
   Divider,
@@ -11,8 +10,24 @@ import {
   ListRow,
 } from "@linky-fit/ui";
 import { useArmedAction } from "../hooks/useArmedAction";
-import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
-import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
+import {
+  useDisplayAmounts,
+  useSetStatus,
+  useTranslation,
+} from "../app/hooks/shell";
+import { useMoveMintFunds } from "../app/hooks/mint/useMoveMintFunds";
+import {
+  useDeleteMint,
+  useMintIcons,
+  useMintInfoByUrl,
+  useMintRuntime,
+  useRefreshMintInfo,
+} from "../app/hooks/mint/useMintInfo";
+import { useAllowTestMints } from "../app/hooks/useAllowTestMints";
+import { useDefaultMintUrl } from "../app/hooks/wallet/useDefaultMint";
+import { useApplyDefaultMint } from "../app/hooks/wallet/useNpubCash";
+import { useWalletInventory } from "../app/hooks/wallet/useWalletInventory";
+import { useWalletOps } from "../app/hooks/wallet/useWalletOps";
 import { holdingOf, mintHoldings } from "../app/lib/mintHoldings";
 import { MintBadge } from "../components/MintBadge";
 import { MintDeferredReceives } from "../components/MintDeferredReceives";
@@ -20,7 +35,6 @@ import { MintFees } from "../components/MintFees";
 import { MintIcon } from "../components/MintIcon";
 import { MintMoveFundsForm } from "../components/MintMoveFundsForm";
 import { navigateTo } from "../hooks/useRouting";
-import { LOCAL_MINT_INFO_STORAGE_KEY_PREFIX } from "../utils/constants";
 import { normalizeLocale } from "../utils/formatting";
 import {
   formatMintLabel,
@@ -30,7 +44,6 @@ import {
   normalizeMintUrl,
   PRESET_MINTS,
 } from "../utils/mint";
-import { safeLocalStorageSetJson } from "../utils/storage";
 
 /** Other mints funds can move to: the default first, then funded mints and presets. */
 const moveTargets = (
@@ -53,22 +66,18 @@ interface MintDetailPageProps {
 }
 
 export function MintDetailPage({ mintUrl }: MintDetailPageProps) {
-  const {
-    allowTestMints,
-    appOwnerIdRef,
-    applyDefaultMintSelection,
-    cashuIsBusy,
-    cashuProofs,
-    defaultMintUrl,
-    estimateMintMove,
-    getMintIconUrl,
-    getMintRuntime,
-    mintInfoByUrl,
-    moveMintFunds,
-    refreshMintInfo,
-    setMintInfoAll,
-    setStatus,
-  } = useMintSettingsContext();
+  const { allowTestMints } = useAllowTestMints();
+  const applyDefaultMintSelection = useApplyDefaultMint();
+  const { walletOpRunning: cashuIsBusy } = useWalletOps();
+  const { proofs: cashuProofs } = useWalletInventory();
+  const defaultMintUrl = useDefaultMintUrl();
+  const { estimateMintMove, moveMintFunds } = useMoveMintFunds();
+  const { getMintIconUrl } = useMintIcons();
+  const getMintRuntime = useMintRuntime();
+  const mintInfoByUrl = useMintInfoByUrl();
+  const refreshMintInfo = useRefreshMintInfo();
+  const deleteMintInfo = useDeleteMint();
+  const setStatus = useSetStatus();
   const { lang, t } = useTranslation();
   const { formatDisplayedAmountText } = useDisplayAmounts();
   const deleteAction = useArmedAction(() => setStatus(t("deleteArmedHint")));
@@ -97,21 +106,7 @@ export function MintDetailPage({ mintUrl }: MintDetailPageProps) {
   const kindBadge = mintKindBadge(cleaned);
 
   const deleteMint = () => {
-    const ownerId = appOwnerIdRef.current;
-    if (ownerId) {
-      setMintInfoAll((prev) => {
-        const next = prev.map((mintInfoRow) =>
-          normalizeMintUrl(mintInfoRow.url) === cleaned
-            ? { ...mintInfoRow, isDeleted: sqliteTrue }
-            : mintInfoRow,
-        );
-        safeLocalStorageSetJson(
-          `${LOCAL_MINT_INFO_STORAGE_KEY_PREFIX}.${ownerId}`,
-          next,
-        );
-        return next;
-      });
-    }
+    deleteMintInfo(cleaned);
     navigateTo({ route: "mints" });
   };
 

@@ -204,6 +204,11 @@ const reportUpstreamQuotesListed = (
 };
 
 /** Claim state of the page: tokens kept only in memory, and whether a claim runs. */
+/** The default mint npub.cash last accepted from this device, so a choice is sent there once. */
+export const npubCashSyncedMintAtom = Atom.keepAlive(
+  Atom.make<string | null>(null),
+);
+
 export interface NpubCashSession {
   inFlight: boolean;
   unsaved: ReadonlyArray<string>;

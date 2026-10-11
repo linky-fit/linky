@@ -1,23 +1,31 @@
 import { Result } from "effect";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { MintSettingsContextValue } from "../app/context/SystemSettingsContexts";
 import {
   createMintSettings,
+  type MintSettings,
   decodeProbeResult,
   probeLightningFee,
 } from "../testUtils/mintSettings";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { MintFees } from "./MintFees";
 
-let mintSettings: MintSettingsContextValue;
+let mintSettings: MintSettings;
 
 vi.mock("../app/hooks/shell", async () =>
   (await import("../testUtils/shellHooks")).shellHooksMock(),
 );
 
-vi.mock("../app/context/SystemSettingsContexts", () => ({
-  useMintSettingsContext: () => mintSettings,
-}));
+vi.mock("../app/hooks/mint/useMintInfo", async () =>
+  (await import("../testUtils/mintSettings")).mintSettingsMocks.mintInfo(
+    () => mintSettings,
+  ),
+);
+
+vi.mock("../app/hooks/composition/useLinkshuComposition", async () =>
+  (await import("../testUtils/mintSettings")).mintSettingsMocks.linkshu(
+    () => mintSettings,
+  ),
+);
 
 const withFeesJson = (mint: string, feesJson: string) =>
   new Map([[mint, { id: "row", url: mint, feesJson }]]);

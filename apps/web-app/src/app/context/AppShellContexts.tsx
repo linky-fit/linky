@@ -25,7 +25,6 @@ import {
   SystemSettingsContextsProvider,
   type AdvancedSettingsContextValue,
   type EvoluSettingsContextValue,
-  type MintSettingsContextValue,
   type RelaySettingsContextValue,
 } from "./SystemSettingsContexts";
 import type { Translate } from "../../i18n";
@@ -173,7 +172,6 @@ interface AppShellContextsProviderProps {
   children: React.ReactNode;
   core: AppShellCoreContextValue;
   evoluSettings: EvoluSettingsContextValue;
-  mintSettings: MintSettingsContextValue;
   relaySettings: RelaySettingsContextValue;
   routes: AppShellRouteContextValue;
 }
@@ -199,7 +197,6 @@ export const AppShellContextsProvider = ({
   children,
   core,
   evoluSettings,
-  mintSettings,
   relaySettings,
   routes,
 }: AppShellContextsProviderProps): React.ReactElement => {
@@ -210,7 +207,6 @@ export const AppShellContextsProvider = ({
           <SystemSettingsContextsProvider
             advancedSettings={advancedSettings}
             evoluSettings={evoluSettings}
-            mintSettings={mintSettings}
             relaySettings={relaySettings}
           >
             {children}

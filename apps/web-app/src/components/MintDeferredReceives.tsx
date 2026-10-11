@@ -6,7 +6,8 @@ import {
   useDisplayAmounts,
   useTranslation,
 } from "../app/hooks/shell";
-import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
+import { useWalletInventory } from "../app/hooks/wallet/useWalletInventory";
+import { useWalletTokens } from "../app/hooks/wallet/useWalletTokens";
 import { normalizeMintUrl } from "../utils/mint";
 import { MintPendingPill } from "./MintPendingPill";
 
@@ -18,8 +19,8 @@ interface MintDeferredReceivesProps {
 export function MintDeferredReceives({
   mint,
 }: MintDeferredReceivesProps): React.ReactElement | null {
-  const { cashuDeferredReceives, discardCashuDeferredReceive } =
-    useMintSettingsContext();
+  const { deferredReceives: cashuDeferredReceives } = useWalletInventory();
+  const { discardCashuDeferredReceive } = useWalletTokens();
   const { t } = useTranslation();
   const { formatDisplayedAmountText } = useDisplayAmounts();
   const copyText = useCopyText();

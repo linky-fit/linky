@@ -1,4 +1,8 @@
-import { useAtomValue } from "@linky-fit/linkstr-react";
+import {
+  RegistryContext,
+  useAtomSuspense,
+  useAtomValue,
+} from "@linky-fit/linkstr-react";
 import { Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import React from "react";
@@ -13,16 +17,20 @@ import { isNpubCashDisabled } from "../../../utils/npubCashServer";
 import { asRecord } from "../../../utils/validation";
 import type { PaidOverlayDetails } from "../../lib/paidOverlay";
 import { touchReceivingMint } from "../../lib/receivingMint";
-import type { WriteOutcome } from "../../lib/storeWrite";
-import type { DefaultMintChoice } from "../../state/wallet/defaultMint";
+import {
+  defaultMintCommandsAtom,
+  type DefaultMintChoice,
+} from "../../state/wallet/defaultMint";
 import {
   fetchNpubCashInfo,
   makeNpubCashAuthHeader,
   npubCashCommandsAtom,
+  npubCashSyncedMintAtom,
   updateNpubCashMint,
   type NpubCashClaimEvents,
 } from "../../state/wallet/npubCash";
-import { currentNsecAtom } from "../../state/session/session";
+import { currentNpubAtom, currentNsecAtom } from "../../state/session/session";
+import { usePushToast, useSetStatus, useTranslation } from "../shell";
 import type { LocalMintInfoRow } from "../../types/appTypes";
 
 /** Signs npub.cash calls with the session's nostr key. */
@@ -61,7 +69,6 @@ interface UseNpubCashParams {
   refreshMintInfo: (mintUrl: string) => Promise<void> | void;
   rememberCashuTokenKnown: (...tokens: readonly string[]) => void;
   routeKind: Route["kind"];
-  setDefaultMint: (mint: string) => Promise<WriteOutcome>;
   setIsProfileEditing: (editing: boolean) => void;
   setOwnedProfileLightningAddresses: (addresses: string[]) => void;
   setOwnedProfileLightningAddressesLoading: (loading: boolean) => void;
@@ -112,7 +119,6 @@ export const useNpubCash = ({
   refreshMintInfo,
   rememberCashuTokenKnown,
   routeKind,
-  setDefaultMint,
   setIsProfileEditing,
   setOwnedProfileLightningAddresses,
   setOwnedProfileLightningAddressesLoading,
@@ -125,47 +131,20 @@ export const useNpubCash = ({
   const commands = Option.getOrNull(
     AsyncResult.value(useAtomValue(npubCashCommandsAtom)),
   );
-  const npubCashMintSyncRef = React.useRef<string | null>(null);
-
-  const applyDefaultMintSelection = React.useCallback(
-    async (mintUrl: string): Promise<boolean> => {
-      const cleaned = normalizeMintUrl(mintUrl);
-      if (!isUrl(cleaned)) {
-        pushToast(t("mintUrlInvalid"));
-        return false;
-      }
-      try {
-        setStatus(t("mintUpdating"));
-        await updateNpubCashMint({ currentNpub, currentNsec, mint: cleaned });
-      } catch (error) {
-        pushToast(
-          String(error ?? "").includes("Missing nsec")
-            ? t("profileMissingNpub")
-            : t("mintUpdateFailed"),
-        );
-        setStatus(null);
-        return false;
-      }
-      npubCashMintSyncRef.current = cleaned;
-      await setDefaultMint(cleaned);
-      setStatus(t("mintSaved"));
-      return true;
-    },
-    [currentNpub, currentNsec, pushToast, setDefaultMint, setStatus, t],
-  );
+  const registry = React.useContext(RegistryContext);
 
   // A choice made on another device reaches npub.cash from here.
   React.useEffect(() => {
     const cleaned = normalizeMintUrl(defaultMintChoice.mint ?? "");
     if (!cleaned || !defaultMintChoice.chosen) return;
-    if (npubCashMintSyncRef.current === cleaned) return;
-    npubCashMintSyncRef.current = cleaned;
+    if (registry.get(npubCashSyncedMintAtom) === cleaned) return;
+    registry.set(npubCashSyncedMintAtom, cleaned);
     void updateNpubCashMint({ currentNpub, currentNsec, mint: cleaned }).catch(
       () => {
-        npubCashMintSyncRef.current = null;
+        registry.set(npubCashSyncedMintAtom, null);
       },
     );
-  }, [currentNpub, currentNsec, defaultMintChoice]);
+  }, [currentNpub, currentNsec, defaultMintChoice, registry]);
 
   React.useEffect(() => {
     setOwnedProfileLightningAddresses([]);
@@ -321,6 +300,49 @@ export const useNpubCash = ({
     );
     return () => clearInterval(intervalId);
   }, [claimNpubCashOnce, networkEnabled, routeKind]);
+};
 
-  return { applyDefaultMintSelection };
+/** Makes `mintUrl` the default mint, at npub.cash first; moves no funds. */
+export const useApplyDefaultMint = () => {
+  const registry = React.useContext(RegistryContext);
+  const currentNpub = useAtomValue(currentNpubAtom);
+  const currentNsec = useAtomValue(currentNsecAtom);
+  const { setDefaultMint } = useAtomSuspense(defaultMintCommandsAtom).value;
+  const pushToast = usePushToast();
+  const setStatus = useSetStatus();
+  const { t } = useTranslation();
+  return React.useCallback(
+    async (mintUrl: string): Promise<boolean> => {
+      const cleaned = normalizeMintUrl(mintUrl);
+      if (!isUrl(cleaned)) {
+        pushToast(t("mintUrlInvalid"));
+        return false;
+      }
+      try {
+        setStatus(t("mintUpdating"));
+        await updateNpubCashMint({ currentNpub, currentNsec, mint: cleaned });
+      } catch (error) {
+        pushToast(
+          String(error ?? "").includes("Missing nsec")
+            ? t("profileMissingNpub")
+            : t("mintUpdateFailed"),
+        );
+        setStatus(null);
+        return false;
+      }
+      registry.set(npubCashSyncedMintAtom, cleaned);
+      await setDefaultMint(cleaned);
+      setStatus(t("mintSaved"));
+      return true;
+    },
+    [
+      currentNpub,
+      currentNsec,
+      pushToast,
+      registry,
+      setDefaultMint,
+      setStatus,
+      t,
+    ],
+  );
 };

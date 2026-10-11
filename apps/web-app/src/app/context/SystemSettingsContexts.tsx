@@ -1,23 +1,12 @@
-import type { MintIcon } from "../../utils/mint";
 import type { ReceiveMethod } from "../../utils/receiveMethod";
 /* eslint-disable react-refresh/only-export-components */
 import type { LinkyScope } from "@linky-fit/linksync";
-import type {
-  AutoswapEstimate,
-  OperationId,
-  StoredOperation,
-  StoredProof,
-} from "@linky-fit/linkshu";
 import React from "react";
 import type { EvoluErrorType, EvoluServerStatus } from "../../evolu";
 import type { ShardSummary } from "../hooks/useLinksync";
 import type { PendingIdentitySwitch } from "../hooks/useProfileAuthDomain";
 import type { IdentityProfileSource } from "../lib/keySwitchProfile";
 import type { PasswordManagerSaveResult } from "../../platform/passwordManager";
-import type { ProbeLightningFee } from "../hooks/composition/useLinkshuComposition";
-import type { MintMove } from "../hooks/mint/useMoveMintFunds";
-import type { WriteOutcome } from "../lib/storeWrite";
-import type { LocalMintInfoRow } from "../types/appTypes";
 
 export interface AdvancedSettingsContextValue {
   canSwitchToDefaultIdentity: boolean;
@@ -83,36 +72,6 @@ export interface EvoluSettingsContextValue {
   wipeEvoluStorage: () => Promise<void>;
 }
 
-export interface MintSettingsContextValue {
-  allowTestMints: boolean;
-  appOwnerIdRef: React.RefObject<string | null>;
-  applyDefaultMintSelection: (mint: string) => Promise<boolean>;
-  cashuIsBusy: boolean;
-  /** Pending `deferredReceive` operations without hidden test mints. */
-  cashuDeferredReceives: readonly StoredOperation[];
-  cashuMeltToMainMintButtonLabel: string | null;
-  /** Stored proofs without hidden test mints. */
-  cashuProofs: readonly StoredProof[];
-  /** The effective default mint: a hidden test mint falls back to production. */
-  defaultMintUrl: string | null;
-  /** Closes a pending deferred receive; its token is lost unless copied first. */
-  discardCashuDeferredReceive: (id: OperationId) => Promise<void>;
-  estimateMintMove: (move: MintMove) => Promise<AutoswapEstimate | null>;
-  getMintIconUrl: (mint: string | null | undefined) => MintIcon;
-  getMintRuntime: (
-    url: string,
-  ) => { lastCheckedAtSec: number; latencyMs: number | null } | null;
-  meltLargestForeignMintToMainMint: () => Promise<void>;
-  mintInfoByUrl: Map<string, LocalMintInfoRow>;
-  moveMintFunds: (move: MintMove) => Promise<boolean>;
-  /** Null until the linkshu runtime is composed (seed + owners resolved). */
-  probeLightningFee: ProbeLightningFee | null;
-  refreshMintInfo: (url: string) => Promise<void>;
-  setAllowTestMints: (allow: boolean) => Promise<WriteOutcome>;
-  setMintInfoAll: React.Dispatch<React.SetStateAction<LocalMintInfoRow[]>>;
-  setStatus: (message: string) => void;
-}
-
 export interface RelaySettingsContextValue {
   canSaveNewRelay: boolean;
   isRecommendedRelay: (url: string) => boolean;
@@ -129,7 +88,6 @@ interface SystemSettingsContextsProviderProps {
   advancedSettings: AdvancedSettingsContextValue;
   children: React.ReactNode;
   evoluSettings: EvoluSettingsContextValue;
-  mintSettings: MintSettingsContextValue;
   relaySettings: RelaySettingsContextValue;
 }
 
@@ -137,8 +95,6 @@ const AdvancedSettingsContext =
   React.createContext<AdvancedSettingsContextValue | null>(null);
 const EvoluSettingsContext =
   React.createContext<EvoluSettingsContextValue | null>(null);
-const MintSettingsContext =
-  React.createContext<MintSettingsContextValue | null>(null);
 const RelaySettingsContext =
   React.createContext<RelaySettingsContextValue | null>(null);
 
@@ -159,16 +115,13 @@ export const SystemSettingsContextsProvider = ({
   advancedSettings,
   children,
   evoluSettings,
-  mintSettings,
   relaySettings,
 }: SystemSettingsContextsProviderProps): React.ReactElement => (
   <AdvancedSettingsContext.Provider value={advancedSettings}>
     <EvoluSettingsContext.Provider value={evoluSettings}>
-      <MintSettingsContext.Provider value={mintSettings}>
-        <RelaySettingsContext.Provider value={relaySettings}>
-          {children}
-        </RelaySettingsContext.Provider>
-      </MintSettingsContext.Provider>
+      <RelaySettingsContext.Provider value={relaySettings}>
+        {children}
+      </RelaySettingsContext.Provider>
     </EvoluSettingsContext.Provider>
   </AdvancedSettingsContext.Provider>
 );
@@ -183,12 +136,6 @@ export const useEvoluSettingsContext = (): EvoluSettingsContextValue =>
   useRequiredContext(
     React.useContext(EvoluSettingsContext),
     "useEvoluSettingsContext",
-  );
-
-export const useMintSettingsContext = (): MintSettingsContextValue =>
-  useRequiredContext(
-    React.useContext(MintSettingsContext),
-    "useMintSettingsContext",
   );
 
 export const useRelaySettingsContext = (): RelaySettingsContextValue =>
