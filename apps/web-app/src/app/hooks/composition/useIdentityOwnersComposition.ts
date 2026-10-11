@@ -10,6 +10,7 @@ import {
 import { platformAtom } from "../../state/platform";
 import { identityCommandsAtom } from "../../state/session/identity";
 import { sessionAtom } from "../../state/session/session";
+import { stopBeaconForIdentityChange } from "../../lib/beaconStore";
 import { toSyncedNostrIdentity } from "../../lib/syncedNostrIdentity";
 import {
   useIdentityRepository,
@@ -90,6 +91,7 @@ export const useIdentityOwnersComposition = ({
     if (!activeSyncedNostrIdentity) return;
     if (syncedNostrIdentityMatchesLocal) return;
 
+    stopBeaconForIdentityChange();
     void persistSyncedActiveNostrIdentity({
       identitySource: activeSyncedNostrIdentity.source,
       nsec: activeSyncedNostrIdentity.nsec,
