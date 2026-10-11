@@ -280,10 +280,7 @@ export const useWalletTokens = ({
       }
     };
     void tick();
-    const intervalId = setInterval(
-      () => void tick(),
-      ISSUED_CHECK_INTERVAL_MS,
-    );
+    const intervalId = setInterval(() => void tick(), ISSUED_CHECK_INTERVAL_MS);
     return () => {
       cancelled = true;
       clearInterval(intervalId);

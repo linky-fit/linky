@@ -22,17 +22,12 @@ import {
   formatDisplayAmountParts,
   type FiatRates,
 } from "../../../utils/displayAmounts";
-import {
-  isNpubCashDisabled,
-  NPUB_CASH_SERVER_BASE_URL,
-} from "../../../utils/npubCashServer";
 import { type TransactionsRepository } from "@linky-fit/linksync";
 import {
   formatMintHost,
   MAIN_MINT_URL,
   normalizeMintUrl,
 } from "../../../utils/mint";
-import { parseNpubCashProfileInfo } from "../../../utils/npubCashInfo";
 import {
   getInitialLightningInvoiceAutoPayLimit,
   getInitialPayWithCashuEnabled,
@@ -41,11 +36,9 @@ import {
   safeLocalStorageSet,
 } from "../../../utils/storage";
 import { getUnknownErrorMessage } from "../../../utils/unknown";
-import { useNpubCashClaim } from "../cashu/useNpubCashClaim";
 import { useSaveCashuFromText } from "../cashu/useSaveCashuFromText";
 import { useDeferredReceiveRetry } from "../cashu/useDeferredReceiveRetry";
 import { normalizePubkeyHex } from "../messages/contactIdentity";
-import { useNpubCashMintSelection } from "../mint/useNpubCashMintSelection";
 import { useContactPayMethod } from "../payments/useContactPayMethod";
 import { useRouteAmountResetEffects } from "../payments/useRouteAmountResetEffects";
 import { useTopupFlow } from "../topup/useTopupFlow";
@@ -63,12 +56,12 @@ import {
   usePaymentMintMove,
   useRememberFirstPayment,
 } from "../wallet/paymentUi";
+import { useNpubCash } from "../wallet/useNpubCash";
 import { useWalletOps } from "../wallet/useWalletOps";
 import { useWalletTokens } from "../wallet/useWalletTokens";
 import { logPayStep } from "../../state/wallet/paymentLog";
 import { useOwnerStorage, usePaymentLog } from "../wallet/useWalletStorage";
 import { usePaidOverlayState } from "../usePaidOverlayState";
-import { useProfileNpubCashEffects } from "../useProfileNpubCashEffects";
 import {
   isOpenTransfer,
   isPendingDeferredReceive,
@@ -257,9 +250,6 @@ export const useCashuWalletComposition = ({
   ] = useState<LnurlWithdrawPreview | null>(null);
   const [lnurlWithdrawIsBusy, setLnurlWithdrawIsBusy] = useState(false);
 
-  const npubCashClaimInFlightRef = React.useRef(false);
-  const npubCashMintSyncRef = React.useRef<string | null>(null);
-
   const {
     dismissPaymentSending,
     paidOverlayDetails,
@@ -293,7 +283,6 @@ export const useCashuWalletComposition = ({
   }, [currentNpub]);
 
   const {
-    adoptPaidCashuQuote,
     allWalletProofs,
     cashuEnvelopes,
     cashuTransferLifecycle,
@@ -480,116 +469,33 @@ export const useCashuWalletComposition = ({
     }
   }, [defaultMintUrl]);
 
-  const { applyDefaultMintSelection, makeNip98AuthHeader } =
-    useNpubCashMintSelection({
-      currentNpub,
-      currentNsec,
-      // npub.cash keeps the stored choice; the test-mint fallback stays local.
-      defaultMintChoice,
-      npubCashMintSyncRef,
-      pushToast,
-      setDefaultMint,
-      setStatus,
-      t,
-    });
-
-  React.useEffect(() => {
-    if (isNpubCashDisabled() || !currentNpub || !currentNsec) {
-      setOwnedProfileLightningAddresses([]);
-      setOwnedProfileLightningAddressesLoading(false);
-      return;
-    }
-
-    setOwnedProfileLightningAddresses([]);
-    setOwnedProfileLightningAddressesLoading(true);
-
-    const controller = new AbortController();
-    let cancelled = false;
-
-    const loadOwnedLightningAddresses = async () => {
-      try {
-        const url = `${NPUB_CASH_SERVER_BASE_URL}/api/v1/info`;
-        const auth = await makeNip98AuthHeader(url, "GET");
-        const response = await fetch(url, {
-          method: "GET",
-          headers: { Authorization: auth },
-          signal: controller.signal,
-        });
-        if (!response.ok) {
-          if (!cancelled) {
-            setOwnedProfileLightningAddresses([]);
-            setOwnedProfileLightningAddressesLoading(false);
-          }
-          return;
-        }
-
-        const json = await response.json();
-        if (cancelled) return;
-
-        const info = parseNpubCashProfileInfo(json);
-        setOwnedProfileLightningAddresses(info.ownedLightningAddresses);
-        setOwnedProfileLightningAddressesLoading(false);
-      } catch {
-        if (cancelled) return;
-        setOwnedProfileLightningAddresses([]);
-        setOwnedProfileLightningAddressesLoading(false);
-      }
-    };
-
-    void loadOwnedLightningAddresses();
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [
+  const { applyDefaultMintSelection, makeNip98AuthHeader } = useNpubCash({
+    copyText,
     currentNpub,
     currentNsec,
-    makeNip98AuthHeader,
-    setOwnedProfileLightningAddresses,
-    setOwnedProfileLightningAddressesLoading,
-  ]);
-
-  const { claimNpubCashOnce, claimNpubCashOnceLatestRef } = useNpubCashClaim({
-    allowTestMints,
-    adoptPaidCashuQuote,
-    cashuIsBusy,
-    copyText,
-    currentNpub: nostrBootstrapReady ? currentNpub : null,
-    currentNsec: nostrBootstrapReady ? currentNsec : null,
+    // npub.cash keeps the stored choice; the test-mint fallback stays local.
+    defaultMintChoice,
     formatDisplayedAmountParts,
     isMintDeleted,
-    logPaymentEvent,
-    makeLocalStorageKey,
-    makeNip98AuthHeader,
     maybeShowPwaNotification,
     mintInfoByUrl,
-    npubCashClaimInFlightRef,
-    pushToast,
-    receiveCashuToken,
-    refreshMintInfo,
-    rememberCashuTokenKnown,
-    routeKind: route.kind,
-    runQueued,
-    setStatus,
-    showPaidOverlay,
-    t,
-    touchMintInfo,
-  });
-
-  useProfileNpubCashEffects({
-    claimNpubCashOnce,
-    claimNpubCashOnceLatestRef,
-    currentNpub,
-    currentNsec,
-    makeNip98AuthHeader,
     networkEnabled: nostrBootstrapReady,
     npubCashInfoInFlightRef,
     npubCashInfoLoadedAtMsRef,
     npubCashInfoLoadedForNpubRef,
+    pushToast,
+    refreshMintInfo,
+    rememberCashuTokenKnown,
     routeKind: route.kind,
+    setDefaultMint,
     setIsProfileEditing,
+    setOwnedProfileLightningAddresses,
+    setOwnedProfileLightningAddressesLoading,
+    setStatus,
+    showPaidOverlay,
     suggestDefaultMint,
+    t,
+    touchMintInfo,
   });
 
   const [contactPayMethod, setContactPayMethod] = useState<
