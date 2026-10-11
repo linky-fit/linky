@@ -1,6 +1,9 @@
 import { Card, Divider, Progress, Row, Stack, Text } from "@linky-fit/ui";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
-import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
+import { useMintIcons } from "../app/hooks/mint/useMintInfo";
+import { useAllowTestMints } from "../app/hooks/useAllowTestMints";
+import { useDefaultMintUrl } from "../app/hooks/wallet/useDefaultMint";
+import { useWalletInventory } from "../app/hooks/wallet/useWalletInventory";
 import { holdingOf, mintHoldings } from "../app/lib/mintHoldings";
 import {
   FloatingActionButton,
@@ -21,13 +24,11 @@ import {
 } from "../utils/mint";
 
 export function MintsPage() {
-  const {
-    allowTestMints,
-    cashuDeferredReceives,
-    cashuProofs,
-    defaultMintUrl,
-    getMintIconUrl,
-  } = useMintSettingsContext();
+  const { allowTestMints } = useAllowTestMints();
+  const { deferredReceives: cashuDeferredReceives, proofs: cashuProofs } =
+    useWalletInventory();
+  const defaultMintUrl = useDefaultMintUrl();
+  const { getMintIconUrl } = useMintIcons();
   const { t } = useTranslation();
   const { formatDisplayedAmountText } = useDisplayAmounts();
   const selectedMint =

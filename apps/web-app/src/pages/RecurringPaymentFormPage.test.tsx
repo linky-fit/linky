@@ -12,10 +12,10 @@ vi.mock("../app/hooks/shell", async () =>
   (await import("../testUtils/shellHooks")).shellHooksMock(),
 );
 
-vi.mock("../app/context/RecurringPaymentsContext", () => ({
-  useRecurringPaymentsContext: () => ({
+vi.mock("../app/hooks/payments/useRecurringPaymentsActions", () => ({
+  useRecurringMintUrl: () => "https://mint.example",
+  useRecurringPaymentsActions: () => ({
     createRecurringPayment: vi.fn(async () => true),
-    defaultMintUrl: "https://mint.example",
     updateRecurringPayment: vi.fn(async () => true),
   }),
 }));

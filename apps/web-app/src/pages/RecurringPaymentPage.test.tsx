@@ -9,10 +9,12 @@ import {
 } from "@linky-fit/linksync";
 import { recurringProgressColumn } from "@linky-fit/recurring-payment";
 import { Effect } from "effect";
+import { AtomRegistry, RegistryContext } from "@linky-fit/linkstr-react";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { RecurringPaymentsProvider } from "../app/context/RecurringPaymentsContext";
-import { useRecurringPaymentsActions } from "../app/hooks/payments/useRecurringPaymentsActions";
+import { contactsAtom } from "../app/state/contacts/readModel";
+import { defaultMintAtom } from "../app/state/wallet/defaultMint";
+import { payWithCashuEnabledAtom } from "../app/state/wallet/prefs";
 import { navigateTo } from "../hooks/useRouting";
 import { makeTestLinkyStore } from "../testUtils/linkyStore";
 import {
@@ -24,9 +26,15 @@ import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { RecurringPaymentPage } from "./RecurringPaymentPage";
 
 const ORDER_ID = recurringPaymentIdFor("rp-1");
-const records = vi.hoisted(() => ({
-  current: new Array<RecurringPaymentRecord>(),
-}));
+const { records, repositoryRef } = vi.hoisted(() => {
+  const repositoryRef: { current: RecurringPaymentsRepository | null } = {
+    current: null,
+  };
+  return {
+    records: { current: new Array<RecurringPaymentRecord>() },
+    repositoryRef,
+  };
+});
 
 vi.mock("../app/hooks/shell", async () =>
   (await import("../testUtils/shellHooks")).shellHooksMock(),
@@ -35,6 +43,7 @@ vi.mock("../app/hooks/shell", async () =>
 vi.mock("../app/hooks/useLinksync", () => ({
   useContactRows: () => [],
   useRecurringPaymentRecords: () => records.current,
+  useRecurringPaymentsRepository: () => repositoryRef.current,
 }));
 
 vi.mock("../hooks/useRouting", () => ({ navigateTo: vi.fn() }));
@@ -65,31 +74,14 @@ const insertOrder = (repository: RecurringPaymentsRepository) => {
   records.current = [record];
 };
 
-const Page = ({ repository }: { repository: RecurringPaymentsRepository }) => {
-  const actions = useRecurringPaymentsActions({
-    contacts: [],
-    defaultMintUrl: "https://mint.example",
-    payWithCashuEnabled: true,
-    pushToast: vi.fn(),
-    repository,
-    runNow: async () => {},
-    t: (key) => key,
+const registry = () =>
+  AtomRegistry.make({
+    initialValues: [
+      [contactsAtom, []],
+      [defaultMintAtom, "https://mint.example"],
+      [payWithCashuEnabledAtom, true],
+    ],
   });
-  return (
-    <RecurringPaymentsProvider
-      value={{
-        ...actions,
-        cancelDue: async () => {},
-        confirmDueNow: async () => {},
-        defaultMintUrl: "https://mint.example",
-        dueConfirmation: null,
-        mintBalanceSat: () => 0,
-      }}
-    >
-      <RecurringPaymentPage id={ORDER_ID} />
-    </RecurringPaymentsProvider>
-  );
-};
 
 const button = (container: HTMLElement, ...labels: string[]) => {
   const found = Array.from(container.querySelectorAll("button")).find(
@@ -109,8 +101,11 @@ const renderPage = async () => {
     makeTestLinkyStore().store,
   );
   insertOrder(repository);
+  repositoryRef.current = repository;
   const { container } = await renderIntoDocument(
-    <Page repository={repository} />,
+    <RegistryContext.Provider value={registry()}>
+      <RecurringPaymentPage id={ORDER_ID} />
+    </RegistryContext.Provider>,
   );
   return { container, repository };
 };

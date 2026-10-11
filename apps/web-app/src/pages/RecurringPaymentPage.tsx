@@ -11,7 +11,7 @@ import {
 } from "@linky-fit/ui";
 import React from "react";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
-import { useRecurringPaymentsContext } from "../app/context/RecurringPaymentsContext";
+import { useRecurringPaymentsActions } from "../app/hooks/payments/useRecurringPaymentsActions";
 import {
   recurringRecipientLabel,
   useRecurringContactSummaries,
@@ -42,7 +42,7 @@ export function RecurringPaymentPage({
     pendingRecurringPaymentDeleteId,
     requestDeleteRecurringPayment,
     setRecurringPaymentPaused,
-  } = useRecurringPaymentsContext();
+  } = useRecurringPaymentsActions();
   const orders = useRecurringPaymentOrders();
   const contacts = useRecurringContactSummaries();
   const order = orders.find((candidate) => candidate.id === id) ?? null;

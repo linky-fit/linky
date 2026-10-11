@@ -24,7 +24,10 @@ import {
 import React from "react";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import { walletOpRunningAtom } from "../app/state/wallet/opQueue";
-import { useRecurringPaymentsContext } from "../app/context/RecurringPaymentsContext";
+import {
+  useRecurringMintUrl,
+  useRecurringPaymentsActions,
+} from "../app/hooks/payments/useRecurringPaymentsActions";
 import {
   contactSummaryLabel,
   isPayableContact,
@@ -154,8 +157,9 @@ function RecurringPaymentForm({
   const { lang, t } = useTranslation();
   const { displayCurrency, fiatRates } = useDisplayAmounts();
   const cashuIsBusy = useAtomValue(walletOpRunningAtom);
-  const { createRecurringPayment, defaultMintUrl, updateRecurringPayment } =
-    useRecurringPaymentsContext();
+  const { createRecurringPayment, updateRecurringPayment } =
+    useRecurringPaymentsActions();
+  const defaultMintUrl = useRecurringMintUrl();
   const mintUrl = order ? order.mintUrl : defaultMintUrl;
   const contacts = useRecurringContactSummaries();
 

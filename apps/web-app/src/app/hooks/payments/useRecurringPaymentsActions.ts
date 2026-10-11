@@ -3,7 +3,6 @@ import {
   NonEmptyString100,
   NonEmptyString1000,
   PositiveInt,
-  type RecurringPaymentsRepository,
 } from "@linky-fit/linksync";
 import {
   editPatch,
@@ -12,9 +11,10 @@ import {
   resumePatch,
   type RecurringPaymentOrder,
 } from "@linky-fit/recurring-payment";
+import { useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
-import type { Translate } from "../../../i18n";
+import { MAIN_MINT_URL, normalizeMintUrl } from "../../../utils/mint";
 import { nowSeconds } from "../../../utils/time";
 import {
   readContactId,
@@ -24,10 +24,22 @@ import {
 } from "../../lib/recurringPaymentStore";
 import { pickRecurringRail, recurringRecipient } from "../../lib/recurringRail";
 import { runWrite } from "../../lib/storeWrite";
-import type { ContactRowLike } from "../../types/appTypes";
-import type { RecurringPaymentsScheduler } from "./useRecurringPaymentsScheduler";
+import { contactsAtom } from "../../state/contacts/readModel";
+import { defaultMintAtom } from "../../state/wallet/defaultMint";
+import { payWithCashuEnabledAtom } from "../../state/wallet/prefs";
+import {
+  armedRecurringDeleteAtom,
+  recurringDeleteArmAtom,
+  recurringSchedulerAtom,
+} from "../../state/wallet/recurring";
+import { usePushToast, useTranslation } from "../shell";
+import { useRecurringPaymentsRepository } from "../useLinksync";
 
 export type { RecurringPaymentInput } from "../../lib/recurringPaymentStore";
+
+/** The mint a new recurring payment is bound to. */
+export const useRecurringMintUrl = () =>
+  normalizeMintUrl(useAtomValue(defaultMintAtom) ?? MAIN_MINT_URL);
 
 export interface RecurringPaymentsActions {
   createRecurringPayment: (input: RecurringPaymentInput) => Promise<boolean>;
@@ -45,47 +57,21 @@ export interface RecurringPaymentsActions {
   ) => Promise<boolean>;
 }
 
-interface UseRecurringPaymentsActionsParams {
-  contacts: readonly ContactRowLike[];
-  /** New payments are bound to the default mint of their creation time. */
-  defaultMintUrl: string;
-  /** With the contact, picks the rail a new payment is bound to. */
-  payWithCashuEnabled: boolean;
-  pushToast: (message: string) => void;
-  repository: RecurringPaymentsRepository;
-  /** A scheduler pass; it settles the envelope of a payment just deleted. */
-  runNow: RecurringPaymentsScheduler["runNow"];
-  t: Translate;
-}
-
-const DELETE_ARM_MS = 5000;
-
 /**
  * User-facing mutations on recurring payments, all through the linksync
  * repository. Deleting is a two-tap armed action; the scheduler's next pass
  * settles the deleted payment's envelope.
  */
-export const useRecurringPaymentsActions = ({
-  contacts,
-  defaultMintUrl,
-  payWithCashuEnabled,
-  pushToast,
-  repository,
-  runNow,
-  t,
-}: UseRecurringPaymentsActionsParams): RecurringPaymentsActions => {
-  const [pendingDeleteId, setPendingDeleteId] = React.useState<string | null>(
-    null,
-  );
-
-  React.useEffect(() => {
-    if (pendingDeleteId === null) return;
-    const timeout = window.setTimeout(
-      () => setPendingDeleteId(null),
-      DELETE_ARM_MS,
-    );
-    return () => window.clearTimeout(timeout);
-  }, [pendingDeleteId]);
+export const useRecurringPaymentsActions = (): RecurringPaymentsActions => {
+  const contacts = useAtomValue(contactsAtom);
+  const defaultMintUrl = useRecurringMintUrl();
+  const payWithCashuEnabled = useAtomValue(payWithCashuEnabledAtom);
+  const pushToast = usePushToast();
+  const { t } = useTranslation();
+  const repository = useRecurringPaymentsRepository();
+  const scheduler = useAtomValue(recurringSchedulerAtom);
+  const pendingDeleteId = useAtomValue(armedRecurringDeleteAtom);
+  const deleteArm = useAtomValue(recurringDeleteArmAtom);
 
   const reportWriteFailure = React.useCallback(
     (error: string): false => {
@@ -225,11 +211,11 @@ export const useRecurringPaymentsActions = ({
   const requestDeleteRecurringPayment = React.useCallback(
     async (order: RecurringPaymentOrder): Promise<boolean> => {
       if (pendingDeleteId !== order.id) {
-        setPendingDeleteId(order.id);
+        deleteArm.arm(order.id);
         return false;
       }
       const outcome = await runWrite(repository.remove(order.id));
-      setPendingDeleteId(null);
+      deleteArm.disarm();
       if (!outcome.ok) return reportWriteFailure(outcome.error);
       reportAppLog({
         tag: "recurring.deleted",
@@ -237,10 +223,10 @@ export const useRecurringPaymentsActions = ({
         links: { recurringPayment: order.id },
         payload: null,
       });
-      void runNow();
+      void scheduler?.runNow();
       return true;
     },
-    [pendingDeleteId, reportWriteFailure, repository, runNow],
+    [deleteArm, pendingDeleteId, reportWriteFailure, repository, scheduler],
   );
 
   return {

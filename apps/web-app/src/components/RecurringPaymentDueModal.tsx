@@ -2,7 +2,7 @@ import { RECURRING_CONFIRM_SEC } from "@linky-fit/recurring-payment";
 import { Pill, Stack, Text } from "@linky-fit/ui";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
-import { useRecurringPaymentsContext } from "../app/context/RecurringPaymentsContext";
+import { useRecurringDue } from "../app/hooks/payments/useRecurringDue";
 import { useNowSeconds } from "../app/hooks/payments/useNowSeconds";
 import {
   recurringRecipientLabel,
@@ -29,8 +29,7 @@ export function RecurringPaymentDueModal(): React.ReactElement | null {
     lang,
     t,
   } = useAppShellCore();
-  const { cancelDue, confirmDueNow, dueConfirmation } =
-    useRecurringPaymentsContext();
+  const { cancelDue, confirmDueNow, dueConfirmation } = useRecurringDue();
   const orders = useRecurringPaymentOrders();
   const contacts = useRecurringContactSummaries();
   const nowSec = useNowSeconds(dueConfirmation !== null);

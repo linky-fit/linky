@@ -14,7 +14,7 @@ import {
 import type { FC } from "react";
 import React from "react";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
-import { useRecurringPaymentsContext } from "../app/context/RecurringPaymentsContext";
+import { useWalletInventory } from "../app/hooks/wallet/useWalletInventory";
 import {
   recurringRecipientLabel,
   useRecurringContactSummaries,
@@ -29,7 +29,9 @@ import { RecurringContactAvatar } from "./RecurringContactAvatar";
 
 /** Every recurring payment with its interval pill, amount, and next due date. */
 export const RecurringPaymentsList: FC = () => {
-  const { mintBalanceSat } = useRecurringPaymentsContext();
+  const mintBalances = useWalletInventory().balances.perMint;
+  const mintBalanceSat = (mintUrl: string) =>
+    mintBalances.find((entry) => entry.mint === mintUrl)?.amount ?? 0;
   const { lang, t } = useTranslation();
   const { displayCurrency, fiatRates, formatDisplayedAmountParts } =
     useDisplayAmounts();

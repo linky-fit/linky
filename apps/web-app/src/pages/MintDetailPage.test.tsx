@@ -1,19 +1,71 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { MintSettingsContextValue } from "../app/context/SystemSettingsContexts";
-import { createMintSettings } from "../testUtils/mintSettings";
+import {
+  createMintSettings,
+  type MintSettings,
+} from "../testUtils/mintSettings";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { MintDetailPage } from "./MintDetailPage";
 
-let mintSettings: MintSettingsContextValue;
+let mintSettings: MintSettings;
 
 vi.mock("../app/hooks/shell", async () =>
   (await import("../testUtils/shellHooks")).shellHooksMock(),
 );
 
-vi.mock("../app/context/SystemSettingsContexts", () => ({
-  useMintSettingsContext: () => mintSettings,
-}));
+vi.mock("../app/hooks/mint/useMintInfo", async () =>
+  (await import("../testUtils/mintSettings")).mintSettingsMocks.mintInfo(
+    () => mintSettings,
+  ),
+);
+
+vi.mock("../app/hooks/useAllowTestMints", async () =>
+  (await import("../testUtils/mintSettings")).mintSettingsMocks.allowTestMints(
+    () => mintSettings,
+  ),
+);
+
+vi.mock("../app/hooks/wallet/useDefaultMint", async () =>
+  (await import("../testUtils/mintSettings")).mintSettingsMocks.defaultMint(
+    () => mintSettings,
+  ),
+);
+
+vi.mock("../app/hooks/wallet/useNpubCash", async () =>
+  (await import("../testUtils/mintSettings")).mintSettingsMocks.npubCash(
+    () => mintSettings,
+  ),
+);
+
+vi.mock("../app/hooks/wallet/useWalletInventory", async () =>
+  (await import("../testUtils/mintSettings")).mintSettingsMocks.walletInventory(
+    () => mintSettings,
+  ),
+);
+
+vi.mock("../app/hooks/wallet/useWalletOps", async () =>
+  (await import("../testUtils/mintSettings")).mintSettingsMocks.walletOps(
+    () => mintSettings,
+  ),
+);
+
+vi.mock("../app/hooks/mint/useMoveMintFunds", async () =>
+  (await import("../testUtils/mintSettings")).mintSettingsMocks.moveMintFunds(
+    () => mintSettings,
+  ),
+);
+
+vi.mock("../app/hooks/wallet/useWalletTokens", async () =>
+  (await import("../testUtils/mintSettings")).mintSettingsMocks.walletTokens(
+    () => mintSettings,
+  ),
+);
+
+vi.mock("../app/hooks/composition/useLinkshuComposition", async () =>
+  (await import("../testUtils/mintSettings")).mintSettingsMocks.linkshu(
+    () => mintSettings,
+  ),
+);
 
 const badgeTexts = (container: HTMLElement): string[] =>
   Array.from(

@@ -1,15 +1,17 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { MintSettingsContextValue } from "../app/context/SystemSettingsContexts";
 import {
   createStoredProofFixture,
   createTransferFixture,
 } from "../testUtils/cashuInventory";
-import { createMintSettings } from "../testUtils/mintSettings";
+import {
+  createMintSettings,
+  type MintSettings,
+} from "../testUtils/mintSettings";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { MintsPage } from "./MintsPage";
 
-let mintSettings: MintSettingsContextValue;
+let mintSettings: MintSettings;
 
 const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
 
@@ -21,9 +23,35 @@ vi.mock("../app/hooks/shell", async () =>
   (await import("../testUtils/shellHooks")).shellHooksMock(),
 );
 
-vi.mock("../app/context/SystemSettingsContexts", () => ({
-  useMintSettingsContext: () => mintSettings,
-}));
+vi.mock("../app/hooks/mint/useMintInfo", async () =>
+  (await import("../testUtils/mintSettings")).mintSettingsMocks.mintInfo(
+    () => mintSettings,
+  ),
+);
+
+vi.mock("../app/hooks/useAllowTestMints", async () =>
+  (await import("../testUtils/mintSettings")).mintSettingsMocks.allowTestMints(
+    () => mintSettings,
+  ),
+);
+
+vi.mock("../app/hooks/wallet/useDefaultMint", async () =>
+  (await import("../testUtils/mintSettings")).mintSettingsMocks.defaultMint(
+    () => mintSettings,
+  ),
+);
+
+vi.mock("../app/hooks/wallet/useWalletInventory", async () =>
+  (await import("../testUtils/mintSettings")).mintSettingsMocks.walletInventory(
+    () => mintSettings,
+  ),
+);
+
+vi.mock("../app/hooks/composition/useLinkshuComposition", async () =>
+  (await import("../testUtils/mintSettings")).mintSettingsMocks.linkshu(
+    () => mintSettings,
+  ),
+);
 
 const findButton = (
   container: HTMLElement,

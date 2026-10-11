@@ -30,14 +30,16 @@ export type {
   StartCashuTopup,
 } from "../../state/linkshu/commands";
 
+/** The linkshu commands, null until the runtime is up. */
+export const useLinkshuCommands = () =>
+  Option.getOrNull(AsyncResult.value(useAtomValue(linkshuCommandsAtom)));
+
 /**
  * The wallet UI's view of linkshu: the commands, null until the runtime is
  * up, and the inventory read model with test mints hidden as configured.
  */
 export const useLinkshuComposition = () => {
-  const commands = Option.getOrNull(
-    AsyncResult.value(useAtomValue(linkshuCommandsAtom)),
-  );
+  const commands = useLinkshuCommands();
   const inventory = useWalletInventory();
 
   return {

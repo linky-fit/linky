@@ -15,10 +15,8 @@ import {
   useAppShellActions,
   useAppShellCore,
 } from "../app/context/AppShellContexts";
-import {
-  useAdvancedSettingsContext,
-  useMintSettingsContext,
-} from "../app/context/SystemSettingsContexts";
+import { useAdvancedSettingsContext } from "../app/context/SystemSettingsContexts";
+import { useAllowTestMints } from "../app/hooks/useAllowTestMints";
 import {
   countConnectedRelays,
   overallRelayStatus,
@@ -68,7 +66,7 @@ export function AdvancedPage(): React.ReactElement {
     setPayWithCashuEnabled,
     switchToDefaultIdentity,
   } = useAdvancedSettingsContext();
-  const { allowTestMints, setAllowTestMints } = useMintSettingsContext();
+  const { allowTestMints, setAllowTestMints } = useAllowTestMints();
   const { experimentalFeatures, setExperimentalFeatures } =
     useExperimentalFeatures();
   const relayHealth = useRelayHealth();

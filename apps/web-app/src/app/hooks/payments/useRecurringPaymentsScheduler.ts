@@ -30,6 +30,7 @@ import {
   type RecurringTickAction,
   type RecurringUnfundedAction,
 } from "@linky-fit/recurring-payment";
+import { useAtom } from "@linky-fit/linkstr-react";
 import { Effect, Result } from "effect";
 import React from "react";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
@@ -50,6 +51,10 @@ import {
 import { recurringPaymentUpdate } from "../../lib/recurringPaymentStore";
 import { recurringRecipient } from "../../lib/recurringRail";
 import { runWrite } from "../../lib/storeWrite";
+import {
+  recurringDueConfirmationAtom,
+  type RecurringDueConfirmation,
+} from "../../state/wallet/recurring";
 import type {
   ContactRowLike,
   LoggedPaymentEventParams,
@@ -73,16 +78,7 @@ const RECURRING_TAB_LOCK = "linky.recurringPayments";
 
 type RecurringRunOutcome = "paid" | "failed" | "waiting" | "busy" | "missing";
 
-/** A due payment waiting for the in-app countdown to end (or the user to decide). */
-export interface RecurringDueConfirmation {
-  orderId: RecurringPaymentId;
-  /** The planned run; confirming pays exactly this one. */
-  runIndex: number;
-  dueAtSec: number;
-  amountSat: number;
-  /** When the countdown ends and the payment goes out on its own. */
-  sendAtSec: number;
-}
+export type { RecurringDueConfirmation };
 
 export interface RecurringPaymentsScheduler {
   /** One scheduler pass over every payment. */
@@ -305,8 +301,9 @@ export const useRecurringPaymentsScheduler = ({
   const envelopeChecksRef = React.useRef(new Map<string, number>());
   /** Per run key: the sats of a run whose envelope the mint signed. */
   const fundedEnvelopeSatRef = React.useRef(new Map<string, number>());
-  const [dueConfirmation, setDueConfirmation] =
-    React.useState<RecurringDueConfirmation | null>(null);
+  const [dueConfirmation, setDueConfirmation] = useAtom(
+    recurringDueConfirmationAtom,
+  );
   const dueConfirmationRef = useLatest(dueConfirmation);
 
   const loadOrders = React.useCallback(
@@ -672,7 +669,7 @@ export const useRecurringPaymentsScheduler = ({
       tickInFlightRef.current = pass.then(() => undefined);
       return pass;
     },
-    [executeRun, latest, loadOrders],
+    [executeRun, latest, loadOrders, setDueConfirmation],
   );
 
   const notifyOnce = React.useCallback(
@@ -915,6 +912,7 @@ export const useRecurringPaymentsScheduler = ({
     nowSec,
     recoverOrderEnvelopes,
     reportWait,
+    setDueConfirmation,
     skipPeriod,
   ]);
 
@@ -932,7 +930,7 @@ export const useRecurringPaymentsScheduler = ({
     if (outcome === "busy") {
       latest.current.pushToast(latest.current.t("recurringWalletBusy"));
     }
-  }, [dueConfirmationRef, latest, runConfirmed]);
+  }, [dueConfirmationRef, latest, runConfirmed, setDueConfirmation]);
 
   /** Whether the countdown's run already went out (or is going out) from its envelope. */
   const isRunOut = React.useCallback(
@@ -989,7 +987,7 @@ export const useRecurringPaymentsScheduler = ({
     const outcome = await inTabLock(() => cancelRun(pending));
     if (outcome === "missing") return;
     latest.current.pushToast(latest.current.t(CANCEL_TOAST[outcome]));
-  }, [cancelRun, dueConfirmationRef, latest]);
+  }, [cancelRun, dueConfirmationRef, latest, setDueConfirmation]);
 
   React.useEffect(() => {
     if (!enabled) return;

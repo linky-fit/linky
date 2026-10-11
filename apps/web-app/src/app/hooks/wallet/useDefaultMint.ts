@@ -7,6 +7,9 @@ import {
 } from "../../state/wallet/defaultMint";
 import { useSetting } from "../useLinksync";
 
+/** The mint new funds arrive at. */
+export const useDefaultMintUrl = () => useAtomValue(defaultMintAtom);
+
 /**
  * The default mint and its writes. Seeds a new account's default mint once
  * and takes over a choice synced from another device; only that direction

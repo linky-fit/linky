@@ -2,72 +2,59 @@ import { AtomRegistry, RegistryContext } from "@linky-fit/linkstr-react";
 import { nip19 } from "nostr-tools";
 import React, { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { signedInSession } from "../../../testUtils/appRegistry";
 import { createSecretKey } from "../../../testUtils/nostrKeys";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import type { WriteOutcome } from "../../lib/storeWrite";
-import { useNpubCash } from "./useNpubCash";
+import { sessionAtom } from "../../state/session/session";
+import { useApplyDefaultMint } from "./useNpubCash";
 
-vi.mock("../../state/wallet/npubCash", async (importOriginal) => {
+const { pushToast, setDefaultMint, setStatus } = vi.hoisted(() => ({
+  pushToast: vi.fn(),
+  setDefaultMint: vi.fn<(mint: string) => Promise<WriteOutcome>>(),
+  setStatus: vi.fn(),
+}));
+
+vi.mock("../shell", async () =>
+  (await import("../../../testUtils/shellHooks")).shellHooksMock({
+    pushToast: (message) => pushToast(message),
+    setStatus: (message) => setStatus(message),
+  }),
+);
+
+vi.mock("../../state/wallet/defaultMint", async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import("../../state/wallet/npubCash")>();
+    await importOriginal<typeof import("../../state/wallet/defaultMint")>();
   const { AsyncResult, Atom } = await import("effect/reactivity");
   return {
     ...actual,
-    npubCashCommandsAtom: Atom.make(AsyncResult.initial()),
+    defaultMintCommandsAtom: Atom.make(
+      AsyncResult.success({
+        setDefaultMint: (mint: string) => setDefaultMint(mint),
+      }),
+    ),
   };
 });
 
 const validNsec = nip19.nsecEncode(createSecretKey(1));
 
 const renderSelection = async () => {
-  const pushToast = vi.fn();
-  const setStatus =
-    vi.fn<React.Dispatch<React.SetStateAction<string | null>>>();
-  const setDefaultMint = vi.fn<(mint: string) => Promise<WriteOutcome>>(
-    async () => ({ ok: true }),
-  );
+  setDefaultMint.mockImplementation(async () => ({ ok: true }));
   const hook: { apply: ((mint: string) => Promise<boolean>) | null } = {
     apply: null,
   };
   const Probe = () => {
-    const { applyDefaultMintSelection } = useNpubCash({
-      copyText: async () => {},
-      currentNpub: "npub-test",
-      currentNsec: validNsec,
-      defaultMintChoice: { mint: "https://cashu.cz", chosen: false },
-      formatDisplayedAmountParts: (amount) => ({
-        approxPrefix: "",
-        amountText: String(amount),
-        unitLabel: "sat",
-      }),
-      isMintDeleted: () => false,
-      maybeShowPwaNotification: async () => {},
-      mintInfoByUrl: new Map(),
-      networkEnabled: false,
-      npubCashInfoInFlightRef: React.useRef(false),
-      npubCashInfoLoadedAtMsRef: React.useRef(0),
-      npubCashInfoLoadedForNpubRef: React.useRef<string | null>(null),
-      pushToast,
-      refreshMintInfo: () => {},
-      rememberCashuTokenKnown: () => {},
-      routeKind: "wallet",
-      setDefaultMint,
-      setIsProfileEditing: () => {},
-      setOwnedProfileLightningAddresses: () => {},
-      setOwnedProfileLightningAddressesLoading: () => {},
-      setStatus,
-      showPaidOverlay: () => {},
-      suggestDefaultMint: () => {},
-      t: (key) => key,
-      touchMintInfo: () => {},
-    });
+    const applyDefaultMintSelection = useApplyDefaultMint();
     React.useEffect(() => {
       hook.apply = applyDefaultMintSelection;
     }, [applyDefaultMintSelection]);
     return null;
   };
+  const registry = AtomRegistry.make({
+    initialValues: [[sessionAtom, signedInSession({ nsec: validNsec })]],
+  });
   const view = await renderIntoDocument(
-    <RegistryContext.Provider value={AtomRegistry.make()}>
+    <RegistryContext.Provider value={registry}>
       <Probe />
     </RegistryContext.Provider>,
   );
@@ -75,12 +62,13 @@ const renderSelection = async () => {
     act(async () => {
       await hook.apply?.(mint);
     });
-  return { apply, pushToast, setDefaultMint, setStatus, view };
+  return { apply, view };
 };
 
-describe("useNpubCash", () => {
+describe("useApplyDefaultMint", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.clearAllMocks();
   });
 
   it("does not store a mint npub.cash refused", async () => {
@@ -92,8 +80,8 @@ describe("useNpubCash", () => {
 
     await ui.apply("https://kashu.me");
 
-    expect(ui.setDefaultMint).not.toHaveBeenCalled();
-    expect(ui.pushToast).toHaveBeenCalledWith("mintUpdateFailed");
+    expect(setDefaultMint).not.toHaveBeenCalled();
+    expect(pushToast).toHaveBeenCalledWith("mintUpdateFailed");
     await ui.view.unmount();
   });
 
@@ -106,8 +94,8 @@ describe("useNpubCash", () => {
 
     await ui.apply("https://kashu.me");
 
-    expect(ui.setDefaultMint).toHaveBeenCalledWith("https://kashu.me");
-    expect(ui.setStatus).toHaveBeenLastCalledWith("mintSaved");
+    expect(setDefaultMint).toHaveBeenCalledWith("https://kashu.me");
+    expect(setStatus).toHaveBeenLastCalledWith("mintSaved");
     await ui.view.unmount();
   });
 
@@ -116,8 +104,8 @@ describe("useNpubCash", () => {
 
     await ui.apply("not a mint");
 
-    expect(ui.pushToast).toHaveBeenCalledWith("mintUrlInvalid");
-    expect(ui.setDefaultMint).not.toHaveBeenCalled();
+    expect(pushToast).toHaveBeenCalledWith("mintUrlInvalid");
+    expect(setDefaultMint).not.toHaveBeenCalled();
     await ui.view.unmount();
   });
 });

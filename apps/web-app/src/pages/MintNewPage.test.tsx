@@ -1,11 +1,13 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { MintSettingsContextValue } from "../app/context/SystemSettingsContexts";
-import { createMintSettings } from "../testUtils/mintSettings";
+import {
+  createMintSettings,
+  type MintSettings,
+} from "../testUtils/mintSettings";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { MintNewPage } from "./MintNewPage";
 
-let mintSettings: MintSettingsContextValue;
+let mintSettings: MintSettings;
 
 const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
 
@@ -14,12 +16,28 @@ vi.mock("../hooks/useRouting", () => ({
 }));
 
 vi.mock("../app/hooks/shell", async () =>
-  (await import("../testUtils/shellHooks")).shellHooksMock(),
+  (await import("../testUtils/shellHooks")).shellHooksMock({
+    setStatus: (message) => mintSettings.setStatus(message),
+  }),
 );
 
-vi.mock("../app/context/SystemSettingsContexts", () => ({
-  useMintSettingsContext: () => mintSettings,
-}));
+vi.mock("../app/hooks/useAllowTestMints", async () =>
+  (await import("../testUtils/mintSettings")).mintSettingsMocks.allowTestMints(
+    () => mintSettings,
+  ),
+);
+
+vi.mock("../app/hooks/wallet/useNpubCash", async () =>
+  (await import("../testUtils/mintSettings")).mintSettingsMocks.npubCash(
+    () => mintSettings,
+  ),
+);
+
+vi.mock("../app/hooks/wallet/useWalletOps", async () =>
+  (await import("../testUtils/mintSettings")).mintSettingsMocks.walletOps(
+    () => mintSettings,
+  ),
+);
 
 const renderPage = async () => {
   const rendered = await renderIntoDocument(<MintNewPage />);
