@@ -1,7 +1,12 @@
+// @vitest-environment jsdom
 import { Result } from "effect";
-import React, { act } from "react";
+import { nip19 } from "nostr-tools";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { makeWalletOps } from "../../state/wallet/opQueue";
+import { createSecretKey } from "../../../testUtils/nostrKeys";
+import { localStorageKv } from "../../../utils/storage";
+import type { ReceiveCashuToken } from "../linkshu/commands";
+import { makeNpubCashCommands, makeNpubCashSession } from "./npubCash";
+import { makeWalletOps } from "./opQueue";
 import {
   Amount,
   CounterLockTimeout,
@@ -13,19 +18,15 @@ import {
   ReceiveReceipt,
   TokenText,
 } from "@linky-fit/linkshu";
-import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import {
   LOCAL_NPUB_CASH_CLAIM_INBOX_STORAGE_KEY_PREFIX,
   LOCAL_NPUB_CASH_CLAIM_LAST_ATTEMPT_STORAGE_KEY_PREFIX,
   LOCAL_NPUB_CASH_CLAIM_LOCK_STORAGE_KEY_PREFIX,
 } from "../../../utils/constants";
-import type { PushToastOptions } from "../../../hooks/useToasts";
 import {
   addToClaimInbox,
   readClaimInbox,
 } from "../../../utils/npubCashClaimInbox";
-import type { ReceiveCashuToken } from "../composition/useLinkshuComposition";
-import { useNpubCashClaim } from "./useNpubCashClaim";
 
 const makeLocalStorageKey = (prefix: string): string => `${prefix}.owner`;
 const inboxKey = makeLocalStorageKey(
@@ -58,7 +59,9 @@ const stubClaimServer = (tokens: readonly string[]): void => {
   let handedOut = false;
   vi.stubGlobal(
     "fetch",
-    vi.fn(async () => {
+    vi.fn(async (url: string) => {
+      if (!url.includes("/api/v1/claim"))
+        return new Response(null, { status: 404 });
       const body = handedOut ? {} : { data: { tokens } };
       handedOut = true;
       return new Response(JSON.stringify(body), { status: 200 });
@@ -84,62 +87,54 @@ const stubStalledClaimServer = (): { abort: () => void } => {
   return { abort: () => timeout.abort() };
 };
 
+const nsec = nip19.nsecEncode(createSecretKey(1));
+
+/** One tab's npub.cash claim over its own session state. */
 const renderClaim = async (
   receiveCashuToken: ReceiveCashuToken,
-  pushToast: (message: string, options?: PushToastOptions) => void = () =>
-    undefined,
+  pushToast: (message: string) => void = () => undefined,
   copyText: (value: string) => Promise<void> = async () => undefined,
 ) => {
-  const ref: { current: (() => Promise<void>) | null } = { current: null };
-  const Probe = (): null => {
-    const npubCashClaimInFlightRef = React.useRef(false);
-    const { claimNpubCashOnce } = useNpubCashClaim({
-      adoptPaidCashuQuote: null,
-      allowTestMints: true,
-      cashuIsBusy: false,
-      copyText,
-      currentNpub: "npub-test",
-      currentNsec: "nsec-test",
-      formatDisplayedAmountParts: () => ({
-        amountText: "21",
-        approxPrefix: "",
-        unitLabel: "sat",
-      }),
-      isMintDeleted: () => false,
-      logPaymentEvent: () => undefined,
-      makeLocalStorageKey,
-      makeNip98AuthHeader: async () => "Nostr test",
-      maybeShowPwaNotification: async () => undefined,
-      mintInfoByUrl: new Map(),
-      npubCashClaimInFlightRef,
-      pushToast,
-      receiveCashuToken,
-      refreshMintInfo: () => undefined,
-      rememberCashuTokenKnown: () => undefined,
-      routeKind: "wallet",
-      runQueued: makeWalletOps(() => {}).runQueuedTask,
-      setStatus: () => undefined,
-      showPaidOverlay: () => undefined,
-      t: (key) => key,
-      touchMintInfo: () => undefined,
-    });
-    React.useEffect(() => {
-      ref.current = claimNpubCashOnce;
-    }, [claimNpubCashOnce]);
-    return null;
-  };
-  const rendered = await renderIntoDocument(<Probe />);
+  const commands = makeNpubCashCommands({
+    allowTestMints: true,
+    currentNpub: "npub-test",
+    currentNsec: nsec,
+    isWalletBusy: () => false,
+    kv: localStorageKv,
+    linkshu: { adoptPaidCashuQuote: vi.fn(), receiveCashuToken },
+    logPaymentEvent: () => undefined,
+    ops: makeWalletOps(() => {}),
+    ownerKey: makeLocalStorageKey,
+    session: makeNpubCashSession(),
+  });
+  const offers: string[] = [];
   const claim = async (): Promise<void> => {
     localStorage.removeItem(
       makeLocalStorageKey(
         LOCAL_NPUB_CASH_CLAIM_LAST_ATTEMPT_STORAGE_KEY_PREFIX,
       ),
     );
-    await ref.current?.();
+    await commands.claim(
+      { fast: false },
+      {
+        onReceived: () => undefined,
+        onReceiveFailed: () => undefined,
+        onUnsaved: (token) => {
+          offers.push(token);
+          pushToast("npubCashClaimUnsaved");
+          void copyText(token);
+        },
+      },
+    );
   };
-  const poll = (): Promise<void> => act(claim);
-  return { claim, poll, unmount: rendered.unmount };
+  return { claim, offers, poll: claim, unmount: async () => undefined };
 };
+
+/** Claim server requests only; the upstream quote listing answers 404. */
+const claimRequests = (): number =>
+  vi
+    .mocked(fetch)
+    .mock.calls.filter(([url]) => String(url).includes("/api/v1/claim")).length;
 
 const inbox = (): readonly string[] => readClaimInbox(inboxKey);
 
@@ -182,7 +177,7 @@ const refuseInboxWrites = (): void => {
   });
 };
 
-describe("useNpubCashClaim", () => {
+describe("npub.cash claim", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     localStorage.clear();
@@ -208,7 +203,7 @@ describe("useNpubCashClaim", () => {
 
     const pollA = tabA.claim();
     await tabB.claim();
-    expect(fetch).toHaveBeenCalledOnce();
+    expect(claimRequests()).toBe(1);
     expect(
       localStorage.getItem(
         makeLocalStorageKey(LOCAL_NPUB_CASH_CLAIM_LOCK_STORAGE_KEY_PREFIX),
@@ -265,7 +260,7 @@ describe("useNpubCashClaim", () => {
     const tabB = await renderClaim(receive);
 
     const pollA = tabA.claim();
-    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(claimRequests()).toBe(1));
     expect(receive.mock.calls.map(([text]) => text)).toEqual([claimed]);
     expect(inbox()).toEqual([]);
     expect(AbortSignal.timeout).toHaveBeenCalledWith(15_000);
@@ -273,7 +268,7 @@ describe("useNpubCashClaim", () => {
     server.abort();
     await pollA;
     await tabB.claim();
-    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(claimRequests()).toBe(2);
     await tabA.unmount();
     await tabB.unmount();
   });
@@ -335,16 +330,17 @@ describe("useNpubCashClaim", () => {
       .fn<ReceiveCashuToken>()
       .mockResolvedValueOnce(waitedOutTheLock)
       .mockResolvedValueOnce(received);
-    const pushToast =
-      vi.fn<(message: string, options?: PushToastOptions) => void>();
+    const pushToast = vi.fn<(message: string) => void>();
     const copyText = vi.fn(async () => undefined);
-    const { poll, unmount } = await renderClaim(receive, pushToast, copyText);
+    const { offers, poll, unmount } = await renderClaim(
+      receive,
+      pushToast,
+      copyText,
+    );
 
     await poll();
     expect(pushToast).toHaveBeenCalledTimes(1);
-    const [message, options] = pushToast.mock.calls[0] ?? [];
-    expect(message).toBe("npubCashClaimUnsaved");
-    options?.action?.onClick();
+    expect(offers).toEqual([claimed]);
     expect(copyText).toHaveBeenCalledWith(claimed);
 
     await poll();
@@ -354,5 +350,55 @@ describe("useNpubCashClaim", () => {
     ]);
     expect(pushToast).toHaveBeenCalledTimes(1);
     await unmount();
+  });
+
+  it("reports a received payment, records it and skips claims while the wallet is busy", async () => {
+    stubClaimServer([claimed]);
+    const logPaymentEvent = vi.fn();
+    const onReceived = vi.fn();
+    let busy = true;
+    const commands = makeNpubCashCommands({
+      allowTestMints: true,
+      currentNpub: "npub-test",
+      currentNsec: nsec,
+      isWalletBusy: () => busy,
+      kv: localStorageKv,
+      linkshu: {
+        adoptPaidCashuQuote: vi.fn(),
+        receiveCashuToken: vi
+          .fn<ReceiveCashuToken>()
+          .mockResolvedValue(received),
+      },
+      logPaymentEvent,
+      ops: makeWalletOps(() => {}),
+      ownerKey: makeLocalStorageKey,
+      session: makeNpubCashSession(),
+    });
+    const events = {
+      onReceived,
+      onReceiveFailed: () => undefined,
+      onUnsaved: () => undefined,
+    };
+
+    await commands.claim({ fast: false }, events);
+    expect(fetch).not.toHaveBeenCalled();
+
+    busy = false;
+    await commands.claim({ fast: false }, events);
+
+    expect(onReceived).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 21,
+        method: "cashu_receive",
+        knownTokens: [claimed, "cashuBresigned"],
+      }),
+    );
+    expect(logPaymentEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        direction: "in",
+        phase: "receive",
+        status: "ok",
+      }),
+    );
   });
 });
