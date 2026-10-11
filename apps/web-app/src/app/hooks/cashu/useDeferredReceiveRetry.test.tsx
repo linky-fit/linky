@@ -10,6 +10,7 @@ import {
 import { transactionIdForOperation } from "@linky-fit/linksync";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { makeWalletOps } from "../../state/wallet/opQueue";
 import * as appLog from "../../../devtools/inspector/appLog";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import { useDeferredReceiveRetry } from "./useDeferredReceiveRetry";
@@ -58,11 +59,11 @@ const mount = async (
   results: ReadonlyArray<DeferredReceiveResult>,
   deferredCount: number,
   resume: Params["resumeDeferredCashuReceives"] = vi.fn(async () => results),
-  enqueueCashuOp: Params["enqueueCashuOp"] = (op) => op(),
+  runQueued: Params["runQueued"] = makeWalletOps(() => {}).runQueuedTask,
 ) => {
   const params: Params = {
     deferredCount,
-    enqueueCashuOp,
+    runQueued,
     formatDisplayedAmountParts: (amount) => ({
       amountText: String(amount),
       approxPrefix: "",
@@ -230,9 +231,9 @@ describe("useDeferredReceiveRetry", () => {
       freeQueue = resolve;
     });
     const resume = vi.fn(async () => [result("pending")]);
-    const view = await mountOnline([], 1, resume, async (op) => {
+    const view = await mountOnline([], 1, resume, async (task) => {
       await queueFree;
-      return op();
+      return task();
     });
 
     expect(resume).not.toHaveBeenCalled();

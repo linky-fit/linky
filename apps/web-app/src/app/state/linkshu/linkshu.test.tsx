@@ -23,9 +23,9 @@ import {
   LinkshuNotConfigured,
   linkshuRuntimeAtom,
   linkshuSeedAtom,
-  WalletOpQueue,
   WalletScope,
 } from "./runtime";
+import { WalletOpQueue } from "../wallet/opQueue";
 
 vi.mock("@evolu/common", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@evolu/common")>()),

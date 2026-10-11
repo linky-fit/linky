@@ -25,6 +25,8 @@ export interface AppConfig {
 
 export interface LifecyclePort {
   readonly reload: () => void;
+  /** Holds back an app update's reload until `work` settles. */
+  readonly deferUpdateWhile: (work: Promise<void>) => void;
 }
 
 export interface PlatformPorts {

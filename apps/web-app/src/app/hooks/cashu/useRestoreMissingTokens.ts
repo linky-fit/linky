@@ -2,6 +2,7 @@ import { transactionIdForRestore } from "@linky-fit/linksync";
 import { parseMintUrl } from "@linky-fit/linkshu";
 import type { MintUrl, RestoreProgress } from "@linky-fit/linkshu";
 import React from "react";
+import type { RunQueuedTask } from "../../state/wallet/opQueue";
 import { isHiddenTestMint, MAIN_MINT_URL } from "../../../utils/mint";
 import type { LoggedPaymentEventParams } from "../../types/appTypes";
 import type {
@@ -20,7 +21,6 @@ interface UseRestoreMissingTokensParams {
    */
   walletMints: readonly string[];
   defaultMintUrl: string | null;
-  enqueueCashuOp: (op: () => Promise<void>) => Promise<void>;
   isMintDeleted: (mintUrl: string) => boolean;
   logPaymentEvent: (event: LoggedPaymentEventParams) => void;
   mintInfoDeduped: readonly { canonicalUrl?: string | null }[];
@@ -32,7 +32,7 @@ interface UseRestoreMissingTokensParams {
   /** Null until the linkshu runtime is composed (seed + owners resolved). */
   restoreCashuTokens: RestoreCashuTokens | null;
   reclaimCashuTokens: ReclaimCashuTokens | null;
-  setCashuIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
+  runQueued: RunQueuedTask;
   setTokensRestoreIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
   setTokensRestoreProgress: (progress: RestoreProgress | null) => void;
   t: Translate;
@@ -52,7 +52,6 @@ export const useRestoreMissingTokens = ({
   cashuIsBusy,
   walletMints,
   defaultMintUrl,
-  enqueueCashuOp,
   isMintDeleted,
   logPaymentEvent,
   mintInfoDeduped,
@@ -62,7 +61,7 @@ export const useRestoreMissingTokens = ({
   rememberSeenMint,
   restoreCashuTokens,
   reclaimCashuTokens,
-  setCashuIsBusy,
+  runQueued,
   setTokensRestoreIsBusy,
   setTokensRestoreProgress,
   t,
@@ -77,9 +76,8 @@ export const useRestoreMissingTokens = ({
 
       running.current = true;
       try {
-        await enqueueCashuOp(async () => {
+        await runQueued(async () => {
           setTokensRestoreIsBusy(mode === "missing");
-          setCashuIsBusy(true);
 
           try {
             if (
@@ -177,7 +175,6 @@ export const useRestoreMissingTokens = ({
           } catch (e) {
             pushToast(`${t("restoreFailed")}: ${String(e ?? "unknown")}`);
           } finally {
-            setCashuIsBusy(false);
             setTokensRestoreIsBusy(false);
             setTokensRestoreProgress(null);
           }
@@ -191,7 +188,6 @@ export const useRestoreMissingTokens = ({
       cashuIsBusy,
       walletMints,
       defaultMintUrl,
-      enqueueCashuOp,
       isMintDeleted,
       logPaymentEvent,
       mintInfoDeduped,
@@ -201,7 +197,7 @@ export const useRestoreMissingTokens = ({
       rememberSeenMint,
       restoreCashuTokens,
       reclaimCashuTokens,
-      setCashuIsBusy,
+      runQueued,
       setTokensRestoreIsBusy,
       setTokensRestoreProgress,
       t,

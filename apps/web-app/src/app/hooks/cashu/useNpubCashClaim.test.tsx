@@ -1,6 +1,7 @@
 import { Result } from "effect";
 import React, { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { makeWalletOps } from "../../state/wallet/opQueue";
 import {
   Amount,
   CounterLockTimeout,
@@ -99,7 +100,6 @@ const renderClaim = async (
       copyText,
       currentNpub: "npub-test",
       currentNsec: "nsec-test",
-      enqueueCashuOp: (op) => op(),
       formatDisplayedAmountParts: () => ({
         amountText: "21",
         approxPrefix: "",
@@ -117,7 +117,7 @@ const renderClaim = async (
       refreshMintInfo: () => undefined,
       rememberCashuTokenKnown: () => undefined,
       routeKind: "wallet",
-      setCashuIsBusy: () => undefined,
+      runQueued: makeWalletOps(() => {}).runQueuedTask,
       setStatus: () => undefined,
       showPaidOverlay: () => undefined,
       t: (key) => key,

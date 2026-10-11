@@ -11,8 +11,9 @@ import {
   paidOverlayContact,
   type PaidOverlayDetails,
 } from "../lib/paidOverlay";
-import { Result } from "effect";
+import { Option, Result } from "effect";
 import React from "react";
+import type { RunExclusiveTask } from "../state/wallet/opQueue";
 import {
   fetchLnurlInvoiceForTarget,
   getLnurlPayDisplayText,
@@ -56,14 +57,13 @@ interface MeltFailure {
 interface UseLightningPaymentsDomainParams {
   canPayWithCashu: boolean;
   cashuBalance: number;
-  cashuIsBusy: boolean;
   defaultMintUrl: string | null;
   dismissPaymentSending: () => void;
   formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
   logPaymentEvent: (event: LoggedPaymentEventParams) => void;
   /** Null until the linkshu runtime is composed (seed + owners resolved). */
   meltCashuInvoice: MeltCashuInvoice | null;
-  setCashuIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
+  runExclusive: RunExclusiveTask;
   setContactsOnboardingHasPaid: React.Dispatch<React.SetStateAction<boolean>>;
   setPostPaySaveContact: React.Dispatch<
     React.SetStateAction<{ amountSat: number; lnAddress: string } | null>
@@ -88,13 +88,12 @@ interface UseLightningPaymentsDomainParams {
 export const useLightningPaymentsDomain = ({
   canPayWithCashu,
   cashuBalance,
-  cashuIsBusy,
   defaultMintUrl,
   dismissPaymentSending,
   formatDisplayedAmountParts,
   logPaymentEvent,
   meltCashuInvoice,
-  setCashuIsBusy,
+  runExclusive,
   setContactsOnboardingHasPaid,
   setPostPaySaveContact,
   setStatus,
@@ -168,7 +167,6 @@ export const useLightningPaymentsDomain = ({
       const normalized = invoice.trim();
       if (!normalized) return false;
 
-      if (cashuIsBusy) return false;
       if (cashuBalance <= 0) {
         setStatus(t("payInsufficient"));
         return false;
@@ -178,99 +176,99 @@ export const useLightningPaymentsDomain = ({
         return false;
       }
 
-      setCashuIsBusy(true);
-      try {
-        const invoicePreview = getLightningInvoicePreview(normalized);
-        const invoiceAmountSat = invoicePreview?.amountSat ?? null;
-        // An amountless invoice cannot pre-select by size; any funded mint
-        // may quote it, so fall back to the 1-sat threshold.
-        const mint = planSendMint({
-          balances: walletMintBalances,
-          isPreferredMint: isSpellingOf(defaultMintUrl),
-          amount: invoiceAmountSat ?? 1,
-        });
-        if (mint === null) {
-          setStatus(t("payInsufficient"));
-          return false;
-        }
-
-        showPaymentSending({ direction: "out", amountSat: invoiceAmountSat });
-        const invoiceDetails = { lightningInvoice: normalized };
-        const note = invoicePreview?.description ?? null;
-        const outcome = await meltOnMint(meltCashuInvoice, normalized, mint);
-
-        if (Result.isFailure(outcome)) {
-          if (outcome.failure.pending !== null) {
-            recordPendingMelt(
-              outcome.failure.pending,
-              "lightning_invoice",
-              "lightning",
-              invoiceDetails,
-              null,
-              note,
-            );
-            return true;
+      const ran = await runExclusive(async (): Promise<boolean> => {
+        try {
+          const invoicePreview = getLightningInvoicePreview(normalized);
+          const invoiceAmountSat = invoicePreview?.amountSat ?? null;
+          // An amountless invoice cannot pre-select by size; any funded mint
+          // may quote it, so fall back to the 1-sat threshold.
+          const mint = planSendMint({
+            balances: walletMintBalances,
+            isPreferredMint: isSpellingOf(defaultMintUrl),
+            amount: invoiceAmountSat ?? 1,
+          });
+          if (mint === null) {
+            setStatus(t("payInsufficient"));
+            return false;
           }
+
+          showPaymentSending({ direction: "out", amountSat: invoiceAmountSat });
+          const invoiceDetails = { lightningInvoice: normalized };
+          const note = invoicePreview?.description ?? null;
+          const outcome = await meltOnMint(meltCashuInvoice, normalized, mint);
+
+          if (Result.isFailure(outcome)) {
+            if (outcome.failure.pending !== null) {
+              recordPendingMelt(
+                outcome.failure.pending,
+                "lightning_invoice",
+                "lightning",
+                invoiceDetails,
+                null,
+                note,
+              );
+              return true;
+            }
+            logPaymentEvent({
+              direction: "out",
+              status: "error",
+              amount: null,
+              details: invoiceDetails,
+              fee: null,
+              mint,
+              unit: "sat",
+              error: outcome.failure.message,
+              contactId: null,
+              method: "lightning_invoice",
+              paymentType: "lightning",
+              phase: "melt",
+            });
+            setStatus(`${t("payFailed")}: ${outcome.failure.message}`);
+            return false;
+          }
+
+          const receipt = outcome.success;
           logPaymentEvent({
             direction: "out",
-            status: "error",
-            amount: null,
+            status: "ok",
+            transactionId: transactionIdForQuote(
+              "melt",
+              receipt.mint,
+              receipt.quoteId,
+            ),
+            amount: receipt.paidAmount,
             details: invoiceDetails,
-            fee: null,
-            mint,
+            fee: receipt.feePaid,
+            mint: receipt.mint,
+            note,
             unit: "sat",
-            error: outcome.failure.message,
+            error: null,
             contactId: null,
             method: "lightning_invoice",
             paymentType: "lightning",
-            phase: "melt",
+            phase: "complete",
           });
-          setStatus(`${t("payFailed")}: ${outcome.failure.message}`);
-          return false;
+
+          const displayAmount = formatDisplayedAmountParts(receipt.paidAmount);
+          showPaidOverlay(
+            t("paidSent")
+              .replace(
+                "{amount}",
+                `${displayAmount.approxPrefix}${displayAmount.amountText}`,
+              )
+              .replace("{unit}", displayAmount.unitLabel),
+            { direction: "out", amountSat: receipt.paidAmount },
+          );
+          rememberFirstPayment();
+          return true;
+        } finally {
+          dismissPaymentSending();
         }
-
-        const receipt = outcome.success;
-        logPaymentEvent({
-          direction: "out",
-          status: "ok",
-          transactionId: transactionIdForQuote(
-            "melt",
-            receipt.mint,
-            receipt.quoteId,
-          ),
-          amount: receipt.paidAmount,
-          details: invoiceDetails,
-          fee: receipt.feePaid,
-          mint: receipt.mint,
-          note,
-          unit: "sat",
-          error: null,
-          contactId: null,
-          method: "lightning_invoice",
-          paymentType: "lightning",
-          phase: "complete",
-        });
-
-        const displayAmount = formatDisplayedAmountParts(receipt.paidAmount);
-        showPaidOverlay(
-          t("paidSent")
-            .replace(
-              "{amount}",
-              `${displayAmount.approxPrefix}${displayAmount.amountText}`,
-            )
-            .replace("{unit}", displayAmount.unitLabel),
-          { direction: "out", amountSat: receipt.paidAmount },
-        );
-        rememberFirstPayment();
-        return true;
-      } finally {
-        setCashuIsBusy(false);
-        dismissPaymentSending();
-      }
+      });
+      return Option.getOrElse(ran, () => false);
     },
     [
       cashuBalance,
-      cashuIsBusy,
       defaultMintUrl,
       dismissPaymentSending,
       formatDisplayedAmountParts,
@@ -279,7 +277,7 @@ export const useLightningPaymentsDomain = ({
       meltOnMint,
       recordPendingMelt,
       rememberFirstPayment,
-      setCashuIsBusy,
+      runExclusive,
       setStatus,
       showPaidOverlay,
       showPaymentSending,
@@ -308,237 +306,242 @@ export const useLightningPaymentsDomain = ({
         return false;
       }
       if (!canPayWithCashu) return false;
-      if (cashuIsBusy) return false;
       if (meltCashuInvoice === null) {
         setStatus(`${t("errorPrefix")}: Cashu storage is not ready`);
         return false;
       }
-      setCashuIsBusy(true);
-
       const displayTarget = getLnurlPayDisplayText(paymentTarget);
       let resolvedLightningAddress =
         inferLightningAddressFromLnurlTarget(paymentTarget);
 
-      try {
-        const mint = planSendMint({
-          balances: walletMintBalances,
-          isPreferredMint: isSpellingOf(defaultMintUrl),
-          amount: amountSat,
-        });
-        if (mint === null) {
-          setStatus(t("payInsufficient"));
-          return false;
-        }
-        const mintBalance =
-          walletMintBalances.find((entry) => entry.mint === mint)?.amount ?? 0;
-        showPaymentSending({
-          direction: "out",
-          amountSat,
-          contact: paidOverlayContact(contact),
-        });
-
-        // Paying the full balance leaves no headroom for fees; the ladder
-        // degrades the requested LNURL amount until amount + fees fit.
-        const queuedAmountAttempts = buildPaymentAmountAttempts(
-          amountSat,
-          mintBalance,
-        );
-        const seenAmountAttempts = new Set(queuedAmountAttempts);
-        let finalErrorMessage: string | null = null;
-        let finalErrorMint: string | null = null;
-        let lastAttemptInvoice: string | null = null;
-
-        for (
-          let attemptIndex = 0;
-          attemptIndex < queuedAmountAttempts.length;
-          attemptIndex += 1
-        ) {
-          const attemptedAmountSat = queuedAmountAttempts[attemptIndex];
-          const canRetryLower = (errorMessage: string): boolean => {
-            if (!isRetryablePaymentAmountFailure(errorMessage)) return false;
-            for (const retryAmountSat of buildPaymentFailureAmountAttempts(
-              attemptedAmountSat,
-              errorMessage,
-            )) {
-              if (seenAmountAttempts.has(retryAmountSat)) continue;
-              seenAmountAttempts.add(retryAmountSat);
-              queuedAmountAttempts.push(retryAmountSat);
-            }
-            return attemptIndex < queuedAmountAttempts.length - 1;
-          };
-
-          let attemptInvoice: string;
-          let attemptInvoicePreview: LightningInvoicePreview | null = null;
-          let attemptSuccessAction: LnurlPaySuccessAction | null = null;
-          try {
-            const invoiceResult = await fetchLnurlInvoiceForTarget(
-              paymentTarget,
-              attemptedAmountSat,
-              commentNote ?? undefined,
-            );
-            if (invoiceResult.lightningAddress) {
-              resolvedLightningAddress = invoiceResult.lightningAddress;
-            }
-            attemptInvoice = invoiceResult.pr;
-            attemptSuccessAction = invoiceResult.successAction;
-            attemptInvoicePreview = getLightningInvoicePreview(attemptInvoice);
-            lastAttemptInvoice = attemptInvoice;
-          } catch (error) {
-            const errorMessage = getUnknownErrorMessage(error, "unknown");
-            if (canRetryLower(errorMessage)) continue;
-            finalErrorMessage = errorMessage;
-            finalErrorMint = null;
-            break;
+      const ran = await runExclusive(async (): Promise<boolean> => {
+        try {
+          const mint = planSendMint({
+            balances: walletMintBalances,
+            isPreferredMint: isSpellingOf(defaultMintUrl),
+            amount: amountSat,
+          });
+          if (mint === null) {
+            setStatus(t("payInsufficient"));
+            return false;
           }
+          const mintBalance =
+            walletMintBalances.find((entry) => entry.mint === mint)?.amount ??
+            0;
+          showPaymentSending({
+            direction: "out",
+            amountSat,
+            contact: paidOverlayContact(contact),
+          });
 
-          const outcome = await meltOnMint(
-            meltCashuInvoice,
-            attemptInvoice,
-            mint,
+          // Paying the full balance leaves no headroom for fees; the ladder
+          // degrades the requested LNURL amount until amount + fees fit.
+          const queuedAmountAttempts = buildPaymentAmountAttempts(
+            amountSat,
+            mintBalance,
           );
+          const seenAmountAttempts = new Set(queuedAmountAttempts);
+          let finalErrorMessage: string | null = null;
+          let finalErrorMint: string | null = null;
+          let lastAttemptInvoice: string | null = null;
 
-          const paidLightningAddress = resolvedLightningAddress;
+          for (
+            let attemptIndex = 0;
+            attemptIndex < queuedAmountAttempts.length;
+            attemptIndex += 1
+          ) {
+            const attemptedAmountSat = queuedAmountAttempts[attemptIndex];
+            const canRetryLower = (errorMessage: string): boolean => {
+              if (!isRetryablePaymentAmountFailure(errorMessage)) return false;
+              for (const retryAmountSat of buildPaymentFailureAmountAttempts(
+                attemptedAmountSat,
+                errorMessage,
+              )) {
+                if (seenAmountAttempts.has(retryAmountSat)) continue;
+                seenAmountAttempts.add(retryAmountSat);
+                queuedAmountAttempts.push(retryAmountSat);
+              }
+              return attemptIndex < queuedAmountAttempts.length - 1;
+            };
 
-          if (Result.isFailure(outcome)) {
-            if (outcome.failure.pending !== null) {
-              recordPendingMelt(
-                outcome.failure.pending,
-                "lightning_address",
-                paymentType,
-                {
-                  lightningAddress: paidLightningAddress,
-                  lightningInvoice: attemptInvoice,
-                },
-                contact?.id ?? null,
-                commentNote ?? attemptInvoicePreview?.description ?? null,
+            let attemptInvoice: string;
+            let attemptInvoicePreview: LightningInvoicePreview | null = null;
+            let attemptSuccessAction: LnurlPaySuccessAction | null = null;
+            try {
+              const invoiceResult = await fetchLnurlInvoiceForTarget(
+                paymentTarget,
+                attemptedAmountSat,
+                commentNote ?? undefined,
               );
-              return true;
+              if (invoiceResult.lightningAddress) {
+                resolvedLightningAddress = invoiceResult.lightningAddress;
+              }
+              attemptInvoice = invoiceResult.pr;
+              attemptSuccessAction = invoiceResult.successAction;
+              attemptInvoicePreview =
+                getLightningInvoicePreview(attemptInvoice);
+              lastAttemptInvoice = attemptInvoice;
+            } catch (error) {
+              const errorMessage = getUnknownErrorMessage(error, "unknown");
+              if (canRetryLower(errorMessage)) continue;
+              finalErrorMessage = errorMessage;
+              finalErrorMint = null;
+              break;
             }
-            if (canRetryLower(outcome.failure.message)) continue;
-            finalErrorMessage = outcome.failure.message;
-            finalErrorMint = mint;
-            break;
+
+            const outcome = await meltOnMint(
+              meltCashuInvoice,
+              attemptInvoice,
+              mint,
+            );
+
+            const paidLightningAddress = resolvedLightningAddress;
+
+            if (Result.isFailure(outcome)) {
+              if (outcome.failure.pending !== null) {
+                recordPendingMelt(
+                  outcome.failure.pending,
+                  "lightning_address",
+                  paymentType,
+                  {
+                    lightningAddress: paidLightningAddress,
+                    lightningInvoice: attemptInvoice,
+                  },
+                  contact?.id ?? null,
+                  commentNote ?? attemptInvoicePreview?.description ?? null,
+                );
+                return true;
+              }
+              if (canRetryLower(outcome.failure.message)) continue;
+              finalErrorMessage = outcome.failure.message;
+              finalErrorMint = mint;
+              break;
+            }
+
+            const receipt = outcome.success;
+            const successActionMessage =
+              attemptSuccessAction?.tag === "message"
+                ? attemptSuccessAction.message
+                : null;
+            const successActionUrl =
+              attemptSuccessAction?.tag === "url"
+                ? attemptSuccessAction.url
+                : null;
+            const successActionUrlDescription =
+              attemptSuccessAction?.tag === "url"
+                ? attemptSuccessAction.description
+                : null;
+
+            logPaymentEvent({
+              direction: "out",
+              status: "ok",
+              transactionId: transactionIdForQuote(
+                "melt",
+                receipt.mint,
+                receipt.quoteId,
+              ),
+              amount: receipt.paidAmount,
+              details: {
+                lightningAddress: paidLightningAddress,
+                lightningInvoice: attemptInvoice,
+                ...(successActionMessage
+                  ? { lnurlSuccessMessage: successActionMessage }
+                  : {}),
+                ...(successActionUrl
+                  ? { lnurlSuccessUrl: successActionUrl }
+                  : {}),
+                ...(successActionUrlDescription
+                  ? { lnurlSuccessUrlDescription: successActionUrlDescription }
+                  : {}),
+              },
+              fee: receipt.feePaid,
+              mint: receipt.mint,
+              note: commentNote ?? attemptInvoicePreview?.description ?? null,
+              unit: "sat",
+              error: null,
+              contactId: contact?.id ?? null,
+              method: "lightning_address",
+              paymentType,
+              phase: "complete",
+            });
+
+            rememberFirstPayment();
+
+            const displayAmount = formatDisplayedAmountParts(
+              receipt.paidAmount,
+            );
+            showPaidOverlay(
+              t("paidSentTo")
+                .replace(
+                  "{amount}",
+                  `${displayAmount.approxPrefix}${displayAmount.amountText}`,
+                )
+                .replace("{unit}", displayAmount.unitLabel)
+                .replace(
+                  "{name}",
+                  (contact?.name ?? "").trim() || displayTarget,
+                ),
+              {
+                direction: "out",
+                amountSat: receipt.paidAmount,
+                contact: paidOverlayContact(contact),
+              },
+            );
+
+            if (successActionMessage) {
+              setStatus(
+                t("lnurlSuccessActionMessage").replace(
+                  "{message}",
+                  successActionMessage,
+                ),
+              );
+            } else if (successActionUrl) {
+              setStatus(
+                t("lnurlSuccessActionUrl")
+                  .replace("{description}", successActionUrlDescription ?? "")
+                  .replace("{url}", successActionUrl),
+              );
+            }
+
+            if (paidLightningAddress && !contact?.id) {
+              setPostPaySaveContact({
+                lnAddress: paidLightningAddress,
+                amountSat: receipt.paidAmount,
+              });
+            }
+            return true;
           }
 
-          const receipt = outcome.success;
-          const successActionMessage =
-            attemptSuccessAction?.tag === "message"
-              ? attemptSuccessAction.message
-              : null;
-          const successActionUrl =
-            attemptSuccessAction?.tag === "url"
-              ? attemptSuccessAction.url
-              : null;
-          const successActionUrlDescription =
-            attemptSuccessAction?.tag === "url"
-              ? attemptSuccessAction.description
-              : null;
-
+          finalErrorMessage ??= "unknown";
           logPaymentEvent({
             direction: "out",
-            status: "ok",
-            transactionId: transactionIdForQuote(
-              "melt",
-              receipt.mint,
-              receipt.quoteId,
-            ),
-            amount: receipt.paidAmount,
+            status: "error",
+            amount: amountSat,
             details: {
-              lightningAddress: paidLightningAddress,
-              lightningInvoice: attemptInvoice,
-              ...(successActionMessage
-                ? { lnurlSuccessMessage: successActionMessage }
-                : {}),
-              ...(successActionUrl
-                ? { lnurlSuccessUrl: successActionUrl }
-                : {}),
-              ...(successActionUrlDescription
-                ? { lnurlSuccessUrlDescription: successActionUrlDescription }
+              lightningAddress: resolvedLightningAddress,
+              ...(lastAttemptInvoice
+                ? { lightningInvoice: lastAttemptInvoice }
                 : {}),
             },
-            fee: receipt.feePaid,
-            mint: receipt.mint,
-            note: commentNote ?? attemptInvoicePreview?.description ?? null,
+            fee: null,
+            mint: finalErrorMint,
             unit: "sat",
-            error: null,
+            error: finalErrorMessage,
             contactId: contact?.id ?? null,
             method: "lightning_address",
             paymentType,
-            phase: "complete",
+            phase: finalErrorMint ? "melt" : "invoice_fetch",
           });
-
-          rememberFirstPayment();
-
-          const displayAmount = formatDisplayedAmountParts(receipt.paidAmount);
-          showPaidOverlay(
-            t("paidSentTo")
-              .replace(
-                "{amount}",
-                `${displayAmount.approxPrefix}${displayAmount.amountText}`,
-              )
-              .replace("{unit}", displayAmount.unitLabel)
-              .replace("{name}", (contact?.name ?? "").trim() || displayTarget),
-            {
-              direction: "out",
-              amountSat: receipt.paidAmount,
-              contact: paidOverlayContact(contact),
-            },
-          );
-
-          if (successActionMessage) {
-            setStatus(
-              t("lnurlSuccessActionMessage").replace(
-                "{message}",
-                successActionMessage,
-              ),
-            );
-          } else if (successActionUrl) {
-            setStatus(
-              t("lnurlSuccessActionUrl")
-                .replace("{description}", successActionUrlDescription ?? "")
-                .replace("{url}", successActionUrl),
-            );
-          }
-
-          if (paidLightningAddress && !contact?.id) {
-            setPostPaySaveContact({
-              lnAddress: paidLightningAddress,
-              amountSat: receipt.paidAmount,
-            });
-          }
-          return true;
+          setStatus(`${t("payFailed")}: ${finalErrorMessage}`);
+          return false;
+        } finally {
+          dismissPaymentSending();
         }
-
-        finalErrorMessage ??= "unknown";
-        logPaymentEvent({
-          direction: "out",
-          status: "error",
-          amount: amountSat,
-          details: {
-            lightningAddress: resolvedLightningAddress,
-            ...(lastAttemptInvoice
-              ? { lightningInvoice: lastAttemptInvoice }
-              : {}),
-          },
-          fee: null,
-          mint: finalErrorMint,
-          unit: "sat",
-          error: finalErrorMessage,
-          contactId: contact?.id ?? null,
-          method: "lightning_address",
-          paymentType,
-          phase: finalErrorMint ? "melt" : "invoice_fetch",
-        });
-        setStatus(`${t("payFailed")}: ${finalErrorMessage}`);
-        return false;
-      } finally {
-        setCashuIsBusy(false);
-        dismissPaymentSending();
-      }
+      });
+      return Option.getOrElse(ran, () => false);
     },
     [
       canPayWithCashu,
-      cashuIsBusy,
       defaultMintUrl,
       dismissPaymentSending,
       formatDisplayedAmountParts,
@@ -547,7 +550,7 @@ export const useLightningPaymentsDomain = ({
       meltOnMint,
       recordPendingMelt,
       rememberFirstPayment,
-      setCashuIsBusy,
+      runExclusive,
       setPostPaySaveContact,
       setStatus,
       showPaidOverlay,

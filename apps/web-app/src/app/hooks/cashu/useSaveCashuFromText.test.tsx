@@ -2,6 +2,7 @@ import { transactionIdForOperation } from "@linky-fit/linksync";
 import { Result, Schema } from "effect";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
+import { makeWalletOps } from "../../state/wallet/opQueue";
 import type { Mock } from "vitest";
 import {
   Amount,
@@ -43,9 +44,6 @@ const setup = async (
     const cashu = useCashuDomain({ cashuTransfers, walletLoaded: true });
     const save = useSaveCashuFromText({
       allowTestMints: true,
-      enqueueCashuOp: async (op) => {
-        await op();
-      },
       formatDisplayedAmountParts: () => ({
         amountText: "0",
         approxPrefix: "",
@@ -59,7 +57,7 @@ const setup = async (
       refreshMintInfo: async () => undefined,
       rememberCashuTokenKnown: cashu.rememberCashuTokenKnown,
       setCashuDraft,
-      setCashuIsBusy: () => undefined,
+      runQueued: makeWalletOps(() => {}).runQueuedTask,
       setStatus,
       showPaidOverlay: () => undefined,
       t: translateToKey,

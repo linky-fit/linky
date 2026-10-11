@@ -4,6 +4,7 @@ import { useLatest } from "../../../hooks/useLatest";
 import { Schema } from "effect";
 import { Result } from "effect";
 import React from "react";
+import type { RunQueuedTask } from "../../state/wallet/opQueue";
 import { parseTokenText, type OperationId } from "@linky-fit/linkshu";
 import { JsonValue } from "../../../types/json";
 import {
@@ -69,7 +70,6 @@ interface UseNpubCashClaimParams {
   copyText: (value: string) => Promise<void>;
   currentNpub: string | null;
   currentNsec: string | null;
-  enqueueCashuOp: <T>(op: () => Promise<T>) => Promise<T>;
   formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
   isMintDeleted: (mintUrl: string) => boolean;
   logPaymentEvent: (event: LoggedPaymentEventParams) => void;
@@ -92,7 +92,7 @@ interface UseNpubCashClaimParams {
   refreshMintInfo: (mintUrl: string) => Promise<void> | void;
   rememberCashuTokenKnown: (...tokens: readonly string[]) => void;
   routeKind: Route["kind"];
-  setCashuIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
+  runQueued: RunQueuedTask;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   showPaidOverlay: (title?: string, details?: PaidOverlayDetails) => void;
   t: Translate;
@@ -186,7 +186,6 @@ export const useNpubCashClaim = ({
   copyText,
   currentNpub,
   currentNsec,
-  enqueueCashuOp,
   formatDisplayedAmountParts,
   isMintDeleted,
   logPaymentEvent,
@@ -200,7 +199,7 @@ export const useNpubCashClaim = ({
   refreshMintInfo,
   rememberCashuTokenKnown,
   routeKind,
-  setCashuIsBusy,
+  runQueued,
   setStatus,
   showPaidOverlay,
   t,
@@ -291,9 +290,7 @@ export const useNpubCashClaim = ({
       if (!tokenRaw) return true;
       if (receiveCashuToken === null) return false;
 
-      return enqueueCashuOp(async () => {
-        setCashuIsBusy(true);
-
+      return runQueued(async () => {
         const parsed = parseTokenText(tokenRaw);
         const parsedMint = parsed?.mint ?? null;
         const parsedAmount = parsed?.amount ?? null;
@@ -351,19 +348,16 @@ export const useNpubCashClaim = ({
           logFailure(message);
           setStatus(`${t("cashuAcceptFailed")}: ${message}`);
           return false;
-        } finally {
-          setCashuIsBusy(false);
         }
       });
     },
     [
       allowTestMints,
       announceReceived,
-      enqueueCashuOp,
       logPaymentEvent,
       receiveCashuToken,
       rememberCashuTokenKnown,
-      setCashuIsBusy,
+      runQueued,
       setStatus,
       t,
     ],
@@ -449,21 +443,16 @@ export const useNpubCashClaim = ({
       if (adoptPaidCashuQuote === null) return false;
       // Left in the ledger: turning test mints back on adopts it.
       if (isHiddenTestMint(quote.mint, allowTestMints)) return false;
-      const outcome = await enqueueCashuOp(async () => {
-        setCashuIsBusy(true);
-        try {
-          return await adoptPaidCashuQuote({
-            mint: quote.mint,
-            quoteId: quote.quoteId,
-            amountSat: quote.amountSat,
-            invoice: quote.invoice,
-            expiresAt: quote.expiresAt,
-            locked: quote.locked,
-          });
-        } finally {
-          setCashuIsBusy(false);
-        }
-      });
+      const outcome = await runQueued(() =>
+        adoptPaidCashuQuote({
+          mint: quote.mint,
+          quoteId: quote.quoteId,
+          amountSat: quote.amountSat,
+          invoice: quote.invoice,
+          expiresAt: quote.expiresAt,
+          locked: quote.locked,
+        }),
+      );
 
       if (Result.isSuccess(outcome)) {
         const receipt = outcome.success;
@@ -501,10 +490,9 @@ export const useNpubCashClaim = ({
       adoptPaidCashuQuote,
       allowTestMints,
       announceReceived,
-      enqueueCashuOp,
       logPaymentEvent,
       rememberCashuTokenKnown,
-      setCashuIsBusy,
+      runQueued,
     ],
   );
 

@@ -5,6 +5,7 @@ import type {
 } from "../../lib/paidOverlay";
 import { Result } from "effect";
 import React from "react";
+import type { RunQueuedTask } from "../../state/wallet/opQueue";
 import { parseTokenText } from "@linky-fit/linkshu";
 import { navigateTo } from "../../../hooks/useRouting";
 import type { DisplayAmountParts } from "../../../utils/displayAmounts";
@@ -50,7 +51,6 @@ export interface SaveCashuFromTextOptions {
 
 interface UseSaveCashuFromTextParams {
   allowTestMints: boolean;
-  enqueueCashuOp: (op: () => Promise<void>) => Promise<void>;
   /** Names the sender on the paid overlay when the token came from a saved contact. */
   findContact?: (contactId: string) => PaidOverlayContact | null;
   formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
@@ -63,7 +63,7 @@ interface UseSaveCashuFromTextParams {
   refreshMintInfo: (mintUrl: string) => Promise<void>;
   rememberCashuTokenKnown: (...tokens: readonly string[]) => void;
   setCashuDraft: React.Dispatch<React.SetStateAction<string>>;
-  setCashuIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
+  runQueued: RunQueuedTask;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   showPaidOverlay: (title?: string, details?: PaidOverlayDetails) => void;
   t: Translate;
@@ -86,7 +86,6 @@ const navigateAfterSave = (options?: SaveCashuFromTextOptions): void => {
  */
 export const useSaveCashuFromText = ({
   allowTestMints,
-  enqueueCashuOp,
   findContact,
   formatDisplayedAmountParts,
   isCashuTokenStored,
@@ -96,8 +95,8 @@ export const useSaveCashuFromText = ({
   receiveCashuToken,
   refreshMintInfo,
   rememberCashuTokenKnown,
+  runQueued,
   setCashuDraft,
-  setCashuIsBusy,
   setStatus,
   showPaidOverlay,
   t,
@@ -172,8 +171,7 @@ export const useSaveCashuFromText = ({
         if (!automatic) setCashuDraft((draft) => draft || tokenRaw);
       };
 
-      await enqueueCashuOp(async () => {
-        setCashuIsBusy(true);
+      await runQueued(async () => {
         try {
           const outcome = await receiveCashuToken(tokenRaw, { automatic });
 
@@ -265,14 +263,11 @@ export const useSaveCashuFromText = ({
           report(`${t("cashuAcceptFailed")}: ${message}`);
           restoreDraftForRetry();
           options?.onResolved?.("transient");
-        } finally {
-          setCashuIsBusy(false);
         }
       });
     },
     [
       allowTestMints,
-      enqueueCashuOp,
       findContact,
       formatDisplayedAmountParts,
       isCashuTokenStored,
@@ -282,8 +277,8 @@ export const useSaveCashuFromText = ({
       receiveCashuToken,
       refreshMintInfo,
       rememberCashuTokenKnown,
+      runQueued,
       setCashuDraft,
-      setCashuIsBusy,
       setStatus,
       showPaidOverlay,
       t,
