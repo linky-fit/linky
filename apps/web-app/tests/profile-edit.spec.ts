@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
-import { expect, test, type Page, type Route } from "@playwright/test";
+import {
+  expect,
+  test,
+  type Locator,
+  type Page,
+  type Route,
+} from "@playwright/test";
 import { Schema } from "effect";
 import {
   generateSecretKey,
@@ -23,6 +29,17 @@ test.use({ serviceWorkers: "block", viewport: MOBILE_VIEWPORT });
 const decodeProfileContent = Schema.decodeUnknownSync(
   Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)),
 );
+
+// An identity switch sets #contacts, then reloads the page.
+const switchIdentityAndAwaitReload = async (
+  page: Page,
+  button: Locator,
+): Promise<void> => {
+  const reloaded = page.waitForEvent("load");
+  await button.click();
+  await reloaded;
+  await expect(page).toHaveURL(/#contacts$/);
+};
 
 const pickPhoto = async (page: Page, color: string): Promise<void> => {
   const png = await page.evaluate((fill) => {
@@ -97,8 +114,7 @@ test("profile edits save after switching to a custom identity", async ({
   await page.goto("/#advanced");
   const paste = page.getByRole("button", { name: "Paste custom nostr keys" });
   await paste.click();
-  await paste.click();
-  await expect(page).toHaveURL(/#contacts$/);
+  await switchIdentityAndAwaitReload(page, paste);
   await page.goto("/#advanced");
   await expect(
     page.getByRole("button", { name: "Switch back to default identity" }),
@@ -179,8 +195,10 @@ test("profile edits save after switching to a custom identity", async ({
       await switchBack.click();
       // The default identity has its onboarding profile, so Linky asks.
       await expect(page.getByTestId("identity-profile-preview")).toBeVisible();
-      await page.getByRole("button", { name: "Switch identity" }).click();
-      await expect(page).toHaveURL(/#contacts$/);
+      await switchIdentityAndAwaitReload(
+        page,
+        page.getByRole("button", { name: "Switch identity" }),
+      );
       await expect
         .poll(() =>
           page.evaluate(() =>
@@ -262,8 +280,10 @@ test("switching to a custom identity with a profile lets the user keep the Linky
   };
   const switchIdentity = async () => {
     await expect.poll(nowSeconds).toBeGreaterThan(existingProfileTime);
-    await page.getByRole("button", { name: "Switch identity" }).click();
-    await expect(page).toHaveURL(/#contacts$/);
+    await switchIdentityAndAwaitReload(
+      page,
+      page.getByRole("button", { name: "Switch identity" }),
+    );
   };
 
   try {
