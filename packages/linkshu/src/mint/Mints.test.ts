@@ -244,24 +244,23 @@ describe("Mints.info", () => {
     },
   );
 
-  it("reports absent optional mint fields as null and mpp as false", async () => {
-    const loaded = fakeWallet({
-      keysetId: "01aaaa",
-      // No published input_fee_ppk on the bound keyset.
-      keyChain: fakeKeyChain([new Keyset("01aaaa", "sat", true)]),
-      getMintInfo: () => new CashuMintInfo(baseInfo),
-    });
-
-    const exit = await runMints(
+  const infoOf = (loaded: LoadedWallet) =>
+    runMints(
       Layer.mergeAll(
         stubInstances(loaded),
         emptyStores,
         stubKv({}),
         Inspector.disabled,
       ),
-      Effect.gen(function* () {
-        const mints = yield* Mints;
-        return yield* mints.info(mint);
+      Effect.flatMap(Mints, (mints) => mints.info(mint)),
+    );
+
+  it("reports absent optional mint fields as null, mpp as false and an omitted keyset fee as 0", async () => {
+    const exit = await infoOf(
+      fakeWallet({
+        keysetId: "01aaaa",
+        keyChain: fakeKeyChain([new Keyset("01aaaa", "sat", true)]),
+        getMintInfo: () => new CashuMintInfo(baseInfo),
       }),
     );
 
@@ -270,13 +269,26 @@ describe("Mints.info", () => {
       new MintInfo({
         url: mint,
         name: "Test mint",
-        inputFeePpk: null,
+        inputFeePpk: 0,
         supportsMpp: false,
         supportsP2pk: false,
         isFakeLightning: false,
         iconUrl: null,
       }),
     );
+  });
+
+  it("reports the input fee as null when the wallet has no bound keyset", async () => {
+    const exit = await infoOf(
+      fakeWallet({
+        keysetId: "01aaaa",
+        keyChain: fakeKeyChain([new Keyset("01bbbb", "sat", true, 100)]),
+        getMintInfo: () => new CashuMintInfo(baseInfo),
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.inputFeePpk).toBeNull();
   });
 });
 

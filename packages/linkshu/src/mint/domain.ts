@@ -6,7 +6,8 @@ export class MintInfo extends Schema.Class<MintInfo>("MintInfo")({
   name: Schema.NullOr(Schema.String),
   /**
    * Cashu-side input fee of the preferred active keyset, per thousand proof
-   * inputs (NUT-02 `input_fee_ppk`); null when the mint publishes none.
+   * inputs (NUT-02 `input_fee_ppk`, 0 when the keyset omits it); null when
+   * the wallet has no bound keyset.
    */
   inputFeePpk: Schema.NullOr(Schema.Natural),
   /** NUT-15 multi-path payments. */
