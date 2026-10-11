@@ -1,7 +1,6 @@
 import { Schema } from "effect";
 import React from "react";
 import { JsonValue } from "../../types/json";
-import { normalizeMintUrl } from "../../utils/mint";
 import {
   isNpubCashDisabled,
   NPUB_CASH_SERVER_BASE_URL,
@@ -13,14 +12,14 @@ interface UseProfileNpubCashEffectsParams {
   claimNpubCashOnceLatestRef: React.MutableRefObject<() => Promise<void>>;
   currentNpub: string | null;
   currentNsec: string | null;
-  hasMintOverrideRef: React.MutableRefObject<boolean>;
   makeNip98AuthHeader: (url: string, method: "GET" | "POST") => Promise<string>;
   networkEnabled?: boolean;
   npubCashInfoInFlightRef: React.MutableRefObject<boolean>;
   npubCashInfoLoadedAtMsRef: React.MutableRefObject<number>;
   npubCashInfoLoadedForNpubRef: React.MutableRefObject<string | null>;
   routeKind: string;
-  setDefaultMintUrl: React.Dispatch<React.SetStateAction<string | null>>;
+  /** Offers npub.cash's mint as the default while the user chose none. */
+  suggestDefaultMint: (mint: string) => void;
   setIsProfileEditing: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
@@ -29,15 +28,14 @@ export const useProfileNpubCashEffects = ({
   claimNpubCashOnceLatestRef,
   currentNpub,
   currentNsec,
-  hasMintOverrideRef,
   makeNip98AuthHeader,
   networkEnabled = true,
   npubCashInfoInFlightRef,
   npubCashInfoLoadedAtMsRef,
   npubCashInfoLoadedForNpubRef,
   routeKind,
-  setDefaultMintUrl,
   setIsProfileEditing,
+  suggestDefaultMint,
 }: UseProfileNpubCashEffectsParams) => {
   React.useEffect(() => {
     // Leave edit mode unless the dedicated edit route is active.
@@ -91,12 +89,7 @@ export const useProfileNpubCashEffects = ({
           return String(wrapped.mintUrl ?? wrapped.mintURL ?? "").trim();
         })();
         if (cancelled) return;
-        if (mintUrl && !hasMintOverrideRef.current) {
-          const cleaned = normalizeMintUrl(mintUrl);
-          if (cleaned) {
-            setDefaultMintUrl(cleaned);
-          }
-        }
+        if (mintUrl) suggestDefaultMint(mintUrl);
 
         npubCashInfoLoadedForNpubRef.current = currentNpub;
         npubCashInfoLoadedAtMsRef.current = Date.now();
@@ -128,13 +121,12 @@ export const useProfileNpubCashEffects = ({
     claimNpubCashOnceLatestRef,
     currentNpub,
     currentNsec,
-    hasMintOverrideRef,
     makeNip98AuthHeader,
     networkEnabled,
     npubCashInfoInFlightRef,
     npubCashInfoLoadedAtMsRef,
     npubCashInfoLoadedForNpubRef,
-    setDefaultMintUrl,
+    suggestDefaultMint,
   ]);
 
   React.useEffect(() => {
