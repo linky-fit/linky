@@ -24,15 +24,28 @@ import {
   UnixSeconds,
 } from "@linky-fit/linkstr";
 import { getPublicKey } from "nostr-tools";
+import { RegistryContext } from "@linky-fit/linkstr-react";
+import { AtomRegistry } from "effect/reactivity";
 import { describe, expect, it, vi } from "vitest";
+import { makeTestAppRegistry } from "../../testUtils/appRegistry";
 import { makeTestLinkyStore } from "../../testUtils/linkyStore";
 import { createSecretKey } from "../../testUtils/nostrKeys";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import { UNKNOWN_CONTACT_ID_PREFIX } from "../../utils/constants";
 import type { NewLocalNostrMessage } from "../types/appTypes";
+import { chatWritesAtom } from "../state/messages/chatWrites";
 import { applyChatMessageReceived } from "./messages/chatInbox";
 
 vi.mock("./useLinksync", () => ({ useConversationRows: () => [] }));
+vi.mock("@evolu/common", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@evolu/common")>()),
+  createEvolu: () => () => ({}),
+}));
+const openLinkyStore = vi.hoisted(() => vi.fn());
+vi.mock("@linky-fit/linksync/evolu", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@linky-fit/linksync/evolu")>()),
+  openLinkyStore,
+}));
 
 import { useMessagesDomain } from "./useMessagesDomain";
 
@@ -68,12 +81,23 @@ const domainParams = (
   unknownSenders: makeUnknownSendersRepository(store),
 });
 
+/** A registry whose session store is `store`, with the chat writes already open. */
+const storeRegistry = async (store: LinkyStore) => {
+  openLinkyStore.mockResolvedValue(store);
+  const registry = makeTestAppRegistry();
+  const chatWrites = await Effect.runPromise(
+    AtomRegistry.getResult(registry, chatWritesAtom),
+  );
+  return { chatWrites, registry };
+};
+
 const renderDomain = async (
   store: LinkyStore,
   contacts: ReadonlyArray<{ readonly id: ContactId }> = [],
 ) => {
   const domainRef: { current: MessagesDomain | null } = { current: null };
   const params = domainParams(store, contacts);
+  const { chatWrites, registry } = await storeRegistry(store);
   const Probe = () => {
     const domain = useMessagesDomain(params);
     React.useEffect(() => {
@@ -81,12 +105,16 @@ const renderDomain = async (
     }, [domain]);
     return null;
   };
-  const view = await renderIntoDocument(<Probe />);
+  const view = await renderIntoDocument(
+    <RegistryContext.Provider value={registry}>
+      <Probe />
+    </RegistryContext.Provider>,
+  );
   const domain = (): MessagesDomain => {
     if (!domainRef.current) throw new Error("hook did not render");
     return domainRef.current;
   };
-  return { domain, view, ...params };
+  return { chatWrites, domain, view, ...params };
 };
 
 const rumorId = RumorId.make("a".repeat(64));
@@ -172,7 +200,7 @@ describe("useMessagesDomain", () => {
     async (scope) => {
       const { store } = makeTestLinkyStore();
       const contactId = createId<"Contact">();
-      const { conversations, domain, unknownSenders, view } =
+      const { chatWrites, conversations, domain, unknownSenders, view } =
         await renderDomain(store, [{ id: contactId }]);
 
       await act(async () => {
@@ -186,7 +214,7 @@ describe("useMessagesDomain", () => {
           status: "pending",
           wrapId: "pending:send",
         });
-        domain().nostrMessagesLatestRef.current = [];
+        chatWrites.syncLatestMessages([]);
         domain().updateLocalNostrMessage(id, {
           status: "sent",
           wrapId: "e".repeat(64),
@@ -335,18 +363,24 @@ describe("useMessagesDomain", () => {
       }),
     );
     const params = { ...domainParams(store), conversations, hydrated: false };
+    const { registry } = await storeRegistry(store);
     const Probe = ({ hydrated }: { hydrated: boolean }) => {
       useMessagesDomain({ ...params, hydrated });
       return null;
     };
+    const withRegistry = (hydrated: boolean) => (
+      <RegistryContext.Provider value={registry}>
+        <Probe hydrated={hydrated} />
+      </RegistryContext.Provider>
+    );
     const reactions = () => Effect.runPromise(conversations.reactions.all);
-    const view = await renderIntoDocument(<Probe hydrated={false} />);
+    const view = await renderIntoDocument(withRegistry(false));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5_000);
     });
     expect(await reactions()).toHaveLength(1);
 
-    await view.rerender(<Probe hydrated />);
+    await view.rerender(withRegistry(true));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5_000);
     });

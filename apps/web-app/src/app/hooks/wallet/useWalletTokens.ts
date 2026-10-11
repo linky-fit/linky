@@ -15,7 +15,6 @@ import { MAIN_MINT_URL } from "../../../utils/mint";
 import { isIssuedTransfer } from "../../lib/cashuTransfers";
 import { linkshuCommandsAtom } from "../../state/linkshu/commands";
 import { walletOpRunningAtom } from "../../state/wallet/opQueue";
-import type { ChatWrites } from "../../state/wallet/payments";
 import {
   issueTokenAmountAtom,
   tokenBulkCheckBusyAtom,
@@ -589,13 +588,11 @@ export const useTokenRecovery = ({
 };
 
 interface UseTokenContactSendParams {
-  chat: Pick<ChatWrites, "appendLocalNostrMessage" | "updateLocalNostrMessage">;
   walletTransfers: ReadonlyArray<TokenTransfer>;
 }
 
 /** Sending an issued token to the contact the user picks after "Send to contact". */
 export const useTokenContactSend = ({
-  chat,
   walletTransfers,
 }: UseTokenContactSendParams) => {
   const commands = useTokensCommands();
@@ -640,14 +637,11 @@ export const useTokenContactSend = ({
             String(candidate.id) === tokenId && isIssuedTransfer(candidate),
         ) ?? null;
       const contactId = (contact.id ?? "").trim();
-      const outcome = await commands.sendIssuedToken(
-        {
-          transfer,
-          contact,
-          onClosed: () => navigateTo({ route: "chat", id: contactId }),
-        },
-        chat,
-      );
+      const outcome = await commands.sendIssuedToken({
+        transfer,
+        contact,
+        onClosed: () => navigateTo({ route: "chat", id: contactId }),
+      });
       switch (outcome._tag) {
         case "Sent":
           return;
@@ -673,7 +667,6 @@ export const useTokenContactSend = ({
       }
     },
     [
-      chat,
       commands,
       setPendingCashuTokenContactPickId,
       setStatus,

@@ -126,7 +126,7 @@ const render = async (writes: {
       logPayStep: () => {},
       maybeShowPwaNotification: () => Promise.resolve(),
       messagesVisibleSinceSec: null,
-      nostrMessagesLatestRef: messagesRef,
+      latestMessages: () => messagesRef.current,
       nostrMessagesLocal: [],
       knownReactionKeysRef: { current: new Set() },
       nostrReactionsLocal: [],

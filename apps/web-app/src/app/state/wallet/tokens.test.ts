@@ -114,14 +114,21 @@ const lifecycleFake = (
   ...overrides,
 });
 
+const chatWrites = (): TokensDeps["chat"] => ({
+  appendLocalNostrMessage: vi.fn(() => ({ id: "row-1", written: NO_WRITE })),
+  updateLocalNostrMessage: vi.fn(() => NO_WRITE),
+});
+
 const setup = ({
   balances = { [MINT_URL]: 100 },
+  chat = chatWrites(),
   lifecycle = lifecycleFake(),
   online = true,
   linkshu = {},
   deferUpdateWhile,
 }: {
   balances?: Record<string, number>;
+  chat?: TokensDeps["chat"];
   lifecycle?: CashuTransferLifecycle;
   online?: boolean;
   linkshu?: Partial<TokensDeps["linkshu"]>;
@@ -183,6 +190,7 @@ const setup = ({
   const logPaymentEvent = vi.fn<TokensDeps["logPaymentEvent"]>();
   const commands = makeTokensCommands({
     allowTestMints: true,
+    chat,
     defaultMint: MINT_URL,
     currentNsec: nip19.nsecEncode(createSecretKey(1)),
     isOnline: () => online,
@@ -532,10 +540,6 @@ describe("transfer updates", () => {
 describe("sendIssuedToken", () => {
   const transfer = issuedTransfer;
   const contact = { id: CONTACT_ID, npub: contactNpub };
-  const chat = () => ({
-    appendLocalNostrMessage: vi.fn(() => ({ id: "row-1", written: NO_WRITE })),
-    updateLocalNostrMessage: vi.fn(() => NO_WRITE),
-  });
 
   it("closes the transfer, sends the token message and its notice, then records it", async () => {
     const order: string[] = [];
@@ -545,7 +549,11 @@ describe("sendIssuedToken", () => {
         return Result.succeed(undefined);
       }),
     });
-    const { commands, linkstr, logPaymentEvent } = setup({ lifecycle });
+    const writes = chatWrites();
+    const { commands, linkstr, logPaymentEvent } = setup({
+      chat: writes,
+      lifecycle,
+    });
     linkstr.enqueueOutbox.mockImplementationOnce(async (input) => {
       order.push("enqueue");
       return Exit.succeed(
@@ -558,12 +566,11 @@ describe("sendIssuedToken", () => {
         }),
       );
     });
-    const writes = chat();
-
-    const outcome = await commands.sendIssuedToken(
-      { transfer, contact, onClosed: () => order.push("closed") },
-      writes,
-    );
+    const outcome = await commands.sendIssuedToken({
+      transfer,
+      contact,
+      onClosed: () => order.push("closed"),
+    });
 
     expect(outcome).toEqual({ _tag: "Sent" });
     expect(order).toEqual(["forget", "closed", "enqueue"]);
@@ -580,9 +587,9 @@ describe("sendIssuedToken", () => {
   it("queues the message offline without a notice", async () => {
     const { commands, linkstr, logPaymentEvent } = setup({ online: false });
 
-    expect(
-      await commands.sendIssuedToken({ transfer, contact }, chat()),
-    ).toEqual({ _tag: "Queued" });
+    expect(await commands.sendIssuedToken({ transfer, contact })).toEqual({
+      _tag: "Queued",
+    });
     expect(linkstr.sendPaymentNotice).not.toHaveBeenCalled();
     expect(logPaymentEvent).toHaveBeenCalledWith(
       expect.objectContaining({ phase: "publish" }),
@@ -600,22 +607,22 @@ describe("sendIssuedToken", () => {
       }),
     });
 
-    expect(
-      await commands.sendIssuedToken({ transfer, contact }, chat()),
-    ).toMatchObject({ _tag: "NotClosed" });
+    expect(await commands.sendIssuedToken({ transfer, contact })).toMatchObject(
+      { _tag: "NotClosed" },
+    );
     expect(linkstr.enqueueOutbox).not.toHaveBeenCalled();
   });
 
   it("refuses a missing token or a contact without an npub", async () => {
     const { commands } = setup();
+    expect(await commands.sendIssuedToken({ transfer: null, contact })).toEqual(
+      { _tag: "InvalidToken" },
+    );
     expect(
-      await commands.sendIssuedToken({ transfer: null, contact }, chat()),
-    ).toEqual({ _tag: "InvalidToken" });
-    expect(
-      await commands.sendIssuedToken(
-        { transfer, contact: { id: CONTACT_ID, npub: "" } },
-        chat(),
-      ),
+      await commands.sendIssuedToken({
+        transfer,
+        contact: { id: CONTACT_ID, npub: "" },
+      }),
     ).toEqual({ _tag: "MissingContactNpub" });
   });
 });

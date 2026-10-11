@@ -47,7 +47,7 @@ import { currentNsecAtom } from "../session/session";
 import { defaultMintAtom } from "./defaultMint";
 import { walletOpsAtom, type WalletOps } from "./opQueue";
 import { logPayStep, paymentLogAtom, type PaymentLog } from "./paymentLog";
-import type { ChatWrites } from "./payments";
+import { chatWritesAtom, type ChatWrites } from "../messages/chatWrites";
 
 interface Busy {
   readonly _tag: "Busy";
@@ -124,17 +124,11 @@ export interface TokensCommands {
    * Sends an issued token to a contact as a chat message. The transfer is
    * closed first (the message carries the funds now); `onClosed` runs then.
    */
-  readonly sendIssuedToken: (
-    args: {
-      readonly transfer: TokenTransfer | null;
-      readonly contact: ContactIdentityRowLike;
-      readonly onClosed?: () => void;
-    },
-    chat: Pick<
-      ChatWrites,
-      "appendLocalNostrMessage" | "updateLocalNostrMessage"
-    >,
-  ) => Promise<SendIssuedTokenOutcome>;
+  readonly sendIssuedToken: (args: {
+    readonly transfer: TokenTransfer | null;
+    readonly contact: ContactIdentityRowLike;
+    readonly onClosed?: () => void;
+  }) => Promise<SendIssuedTokenOutcome>;
   /** NUT-07 check of one transfer; dropped while another wallet operation runs. */
   readonly checkToken: (
     operationId: string,
@@ -181,6 +175,10 @@ export interface TokensCommands {
 
 export interface TokensDeps {
   readonly allowTestMints: boolean;
+  readonly chat: Pick<
+    ChatWrites,
+    "appendLocalNostrMessage" | "updateLocalNostrMessage"
+  >;
   readonly defaultMint: string | null;
   readonly currentNsec: string | null;
   readonly isOnline: () => boolean;
@@ -336,10 +334,12 @@ export const makeTokensCommands = (deps: TokensDeps): TokensCommands => {
     return Option.getOrElse(issued, () => BUSY);
   };
 
-  const sendIssuedToken: TokensCommands["sendIssuedToken"] = async (
-    { transfer, contact, onClosed },
-    chat,
-  ) => {
+  const sendIssuedToken: TokensCommands["sendIssuedToken"] = async ({
+    transfer,
+    contact,
+    onClosed,
+  }) => {
+    const { chat } = deps;
     const tokenText = transfer?.tokenText ?? "";
     if (!transfer || !tokenText) return { _tag: "InvalidToken" };
     const contactId = (contact.id ?? "").trim();
@@ -585,12 +585,14 @@ export const makeTokensCommands = (deps: TokensDeps): TokensCommands => {
 export const tokensCommandsAtom = Atom.readable((get) =>
   AsyncResult.map(
     AsyncResult.all({
+      chat: get(chatWritesAtom),
       linkshu: get(linkshuCommandsAtom),
       paymentLog: get(paymentLogAtom),
     }),
-    ({ linkshu, paymentLog }) =>
+    ({ chat, linkshu, paymentLog }) =>
       makeTokensCommands({
         allowTestMints: get(allowTestMintsAtom),
+        chat,
         currentNsec: get(currentNsecAtom),
         defaultMint: get(defaultMintAtom),
         isOnline: get(platformAtom).lifecycle.isOnline,

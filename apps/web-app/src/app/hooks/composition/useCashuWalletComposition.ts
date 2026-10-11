@@ -71,11 +71,10 @@ interface UseCashuWalletCompositionParams {
     | "appendLocalNostrMessage"
     | "chatMessages"
     | "contacts"
-    | "enqueuePendingPayment"
     | "getBankPaymentOfferForSettlement"
     | "isBankPaymentOfferCanceled"
     | "nostrBootstrapReady"
-    | "nostrMessagesLatestRef"
+    | "latestMessages"
     | "nostrMessagesLocal"
     | "nostrMessagesRecent"
     | "nostrPictureByNpub"
@@ -434,7 +433,7 @@ export const useCashuWalletComposition = ({
     rememberSeenMint,
     walletMints,
   });
-  const tokenContactSend = useTokenContactSend({ chat, walletTransfers });
+  const tokenContactSend = useTokenContactSend({ walletTransfers });
   useIssuedTokenClaimWatch({ walletProofs, walletTransfers });
 
   useDeferredReceiveRetry({
