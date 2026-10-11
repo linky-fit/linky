@@ -6,47 +6,24 @@ import {
   PositiveInt,
   transactionIdForRequest,
   type TransactionRow,
+  type TransactionsRepository,
 } from "@linky-fit/linksync";
 import { Effect } from "effect";
-import React, { act } from "react";
-import type { Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import {
   LOCAL_PAYMENT_EVENTS_STORAGE_KEY_PREFIX,
   LOCAL_PENDING_PAYMENT_TELEMETRY_STORAGE_KEY_PREFIX,
-} from "../../utils/constants";
-import { createCashuTokenId } from "../lib/cashuTokenIdentity";
-import {
-  buildTransactionInsertPayload,
-  useOwnerScopedStorage,
-} from "./useOwnerScopedStorage";
+} from "../../../utils/constants";
+import { localStorageKv } from "../../../utils/storage";
+import { createCashuTokenId } from "../../lib/cashuTokenIdentity";
+import { buildTransactionInsertPayload, makePaymentLog } from "./paymentLog";
 
 beforeAll(() => {
   vi.stubGlobal("__APP_VERSION__", "test");
 });
 
-type OwnerScopedStorage = ReturnType<typeof useOwnerScopedStorage>;
-type Transactions = Parameters<typeof useOwnerScopedStorage>[0]["transactions"];
+type Transactions = Pick<TransactionsRepository, "byId" | "insert" | "update">;
 type TransactionInsert = Transactions["insert"];
-
-interface HookHarnessProps {
-  appOwnerId: OwnerId;
-  transactions: Transactions;
-  onRender: (storage: OwnerScopedStorage) => void;
-}
-
-const HookHarness = ({
-  appOwnerId,
-  transactions,
-  onRender,
-}: HookHarnessProps): React.ReactElement | null => {
-  const appOwnerIdRef = React.useRef<OwnerId | null>(appOwnerId);
-  onRender(useOwnerScopedStorage({ appOwnerIdRef, transactions }));
-  return null;
-};
-
-const mountedRoots = new Set<Root>();
 
 const parseOwnerId = (value: string): OwnerId => {
   const result = OwnerId.fromUnknown(value);
@@ -56,39 +33,25 @@ const parseOwnerId = (value: string): OwnerId => {
   return result.value;
 };
 
-const renderStorageHook = async (
+const paymentLogOver = (
   appOwnerId: OwnerId,
   insert: TransactionInsert,
   overrides: Partial<Transactions> = {},
-): Promise<OwnerScopedStorage> => {
-  const resultRef: { current: OwnerScopedStorage | null } = { current: null };
-  const { root } = await renderIntoDocument(
-    React.createElement(HookHarness, {
-      appOwnerId,
-      transactions: {
-        byId: () => Effect.succeed(null),
-        insert,
-        update: () => Effect.void,
-        ...overrides,
-      },
-      onRender: (storage) => {
-        resultRef.current = storage;
-      },
-    }),
-  );
-  mountedRoots.add(root);
-
-  if (!resultRef.current) {
-    throw new Error("Owner-scoped storage hook did not render");
-  }
-  return resultRef.current;
-};
-
-afterEach(async () => {
-  await act(async () => {
-    for (const root of mountedRoots) root.unmount();
+) =>
+  makePaymentLog({
+    kv: localStorageKv,
+    ownerId: appOwnerId,
+    transactions: {
+      byId: () => Effect.succeed(null),
+      insert,
+      update: () => Effect.void,
+      ...overrides,
+    },
   });
-  mountedRoots.clear();
+
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+afterEach(() => {
   localStorage.clear();
   vi.restoreAllMocks();
 });
@@ -203,12 +166,12 @@ describe("buildTransactionInsertPayload", () => {
   });
 });
 
-describe("useOwnerScopedStorage", () => {
+describe("makePaymentLog", () => {
   const appOwnerId = parseOwnerId("AAAAAAAAAAAAAAAAAAAAAA");
 
   it("logs transactions through the repository and queues app-owner telemetry", async () => {
     const insert = vi.fn<TransactionInsert>(() => Effect.void);
-    const storage = await renderStorageHook(appOwnerId, insert);
+    const storage = paymentLogOver(appOwnerId, insert);
 
     const transactionId = transactionIdForRequest("request-1");
     storage.logPaymentEvent({
@@ -260,7 +223,7 @@ describe("useOwnerScopedStorage", () => {
       error: null,
       pendingLabel: null,
     };
-    const storage = await renderStorageHook(appOwnerId, insert, {
+    const storage = paymentLogOver(appOwnerId, insert, {
       byId: () => Effect.succeed(existing),
       update,
     });
@@ -273,9 +236,7 @@ describe("useOwnerScopedStorage", () => {
       status: "ok",
       transactionId,
     });
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await settle();
 
     expect(insert).not.toHaveBeenCalled();
     expect(update).toHaveBeenCalledWith(transactionId, {
@@ -291,7 +252,7 @@ describe("useOwnerScopedStorage", () => {
 
   it("records no transaction for a failure, only telemetry", async () => {
     const insert = vi.fn<TransactionInsert>(() => Effect.void);
-    const storage = await renderStorageHook(appOwnerId, insert);
+    const storage = paymentLogOver(appOwnerId, insert);
 
     storage.logPaymentEvent({
       direction: "in",
@@ -313,7 +274,7 @@ describe("useOwnerScopedStorage", () => {
     const insert = vi.fn<TransactionInsert>(() =>
       Effect.die(new Error("history unavailable")),
     );
-    const storage = await renderStorageHook(appOwnerId, insert);
+    const storage = paymentLogOver(appOwnerId, insert);
 
     expect(() => {
       storage.logPaymentEvent({
@@ -323,9 +284,7 @@ describe("useOwnerScopedStorage", () => {
         transactionId: transactionIdForRequest("request-1"),
       });
     }).not.toThrow();
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await settle();
     expect(
       localStorage.getItem(
         `${LOCAL_PENDING_PAYMENT_TELEMETRY_STORAGE_KEY_PREFIX}.${appOwnerId}`,
@@ -335,7 +294,7 @@ describe("useOwnerScopedStorage", () => {
 
   it("migrates valid legacy payments through the repository", async () => {
     const insert = vi.fn<TransactionInsert>(() => Effect.void);
-    const storage = await renderStorageHook(appOwnerId, insert);
+    const storage = paymentLogOver(appOwnerId, insert);
     const legacyStorageKey = `${LOCAL_PAYMENT_EVENTS_STORAGE_KEY_PREFIX}.${appOwnerId}`;
     localStorage.setItem(
       legacyStorageKey,
@@ -362,7 +321,7 @@ describe("useOwnerScopedStorage", () => {
       ]),
     );
 
-    storage.migrateLegacyPaymentEventsToEvolu(appOwnerId);
+    storage.migrateLegacyPaymentEvents();
 
     expect(insert).toHaveBeenCalledTimes(1);
     expect(insert).toHaveBeenCalledWith({
