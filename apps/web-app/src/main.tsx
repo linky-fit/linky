@@ -718,6 +718,11 @@ const bootstrap = async () => {
 
     // Only a signed-in session opens the database.
     const signedIn = session._tag === "SignedIn";
+    // The native beacon outlives the page, so a signed-out boot stops whatever an earlier page left running.
+    if (!signedIn && Capacitor.isNativePlatform())
+      await import("./platform/nativeBridge.ts").then(({ stopNativeBeacon }) =>
+        stopNativeBeacon(),
+      );
     if (signedIn) setStage("import-evolu");
     const evoluPlatform = signedIn
       ? (await import("./platform/evolu.web.ts")).makeWebEvoluPlatform()

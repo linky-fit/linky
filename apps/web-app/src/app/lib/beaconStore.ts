@@ -117,6 +117,7 @@ let peers = NO_BEACON_PEERS;
 let contactSightings: ReadonlyArray<NativeBeaconSighting> = [];
 let identitySightings: ReadonlyArray<Sighting> = [];
 let keyTable: ReadonlyArray<NativeBeaconKey> | null = null;
+let identityChanging = false;
 /** What native last received from this store; reset when the service stops. */
 let ownPubkey: Pubkey | null = null;
 const NOTHING_PUSHED = {
@@ -211,24 +212,30 @@ const update = (patch: Partial<BeaconSnapshot>): void => {
   for (const listener of listeners) listener();
 };
 
+const stopNative = (payload: Record<string, unknown>): void => {
+  stopNativeBeacon();
+  pushed = { ...NOTHING_PUSHED };
+  reportAppLog({ tag: "beacon.stopped", summary: "Beacon stopped", payload });
+};
+
+/** Before a reload that logs out or switches the identity: native outlives the page and would keep advertising this identity's keys. */
+export const stopBeaconForIdentityChange = (): void => {
+  identityChanging = true;
+  stopNative({ reason: "identityChange" });
+};
+
 /** Brings the native service in line with the switch, the permission and the latest key table. */
 const reconcileNative = (): void => {
   const { supported, enabled, permission, trade } = snapshot;
   if (
+    identityChanging ||
     !supported ||
     !enabled ||
     permission !== "granted" ||
     !keyTable ||
     !ownPubkey
   ) {
-    if (!pushed.started) return;
-    stopNativeBeacon();
-    pushed = { ...NOTHING_PUSHED };
-    reportAppLog({
-      tag: "beacon.stopped",
-      summary: "Beacon stopped",
-      payload: { enabled, permission, supported },
-    });
+    if (pushed.started) stopNative({ enabled, permission, supported });
     return;
   }
   if (ownPubkey !== pushed.identity) {

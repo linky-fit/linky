@@ -187,7 +187,7 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "beacon.started":
     "The Bluetooth beacon service was started after the key table and trade were pushed to native code. The payload gives the contact count and the trade; keys never appear in the inspector.",
   "beacon.stopped":
-    "The app stopped the Bluetooth beacon service: the switch went off, the permissions were lost, experimental features went off or the account closed.",
+    "The app stopped the Bluetooth beacon service: the switch went off, the permissions were lost, experimental features went off, the account closed, or a logout or identity switch is about to reload the app.",
   "beacon.keysPushed":
     "A new beacon key table went to native code, after contacts, the block list or the message order changed. Only the contact count is logged.",
   "beacon.tradeSet":

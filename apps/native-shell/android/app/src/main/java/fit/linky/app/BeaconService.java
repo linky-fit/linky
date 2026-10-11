@@ -220,6 +220,8 @@ public final class BeaconService extends Service {
 	static void stop(Context context) {
 		main.post(() -> {
 			wanted = false;
+			contacts = List.of();
+			identity = null;
 			if (instance == null) {
 				dispatchIdle(context, null);
 			} else {
