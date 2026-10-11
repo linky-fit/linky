@@ -2,6 +2,7 @@ import { AutoswapEstimate, AutoswapReceipt } from "@linky-fit/linkshu";
 import { Result, Schema } from "effect";
 import { act, useEffect } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { makeWalletOps } from "../../state/wallet/opQueue";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import type {
   AutoswapCashu,
@@ -44,7 +45,6 @@ const renderMoveFunds = async (first: string, second: string) => {
   const Probe = () => {
     const hook = useMoveMintFunds({
       autoswapCashu,
-      cashuIsBusy: false,
       estimateAutoswapCashu,
       formatDisplayedAmountParts: (amountSat) => ({
         amountText: String(amountSat),
@@ -53,7 +53,7 @@ const renderMoveFunds = async (first: string, second: string) => {
       }),
       rememberSeenMint: () => {},
       resolveAutoswapSource,
-      setCashuIsBusy: () => {},
+      runExclusive: makeWalletOps(() => {}).runExclusiveTask,
       setStatus: () => {},
       t: (key) => key,
     });

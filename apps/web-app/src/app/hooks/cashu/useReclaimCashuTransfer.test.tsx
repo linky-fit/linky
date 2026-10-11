@@ -2,6 +2,7 @@ import { createIdFromString } from "@linky-fit/linksync";
 import { NonNegativeAmount, ProofId, ReclaimReport } from "@linky-fit/linkshu";
 import { act, useEffect } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { makeWalletOps } from "../../state/wallet/opQueue";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import type { CashuTransferLifecycle } from "../composition/useLinkshuComposition";
 import { useReclaimCashuTransfer } from "./useReclaimCashuTransfer";
@@ -17,13 +18,13 @@ const report = new ReclaimReport({
 const mount = async (reclaim: CashuTransferLifecycle["reclaim"]) => {
   const pushToast = vi.fn();
   const setCashuIsBusy = vi.fn();
+  const runQueued = makeWalletOps(setCashuIsBusy).runQueuedTask;
   let returnToken = async () => {};
   const Harness = () => {
     const callback = useReclaimCashuTransfer({
       busy: false,
-      enqueueCashuOp: (op) => op(),
       reclaim,
-      setCashuIsBusy,
+      runQueued,
       pushToast,
       t: (key) => key,
     });

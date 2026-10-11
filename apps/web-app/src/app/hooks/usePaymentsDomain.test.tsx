@@ -2,6 +2,7 @@ import { encodeNpub } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import React, { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { makeWalletOps } from "../state/wallet/opQueue";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import {
   appendStoredPendingPayment,
@@ -76,6 +77,7 @@ const setup = async ({
     cashuBalance: number;
   }) => {
     const [cashuIsBusy, setCashuIsBusy] = React.useState(false);
+    const [ops] = React.useState(() => makeWalletOps(setCashuIsBusy));
     usePaymentsDomain({
       cashuBalance,
       cashuIsBusy,
@@ -87,7 +89,7 @@ const setup = async ({
       pendingPaymentsKey: key,
       pushToast: toast,
       updateLocalNostrMessage: update,
-      setCashuIsBusy,
+      runExclusive: ops.runExclusiveTask,
       t: (key) => key,
     });
     return null;

@@ -6,16 +6,7 @@ import {
 } from "@linky-fit/linkshu";
 import { decodeNsec } from "@linky-fit/linkstr";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import {
-  Context,
-  Effect,
-  Exit,
-  Layer,
-  Option,
-  Schema,
-  Scope,
-  Semaphore,
-} from "effect";
+import { Context, Effect, Exit, Layer, Schema, Scope } from "effect";
 import { Atom } from "effect/reactivity";
 import { linkshuAppInspector } from "../../../devtools/inspector/linkshuInspector";
 import { localStorageKeyValueStore } from "../../../platform/linkshu/localStorageKeyValueStore";
@@ -23,6 +14,7 @@ import { resolveLinkshuSeed } from "../../../platform/linkshu/resolveLinkshuSeed
 import { migrateLegacyCashuLocalState } from "../../migrations/linkshuStorageMigration";
 import { sessionAtom, sessionSecrets } from "../session/session";
 import { walletRepositoryAtom } from "../session/store";
+import { WalletOpQueue, walletOpsAtom } from "../wallet/opQueue";
 
 export class LinkshuNotConfigured extends Schema.TaggedError<LinkshuNotConfigured>()(
   "LinkshuNotConfigured",
@@ -95,23 +87,6 @@ export class NostrKeyOptions extends Context.Service<
     Layer.succeed(NostrKeyOptions, nostrKeyOptionsOf(nsec));
 }
 
-/** Runs one wallet operation at a time; one started while another runs is dropped (`None`). */
-export class WalletOpQueue extends Context.Service<
-  WalletOpQueue,
-  {
-    readonly runExclusive: <A, E, R>(
-      operation: Effect.Effect<A, E, R>,
-    ) => Effect.Effect<Option.Option<A>, E, R>;
-  }
->()("linky/WalletOpQueue") {
-  static readonly layer = Layer.effect(
-    WalletOpQueue,
-    Effect.map(Semaphore.make(1), (semaphore) => ({
-      runExclusive: semaphore.withPermitsIfAvailable(1),
-    })),
-  );
-}
-
 export type LinkshuEnv =
   | LinkshuServices
   | WalletScope
@@ -143,7 +118,7 @@ export const linkshuRuntimeAtom = Atom.keepAlive(
             NostrKeyOptions.layer(
               sessionSecrets(get.once(sessionAtom))?.nsec ?? null,
             ),
-            WalletOpQueue.layer,
+            Layer.succeed(WalletOpQueue, get.once(walletOpsAtom)),
           ).pipe(Layer.provideMerge(services)),
         );
       }),

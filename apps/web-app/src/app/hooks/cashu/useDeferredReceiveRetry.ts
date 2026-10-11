@@ -1,6 +1,7 @@
 import type { DeferredReceiveResult } from "@linky-fit/linkshu";
 import { transactionIdForOperation } from "@linky-fit/linksync";
 import React from "react";
+import type { RunQueuedTask } from "../../state/wallet/opQueue";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
 import { useDeferredOnlineReady } from "../../../hooks/useDeferredOnlineReady";
 import { useLatest } from "../../../hooks/useLatest";
@@ -21,7 +22,7 @@ const MAX_RETRY_MS = 10 * 60_000;
 interface UseDeferredReceiveRetryParams extends ReceivingMintBookkeeping {
   /** Pending deferred receives; the backoff timer runs only while there are some. */
   deferredCount: number;
-  enqueueCashuOp: <T>(op: () => Promise<T>) => Promise<T>;
+  runQueued: RunQueuedTask;
   formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
   logPaymentEvent: (event: LoggedPaymentEventParams) => void;
   rememberCashuTokenKnown: (...tokens: readonly string[]) => void;
@@ -45,7 +46,6 @@ interface UseDeferredReceiveRetryParams extends ReceivingMintBookkeeping {
  */
 export const useDeferredReceiveRetry = ({
   deferredCount,
-  enqueueCashuOp,
   formatDisplayedAmountParts,
   isMintDeleted,
   logPaymentEvent,
@@ -53,6 +53,7 @@ export const useDeferredReceiveRetry = ({
   refreshMintInfo,
   rememberCashuTokenKnown,
   resumeDeferredCashuReceives,
+  runQueued,
   showPaidOverlay,
   t,
   touchMintInfo,
@@ -119,7 +120,9 @@ export const useDeferredReceiveRetry = ({
   const resume = React.useMemo(() => {
     if (!onlineReady || resumeDeferredCashuReceives === null) return null;
     return (): Promise<void> => {
-      passRef.current ??= enqueueCashuOp(resumeDeferredCashuReceives)
+      passRef.current ??= runQueued(resumeDeferredCashuReceives, {
+        background: true,
+      })
         .then((results) => announceReceivedRef.current(results))
         .catch((error: unknown) => {
           reportAppLog({
@@ -137,9 +140,9 @@ export const useDeferredReceiveRetry = ({
     };
   }, [
     announceReceivedRef,
-    enqueueCashuOp,
     onlineReady,
     resumeDeferredCashuReceives,
+    runQueued,
   ]);
 
   useResumeOnLaunchAndOnline(resume);

@@ -1,3 +1,4 @@
+import { deferPwaUpdateWhile } from "../utils/pwaUpdate";
 import { localStorageKv, safeLocalStorageGet } from "../utils/storage";
 import { getUnknownErrorMessage } from "../utils/unknown";
 import { asNonEmptyString } from "../utils/validation";
@@ -40,5 +41,8 @@ export const makeWebPlatformPorts = (): PlatformPorts => ({
     ),
     isE2e: import.meta.env.VITE_E2E === "1",
   },
-  lifecycle: { reload: () => globalThis.location.reload() },
+  lifecycle: {
+    reload: () => globalThis.location.reload(),
+    deferUpdateWhile: deferPwaUpdateWhile,
+  },
 });

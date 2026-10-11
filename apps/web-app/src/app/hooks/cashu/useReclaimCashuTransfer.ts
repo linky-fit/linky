@@ -1,4 +1,5 @@
 import { useCallback, useRef } from "react";
+import type { RunQueuedTask } from "../../state/wallet/opQueue";
 import type { CashuOperationId } from "../../../evolu";
 import type { Translate } from "../../../i18n";
 import { getUnknownErrorMessage } from "../../../utils/unknown";
@@ -6,18 +7,16 @@ import type { CashuTransferLifecycle } from "../composition/useLinkshuCompositio
 
 interface UseReclaimCashuTransferParams {
   busy: boolean;
-  enqueueCashuOp: (op: () => Promise<void>) => Promise<void>;
   reclaim: CashuTransferLifecycle["reclaim"] | null;
-  setCashuIsBusy: (busy: boolean) => void;
+  runQueued: RunQueuedTask;
   pushToast: (message: string) => void;
   t: Translate;
 }
 
 export const useReclaimCashuTransfer = ({
   busy,
-  enqueueCashuOp,
   reclaim,
-  setCashuIsBusy,
+  runQueued,
   pushToast,
   t,
 }: UseReclaimCashuTransferParams) => {
@@ -31,8 +30,7 @@ export const useReclaimCashuTransfer = ({
       }
       running.current = true;
       try {
-        await enqueueCashuOp(async () => {
-          setCashuIsBusy(true);
+        await runQueued(async () => {
           try {
             const report = await reclaim(id);
             const message =
@@ -52,14 +50,12 @@ export const useReclaimCashuTransfer = ({
             pushToast(
               `${t("errorPrefix")}: ${getUnknownErrorMessage(error, "unknown")}`,
             );
-          } finally {
-            setCashuIsBusy(false);
           }
         });
       } finally {
         running.current = false;
       }
     },
-    [busy, enqueueCashuOp, reclaim, setCashuIsBusy, pushToast, t],
+    [busy, reclaim, runQueued, pushToast, t],
   );
 };

@@ -9,6 +9,7 @@ import {
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { makeWalletOps } from "../../state/wallet/opQueue";
 import { useRestoreMissingTokens } from "./useRestoreMissingTokens";
 import type {
   ReclaimCashuTokens,
@@ -55,7 +56,6 @@ const renderRestore = (overrides: HookOverrides): RestoreMissingTokens => {
       cashuIsBusy: false,
       walletMints: overrides.walletMints ?? [],
       defaultMintUrl: null,
-      enqueueCashuOp: (op) => op(),
       isMintDeleted: overrides.isMintDeleted ?? (() => false),
       logPaymentEvent: () => {},
       mintInfoDeduped: [],
@@ -68,7 +68,7 @@ const renderRestore = (overrides: HookOverrides): RestoreMissingTokens => {
         overrides.restoreCashuTokens === undefined
           ? null
           : overrides.restoreCashuTokens,
-      setCashuIsBusy: () => {},
+      runQueued: makeWalletOps(() => {}).runQueuedTask,
       setTokensRestoreIsBusy: () => {},
       setTokensRestoreProgress:
         overrides.setTokensRestoreProgress ?? (() => {}),

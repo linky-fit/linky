@@ -12,6 +12,7 @@ import {
 import { Result } from "effect";
 import React, { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { makeWalletOps } from "../state/wallet/opQueue";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import type { MeltCashuInvoice } from "./composition/useLinkshuComposition";
 import type { LnurlPayInvoiceResult } from "../../lnurlPay";
@@ -87,7 +88,6 @@ const setup = async ({ balance = 100, meltCashuInvoice }: SetupOptions) => {
     const domain = useLightningPaymentsDomain({
       canPayWithCashu: balance > 0,
       cashuBalance: balance,
-      cashuIsBusy: false,
       defaultMintUrl: null,
       dismissPaymentSending,
       formatDisplayedAmountParts: (amountSat) => ({
@@ -97,7 +97,7 @@ const setup = async ({ balance = 100, meltCashuInvoice }: SetupOptions) => {
       }),
       logPaymentEvent,
       meltCashuInvoice,
-      setCashuIsBusy: vi.fn(),
+      runExclusive: makeWalletOps(() => {}).runExclusiveTask,
       setContactsOnboardingHasPaid: vi.fn(),
       setPostPaySaveContact,
       setStatus,
