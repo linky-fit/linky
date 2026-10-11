@@ -9,12 +9,14 @@ Test each behavior at the lowest layer that goes red when it breaks. Each layer 
 
 ## Layers
 
-| Layer                | Lives in                                                                           | Catches                                                                                                                                                       |
-| -------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Package unit         | `packages/*/src/**/*.test.ts`                                                      | Everything a package owns: domain rules, state transitions, wire shapes, sync and shard logic. Use the package's fakes from `src/testing/`.                   |
-| App unit / component | `apps/web-app/src/**/*.test.ts(x)` (jsdom, `src/testUtils/renderIntoDocument.tsx`) | Hooks, scheduling, what a screen shows and allows for given props: validation, confirmations, prefills, error branches. Time-based behavior uses fake timers. |
-| Mint integration     | `packages/linkshu/tests/integration`                                               | Cashu operations against a real mint: fees, collisions, restarts, envelopes.                                                                                  |
-| E2E                  | `apps/web-app/tests`, `apps/site/tests` (Playwright on the Docker stack)           | The wiring between real pieces, listed below.                                                                                                                 |
+| Layer                | Lives in                                                                    | Catches                                                                                                                                                       |
+| -------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Package unit         | `packages/*/src/**/*.test.ts`                                               | Everything a package owns: domain rules, state transitions, wire shapes, sync and shard logic. Use the package's fakes from `src/testing/`.                   |
+| App unit / component | `apps/web-app/src/**/*.test.ts(x)` (`src/testUtils/renderIntoDocument.tsx`) | Hooks, scheduling, what a screen shows and allows for given props: validation, confirmations, prefills, error branches. Time-based behavior uses fake timers. |
+| Mint integration     | `packages/linkshu/tests/integration`                                        | Cashu operations against a real mint: fees, collisions, restarts, envelopes.                                                                                  |
+| E2E                  | `apps/web-app/tests`, `apps/site/tests` (Playwright on the Docker stack)    | The wiring between real pieces, listed below.                                                                                                                 |
+
+Web-app `.test.tsx` files run in jsdom and `.test.ts` files in node; a `.test.ts` that reads `window`, `document`, storage or other browser globals starts with `// @vitest-environment jsdom`.
 
 An e2e test earns its place only by covering wiring that lives between real pieces:
 
