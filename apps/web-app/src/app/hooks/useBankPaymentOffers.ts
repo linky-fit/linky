@@ -6,7 +6,7 @@ import {
   type Pubkey,
 } from "@linky-fit/linkstr";
 import {
-  useAtomSet,
+  RegistryContext,
   useAtomValue,
   useLinkstrCommands,
 } from "@linky-fit/linkstr-react";
@@ -70,10 +70,6 @@ import {
   removeBankPaymentOfferStaggerRecipients,
 } from "../lib/bankPaymentOfferStorage";
 import {
-  bankPaymentOfferMessageRow,
-  compareBankPaymentOfferRows,
-} from "../lib/bankPaymentOfferRows";
-import {
   bankPaymentOfferStateAtom,
   contactPubkeysAtom,
 } from "../state/messages/bankOffers";
@@ -97,6 +93,61 @@ interface RequestedBankPaymentOffer {
   chatId: string;
   offerId: string;
 }
+
+/**
+ * Runs `pass` for `owner` one at a time: a kick during a pass runs it once
+ * more right after it, instead of starting a second pass that would find
+ * this tab's own lease locks taken. A pass resolves to the delay before it
+ * should run again, or null.
+ */
+const useSerialPasses = <Owner>(
+  owner: Owner | null,
+  pass: (owner: Owner, isCancelled: () => boolean) => Promise<number | null>,
+): (() => void) => {
+  const passRef = React.useRef(pass);
+  React.useEffect(() => {
+    passRef.current = pass;
+  });
+  const kickRef = React.useRef<() => void>(() => {});
+  React.useEffect(() => {
+    if (owner === null) return;
+    let cancelled = false;
+    let running = false;
+    let again = false;
+    let timeoutId: number | undefined;
+    const isCancelled = () => cancelled;
+    const kick = () => {
+      if (cancelled) return;
+      if (running) {
+        again = true;
+        return;
+      }
+      running = true;
+      window.clearTimeout(timeoutId);
+      void (async () => {
+        let delayMs: number | null = null;
+        try {
+          do {
+            again = false;
+            delayMs = await passRef.current(owner, isCancelled);
+          } while (again && !cancelled);
+        } finally {
+          running = false;
+        }
+        if (!cancelled && delayMs !== null) {
+          timeoutId = window.setTimeout(kick, delayMs);
+        }
+      })();
+    };
+    kickRef.current = kick;
+    kick();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [owner]);
+  return React.useCallback(() => kickRef.current(), []);
+};
 
 interface UseBankPaymentOffersParams {
   currentNsec: string | null;
@@ -133,39 +184,39 @@ export const useBankPaymentOffers = ({
   );
 
   // The inbox applies snapshots synchronously against the newest state, so
-  // the ref is the source of truth and the React state mirrors it for renders.
-  const stateRef = React.useRef<BankPaymentOfferState>(
-    emptyBankPaymentOfferState,
+  // every write and every check reads the atom at call time.
+  const registry = React.useContext(RegistryContext);
+  const readState = React.useCallback(
+    () => registry.get(bankPaymentOfferStateAtom),
+    [registry],
   );
-  const [state, setState] = useState(emptyBankPaymentOfferState);
-  const update = React.useCallback((next: BankPaymentOfferState) => {
-    stateRef.current = next;
-    setState(next);
-  }, []);
-  // Published after the commit: an atom write inside `update` would re-render
-  // this composition early and rerun the offer watchers below off schedule.
-  const setPublishedState = useAtomSet(bankPaymentOfferStateAtom);
-  React.useEffect(() => {
-    setPublishedState(state);
-  }, [setPublishedState, state]);
+  const update = React.useCallback(
+    (next: BankPaymentOfferState) =>
+      registry.set(bankPaymentOfferStateAtom, next),
+    [registry],
+  );
   React.useEffect(() => {
     update(emptyBankPaymentOfferState);
   }, [myPubHex, update]);
-  const offers = state.offers;
+  const offers = useAtomValue(
+    bankPaymentOfferStateAtom,
+    (state) => state.offers,
+  );
 
   const applySnapshot = React.useCallback(
     (event: BankOfferInboxEvent): AppliedBankPaymentOfferSnapshot[] => {
       if (!myPubHex) return [];
+      const current = readState();
       const result = applyBankPaymentOfferSnapshot(
-        stateRef.current,
+        current,
         event,
         myPubHex,
         nowSeconds(),
       );
-      if (result.state !== stateRef.current) update(result.state);
+      if (result.state !== current) update(result.state);
       return [...result.accepted];
     },
-    [myPubHex, update],
+    [myPubHex, readState, update],
   );
 
   const publish = React.useCallback(
@@ -176,14 +227,14 @@ export const useBankPaymentOffers = ({
       const exit = await sendBankOffer(draft);
       if (!Exit.isSuccess(exit)) return null;
       const result = applyBankPaymentOfferReceipt(
-        stateRef.current,
+        readState(),
         peer,
         exit.value,
       );
       update(result.state);
       return result.offer;
     },
-    [sendBankOffer, update],
+    [readState, sendBankOffer, update],
   );
 
   const resolveOffer = React.useCallback(
@@ -191,10 +242,10 @@ export const useBankPaymentOffers = ({
       const offerId = decodeBankPaymentOffer(message.content)?.offerId;
       const peer = pubkeyFor(message.contactId);
       return offerId && peer
-        ? findBankPaymentOffer(stateRef.current.offers, peer, offerId)
+        ? findBankPaymentOffer(readState().offers, peer, offerId)
         : null;
     },
-    [pubkeyFor],
+    [pubkeyFor, readState],
   );
 
   const respondToOffer = React.useCallback(
@@ -291,7 +342,7 @@ export const useBankPaymentOffers = ({
         return false;
       }
       const { alreadyDone, targets } = bankPaymentOfferGroupResponses(
-        stateRef.current.offers,
+        readState().offers,
         offer.offerId,
         nextStatus,
       );
@@ -307,7 +358,14 @@ export const useBankPaymentOffers = ({
       }
       return sentAny;
     },
-    [resolveOffer, respondToBankPaymentOffer, respondToOffer, setStatus, t],
+    [
+      readState,
+      resolveOffer,
+      respondToBankPaymentOffer,
+      respondToOffer,
+      setStatus,
+      t,
+    ],
   );
 
   const getBankPaymentOfferForSettlement = React.useCallback(
@@ -338,7 +396,128 @@ export const useBankPaymentOffers = ({
     [publish],
   );
 
-  const [staggerTick, setStaggerTick] = useState(0);
+  // Staggered offers: queued recipients (persisted by requestBankPaymentOffer)
+  // receive the offer once their delay elapses, unless the offer meanwhile
+  // found a winner or ended.
+  const kickStaggeredOffers = useSerialPasses(
+    myPubHex,
+    async (me, isCancelled): Promise<number | null> => {
+      const records = readBankPaymentOfferStaggerRecords(me);
+      if (records.length === 0) return null;
+
+      const offers = readState().offers;
+      const nowSec = nowSeconds();
+      const dueRecords: typeof records = [];
+      let nextDueAtSec: number | null = null;
+
+      for (const record of records) {
+        if (!isBankPaymentOfferStaggerQueueOpen(record, offers)) {
+          forgetBankPaymentOfferStaggerQueue(record.offerId);
+          if (getInspectorEmissionEnabled()) {
+            reportInspectorRows([
+              {
+                at: Date.now(),
+                channel: "nostr.operation",
+                tag: "bankOffer.staggerDropped",
+                summary: `proxy payment offer is no longer open — dropped ${record.pending.length} queued recipients`,
+                links: {
+                  offer: record.offerId,
+                  pubkey: record.pending.map((recipient) => recipient.peer),
+                },
+                payload: { offerId: record.offerId },
+              },
+            ]);
+          }
+          continue;
+        }
+        const due = bankPaymentOfferStaggerDue(record, offers, nowSec);
+        if (due.send.length > 0 || due.alreadyOffered.length > 0) {
+          dueRecords.push(record);
+        } else if (due.nextDueAtSec !== null) {
+          nextDueAtSec =
+            nextDueAtSec === null
+              ? due.nextDueAtSec
+              : Math.min(nextDueAtSec, due.nextDueAtSec);
+        }
+      }
+
+      if (dueRecords.length === 0) {
+        return nextDueAtSec === null
+          ? null
+          : Math.max(0, nextDueAtSec * 1000 - Date.now());
+      }
+
+      let progressed = false;
+      for (const record of dueRecords) {
+        if (isCancelled()) return null;
+        try {
+          await withLocalStorageLeaseLock({
+            key: `${BANK_PAYMENT_OFFER_STAGGER_LOCK_KEY_PREFIX}.${record.offerId}`,
+            timeoutMs: 0,
+            fn: async () => {
+              // Re-read under the lock: another tab may have just sent.
+              const locked = readBankPaymentOfferStaggerRecords(me).find(
+                (candidate) => candidate.offerId === record.offerId,
+              );
+              if (!locked) {
+                progressed = true;
+                return;
+              }
+              const due = bankPaymentOfferStaggerDue(
+                locked,
+                readState().offers,
+                nowSeconds(),
+              );
+              const dequeue = [...due.alreadyOffered];
+              for (const peer of due.send) {
+                if (isCancelled()) return;
+                const sent = await sendOffered({
+                  amountSat: locked.amountSat,
+                  amountText: locked.amountText,
+                  expiresAtSec: locked.expiresAtSec,
+                  offerId: locked.offerId,
+                  offerer: me,
+                  to: peer,
+                });
+                if (!sent) continue;
+                dequeue.push(peer);
+                if (getInspectorEmissionEnabled()) {
+                  reportInspectorRows([
+                    {
+                      at: Date.now(),
+                      channel: "nostr.operation",
+                      tag: "bankOffer.staggerExtended",
+                      summary:
+                        "proxy payment offer extended to the next queued recipient",
+                      links: { offer: locked.offerId, pubkey: peer },
+                      payload: {
+                        offerId: locked.offerId,
+                        sentAtSec: sent.createdAtSec,
+                      },
+                    },
+                  ]);
+                }
+              }
+              if (dequeue.length > 0) {
+                removeBankPaymentOfferStaggerRecipients(
+                  record.offerId,
+                  dequeue,
+                );
+                progressed = true;
+              }
+            },
+          });
+        } catch {
+          // Another tab holds the stagger lock for this offer; let it finish.
+        }
+      }
+
+      if (isCancelled()) return null;
+      // A dequeue may leave the state untouched and a failed publish changes
+      // nothing at all, so the next pass is scheduled here.
+      return progressed ? 0 : STAGGER_RETRY_MS;
+    },
+  );
 
   // Each offer pins its own payer, so a second live offer for one bank QR
   // would hand the bank details to two payers.
@@ -352,7 +531,7 @@ export const useBankPaymentOffers = ({
       const nowSec = nowSeconds();
       const staggerRecords = readBankPaymentOfferStaggerRecords(myPubHex);
       for (const offerId of offerIds) {
-        const threads = bankPaymentOffersOf(stateRef.current.offers, offerId);
+        const threads = bankPaymentOffersOf(readState().offers, offerId);
         const [livePeer] = activeBankPaymentOffers(threads, nowSec).peers;
         const hasQueuedPeers = staggerRecords.some(
           (record) =>
@@ -365,7 +544,7 @@ export const useBankPaymentOffers = ({
       }
       return null;
     },
-    [contactIdFor, myPubHex],
+    [contactIdFor, myPubHex, readState],
   );
 
   const sendNewBankPaymentOffer = React.useCallback(
@@ -457,7 +636,7 @@ export const useBankPaymentOffers = ({
         });
         if (queue) {
           rememberBankPaymentOfferStaggerQueue(queue);
-          setStaggerTick((tick) => tick + 1);
+          kickStaggeredOffers();
         }
 
         setRecipientCountState(
@@ -472,7 +651,7 @@ export const useBankPaymentOffers = ({
         return null;
       }
     },
-    [myPubHex, pubkeyFor, sendOffered, setStatus, t],
+    [kickStaggeredOffers, myPubHex, pubkeyFor, sendOffered, setStatus, t],
   );
 
   const requestsInFlightRef = React.useRef(
@@ -531,57 +710,57 @@ export const useBankPaymentOffers = ({
   // in storage that survives a crash before they leave, under a per-offer
   // lease lock across tabs; everyone else who is still offered or accepted
   // learns that someone else won.
-  React.useEffect(() => {
-    if (!myPubHex || offers.length === 0) return;
+  const kickResponder = useSerialPasses(
+    myPubHex,
+    async (me, isCancelled): Promise<number | null> => {
+      if (readState().offers.length === 0) return null;
 
-    let cancelled = false;
-    let retryTimeoutId: number | undefined;
+      const closeLosers = async (offerId: BankOfferId) => {
+        const step = bankPaymentOfferResponderSteps(
+          readState().offers,
+          me,
+        ).find((current) => current.offerId === offerId);
+        for (const loser of step?.winner ? step.losers : []) {
+          await respondToOffer(loser, "accepted_by_other");
+        }
+      };
 
-    const closeLosers = async (offerId: BankOfferId) => {
-      const step = bankPaymentOfferResponderSteps(
-        stateRef.current.offers,
-        myPubHex,
-      ).find((current) => current.offerId === offerId);
-      for (const loser of step?.winner ? step.losers : []) {
-        await respondToOffer(loser, "accepted_by_other");
-      }
-    };
+      // Resolves true when a send failed and the pinned payer still waits.
+      const sendBankDetails = async (
+        offerId: BankOfferId,
+      ): Promise<boolean> => {
+        const record = await readBankPaymentOfferSpdRecord({
+          offerId,
+          ownerPubkey: me,
+        });
+        const step = bankPaymentOfferResponderSteps(
+          readState().offers,
+          me,
+        ).find((current) => current.offerId === offerId);
+        const recipient =
+          record && step
+            ? bankPaymentOfferDetailsRecipient(step, record.pin ?? null)
+            : null;
+        if (!record || !recipient) return false;
+        const sent = await respondToOffer(recipient, "bank_details_sent", {
+          spdPayload: record.spdPayload,
+        });
+        if (!sent) return true;
+        await markBankPaymentOfferBankDetailsDelivered({
+          offerId,
+          peer: recipient.peer,
+        });
+        return false;
+      };
 
-    // Resolves true when a send failed and the pinned payer still waits.
-    const sendBankDetails = async (offerId: BankOfferId): Promise<boolean> => {
-      const record = await readBankPaymentOfferSpdRecord({
-        offerId,
-        ownerPubkey: myPubHex,
-      });
-      const step = bankPaymentOfferResponderSteps(
-        stateRef.current.offers,
-        myPubHex,
-      ).find((current) => current.offerId === offerId);
-      const recipient =
-        record && step
-          ? bankPaymentOfferDetailsRecipient(step, record.pin ?? null)
-          : null;
-      if (!record || !recipient) return false;
-      const sent = await respondToOffer(recipient, "bank_details_sent", {
-        spdPayload: record.spdPayload,
-      });
-      if (!sent) return true;
-      await markBankPaymentOfferBankDetailsDelivered({
-        offerId,
-        peer: recipient.peer,
-      });
-      return false;
-    };
-
-    const run = async () => {
       let owed = false;
       try {
-        const steps = bankPaymentOfferResponderSteps(offers, myPubHex);
+        const steps = bankPaymentOfferResponderSteps(readState().offers, me);
         await forgetBankPaymentOfferSpdPayloads(
           steps.flatMap((step) => (step.ended ? [step.offerId] : [])),
         );
         for (const step of steps) {
-          if (cancelled) return;
+          if (isCancelled()) return null;
           if (step.ended || (!step.winner && !step.candidate)) continue;
           try {
             await withLocalStorageLeaseLock({
@@ -600,162 +779,25 @@ export const useBankPaymentOffers = ({
         // Best effort; the next state change or retry runs it again.
       }
 
-      if (cancelled) return;
+      if (isCancelled()) return null;
       // A failed publish or a skipped lease lock leaves the state unchanged,
-      // so nothing re-runs this effect; keep retrying while an accepted
-      // entry of my own offer or a pinned payer still waits for bank details.
-      if (
-        owed ||
-        hasPendingBankPaymentOfferResponderWork(offers, myPubHex, nowSeconds())
-      ) {
-        retryTimeoutId = window.setTimeout(
-          () => void run(),
-          RESPONDER_RETRY_MS,
-        );
-      }
-    };
+      // so nothing kicks another pass; keep retrying while an accepted entry
+      // of my own offer or a pinned payer still waits for bank details.
+      return owed ||
+        hasPendingBankPaymentOfferResponderWork(
+          readState().offers,
+          me,
+          nowSeconds(),
+        )
+        ? RESPONDER_RETRY_MS
+        : null;
+    },
+  );
 
-    void run();
-    return () => {
-      cancelled = true;
-      window.clearTimeout(retryTimeoutId);
-    };
-  }, [myPubHex, offers, respondToOffer]);
-
-  // Staggered offers: queued recipients (persisted by requestBankPaymentOffer)
-  // receive the offer once their delay elapses, unless the offer meanwhile
-  // found a winner or ended.
   React.useEffect(() => {
-    if (!myPubHex) return;
-    const records = readBankPaymentOfferStaggerRecords(myPubHex);
-    if (records.length === 0) return;
-
-    let cancelled = false;
-    let timeoutId: number | undefined;
-    const bumpTick = () => setStaggerTick((tick) => tick + 1);
-    const nowSec = nowSeconds();
-    const dueRecords: typeof records = [];
-    let nextDueAtSec: number | null = null;
-
-    for (const record of records) {
-      if (!isBankPaymentOfferStaggerQueueOpen(record, offers)) {
-        forgetBankPaymentOfferStaggerQueue(record.offerId);
-        if (getInspectorEmissionEnabled()) {
-          reportInspectorRows([
-            {
-              at: Date.now(),
-              channel: "nostr.operation",
-              tag: "bankOffer.staggerDropped",
-              summary: `proxy payment offer is no longer open — dropped ${record.pending.length} queued recipients`,
-              links: {
-                offer: record.offerId,
-                pubkey: record.pending.map((recipient) => recipient.peer),
-              },
-              payload: { offerId: record.offerId },
-            },
-          ]);
-        }
-        continue;
-      }
-      const due = bankPaymentOfferStaggerDue(record, offers, nowSec);
-      if (due.send.length > 0 || due.alreadyOffered.length > 0) {
-        dueRecords.push(record);
-      } else if (due.nextDueAtSec !== null) {
-        nextDueAtSec =
-          nextDueAtSec === null
-            ? due.nextDueAtSec
-            : Math.min(nextDueAtSec, due.nextDueAtSec);
-      }
-    }
-
-    const dispatchDue = async () => {
-      let progressed = false;
-      for (const record of dueRecords) {
-        if (cancelled) return;
-        try {
-          await withLocalStorageLeaseLock({
-            key: `${BANK_PAYMENT_OFFER_STAGGER_LOCK_KEY_PREFIX}.${record.offerId}`,
-            timeoutMs: 0,
-            fn: async () => {
-              // Re-read under the lock: another tab may have just sent.
-              const locked = readBankPaymentOfferStaggerRecords(myPubHex).find(
-                (candidate) => candidate.offerId === record.offerId,
-              );
-              if (!locked) {
-                progressed = true;
-                return;
-              }
-              const due = bankPaymentOfferStaggerDue(
-                locked,
-                offers,
-                nowSeconds(),
-              );
-              const dequeue = [...due.alreadyOffered];
-              for (const peer of due.send) {
-                if (cancelled) return;
-                const sent = await sendOffered({
-                  amountSat: locked.amountSat,
-                  amountText: locked.amountText,
-                  expiresAtSec: locked.expiresAtSec,
-                  offerId: locked.offerId,
-                  offerer: myPubHex,
-                  to: peer,
-                });
-                if (!sent) continue;
-                dequeue.push(peer);
-                if (getInspectorEmissionEnabled()) {
-                  reportInspectorRows([
-                    {
-                      at: Date.now(),
-                      channel: "nostr.operation",
-                      tag: "bankOffer.staggerExtended",
-                      summary:
-                        "proxy payment offer extended to the next queued recipient",
-                      links: { offer: locked.offerId, pubkey: peer },
-                      payload: {
-                        offerId: locked.offerId,
-                        sentAtSec: sent.createdAtSec,
-                      },
-                    },
-                  ]);
-                }
-              }
-              if (dequeue.length > 0) {
-                removeBankPaymentOfferStaggerRecipients(
-                  record.offerId,
-                  dequeue,
-                );
-                progressed = true;
-              }
-            },
-          });
-        } catch {
-          // Another tab holds the stagger lock for this offer; let it finish.
-        }
-      }
-
-      if (cancelled) return;
-      // Successful sends re-run this effect through the state update; the tick
-      // covers dequeues that left the state untouched, and a failed publish
-      // changes nothing at all, so it needs a nudge.
-      if (progressed) bumpTick();
-      else timeoutId = window.setTimeout(bumpTick, STAGGER_RETRY_MS);
-    };
-
-    if (dueRecords.length > 0) {
-      void dispatchDue();
-    } else if (nextDueAtSec !== null) {
-      timeoutId = window.setTimeout(
-        bumpTick,
-        Math.max(0, nextDueAtSec * 1000 - Date.now()),
-      );
-    }
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timeoutId);
-    };
-  }, [myPubHex, offers, sendOffered, staggerTick]);
+    kickResponder();
+    kickStaggeredOffers();
+  }, [kickResponder, kickStaggeredOffers, offers]);
 
   const expiryGroups = React.useMemo(
     () =>
@@ -806,21 +848,6 @@ export const useBankPaymentOffers = ({
     };
   }, [expiryGroups, respondToOffer]);
 
-  const bankPaymentOfferMessages = React.useMemo(
-    () =>
-      myPubHex
-        ? offers
-            .flatMap((offer) => {
-              const contactId = contactIdFor(offer.peer);
-              return contactId
-                ? [bankPaymentOfferMessageRow(offer, contactId, myPubHex)]
-                : [];
-            })
-            .sort(compareBankPaymentOfferRows)
-        : [],
-    [contactIdFor, myPubHex, offers],
-  );
-
   const activeBankPaymentOfferContacts = React.useCallback(
     (nowSec: number) => {
       const active = activeBankPaymentOffers(offers, nowSec);
@@ -852,7 +879,6 @@ export const useBankPaymentOffers = ({
   return {
     activeBankPaymentOfferContacts,
     applyBankPaymentOfferSnapshot: applySnapshot,
-    bankPaymentOfferMessages,
     bankPaymentOfferRecipientCount: recipientCount,
     bankPaymentOfferStaggerDelaySec: staggerDelaySec,
     getBankPaymentOfferForSettlement,
