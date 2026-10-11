@@ -1,5 +1,4 @@
-const normalizeMint = (value: string): string =>
-  value.trim().replace(/\/+$/, "");
+import { normalizeMintUrl } from "../../utils/mint";
 
 export interface SendMintBalance {
   amount: number;
@@ -9,7 +8,7 @@ export interface SendMintBalance {
 /**
  * Picks the mint a linkshu send or melt should spend from: foreign mints
  * first (largest balance wins), the preferred/default mint last, so payments
- * drain foreign balances before touching the main mint.
+ * drain foreign balances before touching the default mint.
  */
 export const selectSendMintForAmount = (
   balances: readonly SendMintBalance[],
@@ -17,9 +16,9 @@ export const selectSendMintForAmount = (
   amountSat: number,
 ): string | null => {
   if (!Number.isFinite(amountSat) || amountSat <= 0) return null;
-  const preferred = normalizeMint(preferredMint ?? "");
+  const preferred = normalizeMintUrl(preferredMint);
   const isPreferred = (mint: string): boolean =>
-    Boolean(preferred) && normalizeMint(mint) === preferred;
+    Boolean(preferred) && normalizeMintUrl(mint) === preferred;
 
   return (
     [...balances]
@@ -31,4 +30,23 @@ export const selectSendMintForAmount = (
       })
       .find((entry) => entry.amount >= amountSat)?.mint ?? null
   );
+};
+
+/**
+ * The spelling linkshu holds `mint`'s funds under. linkshu keys proofs by the
+ * exact url it stored, while the app names a mint by `normalizeMintUrl`; of
+ * several stored spellings the largest balance wins, an unfunded mint stays
+ * `mint`.
+ */
+export const storedMintSpelling = (
+  balances: readonly SendMintBalance[],
+  mint: string,
+): string => {
+  const key = normalizeMintUrl(mint);
+  let stored: SendMintBalance | null = null;
+  for (const entry of balances) {
+    if (normalizeMintUrl(entry.mint) !== key || entry.amount <= 0) continue;
+    if (stored === null || entry.amount > stored.amount) stored = entry;
+  }
+  return stored?.mint ?? mint;
 };
