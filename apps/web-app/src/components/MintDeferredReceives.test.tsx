@@ -12,14 +12,12 @@ const { copyText } = vi.hoisted(() => ({
   copyText: vi.fn<(text: string) => Promise<void>>(async () => {}),
 }));
 
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellActions: () => ({ copyText }),
-  useAppShellCore: () => ({
-    formatDisplayedAmountText: (amount: number) => `${amount} sat`,
-    t: (key: string) =>
-      key === "cashuDeferredDiscardBody" ? "lose {amount}?" : key,
+vi.mock("../app/hooks/shell", async () =>
+  (await import("../testUtils/shellHooks")).shellHooksMock({
+    copyText: (value) => copyText(value),
+    t: (key) => (key === "cashuDeferredDiscardBody" ? "lose {amount}?" : key),
   }),
-}));
+);
 
 vi.mock("../app/context/SystemSettingsContexts", () => ({
   useMintSettingsContext: () => mintSettings,

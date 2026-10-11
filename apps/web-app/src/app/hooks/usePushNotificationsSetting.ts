@@ -1,8 +1,9 @@
 import React from "react";
 import { getNativeNotificationPermissionState } from "../../platform/nativeBridge";
 import { isNativePlatform } from "../../platform/runtime";
-import { useAppShellCore } from "../context/AppShellContexts";
-import { useAdvancedSettingsContext } from "../context/SystemSettingsContexts";
+import { useAtomValue } from "@linky-fit/linkstr-react";
+import { currentNsecAtom } from "../state/session/session";
+import { usePushToast, useTranslation } from "./shell";
 
 export interface PushNotificationsSetting {
   enabled: boolean;
@@ -46,8 +47,9 @@ const readPushNotificationsEnabled = async (
 
 /** The push notification switch shared by Advanced settings and Proxy payments. */
 export const usePushNotificationsSetting = (): PushNotificationsSetting => {
-  const { currentNsec, t } = useAppShellCore();
-  const { pushToast } = useAdvancedSettingsContext();
+  const currentNsec = useAtomValue(currentNsecAtom);
+  const { t } = useTranslation();
+  const pushToast = usePushToast();
   const [enabled, setEnabledState] = React.useState(false);
   const [isBusy, setIsBusy] = React.useState(false);
 

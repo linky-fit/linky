@@ -1,6 +1,6 @@
 import { Button, ListRow, QRCode, Stack, Switch, Text } from "@linky-fit/ui";
 import { useState } from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useTranslation } from "../app/hooks/shell";
 import { useTokenQr } from "../app/hooks/cashu/useTokenQr";
 
 interface CashuTokenQrProps {
@@ -9,7 +9,7 @@ interface CashuTokenQrProps {
 }
 
 export const CashuTokenQr = ({ tokenText, copyText }: CashuTokenQrProps) => {
-  const { t } = useAppShellCore();
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
   const [animationEnabled, setAnimationEnabled] = useState(true);
   const {

@@ -4,7 +4,7 @@ import type { Toast as AppToast } from "../hooks/useToasts";
 
 interface ToastNotificationsProps {
   dismissToast: (id: string) => void;
-  toasts: AppToast[];
+  toasts: readonly AppToast[];
 }
 
 export const ToastNotifications: React.FC<ToastNotificationsProps> = ({

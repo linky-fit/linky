@@ -1,9 +1,10 @@
 import { Amount, Pressable, Stack } from "@linky-fit/ui";
 import type { AmountProps } from "@linky-fit/ui";
 import {
-  useAppShellActions,
-  useAppShellCore,
-} from "../app/context/AppShellContexts";
+  useDisplayAmounts,
+  useDisplayCurrencyCycle,
+  useTranslation,
+} from "../app/hooks/shell";
 import type { Lang } from "../i18n";
 import type { DisplayAmountParts } from "../utils/displayAmounts";
 
@@ -48,9 +49,10 @@ export function DisplayAmount({
   accessibilityLabel,
   testID,
 }: DisplayAmountProps) {
-  const { allowedDisplayCurrencies, formatDisplayedAmountParts, lang, t } =
-    useAppShellCore();
-  const { cycleDisplayCurrency } = useAppShellActions();
+  const { lang, t } = useTranslation();
+  const { formatDisplayedAmountParts } = useDisplayAmounts();
+  const { allowedDisplayCurrencies, cycleDisplayCurrency } =
+    useDisplayCurrencyCycle();
   const content = (
     <Amount
       {...(typeof amount === "string"

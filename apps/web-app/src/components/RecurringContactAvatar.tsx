@@ -1,7 +1,7 @@
 import { Avatar } from "@linky-fit/ui";
 import type { AvatarSize } from "@linky-fit/ui";
 import type { FC } from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useNostrPictureByNpub } from "../app/hooks/contacts/useProfileCache";
 import type { RecurringContactSummary } from "../app/hooks/payments/useRecurringPaymentOrders";
 import { deriveDefaultProfile } from "../derivedProfile";
 
@@ -15,7 +15,7 @@ export const RecurringContactAvatar: FC<RecurringContactAvatarProps> = ({
   contact,
   size,
 }) => {
-  const { nostrPictureByNpub } = useAppShellCore();
+  const nostrPictureByNpub = useNostrPictureByNpub();
   const npub = contact?.npub ?? null;
   const pictureUrl = npub
     ? nostrPictureByNpub[npub] || deriveDefaultProfile(npub).pictureUrl

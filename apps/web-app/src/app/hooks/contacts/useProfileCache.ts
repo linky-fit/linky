@@ -10,6 +10,10 @@ type SetCacheField<K extends keyof ProfileCache> = React.Dispatch<
   React.SetStateAction<ProfileCache[K]>
 >;
 
+/** Profile pictures by npub, as the profile watch last saw them. */
+export const useNostrPictureByNpub = () =>
+  useAtomValue(profileCacheAtom, (cache) => cache.pictureByNpub);
+
 /** The profile cache with a `useState`-style setter per map. */
 export const useProfileCache = () => {
   const cache = useAtomValue(profileCacheAtom);

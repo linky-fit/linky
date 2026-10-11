@@ -3,43 +3,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { epochToDateTimeLocal } from "../app/lib/recurringPaymentDisplay";
 import { contactIdFor } from "../testUtils/recurringOrders";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
-import { applyAmountInputKeyWithDraft } from "../utils/displayAmounts";
 import { nowSeconds } from "../utils/time";
 import { RecurringPaymentFormPage } from "./RecurringPaymentFormPage";
 
 const CONTACT_ID = contactIdFor("alice");
 
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellCore: () => ({
-    allowedDisplayCurrencies: ["sat"],
-    applyAmountInputKeyWithDraft: (
-      amount: string,
-      displayValue: string | null,
-      key: string,
-    ) =>
-      applyAmountInputKeyWithDraft(
-        amount,
-        displayValue,
-        key,
-        { displayCurrency: "sat", fiatRates: null },
-        false,
-      ),
-    cashuIsBusy: false,
-    decimalAmountInputKeyVisible: false,
-    displayCurrency: "sat",
-    displayUnit: "sat",
-    fiatRates: null,
-    formatDisplayedAmountParts: (amountSat: number) => ({
-      amountText: String(amountSat),
-      approxPrefix: "",
-      unitLabel: "sat",
-    }),
-    lang: "en",
-    nostrPictureByNpub: {},
-    t: (key: string) => key,
-  }),
-  useAppShellActions: () => ({ cycleDisplayCurrency: vi.fn() }),
-}));
+vi.mock("../app/hooks/shell", async () =>
+  (await import("../testUtils/shellHooks")).shellHooksMock(),
+);
 
 vi.mock("../app/context/RecurringPaymentsContext", () => ({
   useRecurringPaymentsContext: () => ({

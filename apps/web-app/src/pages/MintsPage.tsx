@@ -1,5 +1,5 @@
 import { Card, Divider, Progress, Row, Stack, Text } from "@linky-fit/ui";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
 import { holdingOf, mintHoldings } from "../app/lib/mintHoldings";
 import {
@@ -28,7 +28,8 @@ export function MintsPage() {
     defaultMintUrl,
     getMintIconUrl,
   } = useMintSettingsContext();
-  const { formatDisplayedAmountText, t } = useAppShellCore();
+  const { t } = useTranslation();
+  const { formatDisplayedAmountText } = useDisplayAmounts();
   const selectedMint =
     normalizeMintUrl(defaultMintUrl ?? MAIN_MINT_URL) || MAIN_MINT_URL;
 

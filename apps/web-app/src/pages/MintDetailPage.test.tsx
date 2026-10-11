@@ -6,17 +6,10 @@ import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { MintDetailPage } from "./MintDetailPage";
 
 let mintSettings: MintSettingsContextValue;
-let mintUrl = "https://cashu.cz";
 
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellActions: () => ({ copyText: vi.fn() }),
-  useAppShellCore: () => ({
-    formatDisplayedAmountText: (amount: number) => `${amount} sat`,
-    lang: "en",
-    route: { kind: "mint", mintUrl },
-    t: (key: string) => key,
-  }),
-}));
+vi.mock("../app/hooks/shell", async () =>
+  (await import("../testUtils/shellHooks")).shellHooksMock(),
+);
 
 vi.mock("../app/context/SystemSettingsContexts", () => ({
   useMintSettingsContext: () => mintSettings,
@@ -34,10 +27,11 @@ describe("MintDetailPage", () => {
   });
 
   it("names the default mint in its header with the list's badges", async () => {
-    mintUrl = "https://cashu.cz";
     mintSettings = createMintSettings();
 
-    const { container, unmount } = await renderIntoDocument(<MintDetailPage />);
+    const { container, unmount } = await renderIntoDocument(
+      <MintDetailPage mintUrl="https://cashu.cz" />,
+    );
     expect(
       container.querySelector('[data-testid="mint-detail-name"]')?.textContent,
     ).toBe("cashu.cz");
@@ -51,11 +45,13 @@ describe("MintDetailPage", () => {
   });
 
   it("offers to make another mint the default", async () => {
-    mintUrl = "https://mint.minibits.cash/Bitcoin";
+    const mintUrl = "https://mint.minibits.cash/Bitcoin";
     const applyDefaultMintSelection = vi.fn(async () => true);
     mintSettings = createMintSettings({ applyDefaultMintSelection });
 
-    const { container, unmount } = await renderIntoDocument(<MintDetailPage />);
+    const { container, unmount } = await renderIntoDocument(
+      <MintDetailPage mintUrl={mintUrl} />,
+    );
     expect(
       container.querySelector('[data-testid="mint-detail-name"]')?.textContent,
     ).toBe("mint.minibits.cash/Bitcoin");

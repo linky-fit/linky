@@ -1,33 +1,28 @@
+import { useAtomValue } from "@linky-fit/linkstr-react";
 import { Button, Row, Stack } from "@linky-fit/ui";
 import type { FC } from "react";
-import { useAppShellActions } from "../app/context/AppShellContexts";
+import { useTranslation } from "../app/hooks/shell";
+import { useTopupInvoice } from "../app/hooks/topup/useTopupFlow";
+import { currentNpubAtom } from "../app/state/session/session";
 import { AmountKeypad } from "../components/AmountKeypad";
 import { PaymentNoteInput } from "../components/PaymentNoteInput";
 import { useAmountInputKeypad } from "../components/useAmountInputKeypad";
 import { navigateTo } from "../hooks/useRouting";
-import type { Translate } from "../i18n";
 
 interface TopupPageProps {
-  currentNpub: string | null;
-  displayUnit: string;
-  setTopupAmount: (value: string | ((prev: string) => string)) => void;
-  setTopupNote: (value: string) => void;
-  t: Translate;
-  topupAmount: string;
-  topupInvoiceIsBusy: boolean;
-  topupNote: string;
+  pasteScanValue: () => Promise<void>;
 }
 
-export const TopupPage: FC<TopupPageProps> = ({
-  currentNpub,
-  setTopupAmount,
-  setTopupNote,
-  t,
-  topupAmount,
-  topupInvoiceIsBusy,
-  topupNote,
-}) => {
-  const { pasteScanValue } = useAppShellActions();
+export const TopupPage: FC<TopupPageProps> = ({ pasteScanValue }) => {
+  const { t } = useTranslation();
+  const currentNpub = useAtomValue(currentNpubAtom);
+  const {
+    setTopupAmount,
+    setTopupNote,
+    topupAmount,
+    topupInvoiceIsBusy,
+    topupNote,
+  } = useTopupInvoice();
 
   const amountSat = Number.parseInt(topupAmount.trim(), 10);
   const invalid =

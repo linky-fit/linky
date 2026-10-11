@@ -1,23 +1,16 @@
+import { useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
 import { reportAppLog } from "../../devtools/inspector/appLog";
 import type { DisplayCurrency } from "../../utils/displayAmounts";
-import { getInitialAllowedDisplayCurrencies } from "../../utils/storage";
-import {
-  resolveDisplayCurrencies,
-  toggleDisplayCurrency,
-} from "../lib/displayCurrenciesSetting";
+import { toggleDisplayCurrency } from "../lib/displayCurrenciesSetting";
 import { runWrite } from "../lib/storeWrite";
-import { useSetting, useSettingsRepository } from "./useLinksync";
+import { allowedDisplayCurrenciesAtom } from "../state/shell/displayPrefs";
+import { useSettingsRepository } from "./useLinksync";
 
 /** The display currencies enabled in Settings, synced across the user's devices. */
 export const useAllowedDisplayCurrencies = () => {
   const settingsRepository = useSettingsRepository();
-  const [deviceCurrencies] = React.useState(getInitialAllowedDisplayCurrencies);
-  const synced = useSetting("displayCurrencies");
-  const allowedDisplayCurrencies = React.useMemo(
-    () => resolveDisplayCurrencies(synced, deviceCurrencies),
-    [deviceCurrencies, synced],
-  );
+  const allowedDisplayCurrencies = useAtomValue(allowedDisplayCurrenciesAtom);
 
   const toggleAllowedDisplayCurrency = React.useCallback(
     (currency: DisplayCurrency) => {

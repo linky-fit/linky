@@ -28,20 +28,9 @@ const records = vi.hoisted(() => ({
   current: new Array<RecurringPaymentRecord>(),
 }));
 
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellCore: () => ({
-    displayCurrency: "sat",
-    fiatRates: null,
-    formatDisplayedAmountParts: (amountSat: number) => ({
-      amountText: String(amountSat),
-      approxPrefix: "",
-      unitLabel: "sat",
-    }),
-    lang: "en",
-    nostrPictureByNpub: {},
-    t: (key: string) => key,
-  }),
-}));
+vi.mock("../app/hooks/shell", async () =>
+  (await import("../testUtils/shellHooks")).shellHooksMock(),
+);
 
 vi.mock("../app/hooks/useLinksync", () => ({
   useContactRows: () => [],

@@ -1,5 +1,5 @@
 import { Pill } from "@linky-fit/ui";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useTranslation } from "../app/hooks/shell";
 import type { I18nKey } from "../i18n";
 import type { MintBadgeKind } from "../utils/mint";
 
@@ -14,7 +14,7 @@ interface MintBadgeProps {
 }
 
 export function MintBadge({ kind }: MintBadgeProps) {
-  const { t } = useAppShellCore();
+  const { t } = useTranslation();
   return (
     <Pill
       size="sm"

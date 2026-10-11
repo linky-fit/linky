@@ -14,7 +14,8 @@ import {
 } from "@linky-fit/ui";
 import type { ContactRowLike } from "../app/types/appTypes";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
+import { useWalletBalance } from "../app/hooks/wallet/useWalletInventory";
 import { canLockAcrossTabs } from "../utils/storage";
 import { useFiatRates } from "../app/hooks/useFiatRates";
 import {
@@ -281,8 +282,9 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
   onRequestReimbursement,
   spdPayload,
 }) => {
-  const { displayCurrency, displayUnit, formatDisplayedAmountText, lang, t } =
-    useAppShellCore();
+  const { lang, t } = useTranslation();
+  const { displayCurrency, displayUnit, formatDisplayedAmountText } =
+    useDisplayAmounts();
   const fiatRates = useFiatRates();
   const [isRequestingOffer, setIsRequestingOffer] = React.useState(false);
   const [offerStatus, setOfferStatus] = React.useState<string | null>(null);
@@ -714,5 +716,14 @@ const OfferContactTile = ({
         </Row>
       ) : null}
     </OptionTile>
+  );
+};
+
+type SpdPaymentRouteProps = Omit<SpdPaymentPageProps, "cashuBalanceAfterMelt">;
+
+export const SpdPaymentRoute: React.FC<SpdPaymentRouteProps> = (props) => {
+  const { cashuBalanceAfterMelt } = useWalletBalance();
+  return (
+    <SpdPaymentPage {...props} cashuBalanceAfterMelt={cashuBalanceAfterMelt} />
   );
 };

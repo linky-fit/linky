@@ -1,25 +1,20 @@
+import { useAtom } from "@linky-fit/linkstr-react";
 import React from "react";
-import {
-  WALLET_WARNING_BALANCE_THRESHOLD_SAT,
-  WALLET_WARNING_DISMISSED_STORAGE_KEY,
-} from "../../../utils/constants";
-import {
-  safeLocalStorageGet,
-  safeLocalStorageSet,
-} from "../../../utils/storage";
+import { WALLET_WARNING_BALANCE_THRESHOLD_SAT } from "../../../utils/constants";
+import { walletWarningDismissedAtom } from "../../state/wallet/prefs";
+import { useWalletBalance } from "./useWalletInventory";
 
 /** The large-balance warning, until the user dismisses it on this device. */
-export const useWalletWarning = (cashuBalance: number) => {
-  const [walletWarningDismissed, setWalletWarningDismissed] = React.useState(
-    () => safeLocalStorageGet(WALLET_WARNING_DISMISSED_STORAGE_KEY) === "1",
+export const useWalletWarning = () => {
+  const { cashuBalance } = useWalletBalance();
+  const [dismissed, setDismissed] = useAtom(walletWarningDismissedAtom);
+  const dismissWalletWarning = React.useCallback(
+    () => setDismissed(true),
+    [setDismissed],
   );
-  const dismissWalletWarning = React.useCallback(() => {
-    safeLocalStorageSet(WALLET_WARNING_DISMISSED_STORAGE_KEY, "1");
-    setWalletWarningDismissed(true);
-  }, []);
   return {
     dismissWalletWarning,
-    walletWarningApplies: cashuBalance > WALLET_WARNING_BALANCE_THRESHOLD_SAT,
-    walletWarningDismissed,
+    showWalletWarning:
+      cashuBalance > WALLET_WARNING_BALANCE_THRESHOLD_SAT && !dismissed,
   };
 };

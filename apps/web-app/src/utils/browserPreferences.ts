@@ -1,6 +1,6 @@
 import type { DisplayCurrency } from "./displayAmounts";
 
-import type { Lang } from "../i18n";
+import type { Lang } from "./lang";
 
 const getPrimaryBrowserLanguage = (): string => {
   if (typeof navigator === "undefined") return "";

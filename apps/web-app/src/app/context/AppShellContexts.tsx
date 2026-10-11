@@ -21,11 +21,7 @@ import type {
   MoneyRoutesProps,
   PeopleRoutesProps,
 } from "../routes/AppRouteContent";
-import type {
-  ContactsGuideStep,
-  ProxyPaymentPayerContact,
-  TopbarButton,
-} from "../types/appTypes";
+import type { ContactsGuideStep, TopbarButton } from "../types/appTypes";
 import type { PaidOverlayDetails, PaidOverlayPhase } from "../lib/paidOverlay";
 import {
   SystemSettingsContextsProvider,
@@ -66,7 +62,6 @@ export interface AppShellCoreContextValue {
   currentNpub: string | null;
   currentNsec: string | null;
   decimalAmountInputEnabled: boolean;
-  decimalAmountInputKeyVisible: boolean;
   sendReadReceiptsEnabled: boolean;
   displayCurrency: DisplayCurrency;
   derivedProfile: DerivedProfileDefaults | null;
@@ -76,12 +71,6 @@ export interface AppShellCoreContextValue {
   effectiveProfilePicture: string | null;
   evoluAppOwnerId: string | null;
   fiatRates: FiatRates | null;
-  applyAmountInputKey: (currentAmount: string, key: string) => string;
-  applyAmountInputKeyWithDraft: (
-    currentAmount: string,
-    currentDisplayValue: string | null,
-    key: string,
-  ) => { amountSat: string; displayValue: string };
   formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
   formatDisplayedAmountText: (amountSat: number) => string;
   isProfileEditing: boolean;
@@ -119,10 +108,7 @@ export interface AppShellCoreContextValue {
   profileIsSaving: boolean;
   profileStatus: string | null;
   profileStatusCurrencies: readonly ProfileStatusCurrency[];
-  proxyPaymentPayerContacts: readonly ProxyPaymentPayerContact[];
-  profileStatusIsSaving: boolean;
   profilePhotoInputRef: React.RefObject<FilePickerHandle | null>;
-  selectedProfileStatusCurrencies: readonly ProfileStatusCurrency[];
   profileSelectedPictureKind: "custom" | "generated";
   profileShareOverlayIsOpen: boolean;
   route: Route;
@@ -133,7 +119,6 @@ export interface AppShellCoreContextValue {
   scanIsOpen: boolean;
   scanVideoRef: React.RefObject<HTMLVideoElement | null>;
   shareOptionsText: string | null;
-  showHiddenTransactions: boolean;
   showProfileQrOnTiltEnabled: boolean;
   t: Translate;
   topbar: TopbarButton | null;
@@ -169,7 +154,6 @@ export interface AppShellActionsContextValue {
   };
   copyText: (text: string) => Promise<void>;
   cycleScanCamera: () => void;
-  cycleDisplayCurrency: () => void;
   shuffleProfileAvatar: () => void;
   onPickProfilePhoto: () => void;
   onProfilePhotoError: (error: unknown) => void;
@@ -181,7 +165,6 @@ export interface AppShellActionsContextValue {
   openManualPayFromScan: () => void;
   openProfileQr: () => void;
   openReceiveScan: () => void;
-  openWalletScan: () => void;
   pasteScanValue: () => Promise<void>;
   copyShareOptionsText: () => Promise<void>;
   saveProfileEdits: () => void;
@@ -211,9 +194,6 @@ export interface AppShellActionsContextValue {
   toggleSendReadReceipts: () => void;
   toggleShowProfileQrOnTilt: () => void;
   toggleProfileEditing: () => void;
-  toggleProfileStatusCurrency: (
-    currency: ProfileStatusCurrency,
-  ) => Promise<void>;
   writeCurrentNpubToNfc: () => Promise<void>;
 }
 

@@ -1,28 +1,25 @@
+import { useAtom, useAtomValue } from "@linky-fit/linkstr-react";
 import { Button, Stack, TextField } from "@linky-fit/ui";
-import type { ComponentRef, FC, RefObject } from "react";
+import { useRef, type ComponentRef, type FC } from "react";
+import { useTranslation } from "../app/hooks/shell";
 import { extractCashuTokenFromText } from "../app/lib/tokenText";
-import type { Translate } from "../i18n";
+import { walletOpRunningAtom } from "../app/state/wallet/opQueue";
+import { receiveTokenDraftAtom } from "../app/state/wallet/tokenActivity";
 
 interface CashuTokenNewPageProps {
-  cashuDraft: string;
-  cashuDraftRef: RefObject<ComponentRef<typeof TextField> | null>;
-  cashuIsBusy: boolean;
   saveCashuFromText: (
     text: string,
     opts: { navigateToTokens?: boolean; navigateToWallet?: boolean },
   ) => Promise<void>;
-  setCashuDraft: (value: string) => void;
-  t: Translate;
 }
 
 export const CashuTokenNewPage: FC<CashuTokenNewPageProps> = ({
-  cashuDraft,
-  cashuDraftRef,
-  cashuIsBusy,
   saveCashuFromText,
-  setCashuDraft,
-  t,
 }) => {
+  const { t } = useTranslation();
+  const cashuIsBusy = useAtomValue(walletOpRunningAtom);
+  const [cashuDraft, setCashuDraft] = useAtom(receiveTokenDraftAtom);
+  const cashuDraftRef = useRef<ComponentRef<typeof TextField>>(null);
   const saveToken = (tokenRaw: string) =>
     void saveCashuFromText(tokenRaw, { navigateToTokens: true });
 

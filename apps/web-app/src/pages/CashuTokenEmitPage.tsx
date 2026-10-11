@@ -1,35 +1,27 @@
 import { Button, Notice, Stack } from "@linky-fit/ui";
-import { useState, type Dispatch, type FC, type SetStateAction } from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useState, type FC } from "react";
+import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
+import { useMoveMintFunds } from "../app/hooks/mint/useMoveMintFunds";
+import { useWalletBalance } from "../app/hooks/wallet/useWalletInventory";
+import { useWalletTokens } from "../app/hooks/wallet/useWalletTokens";
 import { AmountKeypad } from "../components/AmountKeypad";
 import { PaymentNoteInput } from "../components/PaymentNoteInput";
 import { useAmountInputKeypad } from "../components/useAmountInputKeypad";
 
-interface CashuTokenEmitPageProps {
-  cashuBalance: number;
-  cashuBalanceAfterMelt: number;
-  cashuEmitAmount: string;
-  cashuIsBusy: boolean;
-  cashuMeltToMainMintButtonLabel: string | null;
-  cashuHasMultipleAcceptedMints: boolean;
-  displayUnit: string;
-  emitCashuToken: (options: { note: string | null }) => Promise<void>;
-  meltLargestForeignMintToMainMint: () => Promise<void>;
-  setCashuEmitAmount: Dispatch<SetStateAction<string>>;
-}
-
-export const CashuTokenEmitPage: FC<CashuTokenEmitPageProps> = ({
-  cashuBalance,
-  cashuBalanceAfterMelt,
-  cashuEmitAmount,
-  cashuIsBusy,
-  cashuHasMultipleAcceptedMints,
-  cashuMeltToMainMintButtonLabel,
-  emitCashuToken,
-  meltLargestForeignMintToMainMint,
-  setCashuEmitAmount,
-}) => {
-  const { formatDisplayedAmountText, t } = useAppShellCore();
+export const CashuTokenEmitPage: FC = () => {
+  const { t } = useTranslation();
+  const { formatDisplayedAmountText } = useDisplayAmounts();
+  const {
+    cashuBalance,
+    cashuBalanceAfterMelt,
+    cashuHasMultipleAcceptedMints,
+    cashuIsBusy,
+    cashuMeltToMainMintButtonLabel,
+  } = useWalletBalance();
+  const { cashuEmitAmount, emitCashuToken, setCashuEmitAmount } =
+    useWalletTokens();
+  const { meltToDefaultMint: meltLargestForeignMintToMainMint } =
+    useMoveMintFunds();
   const [mintWarningDismissed, setMintWarningDismissed] = useState(false);
   const [note, setNote] = useState("");
   const amountSat = Number.parseInt(cashuEmitAmount.trim(), 10);

@@ -362,7 +362,7 @@ describe("linkshu commands", () => {
     type Wallet = ReturnType<typeof useLinkshuComposition>;
     const hook: { commands: Wallet | null } = { commands: null };
     const Probe = ({ onRender }: { onRender: (wallet: Wallet) => void }) => {
-      onRender(useLinkshuComposition({ allowTestMints: true }));
+      onRender(useLinkshuComposition());
       return null;
     };
     const view = await renderIntoDocument(

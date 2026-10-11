@@ -4,27 +4,17 @@ import { Schema } from "effect";
 import { act, type ComponentProps } from "react";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import { en } from "../i18n/en";
-import type { I18nKey } from "../i18n";
 import { createStoredProofFixture } from "../testUtils/cashuInventory";
 import { buildCashuToken } from "../testUtils/cashuToken";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { navigateTo } from "../hooks/useRouting";
 import { CashuTokensPage } from "./CashuTokensPage";
 
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellCore: () => ({
-    t: (key: I18nKey) => en[key],
-    lang: "en",
-    allowedDisplayCurrencies: ["sat"],
-    formatDisplayedAmountText: (amount: number) => `${amount} sat`,
-    formatDisplayedAmountParts: (amount: number) => ({
-      approxPrefix: "",
-      amountText: String(amount),
-      unitLabel: "sat",
-    }),
+vi.mock("../app/hooks/shell", async () =>
+  (await import("../testUtils/shellHooks")).shellHooksMock({
+    t: (key) => en[key],
   }),
-  useAppShellActions: () => ({ cycleDisplayCurrency: vi.fn() }),
-}));
+);
 vi.mock("../hooks/useRouting", () => ({ navigateTo: vi.fn() }));
 
 const transfer = Schema.decodeUnknownSync(TokenTransfer)({

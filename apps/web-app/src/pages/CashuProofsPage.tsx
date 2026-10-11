@@ -14,9 +14,17 @@ import {
 } from "@linky-fit/ui";
 import type { FC, ReactNode } from "react";
 import { useEffect, useMemo, useRef } from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
-
 import type { InspectCashuProofStates } from "../app/hooks/composition/useLinkshuComposition";
+import { useMoveMintFunds } from "../app/hooks/mint/useMoveMintFunds";
+import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
+import {
+  useWalletBalance,
+  useWalletInventory,
+} from "../app/hooks/wallet/useWalletInventory";
+import {
+  useInspectCashuProofStates,
+  useWalletTokens,
+} from "../app/hooks/wallet/useWalletTokens";
 import { getMintDisplay } from "../app/lib/tokenMessageInfo";
 import { useTokenProofStates } from "../hooks/useTokenProofStates";
 import type { I18nKey } from "../i18n";
@@ -89,7 +97,8 @@ export const CashuProofsPage: FC<CashuProofsPageProps> = ({
   restoreAndReclaimAllTokens,
   tokensRestoreIsBusy,
 }) => {
-  const { formatDisplayedAmountText, t } = useAppShellCore();
+  const { t } = useTranslation();
+  const { formatDisplayedAmountText } = useDisplayAmounts();
 
   const unspentProofs = useMemo(
     () => cashuProofs.filter((proof) => proof.state !== "spent"),
@@ -284,5 +293,39 @@ export const CashuProofsPage: FC<CashuProofsPageProps> = ({
         </Button>
       </Stack>
     </Stack>
+  );
+};
+
+type CashuProofsRouteProps = Pick<
+  CashuProofsPageProps,
+  | "canRestoreTokens"
+  | "reclaimHandedOutTokens"
+  | "restoreAndReclaimAllTokens"
+  | "restoreMissingTokens"
+>;
+
+export const CashuProofsRoute: FC<CashuProofsRouteProps> = (props) => {
+  const { proofs } = useWalletInventory();
+  const { cashuIsBusy, cashuMeltToMainMintButtonLabel } = useWalletBalance();
+  const tokens = useWalletTokens();
+  const { meltToDefaultMint } = useMoveMintFunds();
+  const inspectCashuProofStates = useInspectCashuProofStates();
+  return (
+    <CashuProofsPage
+      {...props}
+      cashuBulkCheckIsBusy={tokens.cashuBulkCheckIsBusy}
+      cashuIsBusy={cashuIsBusy}
+      cashuMeltToMainMintButtonLabel={cashuMeltToMainMintButtonLabel}
+      cashuProofs={proofs}
+      checkAllCashuTokensAndDeleteInvalid={
+        tokens.checkAllCashuTokensAndDeleteInvalid
+      }
+      checkIssuedCashuTokensAndDeleteClaimed={
+        tokens.checkIssuedCashuTokensAndDeleteClaimed
+      }
+      inspectCashuProofStates={inspectCashuProofStates}
+      meltLargestForeignMintToMainMint={meltToDefaultMint}
+      tokensRestoreIsBusy={tokens.tokensRestoreIsBusy}
+    />
   );
 };

@@ -29,6 +29,19 @@ export const testPlatformPorts = (
   ...overrides,
 });
 
+/** Ports over a key-value store whose items the test can inspect. */
+export const memoryKvPorts = (initial: Record<string, string> = {}) => {
+  const items = new Map(Object.entries(initial));
+  const ports = testPlatformPorts({
+    kv: {
+      getItem: (key) => items.get(key) ?? null,
+      setItem: (key, value) => void items.set(key, value),
+      removeItem: (key) => void items.delete(key),
+    },
+  });
+  return { items, ports };
+};
+
 export const signedInSession = (
   secrets: Partial<SessionSecrets> = {},
 ): SignedInSession => ({

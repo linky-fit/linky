@@ -22,10 +22,14 @@ import {
 } from "@linky-fit/ui";
 import type { Tone } from "@linky-fit/ui";
 import React from "react";
+import { useAtomValue } from "@linky-fit/linkstr-react";
+import { useNostrPictureByNpub } from "../app/hooks/contacts/useProfileCache";
 import {
-  useAppShellActions,
-  useAppShellCore,
-} from "../app/context/AppShellContexts";
+  useCopyText,
+  useDisplayAmounts,
+  useTranslation,
+} from "../app/hooks/shell";
+import { hiddenTransactionsShownAtom } from "../app/state/shell/topbar";
 import {
   FloatingActionButton,
   floatingActionButtonClearance,
@@ -350,14 +354,11 @@ const TransactionCardView = ({
 const TransactionCard = React.memo(TransactionCardView);
 
 export function TransactionsPage(): React.ReactElement {
-  const {
-    formatDisplayedAmountText,
-    lang,
-    nostrPictureByNpub,
-    showHiddenTransactions,
-    t,
-  } = useAppShellCore();
-  const { copyText } = useAppShellActions();
+  const { lang, t } = useTranslation();
+  const { formatDisplayedAmountText } = useDisplayAmounts();
+  const nostrPictureByNpub = useNostrPictureByNpub();
+  const showHiddenTransactions = useAtomValue(hiddenTransactionsShownAtom);
+  const copyText = useCopyText();
   const [expandedById, setExpandedById] = React.useState<
     Record<string, boolean>
   >({});

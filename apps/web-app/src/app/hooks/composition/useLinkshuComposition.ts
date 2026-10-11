@@ -1,17 +1,8 @@
 import { useAtomValue } from "@linky-fit/linkstr-react";
 import { Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
-import React from "react";
-import { isShownDeferredReceive } from "../../lib/cashuTransfers";
-import {
-  visibleWalletBalances,
-  withoutHiddenTestMints,
-} from "../../lib/testMintGate";
 import { linkshuCommandsAtom } from "../../state/linkshu/commands";
-import {
-  emptyReadModel,
-  walletReadModelAtom,
-} from "../../state/linkshu/readModel";
+import { useWalletInventory } from "../wallet/useWalletInventory";
 
 export type {
   AdoptPaidCashuQuote,
@@ -39,49 +30,19 @@ export type {
   StartCashuTopup,
 } from "../../state/linkshu/commands";
 
-interface UseLinkshuCompositionParams {
-  /** Off: test-mint proofs are left out of `walletBalances` and `walletProofs`. */
-  allowTestMints: boolean;
-}
-
 /**
  * The wallet UI's view of linkshu: the commands, null until the runtime is
  * up, and the inventory read model with test mints hidden as configured.
  */
-export const useLinkshuComposition = ({
-  allowTestMints,
-}: UseLinkshuCompositionParams) => {
+export const useLinkshuComposition = () => {
   const commands = Option.getOrNull(
     AsyncResult.value(useAtomValue(linkshuCommandsAtom)),
   );
-  const readModel = Option.getOrNull(
-    AsyncResult.value(useAtomValue(walletReadModelAtom)),
-  );
-  const model = readModel ?? emptyReadModel;
-
-  const walletBalances = React.useMemo(
-    () => visibleWalletBalances(model.balances, allowTestMints),
-    [allowTestMints, model.balances],
-  );
-  const walletProofs = React.useMemo(
-    () => withoutHiddenTestMints(model.proofs, allowTestMints),
-    [allowTestMints, model.proofs],
-  );
-  const walletDeferredReceives = React.useMemo(
-    () =>
-      withoutHiddenTestMints(
-        // Linky is sat-only: a non-sat deferral is neither shown nor
-        // discardable here, yet it still keeps its mint known.
-        model.operations.filter(isShownDeferredReceive),
-        allowTestMints,
-      ),
-    [allowTestMints, model.operations],
-  );
+  const inventory = useWalletInventory();
 
   return {
     adoptPaidCashuQuote: commands?.adoptPaidCashuQuote ?? null,
-    /** Every stored proof, test mints included; backups must not lose hidden funds. */
-    allWalletProofs: model.proofs,
+    allWalletProofs: inventory.allProofs,
     autoswapCashu: commands?.autoswapCashu ?? null,
     cashuEnvelopes: commands?.cashuEnvelopes ?? null,
     cashuTransferLifecycle: commands?.cashuTransferLifecycle ?? null,
@@ -103,13 +64,11 @@ export const useLinkshuComposition = ({
     resumePendingCashuTopups: commands?.resumePendingCashuTopups ?? null,
     sendCashuToken: commands?.sendCashuToken ?? null,
     startCashuTopup: commands?.startCashuTopup ?? null,
-    walletBalances,
-    /** Sat tokens kept for an unreachable mint, without hidden test mints. */
-    walletDeferredReceives,
-    /** True once the first inventory read answered; false shows as an empty wallet. */
-    walletLoaded: readModel !== null,
-    walletOperations: model.operations,
-    walletProofs,
-    walletTransfers: model.transfers,
+    walletBalances: inventory.balances,
+    walletDeferredReceives: inventory.deferredReceives,
+    walletLoaded: inventory.loaded,
+    walletOperations: inventory.operations,
+    walletProofs: inventory.proofs,
+    walletTransfers: inventory.transfers,
   };
 };

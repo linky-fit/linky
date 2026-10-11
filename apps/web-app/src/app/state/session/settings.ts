@@ -5,7 +5,7 @@ import { resolveAllowTestMints } from "../../lib/testMintGate";
 import { settingsRepositoryAtom } from "./store";
 
 /** A synced setting, re-read whenever the settings change. */
-const liveSettingAtom = <K extends SettingKey>(key: K) =>
+export const liveSettingAtom = <K extends SettingKey>(key: K) =>
   Atom.make((get) =>
     Effect.gen(function* () {
       const settings = yield* get.result(settingsRepositoryAtom);

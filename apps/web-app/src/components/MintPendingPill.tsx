@@ -1,5 +1,5 @@
 import { Icon, Pill } from "@linky-fit/ui";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 
 interface MintPendingPillProps {
   /** Sats waiting for their mint; they are not part of any balance. */
@@ -15,7 +15,8 @@ export function MintPendingPill({
   size = "md",
   onPress,
 }: MintPendingPillProps) {
-  const { formatDisplayedAmountText, t } = useAppShellCore();
+  const { t } = useTranslation();
+  const { formatDisplayedAmountText } = useDisplayAmounts();
   return (
     <Pill
       testID={testID}

@@ -6,13 +6,9 @@ import { createStoredProofFixture } from "../testUtils/cashuInventory";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { CashuTokenProofStatus } from "./CashuTokenProofStatus";
 
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellCore: () => ({
-    t: (key: string) => key,
-    lang: "en",
-    formatDisplayedAmountText: (amount: number) => `${amount} sat`,
-  }),
-}));
+vi.mock("../app/hooks/shell", async () =>
+  (await import("../testUtils/shellHooks")).shellHooksMock(),
+);
 
 const first = createStoredProofFixture({
   id: "AAAAAAAAAAAAAAAAAAAAAA",

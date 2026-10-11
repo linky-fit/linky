@@ -1,5 +1,5 @@
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useDisplayAmounts } from "../app/hooks/shell";
 import { readClipboardText } from "../platform/clipboard";
 
 interface AmountInputDraft {
@@ -40,7 +40,7 @@ export const useAmountInputKeypad = ({
     applyAmountInputKeyWithDraft,
     decimalAmountInputKeyVisible,
     displayCurrency,
-  } = useAppShellCore();
+  } = useDisplayAmounts();
   const [draft, setDraft] = React.useState<AmountInputDraft | null>(() =>
     initialDisplayValue === null
       ? null

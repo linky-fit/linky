@@ -9,6 +9,7 @@ import {
   TopupQuote,
   TopupReceipt,
 } from "@linky-fit/linkshu";
+import { AtomRegistry, RegistryContext } from "@linky-fit/linkstr-react";
 import { Result } from "effect";
 import { nip19 } from "nostr-tools";
 import React, { act } from "react";
@@ -28,7 +29,7 @@ vi.mock("../../../hooks/useRouting", () => ({
 }));
 
 import { parseCashuPaymentRequestMessage } from "../../lib/paymentRequestMessage";
-import { useTopupFlow } from "./useTopupFlow";
+import { useTopupFlow, useTopupInvoice } from "./useTopupFlow";
 
 const MINT_URL = "https://mint.example";
 const INVOICE = "lnbc2100n1pfakeinvoice";
@@ -81,7 +82,8 @@ const deferredHandle = (quote: TopupQuote): Deferred => {
   };
 };
 
-type Flow = ReturnType<typeof useTopupFlow>;
+type Flow = ReturnType<typeof useTopupFlow> &
+  ReturnType<typeof useTopupInvoice>;
 
 interface SetupOptions {
   resumePendingCashuTopups?: ResumePendingCashuTopups;
@@ -105,7 +107,6 @@ const setup = async ({
 
   const Harness = () => {
     const [currentRouteKind, setCurrentRouteKind] = React.useState(routeKind);
-    const topupPaidNavTimerRef = React.useRef<number | null>(null);
     const flow = useTopupFlow({
       cashuTotalBalance: 0,
       defaultMintUrl: MINT_URL,
@@ -120,17 +121,21 @@ const setup = async ({
       showPaidOverlay,
       startCashuTopup: startCashuTopup ?? null,
       t: (key) => key,
-      topupPaidNavTimerRef,
       topupRecipientNprofile,
     });
+    const invoice = useTopupInvoice();
     React.useEffect(() => {
-      flowRef.current = flow;
+      flowRef.current = { ...flow, ...invoice };
       setRouteKindRef.current = setCurrentRouteKind;
-    }, [flow]);
+    }, [flow, invoice]);
     return null;
   };
 
-  const { unmount } = await renderIntoDocument(<Harness />);
+  const { unmount } = await renderIntoDocument(
+    <RegistryContext.Provider value={AtomRegistry.make()}>
+      <Harness />
+    </RegistryContext.Provider>,
+  );
   const flow = () => {
     if (flowRef.current === null) throw new Error("flow hook did not mount");
     return flowRef.current;
