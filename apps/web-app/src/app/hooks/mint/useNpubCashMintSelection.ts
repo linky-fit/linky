@@ -4,27 +4,23 @@ import {
   UnixSeconds,
 } from "@linky-fit/linkstr";
 import React from "react";
-import {
-  CASHU_DEFAULT_MINT_OVERRIDE_STORAGE_KEY,
-  normalizeMintUrl,
-} from "../../../utils/mint";
+import { normalizeMintUrl } from "../../../utils/mint";
 import {
   isNpubCashDisabled,
   NPUB_CASH_SERVER_BASE_URL,
 } from "../../../utils/npubCashServer";
-import { safeLocalStorageSet } from "../../../utils/storage";
 import { nowSeconds } from "../../../utils/time";
 import type { Translate } from "../../../i18n";
+import type { WriteOutcome } from "../../lib/storeWrite";
+import type { DefaultMintChoice } from "../../state/wallet/defaultMint";
 
 interface UseNpubCashMintSelectionParams {
   currentNpub: string | null;
   currentNsec: string | null;
-  defaultMintUrl: string | null;
-  hasMintOverrideRef: React.RefObject<boolean>;
-  makeLocalStorageKey: (prefix: string) => string;
+  defaultMintChoice: DefaultMintChoice;
   npubCashMintSyncRef: React.RefObject<string | null>;
   pushToast: (message: string) => void;
-  setDefaultMintUrl: React.Dispatch<React.SetStateAction<string | null>>;
+  setDefaultMint: (mint: string) => Promise<WriteOutcome>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   t: Translate;
 }
@@ -32,12 +28,10 @@ interface UseNpubCashMintSelectionParams {
 export const useNpubCashMintSelection = ({
   currentNpub,
   currentNsec,
-  defaultMintUrl,
-  hasMintOverrideRef,
-  makeLocalStorageKey,
+  defaultMintChoice,
   npubCashMintSyncRef,
   pushToast,
-  setDefaultMintUrl,
+  setDefaultMint,
   setStatus,
   t,
 }: UseNpubCashMintSelectionParams) => {
@@ -111,21 +105,16 @@ export const useNpubCashMintSelection = ({
         return false;
       }
 
-      const key = makeLocalStorageKey(CASHU_DEFAULT_MINT_OVERRIDE_STORAGE_KEY);
-      safeLocalStorageSet(key, cleaned);
-      hasMintOverrideRef.current = true;
-      setDefaultMintUrl(cleaned);
       npubCashMintSyncRef.current = cleaned;
+      await setDefaultMint(cleaned);
 
       setStatus(t("mintSaved"));
       return true;
     },
     [
-      hasMintOverrideRef,
-      makeLocalStorageKey,
       npubCashMintSyncRef,
       pushToast,
-      setDefaultMintUrl,
+      setDefaultMint,
       setStatus,
       t,
       updateNpubCashMint,
@@ -133,21 +122,16 @@ export const useNpubCashMintSelection = ({
   );
 
   React.useEffect(() => {
-    const cleaned = normalizeMintUrl(defaultMintUrl ?? "");
+    const cleaned = normalizeMintUrl(defaultMintChoice.mint ?? "");
     if (!cleaned) return;
-    if (!hasMintOverrideRef.current) return;
+    if (!defaultMintChoice.chosen) return;
     if (npubCashMintSyncRef.current === cleaned) return;
 
     npubCashMintSyncRef.current = cleaned;
     void updateNpubCashMint(cleaned).catch(() => {
       npubCashMintSyncRef.current = null;
     });
-  }, [
-    defaultMintUrl,
-    hasMintOverrideRef,
-    npubCashMintSyncRef,
-    updateNpubCashMint,
-  ]);
+  }, [defaultMintChoice, npubCashMintSyncRef, updateNpubCashMint]);
 
   return {
     applyDefaultMintSelection,

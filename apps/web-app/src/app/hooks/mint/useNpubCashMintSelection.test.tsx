@@ -2,15 +2,14 @@ import React, { act } from "react";
 import { nip19 } from "nostr-tools";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
-import { CASHU_DEFAULT_MINT_OVERRIDE_STORAGE_KEY } from "../../../utils/mint";
+import type { WriteOutcome } from "../../lib/storeWrite";
 import { useNpubCashMintSelection } from "./useNpubCashMintSelection";
 
 interface SelectionHarnessProps {
   applyRef: React.RefObject<((mintUrl: string) => Promise<boolean>) | null>;
   defaultMintUrl: string;
-  makeLocalStorageKey: (prefix: string) => string;
   pushToast: (message: string) => void;
-  setDefaultMintUrl: React.Dispatch<React.SetStateAction<string | null>>;
+  setDefaultMint: (mint: string) => Promise<WriteOutcome>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
@@ -21,22 +20,21 @@ const validNsec = nip19.nsecEncode(
 const SelectionHarness = ({
   applyRef,
   defaultMintUrl,
-  makeLocalStorageKey,
   pushToast,
-  setDefaultMintUrl,
+  setDefaultMint,
   setStatus,
 }: SelectionHarnessProps): null => {
-  const hasMintOverrideRef = React.useRef(false);
   const npubCashMintSyncRef = React.useRef<string | null>(null);
   const { applyDefaultMintSelection } = useNpubCashMintSelection({
     currentNpub: "npub-test",
     currentNsec: validNsec,
-    defaultMintUrl,
-    hasMintOverrideRef,
-    makeLocalStorageKey,
+    defaultMintChoice: React.useMemo(
+      () => ({ mint: defaultMintUrl, chosen: false }),
+      [defaultMintUrl],
+    ),
     npubCashMintSyncRef,
     pushToast,
-    setDefaultMintUrl,
+    setDefaultMint,
     setStatus,
     t: (key) => key,
   });
@@ -63,11 +61,11 @@ const renderSelectionHarness = async ({
   defaultMintUrl = "https://cashu.cz",
 }: RenderSelectionHarnessOptions = {}) => {
   const pushToast = vi.fn();
-  const setDefaultMintUrl =
-    vi.fn<React.Dispatch<React.SetStateAction<string | null>>>();
+  const setDefaultMint = vi.fn<(mint: string) => Promise<WriteOutcome>>(
+    async () => ({ ok: true }),
+  );
   const setStatus =
     vi.fn<React.Dispatch<React.SetStateAction<string | null>>>();
-  const makeLocalStorageKey = (prefix: string): string => `${prefix}.owner`;
   const applyRef = React.createRef<
     ((mintUrl: string) => Promise<boolean>) | null
   >();
@@ -76,19 +74,17 @@ const renderSelectionHarness = async ({
     <SelectionHarness
       applyRef={applyRef}
       defaultMintUrl={defaultMintUrl}
-      makeLocalStorageKey={makeLocalStorageKey}
       pushToast={pushToast}
-      setDefaultMintUrl={setDefaultMintUrl}
+      setDefaultMint={setDefaultMint}
       setStatus={setStatus}
     />,
   );
 
   return {
     applyRef,
-    makeLocalStorageKey,
     pushToast,
     root,
-    setDefaultMintUrl,
+    setDefaultMint,
     setStatus,
   };
 };
@@ -110,12 +106,7 @@ describe("useNpubCashMintSelection", () => {
       await readApplyMintSelection(harness.applyRef)("https://kashu.me");
     });
 
-    expect(
-      localStorage.getItem(
-        harness.makeLocalStorageKey(CASHU_DEFAULT_MINT_OVERRIDE_STORAGE_KEY),
-      ),
-    ).toBeNull();
-    expect(harness.setDefaultMintUrl).not.toHaveBeenCalled();
+    expect(harness.setDefaultMint).not.toHaveBeenCalled();
     expect(harness.pushToast).toHaveBeenCalledWith("mintUpdateFailed");
 
     await act(async () => {
@@ -134,12 +125,7 @@ describe("useNpubCashMintSelection", () => {
       await readApplyMintSelection(harness.applyRef)("https://kashu.me");
     });
 
-    expect(
-      localStorage.getItem(
-        harness.makeLocalStorageKey(CASHU_DEFAULT_MINT_OVERRIDE_STORAGE_KEY),
-      ),
-    ).toBe("https://kashu.me");
-    expect(harness.setDefaultMintUrl).toHaveBeenCalledWith("https://kashu.me");
+    expect(harness.setDefaultMint).toHaveBeenCalledWith("https://kashu.me");
     expect(harness.setStatus).toHaveBeenLastCalledWith("mintSaved");
 
     await act(async () => {

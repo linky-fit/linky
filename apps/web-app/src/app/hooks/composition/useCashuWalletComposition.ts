@@ -37,7 +37,6 @@ import {
 } from "../../../lnurlPay";
 import { recommendedNostrRelays } from "../../../utils/nostrRelays";
 import {
-  CASHU_ONBOARDING_SET_MAIN_MINT_STORAGE_KEY,
   CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY,
   WALLET_WARNING_BALANCE_THRESHOLD_SAT,
   WALLET_WARNING_DISMISSED_STORAGE_KEY,
@@ -54,7 +53,6 @@ import {
   getLightningInvoicePreview,
   isAllowedPaymentRequestPostUrl,
   mintMoveCovers,
-  planMintMove,
   planSendMint,
   postPaymentRequestPayload,
   type LightningInvoicePreview,
@@ -66,12 +64,9 @@ import {
   type TransactionsRepository,
 } from "@linky-fit/linksync";
 import {
-  CASHU_DEFAULT_MINT_OVERRIDE_STORAGE_KEY,
-  effectiveDefaultMintUrl,
   formatMintHost,
   MAIN_MINT_URL,
   normalizeMintUrl,
-  toMintUrl,
 } from "../../../utils/mint";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import { parseNpubCashProfileInfo } from "../../../utils/npubCashInfo";
@@ -80,7 +75,6 @@ import {
   getInitialPayWithCashuEnabled,
   getInitialReceiveMethod,
   safeLocalStorageGet,
-  safeLocalStorageRemove,
   safeLocalStorageSet,
 } from "../../../utils/storage";
 import { getUnknownErrorMessage } from "../../../utils/unknown";
@@ -103,6 +97,8 @@ import { useLightningPaymentsDomain } from "../useLightningPaymentsDomain";
 import { useMintDomain } from "../useMintDomain";
 import { useAllowTestMints } from "../useAllowTestMints";
 import { useMoveMintFunds } from "../mint/useMoveMintFunds";
+import { planDefaultMintMove } from "../../state/wallet/moveFunds";
+import { useDefaultMint } from "../wallet/useDefaultMint";
 import { useWalletOps } from "../wallet/useWalletOps";
 import { useOwnerStorage, usePaymentLog } from "../wallet/useWalletStorage";
 import { usePaidOverlayState } from "../usePaidOverlayState";
@@ -140,11 +136,8 @@ import { drainLegacyAcceptedCashuToken } from "../../migrations/legacyAcceptedTo
 import { useLinkshuComposition } from "./useLinkshuComposition";
 import {
   useAccountHydrated,
-  useSetting,
   useRecurringPaymentsRepository,
-  useSettingsRepository,
 } from "../useLinksync";
-import { runWrite } from "../../lib/storeWrite";
 import { useMeltRecovery } from "../payments/useMeltRecovery";
 import { useRecurringPaymentsActions } from "../payments/useRecurringPaymentsActions";
 import { useRecurringPaymentsScheduler } from "../payments/useRecurringPaymentsScheduler";
@@ -273,7 +266,6 @@ export const useCashuWalletComposition = ({
   t,
   transactions,
 }: UseCashuWalletCompositionParams) => {
-  const settingsRepository = useSettingsRepository();
   const recurringPaymentsRepository = useRecurringPaymentsRepository();
   const accountHydrated = useAccountHydrated();
   const { allowTestMints, setAllowTestMints } = useAllowTestMints();
@@ -316,7 +308,12 @@ export const useCashuWalletComposition = ({
     rememberSeenMint,
   } = useOwnerStorage();
 
-  const hasMintOverrideRef = React.useRef(false);
+  const {
+    defaultMintChoice,
+    defaultMintUrl,
+    setDefaultMint,
+    suggestDefaultMint,
+  } = useDefaultMint();
 
   const [payWithCashuEnabled, setPayWithCashuEnabled] = useState<boolean>(() =>
     getInitialPayWithCashuEnabled(),
@@ -332,42 +329,6 @@ export const useCashuWalletComposition = ({
     makeLocalStorageKey,
   });
 
-  React.useEffect(() => {
-    if (!appOwnerId) return;
-    const overrideKey = makeLocalStorageKey(
-      CASHU_DEFAULT_MINT_OVERRIDE_STORAGE_KEY,
-    );
-    const overrideRaw = safeLocalStorageGet(overrideKey);
-    const override = normalizeMintUrl(overrideRaw);
-    const shouldSeedMainMint =
-      safeLocalStorageGet(CASHU_ONBOARDING_SET_MAIN_MINT_STORAGE_KEY) === "1";
-
-    if (!override && shouldSeedMainMint) {
-      const seededMint = normalizeMintUrl(MAIN_MINT_URL);
-      if (seededMint) {
-        safeLocalStorageSet(overrideKey, seededMint);
-        safeLocalStorageRemove(CASHU_ONBOARDING_SET_MAIN_MINT_STORAGE_KEY);
-        hasMintOverrideRef.current = true;
-        setDefaultMintUrl(seededMint);
-        // Mirror the onboarding-seeded value into Evolu so a brand-new
-        // account converges to cashu.cz across devices even before the user
-        // touches the mint UI.
-        upsertDefaultMintToOwnerMetaRef.current(seededMint);
-        return;
-      }
-    }
-
-    if (override) {
-      hasMintOverrideRef.current = true;
-      setDefaultMintUrl(override);
-    } else {
-      if (shouldSeedMainMint) {
-        safeLocalStorageRemove(CASHU_ONBOARDING_SET_MAIN_MINT_STORAGE_KEY);
-      }
-      hasMintOverrideRef.current = false;
-    }
-  }, [appOwnerId, makeLocalStorageKey]);
-
   const [cashuDraft, setCashuDraft] = useState("");
   const cashuDraftRef = React.useRef<ComponentRef<typeof TextField>>(null);
   const [cashuEmitAmount, setCashuEmitAmount] = useState("");
@@ -381,14 +342,6 @@ export const useCashuWalletComposition = ({
   const [tokensRestoreIsBusy, setTokensRestoreIsBusy] = useState(false);
   const [tokensRestoreProgress, setTokensRestoreProgress] =
     useState<RestoreProgress | null>(null);
-
-  const [storedDefaultMintUrl, setDefaultMintUrl] = useState<string | null>(
-    null,
-  );
-  const defaultMintUrl = effectiveDefaultMintUrl(
-    storedDefaultMintUrl,
-    allowTestMints,
-  );
 
   const [lnAddressPayAmount, setLnAddressPayAmount] = useState<string>("");
   const [lnAddressPayNote, setLnAddressPayNote] = useState<string>("");
@@ -413,9 +366,6 @@ export const useCashuWalletComposition = ({
     fromMint: string;
     toMint: string;
   } | null>(null);
-  const meltLargestForeignMintToMainMintRef = React.useRef<() => Promise<void>>(
-    async () => {},
-  );
   const [lnurlWithdrawIsBusy, setLnurlWithdrawIsBusy] = useState(false);
 
   const npubCashClaimInFlightRef = React.useRef(false);
@@ -433,63 +383,6 @@ export const useCashuWalletComposition = ({
   } = usePaidOverlayState({
     t,
   });
-
-  // Default mint cross-tab + cross-device sync through the synced
-  // `defaultMint` setting (the per-owner localStorage override is tab-local).
-  const syncedDefaultMintValue = useSetting("defaultMint");
-  const ownerMetaDefaultMintValue = React.useMemo(
-    () => normalizeMintUrl(syncedDefaultMintValue ?? "") || null,
-    [syncedDefaultMintValue],
-  );
-
-  // setting -> local state: when another tab/device wrote a different
-  // default mint, pick it up here. This is the ONLY direction watched as an
-  // effect. A symmetric `defaultMintUrl -> setting` watcher would
-  // ping-pong with the remote: in the same render where this effect queues
-  // setDefaultMintUrl(remoteValue), the symmetric effect would read the
-  // STALE local `defaultMintUrl` and write it back, racing with the remote
-  // value. Two devices in this state oscillate every few ms (visible in the
-  // setting's CRDT history). Explicit pushes happen instead from
-  // `upsertDefaultMintToOwnerMeta` called by user actions and the seed
-  // effect.
-  React.useEffect(() => {
-    if (!ownerMetaDefaultMintValue) return;
-    if (!appOwnerId) return;
-    const current = normalizeMintUrl(storedDefaultMintUrl ?? "");
-    if (current === ownerMetaDefaultMintValue) return;
-    setDefaultMintUrl(ownerMetaDefaultMintValue);
-    hasMintOverrideRef.current = true;
-    try {
-      const overrideKey = makeLocalStorageKey(
-        CASHU_DEFAULT_MINT_OVERRIDE_STORAGE_KEY,
-      );
-      safeLocalStorageSet(overrideKey, ownerMetaDefaultMintValue);
-    } catch {
-      // ignore
-    }
-  }, [
-    appOwnerId,
-    makeLocalStorageKey,
-    ownerMetaDefaultMintValue,
-    storedDefaultMintUrl,
-  ]);
-
-  const upsertDefaultMintToOwnerMeta = React.useCallback(
-    (mintUrl: string | null | undefined) => {
-      const cleaned = normalizeMintUrl(mintUrl ?? "");
-      if (!cleaned) return;
-      if (cleaned === ownerMetaDefaultMintValue) return;
-      void runWrite(settingsRepository.set("defaultMint", cleaned));
-    },
-    [ownerMetaDefaultMintValue, settingsRepository],
-  );
-
-  const upsertDefaultMintToOwnerMetaRef = React.useRef(
-    upsertDefaultMintToOwnerMeta,
-  );
-  React.useEffect(() => {
-    upsertDefaultMintToOwnerMetaRef.current = upsertDefaultMintToOwnerMeta;
-  }, [upsertDefaultMintToOwnerMeta]);
 
   React.useEffect(() => {
     migrateLegacyPaymentEvents();
@@ -513,20 +406,17 @@ export const useCashuWalletComposition = ({
   const {
     adoptPaidCashuQuote,
     allWalletProofs,
-    autoswapCashu,
     cashuEnvelopes,
     cashuTransferLifecycle,
     checkAllCashuTokens,
     inspectCashuProofStates,
     checkCashuTransfer,
-    estimateAutoswapCashu,
     fetchMintInfo,
     meltCashuInvoice,
     probeLightningFee,
     receiveCashuToken,
     restoreCashuTokens,
     reclaimCashuTokens,
-    resolveAutoswapSource,
     resumeDeferredCashuReceives,
     resumePendingCashuAutoswapClaims,
     resumePendingCashuMelts,
@@ -650,31 +540,13 @@ export const useCashuWalletComposition = ({
   const cashuTotalBalance: number = walletBalances.total;
   const cashuBalance: number = walletBalances.spendable;
 
-  // linkshu's per-mint balances re-keyed into the app's canonical mint-url
-  // vocabulary, which the mint-selection and melt-planning logic compares by.
-  const cashuAcceptedMintBalances = useMemo(() => {
-    const balances = new Map<string, number>();
-    for (const { amount, mint } of walletBalances.perMint) {
-      const key = normalizeMintUrl(mint);
-      if (!key) continue;
-      balances.set(key, (balances.get(key) ?? 0) + amount);
-    }
-    return balances;
-  }, [walletBalances]);
+  const paymentMintMeltPlan = React.useMemo(
+    () => planDefaultMintMove(walletBalances.perMint, defaultMintUrl),
+    [defaultMintUrl, walletBalances.perMint],
+  );
 
-  const paymentMintMeltPlan = React.useMemo(() => {
-    const toMint = toMintUrl(defaultMintUrl ?? MAIN_MINT_URL);
-    if (toMint === null) return null;
-    return planMintMove({
-      toMint,
-      balances: Array.from(cashuAcceptedMintBalances).flatMap(
-        ([key, amount]) => {
-          const mint = toMintUrl(key);
-          return mint === null ? [] : [{ mint, amount }];
-        },
-      ),
-    });
-  }, [cashuAcceptedMintBalances, defaultMintUrl]);
+  const { estimateMintMove, meltToDefaultMint, moveMintFunds } =
+    useMoveMintFunds({ formatDisplayedAmountParts, setStatus, t });
 
   const cashuBalanceAfterMelt = Math.max(
     cashuBalance,
@@ -703,7 +575,9 @@ export const useCashuWalletComposition = ({
     [cashuBalance, paymentMintMeltPlan],
   );
 
-  const cashuHasMultipleAcceptedMints = cashuAcceptedMintBalances.size > 1;
+  const cashuHasMultipleAcceptedMints =
+    new Set(walletBalances.perMint.map(({ mint }) => normalizeMintUrl(mint)))
+      .size > 1;
 
   const canPayWithCashu = cashuBalance > 0;
 
@@ -748,35 +622,18 @@ export const useCashuWalletComposition = ({
     }
   }, [defaultMintUrl]);
 
-  const {
-    applyDefaultMintSelection: applyDefaultMintSelectionInner,
-    makeNip98AuthHeader,
-  } = useNpubCashMintSelection({
-    currentNpub,
-    currentNsec,
-    // npub.cash keeps the stored choice; the test-mint fallback stays local.
-    defaultMintUrl: storedDefaultMintUrl,
-    hasMintOverrideRef,
-    makeLocalStorageKey,
-    npubCashMintSyncRef,
-    pushToast,
-    setDefaultMintUrl,
-    setStatus,
-    t,
-  });
-
-  const applyDefaultMintSelection = React.useCallback(
-    async (mintUrl: string): Promise<boolean> => {
-      const applied = await applyDefaultMintSelectionInner(mintUrl);
-      if (!applied) return false;
-      // Mirror the user's explicit choice into Evolu's ownerMeta so other
-      // tabs/devices converge. Done here (not in a defaultMintUrl-watch
-      // effect) to avoid stale-closure ping-pong with the remote.
-      upsertDefaultMintToOwnerMetaRef.current(mintUrl);
-      return true;
-    },
-    [applyDefaultMintSelectionInner],
-  );
+  const { applyDefaultMintSelection, makeNip98AuthHeader } =
+    useNpubCashMintSelection({
+      currentNpub,
+      currentNsec,
+      // npub.cash keeps the stored choice; the test-mint fallback stays local.
+      defaultMintChoice,
+      npubCashMintSyncRef,
+      pushToast,
+      setDefaultMint,
+      setStatus,
+      t,
+    });
 
   React.useEffect(() => {
     if (isNpubCashDisabled() || !currentNpub || !currentNsec) {
@@ -867,15 +724,14 @@ export const useCashuWalletComposition = ({
     claimNpubCashOnceLatestRef,
     currentNpub,
     currentNsec,
-    hasMintOverrideRef,
     makeNip98AuthHeader,
     networkEnabled: nostrBootstrapReady,
     npubCashInfoInFlightRef,
     npubCashInfoLoadedAtMsRef,
     npubCashInfoLoadedForNpubRef,
     routeKind: route.kind,
-    setDefaultMintUrl,
     setIsProfileEditing,
+    suggestDefaultMint,
   });
 
   const [contactPayMethod, setContactPayMethod] = useState<
@@ -2282,93 +2138,6 @@ export const useCashuWalletComposition = ({
     ],
   );
 
-  const meltLargestForeignMintToMainMint = React.useCallback(async () => {
-    if (cashuIsBusy) return;
-
-    const targetMint = normalizeMintUrl(defaultMintUrl ?? MAIN_MINT_URL);
-    if (!targetMint) {
-      setStatus(t("mintUrlInvalid"));
-      return;
-    }
-
-    const plan = paymentMintMeltPlan;
-    if (!plan || autoswapCashu === null || resolveAutoswapSource === null) {
-      setStatus(t("cashuMeltToMainMintUnavailable"));
-      return;
-    }
-
-    await runExclusive(async () => {
-      setStatus(t("cashuMeltToMainMintProcessing"));
-      try {
-        rememberSeenMint(targetMint);
-        const outcome = await autoswapCashu({
-          sourceMint: await resolveAutoswapSource(plan.fromMint),
-          targetMint,
-        });
-
-        if (Result.isSuccess(outcome)) {
-          const moved = formatDisplayedAmountParts(outcome.success.movedAmount);
-          setStatus(
-            t("cashuMeltToMainMintDone")
-              .replace("{amount}", `${moved.approxPrefix}${moved.amountText}`)
-              .replace("{unit}", moved.unitLabel)
-              .replace("{mint}", formatMintHost(targetMint)),
-          );
-          return;
-        }
-
-        const error = outcome.failure;
-        // PaymentFailed carrying the target mint means the melt already paid
-        // the target's invoice but the claim did not finish; the persisted
-        // pending claim completes it via resumePendingClaims.
-        if (
-          error._tag === "PaymentFailed" &&
-          normalizeMintUrl(error.mint) === targetMint
-        ) {
-          const pending = formatDisplayedAmountParts(plan.sourceBalance);
-          setStatus(
-            t("cashuMeltToMainMintPending")
-              .replace(
-                "{amount}",
-                `${pending.approxPrefix}${pending.amountText}`,
-              )
-              .replace("{unit}", pending.unitLabel),
-          );
-          return;
-        }
-
-        setStatus(
-          `${t("cashuMeltToMainMintFailed")}: ${
-            describeTaggedCashuError(error) ?? error._tag
-          }`,
-        );
-      } catch (error) {
-        setStatus(
-          `${t("cashuMeltToMainMintFailed")}: ${getUnknownErrorMessage(
-            error,
-            "unknown",
-          )}`,
-        );
-      }
-    });
-  }, [
-    autoswapCashu,
-    cashuIsBusy,
-    defaultMintUrl,
-    formatDisplayedAmountParts,
-    paymentMintMeltPlan,
-    rememberSeenMint,
-    resolveAutoswapSource,
-    runExclusive,
-    setStatus,
-    t,
-  ]);
-
-  React.useEffect(() => {
-    meltLargestForeignMintToMainMintRef.current =
-      meltLargestForeignMintToMainMint;
-  }, [meltLargestForeignMintToMainMint]);
-
   const closePaymentMintMeltConfirmation = React.useCallback(() => {
     if (cashuIsBusy) return;
     setPendingPaymentMintMeltConfirmation(null);
@@ -2377,8 +2146,8 @@ export const useCashuWalletComposition = ({
   const confirmPaymentMintMelt = React.useCallback(async () => {
     if (cashuIsBusy) return;
     setPendingPaymentMintMeltConfirmation(null);
-    await meltLargestForeignMintToMainMintRef.current();
-  }, [cashuIsBusy]);
+    await meltToDefaultMint();
+  }, [cashuIsBusy, meltToDefaultMint]);
 
   useResumeOnLaunchAndOnline(
     React.useMemo(() => {
@@ -2614,17 +2383,6 @@ export const useCashuWalletComposition = ({
     return npub ? (nostrPictureByNpub[npub] ?? null) : null;
   }, [knownLnAddressPayContact, nostrPictureByNpub]);
 
-  const { estimateMintMove, moveMintFunds } = useMoveMintFunds({
-    autoswapCashu,
-    estimateAutoswapCashu,
-    formatDisplayedAmountParts,
-    rememberSeenMint,
-    resolveAutoswapSource,
-    runExclusive,
-    setStatus,
-    t,
-  });
-
   return {
     recurringPaymentsContext,
     reclaimCashuTransfer,
@@ -2685,7 +2443,7 @@ export const useCashuWalletComposition = ({
     markCashuTokenExternalized,
     markCashuTokenIssued,
     markMintIconFailed,
-    meltLargestForeignMintToMainMint,
+    meltLargestForeignMintToMainMint: meltToDefaultMint,
     mintInfoByUrl,
     moveMintFunds,
     closeCashuPaymentRequestConfirmation,

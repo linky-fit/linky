@@ -74,6 +74,7 @@ import type {
   TopupReceipt,
   TransferCheckResult,
   ValidationReport,
+  WalletBalances,
 } from "@linky-fit/linkshu";
 import { Effect, Schema, Scope } from "effect";
 import type { Result } from "effect";
@@ -250,6 +251,9 @@ export type EstimateAutoswapCashu = (
 type ResumePendingCashuAutoswapClaims = () => Promise<
   ReadonlyArray<AutoswapClaimResult>
 >;
+
+/** The wallet's balances as stored now (`Tokens.balances`), test mints included. */
+export type ReadWalletBalances = () => Promise<WalletBalances>;
 
 /** Read-only mint status of every unspent proof, for the Tokens page. */
 export type InspectCashuProofStates = () => Promise<
@@ -541,6 +545,9 @@ const makeLinkshuCommands = (run: LinkshuRun) => {
       }),
     );
 
+  const readWalletBalances: ReadWalletBalances = () =>
+    run(Effect.flatMap(Tokens, (tokens) => tokens.balances));
+
   const inspectCashuProofStates: InspectCashuProofStates = () =>
     run(
       Effect.flatMap(Validation, (validation) => validation.inspectProofStates),
@@ -698,6 +705,7 @@ const makeLinkshuCommands = (run: LinkshuRun) => {
     fetchMintInfo,
     meltCashuInvoice,
     probeLightningFee,
+    readWalletBalances,
     receiveCashuToken,
     restoreCashuTokens,
     reclaimCashuTokens,
@@ -721,3 +729,5 @@ export const linkshuCommandsAtom = Atom.readable((get) =>
     makeLinkshuCommands(Effect.runPromiseWith(context)),
   ),
 );
+
+export type LinkshuCommands = ReturnType<typeof makeLinkshuCommands>;
