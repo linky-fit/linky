@@ -1,58 +1,55 @@
+import { useAtom, useAtomValue } from "@linky-fit/linkstr-react";
 import { Stack } from "@linky-fit/ui";
 import React from "react";
+import { ContactCard } from "../../components/ContactCard";
 import { ContactsChecklist } from "../../components/ContactsChecklist";
 import {
   FloatingActionButton,
   floatingActionButtonClearance,
 } from "../../components/FloatingActionButton";
-import type { Translate } from "../../i18n";
+import { useRouting } from "../../hooks/useRouting";
 import { ContactsPage } from "../../pages/ContactsPage";
 import { WalletPage } from "../../pages/WalletPage";
-import type { Route } from "../../types/route";
+import { createContactNameFormatter } from "../../utils/contactName";
+import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
 import { nowSeconds } from "../../utils/time";
-import { useMainTabRoutes } from "../context/AppShellContexts";
+import {
+  useOpenContactDetail,
+  useOpenNewContactPage,
+} from "../hooks/contacts/useContactActions";
+import { useContactsListView } from "../hooks/contacts/useContactsList";
+import {
+  useDisplayContacts,
+  useNostrStatusByNpub,
+  useNpubMessageContactInfo,
+  type DisplayContact,
+} from "../hooks/contacts/useDisplayContacts";
+import { useNostrPictureByNpub } from "../hooks/contacts/useProfileCache";
+import { useStartContactsGuide } from "../hooks/guide/useContactsGuideControls";
+import { useContactsOnboarding } from "../hooks/guide/useContactsOnboarding";
+import { useMintIcons } from "../hooks/mint/useMintInfo";
+import { useTranslation } from "../hooks/shell";
+import { useScanCommands, useScanIsOpen } from "../hooks/shell/scan";
+import { useActiveBankPaymentOfferContacts } from "../hooks/useBankPaymentOffers";
+import { useOpenFeedbackContact } from "../hooks/useFeedbackContact";
+import { useCashuTokenMessageInfo } from "../hooks/wallet/useWalletInventory";
+import { useTokenContactSend } from "../hooks/wallet/useWalletTokens";
+import { parsePrivateImageMessage } from "../lib/privateImageMessage";
+import {
+  activeContactGroupAtom,
+  contactsFilterOpenAtom,
+  contactsSearchAtom,
+  contactsSearchInputRefAtom,
+  unreadByContactIdAtom,
+} from "../state/contacts/contactsList";
+import { lastVisibleMessageByContactIdAtom } from "../state/contacts/displayContacts";
 import type { ContactRowLike, ContactsGuideKey } from "../types/appTypes";
+import { getDesktopActiveContactId } from "./desktopRouteSection";
 
 type ActiveBankPaymentOfferContacts = (nowSec: number) => {
   contactIds: ReadonlySet<string>;
   nextExpiryAtSec: number | null;
 };
-
-export interface MainTabRouteProps {
-  activeGroup: string | null;
-  activeBankPaymentOfferContacts: ActiveBankPaymentOfferContacts;
-  contactsOnboardingCelebrating: boolean;
-  contactsOnboardingTasks: {
-    done: number;
-    percent: number;
-    tasks: ReadonlyArray<{ done: boolean; key: string; label: string }>;
-    total: number;
-  };
-  contactsFilterOpen: boolean;
-  contactsSearch: string;
-  contactsSearchInputRef: React.RefObject<HTMLInputElement | null>;
-  contactFilterOptions: Array<{ count: number; label: string; value: string }>;
-  conversationsLabel: string;
-  dismissContactsOnboarding: () => void;
-  openFeedbackContact: () => void;
-  openNewContactPage: () => void;
-  openWalletScan: () => void;
-  otherContactsLabel: string;
-  renderContactCard: (contact: ContactRowLike) => React.ReactNode;
-  route: Route;
-  scanIsOpen: boolean;
-  setActiveGroup: (group: string | null) => void;
-  setContactsSearch: (value: string) => void;
-  showContactsOnboarding: boolean;
-  showGroupFilter: boolean;
-  startContactsGuide: (task: ContactsGuideKey) => void;
-  t: Translate;
-  visibleContacts: {
-    conversations: ContactRowLike[];
-    others: ContactRowLike[];
-    pinned: ContactRowLike[];
-  };
-}
 
 const isContactsGuideKey = (value: string): value is ContactsGuideKey =>
   value === "add_contact" ||
@@ -70,7 +67,11 @@ interface VisibleContactSections {
 
 const useVisibleContactSections = (
   activeBankPaymentOfferContacts: ActiveBankPaymentOfferContacts,
-  visibleContacts: MainTabRouteProps["visibleContacts"],
+  visibleContacts: {
+    conversations: ContactRowLike[];
+    others: ContactRowLike[];
+    pinned: ContactRowLike[];
+  },
 ): VisibleContactSections => {
   const [nowSec, setNowSec] = React.useState(() => nowSeconds());
   const activeOffers = React.useMemo(
@@ -80,11 +81,11 @@ const useVisibleContactSections = (
 
   React.useEffect(() => {
     if (activeOffers.nextExpiryAtSec === null) return;
-    const timeoutId = window.setTimeout(
+    const timeoutId = setTimeout(
       () => setNowSec(nowSeconds()),
       Math.max(0, activeOffers.nextExpiryAtSec * 1_000 - Date.now() + 25),
     );
-    return () => window.clearTimeout(timeoutId);
+    return () => clearTimeout(timeoutId);
   }, [activeOffers.nextExpiryAtSec]);
 
   return React.useMemo(() => {
@@ -112,35 +113,113 @@ const useVisibleContactSections = (
   }, [activeOffers.contactIds, visibleContacts]);
 };
 
+/** A contact row with its last message and avatar; picking it sends a pending token there. */
+const useContactCardRenderer = () => {
+  const route = useRouting();
+  const { displayContactById } = useDisplayContacts();
+  const nostrPictureByNpub = useNostrPictureByNpub();
+  const nostrStatusByNpub = useNostrStatusByNpub();
+  const lastMessageByContactId = useAtomValue(
+    lastVisibleMessageByContactIdAtom,
+  );
+  const unreadByContactId = useAtomValue(unreadByContactIdAtom);
+  const getCashuTokenMessageInfo = useCashuTokenMessageInfo();
+  const { getMintIconUrl, markMintIconFailed } = useMintIcons();
+  const getNpubMessageContactInfo = useNpubMessageContactInfo();
+  const { pendingCashuTokenContactPickId, sendCashuTokenToContact } =
+    useTokenContactSend();
+  const openContactDetail = useOpenContactDetail();
+
+  const formatContactName = React.useMemo(
+    () => createContactNameFormatter(Array.from(displayContactById.values())),
+    [displayContactById],
+  );
+
+  const handleSelectContact = React.useCallback(
+    (contact: DisplayContact) => {
+      if (pendingCashuTokenContactPickId) {
+        void sendCashuTokenToContact(contact, pendingCashuTokenContactPickId);
+        return;
+      }
+      openContactDetail(contact);
+    },
+    [
+      openContactDetail,
+      pendingCashuTokenContactPickId,
+      sendCashuTokenToContact,
+    ],
+  );
+
+  return React.useCallback(
+    (row: ContactRowLike): React.ReactNode => {
+      const id = (row.id ?? "").trim();
+      const contact = id ? displayContactById.get(id) : undefined;
+      if (!contact) return null;
+      const npub = normalizeNpubIdentifier(contact.npub ?? "");
+      const last = lastMessageByContactId.get(id);
+      const lastText = (last?.content ?? "").trim();
+      return (
+        <ContactCard
+          key={contact.id ?? ""}
+          contact={contact}
+          nameLabel={formatContactName(contact)}
+          avatarUrl={npub ? nostrPictureByNpub[npub] : null}
+          lastMessage={last ?? null}
+          hasAttention={unreadByContactId.has(id)}
+          isActive={(contact.id ?? "") === getDesktopActiveContactId(route)}
+          isUnknownContact={Boolean(contact.isUnknownContact)}
+          statusText={npub ? (nostrStatusByNpub[npub] ?? null) : null}
+          tokenInfo={
+            lastText && !parsePrivateImageMessage(lastText)
+              ? getCashuTokenMessageInfo(lastText)
+              : null
+          }
+          getMintIconUrl={getMintIconUrl}
+          getNpubMessageContactInfo={getNpubMessageContactInfo}
+          onSelect={handleSelectContact}
+          onMintIconError={markMintIconFailed}
+        />
+      );
+    },
+    [
+      displayContactById,
+      formatContactName,
+      getCashuTokenMessageInfo,
+      getMintIconUrl,
+      getNpubMessageContactInfo,
+      handleSelectContact,
+      lastMessageByContactId,
+      markMintIconFailed,
+      nostrPictureByNpub,
+      nostrStatusByNpub,
+      route,
+      unreadByContactId,
+    ],
+  );
+};
+
 const ContactsContent = ({
   filterAlwaysOpen,
 }: {
   filterAlwaysOpen: boolean;
 }): React.ReactElement => {
-  const { mainTabProps } = useMainTabRoutes();
+  const { t } = useTranslation();
+  const [activeGroup, setActiveGroup] = useAtom(activeContactGroupAtom);
+  const [contactsSearch, setContactsSearch] = useAtom(contactsSearchAtom);
+  const contactsFilterOpen = useAtomValue(contactsFilterOpenAtom);
+  const contactsSearchInputRef = useAtomValue(contactsSearchInputRefAtom);
+  const { contactFilterOptions, showGroupFilter, visibleContacts } =
+    useContactsListView();
   const {
-    activeBankPaymentOfferContacts,
-    activeGroup,
     contactsOnboardingCelebrating,
     contactsOnboardingTasks,
-    contactsFilterOpen,
-    contactsSearch,
-    contactsSearchInputRef,
-    contactFilterOptions,
-    conversationsLabel,
     dismissContactsOnboarding,
-    otherContactsLabel,
-    renderContactCard,
-    setActiveGroup,
-    setContactsSearch,
     showContactsOnboarding,
-    showGroupFilter,
-    startContactsGuide,
-    t,
-    visibleContacts,
-  } = mainTabProps;
+  } = useContactsOnboarding();
+  const startContactsGuide = useStartContactsGuide();
+  const renderContactCard = useContactCardRenderer();
   const visibleContactSections = useVisibleContactSections(
-    activeBankPaymentOfferContacts,
+    useActiveBankPaymentOfferContacts(),
     visibleContacts,
   );
 
@@ -174,8 +253,8 @@ const ContactsContent = ({
       setActiveGroup={setActiveGroup}
       filterOptions={contactFilterOptions}
       visibleContacts={visibleContactSections}
-      conversationsLabel={conversationsLabel}
-      otherContactsLabel={otherContactsLabel}
+      conversationsLabel={t("conversations")}
+      otherContactsLabel={t("otherContacts")}
       renderContactCard={renderContactCard}
       t={t}
     />
@@ -183,12 +262,13 @@ const ContactsContent = ({
 };
 
 const AddContactButton = (): React.ReactElement => {
-  const { mainTabProps } = useMainTabRoutes();
+  const { t } = useTranslation();
+  const openNewContactPage = useOpenNewContactPage();
   return (
     <FloatingActionButton
       icon="UserPlus"
-      label={mainTabProps.t("addContact")}
-      onPress={mainTabProps.openNewContactPage}
+      label={t("addContact")}
+      onPress={openNewContactPage}
       guide="contact-add-button"
     />
   );
@@ -211,9 +291,9 @@ export const DesktopContactsPane = (): React.ReactElement => (
 );
 
 export const WalletPane = (): React.ReactElement => {
-  const { mainTabProps } = useMainTabRoutes();
-  const { openFeedbackContact, openWalletScan, scanIsOpen } = mainTabProps;
-
+  const openFeedbackContact = useOpenFeedbackContact();
+  const { openWalletScan } = useScanCommands();
+  const scanIsOpen = useScanIsOpen();
   return (
     <WalletPage
       openFeedbackContact={openFeedbackContact}

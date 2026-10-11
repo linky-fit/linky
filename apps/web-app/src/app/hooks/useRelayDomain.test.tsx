@@ -240,7 +240,10 @@ describe("recommended Nostr relays", () => {
     await mount(fakeTransport(published, []), false);
     expect(state?.relayUrls).toEqual([...recommended, custom]);
     expect(published).toHaveLength(0);
-    expect(recommendedRelaysFetch).not.toHaveBeenCalled();
+    // The inspector flushes its rows through fetch too.
+    expect(recommendedRelaysFetch).not.toHaveBeenCalledWith(
+      "https://linky.fit/recommended-relays",
+    );
   });
 
   it("drops a relay the endpoint stopped recommending", async () => {

@@ -10,11 +10,11 @@ export const useRecurringDue = () => {
   const dueConfirmation = useAtomValue(recurringDueConfirmationAtom);
   const scheduler = useAtomValue(recurringSchedulerAtom);
   const confirmDueNow = React.useCallback(
-    async () => scheduler?.confirmDueNow(),
+    async () => scheduler?.read().confirmDueNow(),
     [scheduler],
   );
   const cancelDue = React.useCallback(
-    async () => scheduler?.cancelDue(),
+    async () => scheduler?.read().cancelDue(),
     [scheduler],
   );
   return { cancelDue, confirmDueNow, dueConfirmation };

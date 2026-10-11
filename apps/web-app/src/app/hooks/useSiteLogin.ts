@@ -8,7 +8,7 @@ import {
   type ResolveLinkauthResult,
 } from "@linky-fit/linkauth/signer";
 import { linkauthAudience } from "@linky-fit/linkstr";
-import { useLinkstrCommands } from "@linky-fit/linkstr-react";
+import { useAtom, useLinkstrCommands } from "@linky-fit/linkstr-react";
 import { Cause, Exit, Option } from "effect";
 import React from "react";
 import { navigateAwayTo } from "../../hooks/useRouting";
@@ -23,6 +23,11 @@ import {
   deliverSiteLogin,
   signSiteLoginAsIdentity,
 } from "../../siteLoginSigner";
+import {
+  pendingSiteLoginAtom,
+  siteLoginBusyAtom,
+  siteLoginDoneAtom,
+} from "../state/shell/confirmations";
 
 const SUCCESS_OVERLAY_MS = 2400;
 
@@ -132,10 +137,10 @@ export const useSiteLogin = ({
   t,
 }: UseSiteLoginParams): SiteLoginResult => {
   const { nostrConnectLogin: logInOverRelays, run } = useLinkstrCommands();
-  const [pending, setPending] = React.useState<PendingSiteLogin | null>(null);
+  const [pending, setPending] = useAtom(pendingSiteLoginAtom);
   const resolutionRef = React.useRef(0);
-  const [isBusy, setIsBusy] = React.useState(false);
-  const [isDone, setIsDone] = React.useState(false);
+  const [isBusy, setIsBusy] = useAtom(siteLoginBusyAtom);
+  const [isDone, setIsDone] = useAtom(siteLoginDoneAtom);
   const successTimerRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
@@ -156,7 +161,7 @@ export const useSiteLogin = ({
       setPending(null);
       successTimerRef.current = null;
     }, SUCCESS_OVERLAY_MS);
-  }, []);
+  }, [setPending, setIsDone]);
 
   const offerSiteLogin = React.useCallback(
     (login: SiteLoginRequest, extra: Record<string, unknown> = {}) => {
@@ -169,7 +174,7 @@ export const useSiteLogin = ({
       });
       setPending(login);
     },
-    [],
+    [setPending],
   );
 
   const requestSiteLoginConfirmation = React.useCallback(
@@ -194,7 +199,7 @@ export const useSiteLogin = ({
       });
       setPending({ channel: "refused", origin, reason: "linkauth-available" });
     },
-    [fetchDomain, offerSiteLogin],
+    [fetchDomain, offerSiteLogin, setPending],
   );
 
   const requestLinkauthLogin = React.useCallback(
@@ -225,7 +230,7 @@ export const useSiteLogin = ({
       }
       offerSiteLogin({ channel: "linkauth", login: result.login });
     },
-    [offerSiteLogin, resolve],
+    [offerSiteLogin, resolve, setPending],
   );
 
   const closeSiteLoginConfirmation = React.useCallback(() => {
@@ -244,7 +249,7 @@ export const useSiteLogin = ({
     if (delivery.kind === "callback") {
       navigate(buildCallbackUrl(delivery.url, "denied"));
     }
-  }, [isBusy, isDone, navigate, pending]);
+  }, [isBusy, isDone, navigate, pending, setPending]);
 
   const confirmSiteLogin = React.useCallback(async () => {
     if (!pending || isBusy || isDone) return;
@@ -327,6 +332,7 @@ export const useSiteLogin = ({
     setStatus,
     showDone,
     t,
+    setIsBusy,
   ]);
 
   return {

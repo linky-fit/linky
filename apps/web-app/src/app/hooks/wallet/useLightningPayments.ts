@@ -1,7 +1,5 @@
-import {
-  getLightningInvoicePreview,
-  type LightningInvoicePreview,
-} from "@linky-fit/linkshu";
+import { getLightningInvoicePreview } from "@linky-fit/linkshu";
+import { useAtom } from "@linky-fit/linkstr-react";
 import React from "react";
 import type { Translate } from "../../../i18n";
 import { getLnurlPayDisplayText } from "../../../lnurlPay";
@@ -12,6 +10,10 @@ import {
   paidOverlayContact,
   type PaidOverlayDetails,
 } from "../../lib/paidOverlay";
+import {
+  pendingLightningInvoiceAtom,
+  postPaySaveContactAtom,
+} from "../../state/shell/confirmations";
 import { useKnownLnAddressPayContact } from "./usePaymentDrafts";
 import { paymentCopy, usePaymentsCommands, type Shortfall } from "./paymentUi";
 
@@ -49,11 +51,10 @@ export const useLightningPayments = ({
   const [
     pendingLightningInvoiceConfirmation,
     setPendingLightningInvoiceConfirmation,
-  ] = React.useState<LightningInvoicePreview | null>(null);
-  const [postPaySaveContact, setPostPaySaveContact] = React.useState<null | {
-    lnAddress: string;
-    amountSat: number;
-  }>(null);
+  ] = useAtom(pendingLightningInvoiceAtom);
+  const [postPaySaveContact, setPostPaySaveContact] = useAtom(
+    postPaySaveContactAtom,
+  );
 
   const { knownLnAddressPayContact } = useKnownLnAddressPayContact(routeKind);
 
@@ -207,19 +208,24 @@ export const useLightningPayments = ({
       showPaidOverlay,
       showPaymentSending,
       t,
+      setPostPaySaveContact,
     ],
   );
 
   const closeLightningInvoiceConfirmation = React.useCallback(() => {
     setPendingLightningInvoiceConfirmation(null);
-  }, []);
+  }, [setPendingLightningInvoiceConfirmation]);
 
   const confirmLightningInvoicePayment = React.useCallback(async () => {
     const pending = pendingLightningInvoiceConfirmation;
     if (!pending) return;
     if (await payLightningInvoiceWithCashu(pending.invoice))
       setPendingLightningInvoiceConfirmation(null);
-  }, [payLightningInvoiceWithCashu, pendingLightningInvoiceConfirmation]);
+  }, [
+    payLightningInvoiceWithCashu,
+    pendingLightningInvoiceConfirmation,
+    setPendingLightningInvoiceConfirmation,
+  ]);
 
   return {
     closeLightningInvoiceConfirmation,

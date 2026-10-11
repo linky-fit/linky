@@ -62,6 +62,8 @@ import {
   type BankPaymentOfferEntry,
   type PendingConfirmation,
 } from "./BankPaymentOfferViews";
+import { useBankOfferCommands } from "../app/hooks/useBankPaymentOffers";
+import { useWalletCommands } from "../app/hooks/wallet/useWalletCommands";
 
 interface BankPaymentOfferDetailPageProps {
   bankPaymentOfferMessages: LocalNostrMessage[];
@@ -723,14 +725,15 @@ export const BankPaymentOfferDetailPage: React.FC<
   );
 };
 
-type BankPaymentOfferDetailRouteProps = Pick<
-  BankPaymentOfferDetailPageProps,
-  "onRespondBankPaymentOffer" | "onSettleBankPaymentOffer"
-> & { route: Extract<Route, { kind: "bankPaymentOffer" }> };
+interface BankPaymentOfferDetailRouteProps {
+  route: Extract<Route, { kind: "bankPaymentOffer" }>;
+}
 
 export const BankPaymentOfferDetailRoute: React.FC<
   BankPaymentOfferDetailRouteProps
-> = ({ route, ...props }) => {
+> = ({ route }) => {
+  const { respondToBankPaymentOffer } = useBankOfferCommands();
+  const { settleBankPaymentOffer } = useWalletCommands();
   const contacts = useContacts();
   const copyText = useCopyText();
   const chatOwnPubkeyHex = useAtomValue(currentPubkeyAtom);
@@ -739,7 +742,6 @@ export const BankPaymentOfferDetailRoute: React.FC<
   const { sendChatImage } = useChatSend(route, selectedChatContact);
   return (
     <BankPaymentOfferDetailPage
-      {...props}
       bankPaymentOfferMessages={bankPaymentOfferMessages}
       chatId={route.chatId}
       chatMessages={chatMessages}
@@ -747,7 +749,9 @@ export const BankPaymentOfferDetailRoute: React.FC<
       contacts={contacts}
       offerId={route.offerId}
       onCopyText={copyText}
+      onRespondBankPaymentOffer={respondToBankPaymentOffer}
       onSendChatImage={sendChatImage}
+      onSettleBankPaymentOffer={settleBankPaymentOffer}
     />
   );
 };

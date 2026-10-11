@@ -43,6 +43,8 @@ import {
 } from "../components/FloatingActionButton";
 import { navigateTo } from "../hooks/useRouting";
 import { nowSeconds } from "../utils/time";
+import { useCanRestoreTokens } from "../app/hooks/settings/useIdentitySettings";
+import { useWalletCommands } from "../app/hooks/wallet/useWalletCommands";
 
 interface CashuTokensPageProps {
   cashuIsBusy: boolean;
@@ -329,12 +331,9 @@ export const CashuTokensPage = ({
   );
 };
 
-type CashuTokensRouteProps = Pick<
-  CashuTokensPageProps,
-  "canRestoreTokens" | "restoreMissingTokens"
->;
-
-export const CashuTokensRoute: FC<CashuTokensRouteProps> = (props) => {
+export const CashuTokensRoute: FC = () => {
+  const canRestoreTokens = useCanRestoreTokens();
+  const { restoreMissingTokens } = useWalletCommands();
   const contacts = useContacts();
   const messages = useAtomValue(localMessagesAtom);
   const { proofs, transfers } = useWalletInventory();
@@ -342,7 +341,7 @@ export const CashuTokensRoute: FC<CashuTokensRouteProps> = (props) => {
   const tokens = useWalletTokens();
   return (
     <CashuTokensPage
-      {...props}
+      canRestoreTokens={canRestoreTokens}
       cashuBulkCheckIsBusy={tokens.cashuBulkCheckIsBusy}
       cashuIsBusy={cashuIsBusy}
       cashuProofs={proofs}
@@ -352,6 +351,7 @@ export const CashuTokensRoute: FC<CashuTokensRouteProps> = (props) => {
       }
       contacts={contacts}
       messages={messages}
+      restoreMissingTokens={restoreMissingTokens}
       tokensRestoreIsBusy={tokens.tokensRestoreIsBusy}
       tokensRestoreProgress={tokens.tokensRestoreProgress}
     />

@@ -16,7 +16,16 @@ import { finalizeEvent } from "nostr-tools";
 import { act, useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SiteLoginRequest } from "../../siteLogin";
+import { AtomRegistry, RegistryContext } from "@linky-fit/linkstr-react";
+import type { ReactElement } from "react";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
+
+const renderInRegistry = (element: ReactElement) =>
+  renderIntoDocument(
+    <RegistryContext.Provider value={AtomRegistry.make()}>
+      {element}
+    </RegistryContext.Provider>,
+  );
 import {
   CALLBACK_URL,
   NONCE,
@@ -51,13 +60,16 @@ const { deliverMock, logInMock, reportAppLogMock, signMock } = vi.hoisted(
 
 type SignerJob = { readonly sign: unknown } | { readonly deliver: unknown };
 
-vi.mock("@linky-fit/linkstr-react", () => {
+vi.mock("@linky-fit/linkstr-react", async (importOriginal) => {
   const commands = {
     nostrConnectLogin: logInMock,
     run: (job: SignerJob) =>
       "sign" in job ? signMock(job.sign) : deliverMock(job.deliver),
   };
-  return { useLinkstrCommands: () => commands };
+  return {
+    ...(await importOriginal<typeof import("@linky-fit/linkstr-react")>()),
+    useLinkstrCommands: () => commands,
+  };
 });
 vi.mock("../../siteLoginSigner", () => ({
   deliverSiteLogin: (delivery: unknown): SignerJob => ({ deliver: delivery }),
@@ -195,7 +207,7 @@ describe("useSiteLogin", () => {
           }),
         ),
       );
-      const rendered = await renderIntoDocument(<Harness />);
+      const rendered = await renderInRegistry(<Harness />);
 
       await confirm(RELAY);
 
@@ -237,7 +249,7 @@ describe("useSiteLogin", () => {
       "reports %o through the status toast and keeps the dialog",
       async (error, key) => {
         logInMock.mockResolvedValue(Exit.fail(error));
-        const rendered = await renderIntoDocument(<Harness />);
+        const rendered = await renderInRegistry(<Harness />);
 
         await confirm(RELAY);
 
@@ -252,7 +264,7 @@ describe("useSiteLogin", () => {
     );
 
     it("closes a request the user cancels without contacting the site", async () => {
-      const rendered = await renderIntoDocument(<Harness />);
+      const rendered = await renderInRegistry(<Harness />);
 
       await request(RELAY);
       await close();
@@ -265,7 +277,7 @@ describe("useSiteLogin", () => {
     });
 
     it("offers a login to an origin without a domain document as unverified", async () => {
-      const rendered = await renderIntoDocument(<Harness />);
+      const rendered = await renderInRegistry(<Harness />);
 
       await request(RELAY);
 
@@ -283,7 +295,7 @@ describe("useSiteLogin", () => {
 
     it("refuses a login to an origin that publishes a domain document", async () => {
       const answer = deferredDomain();
-      const rendered = await renderIntoDocument(<Harness />);
+      const rendered = await renderInRegistry(<Harness />);
 
       await startRequest(RELAY);
       expect(pending()).toEqual({
@@ -313,7 +325,7 @@ describe("useSiteLogin", () => {
 
     it("drops the check when the user closes the dialog meanwhile", async () => {
       const answer = deferredDomain();
-      const rendered = await renderIntoDocument(<Harness />);
+      const rendered = await renderInRegistry(<Harness />);
 
       await startRequest(RELAY);
       await close();
@@ -326,7 +338,7 @@ describe("useSiteLogin", () => {
     });
 
     it("does not approve a request that is not a supported login", async () => {
-      const rendered = await renderIntoDocument(<Harness />);
+      const rendered = await renderInRegistry(<Harness />);
 
       await confirm(UNSUPPORTED_RELAY);
 
@@ -341,7 +353,7 @@ describe("useSiteLogin", () => {
   describe("resolving a #linkauth link", () => {
     it("checks the origin first, then offers the verified login", async () => {
       const answer = deferredResolution();
-      const rendered = await renderIntoDocument(<Harness />);
+      const rendered = await renderInRegistry(<Harness />);
 
       await startLink(CALLBACK_LINK);
       expect(pending()).toEqual({ channel: "checking", origin: SHOP });
@@ -367,7 +379,7 @@ describe("useSiteLogin", () => {
 
     it("drops the result when the user closes the dialog while checking", async () => {
       const answer = deferredResolution();
-      const rendered = await renderIntoDocument(<Harness />);
+      const rendered = await renderInRegistry(<Harness />);
 
       await startLink(CALLBACK_LINK);
       await close();
@@ -396,7 +408,7 @@ describe("useSiteLogin", () => {
       ["malformed-link", { ok: false, reason: "malformed-link" } as const],
     ])("refuses %s without any way to approve", async (reason, result) => {
       resolve.mockResolvedValue(result);
-      const rendered = await renderIntoDocument(<Harness />);
+      const rendered = await renderInRegistry(<Harness />);
 
       await requestLink(CALLBACK_LINK);
 
@@ -421,7 +433,7 @@ describe("useSiteLogin", () => {
 
     it("refuses a link without an origin as malformed", async () => {
       resolve.mockResolvedValue({ ok: false, reason: "malformed-link" });
-      const rendered = await renderIntoDocument(<Harness />);
+      const rendered = await renderInRegistry(<Harness />);
 
       await requestLink("https://app.linky.fit/#linkauth?o=nonsense");
 
@@ -435,7 +447,7 @@ describe("useSiteLogin", () => {
     });
 
     it("ignores text that is not a linkauth link", async () => {
-      const rendered = await renderIntoDocument(<Harness />);
+      const rendered = await renderInRegistry(<Harness />);
 
       await requestLink("https://example.com/");
 
@@ -449,7 +461,7 @@ describe("useSiteLogin", () => {
   describe("through a callback", () => {
     it("signs the login template and sends the browser back with the result", async () => {
       signMock.mockResolvedValue(Exit.succeed(ASSERTION));
-      const rendered = await renderIntoDocument(<Harness />);
+      const rendered = await renderInRegistry(<Harness />);
 
       await confirm(CALLBACK);
 
@@ -472,7 +484,7 @@ describe("useSiteLogin", () => {
     });
 
     it("sends the browser back as denied when the user cancels, without signing", async () => {
-      const rendered = await renderIntoDocument(<Harness />);
+      const rendered = await renderInRegistry(<Harness />);
 
       await request(CALLBACK);
       await close();
@@ -492,7 +504,7 @@ describe("useSiteLogin", () => {
 
     it("keeps the dialog and does not navigate when signing fails", async () => {
       signMock.mockResolvedValue(Exit.fail({ _tag: "LinkstrNotConfigured" }));
-      const rendered = await renderIntoDocument(<Harness />);
+      const rendered = await renderInRegistry(<Harness />);
 
       await confirm(CALLBACK);
 
@@ -508,7 +520,7 @@ describe("useSiteLogin", () => {
 
     it("keeps the signed event out of the inspector", async () => {
       signMock.mockResolvedValue(Exit.succeed(ASSERTION));
-      const rendered = await renderIntoDocument(<Harness />);
+      const rendered = await renderInRegistry(<Harness />);
 
       await confirm(CALLBACK);
 
@@ -531,7 +543,7 @@ describe("useSiteLogin", () => {
     it("signs, publishes the wrap to the document's relays and shows done", async () => {
       signMock.mockResolvedValue(Exit.succeed(ASSERTION));
       deliverMock.mockResolvedValue(Exit.succeed(sent));
-      const rendered = await renderIntoDocument(<Harness />);
+      const rendered = await renderInRegistry(<Harness />);
 
       await confirm(NOSTR);
 
@@ -561,7 +573,7 @@ describe("useSiteLogin", () => {
     });
 
     it("sends nothing when the user cancels", async () => {
-      const rendered = await renderIntoDocument(<Harness />);
+      const rendered = await renderInRegistry(<Harness />);
 
       await request(NOSTR);
       await close();
@@ -583,7 +595,7 @@ describe("useSiteLogin", () => {
       deliverMock.mockResolvedValueOnce(
         Exit.fail({ _tag: "SiteLoginNotDelivered", results: [] }),
       );
-      const rendered = await renderIntoDocument(<Harness />);
+      const rendered = await renderInRegistry(<Harness />);
 
       await confirm(NOSTR);
 

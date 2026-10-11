@@ -1,12 +1,16 @@
+import { useAtom, useAtomSet } from "@linky-fit/linkstr-react";
 import React from "react";
 import { ContactId } from "../../../evoluIds";
 import { navigateTo } from "../../../hooks/useRouting";
 import type { Route } from "../../../types/route";
-import type {
-  ContactRowLike,
-  ContactsGuideKey,
-  ContactsGuideStep,
-} from "../../types/appTypes";
+import { CONTACTS_GUIDE_STEPS } from "../../lib/contactsGuideSteps";
+import {
+  contactsGuideAtom,
+  contactsGuideHighlightRectAtom,
+  contactsGuideTargetContactIdAtom,
+} from "../../state/shell/guide";
+import type { ContactRowLike, ContactsGuideStep } from "../../types/appTypes";
+import { useStopContactsGuide } from "./useContactsGuideControls";
 
 interface UseContactsGuideParams {
   cashuBalance: number;
@@ -18,11 +22,6 @@ interface UseContactsGuideParams {
   route: Route;
 }
 
-interface ContactsGuideState {
-  step: number;
-  task: ContactsGuideKey;
-}
-
 const getRouteContactId = (route: Route): ContactId | null => {
   if (route.kind === "contact" || route.kind === "contactPay") {
     return route.id;
@@ -31,6 +30,11 @@ const getRouteContactId = (route: Route): ContactId | null => {
   return null;
 };
 
+/**
+ * Runs the onboarding walkthrough: opens each step's screen, follows the
+ * user's navigation to the next step and measures the highlighted element.
+ * Mounted once by the shell; screens drive it through `contactsGuideAtom`.
+ */
 export const useContactsGuide = ({
   cashuBalance,
   contacts,
@@ -39,30 +43,14 @@ export const useContactsGuide = ({
   contactsOnboardingHasSentMessage,
   openNewContactPage,
   route,
-}: UseContactsGuideParams) => {
-  const [contactsGuide, setContactsGuide] =
-    React.useState<ContactsGuideState | null>(null);
-
+}: UseContactsGuideParams): void => {
+  const [contactsGuide, setContactsGuide] = useAtom(contactsGuideAtom);
   const [contactsGuideTargetContactId, setContactsGuideTargetContactId] =
-    React.useState<ContactId | null>(null);
-
-  const [contactsGuideHighlightRect, setContactsGuideHighlightRect] =
-    React.useState<null | {
-      height: number;
-      left: number;
-      top: number;
-      width: number;
-    }>(null);
-
-  const startContactsGuide = React.useCallback((task: ContactsGuideKey) => {
-    setContactsGuideTargetContactId(null);
-    setContactsGuide({ task, step: 0 });
-  }, []);
-
-  const stopContactsGuide = React.useCallback(() => {
-    setContactsGuideTargetContactId(null);
-    setContactsGuide(null);
-  }, []);
+    useAtom(contactsGuideTargetContactIdAtom);
+  const setContactsGuideHighlightRect = useAtomSet(
+    contactsGuideHighlightRectAtom,
+  );
+  const stopContactsGuide = useStopContactsGuide();
 
   const contactsGuideSteps = React.useMemo(() => {
     if (!contactsGuide) return null;
@@ -112,125 +100,13 @@ export const useContactsGuide = ({
         navigateTo({ route: "chat", id: contactId });
     };
 
-    const stepsByTask: Record<ContactsGuideKey, ContactsGuideStep[]> = {
-      add_contact: [
-        {
-          id: "add_contact_1",
-          selector: '[data-guide="contact-add-button"]',
-          titleKey: "guideAddContactStep1Title",
-          bodyKey: "guideAddContactStep1Body",
-          ensure: () => ensureRoute("contacts"),
-        },
-        {
-          id: "add_contact_2",
-          selector: '[data-guide="contact-search-input"]',
-          titleKey: "guideAddContactStep2Title",
-          bodyKey: "guideAddContactStep2Body",
-          ensure: () => ensureRoute("contactNew"),
-        },
-      ],
-      topup: [
-        {
-          id: "topup_1",
-          selector: '[data-guide="open-wallet"]',
-          titleKey: "guideTopupStep1Title",
-          bodyKey: "guideTopupStep1Body",
-          ensure: () => ensureRoute("contacts"),
-        },
-        {
-          id: "topup_2",
-          selector: '[data-guide="wallet-topup"]',
-          titleKey: "guideTopupStep2Title",
-          bodyKey: "guideTopupStep2Body",
-          ensure: () => ensureRoute("wallet"),
-        },
-        {
-          id: "topup_3",
-          selector: '[data-guide="topup-show-invoice"]',
-          titleKey: "guideTopupStep3Title",
-          bodyKey: "guideTopupStep3Body",
-          ensure: () => ensureRoute("topup"),
-        },
-      ],
-      pay: [
-        {
-          id: "pay_1",
-          selector: '[data-guide="contact-card"]',
-          titleKey: "guidePayStep1Title",
-          bodyKey: "guidePayStep1Body",
-          ensure: () => ensureRoute("contacts"),
-        },
-        {
-          id: "pay_2",
-          selector: '[data-guide="contact-pay"]',
-          titleKey: "guidePayStep2Title",
-          bodyKey: "guidePayStep2Body",
-          ensure: () => ensureRoute("contact", targetContactId),
-        },
-        {
-          id: "pay_3",
-          selector: '[data-guide="pay-step3"]',
-          titleKey: "guidePayStep3Title",
-          bodyKey: "guidePayStep3Body",
-          ensure: () => ensureRoute("contactPay", targetContactId),
-        },
-      ],
-      message: [
-        {
-          id: "message_1",
-          selector: '[data-guide="contact-card"]',
-          titleKey: "guideMessageStep1Title",
-          bodyKey: "guideMessageStep1Body",
-          ensure: () => ensureRoute("contacts"),
-        },
-        {
-          id: "message_2",
-          selector: '[data-guide="contact-message"]',
-          titleKey: "guideMessageStep2Title",
-          bodyKey: "guideMessageStep2Body",
-          ensure: () => ensureRoute("contact", targetContactId),
-        },
-        {
-          id: "message_3",
-          selector: '[data-guide="chat-input"]',
-          titleKey: "guideMessageStep3Title",
-          bodyKey: "guideMessageStep3Body",
-          ensure: () => ensureRoute("chat", targetContactId),
-        },
-        {
-          id: "message_4",
-          selector: '[data-guide="chat-send"]',
-          titleKey: "guideMessageStep4Title",
-          bodyKey: "guideMessageStep4Body",
-          ensure: () => ensureRoute("chat", targetContactId),
-        },
-      ],
-      backup_keys: [
-        {
-          id: "backup_keys_1",
-          selector: '[data-testid="open-menu"]',
-          titleKey: "guideBackupKeysStep1Title",
-          bodyKey: "guideBackupKeysStep1Body",
-          ensure: () => ensureRoute("contacts"),
-        },
-        {
-          id: "backup_keys_2",
-          selector: '[data-testid="open-master-keys"]',
-          titleKey: "guideBackupKeysStep2Title",
-          bodyKey: "guideBackupKeysStep2Body",
-          ensure: () => ensureRoute("settings"),
-        },
-        {
-          id: "backup_keys_3",
-          selector: '[data-guide="copy-seed"]',
-          titleKey: "guideBackupKeysStep3Title",
-          bodyKey: "guideBackupKeysStep3Body",
-          ensure: () => ensureRoute("settingsMasterKeys"),
-        },
-      ],
-    };
-
-    return stepsByTask[contactsGuide.task] ?? null;
+    return CONTACTS_GUIDE_STEPS[contactsGuide.task].map(
+      (step): ContactsGuideStep => ({
+        ...step,
+        ensure: () =>
+          ensureRoute(step.route, step.showsTarget ? targetContactId : null),
+      }),
+    );
   }, [
     contacts,
     contactsGuide,
@@ -381,6 +257,8 @@ export const useContactsGuide = ({
     contactsOnboardingHasSentMessage,
     route,
     stopContactsGuide,
+    setContactsGuideTargetContactId,
+    setContactsGuide,
   ]);
 
   const contactsGuideActiveSelector =
@@ -400,7 +278,11 @@ export const useContactsGuide = ({
     } catch {
       // ignore
     }
-  }, [contactsGuideActiveSelector, contactsGuideActiveStepId]);
+  }, [
+    contactsGuideActiveSelector,
+    contactsGuideActiveStepId,
+    setContactsGuideHighlightRect,
+  ]);
 
   React.useEffect(() => {
     if (!contactsGuideActiveSelector) return;
@@ -438,32 +320,5 @@ export const useContactsGuide = ({
       window.removeEventListener("resize", scheduleUpdateRect);
       window.removeEventListener("scroll", scheduleUpdateRect);
     };
-  }, [contactsGuideActiveSelector, route.kind]);
-
-  const contactsGuideNav = {
-    back: () => {
-      if (!contactsGuide) return;
-      setContactsGuide((prev) =>
-        prev ? { ...prev, step: Math.max(prev.step - 1, 0) } : prev,
-      );
-    },
-    next: () => {
-      if (!contactsGuideSteps || !contactsGuide) return;
-      setContactsGuide((prev) => {
-        if (!prev) return prev;
-        const max = Math.max(contactsGuideSteps.length - 1, 0);
-        if (prev.step >= max) return null;
-        return { ...prev, step: prev.step + 1 };
-      });
-    },
-  };
-
-  return {
-    contactsGuide,
-    contactsGuideActiveStep,
-    contactsGuideHighlightRect,
-    contactsGuideNav,
-    startContactsGuide,
-    stopContactsGuide,
-  };
+  }, [contactsGuideActiveSelector, route.kind, setContactsGuideHighlightRect]);
 };

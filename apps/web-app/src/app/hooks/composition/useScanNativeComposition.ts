@@ -1,14 +1,15 @@
-import { Share } from "@capacitor/share";
 import { decodeNpub, identityFromNsec, WrapId } from "@linky-fit/linkstr";
 import type { WrapInboxEvent } from "@linky-fit/linkstr";
-import { useLinkstrCommands } from "@linky-fit/linkstr-react";
+import {
+  useAtomSet,
+  useAtomValue,
+  useLinkstrCommands,
+} from "@linky-fit/linkstr-react";
 import { Exit, Schema } from "effect";
 import React from "react";
 import type { ContactsRepository } from "@linky-fit/linksync";
-import type { CashuOperationId } from "../../../evolu";
 import { navigateTo, useRouting } from "../../../hooks/useRouting";
 import {
-  cancelNativeNfcWrite,
   consumePendingIosNativeDeepLinkUrl,
   consumePendingNativeDeepLinkUrl,
   consumePendingNativeNotificationOpenDetail,
@@ -16,23 +17,18 @@ import {
   NATIVE_DEEP_LINK_EVENT,
   NATIVE_NOTIFICATION_OPEN_EVENT,
   NATIVE_PUSH_ACTION_EVENT,
-  startNativeNfcWrite,
-  supportsNativeNfcWrite,
 } from "../../../platform/nativeBridge";
 import { readClipboardText } from "../../../platform/clipboard";
-import { isNativePlatform } from "../../../platform/runtime";
 import { PENDING_DEEP_LINK_TEXT_STORAGE_KEY } from "../../../utils/constants";
 import { pickFile } from "../../../utils/pickFile";
-import {
-  buildCashuDeepLink,
-  parseNativeDeepLinkUrl,
-} from "../../../utils/deepLinks";
+import { parseNativeDeepLinkUrl } from "../../../utils/deepLinks";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import {
   safeLocalStorageGet,
   safeLocalStorageRemove,
   safeLocalStorageSet,
 } from "../../../utils/storage";
+import { useStopContactsGuide } from "../guide/useContactsGuideControls";
 import { useContactsOnboardingProgress } from "../guide/useContactsOnboardingProgress";
 import { buildUnknownContactId } from "../messages/contactIdentity";
 import type { DispatchInboxEvent } from "../messages/useLinkstrInboxSync";
@@ -42,6 +38,7 @@ import { takeSiteLoginHashLink } from "../../../siteLogin";
 import { isAnimatedQrFrame } from "../../../utils/animatedQr";
 import { useExperimentalFeatures } from "../useExperimentalFeatures";
 import { useSetNavIntent } from "../shell/navIntents";
+import { useProvideOwnerCommands } from "../shell/ownerCommands";
 import { useGuideScannerDomain } from "../useGuideScannerDomain";
 import { useScannedTextHandler } from "../useScannedTextHandler";
 import {
@@ -53,6 +50,11 @@ import {
   extractCashuTokenFromText,
   extractCashuTokenFromText as extractCashuTokenFromTextFromUrl,
 } from "../../lib/tokenText";
+import {
+  pendingLightningInvoiceAtom,
+  pendingLnurlWithdrawAtom,
+} from "../../state/shell/confirmations";
+import { scanCommandsAtom, scanEntryPointAtom } from "../../state/shell/scan";
 import type { useCashuWalletComposition } from "./useCashuWalletComposition";
 import type { useContactsMessagingComposition } from "./useContactsMessagingComposition";
 import type { Translate } from "../../../i18n";
@@ -94,7 +96,6 @@ interface QueuedNotificationOpenDetail {
 interface UseScanNativeCompositionParams {
   addNewContactFromIdentifier: ContactsMessagingCompositionResult["addNewContactFromIdentifier"];
   cashuBalance: CashuWalletCompositionResult["cashuBalance"];
-  cashuTransfers: CashuWalletCompositionResult["cashuTransfers"];
   contacts: ContactsMessagingCompositionResult["contacts"];
   contactsLatestRef: ContactsMessagingCompositionResult["contactsLatestRef"];
   contactsOnboardingDismissedSynced: boolean;
@@ -102,13 +103,10 @@ interface UseScanNativeCompositionParams {
   contactsOnboardingHasPaid: ContactsMessagingCompositionResult["contactsOnboardingHasPaid"];
   contactsOnboardingHasSentMessage: ContactsMessagingCompositionResult["contactsOnboardingHasSentMessage"];
   contactsRepository: Pick<ContactsRepository, "insert">;
-  copyText: (value: string) => Promise<void>;
   currentNpub: string | null;
   currentNsec: string | null;
   dispatchInboxEvent: DispatchInboxEvent;
   lightningInvoiceAutoPayLimit: CashuWalletCompositionResult["lightningInvoiceAutoPayLimit"];
-  markCashuTokenExternalized: CashuWalletCompositionResult["markCashuTokenExternalized"];
-  markCashuTokenIssued: CashuWalletCompositionResult["markCashuTokenIssued"];
   nostrBootstrapReady: ContactsMessagingCompositionResult["nostrBootstrapReady"];
   openNewContactPage: ContactsMessagingCompositionResult["openNewContactPage"];
   payCashuPaymentRequest: CashuWalletCompositionResult["payCashuPaymentRequest"];
@@ -120,8 +118,6 @@ interface UseScanNativeCompositionParams {
   requestSiteLoginConfirmation: SiteLoginResult["requestSiteLoginConfirmation"];
   route: ReturnType<typeof useRouting>;
   saveCashuFromText: CashuWalletCompositionResult["saveCashuFromText"];
-  setPendingLightningInvoiceConfirmation: CashuWalletCompositionResult["setPendingLightningInvoiceConfirmation"];
-  setPendingLnurlWithdrawConfirmation: CashuWalletCompositionResult["setPendingLnurlWithdrawConfirmation"];
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   t: Translate;
 }
@@ -129,7 +125,6 @@ interface UseScanNativeCompositionParams {
 export const useScanNativeComposition = ({
   addNewContactFromIdentifier,
   cashuBalance,
-  cashuTransfers,
   contacts,
   contactsLatestRef,
   contactsOnboardingDismissedSynced,
@@ -137,13 +132,10 @@ export const useScanNativeComposition = ({
   contactsOnboardingHasPaid,
   contactsOnboardingHasSentMessage,
   contactsRepository,
-  copyText,
   currentNpub,
   currentNsec,
   dispatchInboxEvent,
   lightningInvoiceAutoPayLimit,
-  markCashuTokenExternalized,
-  markCashuTokenIssued,
   nostrBootstrapReady,
   openNewContactPage,
   payCashuPaymentRequest,
@@ -155,8 +147,6 @@ export const useScanNativeComposition = ({
   requestSiteLoginConfirmation,
   route,
   saveCashuFromText,
-  setPendingLightningInvoiceConfirmation,
-  setPendingLnurlWithdrawConfirmation,
   setStatus,
   t,
 }: UseScanNativeCompositionParams) => {
@@ -164,9 +154,6 @@ export const useScanNativeComposition = ({
   const pendingNotificationOpenDetailsRef = React.useRef<
     QueuedNotificationOpenDetail[]
   >([]);
-  const [shareOptionsText, setShareOptionsText] = React.useState<string | null>(
-    null,
-  );
   const [pendingDeepLinkText, setPendingDeepLinkText] = React.useState<
     string | null
   >(() => {
@@ -192,28 +179,16 @@ export const useScanNativeComposition = ({
     [],
   );
 
+  // The scanner and the scanned text handler need each other; scan results only arrive after commit.
   const scannedTextHandlerRef = React.useRef<
     (rawValue: string) => Promise<void>
   >(async () => {});
-
   const {
     closeScan,
-    contactsGuide,
-    contactsGuideActiveStep,
-    contactsGuideHighlightRect,
-    contactsGuideNav,
     cycleScanCamera,
     openScan,
     openReceiveScan,
     openWalletScan,
-    scanAllowsManualContact,
-    scanDiagnostics,
-    scanCanSwitchCamera,
-    scanEntryPoint,
-    scanIsOpen,
-    scanVideoRef,
-    startContactsGuide,
-    stopContactsGuide,
   } = useGuideScannerDomain({
     cashuBalance,
     contacts,
@@ -221,52 +196,54 @@ export const useScanNativeComposition = ({
     contactsOnboardingHasPaid,
     contactsOnboardingHasSentMessage,
     openNewContactPage,
-    onScannedText: (rawValue: string) =>
-      scannedTextHandlerRef.current(rawValue),
+    onScannedText: (rawValue) => scannedTextHandlerRef.current(rawValue),
     pushToast,
     route,
     t,
   });
-  const contactsGuideNavRef = React.useRef(contactsGuideNav);
-  React.useLayoutEffect(() => {
-    contactsGuideNavRef.current = contactsGuideNav;
-  }, [contactsGuideNav]);
-  const stableContactsGuideNav = React.useMemo(
-    () => ({
-      back: () => {
-        contactsGuideNavRef.current.back();
-      },
-      next: () => {
-        contactsGuideNavRef.current.next();
-      },
-    }),
-    [],
+  const scanEntryPoint = useAtomValue(scanEntryPointAtom);
+  const setPendingLightningInvoice = useAtomSet(pendingLightningInvoiceAtom);
+  const setPendingLnurlWithdraw = useAtomSet(pendingLnurlWithdrawAtom);
+  const handleContactIdentifierScanned = React.useCallback(
+    async (identifier: string) => {
+      await addNewContactFromIdentifier(identifier);
+    },
+    [addNewContactFromIdentifier],
   );
 
-  const openManualContactFromScan = React.useCallback(() => {
-    closeScan();
-    if (route.kind === "contactNew") return;
-    openNewContactPage();
-  }, [closeScan, openNewContactPage, route.kind]);
+  const { experimentalFeatures } = useExperimentalFeatures();
+  const openSavedContact = useSetNavIntent("openSavedContactNpub");
+  const handleScannedText = useScannedTextHandler<(typeof contacts)[number]>({
+    closeScan,
+    contacts,
+    contactsRepository,
+    currentNpub,
+    extractCashuTokenFromText,
+    keryxEnabled: experimentalFeatures,
+    lightningInvoiceAutoPayLimit,
+    onContactIdentifierScanned:
+      route.kind === "contactNew" ? handleContactIdentifierScanned : null,
+    openSavedContact,
+    payCashuPaymentRequest,
+    payLightningInvoiceWithCashu,
+    requestLightningInvoiceConfirmation: setPendingLightningInvoice,
+    requestLnurlAuthConfirmation,
+    requestLnurlWithdrawConfirmation: setPendingLnurlWithdraw,
+    requestLinkauthLogin,
+    requestSiteLoginConfirmation,
+    saveCashuFromText,
+    scanAcceptsBankPayment:
+      scanEntryPoint === "send" || route.kind === "manualPay",
+    scanEntryPoint,
+    setStatus,
+    t,
+  });
 
-  const openIssueTokenFromScan = React.useCallback(() => {
-    closeScan();
-    if (route.kind === "cashuTokenEmit") return;
-    navigateTo({ route: "cashuTokenEmit" });
-  }, [closeScan, route.kind]);
+  React.useLayoutEffect(() => {
+    scannedTextHandlerRef.current = handleScannedText;
+  }, [handleScannedText]);
 
-  const openManualPayFromScan = React.useCallback(() => {
-    closeScan();
-    if (route.kind === "manualPay") return;
-    navigateTo({ route: "manualPay" });
-  }, [closeScan, route.kind]);
-
-  const {
-    contactsOnboardingCelebrating,
-    contactsOnboardingTasks,
-    dismissContactsOnboarding,
-    showContactsOnboarding,
-  } = useContactsOnboardingProgress({
+  useContactsOnboardingProgress({
     cashuBalance,
     contactsCount: contacts.length,
     contactsOnboardingDismissedSynced,
@@ -275,236 +252,9 @@ export const useScanNativeComposition = ({
     contactsOnboardingHasSentMessage,
     persistContactsOnboardingDismissed,
     routeKind: route.kind,
-    stopContactsGuide,
+    stopContactsGuide: useStopContactsGuide(),
     t,
   });
-
-  const closeShareOptions = React.useCallback(() => {
-    setShareOptionsText(null);
-  }, []);
-
-  const openShareOptionsUrl = React.useCallback((url: string) => {
-    if (typeof window === "undefined") return;
-    window.open(url, "_blank", "noopener,noreferrer");
-    setShareOptionsText(null);
-  }, []);
-
-  const copyShareOptionsText = React.useCallback(async () => {
-    const text = (shareOptionsText ?? "").trim();
-    if (!text) return;
-    await copyText(text);
-    setShareOptionsText(null);
-  }, [copyText, shareOptionsText]);
-
-  const shareOptionsViaEmail = React.useCallback(() => {
-    const text = (shareOptionsText ?? "").trim();
-    if (!text) return;
-    openShareOptionsUrl(`mailto:?body=${encodeURIComponent(text)}`);
-  }, [openShareOptionsUrl, shareOptionsText]);
-
-  const shareOptionsViaSms = React.useCallback(() => {
-    const text = (shareOptionsText ?? "").trim();
-    if (!text) return;
-    openShareOptionsUrl(`sms:?body=${encodeURIComponent(text)}`);
-  }, [openShareOptionsUrl, shareOptionsText]);
-
-  const shareOptionsViaWhatsApp = React.useCallback(() => {
-    const text = (shareOptionsText ?? "").trim();
-    if (!text) return;
-    openShareOptionsUrl(`https://wa.me/?text=${encodeURIComponent(text)}`);
-  }, [openShareOptionsUrl, shareOptionsText]);
-
-  const shareText = React.useCallback(
-    async (value: string, whenUnavailable?: () => Promise<void>) => {
-      const text = value.trim();
-      if (!text) {
-        pushToast(t("errorPrefix"));
-        return;
-      }
-
-      if (isNativePlatform()) {
-        try {
-          await Share.share({ text });
-          return;
-        } catch (error) {
-          const errorMessage =
-            typeof error === "object" &&
-            error !== null &&
-            "message" in error &&
-            typeof error.message === "string"
-              ? error.message
-              : "";
-          if (
-            /cancel/i.test(errorMessage) ||
-            /abort/i.test(errorMessage) ||
-            /dismiss/i.test(errorMessage)
-          ) {
-            return;
-          }
-          pushToast(t("shareFailed"));
-          return;
-        }
-      }
-
-      if (typeof navigator.share === "function") {
-        try {
-          await navigator.share({ text });
-          return;
-        } catch (error) {
-          const errorName =
-            typeof error === "object" &&
-            error !== null &&
-            "name" in error &&
-            typeof error.name === "string"
-              ? error.name
-              : "";
-          if (errorName === "AbortError") return;
-          pushToast(t("shareFailed"));
-          return;
-        }
-      }
-
-      if (whenUnavailable) await whenUnavailable();
-      else pushToast(t("shareUnavailable"));
-    },
-    [pushToast, t],
-  );
-
-  const canWriteNfc = supportsNativeNfcWrite();
-  const [nfcWritePromptKind, setNfcWritePromptKind] = React.useState<
-    "profile" | "token" | null
-  >(null);
-  const nfcWriteCancelledByUserRef = React.useRef(false);
-
-  const cancelPendingNfcWrite = React.useCallback(() => {
-    nfcWriteCancelledByUserRef.current = true;
-    setNfcWritePromptKind(null);
-    cancelNativeNfcWrite();
-  }, []);
-
-  const writeNfcUriWithToast = React.useCallback(
-    async (
-      url: string,
-      successKey: "nfcWriteProfileSuccess" | "nfcWriteTokenSuccess",
-      promptKind: "profile" | "token",
-    ): Promise<boolean> => {
-      nfcWriteCancelledByUserRef.current = false;
-
-      const result = await startNativeNfcWrite(url, (progress) => {
-        if (progress.status === "armed" && progress.prompt === "web") {
-          setNfcWritePromptKind(promptKind);
-        }
-      });
-
-      setNfcWritePromptKind(null);
-
-      if (result === null || result.status === "unsupported") {
-        pushToast(t("nfcWriteUnsupported"));
-        return false;
-      }
-
-      if (result.status === "success") {
-        pushToast(t(successKey));
-        return true;
-      }
-
-      if (result.status === "disabled") {
-        pushToast(t("nfcWriteDisabled"));
-        return false;
-      }
-
-      if (result.status === "busy") {
-        pushToast(t("nfcWriteBusy"));
-        return false;
-      }
-
-      if (result.status === "cancelled") {
-        if (nfcWriteCancelledByUserRef.current) {
-          nfcWriteCancelledByUserRef.current = false;
-          return false;
-        }
-
-        pushToast(t("nfcWriteCancelled"));
-        return false;
-      }
-
-      nfcWriteCancelledByUserRef.current = false;
-
-      const message = (result.message ?? "").trim();
-      pushToast(
-        message ? `${t("nfcWriteFailed")}: ${message}` : t("nfcWriteFailed"),
-      );
-
-      return false;
-    },
-    [pushToast, t],
-  );
-
-  const writeCashuTokenToNfc = React.useCallback(
-    async (id: CashuOperationId, tokenText: string) => {
-      const trimmed = tokenText.trim();
-      const deepLink = buildCashuDeepLink(trimmed);
-      if (!deepLink) {
-        pushToast(t("cashuInvalid"));
-        return;
-      }
-
-      const wrote = await writeNfcUriWithToast(
-        deepLink,
-        "nfcWriteTokenSuccess",
-        "token",
-      );
-
-      if (!wrote) return;
-
-      await markCashuTokenExternalized(id);
-    },
-    [markCashuTokenExternalized, pushToast, t, writeNfcUriWithToast],
-  );
-
-  const shareCashuTokenText = React.useCallback(
-    async (id: CashuOperationId, text: string) => {
-      const trimmed = text.trim();
-      if (!trimmed) {
-        pushToast(t("cashuInvalid"));
-        return;
-      }
-
-      const transfer = cashuTransfers.find(
-        (candidate) => String(candidate.id) === id,
-      );
-      if (!transfer) {
-        pushToast(t("cashuInvalid"));
-        return;
-      }
-
-      if (isNativePlatform() || typeof navigator.share === "function") {
-        await shareText(trimmed);
-      } else {
-        setShareOptionsText(trimmed);
-      }
-
-      // A messenger send shared by hand is now out there like a QR token.
-      if (transfer.kind === "send" && transfer.status === "pending") {
-        await markCashuTokenIssued(id);
-      }
-    },
-    [cashuTransfers, markCashuTokenIssued, pushToast, shareText, t],
-  );
-
-  const writeCurrentNpubToNfc = React.useCallback(async () => {
-    const npub = normalizeNpubIdentifier(currentNpub ?? "");
-    if (!npub) {
-      pushToast(t("profileMissingNpub"));
-      return;
-    }
-
-    await writeNfcUriWithToast(
-      `nostr://${npub}`,
-      "nfcWriteProfileSuccess",
-      "profile",
-    );
-  }, [currentNpub, pushToast, t, writeNfcUriWithToast]);
 
   const openNotificationChat = React.useCallback(
     async (rawDetail: unknown): Promise<boolean> => {
@@ -590,41 +340,6 @@ export const useScanNativeComposition = ({
     },
     [contactsLatestRef, currentNsec, dispatchInboxEvent, fetchWrapEvent],
   );
-
-  const handleContactIdentifierScanned = React.useCallback(
-    async (identifier: string) => {
-      await addNewContactFromIdentifier(identifier);
-    },
-    [addNewContactFromIdentifier],
-  );
-
-  const { experimentalFeatures } = useExperimentalFeatures();
-  const openSavedContact = useSetNavIntent("openSavedContactNpub");
-  const handleScannedText = useScannedTextHandler<(typeof contacts)[number]>({
-    closeScan,
-    contacts,
-    contactsRepository,
-    currentNpub,
-    extractCashuTokenFromText,
-    keryxEnabled: experimentalFeatures,
-    lightningInvoiceAutoPayLimit,
-    onContactIdentifierScanned:
-      route.kind === "contactNew" ? handleContactIdentifierScanned : null,
-    openSavedContact,
-    payCashuPaymentRequest,
-    payLightningInvoiceWithCashu,
-    requestLightningInvoiceConfirmation: setPendingLightningInvoiceConfirmation,
-    requestLnurlAuthConfirmation,
-    requestLnurlWithdrawConfirmation: setPendingLnurlWithdrawConfirmation,
-    requestLinkauthLogin,
-    requestSiteLoginConfirmation,
-    saveCashuFromText,
-    scanAcceptsBankPayment:
-      scanEntryPoint === "send" || route.kind === "manualPay",
-    scanEntryPoint,
-    setStatus,
-    t,
-  });
 
   React.useEffect(() => {
     const acceptDeepLinkUrl = (rawUrl: string | null) => {
@@ -920,57 +635,14 @@ export const useScanNativeComposition = ({
     );
   }, [scanImageFile]);
 
-  const onSubmitManualPayText = React.useCallback(
-    async (text: string) => {
-      await handleScannedText(text);
-    },
-    [handleScannedText],
-  );
-
-  React.useEffect(() => {
-    scannedTextHandlerRef.current = handleScannedText;
-  }, [handleScannedText, scannedTextHandlerRef]);
-
-  return {
-    cancelPendingNfcWrite,
-    canWriteNfc,
+  useProvideOwnerCommands(scanCommandsAtom, {
     closeScan,
-    closeShareOptions,
-    contactsGuide,
-    contactsGuideActiveStep,
-    contactsGuideHighlightRect,
-    contactsOnboardingCelebrating,
-    contactsOnboardingTasks,
-    copyShareOptionsText,
     cycleScanCamera,
-    dismissContactsOnboarding,
-    nfcWritePromptKind,
+    handleScannedText,
     onPickScanImage,
-    onSubmitManualPayText,
-    openIssueTokenFromScan,
-    openManualContactFromScan,
-    openManualPayFromScan,
     openReceiveScan,
     openScan,
     openWalletScan,
     pasteScanValue,
-    scanAllowsManualContact,
-    scanDiagnostics,
-    scanCanSwitchCamera,
-    scanEntryPoint,
-    scanIsOpen,
-    scanVideoRef,
-    shareCashuTokenText,
-    shareText,
-    shareOptionsText,
-    shareOptionsViaEmail,
-    shareOptionsViaSms,
-    shareOptionsViaWhatsApp,
-    showContactsOnboarding,
-    stableContactsGuideNav,
-    startContactsGuide,
-    stopContactsGuide,
-    writeCashuTokenToNfc,
-    writeCurrentNpubToNfc,
-  };
+  });
 };

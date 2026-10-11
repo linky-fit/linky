@@ -1,4 +1,4 @@
-import { useAtom } from "@linky-fit/linkstr-react";
+import { useAtom, useAtomValue } from "@linky-fit/linkstr-react";
 import type { PushToastOptions } from "../../../hooks/useToasts";
 import { paidOverlayContact } from "../../lib/paidOverlay";
 import { decodeNpub, encodeNprofile } from "@linky-fit/linkstr";
@@ -21,7 +21,6 @@ import { useMoveMintFunds } from "../mint/useMoveMintFunds";
 import {
   lightningInvoiceAutoPayLimitAtom,
   payWithCashuEnabledAtom,
-  receiveMethodAtom,
 } from "../../state/wallet/prefs";
 import { receiveTokenDraftAtom } from "../../state/wallet/tokenActivity";
 import { useDefaultMint } from "../wallet/useDefaultMint";
@@ -32,18 +31,15 @@ import { useTransferCleanup } from "../wallet/useTransferCleanup";
 import { useWalletOps } from "../wallet/useWalletOps";
 import { useWalletPayments } from "../wallet/useWalletPayments";
 import { useWalletResumes } from "../wallet/useWalletResumes";
-import {
-  useCashuTokenMessageInfo,
-  useWalletBalance,
-} from "../wallet/useWalletInventory";
+import { useWalletBalance } from "../wallet/useWalletInventory";
 import {
   useIssuedTokenClaimWatch,
-  useTokenContactSend,
   useTokenRecovery,
-  useWalletTokens,
 } from "../wallet/useWalletTokens";
 import { useOwnerStorage, usePaymentLog } from "../wallet/useWalletStorage";
-import { usePaidOverlay, usePaidOverlayCommands } from "../shell";
+import { walletCommandsAtom } from "../../state/wallet/walletCommands";
+import { useProvideOwnerCommands } from "../shell/ownerCommands";
+import { usePaidOverlayCommands } from "../shell";
 import { isPendingDeferredReceive } from "../../lib/cashuTransfers";
 import { useContactsMessagingComposition } from "./useContactsMessagingComposition";
 import { useIdentityOwnersComposition } from "./useIdentityOwnersComposition";
@@ -125,7 +121,7 @@ export const useCashuWalletComposition = ({
   t,
   transactions,
 }: UseCashuWalletCompositionParams) => {
-  const { allowTestMints, setAllowTestMints } = useAllowTestMints();
+  const { allowTestMints } = useAllowTestMints();
   const { appOwnerId, currentNpub, currentNsec } = identity;
   const {
     appendLocalNostrMessage,
@@ -146,12 +142,10 @@ export const useCashuWalletComposition = ({
   const { defaultMintChoice, defaultMintUrl, suggestDefaultMint } =
     useDefaultMint();
 
-  const [payWithCashuEnabled, setPayWithCashuEnabled] = useAtom(
-    payWithCashuEnabledAtom,
+  const payWithCashuEnabled = useAtomValue(payWithCashuEnabledAtom);
+  const lightningInvoiceAutoPayLimit = useAtomValue(
+    lightningInvoiceAutoPayLimitAtom,
   );
-  const [lightningInvoiceAutoPayLimit, setLightningInvoiceAutoPayLimit] =
-    useAtom(lightningInvoiceAutoPayLimitAtom);
-  const [receiveMethod, setReceiveMethod] = useAtom(receiveMethodAtom);
 
   useAnonymousPaymentTelemetry({
     appOwnerId,
@@ -163,7 +157,6 @@ export const useCashuWalletComposition = ({
 
   const { dismissPaymentSending, showPaidOverlay, showPaymentSending } =
     usePaidOverlayCommands();
-  const paidOverlay = usePaidOverlay();
 
   React.useEffect(() => {
     migrateLegacyPaymentEvents();
@@ -175,11 +168,9 @@ export const useCashuWalletComposition = ({
   }, [currentNpub]);
 
   const {
-    allWalletProofs,
     cashuEnvelopes,
     cashuTransferLifecycle,
     meltCashuInvoice,
-    probeLightningFee,
     receiveCashuToken,
     resumeDeferredCashuReceives,
     resumePendingCashuAutoswapClaims,
@@ -188,7 +179,6 @@ export const useCashuWalletComposition = ({
     sendCashuToken,
     startCashuTopup,
     walletBalances,
-    walletDeferredReceives,
     walletLoaded,
     walletOperations,
     walletProofs,
@@ -229,15 +219,9 @@ export const useCashuWalletComposition = ({
     transactions,
   });
 
-  const {
-    cashuBalance,
-    cashuBalanceAfterMelt,
-    cashuMeltToMainMintButtonLabel,
-    cashuTotalBalance,
-  } = useWalletBalance();
+  const { cashuBalance, cashuTotalBalance } = useWalletBalance();
 
-  const { estimateMintMove, meltToDefaultMint, moveMintFunds } =
-    useMoveMintFunds();
+  const { meltToDefaultMint } = useMoveMintFunds();
 
   const { startBackgroundTopup } = useTopupFlow({
     cashuTotalBalance,
@@ -251,16 +235,6 @@ export const useCashuWalletComposition = ({
     t,
     topupRecipientNprofile,
   });
-
-  const defaultMintDisplay = useMemo(() => {
-    if (!defaultMintUrl) return null;
-    try {
-      const u = new URL(defaultMintUrl);
-      return u.host;
-    } catch {
-      return defaultMintUrl;
-    }
-  }, [defaultMintUrl]);
 
   useNpubCash({
     ...profile,
@@ -382,11 +356,6 @@ export const useCashuWalletComposition = ({
     walletReady: sendCashuToken !== null && meltCashuInvoice !== null,
   });
 
-  const {
-    discardCashuDeferredReceive,
-    markCashuTokenExternalized,
-    markCashuTokenIssued,
-  } = useWalletTokens();
   const tokenRecovery = useTokenRecovery({
     allowTestMints,
     defaultMintUrl,
@@ -397,7 +366,6 @@ export const useCashuWalletComposition = ({
     rememberSeenMint,
     walletMints,
   });
-  const tokenContactSend = useTokenContactSend({ walletTransfers });
   useIssuedTokenClaimWatch({ walletProofs, walletTransfers });
 
   useDeferredReceiveRetry({
@@ -416,49 +384,41 @@ export const useCashuWalletComposition = ({
     touchMintInfo,
   });
 
-  const getCashuTokenMessageInfo = useCashuTokenMessageInfo();
+  useProvideOwnerCommands(walletCommandsAtom, {
+    closeCashuPaymentRequestConfirmation:
+      walletPayments.closeCashuPaymentRequestConfirmation,
+    closeLightningInvoiceConfirmation:
+      walletPayments.closeLightningInvoiceConfirmation,
+    closeLnurlWithdrawConfirmation:
+      lnurlWithdraw.closeLnurlWithdrawConfirmation,
+    closePaymentMintMeltConfirmation:
+      walletPayments.closePaymentMintMeltConfirmation,
+    confirmCashuPaymentRequest: walletPayments.confirmCashuPaymentRequest,
+    confirmLightningInvoicePayment:
+      walletPayments.confirmLightningInvoicePayment,
+    confirmLnurlWithdraw: lnurlWithdraw.confirmLnurlWithdraw,
+    confirmPaymentMintMelt: walletPayments.confirmPaymentMintMelt,
+    payChatPaymentRequest: walletPayments.onPayChatPaymentRequest,
+    payLightningAddressWithCashu: walletPayments.payLightningAddressWithCashu,
+    payLightningInvoiceWithCashu: walletPayments.payLightningInvoiceWithCashu,
+    paySelectedContact: walletPayments.paySelectedContact,
+    reclaimHandedOutTokens: tokenRecovery.reclaimHandedOutTokens,
+    requestSelectedContact: walletPayments.requestSelectedContact,
+    restoreAndReclaimAllTokens: tokenRecovery.restoreAndReclaimAllTokens,
+    restoreMissingTokens: tokenRecovery.restoreMissingTokens,
+    saveCashuFromText,
+    settleBankPaymentOffer: walletPayments.settleBankPaymentOffer,
+  });
 
   return {
-    ...walletPayments,
-    ...tokenRecovery,
-    ...tokenContactSend,
-    ...lnurlWithdraw,
-    ...paidOverlay,
-    discardCashuDeferredReceive,
-    markCashuTokenExternalized,
-    markCashuTokenIssued,
-    cashuTransferLifecycle,
-    // Backup export and the Nostr bootstrap snapshot need every proof,
-    // including hidden test-mint proofs; keep this unfiltered.
-    allCashuProofs: allWalletProofs,
-    allowTestMints,
     cashuBalance,
-    cashuBalanceAfterMelt,
     cashuIsBusy,
-    cashuMeltToMainMintButtonLabel,
-    cashuDeferredReceives: walletDeferredReceives,
-    cashuProofs: walletProofs,
-    cashuOperations: walletOperations,
     cashuTokensHydratedRef,
-    cashuTransfers: walletTransfers,
-    defaultMintDisplay,
-    defaultMintUrl,
-    estimateMintMove,
-    getCashuTokenMessageInfo,
     isCashuTokenKnownAny,
     isCashuTokenStored,
     lightningInvoiceAutoPayLimit,
-    meltLargestForeignMintToMainMint: meltToDefaultMint,
-    mintInfoByUrl,
-    moveMintFunds,
-    payWithCashuEnabled,
-    receiveMethod,
-    probeLightningFee,
-    refreshMintInfo,
+    payCashuPaymentRequest: walletPayments.payCashuPaymentRequest,
+    payLightningInvoiceWithCashu: walletPayments.payLightningInvoiceWithCashu,
     saveCashuFromText,
-    setLightningInvoiceAutoPayLimit,
-    setAllowTestMints,
-    setPayWithCashuEnabled,
-    setReceiveMethod,
   };
 };

@@ -1,33 +1,32 @@
+import { RegistryContext, useAtomSet } from "@linky-fit/linkstr-react";
 import React from "react";
-import { navigateTo } from "../../../hooks/useRouting";
+import { navigateTo, useRouting } from "../../../hooks/useRouting";
 import type { Route } from "../../../types/route";
+import { mainReturnTabAtom } from "../../state/shell/topbar";
 
-export const useMainMenuState = ({ route }: { route: Route }) => {
-  const mainReturnRouteRef = React.useRef<Route>({ kind: "contacts" });
-
+/** Remembers the main tab the user was last on; mounted once by the shell. */
+export const useMainReturnTabWatcher = (route: Route): void => {
+  const setMainReturnTab = useAtomSet(mainReturnTabAtom);
   React.useEffect(() => {
-    if (route.kind === "wallet") {
-      mainReturnRouteRef.current = { kind: "wallet" };
-      return;
+    if (route.kind === "wallet" || route.kind === "contacts") {
+      setMainReturnTab(route.kind);
     }
-    if (route.kind === "contacts") {
-      mainReturnRouteRef.current = { kind: "contacts" };
-    }
-  }, [route.kind]);
+  }, [route.kind, setMainReturnTab]);
+};
 
+/** Back to the main tab the user came from, and Settings opened from it. */
+export const useMainMenu = () => {
+  const registry = React.useContext(RegistryContext);
+  const route = useRouting();
   const navigateToMainReturn = React.useCallback(() => {
-    if (mainReturnRouteRef.current.kind === "wallet") {
-      navigateTo({ route: "wallet" });
-      return;
-    }
-    navigateTo({ route: "contacts" });
-  }, []);
-
+    navigateTo({ route: registry.get(mainReturnTabAtom) });
+  }, [registry]);
   const openMenu = React.useCallback(() => {
-    mainReturnRouteRef.current =
-      route.kind === "wallet" ? { kind: "wallet" } : { kind: "contacts" };
+    registry.set(
+      mainReturnTabAtom,
+      route.kind === "wallet" ? "wallet" : "contacts",
+    );
     navigateTo({ route: "settings" });
-  }, [route.kind]);
-
+  }, [registry, route.kind]);
   return { navigateToMainReturn, openMenu };
 };

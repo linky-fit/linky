@@ -23,10 +23,7 @@ import { useDocumentVisible } from "../../../hooks/useDocumentVisible";
 import { useLatest } from "../../../hooks/useLatest";
 import { useOnline } from "../../../hooks/useOnline";
 import { navigateTo, useRouting } from "../../../hooks/useRouting";
-import { type Lang } from "../../../i18n";
 import {
-  buildStatusFilterValue,
-  parseProfileGeneralStatus,
   isStatusFilterValue,
   parseStatusFilterValue,
 } from "../../../nostrStatus";
@@ -39,46 +36,33 @@ import {
   ARCHIVED_CONTACTS_FILTER,
   NO_GROUP_FILTER,
 } from "../../../utils/constants";
-import { getContactGroups } from "../../../utils/contactGroups";
 import { getBestNostrName } from "../../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import { setStoredPushContactNames } from "../../../utils/pushContactNamesStorage";
-import { getBankPaymentOfferCurrency } from "@linky-fit/proxy-payment";
-import { mergeBankPaymentOffersIntoLastMessageByContactId } from "../../lib/bankPaymentOfferRows";
-import {
-  collectUnreadNewestIncomingByContactId,
-  contactsToUnarchive,
-} from "../../lib/chatUnread";
+import { contactsToUnarchive } from "../../lib/chatUnread";
 import { NO_WRITE, runWrite, type WriteOutcome } from "../../lib/storeWrite";
 import {
   pendingUnknownContactAddAtom,
   unknownNamesAtom,
 } from "../../state/contacts/chatContacts";
 import { contactsCommandsAtom } from "../../state/contacts/commands";
+import { unreadByContactIdAtom } from "../../state/contacts/contactsList";
 import {
   contactsOnboardingHasBackedUpKeysAtom,
   contactsOnboardingHasPaidAtom,
 } from "../../state/contacts/onboarding";
-import {
-  contactNewPrefillAtom,
-  recentlyAddedContactIdAtom,
-} from "../../state/contacts/contactForm";
 import { bankPaymentOfferMessagesAtom } from "../../state/messages/bankOffers";
 import { chatDraftAtom } from "../../state/messages/chat";
 import { messagesVisibleSinceSecAtom } from "../../state/messages/readModel";
 import { currentPubkeyAtom } from "../../state/session/session";
 import { seenReceiptsEnabledAtSecAtom } from "../../state/shell/devicePrefs";
-import { payAmountAtom } from "../../state/wallet/contactPay";
 import type { PaymentLogData } from "../../types/appTypes";
 import {
   useContactEditor,
   useContactEditorParams,
   useContactEditorWatchers,
 } from "../contacts/useContactEditor";
-import {
-  useCloseContactDetail,
-  useOpenContactPay,
-} from "../contacts/useContactActions";
+import { useOpenNewContactPage } from "../contacts/useContactActions";
 import {
   useChatContact,
   useDisplayContacts,
@@ -87,7 +71,7 @@ import {
 import { useProfileCache } from "../contacts/useProfileCache";
 import { useSaveNpubContact } from "../contacts/useSaveNpubContact";
 import { useSharedProfileLink } from "../contacts/useSharedProfileLink";
-import { useVisibleContacts } from "../contacts/useVisibleContacts";
+import { statusFilterSummary } from "../contacts/useContactsList";
 import { useChatScroll } from "../messages/chatScroll";
 import { applyOutboxResult } from "../messages/outboxResults";
 import type { PeerSeenWindow } from "../messages/seenReceiptInbox";
@@ -102,13 +86,9 @@ import { useLinkstrInboxSync } from "../messages/useLinkstrInboxSync";
 import { useMessagesCommands } from "../messages/useMessagesCommands";
 import { useMuteListSync } from "../messages/useMuteListSync";
 import { useUnknownSenderReassignment } from "../messages/useUnknownSenderReassignment";
-import { useSetNavIntent } from "../shell/navIntents";
 import { useBankPaymentOffers } from "../useBankPaymentOffers";
 import { useContactsDomain } from "../useContactsDomain";
-import {
-  useFeedbackContactWatcher,
-  useOpenFeedbackContact,
-} from "../useFeedbackContact";
+import { useFeedbackContactWatcher } from "../useFeedbackContact";
 import { useLinkstrConfigSync } from "../useLinkstrConfigSync";
 import {
   fetchAndCacheProfiles,
@@ -159,7 +139,6 @@ interface UseContactsMessagingCompositionParams {
   currentNsec: string | null;
   formatDisplayedAmountText: (amountSat: number) => string;
   isSeedLogin: boolean;
-  lang: Lang;
   logPayStep: (step: string, data?: PaymentLogData) => void;
   maybeShowPwaNotification: (
     title: string,
@@ -187,7 +166,6 @@ export const useContactsMessagingComposition = ({
   currentNsec,
   formatDisplayedAmountText,
   isSeedLogin,
-  lang,
   logPayStep,
   maybeShowPwaNotification,
   pushToast,
@@ -197,15 +175,11 @@ export const useContactsMessagingComposition = ({
   t,
 }: UseContactsMessagingCompositionParams) => {
   const registry = React.useContext(RegistryContext);
-  const recentlyAddedContactId = useAtomValue(recentlyAddedContactIdAtom);
 
-  const [contactsOnboardingHasPaid, setContactsOnboardingHasPaid] = useAtom(
-    contactsOnboardingHasPaidAtom,
+  const contactsOnboardingHasPaid = useAtomValue(contactsOnboardingHasPaidAtom);
+  const contactsOnboardingHasBackedUpKeys = useAtomValue(
+    contactsOnboardingHasBackedUpKeysAtom,
   );
-  const [
-    contactsOnboardingHasBackedUpKeys,
-    setContactsOnboardingHasBackedUpKeys,
-  ] = useAtom(contactsOnboardingHasBackedUpKeysAtom);
 
   const chatOwnPubkeyHex = useAtomValue(currentPubkeyAtom);
 
@@ -258,16 +232,6 @@ export const useContactsMessagingComposition = ({
 
   const nostrMetadataInFlight = React.useRef<Set<string>>(new Set());
 
-  const contactNameCollator = useMemo(
-    () =>
-      new Intl.Collator(lang, {
-        usage: "sort",
-        numeric: true,
-        sensitivity: "variant",
-      }),
-    [lang],
-  );
-
   const accountHydrated = useAccountHydrated();
   const messagesCommands = useMessagesCommands();
   const reassignContactMessages = React.useCallback(
@@ -277,26 +241,13 @@ export const useContactsMessagingComposition = ({
     [messagesCommands],
   );
 
-  const {
-    activeGroup,
-    contacts,
-    contactsFilterOpen,
-    contactsSearch,
-    contactsSearchInputRef,
-    contactsSearchParts,
-    groupCounts,
-    groupNames,
-    selectedContact,
-    setActiveGroup,
-    setContactsSearch,
-    toggleContactsFilter,
-    ungroupedCount,
-  } = useContactsDomain({
-    accountHydrated,
-    contacts: contactsRepository,
-    noGroupFilterValue: NO_GROUP_FILTER,
-    route,
-  });
+  const { activeGroup, contacts, selectedContact, setActiveGroup } =
+    useContactsDomain({
+      accountHydrated,
+      contacts: contactsRepository,
+      noGroupFilterValue: NO_GROUP_FILTER,
+      route,
+    });
 
   const contactsLatestRef = useLatest(contacts);
 
@@ -326,7 +277,6 @@ export const useContactsMessagingComposition = ({
     appendLocalNostrMessage,
     appendLocalNostrReaction,
     chatMessages,
-    lastMessageByContactId,
     latestMessages,
     nostrMessagesLocal,
     nostrMessagesRecent,
@@ -367,17 +317,7 @@ export const useContactsMessagingComposition = ({
     enabled: deferredOnlineReady,
   });
 
-  const {
-    canSaveNewRelay,
-    isRecommendedRelay,
-    newRelayUrl,
-    pendingRelayDeleteUrl,
-    relayUrls,
-    requestDeleteSelectedRelay,
-    saveNewRelay,
-    selectedRelayUrl,
-    setNewRelayUrl,
-  } = useRelayDomain({
+  const { relayUrls } = useRelayDomain({
     currentNpub,
     currentNsec,
     networkEnabled: canRunNostrNetworkWork,
@@ -401,14 +341,9 @@ export const useContactsMessagingComposition = ({
   });
 
   const {
-    activeBankPaymentOfferContacts,
     applyBankPaymentOfferSnapshot,
-    bankPaymentOfferRecipientCount,
-    bankPaymentOfferStaggerDelaySec,
     getBankPaymentOfferForSettlement,
     isBankPaymentOfferCanceled,
-    recentBankPaymentOfferOutcomesByContactId,
-    requestBankPaymentOffer,
     respondToBankPaymentOfferWithGroupState,
   } = useBankPaymentOffers({
     currentNsec,
@@ -419,15 +354,6 @@ export const useContactsMessagingComposition = ({
   const chatMessagesWithBankPaymentOffers = React.useMemo(
     () => withChatOffers(route, chatMessages, bankPaymentOfferMessages),
     [bankPaymentOfferMessages, chatMessages, route],
-  );
-
-  const lastVisibleMessageByContactId = React.useMemo(
-    () =>
-      mergeBankPaymentOffersIntoLastMessageByContactId(
-        lastMessageByContactId,
-        bankPaymentOfferMessages,
-      ),
-    [bankPaymentOfferMessages, lastMessageByContactId],
   );
 
   const [unknownNames, setUnknownNames] = useAtom(unknownNamesAtom);
@@ -444,8 +370,7 @@ export const useContactsMessagingComposition = ({
     t,
   });
 
-  const { displayContactById, displayContacts, unknownContacts } =
-    useDisplayContacts();
+  const { displayContacts, unknownContacts } = useDisplayContacts();
 
   useUnknownSenderReassignment({
     contacts,
@@ -569,125 +494,10 @@ export const useContactsMessagingComposition = ({
 
   const selectedChatContact = useChatContact(route);
 
-  const displayContactsSearchData = React.useMemo(() => {
-    return displayContacts.map((contact) => {
-      const idKey = (contact.id ?? "").trim();
-      const groupNames = getContactGroups(contact);
-      const normalizedNpub = normalizeNpubIdentifier(contact.npub ?? "");
-      const statusFilterValues = normalizedNpub
-        ? parseProfileGeneralStatus(nostrStatusByNpub[normalizedNpub])
-            .currencies
-        : [];
-      const haystack = [
-        contact.name,
-        contact.npub,
-        contact.lnAddress,
-        ...groupNames,
-        contact.unknownPubkeyHex,
-        ...statusFilterValues,
-      ]
-        .map((value) => (value ?? "").trim().toLowerCase())
-        .filter(Boolean)
-        .join(" ");
-
-      return {
-        contact,
-        idKey,
-        groupNames,
-        haystack,
-        statusFilterValues,
-      };
-    });
-  }, [displayContacts, nostrStatusByNpub]);
-
-  const { statusFilterCounts, statusFilterCurrencies } = React.useMemo(() => {
-    const currencyCounts = new Map<string, number>();
-
-    for (const contact of displayContacts) {
-      if ((contact.archivedAtSec ?? 0) > 0) continue;
-      const normalizedNpub = normalizeNpubIdentifier(contact.npub ?? "");
-      if (!normalizedNpub) continue;
-
-      for (const currency of parseProfileGeneralStatus(
-        nostrStatusByNpub[normalizedNpub],
-      ).currencies) {
-        currencyCounts.set(currency, (currencyCounts.get(currency) ?? 0) + 1);
-      }
-    }
-
-    const currencies = [...currencyCounts.entries()]
-      .sort((left, right) => {
-        if (right[1] !== left[1]) return right[1] - left[1];
-        return left[0].localeCompare(right[0]);
-      })
-      .map(([currency]) => currency);
-    return {
-      statusFilterCounts: currencyCounts,
-      statusFilterCurrencies: currencies,
-    };
-  }, [displayContacts, nostrStatusByNpub]);
-
-  const contactFilterOptions = React.useMemo(() => {
-    const options: Array<{ count: number; label: string; value: string }> = [];
-    if (ungroupedCount > 0) {
-      options.push({
-        count: ungroupedCount,
-        label: t("noGroup"),
-        value: NO_GROUP_FILTER,
-      });
-    }
-    const archivedCount = displayContacts.filter(
-      (contact) => (contact.archivedAtSec ?? 0) > 0,
-    ).length;
-    if (archivedCount > 0) {
-      options.push({
-        count: archivedCount,
-        label: t("archiveFilter"),
-        value: ARCHIVED_CONTACTS_FILTER,
-      });
-    }
-    for (const groupName of groupNames) {
-      options.push({
-        count: groupCounts.get(groupName) ?? 0,
-        label: groupName,
-        value: groupName,
-      });
-    }
-    for (const currency of statusFilterCurrencies) {
-      options.push({
-        count: statusFilterCounts.get(currency) ?? 0,
-        label: currency,
-        value: buildStatusFilterValue(currency),
-      });
-    }
-    return options.sort((left, right) => {
-      const leftSpecialOrder =
-        left.value === ARCHIVED_CONTACTS_FILTER
-          ? 2
-          : left.value === NO_GROUP_FILTER
-            ? 1
-            : 0;
-      const rightSpecialOrder =
-        right.value === ARCHIVED_CONTACTS_FILTER
-          ? 2
-          : right.value === NO_GROUP_FILTER
-            ? 1
-            : 0;
-      if (leftSpecialOrder !== rightSpecialOrder) {
-        return leftSpecialOrder - rightSpecialOrder;
-      }
-      if (right.count !== left.count) return right.count - left.count;
-      return left.label.localeCompare(right.label);
-    });
-  }, [
-    displayContacts,
-    groupCounts,
-    groupNames,
-    statusFilterCounts,
-    statusFilterCurrencies,
-    t,
-    ungroupedCount,
-  ]);
+  const { statusFilterCurrencies } = React.useMemo(
+    () => statusFilterSummary(displayContacts, nostrStatusByNpub),
+    [displayContacts, nostrStatusByNpub],
+  );
 
   React.useEffect(() => {
     if (activeGroup === ARCHIVED_CONTACTS_FILTER) return;
@@ -704,123 +514,15 @@ export const useContactsMessagingComposition = ({
     }
   }, [activeGroup, setActiveGroup, statusFilterCurrencies]);
 
-  const chatLastSeenAtSecByContactId = React.useMemo(() => {
-    const byContactId = new Map<string, number>();
-    for (const contact of contacts) {
-      const contactId = contact.id.trim();
-      const lastSeenAtSec = contact.chatLastSeenAtSec ?? 0;
-      if (!contactId || !Number.isFinite(lastSeenAtSec) || lastSeenAtSec <= 0) {
-        continue;
-      }
-      byContactId.set(contactId, lastSeenAtSec);
-    }
-    return byContactId;
-  }, [contacts]);
-
   const messagesVisibleSinceSec = useAtomValue(messagesVisibleSinceSecAtom);
   const seenReceiptsEnabledAtSec = useAtomValue(seenReceiptsEnabledAtSecAtom);
-  const unreadByContactId = React.useMemo(
-    () =>
-      collectUnreadNewestIncomingByContactId(
-        [...nostrMessagesLocal, ...bankPaymentOfferMessages],
-        chatLastSeenAtSecByContactId,
-        messagesVisibleSinceSec,
-      ),
-    [
-      bankPaymentOfferMessages,
-      chatLastSeenAtSecByContactId,
-      messagesVisibleSinceSec,
-      nostrMessagesLocal,
-    ],
-  );
-
-  const visibleContacts = useVisibleContacts<DisplayContact>({
-    activeGroup,
-    contactNameCollator,
-    contactsSearchData: displayContactsSearchData,
-    contactsSearchParts,
-    lastMessageByContactId: lastVisibleMessageByContactId,
-    noGroupFilterValue: NO_GROUP_FILTER,
-    pinnedContactId: recentlyAddedContactId,
-    unreadByContactId,
-  });
-
-  const bankPaymentOfferCurrency =
-    route.kind === "bankPayment"
-      ? getBankPaymentOfferCurrency(route.spdPayload)
-      : null;
-
-  const bankPaymentOfferContacts = React.useMemo(() => {
-    if (!bankPaymentOfferCurrency) return [];
-
-    const sortedContacts = [
-      ...visibleContacts.pinned,
-      ...visibleContacts.conversations,
-      ...visibleContacts.others,
-    ];
-    return sortedContacts.flatMap((contact) => {
-      const normalizedNpub = normalizeNpubIdentifier(contact.npub ?? "");
-      if (!normalizedNpub) return [];
-      if (
-        !parseProfileGeneralStatus(
-          nostrStatusByNpub[normalizedNpub],
-        ).currencies.includes(bankPaymentOfferCurrency)
-      ) {
-        return [];
-      }
-
-      return [
-        {
-          ...contact,
-          pictureUrl: nostrPictureByNpub[normalizedNpub] ?? null,
-          recentBankPaymentOfferOutcomes:
-            recentBankPaymentOfferOutcomesByContactId.get(
-              (contact.id ?? "").trim(),
-            ) ?? [],
-        },
-      ];
-    });
-  }, [
-    bankPaymentOfferCurrency,
-    recentBankPaymentOfferOutcomesByContactId,
-    nostrPictureByNpub,
-    nostrStatusByNpub,
-    visibleContacts.pinned,
-    visibleContacts.conversations,
-    visibleContacts.others,
-  ]);
+  const unreadByContactId = useAtomValue(unreadByContactIdAtom);
 
   const contactEditorParams = useContactEditorParams(route);
   useContactEditorWatchers(contactEditorParams);
-  const { addNewContactFromIdentifier, clearContactForm, setForm } =
-    useContactEditor(contactEditorParams);
-  const closeContactDetail = useCloseContactDetail();
+  const { addNewContactFromIdentifier } = useContactEditor(contactEditorParams);
 
-  const setPayAmount = useAtomSet(payAmountAtom);
-  const [contactNewPrefill, setContactNewPrefill] = useAtom(
-    contactNewPrefillAtom,
-  );
-  const openNewContactPage = React.useCallback(() => {
-    setPayAmount("");
-    clearContactForm();
-    const prefill = contactNewPrefill;
-    setContactNewPrefill(null);
-    if (prefill) {
-      setForm({
-        name: prefill.suggestedName ?? "",
-        npub: prefill.npub ?? "",
-        lnAddress: prefill.lnAddress,
-        groups: [],
-      });
-    }
-    navigateTo({ route: "contactNew" });
-  }, [
-    clearContactForm,
-    contactNewPrefill,
-    setContactNewPrefill,
-    setForm,
-    setPayAmount,
-  ]);
+  const openNewContactPage = useOpenNewContactPage();
 
   useOutboxResults(async (result) => {
     applyOutboxResult(result, {
@@ -836,7 +538,6 @@ export const useContactsMessagingComposition = ({
   const { unarchiveContact } = useAtomSuspense(contactsCommandsAtom).value;
 
   useFeedbackContactWatcher(contacts);
-  const openFeedbackContact = useOpenFeedbackContact();
 
   // The in-flight set keeps the effect from repeating the write before the
   // restored row is read back.
@@ -852,43 +553,6 @@ export const useContactsMessagingComposition = ({
       });
     }
   }, [accountHydrated, contacts, unarchiveContact, unreadByContactId]);
-
-  const openContactPay = useOpenContactPay();
-  const setContactPayBackToChat = useSetNavIntent("contactPayBackToChat");
-
-  const openContactDetail = React.useCallback(
-    (contact: DisplayContact) => {
-      const contactId = (contact.id ?? "").trim();
-      if (!contactId) return;
-
-      setContactPayBackToChat(null);
-
-      if (contact.isUnknownContact) {
-        navigateTo({ route: "chat", id: contactId });
-        return;
-      }
-
-      const knownContact =
-        contacts.find((row) => row.id.trim() === contactId) ?? null;
-      if (!knownContact) {
-        navigateTo({ route: "contacts" });
-        return;
-      }
-
-      const npub = (knownContact.npub ?? "").trim();
-      const ln = (knownContact.lnAddress ?? "").trim();
-      if (!npub) {
-        if (ln) {
-          openContactPay(knownContact.id);
-          return;
-        }
-        navigateTo({ route: "contact", id: knownContact.id });
-        return;
-      }
-      navigateTo({ route: "chat", id: knownContact.id });
-    },
-    [contacts, openContactPay, setContactPayBackToChat],
-  );
 
   // Only a contacts change re-checks the pending add, so it is read here
   // rather than subscribed to.
@@ -1039,15 +703,9 @@ export const useContactsMessagingComposition = ({
   });
 
   return {
-    activeBankPaymentOfferContacts,
-    activeGroup,
     addNewContactFromIdentifier,
     appendLocalNostrMessage,
     autoAcceptedChatMessageIdsRef,
-    bankPaymentOfferContacts,
-    bankPaymentOfferRecipientCount,
-    bankPaymentOfferStaggerDelaySec,
-    canSaveNewRelay,
     chatDidInitialScrollForContactRef,
     chatForceScrollToBottomRef,
     chatLastMessageCountRef,
@@ -1056,56 +714,28 @@ export const useContactsMessagingComposition = ({
     chatMessagesRef,
     chatMessagesWithBankPaymentOffers,
     chatScrollTargetIdRef,
-    closeContactDetail,
-    contactFilterOptions,
     contacts,
-    contactsFilterOpen,
     contactsLatestRef,
     contactsOnboardingHasBackedUpKeys,
     contactsOnboardingHasPaid,
     contactsOnboardingHasSentMessage,
-    contactsSearch,
-    contactsSearchInputRef,
     dispatchInboxEvent,
-    displayContactById,
     getBankPaymentOfferForSettlement,
-    groupNames,
     isBankPaymentOfferCanceled,
-    isRecommendedRelay,
-    lastMessageByContactId: lastVisibleMessageByContactId,
     latestMessages,
-    newRelayUrl,
     nostrBootstrapReady,
     nostrMessagesLocal,
     nostrMessagesRecent,
     nostrMetadataByNpub,
     nostrPictureByNpub,
     nostrStatusByNpub,
-    openContactDetail,
-    openFeedbackContact,
     openNewContactPage,
     pendingPaymentsKey,
-    pendingRelayDeleteUrl,
-    relayUrls,
-    requestBankPaymentOffer,
-    requestDeleteSelectedRelay,
     respondToBankPaymentOfferWithGroupState,
-    saveNewRelay,
     saveNpubContact,
     selectedChatContact,
     selectedContact,
-    selectedRelayUrl,
     sendChatMessage,
-    setActiveGroup,
-    setContactsOnboardingHasBackedUpKeys,
-    setContactsOnboardingHasPaid,
-    setContactsSearch,
-    setNewRelayUrl,
-    statusFilterCurrencies,
-    toggleContactsFilter,
-    ungroupedCount,
-    unreadByContactId,
     updateLocalNostrMessage,
-    visibleContacts,
   };
 };

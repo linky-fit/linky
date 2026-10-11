@@ -47,10 +47,20 @@ vi.mock("@linky-fit/linkstr-react", async (importOriginal) => ({
 import { AtomRegistry, RegistryContext } from "@linky-fit/linkstr-react";
 import { mergeBankPaymentOffersIntoChatMessages } from "../lib/bankPaymentOfferRows";
 import { contactsAtom } from "../state/contacts/readModel";
-import { bankPaymentOfferMessagesAtom } from "../state/messages/bankOffers";
+import {
+  bankOfferDefaultsAtom,
+  bankPaymentOfferMessagesAtom,
+} from "../state/messages/bankOffers";
+import { platformAtom } from "../state/platform";
 import { sessionAtom } from "../state/session/session";
-import { signedInSession } from "../../testUtils/appRegistry";
-import { useBankPaymentOffers } from "./useBankPaymentOffers";
+import {
+  signedInSession,
+  testPlatformPorts,
+} from "../../testUtils/appRegistry";
+import {
+  useActiveBankPaymentOfferContacts,
+  useBankPaymentOffers,
+} from "./useBankPaymentOffers";
 
 const owner = makeIdentity();
 const recipient = makeIdentity();
@@ -162,7 +172,13 @@ const unmounts: (() => Promise<void>)[] = [];
 const setup = async ({
   contacts: savedContacts = contacts,
 }: { contacts?: readonly ContactRowLike[] } = {}) => {
-  let value: ReturnType<typeof useBankPaymentOffers> | undefined;
+  let value:
+    | (ReturnType<typeof useBankPaymentOffers> & {
+        activeBankPaymentOfferContacts: ReturnType<
+          typeof useActiveBankPaymentOfferContacts
+        >;
+      })
+    | undefined;
   const currentNsec = nip19.nsecEncode(owner.secretKey);
   const params: Parameters<typeof useBankPaymentOffers>[0] = {
     currentNsec,
@@ -173,13 +189,15 @@ const setup = async ({
     initialValues: [
       [contactsAtom, savedContacts],
       [sessionAtom, signedInSession({ nsec: currentNsec })],
+      [platformAtom, testPlatformPorts()],
     ],
   });
   const Harness = () => {
     const offers = useBankPaymentOffers(params);
+    const activeBankPaymentOfferContacts = useActiveBankPaymentOfferContacts();
     useEffect(() => {
-      value = offers;
-    }, [offers]);
+      value = { ...offers, activeBankPaymentOfferContacts };
+    }, [activeBankPaymentOfferContacts, offers]);
     return null;
   };
   const mounted = await renderIntoDocument(
@@ -190,9 +208,12 @@ const setup = async ({
   unmounts.push(mounted.unmount);
   return () => {
     if (!value) throw new Error("hook did not render");
+    const defaults = registry.get(bankOfferDefaultsAtom);
     return {
       ...value,
       bankPaymentOfferMessages: registry.get(bankPaymentOfferMessagesAtom),
+      bankPaymentOfferRecipientCount: defaults.recipientCount,
+      bankPaymentOfferStaggerDelaySec: defaults.staggerDelaySec,
     };
   };
 };

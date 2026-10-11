@@ -12,10 +12,12 @@ import {
 } from "@linky-fit/ui";
 import type { IconName } from "@linky-fit/ui";
 import React from "react";
+import { useTranslation } from "../app/hooks/shell";
 import {
-  useAppShellActions,
-  useAppShellCore,
-} from "../app/context/AppShellContexts";
+  useScanCommands,
+  useScanShortcuts,
+  useScanView,
+} from "../app/hooks/shell/scan";
 import { useInspectorEmissionEnabled } from "../devtools/inspector/inspectorEnabled";
 import { useDesktopSplitView } from "../hooks/useDesktopSplitView";
 import { navigateTo } from "../hooks/useRouting";
@@ -27,23 +29,21 @@ interface ScanAction {
 }
 
 export function ScanModal(): React.ReactElement {
+  const { closeScan, cycleScanCamera, onPickScanImage, pasteScanValue } =
+    useScanCommands();
   const {
-    closeScan,
-    cycleScanCamera,
     openIssueTokenFromScan: onIssueToken,
-    onPickScanImage,
     openManualPayFromScan: onTypePayment,
     openManualContactFromScan: onTypeManually,
-    pasteScanValue,
-  } = useAppShellActions();
+  } = useScanShortcuts();
   const {
     scanDiagnostics,
     scanCanSwitchCamera,
     scanEntryPoint,
     scanVideoRef,
     scanAllowsManualContact: showTypeAction,
-    t,
-  } = useAppShellCore();
+  } = useScanView();
+  const { t } = useTranslation();
   const isDesktopSplitView = useDesktopSplitView();
   // What the camera decodes is developer information; the progress of an
   // animation is not, so only the detail line waits for the inspector.

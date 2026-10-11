@@ -4,6 +4,7 @@ import {
   isAnimatedQrFrame,
   type AnimatedQrReader,
 } from "../../utils/animatedQr";
+import { useAtom, useAtomSet, useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
 import {
   startNativeQrScan,
@@ -19,36 +20,20 @@ import {
   buildQrCameraConstraintCandidates,
   configureQrCameraTrack,
 } from "../lib/qrCamera";
+import {
+  SCAN_DIAGNOSTICS_START,
+  scanCameraDevicesAtom,
+  scanDiagnosticsAtom,
+  scanEntryPointAtom,
+  scanIsOpenAtom,
+  scanVideoRefAtom,
+  type ScanDiagnostics,
+  type ScanEntryPoint,
+} from "../state/shell/scan";
 import { useContactsGuide } from "./guide/useContactsGuide";
 import type { Translate } from "../../i18n";
 
-/** What the scanner has collected of the animation it is reading. */
-export interface AnimatedQrScanState {
-  received: number;
-  expected: number | null;
-}
-
-/**
- * What the camera is actually reading, shown while scanning. A scan that goes
- * nowhere is otherwise indistinguishable from a camera decoding nothing, and
- * the difference decides where to look.
- */
-export interface ScanDiagnostics {
-  /** QR values decoded since the scanner opened. */
-  reads: number;
-  /** Why the last animation frame was refused, when one was. */
-  lastRejection: string;
-  /** Start of the most recent decoded value. */
-  lastValue: string;
-  animation: AnimatedQrScanState | null;
-}
-
-const SCAN_DIAGNOSTICS_START: ScanDiagnostics = {
-  animation: null,
-  lastRejection: "",
-  lastValue: "",
-  reads: 0,
-};
+export type { ScanDiagnostics };
 
 /** Enough of a value to recognise the format, short enough for one line. */
 const SCAN_VALUE_PREVIEW_CHARS = 28;
@@ -66,21 +51,14 @@ interface UseGuideScannerDomainParams {
   t: Translate;
 }
 
-type ScanEntryPoint = "contacts" | "receive" | "send";
-
-type UseGuideScannerDomainResult = ReturnType<typeof useContactsGuide> & {
+interface UseGuideScannerDomainResult {
   closeScan: () => void;
   cycleScanCamera: () => void;
   openScan: () => void;
   openReceiveScan: () => void;
   openWalletScan: () => void;
-  scanAllowsManualContact: boolean;
-  scanDiagnostics: ScanDiagnostics;
-  scanCanSwitchCamera: boolean;
   scanEntryPoint: ScanEntryPoint | null;
-  scanIsOpen: boolean;
-  scanVideoRef: React.RefObject<HTMLVideoElement | null>;
-};
+}
 
 const MAX_QR_DECODE_SIDE = 640;
 
@@ -127,7 +105,7 @@ export const useGuideScannerDomain = ({
   route,
   t,
 }: UseGuideScannerDomainParams): UseGuideScannerDomainResult => {
-  const contactsGuideDomain = useContactsGuide({
+  useContactsGuide({
     cashuBalance,
     contacts,
     contactsOnboardingHasBackedUpKeys,
@@ -137,18 +115,17 @@ export const useGuideScannerDomain = ({
     route,
   });
 
-  const [scanIsOpen, setScanIsOpen] = React.useState(false);
-  const [scanEntryPoint, setScanEntryPoint] =
-    React.useState<ScanEntryPoint | null>(null);
+  const [scanIsOpen, setScanIsOpen] = useAtom(scanIsOpenAtom);
+  const [scanEntryPoint, setScanEntryPoint] = useAtom(scanEntryPointAtom);
   const [scanStream, setScanStream] = React.useState<MediaStream | null>(null);
-  const [scanCameraDevices, setScanCameraDevices] = React.useState<
-    readonly MediaDeviceInfo[]
-  >([]);
+  const [scanCameraDevices, setScanCameraDevices] = useAtom(
+    scanCameraDevicesAtom,
+  );
   const [scanCameraDeviceId, setScanCameraDeviceId] = React.useState<
     string | null
   >(null);
 
-  const scanVideoRef = React.useRef<HTMLVideoElement | null>(null);
+  const scanVideoRef = useAtomValue(scanVideoRefAtom);
   const scanOpenRequestIdRef = React.useRef(0);
   const scanIsOpenRef = React.useRef(false);
   const nativeScanHandleRef = React.useRef<NativeScanStreamHandle | null>(null);
@@ -158,9 +135,7 @@ export const useGuideScannerDomain = ({
   const animatedQrReaderRef = React.useRef<Promise<AnimatedQrReader> | null>(
     null,
   );
-  const [scanDiagnostics, setScanDiagnostics] = React.useState<ScanDiagnostics>(
-    SCAN_DIAGNOSTICS_START,
-  );
+  const setScanDiagnostics = useAtomSet(scanDiagnosticsAtom);
 
   React.useEffect(() => {
     scanIsOpenRef.current = scanIsOpen;
@@ -209,7 +184,7 @@ export const useGuideScannerDomain = ({
 
       return null;
     });
-  }, []);
+  }, [scanVideoRef]);
 
   const closeScan = React.useCallback(() => {
     animatedQrReaderRef.current = null;
@@ -222,14 +197,20 @@ export const useGuideScannerDomain = ({
     preferredCameraDeviceIdRef.current = null;
     scanOpenRequestIdRef.current += 1;
     stopScanStream();
-  }, [stopScanStream]);
+  }, [
+    stopScanStream,
+    setScanIsOpen,
+    setScanEntryPoint,
+    setScanDiagnostics,
+    setScanCameraDevices,
+  ]);
 
   const handleScannedTextRef = useLatest(onScannedText);
 
   const resetAnimatedQr = React.useCallback(() => {
     animatedQrReaderRef.current = null;
     setScanDiagnostics((current) => ({ ...current, animation: null }));
-  }, []);
+  }, [setScanDiagnostics]);
 
   /**
    * One frame of a NUT-16 animation is not a payload: it is collected until
@@ -277,7 +258,7 @@ export const useGuideScannerDomain = ({
       resetAnimatedQr();
       return progress.payload;
     },
-    [resetAnimatedQr],
+    [resetAnimatedQr, setScanDiagnostics],
   );
 
   const handleDetectedScanValue = React.useCallback(
@@ -556,7 +537,16 @@ export const useGuideScannerDomain = ({
         }
       })();
     },
-    [handleNativeScanResult, logScanDebug, pushToast, stopScanStream, t],
+    [
+      handleNativeScanResult,
+      logScanDebug,
+      pushToast,
+      stopScanStream,
+      t,
+      setScanIsOpen,
+      setScanEntryPoint,
+      setScanCameraDevices,
+    ],
   );
 
   React.useEffect(() => {
@@ -783,20 +773,14 @@ export const useGuideScannerDomain = ({
       cancelled = true;
       stop();
     };
-  }, [handleDetectedScanValue, scanIsOpen, scanStream]);
+  }, [handleDetectedScanValue, scanIsOpen, scanStream, scanVideoRef]);
 
   return {
     closeScan,
-    scanDiagnostics,
     cycleScanCamera,
-    ...contactsGuideDomain,
     openScan,
     openReceiveScan,
     openWalletScan,
-    scanAllowsManualContact: scanEntryPoint === "contacts",
-    scanCanSwitchCamera: scanCameraDevices.length > 1,
     scanEntryPoint,
-    scanIsOpen,
-    scanVideoRef,
   };
 };

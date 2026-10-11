@@ -1,6 +1,7 @@
 import type { RecurringPaymentId } from "@linky-fit/linksync";
 import { Atom } from "effect/reactivity";
 import { armAtoms } from "../shell/arm";
+import { ownerCommandsAtom } from "../shell/ownerCommands";
 
 /** A due payment waiting for the in-app countdown to end (or the user to decide). */
 export interface RecurringDueConfirmation {
@@ -27,10 +28,9 @@ export interface RecurringSchedulerCommands {
   readonly cancelDue: () => Promise<void>;
 }
 
-/** The page's one scheduler, null until the wallet composition mounted it. */
-export const recurringSchedulerAtom = Atom.keepAlive(
-  Atom.make<RecurringSchedulerCommands | null>(null),
-);
+/** The page's one scheduler, mounted by the wallet composition. */
+export const recurringSchedulerAtom =
+  ownerCommandsAtom<RecurringSchedulerCommands>();
 
 /** The payment whose delete was tapped once; a second tap within 5 s deletes it. */
 export const recurringDeleteArm = armAtoms<string>(5000);

@@ -7,6 +7,7 @@ import {
 } from "@linky-fit/linkstr";
 import {
   RegistryContext,
+  useAtomSet,
   useAtomValue,
   useLinkstrCommands,
 } from "@linky-fit/linkstr-react";
@@ -22,8 +23,6 @@ import {
   bankPaymentOfferResponseDraft,
   bankPaymentOfferStaggerDue,
   bankPaymentOfferStaggerQueue,
-  BANK_PAYMENT_OFFER_DEFAULT_RECIPIENT_COUNT,
-  BANK_PAYMENT_OFFER_DEFAULT_STAGGER_DELAY_SEC,
   clampBankPaymentOfferRecipientCount,
   clampBankPaymentOfferStaggerDelaySec,
   decodeBankPaymentOffer,
@@ -42,14 +41,12 @@ import {
   type BankPaymentOfferState,
 } from "@linky-fit/proxy-payment";
 import { Exit } from "effect";
-import React, { useState } from "react";
+import React from "react";
 import { reportInspectorRows } from "../../devtools/inspector/reportInspectorRows";
 import { getInspectorEmissionEnabled } from "../../devtools/inspector/inspectorEnabled";
 import type { Translate } from "../../i18n";
 import {
   canLockAcrossTabs,
-  getInitialBankPaymentOfferRecipientCount,
-  getInitialBankPaymentOfferStaggerDelaySec,
   withLocalStorageLeaseLock,
 } from "../../utils/storage";
 import { nowSeconds } from "../../utils/time";
@@ -70,29 +67,21 @@ import {
   removeBankPaymentOfferStaggerRecipients,
 } from "../lib/bankPaymentOfferStorage";
 import {
+  bankOfferCommandsAtom,
+  bankOfferDefaultsAtom,
   bankPaymentOfferStateAtom,
   contactPubkeysAtom,
+  type BankPaymentOfferRequest,
+  type RequestedBankPaymentOffer,
 } from "../state/messages/bankOffers";
-import type { ContactRowLike, LocalNostrMessage } from "../types/appTypes";
+import { currentPubkeyAtom } from "../state/session/session";
+import { useProvideOwnerCommands } from "./shell/ownerCommands";
+import type { LocalNostrMessage } from "../types/appTypes";
 
 const RESPONDER_RETRY_MS = 30_000;
 // Three dots say how a contact has been doing lately; more would be noise.
 const RECENT_OFFER_OUTCOMES = 3;
 const STAGGER_RETRY_MS = 5_000;
-
-interface BankPaymentOfferRequest {
-  amountSat?: unknown;
-  amountText: string;
-  contacts: readonly ContactRowLike[];
-  singleTabRiskAccepted?: boolean;
-  spdPayload?: unknown;
-  staggerDelaySec?: unknown;
-}
-
-interface RequestedBankPaymentOffer {
-  chatId: string;
-  offerId: string;
-}
 
 /**
  * Runs `pass` for `owner` one at a time: a kick during a pass runs it once
@@ -168,20 +157,7 @@ export const useBankPaymentOffers = ({
   );
   const { contactIdFor, pubkeyFor } = useAtomValue(contactPubkeysAtom);
 
-  const [recipientCount, setRecipientCountState] = useState(() =>
-    clampBankPaymentOfferRecipientCount(
-      getInitialBankPaymentOfferRecipientCount(
-        BANK_PAYMENT_OFFER_DEFAULT_RECIPIENT_COUNT,
-      ),
-    ),
-  );
-  const [staggerDelaySec, setStaggerDelaySecState] = useState(() =>
-    clampBankPaymentOfferStaggerDelaySec(
-      getInitialBankPaymentOfferStaggerDelaySec(
-        BANK_PAYMENT_OFFER_DEFAULT_STAGGER_DELAY_SEC,
-      ),
-    ),
-  );
+  const setOfferDefaults = useAtomSet(bankOfferDefaultsAtom);
 
   // The inbox applies snapshots synchronously against the newest state, so
   // every write and every check reads the atom at call time.
@@ -639,10 +615,12 @@ export const useBankPaymentOffers = ({
           kickStaggeredOffers();
         }
 
-        setRecipientCountState(
-          clampBankPaymentOfferRecipientCount(args.contacts.length),
-        );
-        setStaggerDelaySecState(delaySec);
+        setOfferDefaults({
+          recipientCount: clampBankPaymentOfferRecipientCount(
+            args.contacts.length,
+          ),
+          staggerDelaySec: delaySec,
+        });
         return { chatId: first.contactId, offerId };
       } catch (error) {
         setStatus(
@@ -651,7 +629,15 @@ export const useBankPaymentOffers = ({
         return null;
       }
     },
-    [kickStaggeredOffers, myPubHex, pubkeyFor, sendOffered, setStatus, t],
+    [
+      kickStaggeredOffers,
+      myPubHex,
+      pubkeyFor,
+      sendOffered,
+      setStatus,
+      t,
+      setOfferDefaults,
+    ],
   );
 
   const requestsInFlightRef = React.useRef(
@@ -848,7 +834,31 @@ export const useBankPaymentOffers = ({
     };
   }, [expiryGroups, respondToOffer]);
 
-  const activeBankPaymentOfferContacts = React.useCallback(
+  useProvideOwnerCommands(bankOfferCommandsAtom, {
+    requestBankPaymentOffer,
+    respondToBankPaymentOffer: respondToBankPaymentOfferWithGroupState,
+  });
+
+  return {
+    applyBankPaymentOfferSnapshot: applySnapshot,
+    getBankPaymentOfferForSettlement,
+    isBankPaymentOfferCanceled: React.useCallback(
+      (offerId: BankOfferId) => isBankPaymentOfferCanceled(offers, offerId),
+      [offers],
+    ),
+    requestBankPaymentOffer,
+    respondToBankPaymentOfferWithGroupState,
+  };
+};
+
+/** Which contacts have a live offer at `nowSec`, and when the next one expires. */
+export const useActiveBankPaymentOfferContacts = () => {
+  const offers = useAtomValue(
+    bankPaymentOfferStateAtom,
+    (state) => state.offers,
+  );
+  const { contactIdFor } = useAtomValue(contactPubkeysAtom);
+  return React.useCallback(
     (nowSec: number) => {
       const active = activeBankPaymentOffers(offers, nowSec);
       const contactIds = new Set<string>();
@@ -860,8 +870,17 @@ export const useBankPaymentOffers = ({
     },
     [contactIdFor, offers],
   );
+};
 
-  const recentBankPaymentOfferOutcomesByContactId = React.useMemo(() => {
+/** How each contact's recent offers ended, oldest first. */
+export const useRecentBankPaymentOfferOutcomes = () => {
+  const offers = useAtomValue(
+    bankPaymentOfferStateAtom,
+    (state) => state.offers,
+  );
+  const { contactIdFor } = useAtomValue(contactPubkeysAtom);
+  const myPubHex = useAtomValue(currentPubkeyAtom);
+  return React.useMemo(() => {
     const byContactId = new Map<string, readonly BankPaymentOfferOutcome[]>();
     if (!myPubHex) return byContactId;
     for (const [peer, outcomes] of recentBankPaymentOfferOutcomesByPeer(
@@ -875,19 +894,24 @@ export const useBankPaymentOffers = ({
     }
     return byContactId;
   }, [contactIdFor, myPubHex, offers]);
+};
 
-  return {
-    activeBankPaymentOfferContacts,
-    applyBankPaymentOfferSnapshot: applySnapshot,
-    bankPaymentOfferRecipientCount: recipientCount,
-    bankPaymentOfferStaggerDelaySec: staggerDelaySec,
-    getBankPaymentOfferForSettlement,
-    isBankPaymentOfferCanceled: React.useCallback(
-      (offerId: BankOfferId) => isBankPaymentOfferCanceled(offers, offerId),
-      [offers],
-    ),
-    recentBankPaymentOfferOutcomesByContactId,
-    requestBankPaymentOffer,
-    respondToBankPaymentOfferWithGroupState,
-  };
+/** Proxy offer sends from any screen; the offer watchers run them. */
+export const useBankOfferCommands = () => {
+  const commands = useAtomValue(bankOfferCommandsAtom);
+  return React.useMemo(
+    () => ({
+      requestBankPaymentOffer: async (request: BankPaymentOfferRequest) =>
+        (await commands?.read().requestBankPaymentOffer(request)) ?? null,
+      respondToBankPaymentOffer: async (
+        message: LocalNostrMessage,
+        nextStatus: BankOfferStatus,
+        options?: BankPaymentOfferResponseOptions,
+      ) =>
+        (await commands
+          ?.read()
+          .respondToBankPaymentOffer(message, nextStatus, options)) ?? false,
+    }),
+    [commands],
+  );
 };

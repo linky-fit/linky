@@ -1,8 +1,35 @@
+import { useAtom, useAtomSet, useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
+import { useContactsGuideOverlay } from "../app/hooks/guide/useContactsGuideControls";
+import { useEffectiveProfile } from "../app/hooks/profile/useEffectiveProfile";
+import { usePaidOverlay, useTranslation } from "../app/hooks/shell";
+import { useLoginCommands } from "../app/hooks/shell/login";
+import { useCancelNfcWrite } from "../app/hooks/shell/nfc";
+import { useScanIsOpen } from "../app/hooks/shell/scan";
+import { useShareOptions } from "../app/hooks/shell/share";
+import { useWalletCommands } from "../app/hooks/wallet/useWalletCommands";
+import { useWalletBalance } from "../app/hooks/wallet/useWalletInventory";
+import { contactNewPrefillAtom } from "../app/state/contacts/contactForm";
+import { currentNpubAtom } from "../app/state/session/session";
 import {
-  useAppShellActions,
-  useAppShellCore,
-} from "../app/context/AppShellContexts";
+  lnurlAuthBusyAtom,
+  lnurlAuthDoneAtom,
+  lnurlWithdrawBusyAtom,
+  pendingCashuPaymentRequestAtom,
+  pendingLightningInvoiceAtom,
+  pendingLnurlAuthAtom,
+  pendingLnurlWithdrawAtom,
+  pendingPaymentMintMoveAtom,
+  pendingSiteLoginAtom,
+  postPaySaveContactAtom,
+  siteLoginBusyAtom,
+  siteLoginDoneAtom,
+} from "../app/state/shell/confirmations";
+import {
+  nfcWritePromptKindAtom,
+  profileShareOverlayOpenAtom,
+} from "../app/state/shell/overlays";
+import { walletOpRunningAtom } from "../app/state/wallet/opQueue";
 import { useDesktopSplitView } from "../hooks/useDesktopSplitView";
 import { shouldRenderNativeNfcWritePrompt } from "../platform/nativeBridge";
 import { EvoluRelayWaitBanner } from "./EvoluRelayWaitBanner";
@@ -29,168 +56,192 @@ interface AuthenticatedLayoutProps {
 export function AuthenticatedLayout({
   children,
 }: AuthenticatedLayoutProps): React.ReactElement {
-  const actions = useAppShellActions();
-  const state = useAppShellCore();
   const isDesktopSplitView = useDesktopSplitView();
+  const { t } = useTranslation();
+  const guide = useContactsGuideOverlay();
+  const scanIsOpen = useScanIsOpen();
+  const wallet = useWalletCommands();
+  const login = useLoginCommands();
+  const { cashuBalanceAfterMelt } = useWalletBalance();
+  const cashuIsBusy = useAtomValue(walletOpRunningAtom);
+  const paidOverlay = usePaidOverlay();
+  const [postPaySaveContact, setPostPaySaveContact] = useAtom(
+    postPaySaveContactAtom,
+  );
+  const setContactNewPrefill = useAtomSet(contactNewPrefillAtom);
+  const pendingLightningInvoice = useAtomValue(pendingLightningInvoiceAtom);
+  const pendingCashuPaymentRequest = useAtomValue(
+    pendingCashuPaymentRequestAtom,
+  );
+  const pendingPaymentMintMove = useAtomValue(pendingPaymentMintMoveAtom);
+  const pendingLnurlWithdraw = useAtomValue(pendingLnurlWithdrawAtom);
+  const lnurlWithdrawIsBusy = useAtomValue(lnurlWithdrawBusyAtom);
+  const pendingLnurlAuth = useAtomValue(pendingLnurlAuthAtom);
+  const lnurlAuthIsBusy = useAtomValue(lnurlAuthBusyAtom);
+  const lnurlAuthIsDone = useAtomValue(lnurlAuthDoneAtom);
+  const pendingSiteLogin = useAtomValue(pendingSiteLoginAtom);
+  const siteLoginIsBusy = useAtomValue(siteLoginBusyAtom);
+  const siteLoginIsDone = useAtomValue(siteLoginDoneAtom);
+  const nfcWritePromptKind = useAtomValue(nfcWritePromptKindAtom);
+  const cancelNfcWrite = useCancelNfcWrite();
+  const [profileShareOverlayIsOpen, setProfileShareOverlayIsOpen] = useAtom(
+    profileShareOverlayOpenAtom,
+  );
+  const currentNpub = useAtomValue(currentNpubAtom);
+  const { effectiveProfileName, effectiveProfilePicture } =
+    useEffectiveProfile();
+  const share = useShareOptions();
 
   // New modals must join dismissTopModal in useAppShellComposition.tsx,
   // or Android back navigates under the open dialog.
   return (
     <>
       {isDesktopSplitView ? null : <Topbar />}
-      <EvoluRelayWaitBanner inset={isDesktopSplitView} t={state.t} />
+      <EvoluRelayWaitBanner inset={isDesktopSplitView} t={t} />
 
-      {state.contactsGuide && state.contactsGuideActiveStep?.step ? (
+      {guide.activeStep?.step ? (
         <ContactsGuideOverlay
-          currentIdx={state.contactsGuideActiveStep.idx}
-          highlightRect={state.contactsGuideHighlightRect}
-          onBack={actions.contactsGuideNav.back}
-          onNext={actions.contactsGuideNav.next}
-          onSkip={actions.stopContactsGuide}
-          stepBodyKey={state.contactsGuideActiveStep.step.bodyKey}
-          stepTitleKey={state.contactsGuideActiveStep.step.titleKey}
-          t={state.t}
-          totalSteps={state.contactsGuideActiveStep.total}
+          currentIdx={guide.activeStep.idx}
+          highlightRect={guide.highlightRect}
+          onBack={guide.back}
+          onNext={guide.next}
+          onSkip={guide.stop}
+          stepBodyKey={guide.activeStep.step.bodyKey}
+          stepTitleKey={guide.activeStep.step.titleKey}
+          t={t}
+          totalSteps={guide.activeStep.total}
         />
       ) : null}
 
       {children}
 
-      {!isDesktopSplitView && state.scanIsOpen ? <ScanModal /> : null}
+      {!isDesktopSplitView && scanIsOpen ? <ScanModal /> : null}
 
-      {state.postPaySaveContact && !state.paidOverlayIsOpen ? (
+      {postPaySaveContact && !paidOverlay.paidOverlayIsOpen ? (
         <SaveContactPromptModal
-          amountSat={state.postPaySaveContact.amountSat}
-          lnAddress={state.postPaySaveContact.lnAddress}
-          onClose={() => actions.setPostPaySaveContact(null)}
-          setContactNewPrefill={actions.setContactNewPrefill}
+          amountSat={postPaySaveContact.amountSat}
+          lnAddress={postPaySaveContact.lnAddress}
+          onClose={() => setPostPaySaveContact(null)}
+          setContactNewPrefill={setContactNewPrefill}
         />
       ) : null}
 
-      {state.pendingLightningInvoiceConfirmation &&
-      !state.pendingPaymentMintMeltConfirmation &&
-      !state.paidOverlayIsOpen ? (
+      {pendingLightningInvoice &&
+      !pendingPaymentMintMove &&
+      !paidOverlay.paidOverlayIsOpen ? (
         <LightningInvoiceConfirmModal
-          cashuBalance={state.cashuBalanceAfterMelt}
-          cashuIsBusy={state.cashuIsBusy}
-          confirmation={state.pendingLightningInvoiceConfirmation}
-          onClose={actions.closeLightningInvoiceConfirmation}
-          onConfirm={actions.confirmLightningInvoicePayment}
-          t={state.t}
+          cashuBalance={cashuBalanceAfterMelt}
+          cashuIsBusy={cashuIsBusy}
+          confirmation={pendingLightningInvoice}
+          onClose={wallet.closeLightningInvoiceConfirmation}
+          onConfirm={wallet.confirmLightningInvoicePayment}
+          t={t}
         />
       ) : null}
 
-      {state.pendingCashuPaymentRequestConfirmation &&
-      !state.pendingPaymentMintMeltConfirmation &&
-      !state.paidOverlayIsOpen ? (
+      {pendingCashuPaymentRequest &&
+      !pendingPaymentMintMove &&
+      !paidOverlay.paidOverlayIsOpen ? (
         <CashuPaymentRequestConfirmModal
-          cashuBalance={state.cashuBalanceAfterMelt}
-          cashuIsBusy={state.cashuIsBusy}
-          confirmation={state.pendingCashuPaymentRequestConfirmation}
-          onClose={actions.closeCashuPaymentRequestConfirmation}
-          onConfirm={actions.confirmCashuPaymentRequest}
-          t={state.t}
+          cashuBalance={cashuBalanceAfterMelt}
+          cashuIsBusy={cashuIsBusy}
+          confirmation={pendingCashuPaymentRequest}
+          onClose={wallet.closeCashuPaymentRequestConfirmation}
+          onConfirm={wallet.confirmCashuPaymentRequest}
+          t={t}
         />
       ) : null}
 
-      {state.pendingLnurlWithdrawConfirmation && !state.paidOverlayIsOpen ? (
+      {pendingLnurlWithdraw && !paidOverlay.paidOverlayIsOpen ? (
         <LnurlWithdrawConfirmModal
-          confirmation={state.pendingLnurlWithdrawConfirmation}
-          isBusy={state.lnurlWithdrawIsBusy}
-          onClose={actions.closeLnurlWithdrawConfirmation}
-          onConfirm={actions.confirmLnurlWithdraw}
-          t={state.t}
+          confirmation={pendingLnurlWithdraw}
+          isBusy={lnurlWithdrawIsBusy}
+          onClose={wallet.closeLnurlWithdrawConfirmation}
+          onConfirm={wallet.confirmLnurlWithdraw}
+          t={t}
         />
       ) : null}
 
-      {state.pendingLnurlAuthConfirmation && !state.paidOverlayIsOpen ? (
+      {pendingLnurlAuth && !paidOverlay.paidOverlayIsOpen ? (
         <LnurlAuthModal
-          confirmation={state.pendingLnurlAuthConfirmation}
-          onClose={actions.closeLnurlAuthConfirmation}
-          onConfirm={actions.confirmLnurlAuth}
+          confirmation={pendingLnurlAuth}
+          onClose={login.closeLnurlAuthConfirmation}
+          onConfirm={login.confirmLnurlAuth}
           phase={
-            state.lnurlAuthIsDone
-              ? "done"
-              : state.lnurlAuthIsBusy
-                ? "busy"
-                : "confirm"
+            lnurlAuthIsDone ? "done" : lnurlAuthIsBusy ? "busy" : "confirm"
           }
-          t={state.t}
+          t={t}
         />
       ) : null}
 
-      {state.pendingSiteLoginConfirmation && !state.paidOverlayIsOpen ? (
+      {pendingSiteLogin && !paidOverlay.paidOverlayIsOpen ? (
         <SiteLoginModal
           identity={{
-            name: state.effectiveProfileName,
-            npub: state.currentNpub,
-            picture: state.effectiveProfilePicture,
+            name: effectiveProfileName,
+            npub: currentNpub,
+            picture: effectiveProfilePicture,
           }}
-          login={state.pendingSiteLoginConfirmation}
-          onClose={actions.closeSiteLoginConfirmation}
-          onConfirm={actions.confirmSiteLogin}
+          login={pendingSiteLogin}
+          onClose={login.closeSiteLoginConfirmation}
+          onConfirm={login.confirmSiteLogin}
           phase={
-            state.siteLoginIsDone
-              ? "done"
-              : state.siteLoginIsBusy
-                ? "busy"
-                : "confirm"
+            siteLoginIsDone ? "done" : siteLoginIsBusy ? "busy" : "confirm"
           }
-          t={state.t}
+          t={t}
         />
       ) : null}
 
-      {state.pendingPaymentMintMeltConfirmation && !state.paidOverlayIsOpen ? (
+      {pendingPaymentMintMove && !paidOverlay.paidOverlayIsOpen ? (
         <PaymentMintMeltConfirmModal
-          fromMint={state.pendingPaymentMintMeltConfirmation.fromMint}
-          isBusy={state.cashuIsBusy}
-          onClose={actions.closePaymentMintMeltConfirmation}
-          onConfirm={actions.confirmPaymentMintMelt}
-          t={state.t}
-          toMint={state.pendingPaymentMintMeltConfirmation.toMint}
+          fromMint={pendingPaymentMintMove.fromMint}
+          isBusy={cashuIsBusy}
+          onClose={wallet.closePaymentMintMeltConfirmation}
+          onConfirm={wallet.confirmPaymentMintMelt}
+          t={t}
+          toMint={pendingPaymentMintMove.toMint}
         />
       ) : null}
 
-      {state.paidOverlayIsOpen ? (
+      {paidOverlay.paidOverlayIsOpen ? (
         <PaidOverlay
-          details={state.paidOverlayDetails}
-          phase={state.paidOverlayPhase}
-          paidOverlayTitle={state.paidOverlayTitle}
-          t={state.t}
+          details={paidOverlay.paidOverlayDetails}
+          phase={paidOverlay.paidOverlayPhase}
+          paidOverlayTitle={paidOverlay.paidOverlayTitle}
+          t={t}
         />
       ) : null}
 
-      {state.nfcWritePromptKind && shouldRenderNativeNfcWritePrompt() ? (
+      {nfcWritePromptKind && shouldRenderNativeNfcWritePrompt() ? (
         <NfcWriteModal
-          kind={state.nfcWritePromptKind}
-          onCancel={actions.cancelPendingNfcWrite}
-          t={state.t}
+          kind={nfcWritePromptKind}
+          onCancel={cancelNfcWrite}
+          t={t}
         />
       ) : null}
 
-      {state.profileShareOverlayIsOpen && state.currentNpub ? (
+      {profileShareOverlayIsOpen && currentNpub ? (
         <ProfileShareOverlay
-          name={state.effectiveProfileName}
-          npub={state.currentNpub}
-          onClose={actions.closeProfileShareOverlay}
-          pictureUrl={state.effectiveProfilePicture}
-          t={state.t}
+          name={effectiveProfileName}
+          npub={currentNpub}
+          onClose={() => setProfileShareOverlayIsOpen(false)}
+          pictureUrl={effectiveProfilePicture}
+          t={t}
         />
       ) : null}
 
-      {state.shareOptionsText ? (
+      {share.shareOptionsText ? (
         <ShareOptionsModal
-          onClose={actions.closeShareOptions}
-          onCopy={actions.copyShareOptionsText}
-          onEmail={actions.shareOptionsViaEmail}
-          onSms={actions.shareOptionsViaSms}
-          onWhatsApp={actions.shareOptionsViaWhatsApp}
-          shareText={state.shareOptionsText}
-          t={state.t}
+          onClose={share.closeShareOptions}
+          onCopy={share.copyShareOptionsText}
+          onEmail={share.shareOptionsViaEmail}
+          onSms={share.shareOptionsViaSms}
+          onWhatsApp={share.shareOptionsViaWhatsApp}
+          shareText={share.shareOptionsText}
+          t={t}
         />
       ) : null}
 
-      {!state.paidOverlayIsOpen ? <RecurringPaymentDueModal /> : null}
+      {!paidOverlay.paidOverlayIsOpen ? <RecurringPaymentDueModal /> : null}
     </>
   );
 }

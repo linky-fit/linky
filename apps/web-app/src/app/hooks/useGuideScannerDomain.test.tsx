@@ -1,9 +1,11 @@
+import { AtomRegistry, RegistryContext } from "@linky-fit/linkstr-react";
 import { act } from "react";
 import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import type { Translate } from "../../i18n";
 import { createAnimatedQrFrames } from "../../utils/animatedQr";
+import { scanDiagnosticsAtom, scanIsOpenAtom } from "../state/shell/scan";
 import { useGuideScannerDomain } from "./useGuideScannerDomain";
 
 interface NativeScanResult {
@@ -67,7 +69,12 @@ const setup = async () => {
     return null;
   };
 
-  const rendered = await renderIntoDocument(<Probe />);
+  const registry = AtomRegistry.make();
+  const rendered = await renderIntoDocument(
+    <RegistryContext.Provider value={registry}>
+      <Probe />
+    </RegistryContext.Provider>,
+  );
   await act(async () => {
     scannerRef.current?.openReceiveScan();
   });
@@ -75,7 +82,7 @@ const setup = async () => {
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
   });
-  return { onScannedText, pushToast, rendered, scannerRef };
+  return { onScannedText, pushToast, registry, rendered, scannerRef };
 };
 
 const deliver = async (value: string) => {
@@ -92,7 +99,7 @@ describe("native scanner stream", () => {
   });
 
   it("collects animated QR frames and stops once the token is complete", async () => {
-    const { onScannedText, pushToast, rendered, scannerRef } = await setup();
+    const { onScannedText, pushToast, registry, rendered } = await setup();
     expect(native.onResult).not.toBeNull();
 
     const frames = await createAnimatedQrFrames(token);
@@ -108,7 +115,7 @@ describe("native scanner stream", () => {
     expect(onScannedText).toHaveBeenCalledWith(token);
     expect(native.stop).toHaveBeenCalledTimes(1);
     expect(pushToast).not.toHaveBeenCalled();
-    expect(scannerRef.current?.scanDiagnostics.animation).toBeNull();
+    expect(registry.get(scanDiagnosticsAtom).animation).toBeNull();
     await rendered.unmount();
   });
 
@@ -127,11 +134,11 @@ describe("native scanner stream", () => {
       cancelled: false,
       value: frames.next(),
     });
-    const { onScannedText, pushToast, rendered, scannerRef } = await setup();
+    const { onScannedText, pushToast, registry, rendered } = await setup();
 
     expect(pushToast).toHaveBeenCalledWith("scanAnimatedQrNeedsCamera");
     expect(onScannedText).not.toHaveBeenCalled();
-    expect(scannerRef.current?.scanIsOpen).toBe(false);
+    expect(registry.get(scanIsOpenAtom)).toBe(false);
     await rendered.unmount();
   });
 });

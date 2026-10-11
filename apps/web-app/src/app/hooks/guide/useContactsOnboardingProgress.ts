@@ -1,11 +1,11 @@
+import { useAtom } from "@linky-fit/linkstr-react";
 import React from "react";
 import type { Route } from "../../../types/route";
-import { CONTACTS_ONBOARDING_DISMISSED_STORAGE_KEY } from "../../../utils/constants";
-import {
-  safeLocalStorageGet,
-  safeLocalStorageSet,
-} from "../../../utils/storage";
 import type { Translate } from "../../../i18n";
+import {
+  contactsOnboardingCelebratingAtom,
+  contactsOnboardingDismissedAtom,
+} from "../../state/shell/guide";
 
 interface UseContactsOnboardingProgressParams {
   cashuBalance: number;
@@ -26,13 +26,69 @@ interface ContactsOnboardingTask {
   label: string;
 }
 
-interface ContactsOnboardingTasksSummary {
+export interface ContactsOnboardingTasksSummary {
   done: number;
   percent: number;
   tasks: readonly ContactsOnboardingTask[];
   total: number;
 }
 
+interface ContactsOnboardingProgressInput {
+  cashuBalance: number;
+  contactsCount: number;
+  contactsOnboardingHasBackedUpKeys: boolean;
+  contactsOnboardingHasPaid: boolean;
+  contactsOnboardingHasSentMessage: boolean;
+  t: Translate;
+}
+
+export const contactsOnboardingTasksOf = ({
+  cashuBalance,
+  contactsCount,
+  contactsOnboardingHasBackedUpKeys,
+  contactsOnboardingHasPaid,
+  contactsOnboardingHasSentMessage,
+  t,
+}: ContactsOnboardingProgressInput): ContactsOnboardingTasksSummary => {
+  const tasks = [
+    {
+      key: "add_contact",
+      label: t("contactsOnboardingTaskAddContact"),
+      done: contactsCount > 0,
+    },
+    {
+      key: "message",
+      label: t("contactsOnboardingTaskMessage"),
+      done: contactsOnboardingHasSentMessage,
+    },
+    {
+      key: "topup",
+      label: t("contactsOnboardingTaskTopup"),
+      done: cashuBalance > 0,
+    },
+    {
+      key: "backup_keys",
+      label: t("contactsOnboardingTaskBackupKeys"),
+      done: contactsOnboardingHasBackedUpKeys,
+    },
+    {
+      key: "pay",
+      label: t("contactsOnboardingTaskPay"),
+      done: contactsOnboardingHasPaid,
+    },
+  ] as const;
+
+  const done = tasks.reduce((sum, task) => sum + (task.done ? 1 : 0), 0);
+  const total = tasks.length;
+  const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+  return { tasks, done, total, percent };
+};
+
+/**
+ * Takes over a dismissal synced from another device, mirrors a local one
+ * into the synced setting and closes the checklist once every task is done.
+ * Mounted once by the shell.
+ */
 export const useContactsOnboardingProgress = ({
   cashuBalance,
   contactsCount,
@@ -45,66 +101,44 @@ export const useContactsOnboardingProgress = ({
   stopContactsGuide,
   t,
 }: UseContactsOnboardingProgressParams) => {
-  const [contactsOnboardingDismissed, setContactsOnboardingDismissed] =
-    React.useState<boolean>(
-      () =>
-        safeLocalStorageGet(CONTACTS_ONBOARDING_DISMISSED_STORAGE_KEY) === "1",
-    );
+  const [contactsOnboardingDismissed, setContactsOnboardingDismissed] = useAtom(
+    contactsOnboardingDismissedAtom,
+  );
   const [contactsOnboardingCelebrating, setContactsOnboardingCelebrating] =
-    React.useState(false);
+    useAtom(contactsOnboardingCelebratingAtom);
 
-  const contactsOnboardingTasks =
-    React.useMemo<ContactsOnboardingTasksSummary>(() => {
-      const tasks = [
-        {
-          key: "add_contact",
-          label: t("contactsOnboardingTaskAddContact"),
-          done: contactsCount > 0,
-        },
-        {
-          key: "message",
-          label: t("contactsOnboardingTaskMessage"),
-          done: contactsOnboardingHasSentMessage,
-        },
-        {
-          key: "topup",
-          label: t("contactsOnboardingTaskTopup"),
-          done: cashuBalance > 0,
-        },
-        {
-          key: "backup_keys",
-          label: t("contactsOnboardingTaskBackupKeys"),
-          done: contactsOnboardingHasBackedUpKeys,
-        },
-        {
-          key: "pay",
-          label: t("contactsOnboardingTaskPay"),
-          done: contactsOnboardingHasPaid,
-        },
-      ] as const;
-
-      const done = tasks.reduce((sum, task) => sum + (task.done ? 1 : 0), 0);
-      const total = tasks.length;
-      const percent = total > 0 ? Math.round((done / total) * 100) : 0;
-      return { tasks, done, total, percent };
-    }, [
+  const contactsOnboardingTasks = React.useMemo(
+    () =>
+      contactsOnboardingTasksOf({
+        cashuBalance,
+        contactsCount,
+        contactsOnboardingHasBackedUpKeys,
+        contactsOnboardingHasPaid,
+        contactsOnboardingHasSentMessage,
+        t,
+      }),
+    [
       cashuBalance,
       contactsCount,
       contactsOnboardingHasBackedUpKeys,
       contactsOnboardingHasPaid,
       contactsOnboardingHasSentMessage,
       t,
-    ]);
+    ],
+  );
 
   const showContactsOnboarding =
     !contactsOnboardingDismissed && routeKind === "contacts";
 
   React.useEffect(() => {
     if (!contactsOnboardingDismissedSynced) return;
-    safeLocalStorageSet(CONTACTS_ONBOARDING_DISMISSED_STORAGE_KEY, "1");
     setContactsOnboardingDismissed(true);
     stopContactsGuide();
-  }, [contactsOnboardingDismissedSynced, stopContactsGuide]);
+  }, [
+    contactsOnboardingDismissedSynced,
+    stopContactsGuide,
+    setContactsOnboardingDismissed,
+  ]);
 
   React.useEffect(() => {
     if (!contactsOnboardingDismissed) return;
@@ -112,11 +146,14 @@ export const useContactsOnboardingProgress = ({
   }, [contactsOnboardingDismissed, persistContactsOnboardingDismissed]);
 
   const dismissContactsOnboarding = React.useCallback(() => {
-    safeLocalStorageSet(CONTACTS_ONBOARDING_DISMISSED_STORAGE_KEY, "1");
     setContactsOnboardingDismissed(true);
     persistContactsOnboardingDismissed();
     stopContactsGuide();
-  }, [persistContactsOnboardingDismissed, stopContactsGuide]);
+  }, [
+    persistContactsOnboardingDismissed,
+    stopContactsGuide,
+    setContactsOnboardingDismissed,
+  ]);
 
   React.useEffect(() => {
     if (contactsOnboardingDismissed) return;
@@ -145,6 +182,7 @@ export const useContactsOnboardingProgress = ({
     dismissContactsOnboarding,
     showContactsOnboarding,
     stopContactsGuide,
+    setContactsOnboardingCelebrating,
   ]);
 
   return {

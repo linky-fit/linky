@@ -1,6 +1,7 @@
 import { decodeNpub } from "@linky-fit/linkstr";
 import { NonEmptyString1000, type ContactId } from "@linky-fit/linksync";
 import {
+  RegistryContext,
   useAtom,
   useAtomSet,
   useAtomSuspense,
@@ -26,12 +27,16 @@ import {
 import { contactsCommandsAtom } from "../../state/contacts/commands";
 import {
   contactFormAtom,
+  contactNewPrefillAtom,
   makeEmptyContactForm,
 } from "../../state/contacts/contactForm";
 import { syncMuteListAtom } from "../../state/contacts/muteList";
 import { contactGroupsAtom } from "../../state/contacts/readModel";
 import { currentNpubAtom, currentNsecAtom } from "../../state/session/session";
-import { contactPaymentIntentAtom } from "../../state/wallet/contactPay";
+import {
+  contactPaymentIntentAtom,
+  payAmountAtom,
+} from "../../state/wallet/contactPay";
 import { normalizePubkeyHex } from "../messages/contactIdentity";
 import { useMessageWrites } from "../messages/useMessageWrites";
 import { useMessagesCommands } from "../messages/useMessagesCommands";
@@ -510,4 +515,71 @@ export const useNpubMessageContacts = () => {
     );
 
   return { addNpubMessageContacts, contactsGroupAssignment };
+};
+
+/** Opens the new-contact form, empty or with the prefill a payment left. */
+export const useOpenNewContactPage = () => {
+  const registry = React.useContext(RegistryContext);
+  return React.useCallback(() => {
+    registry.set(payAmountAtom, "");
+    const prefill = registry.get(contactNewPrefillAtom);
+    registry.set(contactNewPrefillAtom, null);
+    registry.update(contactFormAtom, (draft) => ({
+      ...draft,
+      editingId: null,
+      form: prefill
+        ? {
+            name: prefill.suggestedName ?? "",
+            npub: prefill.npub ?? "",
+            lnAddress: prefill.lnAddress,
+            groups: [],
+          }
+        : makeEmptyContactForm(),
+      initial: null,
+    }));
+    navigateTo({ route: "contactNew" });
+  }, [registry]);
+};
+
+/** Opens a contact from the list: its conversation, or its page or pay screen without an npub. */
+export const useOpenContactDetail = () => {
+  const contacts = useContacts();
+  const openContactPay = useOpenContactPay();
+  const setContactPayBackToChat = useSetNavIntent("contactPayBackToChat");
+  return React.useCallback(
+    (contact: {
+      readonly id?: string | null;
+      readonly isUnknownContact?: boolean;
+    }) => {
+      const contactId = (contact.id ?? "").trim();
+      if (!contactId) return;
+
+      setContactPayBackToChat(null);
+
+      if (contact.isUnknownContact) {
+        navigateTo({ route: "chat", id: contactId });
+        return;
+      }
+
+      const knownContact =
+        contacts.find((row) => row.id.trim() === contactId) ?? null;
+      if (!knownContact) {
+        navigateTo({ route: "contacts" });
+        return;
+      }
+
+      const npub = (knownContact.npub ?? "").trim();
+      const ln = (knownContact.lnAddress ?? "").trim();
+      if (!npub) {
+        if (ln) {
+          openContactPay(knownContact.id);
+          return;
+        }
+        navigateTo({ route: "contact", id: knownContact.id });
+        return;
+      }
+      navigateTo({ route: "chat", id: knownContact.id });
+    },
+    [contacts, openContactPay, setContactPayBackToChat],
+  );
 };

@@ -35,7 +35,7 @@ import {
   useSetStatus,
   useTranslation,
 } from "../shell";
-import { useWalletBalance } from "./useWalletInventory";
+import { useWalletBalance, useWalletInventory } from "./useWalletInventory";
 
 const ISSUED_CHECK_INTERVAL_MS = 60_000;
 
@@ -587,14 +587,9 @@ export const useTokenRecovery = ({
   };
 };
 
-interface UseTokenContactSendParams {
-  walletTransfers: ReadonlyArray<TokenTransfer>;
-}
-
 /** Sending an issued token to the contact the user picks after "Send to contact". */
-export const useTokenContactSend = ({
-  walletTransfers,
-}: UseTokenContactSendParams) => {
+export const useTokenContactSend = () => {
+  const walletTransfers = useWalletInventory().transfers;
   const commands = useTokensCommands();
   const setStatus = useSetStatus();
   const { t } = useTranslation();

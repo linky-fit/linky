@@ -41,6 +41,10 @@ import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey, Translate } from "../i18n";
 import type { FiatRates } from "../utils/displayAmounts";
 import { formatInteger } from "../utils/formatting";
+import { useAtomValue } from "@linky-fit/linkstr-react";
+import { useBankPaymentOfferContacts } from "../app/hooks/contacts/useContactsList";
+import { useBankOfferCommands } from "../app/hooks/useBankPaymentOffers";
+import { bankOfferDefaultsAtom } from "../app/state/messages/bankOffers";
 
 interface SpdPaymentPageProps {
   cashuBalanceAfterMelt: number;
@@ -719,11 +723,24 @@ const OfferContactTile = ({
   );
 };
 
-type SpdPaymentRouteProps = Omit<SpdPaymentPageProps, "cashuBalanceAfterMelt">;
+type SpdPaymentRouteProps = Pick<
+  SpdPaymentPageProps,
+  "isEditing" | "isManualEntry" | "spdPayload"
+>;
 
 export const SpdPaymentRoute: React.FC<SpdPaymentRouteProps> = (props) => {
   const { cashuBalanceAfterMelt } = useWalletBalance();
+  const offerDefaults = useAtomValue(bankOfferDefaultsAtom);
+  const offerContacts = useBankPaymentOfferContacts(props.spdPayload);
+  const { requestBankPaymentOffer } = useBankOfferCommands();
   return (
-    <SpdPaymentPage {...props} cashuBalanceAfterMelt={cashuBalanceAfterMelt} />
+    <SpdPaymentPage
+      {...props}
+      cashuBalanceAfterMelt={cashuBalanceAfterMelt}
+      initialOfferContactCount={offerDefaults.recipientCount}
+      initialOfferDelaySec={offerDefaults.staggerDelaySec}
+      offerContacts={offerContacts}
+      onRequestReimbursement={requestBankPaymentOffer}
+    />
   );
 };

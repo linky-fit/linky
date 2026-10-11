@@ -1,8 +1,14 @@
+import { useAtom } from "@linky-fit/linkstr-react";
 import React from "react";
 import { reportAppLog } from "../../devtools/inspector/appLog";
 import type { Translate } from "../../i18n";
 import { submitLnurlAuth, type LnurlAuthPreview } from "../../lnurlAuth";
 import { getUnknownErrorMessage } from "../../utils/unknown";
+import {
+  lnurlAuthBusyAtom,
+  lnurlAuthDoneAtom,
+  pendingLnurlAuthAtom,
+} from "../state/shell/confirmations";
 
 const SUCCESS_OVERLAY_MS = 2400;
 
@@ -34,9 +40,9 @@ export const useLnurlAuth = ({
   t,
 }: UseLnurlAuthParams): LnurlAuthResult => {
   const [pendingLnurlAuthConfirmation, setPendingLnurlAuthConfirmation] =
-    React.useState<LnurlAuthPreview | null>(null);
-  const [lnurlAuthIsBusy, setLnurlAuthIsBusy] = React.useState(false);
-  const [lnurlAuthIsDone, setLnurlAuthIsDone] = React.useState(false);
+    useAtom(pendingLnurlAuthAtom);
+  const [lnurlAuthIsBusy, setLnurlAuthIsBusy] = useAtom(lnurlAuthBusyAtom);
+  const [lnurlAuthIsDone, setLnurlAuthIsDone] = useAtom(lnurlAuthDoneAtom);
   const successTimerRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
@@ -57,7 +63,7 @@ export const useLnurlAuth = ({
       setPendingLnurlAuthConfirmation(null);
       successTimerRef.current = null;
     }, SUCCESS_OVERLAY_MS);
-  }, []);
+  }, [setPendingLnurlAuthConfirmation, setLnurlAuthIsDone]);
 
   const requestLnurlAuthConfirmation = React.useCallback(
     (preview: LnurlAuthPreview) => {
@@ -69,13 +75,13 @@ export const useLnurlAuth = ({
       });
       setPendingLnurlAuthConfirmation(preview);
     },
-    [],
+    [setPendingLnurlAuthConfirmation],
   );
 
   const closeLnurlAuthConfirmation = React.useCallback(() => {
     if (lnurlAuthIsBusy || lnurlAuthIsDone) return;
     setPendingLnurlAuthConfirmation(null);
-  }, [lnurlAuthIsBusy, lnurlAuthIsDone]);
+  }, [lnurlAuthIsBusy, lnurlAuthIsDone, setPendingLnurlAuthConfirmation]);
 
   const confirmLnurlAuth = React.useCallback(async () => {
     const pending = pendingLnurlAuthConfirmation;
@@ -120,6 +126,7 @@ export const useLnurlAuth = ({
     setStatus,
     showDone,
     t,
+    setLnurlAuthIsBusy,
   ]);
 
   return {

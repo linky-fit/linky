@@ -9,12 +9,9 @@ import { MigratingDataScreen } from "../components/MigratingDataScreen";
 import { ToastNotifications } from "../components/ToastNotifications";
 import { UnauthenticatedLayout } from "../components/UnauthenticatedLayout";
 import { usePersistentInspectorLogStartup } from "../devtools/inspector/usePersistentInspectorLogStartup";
-import {
-  AppShellContextsProvider,
-  type AppShellActionsContextValue,
-  type AppShellCoreContextValue,
-  type AppShellRouteContextValue,
-} from "./context/AppShellContexts";
+import { useToasts } from "../hooks/useToasts";
+import { useDisplayAmounts, useTranslation } from "./hooks/shell";
+import { useTokenContactSend } from "./hooks/wallet/useWalletTokens";
 import { BeaconController } from "./BeaconController";
 import { useLaneToShardMigration } from "./migrations/useLaneToShardMigration";
 import { AppRouteContent } from "./routes/AppRouteContent";
@@ -49,63 +46,45 @@ interface AuthenticatedAppShellProps {
   currentNsec: string;
 }
 
-const AuthenticatedAppShell = ({ currentNsec }: AuthenticatedAppShellProps) => {
-  const {
-    appActions,
-    appState,
-    cancelPendingCashuContactSend,
-    dismissToast,
-    formatDisplayedAmountText,
-    mainTabRouteProps,
-    moneyRouteProps,
-    peopleRouteProps,
-    pendingCashuContactSend,
-    t,
-    toasts,
-  } = useAppShellComposition({ currentNsec });
-
-  const coreContextValue: AppShellCoreContextValue = appState;
-
-  const actionsContextValue: AppShellActionsContextValue = appActions;
-
-  const routeContextValue = React.useMemo<AppShellRouteContextValue>(
-    () => ({
-      mainTabRoutes: mainTabRouteProps,
-      moneyRoutes: moneyRouteProps,
-      peopleRoutes: peopleRouteProps,
-    }),
-    [mainTabRouteProps, moneyRouteProps, peopleRouteProps],
+/** Offers to cancel a token send while the user picks its contact. */
+const ContactSendBanner = () => {
+  const { t } = useTranslation();
+  const { formatDisplayedAmountText } = useDisplayAmounts();
+  const { cancelPendingCashuContactSend, pendingCashuContactSend } =
+    useTokenContactSend();
+  return (
+    <CashuContactSendBanner
+      amountText={
+        pendingCashuContactSend
+          ? formatDisplayedAmountText(pendingCashuContactSend.amountSat)
+          : null
+      }
+      onCancel={() => {
+        void cancelPendingCashuContactSend();
+      }}
+      t={t}
+    />
   );
+};
+
+const AuthenticatedAppShell = ({ currentNsec }: AuthenticatedAppShellProps) => {
+  useAppShellComposition({ currentNsec });
+  const { t } = useTranslation();
+  const { dismissToast, toasts } = useToasts();
 
   return (
     <AppFrame>
       <TopBanners>
         <PwaUpdateBanner t={t} />
-        <CashuContactSendBanner
-          amountText={
-            pendingCashuContactSend
-              ? formatDisplayedAmountText(pendingCashuContactSend.amountSat)
-              : null
-          }
-          onCancel={() => {
-            void cancelPendingCashuContactSend();
-          }}
-          t={t}
-        />
+        <ContactSendBanner />
       </TopBanners>
       <ToastNotifications toasts={toasts} dismissToast={dismissToast} />
       <InstallPwaBanner t={t} />
       <BeaconController currentNsec={currentNsec} />
 
-      <AppShellContextsProvider
-        actions={actionsContextValue}
-        core={coreContextValue}
-        routes={routeContextValue}
-      >
-        <AuthenticatedLayout>
-          <AppRouteContent />
-        </AuthenticatedLayout>
-      </AppShellContextsProvider>
+      <AuthenticatedLayout>
+        <AppRouteContent />
+      </AuthenticatedLayout>
     </AppFrame>
   );
 };

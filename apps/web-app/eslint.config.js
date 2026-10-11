@@ -129,7 +129,6 @@ export const platformSeamRatchet = [
   "src/app/lib/pwaNotifications.ts",
   "src/app/lib/testMintGate.ts",
   "src/app/routes/AppRouteContent.tsx",
-  "src/app/routes/MainTabPanes.tsx",
   "src/components/ChatMessage.tsx",
   "src/components/ChatMessageEditor.tsx",
   "src/components/InstallPwaBanner.tsx",

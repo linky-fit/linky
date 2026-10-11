@@ -18,6 +18,7 @@ import React from "react";
 import { useProxyPaymentPayerContacts } from "../app/hooks/contacts/useDisplayContacts";
 import { useProfileStatusEditor } from "../app/hooks/profile/useProfileStatusEditor";
 import { usePushToast, useTranslation } from "../app/hooks/shell";
+import { useScanCommands } from "../app/hooks/shell/scan";
 import {
   useBeacon,
   useBeaconSupport,
@@ -225,13 +226,8 @@ export function NearbyBeaconSection({
   );
 }
 
-interface ProxyPaymentsPageProps {
-  openWalletScan: () => void;
-}
-
-export function ProxyPaymentsPage({
-  openWalletScan,
-}: ProxyPaymentsPageProps): React.ReactElement {
+export function ProxyPaymentsPage(): React.ReactElement {
+  const { openWalletScan } = useScanCommands();
   const currentNsec = useAtomValue(currentNsecAtom);
   const {
     profileStatusIsSaving,

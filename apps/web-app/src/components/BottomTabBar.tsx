@@ -1,7 +1,9 @@
 import { Avatar, Stack, TabBar } from "@linky-fit/ui";
 import type { NavItem } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useAtomValue } from "@linky-fit/linkstr-react";
+import { useEffectiveProfile } from "../app/hooks/profile/useEffectiveProfile";
+import { currentNpubAtom } from "../app/state/session/session";
 import { navigateTo } from "../hooks/useRouting";
 import type { Translate } from "../i18n";
 import { formatShortNpub } from "../utils/formatting";
@@ -30,8 +32,9 @@ export function BottomTabBar({
   activeTab,
   t,
 }: BottomTabBarProps): React.ReactElement {
-  const { currentNpub, effectiveProfileName, effectiveProfilePicture } =
-    useAppShellCore();
+  const currentNpub = useAtomValue(currentNpubAtom);
+  const { effectiveProfileName, effectiveProfilePicture } =
+    useEffectiveProfile();
 
   const items: NavItem<BottomTabKey>[] = [
     {

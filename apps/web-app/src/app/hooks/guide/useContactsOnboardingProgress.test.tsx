@@ -1,5 +1,7 @@
+import { RegistryContext } from "@linky-fit/linkstr-react";
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { makeTestAppRegistry } from "../../../testUtils/appRegistry";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import { CONTACTS_ONBOARDING_DISMISSED_STORAGE_KEY } from "../../../utils/constants";
 import { useContactsOnboardingProgress } from "./useContactsOnboardingProgress";
@@ -13,7 +15,15 @@ interface HarnessProps {
   stopGuide: () => void;
 }
 
-const Harness = ({
+let registry = makeTestAppRegistry();
+
+const Harness = (props: HarnessProps) => (
+  <RegistryContext.Provider value={registry}>
+    <Progress {...props} />
+  </RegistryContext.Provider>
+);
+
+const Progress = ({
   dismissedSynced,
   onProgress,
   persistDismissed,
@@ -34,6 +44,10 @@ const Harness = ({
   onProgress(progress);
   return null;
 };
+
+beforeEach(() => {
+  registry = makeTestAppRegistry();
+});
 
 afterEach(() => {
   localStorage.clear();

@@ -1,10 +1,24 @@
 import { decodeNpub, type Pubkey } from "@linky-fit/linkstr";
 import {
+  BANK_PAYMENT_OFFER_DEFAULT_RECIPIENT_COUNT,
+  BANK_PAYMENT_OFFER_DEFAULT_STAGGER_DELAY_SEC,
+  clampBankPaymentOfferRecipientCount,
+  clampBankPaymentOfferStaggerDelaySec,
   emptyBankPaymentOfferState,
+  type BankOfferStatus,
+  type BankPaymentOfferResponseOptions,
   type BankPaymentOfferState,
 } from "@linky-fit/proxy-payment";
 import { Atom } from "effect/reactivity";
+import {
+  BANK_PAYMENT_OFFER_RECIPIENT_COUNT_STORAGE_KEY,
+  BANK_PAYMENT_OFFER_STAGGER_DELAY_SEC_STORAGE_KEY,
+} from "../../../utils/constants";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
+import {
+  getInitialBankPaymentOfferRecipientCount,
+  getInitialBankPaymentOfferStaggerDelaySec,
+} from "../../../utils/storage";
 import {
   buildUnknownContactId,
   readUnknownContactIdPubkey,
@@ -13,7 +27,10 @@ import {
   bankPaymentOfferMessageRow,
   compareBankPaymentOfferRows,
 } from "../../lib/bankPaymentOfferRows";
+import type { ContactRowLike, LocalNostrMessage } from "../../types/appTypes";
 import { contactsAtom } from "../contacts/readModel";
+import { kvSeededAtom } from "../platform";
+import { ownerCommandsAtom } from "../shell/ownerCommands";
 import { currentPubkeyAtom } from "../session/session";
 
 /**
@@ -68,3 +85,67 @@ export const bankPaymentOfferMessagesAtom = Atom.keepAlive(
       .sort(compareBankPaymentOfferRows);
   }),
 );
+
+export interface BankOfferDefaults {
+  readonly recipientCount: number;
+  readonly staggerDelaySec: number;
+}
+
+/** How many payers the last offer went to and its stagger, the next offer's defaults. */
+export const bankOfferDefaultsAtom = kvSeededAtom(
+  (kv): BankOfferDefaults => ({
+    recipientCount: clampBankPaymentOfferRecipientCount(
+      getInitialBankPaymentOfferRecipientCount(
+        BANK_PAYMENT_OFFER_DEFAULT_RECIPIENT_COUNT,
+        kv,
+      ),
+    ),
+    staggerDelaySec: clampBankPaymentOfferStaggerDelaySec(
+      getInitialBankPaymentOfferStaggerDelaySec(
+        BANK_PAYMENT_OFFER_DEFAULT_STAGGER_DELAY_SEC,
+        kv,
+      ),
+    ),
+  }),
+  (kv, defaults) => {
+    kv.setItem(
+      BANK_PAYMENT_OFFER_RECIPIENT_COUNT_STORAGE_KEY,
+      String(defaults.recipientCount),
+    );
+    kv.setItem(
+      BANK_PAYMENT_OFFER_STAGGER_DELAY_SEC_STORAGE_KEY,
+      String(defaults.staggerDelaySec),
+    );
+  },
+  { persistSeed: true },
+);
+
+export interface BankPaymentOfferRequest {
+  amountSat?: unknown;
+  amountText: string;
+  contacts: readonly ContactRowLike[];
+  singleTabRiskAccepted?: boolean;
+  spdPayload?: unknown;
+  staggerDelaySec?: unknown;
+}
+
+export interface RequestedBankPaymentOffer {
+  chatId: string;
+  offerId: string;
+}
+
+export interface BankOfferCommands {
+  /** Offers a bank QR to its payers, or opens its offer while one is live. */
+  readonly requestBankPaymentOffer: (
+    request: BankPaymentOfferRequest,
+  ) => Promise<RequestedBankPaymentOffer | null>;
+  /** Answers an offer from its chat row; closing or settling answers every payer. */
+  readonly respondToBankPaymentOffer: (
+    message: LocalNostrMessage,
+    nextStatus: BankOfferStatus,
+    options?: BankPaymentOfferResponseOptions,
+  ) => Promise<boolean>;
+}
+
+/** The offer watchers' sends, kept with their in-flight dedupe in one place. */
+export const bankOfferCommandsAtom = ownerCommandsAtom<BankOfferCommands>();

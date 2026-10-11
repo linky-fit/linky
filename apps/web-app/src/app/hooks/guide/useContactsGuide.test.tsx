@@ -10,10 +10,30 @@ vi.mock("../../../hooks/useRouting", () => ({
   navigateTo: navigateToMock,
 }));
 
+import {
+  AtomRegistry,
+  RegistryContext,
+  useAtomValue,
+} from "@linky-fit/linkstr-react";
 import type { Route } from "../../../types/route";
+import { contactsGuideAtom } from "../../state/shell/guide";
 import { useContactsGuide } from "./useContactsGuide";
+import {
+  useContactsGuideOverlay,
+  useStartContactsGuide,
+} from "./useContactsGuideControls";
 
-type GuideApi = ReturnType<typeof useContactsGuide>;
+const useGuideApi = () => {
+  const overlay = useContactsGuideOverlay();
+  return {
+    contactsGuide: useAtomValue(contactsGuideAtom),
+    contactsGuideActiveStep: overlay.activeStep,
+    contactsGuideNav: { back: overlay.back, next: overlay.next },
+    startContactsGuide: useStartContactsGuide(),
+  };
+};
+
+type GuideApi = ReturnType<typeof useGuideApi>;
 
 interface HarnessProps {
   contactsOnboardingHasBackedUpKeys: boolean;
@@ -26,7 +46,7 @@ const Harness = ({
   onRender,
   route,
 }: HarnessProps): null => {
-  const api = useContactsGuide({
+  useContactsGuide({
     cashuBalance: 0,
     contacts: [],
     contactsOnboardingHasBackedUpKeys,
@@ -36,7 +56,7 @@ const Harness = ({
     route,
   });
 
-  onRender(api);
+  onRender(useGuideApi());
   return null;
 };
 
@@ -44,6 +64,7 @@ const setup = () => {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
+  const registry = AtomRegistry.make();
 
   let api: GuideApi | null = null;
 
@@ -53,13 +74,17 @@ const setup = () => {
   ): void => {
     act(() => {
       root.render(
-        <Harness
-          contactsOnboardingHasBackedUpKeys={contactsOnboardingHasBackedUpKeys}
-          onRender={(value) => {
-            api = value;
-          }}
-          route={route}
-        />,
+        <RegistryContext.Provider value={registry}>
+          <Harness
+            contactsOnboardingHasBackedUpKeys={
+              contactsOnboardingHasBackedUpKeys
+            }
+            onRender={(value) => {
+              api = value;
+            }}
+            route={route}
+          />
+        </RegistryContext.Provider>,
       );
     });
   };
