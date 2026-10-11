@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { INITIAL_MNEMONIC_STORAGE_KEY } from "./mnemonic";
 

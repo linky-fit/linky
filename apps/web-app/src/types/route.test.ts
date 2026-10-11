@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { keryxSubscriptionIdFor } from "@linky-fit/linksync";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseRouteFromHash } from "./route";

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makeLocalStorageKeyValueStore } from "./localStorageKeyValueStore";

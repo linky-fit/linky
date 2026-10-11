@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { createIdFromString } from "@linky-fit/linksync";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Route } from "../../types/route";

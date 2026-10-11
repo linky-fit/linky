@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { describe, expect, it } from "vitest";
 import { readNotificationOpenData } from "./notificationOpen";

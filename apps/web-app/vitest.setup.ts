@@ -10,7 +10,7 @@ if (typeof globalThis.Buffer === "undefined") {
   });
 }
 
-// Provide a minimal Worker polyfill for jsdom so Evolu can initialize.
+// Neither jsdom nor Node has a global Worker; Evolu needs one to initialize.
 if (typeof globalThis.Worker === "undefined") {
   class MockWorker {
     onmessage: ((this: Worker, ev: MessageEvent) => unknown) | null = null;

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { base64 } from "@scure/base";
 import { strToU8, zipSync } from "fflate";
 import {

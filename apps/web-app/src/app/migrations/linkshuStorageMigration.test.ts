@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 // Legacy migration; removal gate in app/migrations/AGENTS.md
 
 import { beforeEach, describe, expect, it } from "vitest";

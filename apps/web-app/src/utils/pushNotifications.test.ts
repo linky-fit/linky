@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { getPublicKey, nip19 } from "nostr-tools";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createSecretKey } from "../testUtils/nostrKeys";
