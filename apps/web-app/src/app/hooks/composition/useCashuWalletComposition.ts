@@ -535,6 +535,7 @@ export const useCashuWalletComposition = ({
     receiveCashuToken,
     restoreCashuTokens,
     reclaimCashuTokens,
+    resolveAutoswapSource,
     resumeDeferredCashuReceives,
     resumePendingCashuAutoswapClaims,
     resumePendingCashuMelts,
@@ -2337,7 +2338,7 @@ export const useCashuWalletComposition = ({
     }
 
     const source = largestForeignMintForTokenList;
-    if (!source || autoswapCashu === null) {
+    if (!source || autoswapCashu === null || resolveAutoswapSource === null) {
       setStatus(t("cashuMeltToMainMintUnavailable"));
       return;
     }
@@ -2347,7 +2348,7 @@ export const useCashuWalletComposition = ({
     try {
       rememberSeenMint(targetMint);
       const outcome = await autoswapCashu({
-        sourceMint: source.mint,
+        sourceMint: await resolveAutoswapSource(source.mint),
         targetMint,
       });
 
@@ -2401,6 +2402,7 @@ export const useCashuWalletComposition = ({
     formatDisplayedAmountParts,
     largestForeignMintForTokenList,
     rememberSeenMint,
+    resolveAutoswapSource,
     setCashuIsBusy,
     setStatus,
     t,
@@ -2665,6 +2667,7 @@ export const useCashuWalletComposition = ({
     estimateAutoswapCashu,
     formatDisplayedAmountParts,
     rememberSeenMint,
+    resolveAutoswapSource,
     setCashuIsBusy,
     setStatus,
     t,

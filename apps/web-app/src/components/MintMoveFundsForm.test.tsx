@@ -152,6 +152,24 @@ describe("MintMoveFundsForm", () => {
     await unmount();
   });
 
+  it("moves from the source spelling its estimate priced", async () => {
+    const { container, estimateMintMove, moveMintFunds, unmount } =
+      await renderForm(4);
+    const stored = "https://Cashu.cz";
+    estimateMintMove.mockImplementationOnce(async (move) =>
+      estimateFor({ ...move, sourceMint: stored }, 4),
+    );
+
+    await press(container, ["mintMoveEstimate", "mintMoveConfirm"]);
+
+    expect(estimateMintMove.mock.calls[0]?.[0].sourceMint).toBe(SOURCE_MINT);
+    expect(moveMintFunds.mock.calls[0]?.[0]).toStrictEqual({
+      sourceMint: stored,
+      targetMint: TARGET_MINT,
+    });
+    await unmount();
+  });
+
   it("blocks a move whose fees exceed the balance", async () => {
     const { container, unmount } = await renderForm(60);
     await press(container, ["C", "5", "0", "mintMoveEstimate"]);

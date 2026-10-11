@@ -117,8 +117,9 @@ export function MintMoveFundsForm({
   };
 
   const runMove = async () => {
-    if (move === null) return;
-    if (await moveMintFunds(move)) {
+    if (move === null || estimated === null) return;
+    const priced = { ...move, sourceMint: estimated.estimate.sourceMint };
+    if (await moveMintFunds(priced)) {
       setEditedAmount(null);
       setEstimated(null);
     }

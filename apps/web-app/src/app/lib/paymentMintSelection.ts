@@ -43,10 +43,8 @@ export const storedMintSpelling = (
   mint: string,
 ): string => {
   const key = normalizeMintUrl(mint);
-  let stored: SendMintBalance | null = null;
-  for (const entry of balances) {
-    if (normalizeMintUrl(entry.mint) !== key || entry.amount <= 0) continue;
-    if (stored === null || entry.amount > stored.amount) stored = entry;
-  }
-  return stored?.mint ?? mint;
+  const [largest] = balances
+    .filter((entry) => entry.amount > 0 && normalizeMintUrl(entry.mint) === key)
+    .sort((a, b) => b.amount - a.amount);
+  return largest?.mint ?? mint;
 };
