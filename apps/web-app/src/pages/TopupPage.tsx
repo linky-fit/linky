@@ -8,12 +8,10 @@ import { AmountKeypad } from "../components/AmountKeypad";
 import { PaymentNoteInput } from "../components/PaymentNoteInput";
 import { useAmountInputKeypad } from "../components/useAmountInputKeypad";
 import { navigateTo } from "../hooks/useRouting";
+import { useScanCommands } from "../app/hooks/shell/scan";
 
-interface TopupPageProps {
-  pasteScanValue: () => Promise<void>;
-}
-
-export const TopupPage: FC<TopupPageProps> = ({ pasteScanValue }) => {
+export const TopupPage: FC = () => {
+  const { pasteScanValue } = useScanCommands();
   const { t } = useTranslation();
   const currentNpub = useAtomValue(currentNpubAtom);
   const {

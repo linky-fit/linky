@@ -29,6 +29,7 @@ import {
   useLnurlPayPreview,
 } from "../hooks/useLnurlPayPreview";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
+import { useWalletCommands } from "../app/hooks/wallet/useWalletCommands";
 
 interface Contact {
   id: ContactId;
@@ -242,15 +243,8 @@ export const ContactPayPage: FC<ContactPayPageProps> = ({
   );
 };
 
-type ContactPayRouteProps = Pick<
-  ContactPayPageProps,
-  "paySelectedContact" | "requestSelectedContact"
-> & { route: Route };
-
-export const ContactPayRoute: FC<ContactPayRouteProps> = ({
-  route,
-  ...props
-}) => {
+export const ContactPayRoute: FC<{ route: Route }> = ({ route }) => {
+  const { paySelectedContact, requestSelectedContact } = useWalletCommands();
   const selectedContact = useRoutePeopleContact(route);
   const nostrPictureByNpub = useNostrPictureByNpub();
   const { cashuBalance, cashuBalanceAfterMelt, cashuIsBusy } =
@@ -262,7 +256,6 @@ export const ContactPayRoute: FC<ContactPayRouteProps> = ({
   const [payAmount, setPayAmount] = useAtom(payAmountAtom);
   return (
     <ContactPayPage
-      {...props}
       cashuBalance={cashuBalance}
       cashuBalanceAfterMelt={cashuBalanceAfterMelt}
       cashuIsBusy={cashuIsBusy}
@@ -271,7 +264,9 @@ export const ContactPayRoute: FC<ContactPayRouteProps> = ({
       displayUnit={displayUnit}
       nostrPictureByNpub={nostrPictureByNpub}
       payAmount={payAmount}
+      paySelectedContact={paySelectedContact}
       payWithCashuEnabled={payWithCashuEnabled}
+      requestSelectedContact={requestSelectedContact}
       selectedContact={selectedContact}
       setContactPayMethod={setContactPayMethod}
       setPayAmount={setPayAmount}

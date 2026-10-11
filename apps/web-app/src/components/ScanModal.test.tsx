@@ -1,14 +1,16 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Translate } from "../i18n";
-import type { ScanDiagnostics } from "../app/hooks/useGuideScannerDomain";
+import type { ScanDiagnostics } from "../app/state/shell/scan";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 
-const { mockNavigate, mockScanCore, mockScanActions } = vi.hoisted(() => ({
-  mockNavigate: vi.fn(),
-  mockScanCore: vi.fn(),
-  mockScanActions: vi.fn(),
-}));
+const { mockNavigate, mockScanView, mockScanCommands, mockScanShortcuts } =
+  vi.hoisted(() => ({
+    mockNavigate: vi.fn(),
+    mockScanView: vi.fn(),
+    mockScanCommands: vi.fn(),
+    mockScanShortcuts: vi.fn(),
+  }));
 
 vi.mock("../hooks/useRouting", () => ({
   navigateTo: mockNavigate,
@@ -20,10 +22,17 @@ vi.mock("../devtools/inspector/inspectorEnabled", () => ({
   useInspectorEmissionEnabled: () => false,
 }));
 
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellCore: mockScanCore,
-  useAppShellActions: mockScanActions,
+vi.mock("../app/hooks/shell/scan", () => ({
+  useScanCommands: mockScanCommands,
+  useScanShortcuts: mockScanShortcuts,
+  useScanView: mockScanView,
 }));
+
+vi.mock("../app/hooks/shell", async () =>
+  (await import("../testUtils/shellHooks")).shellHooksMock({
+    t: (key) => translate(key),
+  }),
+);
 
 interface ScanModalProps {
   closeScan: () => void;
@@ -43,12 +52,12 @@ interface ScanModalProps {
 }
 
 function TestScanModal(props: ScanModalProps) {
-  mockScanCore.mockReturnValue({
+  mockScanView.mockReturnValue({
     ...props,
     scanAllowsManualContact: props.showTypeAction,
   });
-  mockScanActions.mockReturnValue({
-    ...props,
+  mockScanCommands.mockReturnValue(props);
+  mockScanShortcuts.mockReturnValue({
     openIssueTokenFromScan: props.onIssueToken,
     openManualPayFromScan: props.onTypePayment,
     openManualContactFromScan: props.onTypeManually,

@@ -1,6 +1,5 @@
 import type { PlanSendMintArgs } from "@linky-fit/linkshu";
-import { useAtomSet } from "@linky-fit/linkstr-react";
-import React from "react";
+import { useProvideOwnerCommands } from "../shell/ownerCommands";
 import type { Translate } from "../../../i18n";
 import type {
   DisplayAmountParts,
@@ -93,12 +92,7 @@ export const useRecurringPayments = ({
     showPaidOverlay,
     t,
   });
-  const { cancelDue, confirmDueNow, runNow } = scheduler;
-  const setScheduler = useAtomSet(recurringSchedulerAtom);
-  React.useEffect(() => {
-    setScheduler({ cancelDue, confirmDueNow, runNow });
-    return () => setScheduler(null);
-  }, [cancelDue, confirmDueNow, runNow, setScheduler]);
+  useProvideOwnerCommands(recurringSchedulerAtom, scheduler);
   useRecurringReminderSync({
     currentNsec,
     enabled: walletReady,

@@ -8,6 +8,7 @@ import { navigateTo } from "../hooks/useRouting";
 import type { Translate } from "../i18n";
 import { formatMiddleDots } from "../utils/formatting";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
+import { useScanCommands } from "../app/hooks/shell/scan";
 
 interface ManualPayContact {
   id: ContactId;
@@ -173,9 +174,8 @@ export const ManualPayPage: FC<ManualPayPageProps> = ({
   );
 };
 
-export const ManualPayRoute: FC<Pick<ManualPayPageProps, "onSubmitText">> = ({
-  onSubmitText,
-}) => {
+export const ManualPayRoute: FC = () => {
+  const { handleScannedText } = useScanCommands();
   const { t } = useTranslation();
   const contacts = useContacts();
   const nostrPictureByNpub = useNostrPictureByNpub();
@@ -183,7 +183,7 @@ export const ManualPayRoute: FC<Pick<ManualPayPageProps, "onSubmitText">> = ({
     <ManualPayPage
       contacts={contacts}
       nostrPictureByNpub={nostrPictureByNpub}
-      onSubmitText={onSubmitText}
+      onSubmitText={handleScannedText}
       t={t}
     />
   );

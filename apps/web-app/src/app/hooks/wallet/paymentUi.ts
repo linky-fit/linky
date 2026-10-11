@@ -1,10 +1,11 @@
-import { useAtomSet, useAtomValue } from "@linky-fit/linkstr-react";
+import { useAtom, useAtomSet, useAtomValue } from "@linky-fit/linkstr-react";
 import { Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import React from "react";
 import type { Translate } from "../../../i18n";
 import type { DisplayAmountParts } from "../../../utils/displayAmounts";
 import { contactsOnboardingHasPaidAtom } from "../../state/contacts/onboarding";
+import { pendingPaymentMintMoveAtom } from "../../state/shell/confirmations";
 import type { FundsCheck } from "../../state/wallet/payments";
 import { paymentsCommandsAtom } from "../../state/wallet/payments";
 
@@ -51,7 +52,7 @@ export const usePaymentMintMove = ({
   const [
     pendingPaymentMintMeltConfirmation,
     setPendingPaymentMintMeltConfirmation,
-  ] = React.useState<{ fromMint: string; toMint: string } | null>(null);
+  ] = useAtom(pendingPaymentMintMoveAtom);
 
   const reportShortfall = React.useCallback(
     (shortfall: Shortfall) => {
@@ -64,19 +65,23 @@ export const usePaymentMintMove = ({
         toMint: shortfall.toMint,
       });
     },
-    [setStatus, t],
+    [setStatus, t, setPendingPaymentMintMeltConfirmation],
   );
 
   const closePaymentMintMeltConfirmation = React.useCallback(() => {
     if (walletOpRunning) return;
     setPendingPaymentMintMeltConfirmation(null);
-  }, [walletOpRunning]);
+  }, [walletOpRunning, setPendingPaymentMintMeltConfirmation]);
 
   const confirmPaymentMintMelt = React.useCallback(async () => {
     if (walletOpRunning) return;
     setPendingPaymentMintMeltConfirmation(null);
     await meltToDefaultMint();
-  }, [meltToDefaultMint, walletOpRunning]);
+  }, [
+    meltToDefaultMint,
+    walletOpRunning,
+    setPendingPaymentMintMeltConfirmation,
+  ]);
 
   return {
     closePaymentMintMeltConfirmation,

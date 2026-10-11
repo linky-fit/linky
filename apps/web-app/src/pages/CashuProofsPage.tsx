@@ -28,6 +28,8 @@ import {
 import { getMintDisplay } from "../app/lib/tokenMessageInfo";
 import { useTokenProofStates } from "../hooks/useTokenProofStates";
 import type { I18nKey } from "../i18n";
+import { useCanRestoreTokens } from "../app/hooks/settings/useIdentitySettings";
+import { useWalletCommands } from "../app/hooks/wallet/useWalletCommands";
 
 interface CashuProofsPageProps {
   inspectCashuProofStates: InspectCashuProofStates | null;
@@ -296,15 +298,13 @@ export const CashuProofsPage: FC<CashuProofsPageProps> = ({
   );
 };
 
-type CashuProofsRouteProps = Pick<
-  CashuProofsPageProps,
-  | "canRestoreTokens"
-  | "reclaimHandedOutTokens"
-  | "restoreAndReclaimAllTokens"
-  | "restoreMissingTokens"
->;
-
-export const CashuProofsRoute: FC<CashuProofsRouteProps> = (props) => {
+export const CashuProofsRoute: FC = () => {
+  const canRestoreTokens = useCanRestoreTokens();
+  const {
+    reclaimHandedOutTokens,
+    restoreAndReclaimAllTokens,
+    restoreMissingTokens,
+  } = useWalletCommands();
   const { proofs } = useWalletInventory();
   const { cashuIsBusy, cashuMeltToMainMintButtonLabel } = useWalletBalance();
   const tokens = useWalletTokens();
@@ -312,7 +312,7 @@ export const CashuProofsRoute: FC<CashuProofsRouteProps> = (props) => {
   const inspectCashuProofStates = useInspectCashuProofStates();
   return (
     <CashuProofsPage
-      {...props}
+      canRestoreTokens={canRestoreTokens}
       cashuBulkCheckIsBusy={tokens.cashuBulkCheckIsBusy}
       cashuIsBusy={cashuIsBusy}
       cashuMeltToMainMintButtonLabel={cashuMeltToMainMintButtonLabel}
@@ -325,6 +325,9 @@ export const CashuProofsRoute: FC<CashuProofsRouteProps> = (props) => {
       }
       inspectCashuProofStates={inspectCashuProofStates}
       meltLargestForeignMintToMainMint={meltToDefaultMint}
+      reclaimHandedOutTokens={reclaimHandedOutTokens}
+      restoreAndReclaimAllTokens={restoreAndReclaimAllTokens}
+      restoreMissingTokens={restoreMissingTokens}
       tokensRestoreIsBusy={tokens.tokensRestoreIsBusy}
     />
   );

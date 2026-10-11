@@ -21,6 +21,10 @@ import { usePushToast, useTranslation } from "../shell";
 
 export const useSeedMnemonic = () => useAtomValue(seedMnemonicAtom);
 
+/** A recovery seed is stored, so tokens can be restored from the mints. */
+export const useCanRestoreTokens = () =>
+  (useSeedMnemonic() ?? "").trim().length > 0;
+
 /** Identity switches and logout as Settings offers them. */
 export const useIdentitySettings = () => {
   const commands = useAtomValue(identityCommandsAtom);

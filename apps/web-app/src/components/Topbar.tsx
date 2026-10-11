@@ -7,7 +7,10 @@ import {
   TopBar,
 } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useNostrPictureByNpub } from "../app/hooks/contacts/useProfileCache";
+import { useTopbar } from "../app/hooks/layout/useTopbar";
+import { useTranslation } from "../app/hooks/shell";
+import { useRouting } from "../hooks/useRouting";
 import {
   getDesktopRouteSection,
   getDesktopSectionRoute,
@@ -43,21 +46,22 @@ const TopbarAction = ({
 export function Topbar({
   desktopDetail = false,
 }: TopbarProps): React.ReactElement {
-  const state = useAppShellCore();
-  const { chatTopbarContact, nostrPictureByNpub, t, topbarTitle } = state;
+  const route = useRouting();
+  const { t } = useTranslation();
+  const nostrPictureByNpub = useNostrPictureByNpub();
+  const state = useTopbar();
+  const { chatTopbarContact, topbarTitle } = state;
 
-  const desktopTopbar: TopbarButton | null = isDesktopSectionEntryRoute(
-    state.route,
-  )
+  const desktopTopbar: TopbarButton | null = isDesktopSectionEntryRoute(route)
     ? {
         icon: "X",
         label: t("close"),
         onClick: () =>
           navigateTo({
-            route: getDesktopSectionRoute(getDesktopRouteSection(state.route)),
+            route: getDesktopSectionRoute(getDesktopRouteSection(route)),
           }),
       }
-    : state.route.kind === "cashuTokenEmit"
+    : route.kind === "cashuTokenEmit"
       ? {
           icon: "ChevronLeft",
           label: t("back"),

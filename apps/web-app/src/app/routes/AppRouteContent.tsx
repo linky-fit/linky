@@ -64,18 +64,11 @@ import {
   RecurringPaymentPage,
   TransactionsPage,
 } from "../../pages";
+import { useRouting } from "../../hooks/useRouting";
 import type { Route } from "../../types/route";
-import {
-  useAppShellCore,
-  useMoneyRoutes,
-  usePeopleRoutes,
-} from "../context/AppShellContexts";
-import {
-  ContactsPane,
-  DesktopContactsPane,
-  WalletPane,
-  type MainTabRouteProps,
-} from "./MainTabPanes";
+import { useTranslation } from "../hooks/shell";
+import { useScanIsOpen } from "../hooks/shell/scan";
+import { ContactsPane, DesktopContactsPane, WalletPane } from "./MainTabPanes";
 import {
   getDesktopRouteSection,
   isDesktopSectionRoot,
@@ -83,49 +76,13 @@ import {
 
 const InspectorPage = React.lazy(() => import("../../pages/InspectorPage"));
 
-export interface PeopleRoutesProps {
-  bankPaymentOfferDetailProps: Omit<
-    React.ComponentProps<typeof BankPaymentOfferDetailRoute>,
-    "route"
-  >;
-  chatProps: Omit<React.ComponentProps<typeof ChatRoute>, "route">;
-  contactPayProps: Omit<React.ComponentProps<typeof ContactPayRoute>, "route">;
-  profileProps: React.ComponentProps<typeof ProfileRoute>;
-}
-
-export interface MoneyRoutesProps {
-  cashuTokenNewProps: React.ComponentProps<typeof CashuTokenNewPage>;
-  cashuTokenProps: Omit<
-    React.ComponentProps<typeof CashuTokenRoute>,
-    "routeId"
-  >;
-  cashuProofsProps: React.ComponentProps<typeof CashuProofsRoute>;
-  cashuTokensProps: React.ComponentProps<typeof CashuTokensRoute>;
-  lnAddressPayProps: Omit<
-    React.ComponentProps<typeof LnAddressPayRoute>,
-    "lnAddress"
-  >;
-  manualPayProps: React.ComponentProps<typeof ManualPayRoute>;
-  proxyPaymentsProps: React.ComponentProps<typeof ProxyPaymentsPage>;
-  spdPaymentProps: Omit<
-    React.ComponentProps<typeof SpdPaymentRoute>,
-    "isEditing" | "isManualEntry" | "spdPayload"
-  >;
-  topupProps: React.ComponentProps<typeof TopupPage>;
-}
-
-export interface MainTabRoutesProps {
-  mainTabProps: MainTabRouteProps;
-}
-
 const assertNever = (route: never): never => {
   throw new Error(`Unhandled app route: ${JSON.stringify(route)}`);
 };
 
 const RoutePage = (): React.ReactElement => {
-  const { route, t } = useAppShellCore();
-  const peopleRoutes = usePeopleRoutes();
-  const moneyRoutes = useMoneyRoutes();
+  const route = useRouting();
+  const { t } = useTranslation();
 
   switch (route.kind) {
     case "contacts":
@@ -156,7 +113,7 @@ const RoutePage = (): React.ReactElement => {
         <KeryxAnnouncementPage id={route.id} announcementKey={route.key} />
       );
     case "proxyPayments":
-      return <ProxyPaymentsPage {...moneyRoutes.proxyPaymentsProps} />;
+      return <ProxyPaymentsPage />;
     case "advancedAutoPayLimit":
       return <AdvancedAutoPayLimitPage />;
     case "advancedInspector":
@@ -196,7 +153,7 @@ const RoutePage = (): React.ReactElement => {
     case "nostrRelay":
       return <NostrRelayPage />;
     case "topup":
-      return <TopupPage {...moneyRoutes.topupProps} />;
+      return <TopupPage />;
     case "transactions":
       return <TransactionsPage />;
     case "recurringPaymentNew":
@@ -212,66 +169,44 @@ const RoutePage = (): React.ReactElement => {
     case "topupInvoice":
       return <TopupInvoiceRoute />;
     case "cashuProofs":
-      return <CashuProofsRoute {...moneyRoutes.cashuProofsProps} />;
+      return <CashuProofsRoute />;
     case "cashuTokens":
-      return <CashuTokensRoute {...moneyRoutes.cashuTokensProps} />;
+      return <CashuTokensRoute />;
     case "cashuTokenNew":
-      return <CashuTokenNewPage {...moneyRoutes.cashuTokenNewProps} />;
+      return <CashuTokenNewPage />;
     case "cashuTokenEmit":
       return <CashuTokenEmitPage />;
     case "cashuToken":
-      return (
-        <CashuTokenRoute {...moneyRoutes.cashuTokenProps} routeId={route.id} />
-      );
+      return <CashuTokenRoute routeId={route.id} />;
     case "contact":
       return <ContactRoute route={route} />;
     case "contactPay":
-      return (
-        <ContactPayRoute {...peopleRoutes.contactPayProps} route={route} />
-      );
+      return <ContactPayRoute route={route} />;
     case "lnAddressPay":
-      return (
-        <LnAddressPayRoute
-          {...moneyRoutes.lnAddressPayProps}
-          lnAddress={route.lnAddress}
-        />
-      );
+      return <LnAddressPayRoute lnAddress={route.lnAddress} />;
     case "manualPay":
-      return <ManualPayRoute {...moneyRoutes.manualPayProps} />;
+      return <ManualPayRoute />;
     case "bankPayment":
       return (
         <SpdPaymentRoute
-          {...moneyRoutes.spdPaymentProps}
           isEditing={route.editing === true}
           isManualEntry={false}
           spdPayload={route.spdPayload}
         />
       );
     case "bankPaymentNew":
-      return (
-        <SpdPaymentRoute
-          {...moneyRoutes.spdPaymentProps}
-          isEditing
-          isManualEntry
-          spdPayload=""
-        />
-      );
+      return <SpdPaymentRoute isEditing isManualEntry spdPayload="" />;
     case "bankPaymentOffer":
-      return (
-        <BankPaymentOfferDetailRoute
-          {...peopleRoutes.bankPaymentOfferDetailProps}
-          route={route}
-        />
-      );
+      return <BankPaymentOfferDetailRoute route={route} />;
     case "chat":
-      return <ChatRoute {...peopleRoutes.chatProps} route={route} />;
+      return <ChatRoute route={route} />;
     case "contactEdit":
       return <ContactEditRoute route={route} />;
     case "contactNew":
       return <ContactNewRoute route={route} />;
     case "profile":
     case "profileEdit":
-      return <ProfileRoute {...peopleRoutes.profileProps} />;
+      return <ProfileRoute />;
     default:
       return assertNever(route satisfies never);
   }
@@ -311,7 +246,8 @@ const getBottomTab = (route: Route): BottomTabKey | null => {
 };
 
 const PhoneRouteContent = (): React.ReactElement => {
-  const { route, t } = useAppShellCore();
+  const route = useRouting();
+  const { t } = useTranslation();
   const tab = getBottomTab(route);
   return (
     <>
@@ -327,8 +263,9 @@ const PhoneRouteContent = (): React.ReactElement => {
 const desktopPanesWidth = size.appWidth - size.hero - space.lg;
 
 export const AppRouteContent = (): React.ReactElement => {
-  const { route, scanIsOpen, t } = useAppShellCore();
-  const moneyRoutes = useMoneyRoutes();
+  const route = useRouting();
+  const { t } = useTranslation();
+  const scanIsOpen = useScanIsOpen();
   const isDesktopSplitView = useDesktopSplitView();
 
   if (!isDesktopSplitView) return <PhoneRouteContent />;
@@ -368,7 +305,7 @@ export const AppRouteContent = (): React.ReactElement => {
             ) : section === "wallet" ? (
               <WalletPane />
             ) : section === "proxy" ? (
-              <ProxyPaymentsPage {...moneyRoutes.proxyPaymentsProps} />
+              <ProxyPaymentsPage />
             ) : (
               <AdvancedPage />
             )}

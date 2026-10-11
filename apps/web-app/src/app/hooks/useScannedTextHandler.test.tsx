@@ -1,3 +1,4 @@
+import { AtomRegistry, RegistryContext } from "@linky-fit/linkstr-react";
 import { encodeNprofile, encodeNpub } from "@linky-fit/linkstr";
 import { createId } from "@linky-fit/linksync";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
@@ -120,7 +121,11 @@ const setup = async ({
     return null;
   };
 
-  const rendered = await renderIntoDocument(<Probe />);
+  const rendered = await renderIntoDocument(
+    <RegistryContext.Provider value={AtomRegistry.make()}>
+      <Probe />
+    </RegistryContext.Provider>,
+  );
   unmounts.push(rendered.unmount);
 
   return {

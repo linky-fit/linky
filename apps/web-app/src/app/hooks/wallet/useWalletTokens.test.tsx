@@ -44,6 +44,7 @@ vi.mock("../shell", async () =>
 );
 vi.mock("./useWalletInventory", () => ({
   useWalletBalance: () => ({ cashuBalance: 100 }),
+  useWalletInventory: () => ({ transfers: [] }),
 }));
 vi.mock("../../state/wallet/tokens", async (importOriginal) => {
   const actual =
@@ -90,7 +91,7 @@ const render = async () => {
         rememberSeenMint: () => {},
         walletMints: ["https://mint-a.example"],
       }),
-      ...useTokenContactSend({ walletTransfers: [] }),
+      ...useTokenContactSend(),
     };
     useEffect(() => {
       hook.current = tokens;

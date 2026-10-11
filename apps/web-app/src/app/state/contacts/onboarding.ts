@@ -2,6 +2,8 @@ import {
   CONTACTS_ONBOARDING_HAS_BACKUPED_KEYS_STORAGE_KEY,
   CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY,
 } from "../../../utils/constants";
+import { Atom } from "effect/reactivity";
+import { messagesByContactAtom } from "../messages/readModel";
 import { kvSeededAtom } from "../platform";
 
 const onboardingFlagAtom = (key: string) =>
@@ -20,4 +22,11 @@ export const contactsOnboardingHasPaidAtom = onboardingFlagAtom(
 /** The user copied the recovery seed on this device, a step of the contacts onboarding. */
 export const contactsOnboardingHasBackedUpKeysAtom = onboardingFlagAtom(
   CONTACTS_ONBOARDING_HAS_BACKUPED_KEYS_STORAGE_KEY,
+);
+
+/** The user sent a message among the recent ones, a step of the contacts onboarding. */
+export const contactsOnboardingHasSentMessageAtom = Atom.readable((get) =>
+  get(messagesByContactAtom).recentMessages.some(
+    (message) => message.direction === "out",
+  ),
 );

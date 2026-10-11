@@ -5,17 +5,10 @@ import { useTranslation } from "../app/hooks/shell";
 import { extractCashuTokenFromText } from "../app/lib/tokenText";
 import { walletOpRunningAtom } from "../app/state/wallet/opQueue";
 import { receiveTokenDraftAtom } from "../app/state/wallet/tokenActivity";
+import { useWalletCommands } from "../app/hooks/wallet/useWalletCommands";
 
-interface CashuTokenNewPageProps {
-  saveCashuFromText: (
-    text: string,
-    opts: { navigateToTokens?: boolean; navigateToWallet?: boolean },
-  ) => Promise<void>;
-}
-
-export const CashuTokenNewPage: FC<CashuTokenNewPageProps> = ({
-  saveCashuFromText,
-}) => {
+export const CashuTokenNewPage: FC = () => {
+  const { saveCashuFromText } = useWalletCommands();
   const { t } = useTranslation();
   const cashuIsBusy = useAtomValue(walletOpRunningAtom);
   const [cashuDraft, setCashuDraft] = useAtom(receiveTokenDraftAtom);

@@ -1,6 +1,8 @@
 import { decodeNpub } from "@linky-fit/linkstr";
-import { useCallback, useState } from "react";
+import { useAtom } from "@linky-fit/linkstr-react";
+import { useCallback } from "react";
 import type { CashuPaymentRequestMessageInfo } from "../../lib/paymentRequestMessage";
+import { pendingCashuPaymentRequestAtom } from "../../state/shell/confirmations";
 import { normalizePubkeyHex } from "../messages/contactIdentity";
 
 interface UseCashuPaymentRequestConfirmationParams {
@@ -21,7 +23,7 @@ export const useCashuPaymentRequestConfirmation = ({
   const [
     pendingCashuPaymentRequestConfirmation,
     setPendingCashuPaymentRequestConfirmation,
-  ] = useState<CashuPaymentRequestMessageInfo | null>(null);
+  ] = useAtom(pendingCashuPaymentRequestAtom);
 
   const payCashuPaymentRequest = useCallback(
     async (requestInfo: CashuPaymentRequestMessageInfo) => {
@@ -40,13 +42,19 @@ export const useCashuPaymentRequestConfirmation = ({
 
       setPendingCashuPaymentRequestConfirmation(requestInfo);
     },
-    [cashuIsBusy, currentNpub, autoPayLimit, runCashuPaymentRequest],
+    [
+      cashuIsBusy,
+      currentNpub,
+      autoPayLimit,
+      runCashuPaymentRequest,
+      setPendingCashuPaymentRequestConfirmation,
+    ],
   );
 
   const closeCashuPaymentRequestConfirmation = useCallback(() => {
     if (cashuIsBusy) return;
     setPendingCashuPaymentRequestConfirmation(null);
-  }, [cashuIsBusy]);
+  }, [cashuIsBusy, setPendingCashuPaymentRequestConfirmation]);
 
   const confirmCashuPaymentRequest = useCallback(async () => {
     const pending = pendingCashuPaymentRequestConfirmation;
@@ -57,6 +65,7 @@ export const useCashuPaymentRequestConfirmation = ({
     cashuIsBusy,
     pendingCashuPaymentRequestConfirmation,
     runCashuPaymentRequest,
+    setPendingCashuPaymentRequestConfirmation,
   ]);
 
   return {

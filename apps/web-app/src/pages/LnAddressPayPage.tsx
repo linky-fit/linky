@@ -17,6 +17,7 @@ import {
   inferLightningAddressFromLnurlTarget,
 } from "../lnurlPay";
 import { formatMiddleDots } from "../utils/formatting";
+import { useWalletCommands } from "../app/hooks/wallet/useWalletCommands";
 
 interface LnAddressPayKnownContact {
   lnAddress?: string | null;
@@ -165,22 +166,21 @@ export const LnAddressPayPage: FC<LnAddressPayPageProps> = ({
   );
 };
 
-type LnAddressPayRouteProps = Pick<
-  LnAddressPayPageProps,
-  "lnAddress" | "payLightningAddressWithCashu"
->;
-
-export const LnAddressPayRoute: FC<LnAddressPayRouteProps> = (props) => {
+export const LnAddressPayRoute: FC<
+  Pick<LnAddressPayPageProps, "lnAddress">
+> = ({ lnAddress }) => {
+  const { payLightningAddressWithCashu } = useWalletCommands();
   const { knownLnAddressPayContact, knownLnAddressPayContactPictureUrl } =
     useKnownLnAddressPayContact("lnAddressPay");
   const draft = useLnAddressPayDraft();
   return (
     <LnAddressPayPage
-      {...props}
       knownContact={knownLnAddressPayContact}
       knownContactPictureUrl={knownLnAddressPayContactPictureUrl}
+      lnAddress={lnAddress}
       lnAddressPayAmount={draft.lnAddressPayAmount}
       lnAddressPayNote={draft.lnAddressPayNote}
+      payLightningAddressWithCashu={payLightningAddressWithCashu}
       setLnAddressPayAmount={draft.setLnAddressPayAmount}
       setLnAddressPayNote={draft.setLnAddressPayNote}
     />

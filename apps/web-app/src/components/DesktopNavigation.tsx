@@ -1,20 +1,22 @@
 import { Avatar, NavigationRail, Pressable } from "@linky-fit/ui";
 import React from "react";
-import {
-  useAppShellActions,
-  useAppShellCore,
-} from "../app/context/AppShellContexts";
+import { useAtomValue } from "@linky-fit/linkstr-react";
+import { useEffectiveProfile } from "../app/hooks/profile/useEffectiveProfile";
+import { useTranslation } from "../app/hooks/shell";
+import { currentNpubAtom } from "../app/state/session/session";
 import {
   getDesktopRouteSection,
   getDesktopSectionRoute,
 } from "../app/routes/desktopRouteSection";
-import { navigateTo } from "../hooks/useRouting";
+import { navigateTo, useRouting } from "../hooks/useRouting";
 import { formatShortNpub } from "../utils/formatting";
 
 export function DesktopNavigation(): React.ReactElement {
-  const actions = useAppShellActions();
-  const state = useAppShellCore();
-  const { t } = state;
+  const route = useRouting();
+  const { t } = useTranslation();
+  const currentNpub = useAtomValue(currentNpubAtom);
+  const { effectiveProfileName, effectiveProfilePicture } =
+    useEffectiveProfile();
 
   return (
     <NavigationRail
@@ -23,14 +25,14 @@ export function DesktopNavigation(): React.ReactElement {
         <Pressable
           borderRadius="$pill"
           aria-label={t("profile")}
-          onPress={actions.openProfileQr}
+          onPress={() => navigateTo({ route: "profile" })}
         >
           <Avatar
             name={
-              state.effectiveProfileName ??
-              (state.currentNpub ? formatShortNpub(state.currentNpub) : "?")
+              effectiveProfileName ??
+              (currentNpub ? formatShortNpub(currentNpub) : "?")
             }
-            uri={state.effectiveProfilePicture ?? undefined}
+            uri={effectiveProfilePicture ?? undefined}
           />
         </Pressable>
       }
@@ -42,7 +44,7 @@ export function DesktopNavigation(): React.ReactElement {
       footerItems={[
         { value: "settings", label: t("settings"), icon: "Settings" },
       ]}
-      value={getDesktopRouteSection(state.route)}
+      value={getDesktopRouteSection(route)}
       onValueChange={(section) =>
         navigateTo({ route: getDesktopSectionRoute(section) })
       }

@@ -47,6 +47,9 @@ import {
   requestOwnLightningAddressClaimPreview,
 } from "../utils/npubCashUsernameClaim";
 import { PageCard } from "../components/PageCard";
+import { canWriteNfc, useWriteCurrentNpubToNfc } from "../app/hooks/shell/nfc";
+import { useShareText } from "../app/hooks/shell/share";
+import { useWalletCommands } from "../app/hooks/wallet/useWalletCommands";
 
 interface DerivedProfile {
   lnAddress: string;
@@ -499,15 +502,10 @@ export function ProfilePage({
   );
 }
 
-type ProfileRouteProps = Pick<
-  ProfilePageProps,
-  | "canWriteToNfc"
-  | "payLightningInvoiceWithCashu"
-  | "shareText"
-  | "writeCurrentNpubToNfc"
->;
-
-export function ProfileRoute(props: ProfileRouteProps): React.ReactElement {
+export function ProfileRoute(): React.ReactElement {
+  const { payLightningInvoiceWithCashu } = useWalletCommands();
+  const shareText = useShareText();
+  const writeCurrentNpubToNfc = useWriteCurrentNpubToNfc();
   const { cashuBalance, cashuBalanceAfterMelt, cashuIsBusy } =
     useWalletBalance();
   const copyText = useCopyText();
@@ -522,8 +520,8 @@ export function ProfileRoute(props: ProfileRouteProps): React.ReactElement {
   const editor = useProfileEditor();
   return (
     <ProfilePage
-      {...props}
       {...editor}
+      canWriteToNfc={canWriteNfc()}
       cashuBalance={cashuBalance}
       cashuBalanceAfterMelt={cashuBalanceAfterMelt}
       cashuIsBusy={cashuIsBusy}
@@ -535,8 +533,11 @@ export function ProfileRoute(props: ProfileRouteProps): React.ReactElement {
       effectiveProfilePicture={profile.effectiveProfilePicture}
       makeNip98AuthHeader={makeNip98AuthHeader}
       ownedLightningAddresses={ownedLightningAddresses}
+      payLightningInvoiceWithCashu={payLightningInvoiceWithCashu}
       profileStatus={profileStatus}
       serverBaseUrl={NPUB_CASH_SERVER_BASE_URL}
+      shareText={shareText}
+      writeCurrentNpubToNfc={writeCurrentNpubToNfc}
     />
   );
 }

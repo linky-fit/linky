@@ -1,12 +1,14 @@
+import { useAtom } from "@linky-fit/linkstr-react";
 import { Result } from "effect";
 import React from "react";
 import type { Translate } from "../../../i18n";
-import {
-  redeemLnurlWithdraw,
-  type LnurlWithdrawPreview,
-} from "../../../lnurlPay";
+import { redeemLnurlWithdraw } from "../../../lnurlPay";
 import { MAIN_MINT_URL, normalizeMintUrl } from "../../../utils/mint";
 import { getUnknownErrorMessage } from "../../../utils/unknown";
+import {
+  lnurlWithdrawBusyAtom,
+  pendingLnurlWithdrawAtom,
+} from "../../state/shell/confirmations";
 import type { useTopupFlow } from "../topup/useTopupFlow";
 
 interface UseLnurlWithdrawParams {
@@ -26,13 +28,15 @@ export const useLnurlWithdraw = ({
   const [
     pendingLnurlWithdrawConfirmation,
     setPendingLnurlWithdrawConfirmation,
-  ] = React.useState<LnurlWithdrawPreview | null>(null);
-  const [lnurlWithdrawIsBusy, setLnurlWithdrawIsBusy] = React.useState(false);
+  ] = useAtom(pendingLnurlWithdrawAtom);
+  const [lnurlWithdrawIsBusy, setLnurlWithdrawIsBusy] = useAtom(
+    lnurlWithdrawBusyAtom,
+  );
 
   const closeLnurlWithdrawConfirmation = React.useCallback(() => {
     if (lnurlWithdrawIsBusy) return;
     setPendingLnurlWithdrawConfirmation(null);
-  }, [lnurlWithdrawIsBusy]);
+  }, [lnurlWithdrawIsBusy, setPendingLnurlWithdrawConfirmation]);
 
   const confirmLnurlWithdraw = React.useCallback(async () => {
     const pending = pendingLnurlWithdrawConfirmation;
@@ -76,6 +80,8 @@ export const useLnurlWithdraw = ({
     setStatus,
     startBackgroundTopup,
     t,
+    setPendingLnurlWithdrawConfirmation,
+    setLnurlWithdrawIsBusy,
   ]);
 
   return {

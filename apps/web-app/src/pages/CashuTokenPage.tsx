@@ -37,6 +37,8 @@ import type { CashuOperationId } from "../evolu";
 import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey } from "../i18n";
 import { buildCashuShareUrl } from "../utils/deepLinks";
+import { canWriteNfc, useWriteCashuTokenToNfc } from "../app/hooks/shell/nfc";
+import { useShareCashuToken } from "../app/hooks/shell/share";
 
 interface CashuTokenPageProps {
   contacts: CashuTokenHandoffProps["contacts"];
@@ -378,12 +380,11 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
   );
 };
 
-type CashuTokenRouteProps = Pick<
-  CashuTokenPageProps,
-  "canWriteToNfc" | "routeId" | "shareTokenText" | "writeToNfc"
->;
-
-export const CashuTokenRoute: FC<CashuTokenRouteProps> = (props) => {
+export const CashuTokenRoute: FC<Pick<CashuTokenPageProps, "routeId">> = ({
+  routeId,
+}) => {
+  const shareTokenText = useShareCashuToken();
+  const writeToNfc = useWriteCashuTokenToNfc();
   const contacts = useContacts();
   const messages = useAtomValue(localMessagesAtom);
   const { proofs, transfers } = useWalletInventory();
@@ -394,8 +395,8 @@ export const CashuTokenRoute: FC<CashuTokenRouteProps> = (props) => {
   const { showPaidOverlay } = usePaidOverlayCommands();
   return (
     <CashuTokenPage
-      {...props}
       canSendToContact={contacts.length > 0}
+      canWriteToNfc={canWriteNfc()}
       cashuIsBusy={tokens.tokenWorkIsBusy}
       cashuProofs={proofs}
       cashuTransfers={transfers}
@@ -410,9 +411,12 @@ export const CashuTokenRoute: FC<CashuTokenRouteProps> = (props) => {
       messages={messages}
       reclaimCashuTransfer={tokens.reclaimCashuTransfer}
       returnCashuTokenToWallet={tokens.returnCashuTokenToWallet}
+      routeId={routeId}
       setStatus={setStatus}
+      shareTokenText={shareTokenText}
       showPaidOverlay={showPaidOverlay}
       startSendCashuTokenToContact={tokens.startSendCashuTokenToContact}
+      writeToNfc={writeToNfc}
     />
   );
 };

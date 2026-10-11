@@ -222,7 +222,7 @@ export const useRecurringPaymentsActions = (): RecurringPaymentsActions => {
         links: { recurringPayment: order.id },
         payload: null,
       });
-      void scheduler?.runNow();
+      void scheduler?.read().runNow();
       return true;
     },
     [deleteArm, pendingDeleteId, reportWriteFailure, repository, scheduler],

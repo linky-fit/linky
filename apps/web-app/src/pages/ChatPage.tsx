@@ -1,3 +1,5 @@
+import { useMintIcons } from "../app/hooks/mint/useMintInfo";
+import { useWalletCommands } from "../app/hooks/wallet/useWalletCommands";
 import {
   Avatar,
   Button,
@@ -1380,15 +1382,9 @@ export const ChatPage: FC<ChatPageProps> = ({
   );
 };
 
-type ChatRouteProps = Pick<
-  ChatPageProps,
-  | "getMintIconUrl"
-  | "markMintIconFailed"
-  | "onPayPaymentRequest"
-  | "onSettleBankPaymentOffer"
-> & { route: Route };
-
-export const ChatRoute: FC<ChatRouteProps> = ({ route, ...props }) => {
+export const ChatRoute: FC<{ route: Route }> = ({ route }) => {
+  const { getMintIconUrl, markMintIconFailed } = useMintIcons();
+  const { payChatPaymentRequest, settleBankPaymentOffer } = useWalletCommands();
   const { lang } = useTranslation();
   const selectedContact = useChatContact(route);
   const composer = useChatComposer();
@@ -1415,7 +1411,6 @@ export const ChatRoute: FC<ChatRouteProps> = ({ route, ...props }) => {
   const openContactPay = useOpenContactPay();
   return (
     <ChatPage
-      {...props}
       addChatAttachments={composer.addChatAttachments}
       bankPaymentOfferMessages={bankPaymentOfferMessages}
       cashuBalance={cashuBalance}
@@ -1432,8 +1427,10 @@ export const ChatRoute: FC<ChatRouteProps> = ({ route, ...props }) => {
       editContext={composer.editContext}
       feedbackContactNpub={FEEDBACK_CONTACT_NPUB}
       getCashuTokenMessageInfo={getCashuTokenMessageInfo}
+      getMintIconUrl={getMintIconUrl}
       getNpubMessageContactInfo={getNpubMessageContactInfo}
       lang={lang}
+      markMintIconFailed={markMintIconFailed}
       mentionContacts={mentionContacts}
       onAddNpubContacts={addNpubMessageContacts}
       onAddUnknownContact={addUnknownContactFromChat}
@@ -1444,8 +1441,10 @@ export const ChatRoute: FC<ChatRouteProps> = ({ route, ...props }) => {
       onDeclinePaymentRequest={send.onDeclineChatPaymentRequest}
       onEdit={composer.onEditChatMessage}
       onOpenNpubContact={onOpenNpubContact}
+      onPayPaymentRequest={payChatPaymentRequest}
       onReact={onReactToChatMessage}
       onReply={composer.onReplyToChatMessage}
+      onSettleBankPaymentOffer={settleBankPaymentOffer}
       openContactPay={openContactPay}
       payWithCashuEnabled={payWithCashuEnabled}
       reactionsByMessageId={reactionsByMessageId}
