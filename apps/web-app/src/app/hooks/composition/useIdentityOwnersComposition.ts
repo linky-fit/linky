@@ -8,6 +8,7 @@ import {
   getInitialNostrIdentitySwitchedAtSec,
 } from "../../../utils/storage";
 import { platformAtom } from "../../state/platform";
+import { identityCommandsAtom } from "../../state/session/identity";
 import { sessionAtom } from "../../state/session/session";
 import { toSyncedNostrIdentity } from "../../lib/syncedNostrIdentity";
 import {
@@ -16,6 +17,7 @@ import {
   useInboxCursorsRepository,
   useSyncedNostrIdentityRow,
 } from "../useLinksync";
+import { useProvideOwnerCommands } from "../shell/ownerCommands";
 import { useProfileAuthDomain } from "../useProfileAuthDomain";
 
 interface UseIdentityOwnersCompositionParams {
@@ -49,6 +51,13 @@ export const useIdentityOwnersComposition = ({
     lang,
     pushToast,
     t,
+  });
+
+  useProvideOwnerCommands(identityCommandsAtom, {
+    answerPendingIdentitySwitch: profileAuth.answerPendingIdentitySwitch,
+    requestLogout: profileAuth.requestLogout,
+    requestPasteNostrKeys: profileAuth.requestPasteNostrKeys,
+    switchToDefaultIdentity: profileAuth.switchToDefaultIdentity,
   });
 
   const syncedNostrIdentityRow = useSyncedNostrIdentityRow();

@@ -7,10 +7,17 @@ import { RegistryContext } from "@linky-fit/linkstr-react";
 import { Effect } from "effect";
 import { act, useEffect } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { makeTestAppRegistry } from "../../testUtils/appRegistry";
-import { makeTestLinkyStore } from "../../testUtils/linkyStore";
-import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
-import { useContactsDomain } from "./useContactsDomain";
+import { makeTestAppRegistry } from "../../../testUtils/appRegistry";
+import { makeTestLinkyStore } from "../../../testUtils/linkyStore";
+import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
+import { useDedupeContacts } from "./useDedupeContacts";
+
+const pushToast = vi.hoisted(() => vi.fn<(message: string) => void>());
+vi.mock("../shell", async () =>
+  (await import("../../../testUtils/shellHooks")).shellHooksMock({
+    pushToast: (message) => pushToast(message),
+  }),
+);
 
 vi.mock("@evolu/common", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@evolu/common")>()),
@@ -28,7 +35,7 @@ const CAROL_NPUB = text(
   "npub1sg6plzptd64u62a878hep2kev88swjh3tw00gjsfl8f237lmu63q0uf63m",
 );
 
-describe("useContactsDomain dedupe", () => {
+describe("useDedupeContacts", () => {
   it("merges contacts by npub and never by a shared lightning address", async () => {
     const { store } = makeTestLinkyStore();
     openLinkyStore.mockResolvedValue(store);
@@ -51,17 +58,8 @@ describe("useContactsDomain dedupe", () => {
       await Effect.runPromise(contacts.insert(row));
 
     const dedupe: { current: (() => Promise<void>) | null } = { current: null };
-    const pushToast = vi.fn<(message: string) => void>();
     const Probe = () => {
-      const { dedupeContacts } = useContactsDomain({
-        accountHydrated: true,
-        contacts,
-        noGroupFilterValue: "",
-        pushToast,
-        reassignContactMessages: () => Promise.resolve(0),
-        route: { kind: "contacts" },
-        t: (key) => key,
-      });
+      const { dedupeContacts } = useDedupeContacts();
       useEffect(() => {
         dedupe.current = dedupeContacts;
       }, [dedupeContacts]);

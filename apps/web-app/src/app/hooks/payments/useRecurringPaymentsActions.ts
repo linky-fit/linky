@@ -28,8 +28,7 @@ import { contactsAtom } from "../../state/contacts/readModel";
 import { defaultMintAtom } from "../../state/wallet/defaultMint";
 import { payWithCashuEnabledAtom } from "../../state/wallet/prefs";
 import {
-  armedRecurringDeleteAtom,
-  recurringDeleteArmAtom,
+  recurringDeleteArm,
   recurringSchedulerAtom,
 } from "../../state/wallet/recurring";
 import { usePushToast, useTranslation } from "../shell";
@@ -70,8 +69,8 @@ export const useRecurringPaymentsActions = (): RecurringPaymentsActions => {
   const { t } = useTranslation();
   const repository = useRecurringPaymentsRepository();
   const scheduler = useAtomValue(recurringSchedulerAtom);
-  const pendingDeleteId = useAtomValue(armedRecurringDeleteAtom);
-  const deleteArm = useAtomValue(recurringDeleteArmAtom);
+  const pendingDeleteId = useAtomValue(recurringDeleteArm.valueAtom);
+  const deleteArm = useAtomValue(recurringDeleteArm.commandsAtom);
 
   const reportWriteFailure = React.useCallback(
     (error: string): false => {

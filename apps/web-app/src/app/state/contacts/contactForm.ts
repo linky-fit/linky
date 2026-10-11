@@ -56,3 +56,6 @@ export const recentlyAddedContactIdAtom = Atom.keepAlive(
 export const contactSuggestionsAtom = Atom.keepAlive(
   Atom.make<ReadonlyArray<ContactSuggestionCandidate>>([]),
 );
+
+/** A duplicate-contact merge runs; another tap meanwhile is ignored. */
+export const dedupeContactsBusyAtom = Atom.keepAlive(Atom.make(false));

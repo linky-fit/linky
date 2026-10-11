@@ -1,12 +1,12 @@
 import { Form, SubmitButton, TextField } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
-import { useRelaySettingsContext } from "../app/context/SystemSettingsContexts";
+import { useTranslation } from "../app/hooks/shell";
+import { useRelaySettings } from "../app/hooks/settings/useRelaySettings";
 
 export function NostrRelayNewPage(): React.ReactElement {
   const { canSaveNewRelay, newRelayUrl, saveNewRelay, setNewRelayUrl } =
-    useRelaySettingsContext();
-  const { t } = useAppShellCore();
+    useRelaySettings();
+  const { t } = useTranslation();
   return (
     <Form onSubmit={saveNewRelay}>
       <TextField

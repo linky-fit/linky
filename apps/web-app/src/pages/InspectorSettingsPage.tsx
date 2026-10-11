@@ -1,7 +1,6 @@
 import { ListRow, Section, Spinner, Stack, Switch } from "@linky-fit/ui";
 import React, { useEffect, useState } from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
-import { useAdvancedSettingsContext } from "../app/context/SystemSettingsContexts";
+import { usePushToast, useTranslation } from "../app/hooks/shell";
 import {
   setInspectorEnabled,
   setInspectorLogsEnabled,
@@ -28,8 +27,8 @@ const formatInspectorLogAge = (
 export function InspectorSettingsPage(): React.ReactElement {
   const inspectorEnabled = useInspectorEnabled();
   const inspectorLogsEnabled = useInspectorLogsEnabled();
-  const { pushToast } = useAdvancedSettingsContext();
-  const { t } = useAppShellCore();
+  const pushToast = usePushToast();
+  const { t } = useTranslation();
 
   const [inspectorLogStats, setInspectorLogStats] =
     useState<PersistentInspectorLogStats | null>(null);

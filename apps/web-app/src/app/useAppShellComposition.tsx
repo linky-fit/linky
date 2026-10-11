@@ -1,37 +1,15 @@
 import { createContactNameFormatter } from "../utils/contactName";
 import { useMemoizedRouteBuilder } from "./hooks/composition/useMemoizedRouteBundle";
 import { ContactId as ContactIdType } from "@linky-fit/linksync";
-import { useAtom, useAtomSet } from "@linky-fit/linkstr-react";
-import React, { useMemo, useState } from "react";
+import { useAtom, useAtomSet, useAtomValue } from "@linky-fit/linkstr-react";
+import React from "react";
 import { ContactCard } from "../components/ContactCard";
-import {
-  useEvoluDatabaseInfoState,
-  useEvoluLastError,
-  useEvoluServersManager,
-  useWipeEvoluStorage,
-  type ContactId,
-} from "../evolu";
+import type { ContactId } from "../evolu";
 import { navigateTo, useRouting } from "../hooks/useRouting";
 import { useToasts } from "../hooks/useToasts";
 import { reportAppLog } from "../devtools/inspector/appLog";
-import {
-  requestDeviceMotionPermission,
-  requiresDeviceMotionPermission,
-} from "../platform/deviceMotion";
 import { shouldRenderNativeNfcWritePrompt } from "../platform/nativeBridge";
-import {
-  triggerPasswordManagerSeedSave,
-  type PasswordManagerSaveResult,
-} from "../platform/passwordManager";
-import { CONTACTS_ONBOARDING_HAS_BACKUPED_KEYS_STORAGE_KEY } from "../utils/constants";
-import type { DisplayCurrency } from "../utils/displayAmounts";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
-import {
-  getInitialSeenReceiptsEnabledAtSec,
-  getInitialShowProfileQrOnTiltEnabled,
-  safeLocalStorageGet,
-  safeLocalStorageSet,
-} from "../utils/storage";
 import { useCashuWalletComposition } from "./hooks/composition/useCashuWalletComposition";
 import { logPayStep } from "./state/wallet/paymentLog";
 import { useContactsMessagingComposition } from "./hooks/composition/useContactsMessagingComposition";
@@ -48,19 +26,21 @@ import { useProfileComposition } from "./hooks/composition/useProfileComposition
 import { buildPeopleRouteProps } from "./routes/props/buildPeopleRouteProps";
 import { useRoutingViewComposition } from "./hooks/composition/useRoutingViewComposition";
 import { useScanNativeComposition } from "./hooks/composition/useScanNativeComposition";
-import { useSystemSettingsComposition } from "./hooks/composition/useSystemSettingsComposition";
+import { useEvoluStorageWatchers } from "./hooks/settings/useEvoluStorageWatchers";
+import { useProvideOwnerCommands } from "./hooks/shell/ownerCommands";
+import { scanCommandsAtom } from "./state/shell/scan";
 import { useMainMenuState } from "./hooks/layout/useMainMenuState";
 import { useNativeBackHandler } from "./hooks/layout/useNativeBackHandler";
 import { useChatMessageEffects } from "./hooks/messages/useChatMessageEffects";
-import { useAppDataTransfer } from "./hooks/useAppDataTransfer";
 import { useAppLanguage } from "./hooks/useAppLanguage";
-import { useAllowedDisplayCurrencies } from "./hooks/useAllowedDisplayCurrencies";
+import { useDisplayCurrencyGuard } from "./hooks/settings/useDeviceSettings";
 import { useAppPreferences } from "./hooks/useAppPreferences";
 import { useTopDownTilt } from "./hooks/useTopDownTilt";
 import { useFiatRatesSync } from "./hooks/useFiatRates";
 import { useCopyText, useDisplayAmounts, useSetStatus } from "./hooks/shell";
 import { useNavIntent } from "./hooks/shell/navIntents";
-import { displayPrefsAtom } from "./state/shell/displayPrefs";
+import { showProfileQrOnTiltAtom } from "./state/shell/devicePrefs";
+import { profileShareOverlayOpenAtom } from "./state/shell/overlays";
 import { hiddenTransactionsShownAtom } from "./state/shell/topbar";
 import { useLnurlAuth } from "./hooks/useLnurlAuth";
 import { useSiteLogin } from "./hooks/useSiteLogin";
@@ -69,9 +49,6 @@ import {
   useConversationsRepository,
   useSetting,
   useSettingsRepository,
-  useShardRotation,
-  useShardSummaries,
-  useSyncOwnerIds,
   useTransactionsRepository,
 } from "./hooks/useLinksync";
 import { useStatusToasts } from "./hooks/useStatusToasts";
@@ -87,7 +64,6 @@ import {
 } from "./lib/topbarConfig";
 import { getDesktopActiveContactId } from "./routes/desktopRouteSection";
 import type { ContactRowLike } from "./types/appTypes";
-import { nowSeconds } from "../utils/time";
 
 const parseContactId = (value: unknown): ContactId | null => {
   const result = ContactIdType.fromUnknown(value);
@@ -106,17 +82,11 @@ export const useAppShellComposition = ({
   const { lang, setLang, t } = useAppLanguage();
   const {
     answerPendingIdentitySwitch,
-    canSwitchToDefaultIdentity,
     appOwnerId,
     currentNpub,
     isSeedLogin,
-    logoutArmed,
     pendingIdentitySwitch,
-    requestLogout,
-    requestPasteNostrKeys,
     seedMnemonic,
-    slip39Seed,
-    switchToDefaultIdentity,
     syncedNostrIdentityMatchesLocal,
   } = useIdentityOwnersComposition({
     currentNsec,
@@ -129,98 +99,17 @@ export const useAppShellComposition = ({
   const conversationsRepository = useConversationsRepository();
   const settingsRepository = useSettingsRepository();
   const transactions = useTransactionsRepository();
-  const evoluShards = useShardSummaries();
-  const evoluSyncOwnerIds = useSyncOwnerIds();
-  const shardRotation = useShardRotation();
-
-  const evoluServers = useEvoluServersManager();
-  const evoluServerUrls = evoluServers.configuredUrls;
-  const evoluActiveServerUrls = evoluServers.activeUrls;
-  const evoluServerStatusByUrl = evoluServers.statusByUrl;
-  const evoluServersReloadRequired = evoluServers.reloadRequired;
-  const saveEvoluServerUrls = evoluServers.setServerUrls;
-  const isEvoluServerOffline = evoluServers.isOffline;
-  const isEvoluServerRecommended = evoluServers.isRecommended;
-  const setEvoluServerOffline = evoluServers.setServerOffline;
-
-  const [newEvoluServerUrl, setNewEvoluServerUrl] = useState("");
-
   const setStatus = useSetStatus();
-  const importDataFileInputRef = React.useRef<HTMLInputElement | null>(null);
+  useEvoluStorageWatchers(route);
 
-  const { allowedDisplayCurrencies, toggleAllowedDisplayCurrency } =
-    useAllowedDisplayCurrencies();
-  const [{ decimalAmountInputEnabled, displayCurrency }, setDisplayPrefs] =
-    useAtom(displayPrefsAtom);
-  const setDisplayCurrency = React.useCallback(
-    (currency: DisplayCurrency) =>
-      setDisplayPrefs((prefs) => ({ ...prefs, displayCurrency: currency })),
-    [setDisplayPrefs],
+  useDisplayCurrencyGuard();
+  const [profileShareOverlayIsOpen, setProfileShareOverlayIsOpen] = useAtom(
+    profileShareOverlayOpenAtom,
   );
-  const [seenReceiptsEnabledAtSec, setSeenReceiptsEnabledAtSec] = useState<
-    number | null
-  >(getInitialSeenReceiptsEnabledAtSec);
-  const [showProfileQrOnTiltEnabled, setShowProfileQrOnTiltEnabled] =
-    useState<boolean>(
-      () =>
-        !requiresDeviceMotionPermission() &&
-        getInitialShowProfileQrOnTiltEnabled(),
-    );
-  const motionPermissionPendingRef = React.useRef(false);
-  const [profileShareOverlayIsOpen, setProfileShareOverlayIsOpen] =
-    useState(false);
-
-  React.useEffect(() => {
-    if (allowedDisplayCurrencies.includes(displayCurrency)) return;
-    setDisplayCurrency(allowedDisplayCurrencies[0] ?? "sat");
-  }, [allowedDisplayCurrencies, displayCurrency, setDisplayCurrency]);
-
-  const setDisplayCurrencyIfAllowed = React.useCallback(
-    (currency: DisplayCurrency) => {
-      if (!allowedDisplayCurrencies.includes(currency)) return;
-      setDisplayCurrency(currency);
-    },
-    [allowedDisplayCurrencies, setDisplayCurrency],
-  );
-
-  const toggleDecimalAmountInput = React.useCallback(() => {
-    setDisplayPrefs((prefs) => ({
-      ...prefs,
-      decimalAmountInputEnabled: !prefs.decimalAmountInputEnabled,
-    }));
-  }, [setDisplayPrefs]);
-
-  const toggleShowProfileQrOnTilt = React.useCallback(async () => {
-    if (motionPermissionPendingRef.current) return;
-    motionPermissionPendingRef.current = true;
-    const enabled = showProfileQrOnTiltEnabled
-      ? false
-      : await requestDeviceMotionPermission();
-    setShowProfileQrOnTiltEnabled(enabled);
-    motionPermissionPendingRef.current = false;
-    reportAppLog({
-      tag: "profileShare.tiltSettingChanged",
-      summary: enabled
-        ? "Tilt to show profile enabled"
-        : "Tilt to show profile disabled",
-      payload: {
-        enabled,
-        permissionGranted: showProfileQrOnTiltEnabled ? null : enabled,
-      },
-    });
-  }, [showProfileQrOnTiltEnabled]);
-
   const closeProfileShareOverlay = React.useCallback(() => {
     setProfileShareOverlayIsOpen(false);
-  }, []);
-
-  // Enabling records the baseline: only messages newer than it are ever
-  // reported as seen, so pre-enable history stays unreported.
-  const toggleSendReadReceipts = React.useCallback(() => {
-    setSeenReceiptsEnabledAtSec((current) =>
-      current === null ? nowSeconds() : null,
-    );
-  }, []);
+  }, [setProfileShareOverlayIsOpen]);
+  const showProfileQrOnTiltEnabled = useAtomValue(showProfileQrOnTiltAtom);
 
   useFiatRatesSync();
   const {
@@ -229,89 +118,6 @@ export const useAppShellComposition = ({
     formatDisplayedAmountParts,
     formatDisplayedAmountText,
   } = useDisplayAmounts();
-
-  const evoluLastError = useEvoluLastError({ logToConsole: true });
-  const wipeEvoluStorageImpl = useWipeEvoluStorage();
-  const evoluHasError = Boolean(evoluLastError);
-
-  React.useEffect(() => {
-    if (!evoluLastError) return;
-    const message = String(evoluLastError ?? "");
-    if (!message.includes("WebAssembly.Memory(): could not allocate memory")) {
-      return;
-    }
-    const key = "linky.evolu.autoWipeOnWasmOom.v1";
-    const alreadyTried = (safeLocalStorageGet(key) ?? "").trim() === "1";
-    if (alreadyTried) return;
-    safeLocalStorageSet(key, "1");
-    // One-shot WASM-OOM recovery is the only automatic wipe of local Evolu data.
-    try {
-      wipeEvoluStorageImpl();
-    } catch {
-      // ignore
-    }
-  }, [evoluLastError, wipeEvoluStorageImpl]);
-
-  const evoluDbInfo = useEvoluDatabaseInfoState({
-    enabled:
-      route.kind === "evoluServers" ||
-      route.kind === "evoluServer" ||
-      route.kind === "evoluServerNew" ||
-      route.kind === "evoluData" ||
-      route.kind === "evoluCurrentData" ||
-      route.kind === "evoluHistoryData",
-  });
-
-  const evoluConnectedServerCount = useMemo(() => {
-    return evoluActiveServerUrls.reduce((sum, url) => {
-      return sum + (evoluServerStatusByUrl[url] === "connected" ? 1 : 0);
-    }, 0);
-  }, [evoluActiveServerUrls, evoluServerStatusByUrl]);
-
-  const evoluOverallStatus = useMemo(() => {
-    if (!appOwnerId) return "disconnected" as const;
-    if (evoluHasError) return "disconnected" as const;
-    if (evoluActiveServerUrls.length === 0) return "disconnected" as const;
-    const states = evoluActiveServerUrls.map(
-      (url) => evoluServerStatusByUrl[url] ?? "checking",
-    );
-    if (states.some((s) => s === "connected")) return "connected" as const;
-    if (states.some((s) => s === "checking")) return "checking" as const;
-    return "disconnected" as const;
-  }, [
-    appOwnerId,
-    evoluActiveServerUrls,
-    evoluHasError,
-    evoluServerStatusByUrl,
-  ]);
-
-  const [evoluWipeStorageIsBusy, setEvoluWipeStorageIsBusy] =
-    useState<boolean>(false);
-
-  const wipeEvoluStorage = React.useCallback(async () => {
-    // Evolu keeps quota errors after another relay converges; successful probes
-    // and dismissed warnings are not proof of recovery.
-    if (evoluLastError?.type === "ProtocolQuotaError") {
-      pushToast(t("evoluQuotaRecoveryHint"));
-      return;
-    }
-    if (evoluWipeStorageIsBusy) return;
-    setEvoluWipeStorageIsBusy(true);
-
-    try {
-      wipeEvoluStorageImpl();
-    } catch {
-      pushToast(t("evoluWipeStorageFailed"));
-    } finally {
-      setEvoluWipeStorageIsBusy(false);
-    }
-  }, [
-    evoluLastError,
-    evoluWipeStorageIsBusy,
-    pushToast,
-    t,
-    wipeEvoluStorageImpl,
-  ]);
 
   const contactsOnboardingDismissedSynced =
     useSetting("onboardingTutorial") === "dismissed";
@@ -347,7 +153,6 @@ export const useAppShellComposition = ({
     bankPaymentOfferContacts,
     bankPaymentOfferRecipientCount,
     bankPaymentOfferStaggerDelaySec,
-    canSaveNewRelay,
     chatDidInitialScrollForContactRef,
     chatForceScrollToBottomRef,
     chatLastMessageCountRef,
@@ -366,17 +171,13 @@ export const useAppShellComposition = ({
     contactsOnboardingHasSentMessage,
     contactsSearch,
     contactsSearchInputRef,
-    dedupeContacts,
-    dedupeContactsIsBusy,
     dispatchInboxEvent,
     displayContactById,
     getBankPaymentOfferForSettlement,
     groupNames,
     isBankPaymentOfferCanceled,
-    isRecommendedRelay,
     lastMessageByContactId,
     latestMessages,
-    newRelayUrl,
     nostrBootstrapReady,
     nostrMessagesLocal,
     nostrMessagesRecent,
@@ -387,22 +188,14 @@ export const useAppShellComposition = ({
     openFeedbackContact,
     openNewContactPage,
     pendingPaymentsKey,
-    pendingRelayDeleteUrl,
-    relayUrls,
     requestBankPaymentOffer,
-    requestDeleteSelectedRelay,
     respondToBankPaymentOfferWithGroupState,
-    saveNewRelay,
     saveNpubContact,
     selectedChatContact,
     selectedContact,
-    selectedRelayUrl,
     sendChatMessage,
     setActiveGroup,
-    setContactsOnboardingHasBackedUpKeys,
-    setContactsOnboardingHasPaid,
     setContactsSearch,
-    setNewRelayUrl,
     statusFilterCurrencies,
     toggleContactsFilter,
     ungroupedCount,
@@ -422,7 +215,6 @@ export const useAppShellComposition = ({
     maybeShowPwaNotification,
     pushToast,
     route,
-    seenReceiptsEnabledAtSec,
     setStatus,
     syncedNostrIdentityMatchesLocal,
     t,
@@ -452,14 +244,11 @@ export const useAppShellComposition = ({
   const setContactNewPrefill = useAtomSet(contactNewPrefillAtom);
 
   const {
-    allCashuProofs,
     cancelPendingCashuContactSend,
     cashuBalance,
     cashuBalanceAfterMelt,
     cashuIsBusy,
-    cashuOperations,
     cashuTokensHydratedRef,
-    cashuTransferLifecycle,
     cashuTransfers,
     closeCashuPaymentRequestConfirmation,
     closeLightningInvoiceConfirmation,
@@ -469,7 +258,6 @@ export const useAppShellComposition = ({
     confirmLightningInvoicePayment,
     confirmLnurlWithdraw,
     confirmPaymentMintMelt,
-    defaultMintDisplay,
     getCashuTokenMessageInfo,
     isCashuTokenKnownAny,
     isCashuTokenStored,
@@ -486,7 +274,6 @@ export const useAppShellComposition = ({
     payLightningAddressWithCashu,
     payLightningInvoiceWithCashu,
     paySelectedContact,
-    payWithCashuEnabled,
     pendingCashuContactSend,
     pendingCashuPaymentRequestConfirmation,
     pendingCashuTokenContactPickId,
@@ -494,7 +281,6 @@ export const useAppShellComposition = ({
     pendingLnurlWithdrawConfirmation,
     pendingPaymentMintMeltConfirmation,
     postPaySaveContact,
-    receiveMethod,
     requestSelectedContact,
     restoreMissingTokens,
     reclaimHandedOutTokens,
@@ -502,8 +288,6 @@ export const useAppShellComposition = ({
     saveCashuFromText,
     sendCashuTokenToContact,
     setLightningInvoiceAutoPayLimit,
-    setPayWithCashuEnabled,
-    setReceiveMethod,
     setPendingLightningInvoiceConfirmation,
     setPendingLnurlWithdrawConfirmation,
     setPostPaySaveContact,
@@ -527,7 +311,6 @@ export const useAppShellComposition = ({
       selectedChatContact,
       selectedContact,
       sendChatMessage,
-      setContactsOnboardingHasPaid,
       updateLocalNostrMessage,
     },
     fiatRates,
@@ -554,12 +337,8 @@ export const useAppShellComposition = ({
   });
 
   useAppPreferences({
-    allowedDisplayCurrencies,
     bankPaymentOfferRecipientCount,
     bankPaymentOfferStaggerDelaySec,
-    lightningInvoiceAutoPayLimit,
-    seenReceiptsEnabledAtSec,
-    showProfileQrOnTiltEnabled,
   });
 
   const {
@@ -659,6 +438,17 @@ export const useAppShellComposition = ({
     t,
   });
 
+  useProvideOwnerCommands(scanCommandsAtom, {
+    closeScan,
+    cycleScanCamera,
+    handleScannedText: onSubmitManualPayText,
+    onPickScanImage,
+    openReceiveScan,
+    openScan,
+    openWalletScan,
+    pasteScanValue,
+  });
+
   const handleSelectContact = React.useCallback(
     (contact: DisplayContact) => {
       if (pendingCashuTokenContactPickId) {
@@ -744,54 +534,6 @@ export const useAppShellComposition = ({
 
   const conversationsLabel = t("conversations");
   const otherContactsLabel = t("otherContacts");
-
-  const { exportAppData, handleImportAppDataFilePicked, requestImportAppData } =
-    useAppDataTransfer<(typeof contacts)[number]>({
-      cashuOperations,
-      cashuProofs: allCashuProofs,
-      contacts,
-      contactsRepository,
-      importCashuLegacyRows: cashuTransferLifecycle?.importLegacyRows ?? null,
-      importCashuOperation: cashuTransferLifecycle?.importOperation ?? null,
-      importCashuProofs: cashuTransferLifecycle?.importProofs ?? null,
-      importDataFileInputRef,
-      pushToast,
-      t,
-    });
-
-  const copyNostrKeys = async () => {
-    const nsec = currentNsec.trim();
-    if (!nsec) return;
-    await navigator.clipboard?.writeText(nsec);
-    pushToast(t("nostrKeysCopied"));
-  };
-
-  const copySeed = async () => {
-    const value = (slip39Seed ?? "").trim();
-    if (value) {
-      await navigator.clipboard?.writeText(value);
-      safeLocalStorageSet(
-        CONTACTS_ONBOARDING_HAS_BACKUPED_KEYS_STORAGE_KEY,
-        "1",
-      );
-      setContactsOnboardingHasBackedUpKeys(true);
-      pushToast(t("seedCopied"));
-      return;
-    }
-
-    pushToast(t("seedMissing"));
-  };
-
-  const saveSeedToPasswordManager =
-    async (): Promise<PasswordManagerSaveResult> => {
-      const password = (slip39Seed ?? "").trim();
-      if (!password) return "failed";
-
-      return triggerPasswordManagerSeedSave({
-        displayName: effectiveProfileName ?? currentNpub ?? "",
-        password,
-      });
-    };
 
   const contactPayBackToChatId = useNavIntent("contactPayBackToChat");
   const topbar = React.useMemo(
@@ -1033,84 +775,8 @@ export const useAppShellComposition = ({
     ungroupedCount,
   });
 
-  const {
-    advancedSettingsContext,
-    evoluSettingsContext,
-    relaySettingsContext,
-  } = useSystemSettingsComposition({
-    advancedSettingsInput: {
-      answerPendingIdentitySwitch,
-      canSwitchToDefaultIdentity,
-      copyNostrKeys,
-      copySeed,
-      dedupeContacts,
-      dedupeContactsIsBusy,
-      defaultMintDisplay,
-      evoluConnectedServerCount,
-      evoluOverallStatus,
-      evoluServerUrls,
-      exportAppData,
-      handleImportAppDataFilePicked,
-      importDataFileInputRef,
-      lightningInvoiceAutoPayLimit,
-      logoutArmed,
-      openScan,
-      payWithCashuEnabled,
-      pendingIdentitySwitch,
-      pushToast,
-      receiveMethod,
-      relayUrls,
-      requestImportAppData,
-      requestLogout,
-      requestPasteNostrKeys,
-      saveSeedToPasswordManager,
-      seedMnemonic,
-      setLightningInvoiceAutoPayLimit,
-      setPayWithCashuEnabled,
-      setReceiveMethod,
-      switchToDefaultIdentity,
-    },
-    evoluSettingsInput: {
-      evoluDatabaseBytes: evoluDbInfo.info.bytes,
-      evoluHasError,
-      evoluErrorType: evoluLastError?.type ?? null,
-      evoluHistoryCount: evoluDbInfo.info.historyCount,
-      evoluServerStatusByUrl,
-      evoluServerUrls,
-      evoluServersReloadRequired,
-      evoluShards,
-      evoluSyncOwnerIds,
-      evoluTableCounts: evoluDbInfo.info.tableCounts,
-      evoluWipeStorageIsBusy,
-      isEvoluServerOffline,
-      isEvoluServerRecommended,
-      newEvoluServerUrl,
-      requestRotateShard: shardRotation.rotate,
-      rotatingShardScope: shardRotation.busyScope,
-      saveEvoluServerUrls,
-      setEvoluServerOffline,
-      setNewEvoluServerUrl,
-      setStatus,
-      syncOwnerId: appOwnerId,
-      wipeEvoluStorage,
-    },
-    relaySettingsInput: {
-      canSaveNewRelay,
-      isRecommendedRelay,
-      newRelayUrl,
-      pendingRelayDeleteUrl,
-      relayUrls,
-      requestDeleteSelectedRelay,
-      saveNewRelay,
-      selectedRelayUrl,
-      setNewRelayUrl,
-    },
-    t,
-  });
-
   const appState = React.useMemo(
     () => ({
-      allowedDisplayCurrencies,
       cashuBalance,
       cashuBalanceAfterMelt,
       cashuIsBusy,
@@ -1120,9 +786,6 @@ export const useAppShellComposition = ({
       contactsGuideHighlightRect,
       currentNpub,
       currentNsec,
-      decimalAmountInputEnabled,
-      sendReadReceiptsEnabled: seenReceiptsEnabledAtSec !== null,
-      displayCurrency,
       effectiveProfileName,
       effectiveProfilePicture,
       evoluAppOwnerId: appOwnerId ? appOwnerId : null,
@@ -1150,7 +813,6 @@ export const useAppShellComposition = ({
       scanEntryPoint,
       scanIsOpen,
       shareOptionsText,
-      showProfileQrOnTiltEnabled,
       scanVideoRef,
       t,
       topbar,
@@ -1163,7 +825,6 @@ export const useAppShellComposition = ({
       siteLoginIsDone,
     }),
     [
-      allowedDisplayCurrencies,
       appOwnerId,
       cashuBalance,
       cashuBalanceAfterMelt,
@@ -1174,9 +835,6 @@ export const useAppShellComposition = ({
       contactsGuideHighlightRect,
       currentNpub,
       currentNsec,
-      decimalAmountInputEnabled,
-      seenReceiptsEnabledAtSec,
-      displayCurrency,
       effectiveProfileName,
       effectiveProfilePicture,
       fiatRates,
@@ -1208,7 +866,6 @@ export const useAppShellComposition = ({
       scanIsOpen,
       scanVideoRef,
       shareOptionsText,
-      showProfileQrOnTiltEnabled,
       profileShareOverlayIsOpen,
       t,
       topbar,
@@ -1248,18 +905,12 @@ export const useAppShellComposition = ({
       openReceiveScan,
       pasteScanValue,
       setContactNewPrefill,
-      setLang,
       setLightningInvoiceAutoPayLimit,
       setPostPaySaveContact,
-      setDisplayCurrency: setDisplayCurrencyIfAllowed,
       stopContactsGuide,
       shareOptionsViaEmail,
       shareOptionsViaSms,
       shareOptionsViaWhatsApp,
-      toggleAllowedDisplayCurrency,
-      toggleDecimalAmountInput,
-      toggleSendReadReceipts,
-      toggleShowProfileQrOnTilt,
     }),
     [
       cancelPendingNfcWrite,
@@ -1291,18 +942,12 @@ export const useAppShellComposition = ({
       openReceiveScan,
       pasteScanValue,
       setContactNewPrefill,
-      setDisplayCurrencyIfAllowed,
-      setLang,
       setLightningInvoiceAutoPayLimit,
       setPostPaySaveContact,
       shareOptionsViaEmail,
       shareOptionsViaSms,
       shareOptionsViaWhatsApp,
       stopContactsGuide,
-      toggleAllowedDisplayCurrency,
-      toggleDecimalAmountInput,
-      toggleSendReadReceipts,
-      toggleShowProfileQrOnTilt,
     ],
   );
 
@@ -1322,9 +967,6 @@ export const useAppShellComposition = ({
     pushToast,
     route,
     setLang,
-    advancedSettingsContext,
-    evoluSettingsContext,
-    relaySettingsContext,
     t,
     toasts,
   };

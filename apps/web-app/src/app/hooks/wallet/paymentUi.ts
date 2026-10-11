@@ -1,11 +1,10 @@
-import { useAtomValue } from "@linky-fit/linkstr-react";
+import { useAtomSet, useAtomValue } from "@linky-fit/linkstr-react";
 import { Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import React from "react";
 import type { Translate } from "../../../i18n";
-import { CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY } from "../../../utils/constants";
 import type { DisplayAmountParts } from "../../../utils/displayAmounts";
-import { safeLocalStorageSet } from "../../../utils/storage";
+import { contactsOnboardingHasPaidAtom } from "../../state/contacts/onboarding";
 import type { FundsCheck } from "../../state/wallet/payments";
 import { paymentsCommandsAtom } from "../../state/wallet/payments";
 
@@ -25,13 +24,10 @@ export const usePaymentsCommands = () =>
   Option.getOrNull(AsyncResult.value(useAtomValue(paymentsCommandsAtom)));
 
 /** Remembers that the user paid once, which ends the contacts onboarding. */
-export const useRememberFirstPayment = (
-  setContactsOnboardingHasPaid: React.Dispatch<React.SetStateAction<boolean>>,
-) =>
-  React.useCallback(() => {
-    safeLocalStorageSet(CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY, "1");
-    setContactsOnboardingHasPaid(true);
-  }, [setContactsOnboardingHasPaid]);
+export const useRememberFirstPayment = () => {
+  const setHasPaid = useAtomSet(contactsOnboardingHasPaidAtom);
+  return React.useCallback(() => setHasPaid(true), [setHasPaid]);
+};
 
 export type Shortfall = Exclude<FundsCheck, { readonly _tag: "Covered" }>;
 

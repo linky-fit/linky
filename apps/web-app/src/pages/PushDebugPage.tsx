@@ -1,10 +1,8 @@
 import { Button, CodeBlock, Row, Stack } from "@linky-fit/ui";
 import React from "react";
-import {
-  useAppShellActions,
-  useAppShellCore,
-} from "../app/context/AppShellContexts";
-import { useAdvancedSettingsContext } from "../app/context/SystemSettingsContexts";
+import { useAtomValue } from "@linky-fit/linkstr-react";
+import { useCopyText, usePushToast, useTranslation } from "../app/hooks/shell";
+import { currentNsecAtom } from "../app/state/session/session";
 import { useArmedAction } from "../hooks/useArmedAction";
 import { isNativePlatform } from "../platform/runtime";
 import {
@@ -129,9 +127,10 @@ type PushDebugAction =
   | "clearLogs";
 
 export function PushDebugPage(): React.ReactElement {
-  const { currentNsec, t } = useAppShellCore();
-  const { copyText } = useAppShellActions();
-  const { pushToast } = useAdvancedSettingsContext();
+  const currentNsec = useAtomValue(currentNsecAtom);
+  const { t } = useTranslation();
+  const copyText = useCopyText();
+  const pushToast = usePushToast();
   const [report, setReport] = React.useState<PushDebugReport>(INITIAL_REPORT);
   const [messages, setMessages] = React.useState<PushDebugMessage[]>([]);
   const [busyAction, setBusyAction] = React.useState<PushDebugAction | null>(

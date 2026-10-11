@@ -7,13 +7,11 @@ import { PushDebugPage } from "./PushDebugPage";
 
 const copyText = vi.hoisted(() => vi.fn<(text: string) => Promise<void>>());
 
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellCore: () => ({ currentNsec: null, t: (key: string) => key }),
-  useAppShellActions: () => ({ copyText }),
-}));
-vi.mock("../app/context/SystemSettingsContexts", () => ({
-  useAdvancedSettingsContext: () => ({ pushToast: vi.fn() }),
-}));
+vi.mock("../app/hooks/shell", async () =>
+  (await import("../testUtils/shellHooks")).shellHooksMock({
+    copyText: (value) => copyText(value),
+  }),
+);
 
 describe("PushDebugPage", () => {
   afterEach(() => {

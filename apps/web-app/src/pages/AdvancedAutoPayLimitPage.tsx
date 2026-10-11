@@ -1,16 +1,17 @@
 import { Stack, Button } from "@linky-fit/ui";
 import type { FC } from "react";
 import { useState } from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
-import { useAdvancedSettingsContext } from "../app/context/SystemSettingsContexts";
+import { useTranslation } from "../app/hooks/shell";
+import { useAtom } from "@linky-fit/linkstr-react";
+import { lightningInvoiceAutoPayLimitAtom } from "../app/state/wallet/prefs";
 import { AmountKeypad } from "../components/AmountKeypad";
 import { useAmountInputKeypad } from "../components/useAmountInputKeypad";
 import { navigateTo } from "../hooks/useRouting";
 
 export const AdvancedAutoPayLimitPage: FC = () => {
-  const { lightningInvoiceAutoPayLimit, setLightningInvoiceAutoPayLimit } =
-    useAdvancedSettingsContext();
-  const { t } = useAppShellCore();
+  const [lightningInvoiceAutoPayLimit, setLightningInvoiceAutoPayLimit] =
+    useAtom(lightningInvoiceAutoPayLimitAtom);
+  const { t } = useTranslation();
 
   const [amount, setAmount] = useState<string>(() =>
     lightningInvoiceAutoPayLimit > 0

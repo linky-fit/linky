@@ -1,8 +1,7 @@
 import { Button, ListRow, Notice, Stack, Text } from "@linky-fit/ui";
 import { useState } from "react";
 import { keepNewest, linkyScopes, messageScopes } from "@linky-fit/linksync";
-import { useAppShellCore } from "../app/context/AppShellContexts";
-import { useAdvancedSettingsContext } from "../app/context/SystemSettingsContexts";
+import { usePushToast, useTranslation } from "../app/hooks/shell";
 import { useLinkyStore, useShardSummaries } from "../app/hooks/useLinksync";
 import { forgetChatShards } from "../evolu";
 import { useArmedAction } from "../hooks/useArmedAction";
@@ -14,8 +13,8 @@ const rowValue = (value: React.ReactNode) => (
 );
 
 export function ChatStoragePage(): React.ReactElement {
-  const { t } = useAppShellCore();
-  const { pushToast } = useAdvancedSettingsContext();
+  const { t } = useTranslation();
+  const pushToast = usePushToast();
   const summaries = useShardSummaries();
   const store = useLinkyStore();
   const messages = summaries.find((shard) => shard.scope === "messages");

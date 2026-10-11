@@ -2,7 +2,7 @@ import { useAtom } from "@linky-fit/linkstr-react";
 import type { PushToastOptions } from "../../../hooks/useToasts";
 import { paidOverlayContact } from "../../lib/paidOverlay";
 import { decodeNpub, encodeNprofile } from "@linky-fit/linkstr";
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { useRouting } from "../../../hooks/useRouting";
 import { recommendedNostrRelays } from "../../../utils/nostrRelays";
 import {
@@ -10,7 +10,6 @@ import {
   type FiatRates,
 } from "../../../utils/displayAmounts";
 import { type TransactionsRepository } from "@linky-fit/linksync";
-import { getInitialLightningInvoiceAutoPayLimit } from "../../../utils/storage";
 import { useSaveCashuFromText } from "../cashu/useSaveCashuFromText";
 import { useDeferredReceiveRetry } from "../cashu/useDeferredReceiveRetry";
 import { useTopupFlow } from "../topup/useTopupFlow";
@@ -20,6 +19,7 @@ import { useMintInfo, useMintInfoWatchers } from "../mint/useMintInfo";
 import { useAllowTestMints } from "../useAllowTestMints";
 import { useMoveMintFunds } from "../mint/useMoveMintFunds";
 import {
+  lightningInvoiceAutoPayLimitAtom,
   payWithCashuEnabledAtom,
   receiveMethodAtom,
 } from "../../state/wallet/prefs";
@@ -80,7 +80,6 @@ interface UseCashuWalletCompositionParams {
     | "selectedChatContact"
     | "selectedContact"
     | "sendChatMessage"
-    | "setContactsOnboardingHasPaid"
     | "updateLocalNostrMessage"
   >;
   fiatRates: FiatRates | null;
@@ -151,7 +150,7 @@ export const useCashuWalletComposition = ({
     payWithCashuEnabledAtom,
   );
   const [lightningInvoiceAutoPayLimit, setLightningInvoiceAutoPayLimit] =
-    useState<number>(() => getInitialLightningInvoiceAutoPayLimit());
+    useAtom(lightningInvoiceAutoPayLimitAtom);
   const [receiveMethod, setReceiveMethod] = useAtom(receiveMethodAtom);
 
   useAnonymousPaymentTelemetry({

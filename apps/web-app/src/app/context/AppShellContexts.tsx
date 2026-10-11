@@ -7,11 +7,7 @@ import type { LnurlAuthPreview } from "../../lnurlAuth";
 import type { LnurlWithdrawPreview } from "../../lnurlPay";
 import type { PendingSiteLogin } from "../../siteLogin";
 import type { Route } from "../../types/route";
-import type {
-  DisplayAmountParts,
-  DisplayCurrency,
-  FiatRates,
-} from "../../utils/displayAmounts";
+import type { DisplayAmountParts, FiatRates } from "../../utils/displayAmounts";
 import type { LightningInvoicePreview } from "@linky-fit/linkshu";
 import type { CashuPaymentRequestMessageInfo } from "../lib/paymentRequestMessage";
 import type {
@@ -21,12 +17,6 @@ import type {
 } from "../routes/AppRouteContent";
 import type { ContactsGuideStep, TopbarButton } from "../types/appTypes";
 import type { PaidOverlayDetails, PaidOverlayPhase } from "../lib/paidOverlay";
-import {
-  SystemSettingsContextsProvider,
-  type AdvancedSettingsContextValue,
-  type EvoluSettingsContextValue,
-  type RelaySettingsContextValue,
-} from "./SystemSettingsContexts";
 import type { Translate } from "../../i18n";
 
 interface ChatContact {
@@ -37,7 +27,6 @@ interface ChatContact {
 }
 
 export interface AppShellCoreContextValue {
-  allowedDisplayCurrencies: readonly DisplayCurrency[];
   cashuBalance: number;
   cashuBalanceAfterMelt: number;
   cashuIsBusy: boolean;
@@ -56,9 +45,6 @@ export interface AppShellCoreContextValue {
   } | null;
   currentNpub: string | null;
   currentNsec: string | null;
-  decimalAmountInputEnabled: boolean;
-  sendReadReceiptsEnabled: boolean;
-  displayCurrency: DisplayCurrency;
   effectiveProfileName: string | null;
   effectiveProfilePicture: string | null;
   evoluAppOwnerId: string | null;
@@ -93,7 +79,6 @@ export interface AppShellCoreContextValue {
   scanIsOpen: boolean;
   scanVideoRef: React.RefObject<HTMLVideoElement | null>;
   shareOptionsText: string | null;
-  showProfileQrOnTiltEnabled: boolean;
   t: Translate;
   topbar: TopbarButton | null;
   topbarRight: TopbarButton | null;
@@ -137,13 +122,11 @@ export interface AppShellActionsContextValue {
   openReceiveScan: () => void;
   pasteScanValue: () => Promise<void>;
   copyShareOptionsText: () => Promise<void>;
-  setDisplayCurrency: (currency: DisplayCurrency) => void;
   setContactNewPrefill: (prefill: {
     lnAddress: string;
     npub: string | null;
     suggestedName: string | null;
   }) => void;
-  setLang: (lang: Lang) => void;
   setPostPaySaveContact: (
     value: {
       amountSat: number;
@@ -154,10 +137,6 @@ export interface AppShellActionsContextValue {
   shareOptionsViaEmail: () => void;
   shareOptionsViaSms: () => void;
   shareOptionsViaWhatsApp: () => void;
-  toggleAllowedDisplayCurrency: (currency: DisplayCurrency) => void;
-  toggleDecimalAmountInput: () => void;
-  toggleSendReadReceipts: () => void;
-  toggleShowProfileQrOnTilt: () => void;
 }
 
 export interface AppShellRouteContextValue {
@@ -168,11 +147,8 @@ export interface AppShellRouteContextValue {
 
 interface AppShellContextsProviderProps {
   actions: AppShellActionsContextValue;
-  advancedSettings: AdvancedSettingsContextValue;
   children: React.ReactNode;
   core: AppShellCoreContextValue;
-  evoluSettings: EvoluSettingsContextValue;
-  relaySettings: RelaySettingsContextValue;
   routes: AppShellRouteContextValue;
 }
 
@@ -193,24 +169,15 @@ const useContextValue = <T,>(contextValue: T | null, hookName: string): T => {
 
 export const AppShellContextsProvider = ({
   actions,
-  advancedSettings,
   children,
   core,
-  evoluSettings,
-  relaySettings,
   routes,
 }: AppShellContextsProviderProps): React.ReactElement => {
   return (
     <AppShellCoreContext.Provider value={core}>
       <AppShellActionsContext.Provider value={actions}>
         <AppShellRouteContext.Provider value={routes}>
-          <SystemSettingsContextsProvider
-            advancedSettings={advancedSettings}
-            evoluSettings={evoluSettings}
-            relaySettings={relaySettings}
-          >
-            {children}
-          </SystemSettingsContextsProvider>
+          {children}
         </AppShellRouteContext.Provider>
       </AppShellActionsContext.Provider>
     </AppShellCoreContext.Provider>

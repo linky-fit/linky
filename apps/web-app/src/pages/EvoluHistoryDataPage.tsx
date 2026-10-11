@@ -10,8 +10,8 @@ import {
 import { EvoluHistoryTable } from "../components/EvoluHistoryTable";
 import { base64 } from "@scure/base";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
-import { useEvoluSettingsContext } from "../app/context/SystemSettingsContexts";
+import { useTranslation } from "../app/hooks/shell";
+import { useSyncOwnerIds } from "../app/hooks/useLinksync";
 import {
   loadEvoluHistoryData,
   useLinkyEvolu,
@@ -20,8 +20,8 @@ import {
 import { decodeBase64Url } from "../utils/base64";
 const BATCH_SIZE = 50;
 export function EvoluHistoryDataPage(): React.ReactElement {
-  const { evoluSyncOwnerIds } = useEvoluSettingsContext();
-  const { t } = useAppShellCore();
+  const evoluSyncOwnerIds = useSyncOwnerIds();
+  const { t } = useTranslation();
   const evolu = useLinkyEvolu();
   const [historyData, setHistoryData] = useState<EvoluHistoryRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);

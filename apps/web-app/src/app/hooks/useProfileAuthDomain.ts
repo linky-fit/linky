@@ -18,10 +18,10 @@ import {
   encodeNpub,
   ProfileMetadata,
   StatusDraft,
-  type Pubkey,
 } from "@linky-fit/linkstr";
 import {
   linkstrConfigAtom,
+  useAtom,
   useAtomSet,
   useAtomValue,
   useLinkstrCommands,
@@ -60,6 +60,14 @@ import {
 } from "../../utils/slip39Nostr";
 import { looksLikeSlip39Share } from "@linky-fit/identity";
 import { myProfileMetadataAtom } from "../state/contacts/profiles";
+import {
+  defaultNsecAtom,
+  logoutArmedAtom,
+  pendingIdentitySwitchAtom,
+  seedMnemonicAtom,
+  slip39SeedAtom,
+  type PendingIdentitySwitch,
+} from "../state/session/identity";
 import { currentNpubAtom } from "../state/session/session";
 import { useMessagesCommands } from "./messages/useMessagesCommands";
 import { buildLinkstrConfig } from "./useLinkstrConfigSync";
@@ -76,7 +84,6 @@ import { prepareProfilePicture } from "../lib/profilePicture";
 import {
   checkIdentityForSwitch,
   profileForIdentitySwitch,
-  type IdentityProfileCheck,
   type IdentityProfileSource,
   type IdentitySwitchTarget,
 } from "../lib/keySwitchProfile";
@@ -100,23 +107,7 @@ export interface PendingOnboardingProfile {
  * A custom identity the user asked to switch to: Linky first checks its
  * profile, then either switches right away or waits for the user's choice.
  */
-export type PendingIdentitySwitch =
-  | {
-      phase: "checking" | "switching";
-      npub: string;
-      pubkey: Pubkey;
-      target: IdentitySwitchTarget;
-    }
-  | {
-      phase: "choosing";
-      check: Exclude<IdentityProfileCheck, { kind: "none" }>;
-      lightningAddress: string;
-      linkyProfile: ProfileMetadata;
-      npub: string;
-      nsec: string;
-      pubkey: Pubkey;
-      target: IdentitySwitchTarget;
-    };
+export type { PendingIdentitySwitch };
 
 export interface ReturningOnboardingStep {
   error: string | null;
@@ -205,17 +196,18 @@ export const useProfileAuthDomain = ({
   const [onboardingIsBusy, setOnboardingIsBusy] = React.useState(false);
   const [onboardingStep, setOnboardingStep] =
     React.useState<OnboardingStep>(null);
-  const [seedMnemonic, setSeedMnemonic] = React.useState<string | null>(null);
   const [cashuSeedMnemonic, setCashuSeedMnemonic] = React.useState<
     string | null
   >(null);
-  const [slip39Seed, setSlip39Seed] = React.useState<string | null>(null);
+  const [slip39Seed, setSlip39Seed] = useAtom(slip39SeedAtom);
+  const seedMnemonic = useAtomValue(seedMnemonicAtom);
   const [activeNostrIdentitySource, setActiveNostrIdentitySource] =
     React.useState<NostrIdentitySource>(() => getInitialNostrIdentitySource());
-  const [logoutArmed, setLogoutArmed] = React.useState(false);
-  const [pendingIdentitySwitch, setPendingIdentitySwitch] =
-    React.useState<PendingIdentitySwitch | null>(null);
-  const [defaultNsec, setDefaultNsec] = React.useState<string | null>(null);
+  const [logoutArmed, setLogoutArmed] = useAtom(logoutArmedAtom);
+  const [pendingIdentitySwitch, setPendingIdentitySwitch] = useAtom(
+    pendingIdentitySwitchAtom,
+  );
+  const [defaultNsec, setDefaultNsec] = useAtom(defaultNsecAtom);
   // Cancelling clears it, so a check that resolves afterwards changes nothing.
   const identityCheckRef = React.useRef<object | null>(null);
   const onboardingPhotoInputRef = React.useRef<FilePickerHandle | null>(null);
@@ -241,7 +233,7 @@ export const useProfileAuthDomain = ({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setSlip39Seed]);
   const decodeNsecPrivateBytes = React.useCallback(async (nsec: string) => {
     const raw = nsec.trim();
     if (!raw) return null;
@@ -301,11 +293,6 @@ export const useProfileAuthDomain = ({
   );
 
   React.useEffect(() => {
-    const normalizedSlip39 = (slip39Seed ?? "").trim();
-    setSeedMnemonic(normalizedSlip39 || null);
-  }, [slip39Seed]);
-
-  React.useEffect(() => {
     const normalizedSeed = (slip39Seed ?? "").trim();
     if (!normalizedSeed) {
       setDefaultNsec(null);
@@ -319,7 +306,7 @@ export const useProfileAuthDomain = ({
     return () => {
       cancelled = true;
     };
-  }, [slip39Seed]);
+  }, [slip39Seed, setDefaultNsec]);
 
   React.useEffect(() => {
     if (!isSeedLogin) return;
@@ -569,6 +556,7 @@ export const useProfileAuthDomain = ({
       pushToast,
       t,
       upsertActiveNostrIdentity,
+      setSlip39Seed,
     ],
   );
 
@@ -1054,6 +1042,7 @@ export const useProfileAuthDomain = ({
       pushToast,
       switchIdentity,
       t,
+      setPendingIdentitySwitch,
     ],
   );
 
@@ -1150,7 +1139,12 @@ export const useProfileAuthDomain = ({
         setOnboardingIsBusy(false);
       }
     },
-    [onboardingIsBusy, pendingIdentitySwitch, switchIdentity],
+    [
+      onboardingIsBusy,
+      pendingIdentitySwitch,
+      switchIdentity,
+      setPendingIdentitySwitch,
+    ],
   );
 
   const requestLogout = React.useCallback(
@@ -1177,7 +1171,7 @@ export const useProfileAuthDomain = ({
         globalThis.location.reload();
       })();
     },
-    [logoutArmed, pushToast, t],
+    [logoutArmed, pushToast, t, setLogoutArmed],
   );
 
   React.useEffect(() => {
@@ -1190,7 +1184,7 @@ export const useProfileAuthDomain = ({
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [logoutArmed]);
+  }, [logoutArmed, setLogoutArmed]);
 
   return {
     answerPendingIdentitySwitch,

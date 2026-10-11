@@ -3,7 +3,7 @@ import {
   RelayListEntry,
   RelayListsDraft,
 } from "@linky-fit/linkstr";
-import { useLinkstrCommands } from "@linky-fit/linkstr-react";
+import { useAtom, useLinkstrCommands } from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 import React from "react";
 import { navigateTo } from "../../hooks/useRouting";
@@ -16,6 +16,13 @@ import {
   saveCachedRelayLists,
   withRecommendedNostrRelays,
 } from "../../utils/nostrRelays";
+import {
+  newRelayUrlAtom,
+  nostrRelayUrlsAtom,
+  pendingRelayDeleteUrlAtom,
+  relayCommandsAtom,
+} from "../state/messages/relays";
+import { useProvideOwnerCommands } from "./shell/ownerCommands";
 import { useRecommendedRelays } from "./useRecommendedRelays";
 import { nowSeconds } from "../../utils/time";
 import type { Translate } from "../../i18n";
@@ -81,7 +88,7 @@ export const useRelayDomain = ({
   setStatus,
   t,
 }: UseRelayDomainParams): UseRelayDomainResult => {
-  const [newRelayUrl, setNewRelayUrl] = React.useState<string>("");
+  const [newRelayUrl, setNewRelayUrl] = useAtom(newRelayUrlAtom);
 
   // Hex pubkey derived synchronously from the nsec (currentNpub arrives a
   // render later), so the cache below is usable from the very first render.
@@ -96,12 +103,7 @@ export const useRelayDomain = ({
 
   // Keeps the array identity while the relays stay the same, because a new
   // array rebuilds the Nostr runtime and replays the inbox.
-  const [relayUrls, setRelayUrls] = React.useState<string[]>(() =>
-    withRecommendedNostrRelays(
-      loadCachedRelayUrls(cachePubkey),
-      recommendedRelays,
-    ),
-  );
+  const [relayUrls, setRelayUrls] = useAtom(nostrRelayUrlsAtom);
   const updateRelayUrls = React.useCallback(
     (urls: readonly string[]) => {
       const next = withRecommendedNostrRelays(urls, recommendedRelays);
@@ -109,7 +111,7 @@ export const useRelayDomain = ({
         haveSameRelayUrls(current, next) ? current : next,
       );
     },
-    [recommendedRelays],
+    [recommendedRelays, setRelayUrls],
   );
 
   React.useEffect(() => {
@@ -133,16 +135,16 @@ export const useRelayDomain = ({
     },
     [cachePubkey],
   );
-  const [pendingRelayDeleteUrl, setPendingRelayDeleteUrl] = React.useState<
-    string | null
-  >(null);
+  const [pendingRelayDeleteUrl, setPendingRelayDeleteUrl] = useAtom(
+    pendingRelayDeleteUrlAtom,
+  );
   React.useEffect(() => {
     if (!pendingRelayDeleteUrl) return;
     const timeoutId = window.setTimeout(() => {
       setPendingRelayDeleteUrl(null);
     }, 5000);
     return () => window.clearTimeout(timeoutId);
-  }, [pendingRelayDeleteUrl]);
+  }, [pendingRelayDeleteUrl, setPendingRelayDeleteUrl]);
 
   const selectedRelayUrl = React.useMemo(() => {
     if (route.kind !== "nostrRelay") return null;
@@ -339,6 +341,8 @@ export const useRelayDomain = ({
     persistLocalRelayUrls,
     publishNostrRelayLists,
     relayUrls,
+    setNewRelayUrl,
+    setRelayUrls,
     setStatus,
     t,
     unretireNostrRelay,
@@ -386,11 +390,17 @@ export const useRelayDomain = ({
     relayUrls,
     route.kind,
     selectedRelayUrl,
+    setPendingRelayDeleteUrl,
+    setRelayUrls,
     setStatus,
     t,
   ]);
 
   const canSaveNewRelay = isRelayUrl(newRelayUrl.trim());
+  useProvideOwnerCommands(relayCommandsAtom, {
+    requestDeleteSelectedRelay,
+    saveNewRelay,
+  });
 
   return {
     canSaveNewRelay,

@@ -1,5 +1,5 @@
 import { ListRow, Stack, StatusDot, Text, Pill } from "@linky-fit/ui";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useTranslation } from "../app/hooks/shell";
 import type { RelayDotState } from "../app/hooks/useRelayHealth";
 import { navigateTo } from "../hooks/useRouting";
 
@@ -18,7 +18,7 @@ export function NostrRelayRow({
   state,
   url,
 }: NostrRelayRowProps) {
-  const { t } = useAppShellCore();
+  const { t } = useTranslation();
   const stateLabel = t(connectionStatus[state].labelKey);
   return (
     <ListRow

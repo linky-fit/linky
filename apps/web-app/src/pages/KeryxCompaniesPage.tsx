@@ -1,12 +1,12 @@
 import { ListRow, Stack } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useTranslation } from "../app/hooks/shell";
 import { useKeryx, useRefreshOnOpen } from "../app/hooks/useKeryx";
 import { KeryxCompanyRow } from "../components/KeryxCompany";
 import { navigateTo } from "../hooks/useRouting";
 
 export function KeryxCompaniesPage(): React.ReactElement {
-  const { t } = useAppShellCore();
+  const { t } = useTranslation();
   const { companies, refresh } = useKeryx();
   useRefreshOnOpen(companies, refresh);
   return (

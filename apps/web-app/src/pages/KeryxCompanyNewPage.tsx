@@ -12,8 +12,8 @@ import {
   TextField,
 } from "@linky-fit/ui";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
-import { useAdvancedSettingsContext } from "../app/context/SystemSettingsContexts";
+import { useTranslation } from "../app/hooks/shell";
+import { useScanCommands } from "../app/hooks/shell/scan";
 import { useKeryxPairing } from "../app/hooks/useKeryxPairing";
 import {
   KeryxChannelToggles,
@@ -23,8 +23,8 @@ import {
 import { readClipboardText } from "../platform/clipboard";
 
 export function KeryxCompanyNewPage(): React.ReactElement {
-  const { t } = useAppShellCore();
-  const { openScan } = useAdvancedSettingsContext();
+  const { t } = useTranslation();
+  const { openScan } = useScanCommands();
   const pairing = useKeryxPairing();
   const [joinUrl, setJoinUrl] = React.useState("");
   const { step, error, busy } = pairing;

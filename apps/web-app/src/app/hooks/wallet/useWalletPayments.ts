@@ -39,7 +39,6 @@ interface UseWalletPaymentsParams {
     | "selectedChatContact"
     | "selectedContact"
     | "sendChatMessage"
-    | "setContactsOnboardingHasPaid"
     | "updateLocalNostrMessage"
   >;
   currentNpub: string | null;
@@ -85,7 +84,7 @@ export const useWalletPayments = ({
   t,
   walletOpRunning,
 }: UseWalletPaymentsParams) => {
-  const { selectedContact, setContactsOnboardingHasPaid } = contactsMessaging;
+  const { selectedContact } = contactsMessaging;
   const [payAmount, setPayAmount] = useAtom(payAmountAtom);
   const setContactPaymentIntent = useAtomSet(contactPaymentIntentAtom);
   const [contactPayMethod, setContactPayMethod] = useAtom(contactPayMethodAtom);
@@ -112,9 +111,7 @@ export const useWalletPayments = ({
     setContactPayMethod,
   });
 
-  const rememberFirstPayment = useRememberFirstPayment(
-    setContactsOnboardingHasPaid,
-  );
+  const rememberFirstPayment = useRememberFirstPayment();
   const mintMove = usePaymentMintMove({
     meltToDefaultMint,
     setStatus,

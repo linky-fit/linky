@@ -6,11 +6,14 @@ import { EvoluCurrentDataPage } from "./EvoluCurrentDataPage";
 import { EvoluDataDetailPage } from "./EvoluDataDetailPage";
 import { EvoluHistoryTable } from "../components/EvoluHistoryTable";
 
-vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellCore: () => ({ t: (key: string) => key }),
-}));
-vi.mock("../app/context/SystemSettingsContexts", () => ({
-  useEvoluSettingsContext: () => ({
+vi.mock("../app/hooks/shell", async () =>
+  (await import("../testUtils/shellHooks")).shellHooksMock(),
+);
+vi.mock("../app/hooks/useLinksync", () => ({ useSyncOwnerIds: () => [] }));
+vi.mock("../app/hooks/settings/useEvoluSettings", () => ({
+  useEvoluErrorType: () => null,
+  useEvoluReloadRequired: () => false,
+  useEvoluSettings: () => ({
     evoluDatabaseBytes: 4096,
     evoluShards: [],
     evoluSyncOwnerIds: [],

@@ -1,6 +1,7 @@
 import { encodeNsec, ProfileMetadata } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
-import { AsyncResult } from "effect/reactivity";
+import { AtomRegistry, RegistryContext } from "@linky-fit/linkstr-react";
+import { AsyncResult, type Atom } from "effect/reactivity";
 import { act, useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
@@ -22,16 +23,23 @@ const mocks = vi.hoisted(() => ({
   atomValues: new Map<unknown, unknown>(),
 }));
 
-vi.mock("@linky-fit/linkstr-react", () => ({
-  linkstrConfigAtom: {},
-  useAtomSet: () => vi.fn(),
-  useAtomValue: (atom: unknown) => mocks.atomValues.get(atom) ?? null,
-  useLinkstrCommands: () => ({
-    fetchProfile: vi.fn(),
-    publishProfile: mocks.publishProfile,
-    publishStatus: vi.fn(),
-  }),
-}));
+vi.mock("@linky-fit/linkstr-react", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@linky-fit/linkstr-react")>();
+  return {
+    ...actual,
+    useAtomSet: () => vi.fn(),
+    useAtomValue: <A,>(atom: Atom.Atom<A>) =>
+      mocks.atomValues.has(atom)
+        ? mocks.atomValues.get(atom)
+        : actual.useAtomValue(atom),
+    useLinkstrCommands: () => ({
+      fetchProfile: vi.fn(),
+      publishProfile: mocks.publishProfile,
+      publishStatus: vi.fn(),
+    }),
+  };
+});
 
 vi.mock("../lib/keySwitchProfile", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../lib/keySwitchProfile")>()),
@@ -111,7 +119,11 @@ describe("switching to a custom identity", () => {
       }, [value]);
       return null;
     };
-    ({ unmount } = await renderIntoDocument(<Probe />));
+    ({ unmount } = await renderIntoDocument(
+      <RegistryContext.Provider value={AtomRegistry.make()}>
+        <Probe />
+      </RegistryContext.Provider>,
+    ));
     return domain;
   };
 

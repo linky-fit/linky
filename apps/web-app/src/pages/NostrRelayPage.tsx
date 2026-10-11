@@ -1,8 +1,8 @@
 import { Button, ListRow, Notice, Stack, StatusDot, Text } from "@linky-fit/ui";
 import { connectionStatus } from "../utils/connectionStatus";
 import React from "react";
-import { useAppShellCore } from "../app/context/AppShellContexts";
-import { useRelaySettingsContext } from "../app/context/SystemSettingsContexts";
+import { useTranslation } from "../app/hooks/shell";
+import { useRelaySettings } from "../app/hooks/settings/useRelaySettings";
 import { relayDotState, useRelayHealth } from "../app/hooks/useRelayHealth";
 import { formatRelativeTime } from "../utils/formatting";
 export function NostrRelayPage(): React.ReactElement {
@@ -11,9 +11,9 @@ export function NostrRelayPage(): React.ReactElement {
     pendingRelayDeleteUrl,
     requestDeleteSelectedRelay,
     selectedRelayUrl,
-  } = useRelaySettingsContext();
+  } = useRelaySettings();
   const relayHealth = useRelayHealth();
-  const { lang, t } = useAppShellCore();
+  const { lang, t } = useTranslation();
   if (!selectedRelayUrl) {
     return <Notice tone="danger" title={t("errorPrefix")} />;
   }
