@@ -12,36 +12,31 @@ import {
   type TransactionsRepository,
   type WriteRow,
 } from "@linky-fit/linksync";
+import type { KeyValueStorage } from "@linky-fit/linksync/evolu";
 import { Effect, Option, Schema } from "effect";
-import React from "react";
-import { isLocalPaymentTelemetryEvent } from "./useAnonymousPaymentTelemetry";
-import { JsonValue } from "../../types/json";
+import { AsyncResult, Atom } from "effect/reactivity";
+import { JsonValue } from "../../../types/json";
 import {
   LOCAL_PAYMENT_EVENTS_STORAGE_KEY_PREFIX,
   LOCAL_PENDING_PAYMENT_TELEMETRY_STORAGE_KEY_PREFIX,
-} from "../../utils/constants";
-import {
-  CASHU_SEEN_MINTS_STORAGE_KEY,
-  normalizeMintUrl,
-} from "../../utils/mint";
+} from "../../../utils/constants";
+import { readKvJson, writeKvJson } from "../../../utils/storage";
+import { nowSeconds } from "../../../utils/time";
+import { isRecord } from "../../../utils/unknown";
+import { isUnknownContactId } from "../../hooks/messages/contactIdentity";
+import { createCashuTokenId } from "../../lib/cashuTokenIdentity";
 import {
   createLocalPaymentTelemetryEvent,
+  isLocalPaymentTelemetryEvent,
   normalizePaymentTelemetryStatus,
-} from "../lib/paymentTelemetry";
-import { createCashuTokenId } from "../lib/cashuTokenIdentity";
+} from "../../lib/paymentTelemetry";
 import type {
   LocalPaymentEvent,
   LoggedPaymentEventParams,
-} from "../types/appTypes";
-import { isUnknownContactId } from "./messages/contactIdentity";
-import {
-  safeLocalStorageGet,
-  safeLocalStorageGetJson,
-  safeLocalStorageSet,
-  safeLocalStorageSetJson,
-} from "../../utils/storage";
-import { isRecord } from "../../utils/unknown";
-import { nowSeconds } from "../../utils/time";
+} from "../../types/appTypes";
+import { platformAtom } from "../platform";
+import { appOwnerIdAtom, transactionsRepositoryAtom } from "../session/store";
+import { ownerStorageKey } from "./ownerStorage";
 
 type TransactionInsertPayload = {
   -readonly [K in keyof Omit<
@@ -297,78 +292,50 @@ export const mergeTransactionWrite = (
   };
 };
 
-interface UseOwnerScopedStorageParams {
-  appOwnerIdRef: React.MutableRefObject<string | null>;
-  transactions: Pick<TransactionsRepository, "byId" | "insert" | "update">;
+export interface PaymentLog {
+  /**
+   * Records a payment step: an `ok` step becomes (or extends) its transaction
+   * row, every step queues anonymous telemetry. Never throws; history must
+   * not break a payment.
+   */
+  readonly logPaymentEvent: (event: LoggedPaymentEventParams) => void;
+  /** Copies the pre-Evolu localStorage payment history once per owner. */
+  readonly migrateLegacyPaymentEvents: () => void;
 }
 
-interface UseOwnerScopedStorageResult {
-  logPaymentEvent: (event: LoggedPaymentEventParams) => void;
-  makeLocalStorageKey: (prefix: string) => string;
-  migrateLegacyPaymentEventsToEvolu: (ownerId: string) => void;
-  readSeenMintsFromStorage: () => string[];
-  rememberSeenMint: (mintUrl: string | null | undefined) => void;
-}
-
-export const useOwnerScopedStorage = ({
-  appOwnerIdRef,
+export const makePaymentLog = ({
+  kv,
+  ownerId,
   transactions,
-}: UseOwnerScopedStorageParams): UseOwnerScopedStorageResult => {
-  const migratedLegacyPaymentsKeyRef = React.useRef<string | null>(null);
-
-  // Transaction history must never break payment receive/send flows.
-  const insertTransaction = React.useCallback(
-    (id: TransactionId, payload: TransactionInsertPayload): void => {
-      const write = Effect.flatMap(transactions.byId(id), (existing) =>
-        existing === null
-          ? transactions.insert({ id, ...payload })
-          : transactions.update(id, mergeTransactionWrite(existing, payload)),
-      );
-      void Effect.runPromise(write).catch((error: unknown) => {
-        console.warn("[linky][transactions] insert failed", error);
-      });
-    },
-    [transactions],
+}: {
+  readonly kv: KeyValueStorage;
+  readonly ownerId: string;
+  readonly transactions: Pick<
+    TransactionsRepository,
+    "byId" | "insert" | "update"
+  >;
+}): PaymentLog => {
+  const insertTransaction = (
+    id: TransactionId,
+    payload: TransactionInsertPayload,
+  ): void => {
+    const write = Effect.flatMap(transactions.byId(id), (existing) =>
+      existing === null
+        ? transactions.insert({ id, ...payload })
+        : transactions.update(id, mergeTransactionWrite(existing, payload)),
+    );
+    void Effect.runPromise(write).catch((error: unknown) => {
+      console.warn("[linky][transactions] insert failed", error);
+    });
+  };
+  const telemetryKey = ownerStorageKey(
+    LOCAL_PENDING_PAYMENT_TELEMETRY_STORAGE_KEY_PREFIX,
+    ownerId,
   );
+  let legacyMigrated = false;
 
-  const makeLocalStorageKey = React.useCallback(
-    (prefix: string): string => {
-      const ownerId = appOwnerIdRef.current;
-      return `${prefix}.${ownerId ?? "anon"}`;
-    },
-    [appOwnerIdRef],
-  );
-
-  const readSeenMintsFromStorage = React.useCallback(
-    (): string[] =>
-      safeLocalStorageGetJson(
-        makeLocalStorageKey(CASHU_SEEN_MINTS_STORAGE_KEY),
-        Schema.Array(Schema.String),
-        [],
-      )
-        .map((value) => normalizeMintUrl(value))
-        .filter(Boolean),
-    [makeLocalStorageKey],
-  );
-
-  const rememberSeenMint = React.useCallback(
-    (mintUrl: string | null | undefined): void => {
-      const cleaned = normalizeMintUrl(mintUrl);
-      if (!cleaned) return;
-      const existing = new Set(readSeenMintsFromStorage());
-      existing.add(cleaned);
-      safeLocalStorageSetJson(
-        makeLocalStorageKey(CASHU_SEEN_MINTS_STORAGE_KEY),
-        Array.from(existing).slice(0, 50),
-      );
-    },
-    [makeLocalStorageKey, readSeenMintsFromStorage],
-  );
-
-  const logPaymentEvent = React.useCallback(
-    (event: LoggedPaymentEventParams) => {
-      if (!appOwnerIdRef.current) return;
-
+  return {
+    logPaymentEvent: (event) => {
       const nowSec = nowSeconds();
       if (event.status === "ok") {
         insertTransaction(
@@ -393,47 +360,37 @@ export const useOwnerScopedStorage = ({
         );
       }
 
-      const telemetryEntry = createLocalPaymentTelemetryEvent(event, nowSec);
-      const telemetryQueue = safeLocalStorageGetJson(
-        makeLocalStorageKey(LOCAL_PENDING_PAYMENT_TELEMETRY_STORAGE_KEY_PREFIX),
+      const queue = readKvJson(
+        kv,
+        telemetryKey,
         Schema.Array(Schema.Unknown),
         [],
       ).filter(isLocalPaymentTelemetryEvent);
-      const nextTelemetryQueue = [telemetryEntry, ...telemetryQueue].slice(
-        0,
-        250,
-      );
-      safeLocalStorageSetJson(
-        makeLocalStorageKey(LOCAL_PENDING_PAYMENT_TELEMETRY_STORAGE_KEY_PREFIX),
-        nextTelemetryQueue,
+      writeKvJson(
+        kv,
+        telemetryKey,
+        [createLocalPaymentTelemetryEvent(event, nowSec), ...queue].slice(
+          0,
+          250,
+        ),
       );
     },
-    [appOwnerIdRef, insertTransaction, makeLocalStorageKey],
-  );
-
-  const migrateLegacyPaymentEventsToEvolu = React.useCallback(
-    (ownerId: string) => {
-      const legacyStorageKey = `${LOCAL_PAYMENT_EVENTS_STORAGE_KEY_PREFIX}.${ownerId}`;
+    migrateLegacyPaymentEvents: () => {
+      if (legacyMigrated) return;
+      legacyMigrated = true;
+      const legacyStorageKey = ownerStorageKey(
+        LOCAL_PAYMENT_EVENTS_STORAGE_KEY_PREFIX,
+        ownerId,
+      );
       const migratedKey = `${legacyStorageKey}${LEGACY_PAYMENT_EVENTS_MIGRATED_SUFFIX}`;
+      if (kv.getItem(migratedKey) === "1") return;
 
-      if (migratedLegacyPaymentsKeyRef.current === migratedKey) return;
-
-      if (safeLocalStorageGet(migratedKey) === "1") {
-        migratedLegacyPaymentsKeyRef.current = migratedKey;
-        return;
-      }
-
-      const legacyItems = safeLocalStorageGetJson(
+      const legacyItems = readKvJson(
+        kv,
         legacyStorageKey,
         Schema.Array(Schema.Unknown),
         [],
       );
-      if (legacyItems.length === 0) {
-        safeLocalStorageSet(migratedKey, "1");
-        migratedLegacyPaymentsKeyRef.current = migratedKey;
-        return;
-      }
-
       for (const legacyItem of legacyItems) {
         if (!isLegacyPaymentEvent(legacyItem)) continue;
         insertTransaction(
@@ -444,18 +401,21 @@ export const useOwnerScopedStorage = ({
           }),
         );
       }
-
-      safeLocalStorageSet(migratedKey, "1");
-      migratedLegacyPaymentsKeyRef.current = migratedKey;
+      kv.setItem(migratedKey, "1");
     },
-    [insertTransaction],
-  );
-
-  return {
-    logPaymentEvent,
-    makeLocalStorageKey,
-    migrateLegacyPaymentEventsToEvolu,
-    readSeenMintsFromStorage,
-    rememberSeenMint,
   };
 };
+
+/** The session owner's payment history and telemetry queue. */
+export const paymentLogAtom = Atom.keepAlive(
+  Atom.readable((get) =>
+    AsyncResult.map(
+      AsyncResult.all({
+        ownerId: get(appOwnerIdAtom),
+        transactions: get(transactionsRepositoryAtom),
+      }),
+      ({ ownerId, transactions }) =>
+        makePaymentLog({ kv: get(platformAtom).kv, ownerId, transactions }),
+    ),
+  ),
+);

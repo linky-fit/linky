@@ -1,5 +1,6 @@
 import { useAtomSet, useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
+import { useLatest } from "../../../hooks/useLatest";
 import type { Lang, Translate } from "../../../i18n";
 import { persistSyncedActiveNostrIdentity } from "../../../platform/identitySecrets";
 import {
@@ -39,7 +40,7 @@ export const useIdentityOwnersComposition = ({
   const identityRepository = useIdentityRepository();
   const inboxCursors = useInboxCursorsRepository();
   const appOwnerId: string = useAppOwnerId();
-  const appOwnerIdRef = React.useRef<string | null>(null);
+  const appOwnerIdRef = useLatest<string | null>(appOwnerId);
 
   const profileAuth = useProfileAuthDomain({
     currentNsec,

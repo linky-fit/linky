@@ -24,11 +24,9 @@ const Harness = ({
   fetchMintInfo: FetchMintInfo;
   storeRef: React.RefObject<Store | null>;
 }): null => {
-  const appOwnerIdRef = React.useRef<string | null>("owner-1");
   const store = useMintInfoStore({
     allowTestMints: true,
     appOwnerId: "owner-1",
-    appOwnerIdRef,
     walletProofs: [],
     defaultMintUrl: null,
     fetchMintInfo,

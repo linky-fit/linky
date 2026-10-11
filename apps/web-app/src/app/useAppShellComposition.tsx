@@ -84,7 +84,6 @@ import {
   useSyncOwnerIds,
   useTransactionsRepository,
 } from "./hooks/useLinksync";
-import { useOwnerScopedStorage } from "./hooks/useOwnerScopedStorage";
 import { useStatusToasts } from "./hooks/useStatusToasts";
 import { useStoragePersistRequestEffect } from "./hooks/useStoragePersistRequestEffect";
 import { runWrite } from "./lib/storeWrite";
@@ -144,17 +143,6 @@ export const useAppShellComposition = ({
   const evoluShards = useShardSummaries();
   const evoluSyncOwnerIds = useSyncOwnerIds();
   const shardRotation = useShardRotation();
-
-  const {
-    logPaymentEvent,
-    makeLocalStorageKey,
-    migrateLegacyPaymentEventsToEvolu,
-    readSeenMintsFromStorage,
-    rememberSeenMint,
-  } = useOwnerScopedStorage({
-    appOwnerIdRef,
-    transactions,
-  });
 
   const evoluServers = useEvoluServersManager();
   const evoluServerUrls = evoluServers.configuredUrls;
@@ -768,18 +756,10 @@ export const useAppShellComposition = ({
     formatDisplayedAmountText,
     identity: {
       appOwnerId,
-      appOwnerIdRef,
       currentNpub,
       currentNsec,
     },
     maybeShowPwaNotification,
-    ownerScopedStorage: {
-      logPaymentEvent,
-      makeLocalStorageKey,
-      migrateLegacyPaymentEventsToEvolu,
-      readSeenMintsFromStorage,
-      rememberSeenMint,
-    },
     payAmount,
     profile: {
       npubCashInfoInFlightRef,

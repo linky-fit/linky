@@ -10,7 +10,6 @@ import { useMintInfoStore } from "./mint/useMintInfoStore";
 interface UseMintDomainParams {
   allowTestMints: boolean;
   appOwnerId: string | null;
-  appOwnerIdRef: React.MutableRefObject<string | null>;
   walletProofs: readonly StoredProof[];
   defaultMintUrl: string | null;
   fetchMintInfo: FetchMintInfo | null;
@@ -34,7 +33,6 @@ interface UseMintDomainResult {
 export const useMintDomain = ({
   allowTestMints,
   appOwnerId,
-  appOwnerIdRef,
   walletProofs,
   defaultMintUrl,
   fetchMintInfo,
@@ -56,7 +54,6 @@ export const useMintDomain = ({
   } = useMintInfoStore({
     allowTestMints,
     appOwnerId,
-    appOwnerIdRef,
     walletProofs,
     defaultMintUrl,
     fetchMintInfo,

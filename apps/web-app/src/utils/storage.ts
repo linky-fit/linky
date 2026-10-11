@@ -122,12 +122,14 @@ export const safeLocalStorageKeys = (): string[] => {
   }
 };
 
-export const safeLocalStorageGetJson = <A, I>(
+/** The JSON value at `key` decoded by `schema`, or `fallback`. */
+export const readKvJson = <A, I>(
+  kv: KeyValueStorage,
   key: string,
   schema: Schema.Codec<A, I>,
   fallback: A,
 ): A => {
-  const raw = safeLocalStorageGet(key);
+  const raw = kv.getItem(key);
   if (!raw) return fallback;
   let parsed: unknown;
   try {
@@ -141,13 +143,26 @@ export const safeLocalStorageGetJson = <A, I>(
   );
 };
 
-export const safeLocalStorageSetJson = (key: string, value: unknown): void => {
+export const writeKvJson = (
+  kv: KeyValueStorage,
+  key: string,
+  value: unknown,
+): void => {
   try {
-    safeLocalStorageSet(key, JSON.stringify(value));
+    kv.setItem(key, JSON.stringify(value));
   } catch {
     // Circular or non-serializable values are not persisted.
   }
 };
+
+export const safeLocalStorageGetJson = <A, I>(
+  key: string,
+  schema: Schema.Codec<A, I>,
+  fallback: A,
+): A => readKvJson(localStorageKv, key, schema, fallback);
+
+export const safeLocalStorageSetJson = (key: string, value: unknown): void =>
+  writeKvJson(localStorageKv, key, value);
 
 const LeaseLockRecord = Schema.Struct({
   expiresAtMs: Schema.Number,

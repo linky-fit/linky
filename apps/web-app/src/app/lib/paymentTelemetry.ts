@@ -1,4 +1,5 @@
 import { classifyPaymentErrorCode } from "@linky-fit/linkstr";
+import { Schema } from "effect";
 export { classifyPaymentErrorCode } from "@linky-fit/linkstr";
 import {
   getTelemetryAppHost,
@@ -132,3 +133,67 @@ export const createLocalPaymentTelemetryEvent = (
     appVersion: __APP_VERSION__,
   };
 };
+
+const LocalPaymentTelemetryEventSchema = Schema.Struct({
+  id: Schema.String,
+  createdAtSec: Schema.Number,
+  direction: Schema.Literals(["in", "out"]),
+  status: Schema.Literals(["declined", "error", "ok"]),
+  method: Schema.Literals([
+    "cashu_chat",
+    "cashu_receive",
+    "cashu_restore",
+    "lightning_address",
+    "lightning_invoice",
+    "unknown",
+  ]),
+  phase: Schema.Literals([
+    "complete",
+    "invoice_fetch",
+    "melt",
+    "publish",
+    "receive",
+    "restore",
+    "swap",
+    "unknown",
+  ]),
+  paymentType: Schema.optional(
+    Schema.NullOr(
+      Schema.Literals([
+        "contact",
+        "lightning",
+        "proxy",
+        "recurring",
+        "request",
+      ]),
+    ),
+  ),
+  appVersion: Schema.String,
+  appHost: Schema.optional(Schema.NullOr(Schema.String)),
+  appRuntime: Schema.optional(
+    Schema.NullOr(Schema.Literals(["native", "pwa", "web"])),
+  ),
+  devicePlatform: Schema.optional(
+    Schema.NullOr(
+      Schema.Literals([
+        "android",
+        "iphone",
+        "ipad",
+        "linux",
+        "mac",
+        "windows",
+        "unknown",
+      ]),
+    ),
+  ),
+  mint: Schema.NullOr(Schema.String),
+  amountBucket: Schema.NullOr(Schema.String),
+  feeBucket: Schema.NullOr(Schema.String),
+  errorCode: Schema.NullOr(Schema.String),
+  errorDetail: Schema.NullOr(Schema.String),
+});
+
+export const isLocalPaymentTelemetryEvent = (
+  value: unknown,
+): value is LocalPaymentTelemetryEvent =>
+  Schema.is(LocalPaymentTelemetryEventSchema)(value);

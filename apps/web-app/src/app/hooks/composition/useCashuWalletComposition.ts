@@ -104,7 +104,7 @@ import { useLightningPaymentsDomain } from "../useLightningPaymentsDomain";
 import { useMintDomain } from "../useMintDomain";
 import { useAllowTestMints } from "../useAllowTestMints";
 import { useMoveMintFunds } from "../mint/useMoveMintFunds";
-import { useOwnerScopedStorage } from "../useOwnerScopedStorage";
+import { useOwnerStorage, usePaymentLog } from "../wallet/useWalletStorage";
 import { usePaidOverlayState } from "../usePaidOverlayState";
 import { usePaymentsDomain } from "../usePaymentsDomain";
 import { useProfileNpubCashEffects } from "../useProfileNpubCashEffects";
@@ -179,7 +179,6 @@ type ContactsMessagingCompositionResult = ReturnType<
   typeof useContactsMessagingComposition
 >;
 type ProfileCompositionResult = ReturnType<typeof useProfileComposition>;
-type OwnerScopedStorageResult = ReturnType<typeof useOwnerScopedStorage>;
 
 interface UseCashuWalletCompositionParams {
   contactPayBackToChatRef: React.MutableRefObject<ContactId | null>;
@@ -214,21 +213,13 @@ interface UseCashuWalletCompositionParams {
   formatDisplayedAmountText: (amountSat: number) => string;
   identity: Pick<
     IdentityOwnersCompositionResult,
-    "appOwnerId" | "appOwnerIdRef" | "currentNpub" | "currentNsec"
+    "appOwnerId" | "currentNpub" | "currentNsec"
   >;
   maybeShowPwaNotification: (
     title: string,
     body: string,
     tag?: string,
   ) => Promise<void>;
-  ownerScopedStorage: Pick<
-    OwnerScopedStorageResult,
-    | "logPaymentEvent"
-    | "makeLocalStorageKey"
-    | "migrateLegacyPaymentEventsToEvolu"
-    | "readSeenMintsFromStorage"
-    | "rememberSeenMint"
-  >;
   payAmount: string;
   profile: Pick<
     ProfileCompositionResult,
@@ -272,7 +263,6 @@ export const useCashuWalletComposition = ({
   formatDisplayedAmountText,
   identity,
   maybeShowPwaNotification,
-  ownerScopedStorage,
   payAmount,
   profile,
   pushToast,
@@ -288,7 +278,7 @@ export const useCashuWalletComposition = ({
   const accountHydrated = useAccountHydrated();
   const { allowTestMints, setAllowTestMints } = useAllowTestMints();
   const { enqueueOutbox, sendPaymentNotice } = useLinkstrCommands();
-  const { appOwnerId, appOwnerIdRef, currentNpub, currentNsec } = identity;
+  const { appOwnerId, currentNpub, currentNsec } = identity;
   const {
     saveNpubContact,
     appendLocalNostrMessage,
@@ -319,13 +309,12 @@ export const useCashuWalletComposition = ({
     setOwnedProfileLightningAddresses,
     setOwnedProfileLightningAddressesLoading,
   } = profile;
+  const { logPaymentEvent, migrateLegacyPaymentEvents } = usePaymentLog();
   const {
-    logPaymentEvent,
-    makeLocalStorageKey,
-    migrateLegacyPaymentEventsToEvolu,
-    readSeenMintsFromStorage,
+    key: makeLocalStorageKey,
+    readSeenMints: readSeenMintsFromStorage,
     rememberSeenMint,
-  } = ownerScopedStorage;
+  } = useOwnerStorage();
 
   const hasMintOverrideRef = React.useRef(false);
 
@@ -344,7 +333,6 @@ export const useCashuWalletComposition = ({
   });
 
   React.useEffect(() => {
-    appOwnerIdRef.current = appOwnerId;
     if (!appOwnerId) return;
     const overrideKey = makeLocalStorageKey(
       CASHU_DEFAULT_MINT_OVERRIDE_STORAGE_KEY,
@@ -378,7 +366,7 @@ export const useCashuWalletComposition = ({
       }
       hasMintOverrideRef.current = false;
     }
-  }, [appOwnerId, appOwnerIdRef, makeLocalStorageKey]);
+  }, [appOwnerId, makeLocalStorageKey]);
 
   const [cashuDraft, setCashuDraft] = useState("");
   const cashuDraftRef = React.useRef<ComponentRef<typeof TextField>>(null);
@@ -514,9 +502,8 @@ export const useCashuWalletComposition = ({
   }, [upsertDefaultMintToOwnerMeta]);
 
   React.useEffect(() => {
-    if (!appOwnerId) return;
-    migrateLegacyPaymentEventsToEvolu(appOwnerId);
-  }, [appOwnerId, migrateLegacyPaymentEventsToEvolu]);
+    migrateLegacyPaymentEvents();
+  }, [migrateLegacyPaymentEvents]);
 
   useRouteAmountResetEffects({
     contactPayBackToChatRef,
@@ -595,7 +582,6 @@ export const useCashuWalletComposition = ({
   } = useMintDomain({
     allowTestMints,
     appOwnerId,
-    appOwnerIdRef,
     walletProofs,
     defaultMintUrl,
     fetchMintInfo,

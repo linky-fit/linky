@@ -54,7 +54,6 @@ const isStoredMintInfoRow = (
 interface UseMintInfoStoreParams {
   allowTestMints: boolean;
   appOwnerId: string | null;
-  appOwnerIdRef: React.MutableRefObject<string | null>;
   walletProofs: readonly StoredProof[];
   defaultMintUrl: string | null;
   /** Null until the linkshu runtime is up; no refresh runs before. */
@@ -77,7 +76,6 @@ interface UseMintInfoStoreResult {
 export const useMintInfoStore = ({
   allowTestMints,
   appOwnerId,
-  appOwnerIdRef,
   walletProofs,
   defaultMintUrl,
   fetchMintInfo,
@@ -89,7 +87,7 @@ export const useMintInfoStore = ({
   );
 
   React.useEffect(() => {
-    const ownerId = appOwnerIdRef.current;
+    const ownerId = appOwnerId;
     if (!ownerId) {
       setMintInfoAll([]);
       return;
@@ -103,7 +101,7 @@ export const useMintInfoStore = ({
     setMintInfoAll(
       storedRows.filter(isStoredMintInfoRow).map(repairStoredMintInfoRow),
     );
-  }, [appOwnerId, appOwnerIdRef]);
+  }, [appOwnerId]);
 
   const mintInfo = React.useMemo(
     () => getActiveMintInfoRows(mintInfoAll),
@@ -143,7 +141,7 @@ export const useMintInfoStore = ({
       const existing = mintInfoByUrl.get(cleaned);
 
       const now = PositiveInt.orThrow(Math.floor(nowSec));
-      const ownerId = appOwnerIdRef.current;
+      const ownerId = appOwnerId;
       if (!ownerId) return;
 
       setMintInfoAll((prev) => {
@@ -198,7 +196,7 @@ export const useMintInfoStore = ({
         return next;
       });
     },
-    [appOwnerIdRef, isMintDeleted, mintInfoByUrl, rememberSeenMint],
+    [appOwnerId, isMintDeleted, mintInfoByUrl, rememberSeenMint],
   );
 
   const encounteredMintUrls = React.useMemo(
@@ -249,7 +247,7 @@ export const useMintInfoStore = ({
       if (typeof navigator !== "undefined" && navigator.onLine === false) {
         return;
       }
-      const ownerId = appOwnerIdRef.current;
+      const ownerId = appOwnerId;
       if (!ownerId) return;
       if (mintInfoRefreshInFlightRef.current.has(cleaned)) return;
 
@@ -318,7 +316,7 @@ export const useMintInfoStore = ({
       }
     },
     [
-      appOwnerIdRef,
+      appOwnerId,
       fetchMintInfo,
       isMintDeleted,
       mintInfoByUrl,
@@ -426,7 +424,7 @@ export const useMintInfoStore = ({
 
     mintDedupeRanRef.current = signature;
 
-    const ownerId = appOwnerIdRef.current;
+    const ownerId = appOwnerId;
     if (!ownerId) return;
 
     const deduped = dedupeMintInfoRows(mintInfoAll);
@@ -437,7 +435,7 @@ export const useMintInfoStore = ({
       `${LOCAL_MINT_INFO_STORAGE_KEY_PREFIX}.${ownerId}`,
       deduped,
     );
-  }, [appOwnerIdRef, mintInfoAll]);
+  }, [appOwnerId, mintInfoAll]);
 
   return {
     getMintRuntime,
