@@ -5,7 +5,12 @@ import {
   type Pubkey,
   type PaymentNoticeContext,
 } from "@linky-fit/linkstr";
-import type { SendError, SendReceipt } from "@linky-fit/linkshu";
+import {
+  planSendMint,
+  type PlanSendMintArgs,
+  type SendError,
+  type SendReceipt,
+} from "@linky-fit/linkshu";
 import { useLinkstrCommands } from "@linky-fit/linkstr-react";
 import { Result } from "effect";
 import React from "react";
@@ -13,18 +18,16 @@ import { ContactId } from "@linky-fit/linksync";
 import { navigateTo } from "../../../hooks/useRouting";
 import { CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY } from "../../../utils/constants";
 import type { DisplayAmountParts } from "../../../utils/displayAmounts";
-import { normalizeMintUrl } from "../../../utils/mint";
 import { safeLocalStorageSet } from "../../../utils/storage";
 import { getUnknownErrorMessage } from "../../../utils/unknown";
 import { makeLocalId } from "../../../utils/validation";
 import { reportCashuSendForgotten } from "../../lib/cashuSendInspector";
 import { describeTaggedCashuError } from "../../lib/cashuStoredError";
+import { isSpellingOf } from "../../lib/mintSpelling";
 import {
   paidOverlayContact,
   type PaidOverlayDetails,
 } from "../../lib/paidOverlay";
-import { selectSendMintForAmount } from "../../lib/paymentMintSelection";
-import type { SendMintBalance } from "../../lib/paymentMintSelection";
 import type {
   AppendLocalNostrMessage,
   ContactRowLike,
@@ -74,7 +77,7 @@ interface UsePayContactWithCashuMessageParams {
   t: Translate;
   updateLocalNostrMessage: UpdateLocalNostrMessage;
   /** Per-mint spendable balances from the linkshu read model. */
-  walletMintBalances: readonly SendMintBalance[];
+  walletMintBalances: PlanSendMintArgs["balances"];
 }
 
 const describeSendError = (error: SendError): string =>
@@ -277,11 +280,11 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
         };
       }
 
-      const mint = selectSendMintForAmount(
-        walletMintBalances,
-        normalizeMintUrl(defaultMintUrl ?? ""),
-        amountSat,
-      );
+      const mint = planSendMint({
+        balances: walletMintBalances,
+        isPreferredMint: isSpellingOf(defaultMintUrl),
+        amount: amountSat,
+      });
       if (mint === null) {
         if (notify) setStatus(t("payInsufficient"));
         return {

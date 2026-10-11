@@ -1,4 +1,4 @@
-import { NewProof, parseP2pkPubkey } from "@linky-fit/linkshu";
+import { Mints, NewProof, parseP2pkPubkey } from "@linky-fit/linkshu";
 import { encodeNpub, encodeNsec, type Pubkey } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { RegistryContext } from "@linky-fit/linkstr-react";
@@ -92,6 +92,44 @@ const gateMints = () => {
       : fetch(),
   );
   return { fetch, release };
+};
+
+/** A mint answering NUT-06 info, keysets and keys for one v1 keyset. */
+const stubMintEndpoints = () => {
+  const keysetId = "004cc88c4e270576";
+  const keys = {
+    "1": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+    "2": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+    "4": "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
+    "8": "02e493dbf1c10d80f3581e4904930b1404cc6c13900ee0758474fa94abe8c4cd13",
+  };
+  const keyset = {
+    id: keysetId,
+    unit: "sat",
+    active: true,
+    input_fee_ppk: 100,
+  };
+  const bodies: Record<string, unknown> = {
+    "/v1/info": {
+      name: "Preset mint",
+      pubkey: keys["1"],
+      version: "Nutshell/0.16.0",
+      nuts: { "15": { methods: [{ method: "bolt11", unit: "sat" }] } },
+      icon_url: "/icon.png",
+    },
+    "/v1/keysets": { keysets: [keyset] },
+    "/v1/keys": { keysets: [{ ...keyset, keys }] },
+  };
+  vi.stubGlobal("fetch", (input: RequestInfo | URL) => {
+    const url = input instanceof Request ? input.url : String(input);
+    const body = bodies[new URL(url, "http://localhost").pathname];
+    return Promise.resolve(
+      new Response(JSON.stringify(body ?? null), {
+        status: body === undefined ? 404 : 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+  });
 };
 
 const proofAt = (mint: string) =>
@@ -227,6 +265,29 @@ describe("walletReadModelAtom", () => {
 });
 
 describe("linkshu commands", () => {
+  it("fetches a previewed mint's info without making it a known mint", async () => {
+    stubMintEndpoints();
+    const registry = boot();
+    const commands = await commandsOf(registry);
+
+    const outcome = await commands.fetchMintInfo("https://preset.example");
+    const known = await Effect.runPromiseWith(
+      await result(registry, linkshuRuntimeAtom),
+    )(Effect.flatMap(Mints, (mints) => mints.knownMints));
+
+    expect(outcome).toEqual(
+      Result.succeed(
+        expect.objectContaining({
+          url: "https://preset.example",
+          inputFeePpk: 100,
+          supportsMpp: true,
+          iconUrl: "https://preset.example/icon.png",
+        }),
+      ),
+    );
+    expect(known).toEqual([]);
+  });
+
   it("settles two concurrent receives, each with its own outcome", async () => {
     const registry = boot();
     const commands = await commandsOf(registry);

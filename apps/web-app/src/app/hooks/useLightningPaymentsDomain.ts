@@ -27,13 +27,13 @@ import {
   getLightningInvoicePreview,
   isRetryablePaymentAmountFailure,
   type LightningInvoicePreview,
+  planSendMint,
+  type PlanSendMintArgs,
 } from "@linky-fit/linkshu";
-import { normalizeMintUrl } from "../../utils/mint";
 import { safeLocalStorageSet } from "../../utils/storage";
 import { getUnknownErrorMessage } from "../../utils/unknown";
 import { describeTaggedCashuError } from "../lib/cashuStoredError";
-import { selectSendMintForAmount } from "../lib/paymentMintSelection";
-import type { SendMintBalance } from "../lib/paymentMintSelection";
+import { isSpellingOf } from "../lib/mintSpelling";
 import type {
   ContactPayRowLike,
   LoggedPaymentEventParams,
@@ -73,7 +73,7 @@ interface UseLightningPaymentsDomainParams {
   showPaymentSending: (details: PaidOverlayDetails) => void;
   t: Translate;
   /** Per-mint spendable balances from the linkshu read model. */
-  walletMintBalances: readonly SendMintBalance[];
+  walletMintBalances: PlanSendMintArgs["balances"];
 }
 
 /**
@@ -184,11 +184,11 @@ export const useLightningPaymentsDomain = ({
         const invoiceAmountSat = invoicePreview?.amountSat ?? null;
         // An amountless invoice cannot pre-select by size; any funded mint
         // may quote it, so fall back to the 1-sat threshold.
-        const mint = selectSendMintForAmount(
-          walletMintBalances,
-          normalizeMintUrl(defaultMintUrl ?? ""),
-          invoiceAmountSat ?? 1,
-        );
+        const mint = planSendMint({
+          balances: walletMintBalances,
+          isPreferredMint: isSpellingOf(defaultMintUrl),
+          amount: invoiceAmountSat ?? 1,
+        });
         if (mint === null) {
           setStatus(t("payInsufficient"));
           return false;
@@ -320,11 +320,11 @@ export const useLightningPaymentsDomain = ({
         inferLightningAddressFromLnurlTarget(paymentTarget);
 
       try {
-        const mint = selectSendMintForAmount(
-          walletMintBalances,
-          normalizeMintUrl(defaultMintUrl ?? ""),
-          amountSat,
-        );
+        const mint = planSendMint({
+          balances: walletMintBalances,
+          isPreferredMint: isSpellingOf(defaultMintUrl),
+          amount: amountSat,
+        });
         if (mint === null) {
           setStatus(t("payInsufficient"));
           return false;

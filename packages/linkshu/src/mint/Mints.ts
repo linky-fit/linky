@@ -70,6 +70,18 @@ export class Mints extends Context.Service<Mints>()("linkshu/Mints", {
         inspectOperation(inspector, "mints.info", { mint }),
       );
 
+    /**
+     * `info` from a fresh load that bypasses the wallet cache and leaves the
+     * mint out of `knownMints`, for mints the user only looks at.
+     */
+    const fetchInfo = (
+      mint: MintUrl,
+    ): Effect.Effect<MintInfo, MintUnreachable | MintRejected> =>
+      instances.loadFresh(mint, sat).pipe(
+        Effect.map((wallet) => buildMintInfo(mint, wallet)),
+        inspectOperation(inspector, "mints.fetchInfo", { mint }),
+      );
+
     /** Every mint the wallet has state for: stored proofs plus seen mints. */
     const knownMints: Effect.Effect<ReadonlyArray<MintUrl>> = collectKnownMints(
       kv,
@@ -111,7 +123,13 @@ export class Mints extends Context.Service<Mints>()("linkshu/Mints", {
           : kv.remove(seenMintKey(mint)),
       ).pipe(inspectOperation(inspector, "mints.removeKnownMint", { mint }));
 
-    return { info, knownMints, addKnownMint, removeKnownMint } as const;
+    return {
+      info,
+      fetchInfo,
+      knownMints,
+      addKnownMint,
+      removeKnownMint,
+    } as const;
   }),
 }) {
   static readonly layerWithoutDependencies = Layer.effect(this, this.make);

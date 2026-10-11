@@ -42,7 +42,10 @@ const baseInfo: GetInfoResponse = {
 const stubInstances = (loaded: LoadedWallet): Layer.Layer<WalletInstances> =>
   Layer.succeed(
     WalletInstances,
-    WalletInstances.of({ get: () => Effect.succeed(loaded) }),
+    WalletInstances.of({
+      loadFresh: () => Effect.die("not under test"),
+      get: () => Effect.succeed(loaded),
+    }),
   );
 
 const stubProofStore = (
@@ -277,6 +280,59 @@ describe("Mints.info", () => {
   });
 });
 
+describe("Mints.fetchInfo", () => {
+  it("builds MintInfo from a fresh load and leaves the mint unknown", async () => {
+    const kv = recordingKv({});
+    const inspector = recordingInspector();
+    const instances = Layer.succeed(
+      WalletInstances,
+      WalletInstances.of({
+        get: () => Effect.die("must not use the wallet cache"),
+        loadFresh: () =>
+          Effect.succeed(
+            fakeWallet({
+              keysetId: "01aaaa",
+              keyChain: fakeKeyChain([new Keyset("01aaaa", "sat", true, 100)]),
+              getMintInfo: () =>
+                new CashuMintInfo({ ...baseInfo, icon_url: "/icon.png" }),
+            }),
+          ),
+      }),
+    );
+
+    const exit = await runMints(
+      Layer.mergeAll(instances, emptyStores, kv.layer, inspector.layer),
+      Effect.gen(function* () {
+        const mints = yield* Mints;
+        const info = yield* mints.fetchInfo(mint);
+        return { info, known: yield* mints.knownMints };
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.info).toEqual(
+      new MintInfo({
+        url: mint,
+        name: "Test mint",
+        inputFeePpk: 100,
+        supportsMpp: false,
+        supportsP2pk: false,
+        isFakeLightning: false,
+        iconUrl: "https://mint.example/icon.png",
+      }),
+    );
+    expect(exit.value.known).toEqual([]);
+    expect(kv.store.size).toBe(0);
+    expect(inspector.events).toEqual([
+      expect.objectContaining({
+        _tag: "OperationSucceeded",
+        name: "mints.fetchInfo",
+        params: { mint },
+      }),
+    ]);
+  });
+});
+
 describe("Mints.knownMints", () => {
   it("unions proof, operation, and seen mints, deduped, normalized, sorted", async () => {
     const seen = MintUrl.make("https://seen.example");
@@ -326,7 +382,10 @@ describe("Mints.addKnownMint", () => {
     const inspector = recordingInspector();
     const instances = Layer.succeed(
       WalletInstances,
-      WalletInstances.of({ get: () => Effect.die("must not load") }),
+      WalletInstances.of({
+        loadFresh: () => Effect.die("not under test"),
+        get: () => Effect.die("must not load"),
+      }),
     );
 
     const exit = await runMints(
@@ -353,7 +412,10 @@ describe("Mints.addKnownMint", () => {
 describe("Mints.removeKnownMint", () => {
   const instances = Layer.succeed(
     WalletInstances,
-    WalletInstances.of({ get: () => Effect.die("must not load") }),
+    WalletInstances.of({
+      loadFresh: () => Effect.die("not under test"),
+      get: () => Effect.die("must not load"),
+    }),
   );
 
   it("forgets a seen mint no proof names", async () => {

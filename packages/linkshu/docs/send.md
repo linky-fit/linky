@@ -19,7 +19,7 @@ const issueToken = (mint: MintUrl, amount: Amount) =>
   });
 ```
 
-Pick `mint` from `Tokens.balances.perMint`; sends never cross mints. Both `tokenText` and `proofs` on the receipt are spendable secrets; keep them out of logs.
+Pick `mint` from `Tokens.balances.perMint`; sends never cross mints. `planSendMint({ balances, amount, isPreferredMint })` is one such policy, as a pure function: of the mints whose balance covers `amount` it takes the largest one `isPreferredMint` rejects, and a preferred mint only when no other mint covers it, so a wallet drains foreign balances first. Make `isPreferredMint` match the wallet's default mint under every spelling its funds are stored under (balances key a mint by the exact URL its proofs were stored under); the result is always one of those stored URLs, ready to pass as `mint`. It returns `null` when no single mint covers `amount`; [autoswap.md](./autoswap.md#planning-a-move) plans the move that would. Both `tokenText` and `proofs` on the receipt are spendable secrets; keep them out of logs.
 
 ## How it works
 

@@ -1,10 +1,9 @@
 import { sqliteTrue } from "@linky-fit/linksync";
-import { Effect, Option, Schema } from "effect";
+import { Option, Schema } from "effect";
 import { JsonValue } from "../../../types/json";
 import { findMintInfoIconValue } from "@linky-fit/linkshu";
-import type { StoredProof } from "@linky-fit/linkshu";
+import type { MintInfo, StoredProof } from "@linky-fit/linkshu";
 import {
-  extractPpk,
   GENERIC_MINT_ICON_DATA_URL,
   getMintIconOverride,
   getMintOriginAndHost,
@@ -140,25 +139,6 @@ export const getEncounteredMintUrls = (
   return Array.from(set.values()).sort();
 };
 
-const toJson = (value: unknown): string | null => {
-  try {
-    const text = JSON.stringify(value);
-    const trimmed = text.trim();
-    if (
-      !trimmed ||
-      trimmed === "null" ||
-      trimmed === "{}" ||
-      trimmed === "[]"
-    ) {
-      return null;
-    }
-
-    return trimmed;
-  } catch {
-    return null;
-  }
-};
-
 const parseJsonText = Schema.decodeUnknownOption(
   Schema.fromJsonString(JsonValue),
 );
@@ -242,63 +222,20 @@ export const resolveMintIcon = (
   return { origin, url, host, failed: url === null };
 };
 
-// Fees are not part of NUT-06 info; the only published fee is the active
-// keyset's input_fee_ppk from /v1/keysets.
-export const extractActiveKeysetPpk = (
-  keysetsPayload: unknown,
-  unit = "sat",
-): number | null => {
-  const decoded = Schema.decodeUnknownOption(
-    Schema.Struct({
-      keysets: Schema.Array(Schema.Unknown),
-    }),
-  )(keysetsPayload);
-  if (Option.isNone(decoded)) return null;
-  const keysetSchema = Schema.Struct({
-    active: Schema.Boolean,
-    unit: Schema.String,
-    input_fee_ppk: Schema.Natural.pipe(
-      Schema.withDecodingDefaultType(Effect.succeed(0)),
-    ),
-  });
-  const fees = decoded.value.keysets.flatMap((value) => {
-    const keyset = Schema.decodeUnknownOption(keysetSchema)(value);
-    return Option.isSome(keyset) &&
-      keyset.value.active &&
-      keyset.value.unit === unit
-      ? [keyset.value.input_fee_ppk]
-      : [];
-  });
-  return fees.length ? Math.min(...fees) : null;
-};
-
-export const parseMintInfoPayload = (
-  info: unknown,
-  keysetsPayload?: unknown,
-): {
-  feesJson: string | null;
-  infoJson: string | null;
-  supportsMpp: string | null;
-} => {
-  const decodeRecord = Schema.decodeUnknownOption(
-    Schema.Record(Schema.String, JsonValue),
-  );
-  const payload = Option.getOrNull(decodeRecord(info));
-  const nuts = Option.getOrNull(decodeRecord(payload?.nuts ?? payload?.NUTS));
-  const nut15 = nuts?.["15"] ?? nuts?.nut15 ?? nuts?.NUT15 ?? null;
-  const feesRaw = payload?.fees ?? payload?.fee ?? null;
-  const ppk =
-    extractActiveKeysetPpk(keysetsPayload) ??
-    extractPpk(feesRaw) ??
-    extractPpk(payload);
-  const fees = ppk !== null ? { ppk, raw: feesRaw } : feesRaw;
-
-  return {
-    supportsMpp: nut15 ? "1" : null,
-    feesJson: toJson(fees),
-    infoJson: toJson(info),
-  };
-};
+/**
+ * The stored row's fields for linkshu's mint info. `infoJson` keeps only the
+ * NUT-06 keys the icon lookup reads; `feesJson` holds the keyset fee.
+ */
+export const mintInfoRowFields = (
+  info: MintInfo,
+): Pick<LocalMintInfoRow, "feesJson" | "infoJson" | "supportsMpp"> => ({
+  supportsMpp: info.supportsMpp ? "1" : null,
+  feesJson:
+    info.inputFeePpk === null
+      ? null
+      : JSON.stringify({ ppk: info.inputFeePpk }),
+  infoJson: JSON.stringify({ name: info.name, icon_url: info.iconUrl }),
+});
 
 interface DuplicateRow extends MintInfoRowLike {
   id: string;

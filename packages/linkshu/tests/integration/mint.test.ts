@@ -33,4 +33,19 @@ describe("local mint via the public API", () => {
 
     expect(known).toContain(mintUrl);
   });
+
+  it("fetches a mint's info without remembering it", async () => {
+    const { info, known } = await runLinkshu(
+      { bip39Seed: seed },
+      Effect.gen(function* () {
+        const mints = yield* Mints;
+        const info = yield* mints.fetchInfo(mintUrl);
+        return { info, known: yield* mints.knownMints };
+      }),
+    );
+
+    expect(info.url).toBe(mintUrl);
+    expect(info.inputFeePpk).toBe(100);
+    expect(known).not.toContain(mintUrl);
+  });
 });

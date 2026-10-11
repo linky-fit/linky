@@ -209,6 +209,7 @@ const makeHarness = (
         Layer.succeed(
           WalletInstances,
           WalletInstances.of({
+            loadFresh: () => Effect.die("not under test"),
             get: () => Effect.succeed(wallets.wallet()),
           }),
         ),

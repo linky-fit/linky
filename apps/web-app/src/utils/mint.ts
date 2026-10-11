@@ -5,7 +5,11 @@ export interface MintIcon {
   url: string | null;
 }
 
-import { isTestMintUrl as sharedIsTestMintUrl } from "@linky-fit/linkshu";
+import {
+  isTestMintUrl as sharedIsTestMintUrl,
+  parseMintUrl,
+  type MintUrl,
+} from "@linky-fit/linkshu";
 import { GENERIC_MINT_ICON_DATA_URL } from "@linky-fit/linkshu";
 export {
   GENERIC_MINT_ICON_DATA_URL,
@@ -53,37 +57,6 @@ type MintStringInput =
   | null
   | undefined;
 
-type PpkSearchPrimitive =
-  | bigint
-  | boolean
-  | number
-  | MintStructuredValue
-  | string
-  | symbol
-  | null
-  | undefined;
-
-interface PpkSearchRecord {
-  [key: string]: PpkSearchValue;
-}
-
-type PpkSearchValue = PpkSearchPrimitive | PpkSearchRecord | PpkSearchValue[];
-
-const isPpkSearchBranch = (
-  value: PpkSearchValue,
-): value is PpkSearchRecord | PpkSearchValue[] => {
-  return typeof value === "object" && value !== null;
-};
-
-const getPpkEntries = (
-  value: PpkSearchRecord | PpkSearchValue[],
-): Array<[string, PpkSearchValue]> => {
-  if (Array.isArray(value)) {
-    return value.map((inner, index) => [String(index), inner]);
-  }
-  return Object.entries(value);
-};
-
 export const normalizeMintUrl = (value: MintStringInput): string => {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
@@ -106,6 +79,10 @@ export const normalizeMintUrl = (value: MintStringInput): string => {
     return stripped;
   }
 };
+
+/** The app's canonical mint url, branded for linkshu; null when invalid. */
+export const toMintUrl = (value: MintStringInput): MintUrl | null =>
+  parseMintUrl(normalizeMintUrl(value));
 
 export const getMintOriginAndHost = (
   mint: MintStringInput,
@@ -164,34 +141,6 @@ export const getNextMintIconUrl = (
     return genericUrl;
   }
 
-  return null;
-};
-
-export const extractPpk = (value: PpkSearchValue): number | null => {
-  const seen = new Set<PpkSearchRecord | PpkSearchValue[]>();
-  const queue: Array<{ depth: number; value: PpkSearchValue }> = [
-    { value, depth: 0 },
-  ];
-
-  while (queue.length) {
-    const item = queue.shift();
-    if (!item) break;
-    const { depth, value: current } = item;
-    if (!isPpkSearchBranch(current)) continue;
-    if (seen.has(current)) continue;
-    seen.add(current);
-
-    for (const [key, inner] of getPpkEntries(current)) {
-      if (key.toLowerCase() === "ppk") {
-        if (typeof inner === "number" && Number.isFinite(inner)) return inner;
-        const num = Number(String(inner ?? "").trim());
-        if (Number.isFinite(num)) return num;
-      }
-      if (depth < 3 && isPpkSearchBranch(inner)) {
-        queue.push({ value: inner, depth: depth + 1 });
-      }
-    }
-  }
   return null;
 };
 

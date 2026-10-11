@@ -243,7 +243,17 @@ export const makeWalletInstances = (
       );
     });
 
-  return { get } as const;
+  /** One load past the cache: neither cached nor recorded as seen. */
+  const loadFresh = (
+    mint: MintUrl,
+    unit: CurrencyUnit,
+  ): Effect.Effect<LoadedWallet, MintUnreachable | MintRejected> =>
+    Effect.tryPromise({
+      try: () => load(mint, unit),
+      catch: (error) => classifyMintError(mint, error),
+    });
+
+  return { get, loadFresh } as const;
 };
 
 /**

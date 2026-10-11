@@ -36,7 +36,7 @@ The receipt resolves only after the received proofs are persisted as `available`
 
 Guides are in [`docs/`](./docs/README.md); start with [getting started](./docs/getting-started.md).
 
-The token codec, bolt11 invoice preview, LNURL helpers, lightning-address parsing and fiat rates need no wallet runtime ([tokens](./docs/tokens.md), [lightning utilities](./docs/lightning-utilities.md)). `@linky-fit/linkshu/lightning-address` exports only the lightning-address helpers, with no dependency on cashu-ts or Effect. `@linky-fit/linkshu/payment-request` exports the NUT-18 and BIP-321 helpers without cashu-ts ([payment requests](./docs/payment-requests.md)).
+The token codec, bolt11 invoice preview, LNURL helpers, lightning-address parsing and fiat rates need no wallet runtime ([tokens](./docs/tokens.md), [lightning utilities](./docs/lightning-utilities.md)). `@linky-fit/linkshu/lightning-address` exports only the lightning-address helpers, with no dependency on cashu-ts or Effect. `planSendMint` and `planMintMove` pick the mint a payment spends from and the move that would make it payable ([send](./docs/send.md), [autoswap](./docs/autoswap.md)). `@linky-fit/linkshu/payment-request` exports the NUT-18 and BIP-321 helpers, including the NUT-18 POST transport, without cashu-ts ([payment requests](./docs/payment-requests.md)).
 
 ## License
 

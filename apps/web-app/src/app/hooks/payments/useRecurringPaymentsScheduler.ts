@@ -2,7 +2,11 @@ import type {
   RecurringPaymentId,
   RecurringPaymentsRepository,
 } from "@linky-fit/linksync";
-import type { EnvelopeState, EnvelopeStatus } from "@linky-fit/linkshu";
+import type {
+  EnvelopeState,
+  EnvelopeStatus,
+  PlanSendMintArgs,
+} from "@linky-fit/linkshu";
 import {
   isRecurringUnfunded,
   planRecurringPaymentTick,
@@ -43,7 +47,6 @@ import {
   paidOverlayContact,
   type PaidOverlayDetails,
 } from "../../lib/paidOverlay";
-import type { SendMintBalance } from "../../lib/paymentMintSelection";
 import { recurringPaymentUpdate } from "../../lib/recurringPaymentStore";
 import { recurringRecipient } from "../../lib/recurringRail";
 import { runWrite } from "../../lib/storeWrite";
@@ -108,7 +111,7 @@ interface UseRecurringPaymentsSchedulerParams {
     tag?: string,
   ) => Promise<void>;
   /** Available sats per mint from the linkshu read model. */
-  mintBalances: readonly SendMintBalance[];
+  mintBalances: PlanSendMintArgs["balances"];
   pushToast: (message: string) => void;
   repository: RecurringPaymentsRepository;
   sendTokenMessage: SendTokenMessage;

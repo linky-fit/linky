@@ -70,7 +70,7 @@ type Params = Parameters<typeof useRecurringPaymentsScheduler>[0];
 type Scheduler = ReturnType<typeof useRecurringPaymentsScheduler>;
 
 const NOW = DUE + 90;
-const MINT = "https://mint.example";
+const MINT = MintUrl.make("https://mint.example");
 const ORDER_ID = recurringPaymentIdFor("rp-1");
 const NOSTR_CONTACT_ID = contactIdFor("contact-1");
 const LIGHTNING_CONTACT_ID = contactIdFor("contact-2");
@@ -744,7 +744,7 @@ describe("useRecurringPaymentsScheduler", () => {
       {
         mintBalances: [
           { mint: MINT, amount: 100 },
-          { mint: "https://other.example", amount: 5_000 },
+          { mint: MintUrl.make("https://other.example"), amount: 5_000 },
         ],
       },
     );

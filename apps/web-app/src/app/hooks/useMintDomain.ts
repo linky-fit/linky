@@ -2,6 +2,7 @@ import React from "react";
 import type { StoredProof } from "@linky-fit/linkshu";
 import type { MintIcon } from "../../utils/mint";
 import { normalizeMintUrl } from "../../utils/mint";
+import type { FetchMintInfo } from "../state/linkshu/commands";
 import type { LocalMintInfoRow } from "../types/appTypes";
 import { resolveMintIcon } from "./mint/mintInfoHelpers";
 import { useMintInfoStore } from "./mint/useMintInfoStore";
@@ -12,6 +13,7 @@ interface UseMintDomainParams {
   appOwnerIdRef: React.MutableRefObject<string | null>;
   walletProofs: readonly StoredProof[];
   defaultMintUrl: string | null;
+  fetchMintInfo: FetchMintInfo | null;
   rememberSeenMint: (mintUrl: string | null | undefined) => void;
 }
 
@@ -35,6 +37,7 @@ export const useMintDomain = ({
   appOwnerIdRef,
   walletProofs,
   defaultMintUrl,
+  fetchMintInfo,
   rememberSeenMint,
 }: UseMintDomainParams): UseMintDomainResult => {
   // Icon URLs that failed to load in this session.
@@ -56,6 +59,7 @@ export const useMintDomain = ({
     appOwnerIdRef,
     walletProofs,
     defaultMintUrl,
+    fetchMintInfo,
     rememberSeenMint,
   });
 

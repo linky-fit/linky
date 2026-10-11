@@ -246,6 +246,7 @@ const makeDevice = (
         Layer.succeed(
           WalletInstances,
           WalletInstances.of({
+            loadFresh: () => Effect.die("not under test"),
             get: (requested) =>
               requested === mint
                 ? Effect.succeed(wallet)

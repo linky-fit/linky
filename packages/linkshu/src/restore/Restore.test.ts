@@ -102,6 +102,7 @@ const makeHarness = (args: HarnessArgs) => {
         Layer.succeed(
           WalletInstances,
           WalletInstances.of({
+            loadFresh: () => Effect.die("not under test"),
             get: (requested) =>
               args.walletUnreachable === true ||
               args.unreachableMints?.includes(requested)

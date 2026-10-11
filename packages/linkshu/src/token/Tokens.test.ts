@@ -113,7 +113,10 @@ const makeHarness = (args: HarnessArgs = {}) => {
       Layer.mergeAll(
         Layer.succeed(
           WalletInstances,
-          WalletInstances.of({ get: () => Effect.succeed(wallet) }),
+          WalletInstances.of({
+            loadFresh: () => Effect.die("not under test"),
+            get: () => Effect.succeed(wallet),
+          }),
         ),
         inMemoryKeyValueStore,
         inMemoryProofStore,
@@ -684,7 +687,13 @@ describe("Tokens.forget on a deferred receive", () => {
     ).pipe(
       Layer.provideMerge(
         Layer.mergeAll(
-          Layer.succeed(WalletInstances, WalletInstances.of({ get: load })),
+          Layer.succeed(
+            WalletInstances,
+            WalletInstances.of({
+              loadFresh: () => Effect.die("not under test"),
+              get: load,
+            }),
+          ),
           inMemoryKeyValueStore,
           inMemoryProofStore,
           inMemoryOperationStore,

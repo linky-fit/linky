@@ -1,5 +1,6 @@
 export * from "./autoswap/Autoswap";
 export * from "./autoswap/domain";
+export * from "./autoswap/planMintMove";
 export * from "./composition";
 export * from "./domain/errors";
 export * from "./domain/p2pk";
@@ -30,6 +31,7 @@ export * from "./receive/Receive";
 export * from "./restore/domain";
 export * from "./restore/Restore";
 export * from "./send/domain";
+export * from "./send/planSendMint";
 export * from "./send/Send";
 export * from "./token/codec";
 export * from "./token/domain";

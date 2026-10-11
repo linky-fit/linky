@@ -1,5 +1,5 @@
 import { PositiveInt } from "@linky-fit/linksync";
-import { Schema } from "effect";
+import { Result, Schema } from "effect";
 import React from "react";
 import type { StoredProof } from "@linky-fit/linkshu";
 import { useDeferredOnlineReady } from "../../../hooks/useDeferredOnlineReady";
@@ -11,6 +11,7 @@ import {
   PRESET_MINTS,
 } from "../../../utils/mint";
 import type { LocalMintInfoRow } from "../../types/appTypes";
+import type { FetchMintInfo } from "../../state/linkshu/commands";
 import {
   buildMintDedupeSignature,
   dedupeMintInfoRows,
@@ -19,7 +20,7 @@ import {
   getMintInfoByUrlMap,
   getMintInfoDedupedRows,
   isMintDeletedRow,
-  parseMintInfoPayload,
+  mintInfoRowFields,
   repairStoredMintInfoRow,
 } from "./mintInfoHelpers";
 import {
@@ -56,6 +57,8 @@ interface UseMintInfoStoreParams {
   appOwnerIdRef: React.MutableRefObject<string | null>;
   walletProofs: readonly StoredProof[];
   defaultMintUrl: string | null;
+  /** Null until the linkshu runtime is up; no refresh runs before. */
+  fetchMintInfo: FetchMintInfo | null;
   rememberSeenMint: (mintUrl: string | null | undefined) => void;
 }
 
@@ -77,6 +80,7 @@ export const useMintInfoStore = ({
   appOwnerIdRef,
   walletProofs,
   defaultMintUrl,
+  fetchMintInfo,
   rememberSeenMint,
 }: UseMintInfoStoreParams): UseMintInfoStoreResult => {
   const canRunNetworkWork = useDeferredOnlineReady();
@@ -241,6 +245,7 @@ export const useMintInfoStore = ({
     async (mintUrl: string) => {
       const cleaned = normalizeMintUrl(mintUrl);
       if (!cleaned || isMintDeleted(cleaned)) return;
+      if (fetchMintInfo === null) return;
       if (typeof navigator !== "undefined" && navigator.onLine === false) {
         return;
       }
@@ -250,50 +255,21 @@ export const useMintInfoStore = ({
 
       mintInfoRefreshInFlightRef.current.add(cleaned);
 
-      const controller = new AbortController();
-      const timeout = window.setTimeout(() => controller.abort(), 8000);
-      const startedAt =
-        typeof performance !== "undefined" &&
-        typeof performance.now === "function"
-          ? performance.now()
-          : Date.now();
-
+      const startedAt = performance.now();
       const nowSec = nowSeconds();
       recordMintRuntime(cleaned, { lastCheckedAtSec: nowSec, latencyMs: null });
 
       try {
-        const tryUrls = [`${cleaned}/v1/info`, `${cleaned}/info`];
-        let info: unknown = null;
-        let lastErr: unknown = null;
-
-        for (const url of tryUrls) {
-          try {
-            const res = await fetch(url, {
-              method: "GET",
-              headers: { accept: "application/json" },
-              signal: controller.signal,
-            });
-
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            info = await res.json();
-            lastErr = null;
-            break;
-          } catch (err) {
-            lastErr = err;
-          }
+        const outcome = await fetchMintInfo(cleaned);
+        if (Result.isFailure(outcome)) {
+          recordMintRuntime(cleaned, {
+            lastCheckedAtSec: nowSec,
+            latencyMs: null,
+          });
+          return;
         }
 
-        if (!info) throw lastErr ?? new Error("No info");
-
-        const keysets: unknown = await fetch(`${cleaned}/v1/keysets`, {
-          method: "GET",
-          headers: { accept: "application/json" },
-          signal: controller.signal,
-        })
-          .then((res) => (res.ok ? res.json() : null))
-          .catch(() => null);
-
-        const parsed = parseMintInfoPayload(info, keysets);
+        const fields = mintInfoRowFields(outcome.success);
         const existing = mintInfoByUrl.get(cleaned);
 
         setMintInfoAll((prev) => {
@@ -305,9 +281,7 @@ export const useMintInfoStore = ({
           if (idx >= 0) {
             next[idx] = {
               ...next[idx],
-              supportsMpp: parsed.supportsMpp,
-              feesJson: parsed.feesJson,
-              infoJson: parsed.infoJson,
+              ...fields,
               lastCheckedAtSec: nowSec,
             };
           } else if (!existing || isMintDeletedRow(existing)) {
@@ -316,9 +290,7 @@ export const useMintInfoStore = ({
               url: cleaned,
               firstSeenAtSec: nowSec,
               lastSeenAtSec: nowSec,
-              supportsMpp: parsed.supportsMpp,
-              feesJson: parsed.feesJson,
-              infoJson: parsed.infoJson,
+              ...fields,
               lastCheckedAtSec: nowSec,
             });
           }
@@ -331,15 +303,9 @@ export const useMintInfoStore = ({
           return next;
         });
 
-        const finishedAt =
-          typeof performance !== "undefined" &&
-          typeof performance.now === "function"
-            ? performance.now()
-            : Date.now();
-
         recordMintRuntime(cleaned, {
           lastCheckedAtSec: nowSec,
-          latencyMs: Math.max(0, Math.round(finishedAt - startedAt)),
+          latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
         });
         mintInfoLastSuccessfulRefreshRef.current.set(cleaned, nowSec);
       } catch {
@@ -348,11 +314,16 @@ export const useMintInfoStore = ({
           latencyMs: null,
         });
       } finally {
-        window.clearTimeout(timeout);
         mintInfoRefreshInFlightRef.current.delete(cleaned);
       }
     },
-    [appOwnerIdRef, isMintDeleted, mintInfoByUrl, recordMintRuntime],
+    [
+      appOwnerIdRef,
+      fetchMintInfo,
+      isMintDeleted,
+      mintInfoByUrl,
+      recordMintRuntime,
+    ],
   );
 
   React.useEffect(() => {

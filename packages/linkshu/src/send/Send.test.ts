@@ -143,7 +143,10 @@ const makeHarness = (wallet: LoadedWallet) => {
       Layer.mergeAll(
         Layer.succeed(
           WalletInstances,
-          WalletInstances.of({ get: () => Effect.succeed(wallet) }),
+          WalletInstances.of({
+            loadFresh: () => Effect.die("not under test"),
+            get: () => Effect.succeed(wallet),
+          }),
         ),
         inMemoryKeyValueStore,
         inMemoryProofStore,

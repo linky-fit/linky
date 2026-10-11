@@ -63,6 +63,7 @@ const makeHarness = (args: HarnessArgs = {}) => {
         Layer.succeed(
           WalletInstances,
           WalletInstances.of({
+            loadFresh: () => Effect.die("not under test"),
             // Only the mint under test loads; anything else is a second mint
             // this wallet cannot reach right now.
             get: (requested) =>

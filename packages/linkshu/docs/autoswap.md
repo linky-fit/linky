@@ -46,6 +46,10 @@ const resumeSwaps = Effect.gen(function* () {
 
 A melt `InsufficientFunds` costs only an unpaid quote, because the melt prices itself before touching a proof; that attempt's operation closes `failed`. A sweep retries with up to four progressively smaller amounts to leave room for the Lightning fee reserve; if none fits, the last `InsufficientFunds` surfaces. An explicit `amount` makes a single attempt.
 
+### Planning a move
+
+`planMintMove({ balances, toMint })` is a pure function over `Tokens.balances.perMint`: it picks the largest balance at a mint other than `toMint` and returns a `MintMovePlan` (`fromMint`, `toMint`, `sourceBalance`, `targetBalance`, and `maxBalanceAfterMove`, their sum, an upper bound because the move pays fees), or `null` when no other mint holds funds. `mintMoveCovers({ plan, amount, spendable })` says whether that move makes `amount` payable from one mint: `amount` is above `spendable` (`WalletBalances.spendable`, the largest single-mint balance) and within `maxBalanceAfterMove`. Neither moves anything; show the plan to the user and run `claim` with `sourceMint: plan.fromMint`, `targetMint: plan.toMint` and no `amount` once they confirm.
+
 ### `estimate`
 
 `estimate(draft)` prices a move without paying anything: a mint quote at the target, a melt quote for its invoice at the source, plus the input-fee allowance over the source's stored `available` proofs. Both quotes expire on their own; no proof changes state and no operation is written. `AutoswapEstimate.totalFromSource = amount + lightningFeeReserve + inputFee` is an upper bound: the melt returns unused fee reserve as change. `claim` does not reuse the estimate's quotes.
