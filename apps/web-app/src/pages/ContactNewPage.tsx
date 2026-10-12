@@ -143,7 +143,7 @@ export function ContactFields({
         trailing={publicValueAndAction(lightningPublicValue, lightningAction)}
       />
 
-      <Stack gap="$xs">
+      <Stack gap="$xs" data-guide="contact-group">
         <Text variant="label" color="$colorSubtle">
           {t("group")}
         </Text>

@@ -53,8 +53,18 @@ export function BottomTabBar({
       ),
     },
     { value: "contacts", label: t("contactsTitle"), icon: "Users" },
-    { value: "wallet", label: t("wallet"), icon: "Wallet" },
-    { value: "proxy", label: t("proxyPayments"), icon: "HandCoins" },
+    {
+      value: "wallet",
+      label: t("wallet"),
+      icon: "Wallet",
+      testID: "open-wallet",
+    },
+    {
+      value: "proxy",
+      label: t("proxyPayments"),
+      icon: "HandCoins",
+      testID: "open-proxy",
+    },
     {
       value: "settings",
       label: t("settings"),

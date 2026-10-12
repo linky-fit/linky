@@ -37,6 +37,11 @@ vi.mock("../../platform/nativeBridge", () => ({
   },
   supportsNativeQrScan: () => true,
 }));
+// The walkthrough reads the beacon, whose store needs the whole native bridge.
+vi.mock("./useBeacon", () => ({
+  useBeacon: () => ({ enabled: false }),
+  useBeaconSupport: () => false,
+}));
 
 const token = `cashuB${"o2FtcGh0dHBzOi8vY2FzaHUuY3phdWNzYXRhdIGiYWlIAbqH8lOtAF9hcI".repeat(40)}`;
 const translateToKey: Translate = (key) => key;

@@ -60,6 +60,7 @@ describe("resolveBackAction", () => {
   it("walks settings sub-pages back up to settings", () => {
     expect(backHashFor({ kind: "settingsLanguage" })).toBe("#settings");
     expect(backHashFor({ kind: "settingsUnits" })).toBe("#settings");
+    expect(backHashFor({ kind: "settingsTutorial" })).toBe("#settings");
     expect(backHashFor({ kind: "settingsReceiveMethod" })).toBe("#settings");
     expect(backHashFor({ kind: "settingsMasterKeys" })).toBe("#settings");
     expect(backHashFor({ kind: "bankPaymentNew" })).toBe("#proxy");

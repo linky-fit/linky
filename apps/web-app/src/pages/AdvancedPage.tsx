@@ -239,6 +239,9 @@ export function AdvancedPage(): React.ReactElement {
         {linkRow("Bitcoin", t("unit"), () =>
           navigateTo({ route: "settingsUnits" }),
         )}
+        {linkRow("Compass", t("tutorial"), () =>
+          navigateTo({ route: "settingsTutorial" }),
+        )}
         {linkRow("MessageCircle", t("feedback"), openFeedbackContact)}
         {/* Electron has no Web Push service; the running desktop app notifies. */}
         {isDesktopShell()

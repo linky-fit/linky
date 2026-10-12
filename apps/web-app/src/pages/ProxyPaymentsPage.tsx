@@ -188,19 +188,21 @@ export function NearbyBeaconSection({
       <Text variant="title" role="heading">
         {t("nearby")}
       </Text>
-      <ListRow
-        icon="Radio"
-        title={t("beacon")}
-        description={beaconStatusText(beacon, t)}
-        trailing={
-          <Switch
-            accessibilityLabel={t("beacon")}
-            value={beacon.enabled}
-            onValueChange={setEnabled}
-          />
-        }
-      />
-      <Stack gap="$xs">
+      <Stack data-guide="beacon-switch">
+        <ListRow
+          icon="Radio"
+          title={t("beacon")}
+          description={beaconStatusText(beacon, t)}
+          trailing={
+            <Switch
+              accessibilityLabel={t("beacon")}
+              value={beacon.enabled}
+              onValueChange={setEnabled}
+            />
+          }
+        />
+      </Stack>
+      <Stack gap="$xs" data-guide="beacon-trade">
         <Text variant="label">{t("beaconTrade")}</Text>
         <SegmentedControl
           accessibilityLabel={t("beaconTrade")}
@@ -291,6 +293,7 @@ export function ProxyPaymentsPage(): React.ReactElement {
           flexDirection="column"
           paddingVertical="$xl"
           onPress={openWalletScan}
+          data-guide="proxy-scan"
         >
           {t("proxyPaymentsScanBankQr")}
         </Button>
@@ -321,7 +324,7 @@ export function ProxyPaymentsPage(): React.ReactElement {
 
       <Divider />
 
-      <Stack gap="$sm">
+      <Stack gap="$sm" data-guide="proxy-earn">
         <Text variant="title" role="heading">
           {t("proxyPaymentsEarnTitle")}
         </Text>

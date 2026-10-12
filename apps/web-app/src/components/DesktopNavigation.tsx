@@ -25,6 +25,7 @@ export function DesktopNavigation(): React.ReactElement {
         <Pressable
           borderRadius="$pill"
           aria-label={t("profile")}
+          testID="profile-qr-button"
           onPress={() => navigateTo({ route: "profile" })}
         >
           <Avatar
@@ -38,11 +39,26 @@ export function DesktopNavigation(): React.ReactElement {
       }
       items={[
         { value: "contacts", label: t("contactsTitle"), icon: "Users" },
-        { value: "wallet", label: t("wallet"), icon: "Wallet" },
-        { value: "proxy", label: t("proxyPayments"), icon: "HandCoins" },
+        {
+          value: "wallet",
+          label: t("wallet"),
+          icon: "Wallet",
+          testID: "open-wallet",
+        },
+        {
+          value: "proxy",
+          label: t("proxyPayments"),
+          icon: "HandCoins",
+          testID: "open-proxy",
+        },
       ]}
       footerItems={[
-        { value: "settings", label: t("settings"), icon: "Settings" },
+        {
+          value: "settings",
+          label: t("settings"),
+          icon: "Settings",
+          testID: "open-menu",
+        },
       ]}
       value={getDesktopRouteSection(route)}
       onValueChange={(section) =>

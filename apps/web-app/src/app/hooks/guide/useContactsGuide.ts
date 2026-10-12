@@ -1,16 +1,31 @@
-import { useAtom, useAtomSet } from "@linky-fit/linkstr-react";
+import {
+  RegistryContext,
+  useAtom,
+  useAtomSet,
+  useAtomValue,
+} from "@linky-fit/linkstr-react";
 import React from "react";
 import { ContactId } from "../../../evoluIds";
 import { navigateTo } from "../../../hooks/useRouting";
 import type { Route } from "../../../types/route";
 import { CONTACTS_GUIDE_STEPS } from "../../lib/contactsGuideSteps";
+import { hasLinkyNameAtom } from "../../state/contacts/onboarding";
 import {
   contactsGuideAtom,
   contactsGuideHighlightRectAtom,
   contactsGuideTargetContactIdAtom,
 } from "../../state/shell/guide";
-import type { ContactRowLike, ContactsGuideStep } from "../../types/appTypes";
+import { topupAmountAtom } from "../../state/wallet/topup";
+import type {
+  ContactRowLike,
+  ContactsGuideKey,
+  ContactsGuideStep,
+} from "../../types/appTypes";
+import { useBeacon } from "../useBeacon";
 import { useStopContactsGuide } from "./useContactsGuideControls";
+
+/** The tutorial's sample top-up, so the guide can show a real invoice; a typed amount wins. */
+const SAMPLE_TOPUP_AMOUNT = "10000";
 
 interface UseContactsGuideParams {
   cashuBalance: number;
@@ -23,8 +38,16 @@ interface UseContactsGuideParams {
 }
 
 const getRouteContactId = (route: Route): ContactId | null => {
-  if (route.kind === "contact" || route.kind === "contactPay") {
+  if (
+    route.kind === "contact" ||
+    route.kind === "contactPay" ||
+    route.kind === "contactEdit"
+  ) {
     return route.id;
+  }
+  if (route.kind === "chat") {
+    const result = ContactId.fromUnknown(route.id);
+    return result.ok ? result.value : null;
   }
 
   return null;
@@ -44,6 +67,9 @@ export const useContactsGuide = ({
   openNewContactPage,
   route,
 }: UseContactsGuideParams): void => {
+  const registry = React.useContext(RegistryContext);
+  const beaconEnabled = useBeacon().enabled;
+  const hasLinkyName = useAtomValue(hasLinkyNameAtom);
   const [contactsGuide, setContactsGuide] = useAtom(contactsGuideAtom);
   const [contactsGuideTargetContactId, setContactsGuideTargetContactId] =
     useAtom(contactsGuideTargetContactIdAtom);
@@ -51,6 +77,24 @@ export const useContactsGuide = ({
     contactsGuideHighlightRectAtom,
   );
   const stopContactsGuide = useStopContactsGuide();
+
+  // Tasks the guide ends on its own once the user completes them.
+  const doneByTask = React.useMemo<Partial<Record<ContactsGuideKey, boolean>>>(
+    () => ({
+      backup_keys: contactsOnboardingHasBackedUpKeys,
+      linky_name: hasLinkyName,
+      message: contactsOnboardingHasSentMessage,
+      pay: contactsOnboardingHasPaid,
+      topup: cashuBalance > 0,
+    }),
+    [
+      cashuBalance,
+      contactsOnboardingHasBackedUpKeys,
+      contactsOnboardingHasPaid,
+      contactsOnboardingHasSentMessage,
+      hasLinkyName,
+    ],
+  );
 
   const contactsGuideSteps = React.useMemo(() => {
     if (!contactsGuide) return null;
@@ -65,7 +109,12 @@ export const useContactsGuide = ({
 
     const ensureRoute = (kind: Route["kind"], contactId?: ContactId | null) => {
       if (route.kind === kind) {
-        if (kind === "contact" || kind === "contactPay" || kind === "chat") {
+        if (
+          kind === "contact" ||
+          kind === "contactPay" ||
+          kind === "contactEdit" ||
+          kind === "chat"
+        ) {
           const currentId = getRouteContactId(route) ?? undefined;
 
           if (contactId && currentId && currentId !== contactId) {
@@ -73,6 +122,9 @@ export const useContactsGuide = ({
               navigateTo({ route: "contact", id: contactId });
             if (kind === "contactPay") {
               navigateTo({ route: "contactPay", id: contactId });
+            }
+            if (kind === "contactEdit") {
+              navigateTo({ route: "contactEdit", id: contactId });
             }
             if (kind === "chat") navigateTo({ route: "chat", id: contactId });
           }
@@ -82,19 +134,30 @@ export const useContactsGuide = ({
 
       if (kind === "contacts") navigateTo({ route: "contacts" });
       if (kind === "wallet") navigateTo({ route: "wallet" });
+      if (kind === "proxyPayments") navigateTo({ route: "proxyPayments" });
+      if (kind === "profile") navigateTo({ route: "profile" });
+      if (kind === "profileEdit") navigateTo({ route: "profileEdit" });
       if (kind === "settings") navigateTo({ route: "settings" });
       if (kind === "settingsMasterKeys") {
         navigateTo({ route: "settingsMasterKeys" });
       }
       if (kind === "advanced") navigateTo({ route: "advanced" });
       if (kind === "topup") navigateTo({ route: "topup" });
-      if (kind === "topupInvoice") navigateTo({ route: "topupInvoice" });
+      if (kind === "topupInvoice") {
+        registry.update(topupAmountAtom, (amount) =>
+          amount.trim() ? amount : SAMPLE_TOPUP_AMOUNT,
+        );
+        navigateTo({ route: "topupInvoice" });
+      }
       if (kind === "contactNew") openNewContactPage();
       if (kind === "contact" && contactId) {
         navigateTo({ route: "contact", id: contactId });
       }
       if (kind === "contactPay" && contactId) {
         navigateTo({ route: "contactPay", id: contactId });
+      }
+      if (kind === "contactEdit" && contactId) {
+        navigateTo({ route: "contactEdit", id: contactId });
       }
       if (kind === "chat" && contactId)
         navigateTo({ route: "chat", id: contactId });
@@ -112,6 +175,7 @@ export const useContactsGuide = ({
     contactsGuide,
     contactsGuideTargetContactId,
     openNewContactPage,
+    registry,
     route,
   ]);
 
@@ -189,20 +253,29 @@ export const useContactsGuide = ({
     const transition = (from: Route["kind"], to: Route["kind"]) =>
       Boolean(prev && prev.kind === from && current.kind === to);
 
+    // A contact card opens the conversation; that contact is the guide's
+    // target from then on.
     if (
-      (contactsGuide.task === "pay" || contactsGuide.task === "message") &&
-      transition("contacts", "contact") &&
+      (contactsGuide.task === "pay" ||
+        contactsGuide.task === "message" ||
+        contactsGuide.task === "groups") &&
+      transition("contacts", "chat") &&
       current.id
     ) {
       setContactsGuideTargetContactId(ContactId.orThrow(current.id));
     }
 
-    if (id === "add_contact_1" && transition("contacts", "contactNew")) {
+    if (id === "add_contact_1" && transition("contacts", "profile")) {
       goToStep(1);
     }
-
+    if (id === "add_contact_2" && transition("profile", "contacts")) {
+      goToStep(2);
+    }
+    if (id === "add_contact_3" && transition("contacts", "contactNew")) {
+      goToStep(3);
+    }
     if (
-      id === "add_contact_2" &&
+      id === "add_contact_4" &&
       prev &&
       prev.kind === "contactNew" &&
       current.kind !== "contactNew"
@@ -212,17 +285,42 @@ export const useContactsGuide = ({
 
     if (id === "topup_1" && transition("contacts", "wallet")) goToStep(1);
     if (id === "topup_2" && transition("wallet", "topup")) goToStep(2);
-    if (id === "topup_3" && transition("topup", "topupInvoice")) {
-      stopContactsGuide();
-    }
+    if (id === "topup_3" && transition("topup", "topupInvoice")) goToStep(3);
 
-    if (id === "pay_1" && transition("contacts", "contact")) goToStep(1);
-    if (id === "pay_2" && transition("contact", "contactPay")) goToStep(2);
+    if (id === "pay_1" && transition("contacts", "chat")) goToStep(1);
+    if (id === "pay_2" && transition("chat", "contactPay")) goToStep(2);
 
-    if (id === "message_1" && transition("contacts", "contact")) {
+    if (id === "message_1" && transition("contacts", "chat")) goToStep(1);
+
+    if (id === "linky_name_1" && transition("contacts", "profile")) {
       goToStep(1);
     }
-    if (id === "message_2" && transition("contact", "chat")) goToStep(2);
+    if (id === "linky_name_2" && transition("profile", "profileEdit")) {
+      goToStep(2);
+    }
+
+    if (id === "groups_1" && transition("contacts", "chat")) goToStep(1);
+    if (id === "groups_2" && transition("chat", "contactEdit")) goToStep(2);
+    // Saving or leaving the edit form ends the group part; what is left is
+    // mentioning the group in a conversation.
+    if (
+      id === "groups_3" &&
+      prev &&
+      prev.kind === "contactEdit" &&
+      current.kind !== "contactEdit"
+    ) {
+      goToStep(3);
+    }
+
+    if (
+      (id === "proxy_payment_1" || id === "beacon_1") &&
+      transition("contacts", "proxyPayments")
+    ) {
+      goToStep(1);
+    }
+    if (id === "beacon_2" && beaconEnabled && !contactsGuide.doneAtStart) {
+      goToStep(2);
+    }
 
     if (id === "backup_keys_1" && transition("contacts", "settings")) {
       goToStep(1);
@@ -234,27 +332,14 @@ export const useContactsGuide = ({
       goToStep(2);
     }
 
-    if (
-      contactsGuide.task === "backup_keys" &&
-      contactsOnboardingHasBackedUpKeys
-    ) {
-      stopContactsGuide();
-    }
-
-    if (contactsGuide.task === "topup" && cashuBalance > 0) stopContactsGuide();
-    if (contactsGuide.task === "pay" && contactsOnboardingHasPaid) {
-      stopContactsGuide();
-    }
-    if (contactsGuide.task === "message" && contactsOnboardingHasSentMessage) {
+    if (!contactsGuide.doneAtStart && doneByTask[contactsGuide.task]) {
       stopContactsGuide();
     }
   }, [
-    cashuBalance,
+    beaconEnabled,
     contactsGuide,
     contactsGuideActiveStep?.step,
-    contactsOnboardingHasBackedUpKeys,
-    contactsOnboardingHasPaid,
-    contactsOnboardingHasSentMessage,
+    doneByTask,
     route,
     stopContactsGuide,
     setContactsGuideTargetContactId,

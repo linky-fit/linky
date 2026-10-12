@@ -1,11 +1,18 @@
-import { useAtom } from "@linky-fit/linkstr-react";
+import { useAtom, useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
 import type { Route } from "../../../types/route";
 import type { Translate } from "../../../i18n";
 import {
+  hasContactGroupsAtom,
+  hasLinkyNameAtom,
+  hasProxyPaymentSetupAtom,
+} from "../../state/contacts/onboarding";
+import {
   contactsOnboardingCelebratingAtom,
   contactsOnboardingDismissedAtom,
 } from "../../state/shell/guide";
+import type { ContactsGuideKey } from "../../types/appTypes";
+import { useBeacon, useBeaconSupport } from "../useBeacon";
 
 interface UseContactsOnboardingProgressParams {
   cashuBalance: number;
@@ -20,9 +27,9 @@ interface UseContactsOnboardingProgressParams {
   t: Translate;
 }
 
-interface ContactsOnboardingTask {
+export interface ContactsOnboardingTask {
   done: boolean;
-  key: string;
+  key: ContactsGuideKey;
   label: string;
 }
 
@@ -33,7 +40,18 @@ export interface ContactsOnboardingTasksSummary {
   total: number;
 }
 
-interface ContactsOnboardingProgressInput {
+/** The onboarding tasks that are not a tutorial step of their own: read from atoms and the beacon. */
+export interface ContactsOnboardingExtras {
+  beaconEnabled: boolean;
+  /** The beacon task is listed only where a beacon can run (native shell). */
+  beaconSupported: boolean;
+  hasContactGroups: boolean;
+  /** The user owns a name@linky.fit lightning address. */
+  hasLinkyName: boolean;
+  hasProxyPaymentSetup: boolean;
+}
+
+interface ContactsOnboardingProgressInput extends ContactsOnboardingExtras {
   cashuBalance: number;
   contactsCount: number;
   contactsOnboardingHasBackedUpKeys: boolean;
@@ -42,15 +60,44 @@ interface ContactsOnboardingProgressInput {
   t: Translate;
 }
 
+export const useContactsOnboardingExtras = (): ContactsOnboardingExtras => {
+  const beaconEnabled = useBeacon().enabled;
+  const beaconSupported = useBeaconSupport();
+  const hasContactGroups = useAtomValue(hasContactGroupsAtom);
+  const hasLinkyName = useAtomValue(hasLinkyNameAtom);
+  const hasProxyPaymentSetup = useAtomValue(hasProxyPaymentSetupAtom);
+  return React.useMemo(
+    () => ({
+      beaconEnabled,
+      beaconSupported,
+      hasContactGroups,
+      hasLinkyName,
+      hasProxyPaymentSetup,
+    }),
+    [
+      beaconEnabled,
+      beaconSupported,
+      hasContactGroups,
+      hasLinkyName,
+      hasProxyPaymentSetup,
+    ],
+  );
+};
+
 export const contactsOnboardingTasksOf = ({
+  beaconEnabled,
+  beaconSupported,
   cashuBalance,
   contactsCount,
   contactsOnboardingHasBackedUpKeys,
   contactsOnboardingHasPaid,
   contactsOnboardingHasSentMessage,
+  hasContactGroups,
+  hasLinkyName,
+  hasProxyPaymentSetup,
   t,
 }: ContactsOnboardingProgressInput): ContactsOnboardingTasksSummary => {
-  const tasks = [
+  const tasks: ContactsOnboardingTask[] = [
     {
       key: "add_contact",
       label: t("contactsOnboardingTaskAddContact"),
@@ -76,7 +123,31 @@ export const contactsOnboardingTasksOf = ({
       label: t("contactsOnboardingTaskPay"),
       done: contactsOnboardingHasPaid,
     },
-  ] as const;
+    {
+      key: "linky_name",
+      label: t("contactsOnboardingTaskLinkyName"),
+      done: hasLinkyName,
+    },
+    {
+      key: "groups",
+      label: t("contactsOnboardingTaskGroups"),
+      done: hasContactGroups,
+    },
+    {
+      key: "proxy_payment",
+      label: t("contactsOnboardingTaskProxyPayment"),
+      done: hasProxyPaymentSetup,
+    },
+    ...(beaconSupported
+      ? [
+          {
+            key: "beacon" as const,
+            label: t("contactsOnboardingTaskBeacon"),
+            done: beaconEnabled,
+          },
+        ]
+      : []),
+  ];
 
   const done = tasks.reduce((sum, task) => sum + (task.done ? 1 : 0), 0);
   const total = tasks.length;
@@ -106,23 +177,40 @@ export const useContactsOnboardingProgress = ({
   );
   const [contactsOnboardingCelebrating, setContactsOnboardingCelebrating] =
     useAtom(contactsOnboardingCelebratingAtom);
+  const {
+    beaconEnabled,
+    beaconSupported,
+    hasContactGroups,
+    hasLinkyName,
+    hasProxyPaymentSetup,
+  } = useContactsOnboardingExtras();
 
   const contactsOnboardingTasks = React.useMemo(
     () =>
       contactsOnboardingTasksOf({
+        beaconEnabled,
+        beaconSupported,
         cashuBalance,
         contactsCount,
         contactsOnboardingHasBackedUpKeys,
         contactsOnboardingHasPaid,
         contactsOnboardingHasSentMessage,
+        hasContactGroups,
+        hasLinkyName,
+        hasProxyPaymentSetup,
         t,
       }),
     [
+      beaconEnabled,
+      beaconSupported,
       cashuBalance,
       contactsCount,
       contactsOnboardingHasBackedUpKeys,
       contactsOnboardingHasPaid,
       contactsOnboardingHasSentMessage,
+      hasContactGroups,
+      hasLinkyName,
+      hasProxyPaymentSetup,
       t,
     ],
   );

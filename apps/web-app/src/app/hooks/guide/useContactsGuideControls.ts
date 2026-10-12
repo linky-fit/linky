@@ -15,12 +15,13 @@ import {
 } from "../../state/shell/guide";
 import type { ContactsGuideKey } from "../../types/appTypes";
 
+/** Starts a walkthrough; `doneAtStart` says the task is already done, so it replays to its end. */
 export const useStartContactsGuide = () => {
   const registry = React.useContext(RegistryContext);
   return React.useCallback(
-    (task: ContactsGuideKey) => {
+    (task: ContactsGuideKey, doneAtStart = false) => {
       registry.set(contactsGuideTargetContactIdAtom, null);
-      registry.set(contactsGuideAtom, { task, step: 0 });
+      registry.set(contactsGuideAtom, { doneAtStart, task, step: 0 });
     },
     [registry],
   );

@@ -6,6 +6,12 @@ import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import { CONTACTS_ONBOARDING_DISMISSED_STORAGE_KEY } from "../../../utils/constants";
 import { useContactsOnboardingProgress } from "./useContactsOnboardingProgress";
 
+const beacon = vi.hoisted(() => ({ supported: false }));
+vi.mock("../useBeacon", () => ({
+  useBeacon: () => ({ enabled: false }),
+  useBeaconSupport: () => beacon.supported,
+}));
+
 type OnboardingProgress = ReturnType<typeof useContactsOnboardingProgress>;
 
 interface HarnessProps {
@@ -50,6 +56,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  beacon.supported = false;
   localStorage.clear();
   vi.clearAllMocks();
 });
@@ -105,6 +112,42 @@ describe("useContactsOnboardingProgress", () => {
       localStorage.getItem(CONTACTS_ONBOARDING_DISMISSED_STORAGE_KEY),
     ).toBe("1");
     expect(stopGuide).toHaveBeenCalled();
+    await act(async () => root.unmount());
+  });
+
+  it("lists the beacon task only where a beacon can run", async () => {
+    const snapshots: OnboardingProgress[] = [];
+    const { rerender, root } = await renderIntoDocument(
+      <Harness
+        dismissedSynced={false}
+        onProgress={(value) => snapshots.push(value)}
+        persistDismissed={vi.fn()}
+        stopGuide={vi.fn()}
+      />,
+    );
+    const keys = () =>
+      snapshots.at(-1)?.contactsOnboardingTasks.tasks.map((task) => task.key);
+    expect(keys()).toEqual([
+      "add_contact",
+      "message",
+      "topup",
+      "backup_keys",
+      "pay",
+      "linky_name",
+      "groups",
+      "proxy_payment",
+    ]);
+
+    beacon.supported = true;
+    await rerender(
+      <Harness
+        dismissedSynced={false}
+        onProgress={(value) => snapshots.push(value)}
+        persistDismissed={vi.fn()}
+        stopGuide={vi.fn()}
+      />,
+    );
+    expect(keys()?.at(-1)).toBe("beacon");
     await act(async () => root.unmount());
   });
 });

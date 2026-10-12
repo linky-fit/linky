@@ -5,6 +5,8 @@ export const cs = {
   settings: "Nastavení",
   detail: "Detail",
   settingsGeneral: "Obecné",
+  tutorial: "Tutoriál",
+  tutorialIntro: "Projděte si Linky krok za krokem.",
   settingsPayments: "Platby",
   settingsNetwork: "Síť",
   settingsSecurity: "Zabezpečení",
@@ -595,11 +597,16 @@ export const cs = {
 
   contactsScanContactQr: "Přidat kontakt",
 
-  guideAddContactStep1Title: "Přidat kontakt",
-  guideAddContactStep1Body: "Klepněte na tlačítko Přidat kontakt.",
-  guideAddContactStep2Title: "Najít nebo vytvořit",
+  guideAddContactStep1Title: "Váš QR kód",
+  guideAddContactStep1Body: "Otevřete svůj profil v dolní liště.",
+  guideAddContactStep2Title: "Nechte se naskenovat",
   guideAddContactStep2Body:
-    "Zadejte jméno, npub nebo NIP-05. Linky kontakt najde, nebo můžete vytvořit vlastní kontakt.",
+    "Tohle je váš QR kód. Kdo si ho v Linky naskenuje, získá vás jako kontakt.",
+  guideAddContactStep3Title: "Přidat kontakt",
+  guideAddContactStep3Body: "Zpět v Kontaktech klepněte na Přidat kontakt.",
+  guideAddContactStep4Title: "Naskenujte jejich QR kód",
+  guideAddContactStep4Body:
+    "Klepněte na Načíst QR kontaktu a naskenujte QR kód druhé osoby. Níže jde také hledat podle jména, npub nebo NIP-05.",
 
   guideTopupStep1Title: "Peněženka",
   guideTopupStep1Body: "Klepněte na ikonu peněženky dole.",
@@ -607,26 +614,33 @@ export const cs = {
   guideTopupStep2Body: "Klepněte na Přijmout.",
   guideTopupStep3Title: "Faktura",
   guideTopupStep3Body: "Zadejte částku a zobrazte fakturu pro dobití.",
+  guideTopupStep4Title: "Zaplaťte fakturu",
+  guideTopupStep4Body:
+    "Tento QR kód zaplaťte z libovolné Lightning peněženky; saty přijdou do peněženky v Linky.",
+  guideTopupStep5Title: "Požádat kontakt",
+  guideTopupStep5Body:
+    "V konverzaci klepněte na Požádat a zadejte částku. Kontakt dostane žádost, kterou zaplatí jedním klepnutím.",
 
   guidePayStep1Title: "Zaplatit",
   guidePayStep1Body: "Otevřete libovolný kontakt.",
   guidePayStep2Title: "Platba",
-  guidePayStep2Body: "V detailu kontaktu klepněte na Zaplatit.",
+  guidePayStep2Body: "V konverzaci klepněte na Zaplatit.",
   guidePayStep3Title: "Odeslat platbu",
   guidePayStep3Body: "Zadejte částku (čísly) a pak klepněte na Odeslat.",
+  guidePayStep4Title: "Zaplatit komukoli",
+  guidePayStep4Body:
+    "Mimo kontakty platí Peněženka → Odeslat: naskenuje Lightning fakturu nebo přijme Lightning adresu.",
 
   guideMessageStep1Title: "Poslat zprávu",
-  guideMessageStep1Body: "Otevřete libovolný kontakt.",
-  guideMessageStep2Title: "Zprávy",
-  guideMessageStep2Body: "V detailu kontaktu klepněte na Zprávy.",
-  guideMessageStep3Title: "Napsat zprávu",
-  guideMessageStep3Body: "Napište zprávu do pole.",
-  guideMessageStep4Title: "Odeslat",
-  guideMessageStep4Body: "Klepněte na Odeslat.",
+  guideMessageStep1Body:
+    "Otevřete libovolný kontakt; otevře se jeho konverzace.",
+  guideMessageStep2Title: "Napsat a odeslat",
+  guideMessageStep2Body:
+    "Napište zprávu a klepněte na Odeslat. Tlačítkem s obrázkem přiložíte obrázek nebo PDF.",
   guideBackupKeysStep1Title: "Nastavení",
   guideBackupKeysStep1Body: "Otevřete nastavení v dolní liště.",
-  guideBackupKeysStep2Title: "Pokročilé",
-  guideBackupKeysStep2Body: "Otevřete Pokročilé nastavení.",
+  guideBackupKeysStep2Title: "Hlavní klíče",
+  guideBackupKeysStep2Body: "V sekci Zabezpečení klepněte na Hlavní klíče.",
   guideBackupKeysStep3Title: "Záloha klíče",
   guideBackupKeysStep3Body: "Zkopírujte své hlavní klíče a bezpečně je uložte.",
   contactsOnboardingTaskAddContact: "Přidat kontakt",
@@ -634,6 +648,43 @@ export const cs = {
   contactsOnboardingTaskTopup: "Přijmout bitcoin",
   contactsOnboardingTaskPay: "Zaplatit",
   contactsOnboardingTaskMessage: "Poslat zprávu",
+  contactsOnboardingTaskLinkyName: "Zaregistrovat Linky jméno",
+  contactsOnboardingTaskGroups: "Vytvořit skupinu",
+  contactsOnboardingTaskProxyPayment: "Nastavit proxy platby",
+  contactsOnboardingTaskBeacon: "Zapnout maják",
+  guideLinkyNameStep1Title: "Linky jméno",
+  guideLinkyNameStep1Body: "Otevřete svůj profil v dolní liště.",
+  guideLinkyNameStep2Title: "Upravit profil",
+  guideLinkyNameStep2Body: "Klepněte na tužku a upravte profil.",
+  guideLinkyNameStep3Title: "Zvolte jméno",
+  guideLinkyNameStep3Body:
+    "Do pole Lightning adresa napište jméno, které chcete, třeba alice. Linky ověří, zda je alice@linky.fit volné, a nabídne koupi za saty z peněženky.",
+  guideGroupsStep1Title: "Skupiny",
+  guideGroupsStep1Body: "Otevřete kontakt, který chcete zařadit do skupiny.",
+  guideGroupsStep2Title: "Upravit kontakt",
+  guideGroupsStep2Body: "Klepněte na tužku v konverzaci a upravte kontakt.",
+  guideGroupsStep3Title: "Skupina",
+  guideGroupsStep3Body:
+    "Napište název skupiny, třeba Přátelé, potvrďte Enterem a kontakt uložte. Klepnutím na existující skupinu do ní kontakt přidáte. Kontakty pak jde podle skupin filtrovat.",
+  guideGroupsStep4Title: "Zmínka skupiny",
+  guideGroupsStep4Body:
+    "V konverzaci napište @ a název skupiny. Do zprávy se vloží celá skupina a protistrana si může všechny její kontakty uložit najednou.",
+  guideProxyPaymentStep1Title: "Proxy platby",
+  guideProxyPaymentStep1Body: "Otevřete Proxy platby v dolní liště.",
+  guideProxyPaymentStep2Title: "Požádat o zaplacení",
+  guideProxyPaymentStep2Body:
+    "Naskenujte QR kód bankovní platby, nebo platbu zadejte ručně. Vyberte kontakty, které oslovíte; kdo nabídku přijme první, zaplatí bankovní převod a vy mu pošlete saty.",
+  guideProxyPaymentStep3Title: "Vydělat bitcoin",
+  guideProxyPaymentStep3Body:
+    "Zapněte měny, ve kterých umíte platit. Kontakty vám pak posílají své bankovní platby a vy za jejich zaplacení získáte bitcoin.",
+  guideBeaconStep1Title: "V okolí",
+  guideBeaconStep1Body: "Otevřete Proxy platby v dolní liště.",
+  guideBeaconStep2Title: "Maják",
+  guideBeaconStep2Body:
+    "Zapněte maják. Kontakty, které si vás také uložily, pak uvidí, že jste poblíž.",
+  guideBeaconStep3Title: "Obchod",
+  guideBeaconStep3Body:
+    "Zvolte, jestli bitcoin kupujete nebo prodáváte. Kontakty v okolí i s jejich záměrem se zobrazí nahoře v Kontaktech a v jejich konverzaci, takže vidíte, kdo prodává, když vy kupujete.",
   addContact: "Přidat kontakt",
   addAllContacts: "Přidat všechny",
   contactLoadQr: "Načíst QR kontaktu",

@@ -8,6 +8,8 @@ export const pt = {
   settings: "Configurações",
   detail: "Detalhe",
   settingsGeneral: "Geral",
+  tutorial: "Tutorial",
+  tutorialIntro: "Aprenda o Linky passo a passo.",
   settingsPayments: "Pagamentos",
   settingsNetwork: "Rede",
   settingsSecurity: "Segurança",
@@ -605,11 +607,16 @@ export const pt = {
 
   contactsScanContactQr: "Adicionar contato",
 
-  guideAddContactStep1Title: "Adicionar contato",
-  guideAddContactStep1Body: "Toque no botão Adicionar contato.",
-  guideAddContactStep2Title: "Encontrar ou criar",
+  guideAddContactStep1Title: "Seu QR code",
+  guideAddContactStep1Body: "Abra seu perfil na barra inferior.",
+  guideAddContactStep2Title: "Deixe que escaneiem você",
   guideAddContactStep2Body:
-    "Digite um nome, npub ou NIP-05. O Linky encontra o contato, ou você pode criar o seu próprio.",
+    "Este é o seu QR code. Quem o escanear no Linky passa a ter você como contato.",
+  guideAddContactStep3Title: "Adicionar contato",
+  guideAddContactStep3Body: "De volta em Contatos, toque em Adicionar contato.",
+  guideAddContactStep4Title: "Escaneie o QR code da pessoa",
+  guideAddContactStep4Body:
+    "Toque em Ler QR do contato e escaneie o QR code da outra pessoa. Abaixo também dá para buscar por nome, npub ou NIP-05.",
 
   guideTopupStep1Title: "Carteira",
   guideTopupStep1Body: "Toque no botão da carteira abaixo.",
@@ -617,26 +624,32 @@ export const pt = {
   guideTopupStep2Body: "Toque em Receber.",
   guideTopupStep3Title: "Fatura",
   guideTopupStep3Body: "Digite um valor e mostre a fatura de recarga.",
+  guideTopupStep4Title: "Pague a fatura",
+  guideTopupStep4Body:
+    "Pague este QR code com qualquer carteira Lightning; os sats chegam à sua carteira Linky.",
+  guideTopupStep5Title: "Pedir a um contato",
+  guideTopupStep5Body:
+    "Em uma conversa, toque em Pedir e digite um valor. O contato recebe um pedido que pode pagar com um toque.",
 
   guidePayStep1Title: "Pagar",
   guidePayStep1Body: "Abra qualquer contato.",
   guidePayStep2Title: "Pagamento",
-  guidePayStep2Body: "No detalhe do contato, toque em Pagar.",
+  guidePayStep2Body: "Na conversa, toque em Pagar.",
   guidePayStep3Title: "Enviar pagamento",
   guidePayStep3Body: "Digite um valor (no teclado) e toque em Enviar.",
+  guidePayStep4Title: "Pagar qualquer pessoa",
+  guidePayStep4Body:
+    "Fora dos seus contatos, Carteira → Enviar escaneia uma fatura Lightning ou aceita um endereço Lightning.",
 
   guideMessageStep1Title: "Enviar uma mensagem",
-  guideMessageStep1Body: "Abra qualquer contato.",
-  guideMessageStep2Title: "Mensagens",
-  guideMessageStep2Body: "No detalhe do contato, toque em Mensagens.",
-  guideMessageStep3Title: "Escrever uma mensagem",
-  guideMessageStep3Body: "Digite uma mensagem no campo.",
-  guideMessageStep4Title: "Enviar",
-  guideMessageStep4Body: "Toque em Enviar.",
+  guideMessageStep1Body: "Abra qualquer contato; a conversa dele se abre.",
+  guideMessageStep2Title: "Escrever e enviar",
+  guideMessageStep2Body:
+    "Digite uma mensagem e toque em Enviar. O botão de imagem anexa uma imagem ou um PDF.",
   guideBackupKeysStep1Title: "Configurações",
   guideBackupKeysStep1Body: "Abra Configurações na barra inferior.",
-  guideBackupKeysStep2Title: "Avançado",
-  guideBackupKeysStep2Body: "Abra as configurações avançadas.",
+  guideBackupKeysStep2Title: "Chaves mestras",
+  guideBackupKeysStep2Body: "Em Segurança, toque em Chaves mestras.",
   guideBackupKeysStep3Title: "Fazer backup das chaves",
   guideBackupKeysStep3Body:
     "Copie suas chaves mestras e guarde-as em um lugar seguro.",
@@ -645,6 +658,43 @@ export const pt = {
   contactsOnboardingTaskTopup: "Receber bitcoin",
   contactsOnboardingTaskPay: "Pagar",
   contactsOnboardingTaskMessage: "Enviar uma mensagem",
+  contactsOnboardingTaskLinkyName: "Registrar um nome Linky",
+  contactsOnboardingTaskGroups: "Criar um grupo",
+  contactsOnboardingTaskProxyPayment: "Configurar pagamentos proxy",
+  contactsOnboardingTaskBeacon: "Ligar o beacon",
+  guideLinkyNameStep1Title: "Nome Linky",
+  guideLinkyNameStep1Body: "Abra seu perfil na barra inferior.",
+  guideLinkyNameStep2Title: "Editar perfil",
+  guideLinkyNameStep2Body: "Toque no lápis para editar seu perfil.",
+  guideLinkyNameStep3Title: "Escolha um nome",
+  guideLinkyNameStep3Body:
+    "Digite o nome que você quer no campo Endereço Lightning, por exemplo alice. O Linky verifica se alice@linky.fit está livre e oferece a compra com sats da sua carteira.",
+  guideGroupsStep1Title: "Grupos",
+  guideGroupsStep1Body: "Abra um contato que você quer colocar em um grupo.",
+  guideGroupsStep2Title: "Editar contato",
+  guideGroupsStep2Body: "Toque no lápis na conversa para editar o contato.",
+  guideGroupsStep3Title: "Grupo",
+  guideGroupsStep3Body:
+    "Digite um nome de grupo, como Amigos, confirme com Enter e salve o contato. Toque em um grupo existente para adicionar o contato a ele. Depois é possível filtrar os contatos por grupo.",
+  guideGroupsStep4Title: "Mencionar um grupo",
+  guideGroupsStep4Body:
+    "Em uma conversa, digite @ e o nome do grupo. O grupo inteiro é inserido na mensagem, e o outro lado pode salvar todos os contatos de uma vez.",
+  guideProxyPaymentStep1Title: "Pagamentos proxy",
+  guideProxyPaymentStep1Body: "Abra Pagamentos proxy na barra inferior.",
+  guideProxyPaymentStep2Title: "Pedir para alguém pagar",
+  guideProxyPaymentStep2Body:
+    "Escaneie o QR code de um pagamento bancário ou digite o pagamento à mão. Escolha os contatos a quem pedir; quem aceitar primeiro paga a transferência, e você envia sats para essa pessoa.",
+  guideProxyPaymentStep3Title: "Ganhar bitcoin",
+  guideProxyPaymentStep3Body:
+    "Ative as moedas em que você consegue pagar. Os contatos então enviam seus pagamentos bancários, e você ganha bitcoin ao pagá-los.",
+  guideBeaconStep1Title: "Por perto",
+  guideBeaconStep1Body: "Abra Pagamentos proxy na barra inferior.",
+  guideBeaconStep2Title: "Beacon",
+  guideBeaconStep2Body:
+    "Ligue o beacon. Os contatos que também salvaram você passam a ver que você está por perto.",
+  guideBeaconStep3Title: "Negociação",
+  guideBeaconStep3Body:
+    "Escolha se você compra ou vende bitcoin. Os contatos por perto e sua negociação aparecem no topo de Contatos e na conversa deles, assim você vê quem vende quando você compra.",
   addContact: "Adicionar contato",
   addAllContacts: "Adicionar todos",
   contactLoadQr: "Ler QR do contato",

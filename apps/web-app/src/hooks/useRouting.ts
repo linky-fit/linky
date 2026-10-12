@@ -119,6 +119,7 @@ type NavigationAction =
   | { route: "keryxAnnouncement"; id: KeryxSubscriptionId; key: string }
   | { route: "proxyPayments" }
   | { route: "settingsUnits" }
+  | { route: "settingsTutorial" }
   | { route: "settingsReceiveMethod" }
   | { route: "transactions" }
   | {
@@ -153,6 +154,9 @@ export const navigateTo = (action: NavigationAction): void => {
       break;
     case "settingsUnits":
       window.location.assign("#settings/units");
+      break;
+    case "settingsTutorial":
+      window.location.assign("#settings/tutorial");
       break;
     case "settingsReceiveMethod":
       window.location.assign("#settings/receive-method");
