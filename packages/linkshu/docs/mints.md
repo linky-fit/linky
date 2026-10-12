@@ -41,6 +41,8 @@ Always go through `parseMintUrl` (or `MintUrl.make` on already-normalized input)
 
 Successful wallet loads are cached for the runtime's lifetime; a failed load is evicted so the next call retries, and so is one its caller stopped waiting for (`Receive` waits 15 s), so the next call starts a fresh load instead of awaiting a stalled one. Keyset verification failures surface as `MintRejected`; there is no fallback that accepts rejected keys. A mint with only inactive keysets can still load for restore.
 
+Every wallet load except `fetchInfo`'s, cached ones included, fails with `MintRejected` when the mint lists a keyset, active or not, that belongs to another mint: a keyset belongs to the mint of its oldest stored proof. NUT-13 derives secrets from the seed, keyset id and counter but not the mint URL, so a mint copying another mint's keyset would make the wallet derive proofs it already holds there, and those proofs would be stored as the copying mint's. A keyset no stored proof names belongs to no mint yet, and whichever mint first stores proofs under it keeps it. One mint served under two URLs is therefore usable under the URL that stored proofs first.
+
 `fetchInfo(mint)` returns the same `MintInfo` from a fresh load every call: it bypasses the wallet cache, leaves it as it was, and does not record the mint as seen. Use it for mints the user only looks at (a list of suggested mints, a refresh of cached metadata), so they stay out of `knownMints` and out of `Restore` scans. It has no timeout of its own; wrap it in `Effect.timeout` when a stalled mint must not hold the caller.
 
 ### The known-mint set
