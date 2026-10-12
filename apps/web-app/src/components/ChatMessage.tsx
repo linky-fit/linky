@@ -414,7 +414,7 @@ function ChatMessageComponent({
   const renderCashuTokenPill = React.useCallback(
     (info: CashuTokenMessageInfo, key?: string) => {
       const amountText = formatDisplayedAmountText(info.amount ?? 0);
-      const stateKey = cashuTokenStateKey(info);
+      const stateKey = cashuTokenStateKey(info, isOut);
       return (
         <CashuTokenPill
           key={key}
@@ -442,6 +442,7 @@ function ChatMessageComponent({
       cycleUnitOnPress,
       formatDisplayedAmountText,
       getMintIconUrl,
+      isOut,
       onMintIconError,
       t,
     ],

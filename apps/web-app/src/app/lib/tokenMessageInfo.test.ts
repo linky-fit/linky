@@ -112,6 +112,7 @@ describe("cashuTokenStateKey", () => {
   const stateOf = (
     taken: boolean,
     sentClaims: ReadonlyMap<string, boolean> = new Map(),
+    outgoing = true,
   ) => {
     const info = getCashuTokenMessageInfo(
       token,
@@ -119,7 +120,7 @@ describe("cashuTokenStateKey", () => {
       true,
       sentClaims,
     );
-    return info && cashuTokenStateKey(info);
+    return info && cashuTokenStateKey(info, outgoing);
   };
 
   it("announces an own send the recipient claimed as claimed, not as an error", () => {
@@ -133,5 +134,12 @@ describe("cashuTokenStateKey", () => {
   it("keeps the error for a token the wallet took that it did not send", () => {
     expect(stateOf(true)).toBe("cashuInvalid");
     expect(stateOf(false)).toBeNull();
+  });
+
+  it("keeps the error for an own send a peer sent back, claimed or not", () => {
+    expect(stateOf(true, new Map([[token, true]]), false)).toBe("cashuInvalid");
+    expect(stateOf(true, new Map([[token, false]]), false)).toBe(
+      "cashuInvalid",
+    );
   });
 });

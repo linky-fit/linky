@@ -108,7 +108,8 @@ describe("sentTokenClaims", () => {
     id: string,
     operationId: string,
     state: "handedOut" | "spent",
-  ) => createStoredProofFixture({ id, operationId, state });
+    amount = 50,
+  ) => createStoredProofFixture({ id, operationId, state, amount });
 
   it("marks an own send claimed once every proof it handed out is spent", () => {
     const claimed = transfer("AQEBAQEBAQEBAQEBAQEBAQ", "send", "done");
@@ -133,5 +134,16 @@ describe("sentTokenClaims", () => {
       [partial.tokenText, false],
       [returned.tokenText, false],
     ]);
+  });
+
+  it("keeps a send unclaimed while spent proofs cover only part of its amount", () => {
+    const send = transfer("AQEBAQEBAQEBAQEBAQEBAQ", "send", "done");
+
+    const claims = sentTokenClaims(
+      [send],
+      [proof("BQUFBQUFBQUFBQUFBQUFBQ", send.id, "spent", 20)],
+    );
+
+    expect(claims.get(send.tokenText)).toBe(false);
   });
 });
