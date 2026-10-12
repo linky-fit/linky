@@ -27,6 +27,15 @@ function AuthorProfile({
   label: string;
 }) {
   const socials = [
+    ...(author.linky
+      ? [
+          {
+            name: "Linky",
+            icon: "/icon.svg",
+            href: `https://linky.fit/p/${author.linky}`,
+          },
+        ]
+      : []),
     ...(author.nostr
       ? [
           {

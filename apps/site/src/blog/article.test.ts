@@ -36,6 +36,21 @@ describe("translateArticle", () => {
     });
   });
 
+  it("falls back to the only language of an article without English", () => {
+    const czechOnly: Article = {
+      ...article,
+      translations: {
+        cs: { title: "Česky", description: "", coverAlt: "", Body },
+      },
+    };
+    const { language, title, bio } = translateArticle(czechOnly, "de");
+    expect({ language, title, bio }).toEqual({
+      language: "cs",
+      title: "Česky",
+      bio: "Český životopis",
+    });
+  });
+
   it("keeps the English bio when the author has none in the article's language", () => {
     const englishBioOnly = {
       ...article,

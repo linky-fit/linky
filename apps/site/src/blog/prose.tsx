@@ -1,4 +1,4 @@
-import { Image, Stack, Text } from "@linky-fit/ui";
+import { DeviceFrame, Image, Stack, Text } from "@linky-fit/ui";
 import type { ReactNode } from "react";
 import type { Screen } from "../landing/copy";
 import { Phone } from "../landing/parts";
@@ -59,6 +59,66 @@ export function DemoFigure({
       margin="$none"
     >
       <Phone screen={screen} width="$qr" />
+      <Text
+        render={<figcaption />}
+        variant="caption"
+        color="$colorMuted"
+        textAlign="center"
+      >
+        {caption}
+      </Text>
+    </Stack>
+  );
+}
+
+export function Subheading({ children }: { children: string }) {
+  return (
+    <Text
+      variant="title"
+      color="$colorStrong"
+      role="heading"
+      aria-level={3}
+      paddingTop="$sm"
+    >
+      {children}
+    </Text>
+  );
+}
+
+export interface AppScreenshot {
+  src: string;
+  width: number;
+  height: number;
+}
+
+/** A screenshot of the app in a phone, with a caption, like `DemoFigure` without the animation. */
+export function ScreenshotFigure({
+  shot,
+  alt,
+  caption,
+}: {
+  shot: AppScreenshot;
+  alt: string;
+  caption: string;
+}) {
+  return (
+    <Stack
+      render={<figure />}
+      alignItems="center"
+      gap="$lg"
+      paddingVertical="$lg"
+      margin="$none"
+    >
+      <DeviceFrame width="$qr">
+        <Image
+          src={shot.src}
+          alt={alt}
+          width="100%"
+          height="100%"
+          objectFit="cover"
+          objectPosition="top"
+        />
+      </DeviceFrame>
       <Text
         render={<figcaption />}
         variant="caption"
