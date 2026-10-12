@@ -30,6 +30,8 @@ export interface DisplayAmountParts {
 }
 
 const SATS_PER_BTC = 100_000_000;
+const BTC_FRACTION_DIGITS = 8;
+const FIAT_INPUT_FRACTION_DIGITS = 2;
 
 export const isFiatDisplayCurrency = (
   displayCurrency: DisplayCurrency,
@@ -58,7 +60,17 @@ const getRateForCurrency = (
   }
 };
 
+/** How many decimal places the keypad accepts in the display unit; 0 means whole numbers only. */
+export const getDisplayFractionDigits = (
+  displayCurrency: DisplayCurrency,
+): number => {
+  if (displayCurrency === "btc") return BTC_FRACTION_DIGITS;
+  if (isFiatDisplayCurrency(displayCurrency)) return FIAT_INPUT_FRACTION_DIGITS;
+  return 0;
+};
+
 const fiatFormatters = new Map<string, Intl.NumberFormat>();
+const btcFormatters = new Map<string, Intl.NumberFormat>();
 
 const isDisplayCurrency = (value: unknown): value is DisplayCurrency =>
   DISPLAY_CURRENCIES.some((currency) => currency === value);
@@ -164,9 +176,43 @@ const getFiatFormatter = (
   return formatter;
 };
 
+const getBtcFormatter = (locale: string): Intl.NumberFormat => {
+  const existing = btcFormatters.get(locale);
+  if (existing) return existing;
+
+  const formatter = new Intl.NumberFormat(locale, {
+    maximumFractionDigits: BTC_FRACTION_DIGITS,
+    minimumFractionDigits: 0,
+  });
+  btcFormatters.set(locale, formatter);
+  return formatter;
+};
+
 const normalizeAmountSat = (amountSat: number): number => {
   if (!Number.isFinite(amountSat)) return 0;
   return Math.max(0, Math.trunc(amountSat));
+};
+
+/** Sat as a plain bitcoin number, e.g. 123456 → "0.00123456"; built from digits so no float rounding leaks in. */
+const satToBtcInputValue = (amountSat: number): string => {
+  const digits = String(normalizeAmountSat(amountSat)).padStart(
+    BTC_FRACTION_DIGITS + 1,
+    "0",
+  );
+  const whole = digits.slice(0, -BTC_FRACTION_DIGITS);
+  const fraction = digits.slice(-BTC_FRACTION_DIGITS).replace(/0+$/, "");
+  return fraction ? `${whole}.${fraction}` : whole;
+};
+
+/** Whole sats for a typed bitcoin amount; 0 when it is not a positive number. */
+const btcInputValueToSat = (value: string): number => {
+  const match = /^(\d+)(?:\.(\d*))?$/.exec(value.trim().replace(",", "."));
+  if (!match) return 0;
+  const fraction = (match[2] ?? "")
+    .slice(0, BTC_FRACTION_DIGITS)
+    .padEnd(BTC_FRACTION_DIGITS, "0");
+  const amountSat = Number.parseInt(`${match[1]}${fraction}`, 10);
+  return Number.isFinite(amountSat) && amountSat > 0 ? amountSat : 0;
 };
 
 const getFiatValue = (
@@ -222,6 +268,10 @@ const getDisplayAmountInputValue = (
   const normalizedAmount = normalizeAmountSat(amountSat);
   if (normalizedAmount <= 0) return "";
 
+  if (options.displayCurrency === "btc") {
+    return satToBtcInputValue(normalizedAmount);
+  }
+
   if (isFiatDisplayCurrency(options.displayCurrency) && options.fiatRates) {
     return String(
       Math.max(
@@ -244,6 +294,10 @@ const toAmountSatFromDisplayInput = (
   displayValue: string,
   options: DisplayAmountOptions,
 ): number => {
+  if (options.displayCurrency === "btc") {
+    return btcInputValueToSat(displayValue);
+  }
+
   const parsedDisplayValue = parsePositiveDisplayNumber(displayValue);
   if (parsedDisplayValue <= 0) return 0;
 
@@ -274,6 +328,9 @@ export const applyAmountInputKeyWithDraft = (
   const displayValue =
     currentDisplayValue ??
     getDisplayAmountInputValue(currentAmountSat, options);
+  const fractionDigits = allowDecimals
+    ? getDisplayFractionDigits(options.displayCurrency)
+    : 0;
 
   let nextDisplayValue = displayValue;
   if (key === "C") {
@@ -281,12 +338,15 @@ export const applyAmountInputKeyWithDraft = (
   } else if (key === "⌫") {
     nextDisplayValue = displayValue.slice(0, -1);
   } else if (key === "." || key === ",") {
-    if (allowDecimals && !displayValue.includes(".")) {
+    if (fractionDigits > 0 && !displayValue.includes(".")) {
       nextDisplayValue = `${displayValue || "0"}.`;
     }
   } else if (/^\d$/.test(key)) {
     const candidate = (displayValue + key).replace(/^0+(\d)/, "$1");
-    if (!allowDecimals || /^\d*(?:\.\d{0,2})?$/.test(candidate)) {
+    if (
+      fractionDigits === 0 ||
+      new RegExp(`^\\d*(?:\\.\\d{0,${fractionDigits}})?$`).test(candidate)
+    ) {
       nextDisplayValue = candidate;
     }
   }
@@ -335,7 +395,9 @@ export const formatDisplayAmountParts = (
 
   if (options.displayCurrency === "btc") {
     return {
-      amountText: formatInteger(normalizedAmount, options.lang),
+      amountText: getBtcFormatter(locale).format(
+        normalizedAmount / SATS_PER_BTC,
+      ),
       approxPrefix: "",
       unitLabel: getDisplayUnitLabel("btc", options.lang),
     };

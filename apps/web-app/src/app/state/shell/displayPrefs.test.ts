@@ -21,7 +21,7 @@ describe("displayPrefsAtom", () => {
       "linky.lang": prefs.lang,
       "linky.display_currency.v1": prefs.displayCurrency,
       linky_use_btc_symbol: prefs.displayCurrency === "btc" ? "1" : "0",
-      "linky.decimal_amount_input.v1": "0",
+      "linky.decimal_amount_input.v1": "1",
     });
   });
 

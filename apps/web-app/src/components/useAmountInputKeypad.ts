@@ -1,6 +1,7 @@
 import React from "react";
 import { useDisplayAmounts } from "../app/hooks/shell";
 import { readClipboardText } from "../platform/clipboard";
+import { getDisplayFractionDigits } from "../utils/displayAmounts";
 
 interface AmountInputDraft {
   amountSat: string;
@@ -22,12 +23,16 @@ export interface AmountInput {
   pasteFromClipboard: () => Promise<boolean>;
 }
 
+/** The clipboard text as keypad input, or null; `fractionDigits` 0 accepts whole numbers only. */
 export const normalizePastedAmountInput = (
   value: string,
-  allowDecimals: boolean,
+  fractionDigits: number,
 ): string | null => {
   const normalized = value.trim().replace(",", ".");
-  const pattern = allowDecimals ? /^\d+(?:\.\d{0,2})?$/ : /^\d+$/;
+  const pattern =
+    fractionDigits > 0
+      ? new RegExp(`^\\d+(?:\\.\\d{0,${fractionDigits}})?$`)
+      : /^\d+$/;
   return pattern.test(normalized) ? normalized : null;
 };
 
@@ -84,7 +89,9 @@ export const useAmountInputKeypad = ({
 
     const pastedAmount = normalizePastedAmountInput(
       clipboardText,
-      decimalAmountInputKeyVisible,
+      decimalAmountInputKeyVisible
+        ? getDisplayFractionDigits(displayCurrency)
+        : 0,
     );
     if (pastedAmount === null) return false;
 

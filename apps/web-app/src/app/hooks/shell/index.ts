@@ -48,10 +48,12 @@ export const useDisplayAmounts = () => {
   const fiatRates = useAtomValue(fiatRatesAtom);
   return React.useMemo(() => {
     const options = { displayCurrency, fiatRates, lang };
+    // Bitcoin amounts are fractions, so ₿ always takes decimals.
     const decimalAmountInputKeyVisible =
-      decimalAmountInputEnabled &&
-      isFiatDisplayCurrency(displayCurrency) &&
-      fiatRates !== null;
+      displayCurrency === "btc" ||
+      (decimalAmountInputEnabled &&
+        isFiatDisplayCurrency(displayCurrency) &&
+        fiatRates !== null);
     return {
       applyAmountInputKey: (currentAmount: string, key: string) =>
         applyAmountInputKey(currentAmount, key, options),

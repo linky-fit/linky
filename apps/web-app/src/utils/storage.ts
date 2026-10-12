@@ -322,9 +322,13 @@ export const getInitialAllowedDisplayCurrencies = (
   );
 };
 
+// Default on: only an explicit "0" disables decimal places.
 export const getInitialDecimalAmountInputEnabled = (
   kv: KeyValueStorage = localStorageKv,
-): boolean => kv.getItem(DECIMAL_AMOUNT_INPUT_STORAGE_KEY) === "1";
+): boolean => {
+  const stored = trimString(kv.getItem(DECIMAL_AMOUNT_INPUT_STORAGE_KEY));
+  return !stored || stored === "1";
+};
 
 // Default ON: an absent key self-initializes to "enabled now", so both fresh
 // installs and updated ones start sending receipts with a baseline of first

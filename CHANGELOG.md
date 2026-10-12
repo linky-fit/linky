@@ -19,6 +19,8 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - A message can be deleted from its menu, except tokens, payment requests and offers; both sides keep only a "Message deleted" placeholder.
 - A proxy payment offer shows the bank transfer's currency (CZK, EUR, BRL) next to the amount.
 - Tapping a token in a chat switches the display unit, like the wallet balance.
+- The ₿ unit shows bitcoin (0.00123456 ₿) instead of sats with a bitcoin symbol, and the keypad takes up to eight decimal places in it.
+- Decimal places on the amount keypad are on by default; turn them off in Settings under Units.
 
 ### cs-CZ
 
@@ -27,6 +29,8 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - Z menu zprávy jde smazat zprávu, kromě tokenů, žádostí o platbu a nabídek; oběma stranám zůstane jen zástupný text „Zpráva byla smazána“.
 - Nabídka proxy platby ukazuje měnu bankovního převodu (CZK, EUR, BRL) vedle částky.
 - Klepnutí na token v chatu přepne jednotku, stejně jako u zůstatku.
+- Jednotka ₿ zobrazuje bitcoin (0,00123456 ₿) místo satů se symbolem bitcoinu a klávesnice v ní přijme až osm desetinných míst.
+- Desetinná místa na klávesnici částky jsou ve výchozím stavu zapnutá; vypnout jdou v Nastavení v Jednotkách.
 
 ## [26.10.3] - 2026-10-05
 
