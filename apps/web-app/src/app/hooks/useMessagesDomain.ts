@@ -51,7 +51,7 @@ interface UseMessagesDomainParams {
   chatForceScrollToBottomRef: React.MutableRefObject<boolean>;
   chatMessagesRef: React.RefObject<HTMLDivElement | null>;
   conversations: ConversationsRepository;
-  /** Background writes (legacy import, retention prune) wait until the account is hydrated. */
+  /** Background writes (legacy imports and migrations) wait until the account is hydrated. */
   hydrated: boolean;
   route: Route;
   unknownSenders: UnknownSendersRepository;
@@ -59,10 +59,6 @@ interface UseMessagesDomainParams {
 
 // removal gate in app/migrations/AGENTS.md
 const MESSAGE_MIGRATION_VERSION = 1;
-const MESSAGE_RETENTION_PER_CONTACT = 500;
-const MESSAGE_RETENTION_GLOBAL = 3000;
-const REACTION_RETENTION_GLOBAL = 5000;
-const RETENTION_PRUNE_THROTTLE_MS = 900;
 
 const toMessageStatus = (value: unknown): "pending" | "sent" =>
   trimString(value) === "pending" ? "pending" : "sent";
@@ -113,7 +109,6 @@ export const useMessagesDomain = ({
   const {
     appendLocalNostrReaction,
     removeLocalNostrMessagesByContactId,
-    removeNostrMessage,
     removeNostrReaction,
     softDeleteLocalNostrReaction,
     updateLocalNostrReaction,
@@ -259,152 +254,6 @@ export const useMessagesDomain = ({
     },
     [conversations, write],
   );
-
-  const retentionPruneTimerRef = React.useRef<number | null>(null);
-  const retentionPruneInFlightRef = React.useRef(false);
-  // Bumped after each pass, so the overflow check reruns on what it left.
-  const [retentionPrunePasses, setRetentionPrunePasses] = React.useState(0);
-
-  const pruneRetention = React.useCallback(async () => {
-    retentionPruneInFlightRef.current = true;
-    try {
-      const removals: Array<Promise<WriteOutcome>> = [];
-      const byContact = new Map<string, LocalNostrMessage[]>();
-      for (const message of nostrMessagesLocal) {
-        const contactId = trimString(message.contactId);
-        if (!contactId) continue;
-        const list = byContact.get(contactId);
-        if (list) list.push(message);
-        else byContact.set(contactId, [message]);
-      }
-
-      const keepIds = new Set<string>();
-      for (const list of byContact.values()) {
-        const sorted = [...list].sort(
-          (a, b) => a.createdAtSec - b.createdAtSec,
-        );
-        for (const message of sorted.slice(-MESSAGE_RETENTION_PER_CONTACT)) {
-          keepIds.add(trimString(message.id));
-        }
-      }
-
-      const keptMessagesSorted = nostrMessagesLocal
-        .filter((message) => keepIds.has(trimString(message.id)))
-        .sort((a, b) => a.createdAtSec - b.createdAtSec);
-
-      if (keptMessagesSorted.length > MESSAGE_RETENTION_GLOBAL) {
-        const limited = keptMessagesSorted.slice(-MESSAGE_RETENTION_GLOBAL);
-        keepIds.clear();
-        for (const message of limited) {
-          keepIds.add(trimString(message.id));
-        }
-      }
-
-      for (const message of nostrMessagesLocal) {
-        const messageId = trimString(message.id);
-        if (!messageId || keepIds.has(messageId)) continue;
-        removals.push(removeNostrMessage(message));
-      }
-
-      const keptRumorIds = new Set<string>();
-      for (const message of nostrMessagesLocal) {
-        if (!keepIds.has(trimString(message.id))) continue;
-        const rumorId = trimString(message.rumorId);
-        if (rumorId) keptRumorIds.add(rumorId);
-      }
-
-      const validReactions = nostrReactionsLocal
-        .filter((reaction) => keptRumorIds.has(trimString(reaction.messageId)))
-        .sort((a, b) => a.createdAtSec - b.createdAtSec);
-
-      const keepReactionIds = new Set<string>(
-        validReactions
-          .slice(-REACTION_RETENTION_GLOBAL)
-          .map((reaction) => trimString(reaction.id))
-          .filter(Boolean),
-      );
-
-      for (const reaction of nostrReactionsLocal) {
-        const reactionId = trimString(reaction.id);
-        if (!reactionId || keepReactionIds.has(reactionId)) continue;
-        removals.push(removeNostrReaction(reactionId));
-      }
-      await allWrites(removals);
-    } finally {
-      retentionPruneInFlightRef.current = false;
-      setRetentionPrunePasses((passes) => passes + 1);
-    }
-  }, [
-    nostrMessagesLocal,
-    nostrReactionsLocal,
-    removeNostrMessage,
-    removeNostrReaction,
-  ]);
-
-  const pruneRetentionRef = useLatest(pruneRetention);
-
-  // Before hydration a reaction's message may not have arrived yet, so it would look orphaned.
-  React.useEffect(() => {
-    if (!hydrated) return;
-    const messageCountsByContact = new Map<string, number>();
-    for (const message of nostrMessagesLocal) {
-      const contactId = trimString(message.contactId);
-      if (!contactId) continue;
-      messageCountsByContact.set(
-        contactId,
-        (messageCountsByContact.get(contactId) ?? 0) + 1,
-      );
-    }
-    const hasContactOverflow = [...messageCountsByContact.values()].some(
-      (count) => count > MESSAGE_RETENTION_PER_CONTACT,
-    );
-    const hasMessageOverflow =
-      nostrMessagesLocal.length > MESSAGE_RETENTION_GLOBAL;
-    const messageRumorIds = new Set(
-      nostrMessagesLocal
-        .map((message) => trimString(message.rumorId))
-        .filter(Boolean),
-    );
-    const hasOrphanReaction = nostrReactionsLocal.some(
-      (reaction) => !messageRumorIds.has(trimString(reaction.messageId)),
-    );
-    const hasReactionOverflow =
-      nostrReactionsLocal.length > REACTION_RETENTION_GLOBAL;
-
-    if (
-      !hasContactOverflow &&
-      !hasMessageOverflow &&
-      !hasOrphanReaction &&
-      !hasReactionOverflow
-    ) {
-      return;
-    }
-
-    if (
-      retentionPruneTimerRef.current != null ||
-      retentionPruneInFlightRef.current
-    )
-      return;
-    retentionPruneTimerRef.current = window.setTimeout(() => {
-      retentionPruneTimerRef.current = null;
-      void pruneRetentionRef.current();
-    }, RETENTION_PRUNE_THROTTLE_MS);
-  }, [
-    hydrated,
-    nostrMessagesLocal,
-    nostrReactionsLocal,
-    pruneRetentionRef,
-    retentionPrunePasses,
-  ]);
-
-  React.useEffect(() => {
-    return () => {
-      if (retentionPruneTimerRef.current != null) {
-        window.clearTimeout(retentionPruneTimerRef.current);
-        retentionPruneTimerRef.current = null;
-      }
-    };
-  }, []);
 
   const pendingPaymentsKey = pendingPaymentsKeyFor(appOwnerId);
 

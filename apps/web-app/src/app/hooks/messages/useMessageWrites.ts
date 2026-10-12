@@ -24,13 +24,9 @@ import {
 import type {
   AppendedRow,
   AppendLocalNostrReaction,
-  LocalNostrMessage,
   UpdateLocalNostrReaction,
 } from "../../types/appTypes";
-import {
-  isUnknownContactId,
-  readUnknownContactIdPubkey,
-} from "./contactIdentity";
+import { readUnknownContactIdPubkey } from "./contactIdentity";
 import { toReactionPatch, toReactionWriteRow } from "./messageRows";
 import { buildReactionUpdate } from "./messageUpdates";
 
@@ -66,20 +62,6 @@ export const useMessageWrites = ({
   const write = chatWrites.queueWrite;
   // Read at call time, so screens that only write do not rerender on every message.
   const registry = React.useContext(RegistryContext);
-
-  const removeNostrMessage = React.useCallback(
-    (message: LocalNostrMessage): Promise<WriteOutcome> => {
-      const messageId = parseMessageId(message.id);
-      if (!messageId) return NO_WRITE;
-      return write(
-        "message removal",
-        isUnknownContactId(message.contactId)
-          ? unknownSenders.remove(messageId)
-          : conversations.messages.remove(messageId),
-      );
-    },
-    [conversations, unknownSenders, write],
-  );
 
   const removeNostrReaction = React.useCallback(
     (id: string): Promise<WriteOutcome> => {
@@ -201,16 +183,20 @@ export const useMessageWrites = ({
       }
       for (const message of registry.get(contactMessagesAtom)) {
         if (trimString(message.contactId) !== normalizedContactId) continue;
-        void removeNostrMessage(message);
+        const messageId = parseMessageId(message.id);
+        if (messageId)
+          void write(
+            "message removal",
+            conversations.messages.remove(messageId),
+          );
       }
     },
-    [registry, removeNostrMessage, unknownSenders, write],
+    [conversations, registry, unknownSenders, write],
   );
 
   return {
     appendLocalNostrReaction,
     removeLocalNostrMessagesByContactId,
-    removeNostrMessage,
     removeNostrReaction,
     softDeleteLocalNostrReaction,
     updateLocalNostrReaction,
