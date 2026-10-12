@@ -7,6 +7,7 @@ import {
   type TokenTransfer,
 } from "@linky-fit/linkshu";
 import { Cause, Effect } from "effect";
+import { changesAtom } from "../session/live";
 import { walletRepositoryAtom } from "../session/store";
 import { linkshuRuntimeAtom } from "./runtime";
 
@@ -28,14 +29,15 @@ export const emptyReadModel: LinkshuReadModel = {
   transfers: [],
 };
 
+const walletChangesAtom = changesAtom(
+  walletRepositoryAtom,
+  (wallet) => wallet.subscribe,
+);
+
 /** The wallet inventory through linkshu `Tokens`, re-read whenever the wallet repository reports a change. */
 export const walletReadModelAtom = linkshuRuntimeAtom.atom((get) =>
   Effect.gen(function* () {
-    const wallet = yield* get.result(walletRepositoryAtom);
-    // A refresh re-subscribes; inside the store's notify loop the new listener would get the same notification, forever.
-    get.addFinalizer(
-      wallet.subscribe(() => queueMicrotask(() => get.refreshSelf())),
-    );
+    get(walletChangesAtom);
     const tokens = yield* Tokens;
     return {
       balances: yield* tokens.balances,

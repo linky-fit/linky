@@ -1,11 +1,37 @@
-import { Effect } from "effect";
-import { Atom, type AsyncResult } from "effect/reactivity";
+import { Effect, Option } from "effect";
+import { AsyncResult, Atom } from "effect/reactivity";
+
+type Subscribe = (listener: () => void) => () => void;
 
 /** A value read whole, and the subscription that reports it may have changed. */
 export interface LiveSource<A> {
   readonly all: Effect.Effect<A, unknown>;
-  readonly subscribe: (listener: () => void) => () => void;
+  readonly subscribe: Subscribe;
 }
+
+/**
+ * Counts the changes a repository's subscription reports, through one
+ * subscription per repository. A read that re-subscribed on every change
+ * would re-read on every unrelated database change too: an Evolu
+ * subscription reports the first query change it sees, whichever query.
+ */
+export const changesAtom = <R, E>(
+  repository: Atom.Atom<AsyncResult.AsyncResult<R, E>>,
+  subscribe: (repository: R) => Subscribe,
+) =>
+  Atom.make((get): number => {
+    const result = get(repository);
+    if (!AsyncResult.isSuccess(result)) return 0;
+    get.addFinalizer(
+      subscribe(result.value)(() =>
+        // Dependents re-read after Evolu's change callback, not inside it.
+        queueMicrotask(() =>
+          get.setSelf(Option.getOrElse(get.self<number>(), () => 0) + 1),
+        ),
+      ),
+    );
+    return 0;
+  });
 
 /**
  * A store read kept current: re-read whenever the source reports a change,
@@ -14,16 +40,17 @@ export interface LiveSource<A> {
 export const liveAtom = <R, E, A>(
   repository: Atom.Atom<AsyncResult.AsyncResult<R, E>>,
   source: (repository: R) => LiveSource<A>,
-) =>
-  Atom.keepAlive(
+) => {
+  const changes = changesAtom(
+    repository,
+    (current) => source(current).subscribe,
+  );
+  return Atom.keepAlive(
     Atom.make((get) =>
       Effect.gen(function* () {
-        const { all, subscribe } = source(yield* get.result(repository));
-        // As in walletReadModelAtom: a refresh inside the store's notify loop would re-notify forever.
-        get.addFinalizer(
-          subscribe(() => queueMicrotask(() => get.refreshSelf())),
-        );
-        return yield* all;
+        get(changes);
+        return yield* source(yield* get.result(repository)).all;
       }),
     ),
   );
+};
