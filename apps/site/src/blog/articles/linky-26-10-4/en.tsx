@@ -138,6 +138,7 @@ export function Body() {
             mode, and an open chat redraws less, which long conversations
             notice.
           </>,
+          <>The Android app now needs Android 7.0 or newer.</>,
         ]}
       />
 

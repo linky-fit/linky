@@ -10,7 +10,7 @@ export const article: Article = {
   cover,
   translations: {
     en: {
-      title: "Linky 26.10.4: tidy up your chats and contacts",
+      title: "Linky 26.10.5: tidy up your chats and contacts",
       description:
         "Delete a message for both sides, react with any emoji, delete and block contacts. The release also brings notifications on Android phones without Google, restoring an account with one paste and a Nostr identity page.",
       coverAlt:
@@ -18,7 +18,7 @@ export const article: Article = {
       Body: EnglishBody,
     },
     cs: {
-      title: "Linky 26.10.4: úklid v chatech a kontaktech",
+      title: "Linky 26.10.5: úklid v chatech a kontaktech",
       description:
         "Smazání zprávy u obou stran, reakce jakýmkoli emoji, mazání a blokování kontaktů. K tomu notifikace na Androidu bez Googlu, obnova účtu jedním vložením a stránka Nostr identita.",
       coverAlt:
