@@ -252,10 +252,12 @@ describe("useSendChatMessage", () => {
       root: ROOT,
     });
     expect(draft?.clientId).toBeTruthy();
+    expect(draft?.sentAt).toBeTruthy();
     expect(harness.appendLocalNostrMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         clientId: draft?.clientId,
         content: "hello",
+        createdAtSec: draft?.sentAt,
         pubkey: MY_PUBKEY,
         replyToId: REPLY_TO,
         rootMessageId: ROOT,
@@ -269,10 +271,7 @@ describe("useSendChatMessage", () => {
     );
     expect(harness.updateLocalNostrMessage).toHaveBeenCalledWith(
       "pending-message",
-      {
-        createdAtSec: SENT_AT,
-        rumorId: MESSAGE_ID,
-      },
+      { rumorId: MESSAGE_ID },
     );
     expect(harness.operations).toEqual(["append", "enqueue", "update"]);
     expect(harness.setChatDraft).toHaveBeenCalledWith("");
@@ -355,10 +354,7 @@ describe("useSendChatMessage", () => {
     );
     expect(harness.updateLocalNostrMessage).toHaveBeenCalledWith(
       "pending-message",
-      expect.objectContaining({
-        createdAtSec: SENT_AT,
-        rumorId: MESSAGE_ID,
-      }),
+      { rumorId: MESSAGE_ID },
     );
 
     await act(async () => harness.root.unmount());
@@ -416,7 +412,7 @@ describe("useSendChatMessage", () => {
     );
     expect(harness.updateLocalNostrMessage).toHaveBeenCalledWith(
       "pending-message",
-      { createdAtSec: SENT_AT, rumorId: MESSAGE_ID },
+      { rumorId: MESSAGE_ID },
     );
     expect(harness.setStatus).toHaveBeenCalledWith("chatQueued");
 
