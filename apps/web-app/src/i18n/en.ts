@@ -611,7 +611,7 @@ export const en = {
   guideAddContactStep3Body: "Back in Contacts, tap Add contact.",
   guideAddContactStep4Title: "Scan their QR code",
   guideAddContactStep4Body:
-    "Tap Load QR and scan the other person's QR code. You can also search by name, npub or NIP-05 below.",
+    "Tap Scan contact QR and scan the other person's QR code. You can also search by name, npub or NIP-05 below.",
 
   guideTopupStep1Title: "Wallet",
   guideTopupStep1Body: "Tap the wallet button below.",
