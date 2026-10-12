@@ -8,7 +8,8 @@
  *
  * Needs the docker stack up — see playwright.config.ts.
  */
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import type { Browser, Page } from "@playwright/test";
+import { expect, test } from "./helpers/test";
 import type { LinkyE2eHooks } from "../src/devtools/e2e/installLinkyE2eHooks";
 
 declare global {

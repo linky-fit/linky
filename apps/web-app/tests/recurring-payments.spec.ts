@@ -1,4 +1,4 @@
-import { expect } from "@playwright/test";
+import { expect } from "./helpers/test";
 import { readBalanceSat, relaunchApp } from "./helpers/appState";
 import { FIXTURE_AMOUNT_SAT } from "./helpers/network";
 import {

@@ -24,12 +24,8 @@
  * writer of that row shape: a version-1 backup import, whose token rows go
  * through the same `Tokens.ingestLegacyRows` path as the legacy table.
  */
-import {
-  expect,
-  test,
-  type APIRequestContext,
-  type Page,
-} from "@playwright/test";
+import type { APIRequestContext, Page } from "@playwright/test";
+import { expect, test } from "./helpers/test";
 import {
   MOBILE_VIEWPORT,
   readBalanceSat,

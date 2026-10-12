@@ -1,11 +1,6 @@
 import { createHash } from "node:crypto";
-import {
-  expect,
-  test,
-  type Locator,
-  type Page,
-  type Route,
-} from "@playwright/test";
+import type { Locator, Page, Route } from "@playwright/test";
+import { expect, test } from "./helpers/test";
 import { Schema } from "effect";
 import {
   generateSecretKey,

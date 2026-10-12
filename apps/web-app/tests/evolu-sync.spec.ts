@@ -1,5 +1,6 @@
 import { appOwnerFromMnemonic } from "@linky-fit/linksync";
-import { test, expect, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./helpers/test";
 import { MOBILE_VIEWPORT, setBaseStorage } from "./helpers/appState";
 import { createSeedIdentity, setSeedLoginStorage } from "./helpers/identity";
 import { isHydrated } from "./helpers/linkyHooks";

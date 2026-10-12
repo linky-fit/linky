@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./helpers/test";
 import { mnemonicToSeedSync } from "@scure/bip39";
 import type { LinkyE2eHooks } from "../src/devtools/e2e/installLinkyE2eHooks";
 import {

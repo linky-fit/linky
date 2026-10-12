@@ -29,6 +29,7 @@ import {
   setMessagesRotation,
 } from "../../app/state/session/store";
 import { makeLocalStorageKeyValueStore } from "../../platform/linkshu/localStorageKeyValueStore";
+import { readPersistentInspectorLogsNdjson } from "../inspector/persistentInspectorLogSink";
 
 /**
  * Test-only entry point the Playwright suites reach through
@@ -74,6 +75,8 @@ export interface LinkyE2eHooks {
   ) => Promise<string | null>;
   /** Restarts a recurring payment's schedule at `atSec`, as an edit would, but without the form's no-past rule. */
   readonly makeRecurringDue: (id: string, atSec: number) => Promise<void>;
+  /** The origin's persistent inspector log as ndjson; empty unless `linky.inspector_logs_enabled` is set. */
+  readonly inspectorLogs: () => Promise<string>;
 }
 
 declare global {
@@ -202,5 +205,6 @@ export const installLinkyE2eHooks = (
         }),
       );
     },
+    inspectorLogs: readPersistentInspectorLogsNdjson,
   };
 };

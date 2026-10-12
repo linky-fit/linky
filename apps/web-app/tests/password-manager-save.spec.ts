@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./helpers/test";
 import { NOSTR_SLIP39_SEED_STORAGE_KEY } from "../src/utils/constants";
 import { deriveNostrKeysFromSlip39 } from "../src/utils/slip39Nostr";
 import { MOBILE_VIEWPORT, setBaseStorage } from "./helpers/appState";

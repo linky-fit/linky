@@ -112,6 +112,15 @@ export const clearPersistentInspectorLogs = async (): Promise<void> => {
   });
 };
 
+/** Every stored row as ndjson, including the rows other tabs of the origin stored. */
+export const readPersistentInspectorLogsNdjson = async (): Promise<string> => {
+  await flushPendingRows();
+  const rows = await enqueueOperation(() =>
+    indexedDbInspectorLogStorage.load(),
+  );
+  return serializeInspectorLogsNdjson(rows);
+};
+
 export const downloadPersistentInspectorLogs = async (): Promise<number> => {
   await flushPendingRows();
   const currentState = await enqueueOperation(ensureState);

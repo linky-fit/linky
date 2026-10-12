@@ -7,7 +7,8 @@
  *
  * Needs the docker stack up — see playwright.config.ts.
  */
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./helpers/test";
 import {
   expectSingleLoad,
   MOBILE_VIEWPORT,

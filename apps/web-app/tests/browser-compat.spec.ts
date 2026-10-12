@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./helpers/test";
 import { setBaseStorage, MOBILE_VIEWPORT } from "./helpers/appState";
 import { addContactByNpub } from "./helpers/contacts";
 import { EVOLU_WORKER_BUNDLE } from "./helpers/bundles";

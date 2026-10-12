@@ -2,7 +2,8 @@
 // ago, rotated its message shards past that deletion, read part of a chat,
 // heard from unknown senders and blocked one of them.
 import { appOwnerFromMnemonic } from "@linky-fit/linksync";
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import type { Browser, Page } from "@playwright/test";
+import { expect, test } from "./helpers/test";
 import { UNKNOWN_CONTACT_ID_PREFIX } from "../src/utils/constants";
 import { MOBILE_VIEWPORT, setBaseStorage } from "./helpers/appState";
 import { addContactByNpub } from "./helpers/contacts";

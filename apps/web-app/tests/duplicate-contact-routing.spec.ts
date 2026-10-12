@@ -5,7 +5,7 @@
  *
  * Needs the docker stack up — see playwright.config.ts.
  */
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./helpers/test";
 import { MOBILE_VIEWPORT, setBaseStorage } from "./helpers/appState";
 import { createSeedIdentity, setSeedLoginStorage } from "./helpers/identity";
 import {

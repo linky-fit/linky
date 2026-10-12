@@ -1,4 +1,5 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import type { Browser, Page } from "@playwright/test";
+import { expect, test } from "./helpers/test";
 import type { OwnerRole } from "@linky-fit/identity";
 import type { LinkyE2eHooks } from "../src/devtools/e2e/installLinkyE2eHooks";
 import { deriveEvoluOwnerMnemonicFromSlip39 } from "../src/utils/slip39Nostr";

@@ -1,6 +1,6 @@
 // A profile link opened before onboarding survives creating the profile and the
 // reload after it; the hook's branches are covered by useSharedProfileLink.test.tsx.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./helpers/test";
 import { MOBILE_VIEWPORT, setBaseStorage } from "./helpers/appState";
 import { watchAppErrors } from "./helpers/diagnostics";
 import { createSeedIdentity } from "./helpers/identity";
