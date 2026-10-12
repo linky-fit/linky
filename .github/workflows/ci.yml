@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   # Pushes run everything: require-ci and Vercel need every check on the commit
-  # they ship. Anything outside apps/ counts as shared, and linky-app imports linky-site.
+  # they ship. Anything outside apps/ counts as shared, linky-app imports linky-site and expo imports linky-app.
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -41,7 +41,7 @@ jobs:
             changed=$(git diff --name-only "$BASE" HEAD)
             echo "$changed"
             grep -qv '^apps/' <<< "$changed" || shared=false
-            grep -qE '^apps/linky-(app|site)/' <<< "$changed" || linky_e2e=$shared
+            grep -qE '^apps/(linky-app|linky-site|expo)/' <<< "$changed" || linky_e2e=$shared
           fi
           echo "shared=$shared" >> "$GITHUB_OUTPUT"
           echo "linky-e2e=$linky_e2e" >> "$GITHUB_OUTPUT"
@@ -162,8 +162,18 @@ jobs:
   app-e2e:
     needs: changes
     if: needs.changes.outputs.linky-e2e == 'true'
+    # One suite, run against the Vite build and the apps/expo (Metro) build.
+    name: ${{ matrix.check }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { bundler: vite, check: app-e2e, cache: linky-app }
+          - { bundler: expo, check: app-e2e-expo, cache: linky-app-expo }
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      LINKY_E2E_WEB_BUNDLER: ${{ matrix.bundler }}
 
     steps:
       - name: Checkout
@@ -189,8 +199,8 @@ jobs:
             docker buildx bake -f docker-compose.dev.yml \
               --set 'evolu-relay.cache-from=type=gha,scope=evolu-relay' \
               --set 'evolu-relay.cache-to=type=gha,scope=evolu-relay,mode=max' \
-              --set 'linky-app.cache-from=type=gha,scope=linky-app' \
-              --set 'linky-app.cache-to=type=gha,scope=linky-app,mode=max' \
+              --set 'linky-app.cache-from=type=gha,scope=${{ matrix.cache }}' \
+              --set 'linky-app.cache-to=type=gha,scope=${{ matrix.cache }},mode=max' \
               --load &
             bake=$!
             status=0
@@ -252,7 +262,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: app-e2e-test-results
+          name: ${{ matrix.check }}-test-results
           path: apps/linky-app/test-results/
           retention-days: 7
 

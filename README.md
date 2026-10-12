@@ -34,6 +34,7 @@ End-to-end tests (Playwright against a Docker stack owned by the checkout, so wo
 
 ```bash
 bun run e2e          # linky-app suite; extra args go to Playwright
+bun run e2e expo     # linky-app suite against the apps/expo build
 bun run e2e site     # linky-site suite
 bun run e2e down     # stop the stack and drop its data
 ```
