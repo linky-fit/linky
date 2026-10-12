@@ -37,6 +37,7 @@ const tableColumns = new Map<string, ReadonlySet<string>>([
       "editedAtSec",
       "editedFromId",
       "isEdited",
+      "deletedAtSec",
     ]),
   ],
   [

@@ -4,7 +4,9 @@ import { BANK_OFFER_KIND, decodeBankOfferRumor } from "../bankOffers/codec";
 import {
   CHAT_IMAGE_KIND,
   CHAT_TEXT_KIND,
+  decodeChatDeletionRumor,
   decodeChatRumor,
+  isChatDeletionRumor,
 } from "../chat/codec";
 import type { Rumor, SignedWrapEvent } from "../internal/nostrEvent";
 import {
@@ -51,6 +53,12 @@ const routeRumor = (
       });
     case REACTION_KIND:
     case RETRACTION_KIND:
+      if (isChatDeletionRumor(rumor)) {
+        return Result.match(decodeChatDeletionRumor(rumor, identity.pubkey), {
+          onFailure: (reason) => new WrapDropped({ wrapId: wrap.id, reason }),
+          onSuccess: (event) => event,
+        });
+      }
       return Result.match(decodeReactionRumor(rumor, identity.pubkey), {
         onFailure: (reason) => new WrapDropped({ wrapId: wrap.id, reason }),
         onSuccess: (event) => event,

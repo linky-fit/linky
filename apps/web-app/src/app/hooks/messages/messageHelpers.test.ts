@@ -1,4 +1,10 @@
+import {
+  derivePubkey,
+  encodeNprofile,
+  NostrSecretKey,
+} from "@linky-fit/linkstr";
 import { describe, expect, it } from "vitest";
+import { buildCashuPaymentRequestMessage } from "../../lib/paymentRequestMessage";
 import type { LocalNostrMessage } from "../../types/appTypes";
 import {
   dedupeChatMessages,
@@ -42,6 +48,134 @@ describe("dedupeNostrMessagesByPriority", () => {
     expect(deduped).toHaveLength(1);
     expect(deduped[0]?.wrapId).toBe("wrap-fixed");
     expect(deduped[0]?.clientId).toBe("client-fixed");
+  });
+
+  it("keeps a deletion when its row merges with an undeleted copy", () => {
+    const deduped = dedupeNostrMessagesByPriority([
+      makeMessage("1"),
+      makeMessage("2", {
+        content: "[deleted]",
+        deletedAtSec: 2,
+        rumorId: "rumor-1",
+        wrapId: "rumor-1",
+      }),
+    ]);
+
+    expect(deduped).toEqual([
+      expect.objectContaining({ content: "[deleted]", deletedAtSec: 2 }),
+    ]);
+  });
+
+  it("keeps a deletion of a duplicate the merge drops", () => {
+    const deduped = dedupeNostrMessagesByPriority([
+      makeMessage("1", { clientId: "client-1", rumorId: "rumor-a" }),
+      makeMessage("2", {
+        clientId: "client-1",
+        content: "[deleted]",
+        deletedAtSec: 2,
+        rumorId: "rumor-b",
+        wrapId: "rumor-b",
+      }),
+    ]);
+
+    expect(deduped).toEqual([
+      expect.objectContaining({
+        content: "[deleted]",
+        deletedAtSec: 2,
+        rumorId: "rumor-a",
+      }),
+    ]);
+  });
+
+  it("applies a deletion naming a duplicate the merge dropped earlier", () => {
+    const deduped = dedupeNostrMessagesByPriority([
+      makeMessage("1", { clientId: "client-1", rumorId: "rumor-a" }),
+      makeMessage("2", { clientId: "client-1", rumorId: "rumor-b" }),
+      makeMessage("3", {
+        content: "[deleted]",
+        deletedAtSec: 3,
+        rumorId: "rumor-b",
+        wrapId: "rumor-b",
+      }),
+    ]);
+
+    expect(deduped).toEqual([
+      expect.objectContaining({ content: "[deleted]", deletedAtSec: 3 }),
+    ]);
+  });
+
+  it("drops a deletion of a message carrying a payment", () => {
+    const request = buildCashuPaymentRequestMessage({
+      amount: 21,
+      mintUrls: [],
+      recipientNprofile: encodeNprofile(
+        derivePubkey(NostrSecretKey.make(new Uint8Array(32).fill(1))),
+        [],
+      ),
+      requestId: "request-1",
+    });
+    const placeholder = (id: string, rumorId: string) =>
+      makeMessage(id, {
+        content: "[deleted]",
+        deletedAtSec: 5,
+        rumorId,
+        wrapId: rumorId,
+      });
+
+    const deduped = dedupeNostrMessagesByPriority([
+      makeMessage("1", { content: request, direction: "out" }),
+      makeMessage("2", { content: request }),
+      placeholder("3", "rumor-1"),
+      placeholder("4", "rumor-2"),
+    ]);
+
+    expect(
+      deduped.map(({ content, deletedAtSec }) => ({ content, deletedAtSec })),
+    ).toEqual([
+      { content: request, deletedAtSec: undefined },
+      { content: request, deletedAtSec: undefined },
+    ]);
+  });
+
+  it("shows an own message and a placeholder deleting it as one deleted message", () => {
+    const deduped = dedupeNostrMessagesByPriority([
+      makeMessage("1", {
+        direction: "out",
+        originalContent: "first draft",
+        rumorId: "rumor-shared",
+      }),
+      makeMessage("2"),
+      makeMessage("3", {
+        content: "[deleted]",
+        deletedAtSec: 3,
+        rumorId: "rumor-shared",
+        wrapId: "rumor-shared",
+      }),
+      makeMessage("4", { contactId: "contact-2", rumorId: "rumor-shared" }),
+    ]);
+
+    expect(
+      deduped.map(({ id, content, deletedAtSec, originalContent }) => ({
+        id,
+        content,
+        deletedAtSec,
+        originalContent,
+      })),
+    ).toEqual([
+      { id: "1", content: "[deleted]", deletedAtSec: 3, originalContent: null },
+      {
+        id: "2",
+        content: "message-2",
+        deletedAtSec: undefined,
+        originalContent: undefined,
+      },
+      {
+        id: "4",
+        content: "message-4",
+        deletedAtSec: undefined,
+        originalContent: undefined,
+      },
+    ]);
   });
 });
 

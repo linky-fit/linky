@@ -15,6 +15,8 @@ import type { Event as NostrToolsEvent, Filter } from "nostr-tools";
 import { encodeAppMessageRumor } from "../appMessages/codec";
 import { AppMessageDraft, AppNamespace } from "../appMessages/domain";
 import { encodeBankOfferRumor } from "../bankOffers/codec";
+import { encodeDeletionRumor } from "../chat/codec";
+import { DeleteMessageDraft } from "../chat/domain";
 import { BankOfferDraft, BankOfferId } from "../bankOffers/domain";
 import {
   ClientId,
@@ -87,6 +89,20 @@ const chatWrap = () => {
     content: "hello",
   };
   const rumor = new Rumor({ ...fields, id: getEventHash(fields) });
+  return wrapRumorFor(rumor, bob.secretKey, alice.pubkey);
+};
+
+const deletionWrap = () => {
+  const rumor = encodeDeletionRumor(
+    new DeleteMessageDraft({
+      to: alice.pubkey,
+      deleteOf: RumorId.make("ab".repeat(32)),
+      deleteOfKind: "text",
+    }),
+    bob.pubkey,
+    sentAt,
+    ClientId.make("deletion-client"),
+  );
   return wrapRumorFor(rumor, bob.secretKey, alice.pubkey);
 };
 
@@ -738,6 +754,27 @@ describe("WrapInbox", () => {
             _tag: "ChatMessageReceived",
             from: bob.pubkey,
             body: expect.objectContaining({ _tag: "TextBody", text: "hello" }),
+            sentAt,
+          }),
+        );
+      }),
+    );
+  });
+
+  it("routes a wrapped kind-5 rumor with a chat k tag to ChatMessageDeleted", async () => {
+    const fakeA = new FakeRelay();
+    const wrap = deletionWrap();
+
+    await runOpen([[relayA, fakeA]], {}, ({ collected }) =>
+      Effect.gen(function* () {
+        yield* eventually(() => fakeA.subscriptions.length === 1);
+        fakeA.emit(wrap);
+        yield* eventually(() => collected.length === 1);
+        expect(collected[0]?.event).toEqual(
+          expect.objectContaining({
+            _tag: "ChatMessageDeleted",
+            from: bob.pubkey,
+            deleteOf: "ab".repeat(32),
             sentAt,
           }),
         );

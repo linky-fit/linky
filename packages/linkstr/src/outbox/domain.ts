@@ -2,8 +2,10 @@ import { Predicate, Schema, SchemaGetter } from "effect";
 import { AppMessageDraft, AppMessageReceipt } from "../appMessages/domain";
 import {
   ChatMessageReceipt,
+  DeleteMessageDraft,
   EditMessageDraft,
   ImageMessageDraft,
+  MessageDeletionReceipt,
   MessageEditReceipt,
   TextMessageDraft,
   TokenMessageDraft,
@@ -46,6 +48,11 @@ export const ChatEditOperation = Schema.TaggedStruct("chat.edit", {
 });
 export type ChatEditOperation = typeof ChatEditOperation.Type;
 
+export const ChatDeleteOperation = Schema.TaggedStruct("chat.delete", {
+  draft: DeleteMessageDraft,
+});
+export type ChatDeleteOperation = typeof ChatDeleteOperation.Type;
+
 export const ReactionOperation = Schema.TaggedStruct("reaction", {
   draft: ReactionDraft,
 });
@@ -71,6 +78,7 @@ export const OutboxOperation = Schema.Union([
   ChatTokenOperation,
   ChatImageOperation,
   ChatEditOperation,
+  ChatDeleteOperation,
   ReactionOperation,
   PaymentTelemetryOperation,
   AppMessageOperation,
@@ -102,6 +110,7 @@ export class EnqueueReceipt extends Schema.TaggedClass<EnqueueReceipt>()(
 export const OutboxReceipt = Schema.Union([
   ChatMessageReceipt,
   MessageEditReceipt,
+  MessageDeletionReceipt,
   ReactionReceipt,
   PaymentTelemetryReceipt,
   AppMessageReceipt,
@@ -165,6 +174,8 @@ const receiptTagOf = (
       return "ChatMessageReceipt";
     case "chat.edit":
       return "MessageEditReceipt";
+    case "chat.delete":
+      return "MessageDeletionReceipt";
     case "reaction":
       return "ReactionReceipt";
     case "paymentTelemetry":

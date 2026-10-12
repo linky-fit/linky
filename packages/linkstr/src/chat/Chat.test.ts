@@ -14,6 +14,7 @@ import {
 import { Chat } from "./Chat";
 import {
   CashuTokenText,
+  DeleteMessageDraft,
   EditMessageDraft,
   ImageMessageDraft,
   MessageText,
@@ -145,6 +146,37 @@ describe("Chat sends", () => {
     expect(exit.value.editOf).toBe(editOf);
     expect(published).toHaveLength(2);
     expect(published.every((wrap) => !hasPushMarker(wrap))).toBe(true);
+  });
+
+  it("publishes unmarked deletion wraps and returns the deleted reference", async () => {
+    const published: Array<SignedWrapEvent> = [];
+    const deleteOf = RumorId.make("ab".repeat(32));
+    const exit = await runWith(
+      stubWrapTransport(published),
+      Effect.gen(function* () {
+        const chat = yield* Chat;
+        return yield* chat.deleteMessage(
+          new DeleteMessageDraft({
+            to: bob.pubkey,
+            deleteOf,
+            deleteOfKind: "text",
+            clientId,
+          }),
+        );
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.deleteOf).toBe(deleteOf);
+    expect(published).toHaveLength(2);
+    expect(published.every((wrap) => !hasPushMarker(wrap))).toBe(true);
+    const recipient = published.find(
+      (wrap) => recipientOf(wrap) === bob.pubkey,
+    );
+    assert(recipient !== undefined);
+    const rumor = Result.getOrThrow(unwrapToRumor(recipient, bob.secretKey));
+    expect(rumor.kind).toBe(5);
+    expect(rumor.tags).toContainEqual(["e", deleteOf]);
   });
 
   it("publishes two unmarked token wraps with the token rumor", async () => {

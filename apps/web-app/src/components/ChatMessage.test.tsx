@@ -44,6 +44,7 @@ const makeMessage = (
   pubkey: "sender-pubkey",
   rumorId: "rumor-1",
   wrapId: "wrap-1",
+  ...(content === "[deleted]" ? { deletedAtSec: 1_700_000_100 } : {}),
 });
 
 const contactInfo = (
@@ -82,6 +83,8 @@ const renderChatMessage = async (
       contactsGroupAssignment={options.contactsGroupAssignment ?? null}
       actionLabels={{
         copy: "copy",
+        delete: "delete",
+        deleted: "Message deleted",
         edit: "edit",
         edited: "edited",
         emojiGroups: {
@@ -106,6 +109,7 @@ const renderChatMessage = async (
       canOpenBankPaymentOfferDetails={true}
       canSettleBankPaymentOffer={options.canSettleBankPaymentOffer ?? false}
       canActOnPaymentRequest={false}
+      canDelete={false}
       canEdit={false}
       canReplyOrReact={options.canReplyOrReact ?? false}
       chatPendingLabel="pending"
@@ -129,6 +133,7 @@ const renderChatMessage = async (
       onAddNpubContacts={options.onAddNpubContacts ?? (() => undefined)}
       onCopy={() => undefined}
       onDeclinePaymentRequest={() => undefined}
+      onDelete={() => undefined}
       onEdit={() => undefined}
       onMintIconError={() => undefined}
       onOpenBankPaymentOfferDetails={() => undefined}
@@ -309,6 +314,28 @@ describe("ChatMessage image message actions", () => {
     expect(sharedFile?.type).toBe("image/jpeg");
     expect(shared && "url" in shared).toBe(false);
     expect(shared && "text" in shared).toBe(false);
+  });
+
+  it("leaves a placeholder without actions where a deleted message was", async () => {
+    const container = await renderChatMessage("[deleted]", {
+      canReplyOrReact: true,
+    });
+    const bubble = container.querySelector('[data-testid="chat-message"]');
+
+    expect(bubble?.getAttribute("data-deleted")).toBe("true");
+    expect(bubble?.textContent).toContain("Message deleted");
+    expect(bubble?.textContent).not.toContain("[deleted]");
+    expect(
+      container.querySelector('[aria-label="Message actions"]'),
+    ).toBeNull();
+    await act(async () => {
+      bubble?.dispatchEvent(
+        new MouseEvent("contextmenu", { bubbles: true, cancelable: true }),
+      );
+    });
+    expect(
+      document.body.querySelector('[data-testid="message-action"]'),
+    ).toBeNull();
   });
 
   it("keeps copy for plain text messages", async () => {

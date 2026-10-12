@@ -89,6 +89,7 @@ In React the runtime is `linkstrRuntimeAtom`, the consumer is `useOutboxResults`
 | `chat.token`       | `TokenMessageDraft`                   | `Chat.sendToken`                           |
 | `chat.image`       | `ImageMessageDraft`                   | `Chat.sendImage`                           |
 | `chat.edit`        | `EditMessageDraft`                    | `Chat.edit`                                |
+| `chat.delete`      | `DeleteMessageDraft`                  | `Chat.deleteMessage`                       |
 | `reaction`         | `ReactionDraft`                       | `Reactions.react`                          |
 | `paymentTelemetry` | `PaymentTelemetryDraft` + `recipient` | `PaymentTelemetry.publishPaymentTelemetry` |
 | `appMessage`       | `AppMessageDraft`                     | `AppMessages.send`                         |
@@ -113,4 +114,4 @@ Everything else (retractions, seen receipts, payment notices, bank offers, plain
 
 In React, use `useOutboxResults(handler)`, or set `outboxResultsHandlerAtom` to `{ onResult }` and mount `outboxResultsAtom` once. Both ack only after the async handler resolves; a rejection leaves the result for the next runtime build. Clear a manually registered handler to `null` on cleanup.
 
-Persist the outcome, then ack. `OutboxJobSucceeded` means a relay accepted the recipient copy ([honest delivery](./concepts.md#honest-delivery)); the peer's own inbox still has to receive it. Match the row by `ref`, mark it sent with `receipt.rumorId` (or `receipt.editOf` for edits) and, if you track wraps, `receipt.selfCopy.wrapId`.
+Persist the outcome, then ack. `OutboxJobSucceeded` means a relay accepted the recipient copy ([honest delivery](./concepts.md#honest-delivery)); the peer's own inbox still has to receive it. Match the row by `ref`, mark it sent with `receipt.rumorId` (or `receipt.editOf` for edits; a deletion's `receipt.deleteOf` names a row you already removed) and, if you track wraps, `receipt.selfCopy.wrapId`.

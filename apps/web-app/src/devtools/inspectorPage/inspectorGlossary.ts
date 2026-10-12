@@ -166,6 +166,12 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "An offline payment was sent after reconnecting and failed after it may have created a token. It is not retried, so it can never be paid twice; its chat placeholder shows the error.",
   "paymentRequest.authorizationLost":
     "The reviewed request or approved recipient changed during token creation. Delivery was stopped and the app attempted to return the pending transfer to the wallet; a failed return leaves it recoverable.",
+  "messages.deleted":
+    "The user deleted a message for both sides: the local row became a placeholder (deletedAtSec set, text replaced), its reactions went, and a NIP-09 deletion request (kind 5 with a k tag naming the message kind) was queued for the peer. The rumor link is the deletion, the message link the deleted rumor id.",
+  "messages.deletedByPeer":
+    "The peer deleted a message of the conversation; the matching local row became a placeholder and its reactions were removed. A deletion is honoured only for messages of the chat with that peer.",
+  "messages.deletionConfirmed":
+    "The echo of an own deletion sent from another device still found the message here and turned it into a placeholder; usually Evolu sync marked the row first and this never fires.",
   "paymentRequest.editRejected":
     "An incoming edit tried to create or change a payment request. Payment requests are immutable; the sender must send a new request.",
   "bankOffer.snapshotNotAuthorized":

@@ -133,6 +133,7 @@ const render = async (writes: {
       onOpenInboxMessageToast: () => {},
       pushToast: () => {},
       recordSentSeenReceipt: () => {},
+      markLocalNostrMessageDeleted: () => NO_WRITE,
       route: { kind: "contacts" },
       softDeleteLocalNostrReactionsByWrapIds: () => NO_WRITE,
       storeRetractedReaction: () => writes.retraction?.() ?? NO_WRITE,

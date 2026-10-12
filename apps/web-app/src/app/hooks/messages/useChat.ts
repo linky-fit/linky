@@ -38,6 +38,7 @@ import {
   useUnknownSendersRepository,
 } from "../useLinksync";
 import { useChatScroll } from "./chatScroll";
+import { useDeleteChatMessage } from "./useDeleteChatMessage";
 import { useEditChatMessage } from "./useEditChatMessage";
 import { useMessageWrites } from "./useMessageWrites";
 import { useSendChatMessage } from "./useSendChatMessage";
@@ -329,6 +330,24 @@ export const useChatReactions = <TContact extends ContactIdentityRowLike>(
   );
 
   return { onReactToChatMessage, reactionsByMessageId };
+};
+
+/** Deleting a message of the open conversation for both sides. */
+export const useChatDelete = <TContact extends ContactIdentityRowLike>(
+  selectedContact: TContact | null,
+) => {
+  const { t } = useTranslation();
+  const { markLocalNostrMessageDeleted } = useMessageWrites({
+    conversations: useConversationsRepository(),
+    unknownSenders: useUnknownSendersRepository(),
+  });
+  return useDeleteChatMessage({
+    currentNsec: useAtomValue(currentNsecAtom),
+    markLocalNostrMessageDeleted,
+    selectedContact,
+    setStatus: useSetStatus(),
+    t,
+  });
 };
 
 /** Copies a message, a private image as its preview text. */

@@ -3,6 +3,7 @@ import type { NoRelayReachable, RecipientNotReached } from "../domain/errors";
 import { makeWrapSendContext, sendToPeer } from "../internal/wrapSend";
 import type { PeerSendOutcome } from "../internal/wrapSend";
 import {
+  encodeDeletionRumor,
   encodeEditRumor,
   encodeImageMessageRumor,
   encodeTextMessageRumor,
@@ -10,7 +11,9 @@ import {
 } from "./codec";
 import {
   ChatMessageReceipt,
+  MessageDeletionReceipt,
   MessageEditReceipt,
+  type DeleteMessageDraft,
   type EditMessageDraft,
   type ImageMessageDraft,
   type TextMessageDraft,
@@ -72,7 +75,19 @@ export class Chat extends Context.Service<Chat>()("linkstr/Chat", {
           new MessageEditReceipt({ ...outcome, editOf: draft.editOf }),
       });
 
-    return { sendText, sendImage, sendToken, edit } as const;
+    const deleteMessage = (
+      draft: DeleteMessageDraft,
+    ): Effect.Effect<
+      MessageDeletionReceipt,
+      RecipientNotReached | NoRelayReachable
+    > =>
+      sendToPeer(context, "chat.deleteMessage", draft, {
+        encode: encodeDeletionRumor,
+        receipt: (outcome) =>
+          new MessageDeletionReceipt({ ...outcome, deleteOf: draft.deleteOf }),
+      });
+
+    return { sendText, sendImage, sendToken, edit, deleteMessage } as const;
   }),
 }) {
   static readonly layer = Layer.effect(this, this.make);

@@ -6,11 +6,12 @@ import type {
 } from "../../types/appTypes";
 
 type ParsedOutboxRef =
+  | { id: string; kind: "deletion" }
   | { id: string; kind: "message" }
   | { id: string; kind: "reaction" };
 
 const parseOutboxRef = (ref: OutboxRef): ParsedOutboxRef | null => {
-  for (const kind of ["message", "reaction"] as const) {
+  for (const kind of ["deletion", "message", "reaction"] as const) {
     const prefix = `${kind}:`;
     if (!ref.startsWith(prefix)) continue;
     const id = ref.slice(prefix.length).trim();
@@ -67,6 +68,9 @@ export const applyOutboxResult = (
         status: "sent",
         wrapId: receipt.selfCopy.wrapId,
       });
+      return;
+    case "MessageDeletionReceipt":
+      // The row became a placeholder when the deletion was enqueued.
       return;
     case "ReactionReceipt":
       if (parsedRef.kind !== "reaction") return;

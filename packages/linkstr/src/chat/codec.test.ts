@@ -5,14 +5,18 @@ import { ClientId, Pubkey, RumorId, UnixSeconds } from "../domain/primitives";
 import { Rumor } from "../internal/nostrEvent";
 import type { NostrTags } from "../internal/nostrEvent";
 import {
+  decodeChatDeletionRumor,
   decodeChatRumor,
+  encodeDeletionRumor,
   encodeEditRumor,
   encodeImageMessageRumor,
   encodeTextMessageRumor,
   encodeTokenMessageRumor,
+  isChatDeletionRumor,
 } from "./codec";
 import {
   CashuTokenText,
+  DeleteMessageDraft,
   EditMessageDraft,
   ImageMessageDraft,
   MessageText,
@@ -263,6 +267,115 @@ describe("chat rumor encoding", () => {
     ]);
     expect(rumor.content).toBe("edited");
     expect(rumor.id).toBe(getEventHash(rumor));
+  });
+
+  it("encodes a deletion as a NIP-09 request naming the message kind", () => {
+    const rumor = encodeDeletionRumor(
+      new DeleteMessageDraft({
+        to: bob.pubkey,
+        deleteOf: editId,
+        deleteOfKind: "image",
+      }),
+      alice.pubkey,
+      sentAt,
+      clientId,
+    );
+
+    expect(rumor.kind).toBe(5);
+    expect(rumor.tags).toEqual([
+      ["p", bob.pubkey],
+      ["p", alice.pubkey],
+      ["e", editId],
+      ["k", "15"],
+      ["client", clientId],
+    ]);
+    expect(rumor.content).toBe("");
+    expect(rumor.id).toBe(getEventHash(rumor));
+    expect(isChatDeletionRumor(rumor)).toBe(true);
+  });
+});
+
+describe("chat deletion decoding", () => {
+  const deletion = (author: typeof alice, to: typeof bob) =>
+    encodeDeletionRumor(
+      new DeleteMessageDraft({
+        to: to.pubkey,
+        deleteOf: editId,
+        deleteOfKind: "text",
+      }),
+      author.pubkey,
+      sentAt,
+      clientId,
+    );
+
+  it("tells a message deletion from a reaction retraction by its k tag", () => {
+    const retraction = withHash({
+      pubkey: bob.pubkey,
+      created_at: sentAt,
+      kind: 5,
+      tags: [
+        ["p", alice.pubkey],
+        ["e", editId],
+      ],
+      content: "",
+    });
+    expect(isChatDeletionRumor(retraction)).toBe(false);
+    expect(
+      isChatDeletionRumor(
+        withHash({ ...retraction, tags: [...retraction.tags, ["k", "7"]] }),
+      ),
+    ).toBe(false);
+  });
+
+  it("decodes a peer's deletion with the deleted rumor id", () => {
+    const rumor = deletion(bob, alice);
+    expect(decodeChatDeletionRumor(rumor, alice.pubkey)).toEqual(
+      Result.succeed(
+        expect.objectContaining({
+          _tag: "ChatMessageDeleted",
+          deletionId: rumor.id,
+          deleteOf: editId,
+          from: bob.pubkey,
+          sentAt,
+        }),
+      ),
+    );
+  });
+
+  it("decodes an own deletion echo with its peer and client id", () => {
+    const rumor = deletion(alice, bob);
+    expect(decodeChatDeletionRumor(rumor, alice.pubkey)).toEqual(
+      Result.succeed(
+        expect.objectContaining({
+          _tag: "OwnChatMessageDeletionConfirmed",
+          deletionId: rumor.id,
+          deleteOf: editId,
+          to: bob.pubkey,
+          clientId,
+          sentAt,
+        }),
+      ),
+    );
+  });
+
+  it("drops a deletion that names no rumor id or is not addressed to me", () => {
+    const noTarget = withHash({
+      pubkey: bob.pubkey,
+      created_at: sentAt,
+      kind: 5,
+      tags: [
+        ["p", alice.pubkey],
+        ["e", "not-a-rumor-id"],
+        ["k", "14"],
+      ],
+      content: "",
+    });
+    expect(decodeChatDeletionRumor(noTarget, alice.pubkey)).toEqual(
+      Result.fail("invalid-deletion"),
+    );
+    expect(
+      decodeChatDeletionRumor(deletion(bob, alice), wrapAuthor.pubkey),
+    ).toEqual(Result.fail("invalid-message"));
   });
 });
 

@@ -44,14 +44,14 @@ The backfill starts at the cursor minus the two-day backdate margin, but never m
 
 `event` is a `WrapInboxEvent`. Dispatch on `_tag`:
 
-| Vertical        | Peer-authored fact                   | Own echo                                         |
-| --------------- | ------------------------------------ | ------------------------------------------------ |
-| Chat            | `ChatMessageReceived`                | `OwnChatMessageConfirmed`                        |
-| Reactions       | `ReactionAdded`, `ReactionRetracted` | `OwnReactionConfirmed`, `OwnRetractionConfirmed` |
-| Payment notices | `PaymentNoticeReceived`              | none                                             |
-| Bank offers     | `BankOfferSnapshotReceived`          | `OwnBankOfferSnapshotConfirmed`                  |
-| Seen receipts   | `SeenReceiptReceived`                | `OwnSeenReceiptConfirmed`                        |
-| (any)           | `WrapDropped`                        |                                                  |
+| Vertical        | Peer-authored fact                          | Own echo                                                     |
+| --------------- | ------------------------------------------- | ------------------------------------------------------------ |
+| Chat            | `ChatMessageReceived`, `ChatMessageDeleted` | `OwnChatMessageConfirmed`, `OwnChatMessageDeletionConfirmed` |
+| Reactions       | `ReactionAdded`, `ReactionRetracted`        | `OwnReactionConfirmed`, `OwnRetractionConfirmed`             |
+| Payment notices | `PaymentNoticeReceived`                     | none                                                         |
+| Bank offers     | `BankOfferSnapshotReceived`                 | `OwnBankOfferSnapshotConfirmed`                              |
+| Seen receipts   | `SeenReceiptReceived`                       | `OwnSeenReceiptConfirmed`                                    |
+| (any)           | `WrapDropped`                               |                                                              |
 
 Peer facts carry `from`; own echoes carry `to` (the peer). Chat facts also carry a nullable `clientId`: on an own echo it reconciles an optimistic local row, on a peer message it dedups one message the sender published twice. A `switch (event._tag)` or effect's `Match.tag` dispatches; `Match.tagsExhaustive` makes the compiler demand a branch per tag. Run one consumer per process and hand each vertical's tags to its own handler (each vertical guide has one).
 
@@ -59,22 +59,22 @@ Peer facts carry `from`; own echoes carry `to` (the peer). Chat facts also carry
 
 Before a wrap becomes a fact its outer signature is verified, it is decrypted, the seal signature is verified, the rumor author must equal the seal author and differ from the ephemeral wrap key, the rumor id must equal the rumor's hash, and a rumor timestamp more than five minutes in the future is rejected (there is no age cutoff; wrap timestamps are randomized by NIP-59 and never checked). Anything that fails surfaces as `WrapDropped` with `wrapId` (null when the outer event was malformed) and a `reason`:
 
-| Reason                                                                                | Meaning                                                                             |
-| ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `malformed-wrap`                                                                      | not a valid signed kind-1059 event                                                  |
-| `not-addressed-to-me`                                                                 | no `p` tag with your pubkey (also a seen receipt from a peer that does not tag you) |
-| `invalid-wrap`                                                                        | outer signature verification failed                                                 |
-| `unwrap-failed`                                                                       | decryption failed                                                                   |
-| `invalid-seal`                                                                        | seal does not decode or its signature fails                                         |
-| `malformed-rumor`, `forged-rumor-id`                                                  | rumor does not decode, or its id ≠ its hash                                         |
-| `invalid-rumor-timestamp`                                                             | rumor timestamp more than five minutes in the future                                |
-| `sender-forged`                                                                       | rumor author ≠ seal author, or equals the ephemeral wrap key                        |
-| `unsupported-kind`                                                                    | rumor kind has no decoder (telemetry, foreign kinds)                                |
-| `invalid-message`, `invalid-image`, `invalid-edit`, `empty-message`, `nested-payload` | chat codec rejected it ([chat.md](./chat.md#receiving))                             |
-| `invalid-reaction`, `invalid-retraction`                                              | reactions codec rejected it ([reactions.md](./reactions.md#receiving))              |
-| `invalid-seen-receipt`                                                                | seen-receipts codec rejected it ([seen-receipts.md](./seen-receipts.md#receiving))  |
-| `invalid-notice`, `invalid-bank-offer`                                                | payment-kinds codec rejected it ([payment-kinds.md](./payment-kinds.md))            |
-| `invalid-app-message`                                                                 | app-messages codec rejected it ([app-messages.md](./app-messages.md#wire-format))   |
+| Reason                                                                                                    | Meaning                                                                             |
+| --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `malformed-wrap`                                                                                          | not a valid signed kind-1059 event                                                  |
+| `not-addressed-to-me`                                                                                     | no `p` tag with your pubkey (also a seen receipt from a peer that does not tag you) |
+| `invalid-wrap`                                                                                            | outer signature verification failed                                                 |
+| `unwrap-failed`                                                                                           | decryption failed                                                                   |
+| `invalid-seal`                                                                                            | seal does not decode or its signature fails                                         |
+| `malformed-rumor`, `forged-rumor-id`                                                                      | rumor does not decode, or its id ≠ its hash                                         |
+| `invalid-rumor-timestamp`                                                                                 | rumor timestamp more than five minutes in the future                                |
+| `sender-forged`                                                                                           | rumor author ≠ seal author, or equals the ephemeral wrap key                        |
+| `unsupported-kind`                                                                                        | rumor kind has no decoder (telemetry, foreign kinds)                                |
+| `invalid-message`, `invalid-image`, `invalid-edit`, `invalid-deletion`, `empty-message`, `nested-payload` | chat codec rejected it ([chat.md](./chat.md#receiving))                             |
+| `invalid-reaction`, `invalid-retraction`                                                                  | reactions codec rejected it ([reactions.md](./reactions.md#receiving))              |
+| `invalid-seen-receipt`                                                                                    | seen-receipts codec rejected it ([seen-receipts.md](./seen-receipts.md#receiving))  |
+| `invalid-notice`, `invalid-bank-offer`                                                                    | payment-kinds codec rejected it ([payment-kinds.md](./payment-kinds.md))            |
+| `invalid-app-message`                                                                                     | app-messages codec rejected it ([app-messages.md](./app-messages.md#wire-format))   |
 
 Drops are facts too: log them, count them, but never treat one as an error.
 

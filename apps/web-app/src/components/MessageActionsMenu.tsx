@@ -21,12 +21,14 @@ interface MessageImageActions {
 
 interface MessageActionsMenuProps {
   canCopy: boolean;
+  canDelete: boolean;
   canEdit: boolean;
   canReplyOrReact: boolean;
   imageActions: MessageImageActions | null;
   isOpen: boolean;
   labels: {
     copy: string;
+    delete: string;
     edit: string;
     emojiGroups: Record<ReactionEmojiGroupId, string>;
     menu: string;
@@ -38,6 +40,7 @@ interface MessageActionsMenuProps {
   };
   onClose: () => void;
   onCopy: () => void;
+  onDelete: () => void;
   onEdit: () => void;
   onReact: (emoji: string) => void;
   onReply: () => void;
@@ -51,6 +54,7 @@ interface MenuAction {
 
 export const MessageActionsMenu: FC<MessageActionsMenuProps> = ({
   canCopy,
+  canDelete,
   canEdit,
   canReplyOrReact,
   imageActions,
@@ -58,6 +62,7 @@ export const MessageActionsMenu: FC<MessageActionsMenuProps> = ({
   labels,
   onClose,
   onCopy,
+  onDelete,
   onEdit,
   onReact,
   onReply,
@@ -93,6 +98,8 @@ export const MessageActionsMenu: FC<MessageActionsMenuProps> = ({
       run: imageActions.onSave,
     });
   if (canCopy) actions.push({ icon: "Copy", label: labels.copy, run: onCopy });
+  if (canDelete)
+    actions.push({ icon: "Trash2", label: labels.delete, run: onDelete });
   const close = () => {
     setEmojisExpanded(false);
     onClose();

@@ -27,6 +27,7 @@ export const DropReason = Schema.Literals([
   "invalid-message",
   "invalid-image",
   "invalid-edit",
+  "invalid-deletion",
   "empty-message",
   "nested-payload",
   "invalid-notice",

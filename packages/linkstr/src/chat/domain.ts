@@ -3,6 +3,10 @@ import { WrapDelivery } from "../domain/delivery";
 import { ClientId, Pubkey, RumorId, UnixSeconds } from "../domain/primitives";
 import { parseCashuToken } from "./cashuToken";
 
+/** Kind of the message a deletion refers to; the codec maps this to the ["k"] tag. */
+export const DeletedMessageKind = Schema.Literals(["text", "image"]);
+export type DeletedMessageKind = typeof DeletedMessageKind.Type;
+
 const LOWERCASE_HEX_64 = /^[0-9a-f]{64}$/;
 const LOWERCASE_HEX_24 = /^[0-9a-f]{24}$/;
 
@@ -88,6 +92,17 @@ export class EditMessageDraft extends Schema.Class<EditMessageDraft>(
   sentAt: Schema.optional(UnixSeconds),
 }) {}
 
+/** Asks both sides to drop a message; either participant may delete any message of the conversation. */
+export class DeleteMessageDraft extends Schema.Class<DeleteMessageDraft>(
+  "DeleteMessageDraft",
+)({
+  to: Pubkey,
+  deleteOf: RumorId,
+  deleteOfKind: DeletedMessageKind,
+  clientId: Schema.optional(ClientId),
+  sentAt: Schema.optional(UnixSeconds),
+}) {}
+
 export class ChatMessageReceipt extends Schema.TaggedClass<ChatMessageReceipt>()(
   "ChatMessageReceipt",
   {
@@ -104,6 +119,18 @@ export class MessageEditReceipt extends Schema.TaggedClass<MessageEditReceipt>()
   {
     rumorId: RumorId,
     editOf: RumorId,
+    clientId: ClientId,
+    sentAt: UnixSeconds,
+    selfCopy: WrapDelivery,
+    recipientCopy: WrapDelivery,
+  },
+) {}
+
+export class MessageDeletionReceipt extends Schema.TaggedClass<MessageDeletionReceipt>()(
+  "MessageDeletionReceipt",
+  {
+    rumorId: RumorId,
+    deleteOf: RumorId,
     clientId: ClientId,
     sentAt: UnixSeconds,
     selfCopy: WrapDelivery,

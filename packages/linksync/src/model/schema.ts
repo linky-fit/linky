@@ -55,6 +55,9 @@ export const messageContentColumns = {
   isEdited: nullOr(NonEmptyString100),
   // First known message content before edits.
   originalContent: nullOr(NonEmptyString),
+  // Set once either side deleted the message; the row stays as a placeholder
+  // and `content` holds a stand-in instead of the text.
+  deletedAtSec: nullOr(PositiveInt),
 };
 
 /**

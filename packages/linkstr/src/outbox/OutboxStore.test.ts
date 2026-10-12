@@ -3,8 +3,10 @@ import { generateSecretKey, getPublicKey } from "nostr-tools";
 import {
   CashuTokenText,
   ChatMessageReceipt,
+  DeleteMessageDraft,
   EditMessageDraft,
   ImageMessageDraft,
+  MessageDeletionReceipt,
   MessageEditReceipt,
   MessageText,
   PrivateImage,
@@ -272,6 +274,7 @@ interface ReceiptCase {
   readonly receiptClass:
     | typeof ChatMessageReceipt
     | typeof MessageEditReceipt
+    | typeof MessageDeletionReceipt
     | typeof ReactionReceipt
     | typeof PaymentTelemetryReceipt;
   /** Pre-#319 shape: per-vertical id key, no `_tag`. */
@@ -331,6 +334,24 @@ const receiptCases: ReadonlyArray<ReceiptCase> = [
     receiptClass: MessageEditReceipt,
     preRenameJson: { messageId: rumorId, editOf, ...wirePeerCopies },
     untaggedJson: { rumorId, editOf, ...wirePeerCopies },
+  },
+  {
+    name: "chat.delete",
+    operation: {
+      _tag: "chat.delete",
+      draft: new DeleteMessageDraft({
+        to: pubkey,
+        deleteOf: editOf,
+        deleteOfKind: "text",
+        clientId,
+        sentAt,
+      }),
+    },
+    receipt: new MessageDeletionReceipt({ ...peerReceipt, deleteOf: editOf }),
+    receiptClass: MessageDeletionReceipt,
+    // Deletions never shipped before receipts carried rumorId, so both legacy shapes are the untagged one.
+    preRenameJson: { rumorId, deleteOf: editOf, ...wirePeerCopies },
+    untaggedJson: { rumorId, deleteOf: editOf, ...wirePeerCopies },
   },
   {
     name: "reaction",

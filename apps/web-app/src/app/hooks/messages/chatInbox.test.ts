@@ -2,10 +2,12 @@
 import { encodeNprofile } from "@linky-fit/linkstr";
 import { buildCashuPaymentRequestMessage } from "../../lib/paymentRequestMessage";
 import {
+  ChatMessageDeleted,
   ChatMessageReceived,
   ClientId,
   ImageBody,
   OwnChatMessageConfirmed,
+  OwnChatMessageDeletionConfirmed,
   PrivateImage,
   Pubkey,
   RumorId,
@@ -22,6 +24,7 @@ import type {
   NewLocalNostrMessage,
 } from "../../types/appTypes";
 import {
+  applyChatMessageDeletion,
   applyChatMessageReceived,
   applyOwnChatMessageConfirmed,
   type ChatInboxContext,
@@ -91,6 +94,14 @@ const createHarness = (options: HarnessOptions = {}) => {
     },
   );
   const logPayStep = vi.fn();
+  const markLocalNostrMessageDeleted = vi.fn((message: LocalNostrMessage) => {
+    const stored = messages.find((candidate) => candidate.id === message.id);
+    if (stored) {
+      stored.content = "[deleted]";
+      stored.deletedAtSec = SENT_AT + 5;
+    }
+    return NO_WRITE;
+  });
 
   const ctx: ChatInboxContext = {
     appendLocalNostrMessage,
@@ -98,6 +109,7 @@ const createHarness = (options: HarnessOptions = {}) => {
     isBlockedPubkey: (pubkey) => blockedPubkeys.has(pubkey),
     logPayStep,
     messages,
+    markLocalNostrMessageDeleted,
     resolveContactId: (pubkey) => (pubkey === peerPubkey ? "contact-1" : null),
     updateLocalNostrMessage,
     visibleSinceSec: options.visibleSinceSec ?? null,
@@ -107,6 +119,7 @@ const createHarness = (options: HarnessOptions = {}) => {
     appendLocalNostrMessage,
     ctx,
     logPayStep,
+    markLocalNostrMessageDeleted,
     messages,
     updateLocalNostrMessage,
   };
@@ -507,5 +520,195 @@ describe("immutable chat payment requests", () => {
       wrapId: MESSAGE_RUMOR_ID,
       pubkey: peerPubkey,
     });
+  });
+});
+
+describe("applyChatMessageDeletion", () => {
+  const DELETION_RUMOR_ID = "e".repeat(64);
+  const stored = (
+    overrides: Partial<LocalNostrMessage> = {},
+  ): LocalNostrMessage => ({
+    id: "message-1",
+    contactId: "contact-1",
+    content: "hello",
+    createdAtSec: SENT_AT,
+    direction: "in",
+    pubkey: peerPubkey,
+    rumorId: MESSAGE_RUMOR_ID,
+    wrapId: MESSAGE_RUMOR_ID,
+    status: "sent",
+    ...overrides,
+  });
+  const deletedByPeer = (
+    overrides: Partial<
+      ConstructorParameters<typeof ChatMessageDeleted>[0]
+    > = {},
+  ) =>
+    new ChatMessageDeleted({
+      deletionId: RumorId.make(DELETION_RUMOR_ID),
+      deleteOf: RumorId.make(MESSAGE_RUMOR_ID),
+      from: Pubkey.make(peerPubkey),
+      sentAt: UnixSeconds.make(SENT_AT + 5),
+      ...overrides,
+    });
+
+  it("marks the peer's and own messages of that conversation deleted, edits included", () => {
+    const harness = createHarness({
+      messages: [
+        stored(),
+        stored({
+          id: "message-2",
+          direction: "out",
+          pubkey: "my-pubkey",
+          rumorId: EDIT_RUMOR_ID,
+          editedFromId: MESSAGE_RUMOR_ID,
+        }),
+        stored({ id: "message-3", rumorId: REPLY_RUMOR_ID }),
+      ],
+    });
+
+    void applyChatMessageDeletion(deletedByPeer(), harness.ctx);
+
+    expect(harness.markLocalNostrMessageDeleted).toHaveBeenCalledTimes(2);
+    expect(
+      harness.messages.map((message) => [message.id, message.content]),
+    ).toEqual([
+      ["message-1", "[deleted]"],
+      ["message-2", "[deleted]"],
+      ["message-3", "hello"],
+    ]);
+
+    // A replayed deletion finds nothing left to mark.
+    void applyChatMessageDeletion(deletedByPeer(), harness.ctx);
+    expect(harness.markLocalNostrMessageDeleted).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a placeholder for a deletion that arrives before its message", () => {
+    const harness = createHarness();
+
+    void applyChatMessageDeletion(deletedByPeer(), harness.ctx);
+    const { inserted } = applyChatMessageReceived(received(), harness.ctx);
+
+    expect(inserted).toBeNull();
+    expect(harness.messages).toEqual([
+      expect.objectContaining({
+        contactId: "contact-1",
+        content: "[deleted]",
+        deletedAtSec: SENT_AT + 5,
+        direction: "in",
+        rumorId: MESSAGE_RUMOR_ID,
+      }),
+    ]);
+  });
+
+  it("keeps the text of a deleted edit's original out when the original arrives late", () => {
+    const harness = createHarness({
+      messages: [
+        stored({
+          content: "[deleted]",
+          deletedAtSec: SENT_AT + 5,
+          editedFromId: MESSAGE_RUMOR_ID,
+          isEdited: true,
+          originalContent: null,
+          rumorId: EDIT_RUMOR_ID,
+        }),
+      ],
+    });
+
+    applyChatMessageReceived(received(), harness.ctx);
+
+    expect(harness.updateLocalNostrMessage).not.toHaveBeenCalled();
+    expect(harness.messages).toHaveLength(1);
+  });
+
+  it("leaves a message carrying a payment in place", () => {
+    const request = buildCashuPaymentRequestMessage({
+      amount: 21,
+      mintUrls: [],
+      recipientNprofile: encodeNprofile(Pubkey.make(peerPubkey), []),
+      requestId: "request-1",
+    });
+    const harness = createHarness({ messages: [stored({ content: request })] });
+
+    void applyChatMessageDeletion(deletedByPeer(), harness.ctx);
+
+    expect(harness.markLocalNostrMessageDeleted).not.toHaveBeenCalled();
+    expect(harness.messages).toHaveLength(1);
+    expect(harness.messages[0]?.content).toBe(request);
+  });
+
+  it("ignores an edit of a message that was deleted", () => {
+    const harness = createHarness({
+      messages: [stored({ content: "[deleted]", deletedAtSec: SENT_AT + 5 })],
+    });
+
+    applyChatMessageReceived(
+      received({
+        messageId: RumorId.make(EDIT_RUMOR_ID),
+        editOf: RumorId.make(MESSAGE_RUMOR_ID),
+        body: new TextBody({ text: "edited after deletion" }),
+        sentAt: UnixSeconds.make(SENT_AT + 9),
+      }),
+      harness.ctx,
+    );
+
+    expect(harness.messages).toHaveLength(1);
+    expect(harness.messages[0]?.content).toBe("[deleted]");
+  });
+
+  it("ignores a deletion that names a message of another conversation", () => {
+    const harness = createHarness({
+      messages: [
+        stored({ contactId: "contact-2", pubkey: unknownSenderPubkey }),
+      ],
+    });
+
+    void applyChatMessageDeletion(deletedByPeer(), harness.ctx);
+
+    expect(harness.markLocalNostrMessageDeleted).not.toHaveBeenCalled();
+    expect(harness.messages[0]?.content).toBe("hello");
+  });
+
+  it("ignores deletions from blocked peers and from before the identity", () => {
+    const blocked = createHarness({
+      blockedPubkeys: [peerPubkey],
+      messages: [stored()],
+    });
+    void applyChatMessageDeletion(deletedByPeer(), blocked.ctx);
+    expect(blocked.markLocalNostrMessageDeleted).not.toHaveBeenCalled();
+
+    const earlier = createHarness({
+      identitySinceSec: SENT_AT + 10,
+      messages: [stored()],
+    });
+    void applyChatMessageDeletion(deletedByPeer(), earlier.ctx);
+    expect(earlier.markLocalNostrMessageDeleted).not.toHaveBeenCalled();
+  });
+
+  it("applies an own deletion echoed from another device within the peer's chat", () => {
+    const harness = createHarness({
+      messages: [
+        stored({ direction: "out", pubkey: "my-pubkey" }),
+        stored({ id: "message-2", contactId: "contact-2", rumorId: null }),
+      ],
+    });
+
+    void applyChatMessageDeletion(
+      new OwnChatMessageDeletionConfirmed({
+        deletionId: RumorId.make(DELETION_RUMOR_ID),
+        deleteOf: RumorId.make(MESSAGE_RUMOR_ID),
+        to: Pubkey.make(peerPubkey),
+        clientId: null,
+        sentAt: UnixSeconds.make(SENT_AT + 5),
+      }),
+      harness.ctx,
+    );
+
+    expect(
+      harness.messages.map((message) => [message.id, message.content]),
+    ).toEqual([
+      ["message-1", "[deleted]"],
+      ["message-2", "hello"],
+    ]);
   });
 });

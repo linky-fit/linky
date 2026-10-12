@@ -1,18 +1,25 @@
 import { parseCashuPaymentRequestMessage } from "../../lib/paymentRequestMessage";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
 import type {
+  ChatMessageDeleted,
   ChatMessageReceived,
   MessageBody,
   OwnChatMessageConfirmed,
+  OwnChatMessageDeletionConfirmed,
 } from "@linky-fit/linkstr";
 import { serializePrivateImageMessage } from "../../lib/privateImageMessage";
-import { NO_WRITE, type WriteOutcome } from "../../lib/storeWrite";
+import { allWrites, NO_WRITE, type WriteOutcome } from "../../lib/storeWrite";
 import type {
   AppendLocalNostrMessage,
   LocalNostrMessage,
   PaymentLogData,
   UpdateLocalNostrMessage,
 } from "../../types/appTypes";
+import {
+  carriesPayment,
+  DELETED_MESSAGE_CONTENT,
+  isDeletedMessage,
+} from "../../lib/deletedMessage";
 import { buildUnknownContactId, normalizePubkeyHex } from "./contactIdentity";
 import { trimString } from "../../../utils/validation";
 
@@ -50,6 +57,10 @@ export interface ChatInboxContext {
   isBlockedPubkey: (pubkey: string) => boolean;
   logPayStep: (step: string, data?: PaymentLogData) => void;
   messages: readonly LocalNostrMessage[];
+  /** Turns a stored message into a deleted-message placeholder and drops its reactions. */
+  markLocalNostrMessageDeleted: (
+    message: LocalNostrMessage,
+  ) => Promise<WriteOutcome>;
   /** Known-contact lookup; unknown senders fall back to a synthetic id. */
   resolveContactId: (peerPubkey: string) => string | null;
   updateLocalNostrMessage: UpdateLocalNostrMessage;
@@ -138,6 +149,7 @@ export const applyChatMessageReceived = (
       return NOTHING_INSERTED;
     }
     if (target) {
+      if (isDeletedMessage(target)) return NOTHING_INSERTED;
       // A replayed backfill must not roll an already-applied newer edit back.
       if (target.isEdited && (target.editedAtSec ?? 0) >= event.sentAt) {
         return NOTHING_INSERTED;
@@ -180,7 +192,9 @@ export const applyChatMessageReceived = (
     }
     if (editedVersion) {
       const editedVersionId = trimString(editedVersion.id);
-      return !trimString(editedVersion.originalContent) && editedVersionId
+      return !trimString(editedVersion.originalContent) &&
+        !isDeletedMessage(editedVersion) &&
+        editedVersionId
         ? updatedOnly(
             ctx.updateLocalNostrMessage(editedVersionId, {
               originalContent: content,
@@ -278,4 +292,85 @@ export const applyOwnChatMessageConfirmed = (
     rumorId: event.messageId,
   });
   return written;
+};
+
+const appendDeletedPlaceholder = (
+  event: ChatMessageDeleted,
+  contactId: string,
+  ctx: ChatInboxContext,
+): Promise<WriteOutcome> => {
+  if (ctx.visibleSinceSec !== null && event.sentAt < ctx.visibleSinceSec) {
+    return NO_WRITE;
+  }
+  reportAppLog({
+    tag: "messages.deletedBeforeArrival",
+    summary:
+      "Kept a placeholder for a message the peer deleted before it arrived",
+    links: {
+      rumor: event.deletionId,
+      message: event.deleteOf,
+      pubkey: event.from,
+    },
+    payload: null,
+  });
+  return ctx.appendLocalNostrMessage({
+    contactId,
+    direction: "in",
+    content: DELETED_MESSAGE_CONTENT,
+    wrapId: event.deleteOf,
+    rumorId: event.deleteOf,
+    pubkey: event.from,
+    createdAtSec: event.sentAt,
+    deletedAtSec: event.sentAt,
+    status: "sent",
+  }).written;
+};
+
+/**
+ * A deletion names only a rumor id, so the message is looked up within the
+ * conversation with the peer: a peer can delete any message of that chat
+ * except one carrying a payment, and nothing outside it. A peer's deletion
+ * that arrives before its message leaves a placeholder under that rumor id,
+ * which the message then dedupes against. The own echo mostly finds nothing
+ * left to do, since the deleting device marked the row and Evolu synced that;
+ * it stays idempotent.
+ */
+export const applyChatMessageDeletion = (
+  event: ChatMessageDeleted | OwnChatMessageDeletionConfirmed,
+  ctx: ChatInboxContext,
+): Promise<WriteOutcome> => {
+  const byPeer = event._tag === "ChatMessageDeleted";
+  const peer = byPeer ? event.from : event.to;
+  if (byPeer && ctx.isBlockedPubkey(peer)) return NO_WRITE;
+  if (ctx.identitySinceSec !== null && event.sentAt < ctx.identitySinceSec) {
+    return NO_WRITE;
+  }
+  const contactId = ctx.resolveContactId(peer) ?? buildUnknownContactId(peer);
+  if (!contactId) return NO_WRITE;
+
+  const matches = ctx.messages.filter(
+    (message) =>
+      (trimString(message.contactId) === contactId ||
+        matchesIncomingConversation(message, contactId, peer)) &&
+      (trimString(message.rumorId) === event.deleteOf ||
+        trimString(message.editedFromId) === event.deleteOf),
+  );
+  if (matches.length === 0) {
+    return byPeer ? appendDeletedPlaceholder(event, contactId, ctx) : NO_WRITE;
+  }
+  const targets = matches.filter(
+    (message) => !isDeletedMessage(message) && !carriesPayment(message.content),
+  );
+  if (targets.length === 0) return NO_WRITE;
+  reportAppLog({
+    tag: byPeer ? "messages.deletedByPeer" : "messages.deletionConfirmed",
+    summary: byPeer
+      ? "Replaced a message the peer deleted with a placeholder"
+      : "Replaced a message deleted from another device with a placeholder",
+    links: { rumor: event.deletionId, message: event.deleteOf, pubkey: peer },
+    payload: { deleted: targets.length },
+  });
+  return allWrites(
+    targets.map((message) => ctx.markLocalNostrMessageDeleted(message)),
+  );
 };

@@ -27,6 +27,7 @@ import type {
   UpdateLocalNostrReaction,
 } from "../../types/appTypes";
 import {
+  applyChatMessageDeletion,
   applyChatMessageReceived,
   applyOwnChatMessageConfirmed,
   type ChatInboxContext,
@@ -102,6 +103,7 @@ interface UseLinkstrInboxSyncParams {
   }) => void;
   pushToast: (message: string, options?: PushToastOptions) => void;
   recordSentSeenReceipt: (peerPubkey: string, seenUpToSec: number) => void;
+  markLocalNostrMessageDeleted: ChatInboxContext["markLocalNostrMessageDeleted"];
   route: RouteWithOptionalId;
   softDeleteLocalNostrReactionsByWrapIds: ReactionInboxContext["softDeleteLocalNostrReactionsByWrapIds"];
   storeRetractedReaction: ReactionInboxContext["storeRetractedReaction"];
@@ -184,6 +186,7 @@ export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
       isBlockedPubkey,
       logPayStep: latest.logPayStep,
       messages: latest.latestMessages(),
+      markLocalNostrMessageDeleted: latest.markLocalNostrMessageDeleted,
       resolveContactId: (peerPubkey) => findContact(peerPubkey)?.id ?? null,
       updateLocalNostrMessage: latest.updateLocalNostrMessage,
       visibleSinceSec: latest.messagesVisibleSinceSec,
@@ -239,6 +242,9 @@ export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
         }
         case "OwnChatMessageConfirmed":
           return applyOwnChatMessageConfirmed(event, chatCtx);
+        case "ChatMessageDeleted":
+        case "OwnChatMessageDeletionConfirmed":
+          return applyChatMessageDeletion(event, chatCtx);
         case "PaymentNoticeReceived": {
           if (isBlockedPubkey(event.from)) return NO_WRITE;
           if (cutoff !== null && event.sentAt < cutoff) return NO_WRITE;

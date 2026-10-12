@@ -559,6 +559,8 @@ export const pt = {
   chatEmojiGroupFlags: "Bandeiras",
   chatMessageActions: "Ações da mensagem",
   chatEditAction: "Editar",
+  chatDeleteAction: "Excluir",
+  chatMessageDeleted: "Mensagem excluída",
   chatSaveAction: "Salvar",
   chatReplyingTo: "Respondendo a",
   chatReplyUnavailable: "Mensagem original indisponível",

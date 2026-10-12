@@ -34,6 +34,8 @@ const formatInlinePreviewEntities = (content: string): string => {
 
 interface FormatChatMessagePreviewArgs {
   content: string;
+  /** A deleted message previews as its placeholder, whatever `content` holds. */
+  deleted?: boolean | undefined;
   direction?: "in" | "out" | null;
   formatDisplayedAmountText: (amountSat: number) => string;
   t: Translate;
@@ -41,10 +43,12 @@ interface FormatChatMessagePreviewArgs {
 
 export const formatChatMessagePreviewText = ({
   content,
+  deleted = false,
   direction,
   formatDisplayedAmountText,
   t,
 }: FormatChatMessagePreviewArgs): string => {
+  if (deleted) return t("chatMessageDeleted");
   const privateImage = parsePrivateImageMessage(content);
   if (privateImage) {
     return privateImagePreviewText(t, privateImage);
