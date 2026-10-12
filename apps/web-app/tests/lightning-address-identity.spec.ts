@@ -138,7 +138,7 @@ const addContactByLightningAddress = async (
   await search.fill(address);
   await search.press("Enter");
   await page
-    .getByRole("button", { name: "Create contact", exact: true })
+    .getByRole("button", { name: "Save lightning address", exact: true })
     .click({ timeout: 30_000 });
   await page.getByLabel("Name").fill(name);
   await page.getByRole("button", { name: "Add", exact: true }).click();

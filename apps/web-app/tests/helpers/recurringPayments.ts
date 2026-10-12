@@ -271,7 +271,7 @@ export const addLightningContact = async (page: Page): Promise<void> => {
   await search.fill(LIGHTNING_ADDRESS);
   await search.press("Enter");
   await page
-    .getByRole("button", { name: "Create contact", exact: true })
+    .getByRole("button", { name: "Save lightning address", exact: true })
     .click({ timeout: 30_000 });
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await page.waitForURL(/#(?:contacts)?$/, { timeout: 20_000 });

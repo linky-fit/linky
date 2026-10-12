@@ -211,6 +211,9 @@ export interface ContactsGuideStep {
   titleKey: I18nKey;
 }
 
+/** The add-contact page: finding someone, or filling in their details. */
+export type ContactNewStep = "search" | "details";
+
 export interface ContactFormState {
   groups: string[];
   lnAddress: string;

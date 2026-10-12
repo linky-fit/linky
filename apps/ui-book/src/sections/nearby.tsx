@@ -3,20 +3,21 @@ import * as UI from "@linky-fit/ui";
 import type { Section } from "../section";
 import { sampleImage } from "../sample-image";
 
+const sells: UI.NearbyBadge = { label: "Sells BTC", tone: "info" };
+const buys: UI.NearbyBadge = { label: "Buys BTC", tone: "accent" };
+
 const people: readonly {
   name: string;
-  trade?: UI.NearbyTrade;
+  badge?: UI.NearbyBadge;
   imageUrl?: string;
 }[] = [
-  { name: "Bea Stone", trade: "sell" },
-  { name: "Color Study", trade: "buy", imageUrl: sampleImage },
-  { name: "Cyril Novak" },
+  { name: "Bea Stone", badge: sells },
+  { name: "Color Study", badge: buys, imageUrl: sampleImage },
+  { name: "Cyril Novak", badge: { label: "New", tone: "neutral" } },
   { name: "Dana Kral" },
   { name: "Emil Horak" },
   { name: "Filip Dvorak" },
 ];
-
-const badgeLabels = { buy: "Buys BTC", sell: "Sells BTC" };
 
 const firstName = (name: string) => name.split(" ")[0] ?? name;
 
@@ -32,27 +33,25 @@ export const nearby: Section = {
               name="Alex Rivers"
               label="You"
               isSelf
-              trade="sell"
-              badgeLabel="Sells BTC"
+              badge={sells}
               onPress={() => setPressed("You")}
             />
             <UI.NearbyAvatar
               name="Bea Stone"
               label="Bea"
-              trade="buy"
-              badgeLabel="Buys BTC"
+              badge={buys}
               onPress={() => setPressed("Bea")}
             />
             <UI.NearbyAvatar
               name="Cyril Novak"
               label="Cyril"
+              badge={{ label: "New", tone: "neutral" }}
               onPress={() => setPressed("Cyril")}
             />
             <UI.NearbyAvatar
               name="Long localized badge"
               label="Maximilian"
-              trade="sell"
-              badgeLabel="Prodává BTC"
+              badge={{ label: "Prodává BTC", tone: "info" }}
               onPress={() => setPressed("Maximilian")}
             />
           </UI.Row>
@@ -69,18 +68,17 @@ export const nearby: Section = {
             name="Alex Rivers"
             label="You"
             isSelf
-            trade="buy"
-            badgeLabel="Buys BTC"
+            badge={buys}
             onPress={() => {}}
           />
-          {people.map(({ name, trade, imageUrl }) => (
+          {people.map(({ name, badge, imageUrl }) => (
             <UI.NearbyAvatar
               key={name}
               name={name}
               imageUrl={imageUrl}
               label={firstName(name)}
+              badge={badge}
               onPress={() => {}}
-              {...(trade ? { trade, badgeLabel: badgeLabels[trade] } : {})}
             />
           ))}
         </UI.NearbyRow>

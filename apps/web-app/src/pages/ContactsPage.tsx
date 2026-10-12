@@ -4,6 +4,7 @@ import {
   EmptyState,
   IconButton,
   NearbyAvatar,
+  type NearbyBadge,
   NearbyRow,
   Row,
   ScrollList,
@@ -26,7 +27,7 @@ import { useContactRows } from "../app/hooks/useLinksync";
 import type { ContactRowLike } from "../app/types/appTypes";
 import { navigateTo } from "../hooks/useRouting";
 import type { Translate } from "../i18n";
-import { formatShortNpub } from "../utils/formatting";
+import { firstName, formatShortNpub } from "../utils/formatting";
 
 interface ContactsPageProps {
   activeGroup: string | null;
@@ -50,12 +51,10 @@ interface ContactsPageProps {
   };
 }
 
-const TRADE_BADGE_KEYS = {
-  buy: "beaconTradeBuy",
-  sell: "beaconTradeSell",
+const TRADE_BADGES = {
+  buy: { key: "beaconTradeBuy", tone: "accent" },
+  sell: { key: "beaconTradeSell", tone: "info" },
 } as const;
-
-const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? name;
 
 /** The user (while their own trade is published) and nearby contacts, trades first. */
 function NearbyContactsSection({ t }: { t: Translate }) {
@@ -69,10 +68,10 @@ function NearbyContactsSection({ t }: { t: Translate }) {
 
   if (nearby.length === 0 && ownTrade === "none") return null;
 
-  const badge = (state: "nearby" | "buy" | "sell") =>
+  const badge = (state: "nearby" | "buy" | "sell"): NearbyBadge | undefined =>
     state === "nearby"
-      ? {}
-      : { trade: state, badgeLabel: t(TRADE_BADGE_KEYS[state]) };
+      ? undefined
+      : { label: t(TRADE_BADGES[state].key), tone: TRADE_BADGES[state].tone };
 
   return (
     <Section title={t("nearby")}>
@@ -83,8 +82,8 @@ function NearbyContactsSection({ t }: { t: Translate }) {
             imageUrl={effectiveProfilePicture ?? undefined}
             label={t("nearbyYou")}
             isSelf
+            badge={badge(ownTrade)}
             onPress={() => navigateTo({ route: "proxyPayments" })}
-            {...badge(ownTrade)}
           />
         )}
         {nearby.map(({ pubkey, contactId, state }) => {
@@ -97,8 +96,8 @@ function NearbyContactsSection({ t }: { t: Translate }) {
               name={name}
               imageUrl={nostrPictureByNpub[npub] ?? undefined}
               label={firstName(name)}
+              badge={badge(state)}
               onPress={() => navigateTo({ route: "chat", id: contactId })}
-              {...badge(state)}
             />
           );
         })}

@@ -648,17 +648,19 @@ export const pt = {
   contactsOnboardingTaskMessage: "Enviar uma mensagem",
   addContact: "Adicionar contato",
   addAllContacts: "Adicionar todos",
-  contactLoadQr: "Carregar QR",
+  contactLoadQr: "Ler QR do contato",
   search: "Buscar",
   contactSearching: "Buscando...",
-  contactSearchLabel: "Contato",
+  contactSearchLabel: "Buscar contato",
   contactSearchPlaceholder: "npub, NIP-05 ou nome reservado",
-  contactSearchHint:
-    "Digite um npub, NIP-05 ou nome reservado, por exemplo alice.",
   contactSearchEmpty: "Digite quem você quer buscar.",
   contactSearchNoResult: "Nada encontrado.",
   contactSearchCreateFromQuery: "Criar contato",
-  contactSuggestionsTitle: "Novos usuários do Linky",
+  contactSuggestionsTitle: "Sugestões",
+  contactSuggestionNew: "Novo",
+  contactSaveLightningAddress: "Salvar endereço lightning",
+  contactNewIntro:
+    "Adicione apenas contatos confiáveis que você conhece pessoalmente.",
   contactIdentifierInvalid: "Digite um npub ou nome reservado válido.",
   noContactsYet: "Nenhum contato ainda.",
 
@@ -678,7 +680,7 @@ export const pt = {
   contactEditTitle: "Editar contato",
   contactPayTitle: "Pagar ao contato",
   messagesTitle: "Mensagens",
-  newContact: "Adicionar novo contato",
+  newContact: "Adicionar contato",
   close: "Fechar",
   continue: "Continuar",
 

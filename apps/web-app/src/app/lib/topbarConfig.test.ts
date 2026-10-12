@@ -21,10 +21,12 @@ vi.stubGlobal("location", { assign: assignMock, hash: "" });
 const contactId = createIdFromString<"Contact">("contact-1");
 const tokenId = createIdFromString<"CashuOperation">("token-1");
 
+const backFromContactNew = vi.fn();
 const closeContactDetail = vi.fn();
 const navigateToMainReturn = vi.fn();
 
 const baseContext: BackActionContext = {
+  backFromContactNew,
   closeContactDetail,
   contactPayBackToChatId: null,
   navigateToMainReturn,
@@ -112,7 +114,8 @@ describe("resolveBackAction", () => {
     resolveBackAction({ kind: "contact", id: contactId }, baseContext)?.();
     resolveBackAction({ kind: "contactNew" }, baseContext)?.();
 
-    expect(closeContactDetail).toHaveBeenCalledTimes(2);
+    expect(closeContactDetail).toHaveBeenCalledOnce();
+    expect(backFromContactNew).toHaveBeenCalledOnce();
     expect(assignMock).not.toHaveBeenCalled();
   });
 
@@ -158,6 +161,7 @@ describe("resolveBackAction", () => {
 describe("buildTopbar", () => {
   it("hides the back button on the bottom-nav roots", () => {
     const args = {
+      backFromContactNew: vi.fn(),
       closeContactDetail: vi.fn(),
       contactPayBackToChatId: null,
       navigateToMainReturn: vi.fn(),
@@ -181,7 +185,6 @@ describe("buildTopbarRight", () => {
       hiddenTransactionsShown: false,
       isProfileEditing: false,
       openReceiveScan: vi.fn(),
-      openScan: vi.fn(),
       t: (key: string) => key,
       toggleContactsFilter: vi.fn(),
       toggleHiddenTransactions: vi.fn(),
@@ -261,7 +264,6 @@ describe("buildTopbarRight", () => {
       hiddenTransactionsShown: false,
       isProfileEditing: false,
       openReceiveScan: vi.fn(),
-      openScan: vi.fn(),
       route: { kind: "contacts" },
       t: (key) => key,
       toggleContactsFilter,
@@ -271,7 +273,7 @@ describe("buildTopbarRight", () => {
 
     button?.onClick();
 
-    expect(button?.icon).toBe("Filter");
+    expect(button?.icon).toBe("Search");
     expect(button?.isActive).toBe(true);
     expect(toggleContactsFilter).toHaveBeenCalledOnce();
   });
@@ -285,7 +287,6 @@ describe("buildTopbarRight", () => {
       hiddenTransactionsShown: true,
       isProfileEditing: false,
       openReceiveScan: vi.fn(),
-      openScan: vi.fn(),
       route: { kind: "transactions" },
       t: (key) => key,
       toggleContactsFilter: vi.fn(),

@@ -128,7 +128,7 @@ const contactList = (list: Conversation[]) => (
 export function ContactsScreen() {
   return (
     <>
-      <DemoTopBar title="Contacts" trailing="Filter" />
+      <DemoTopBar title="Contacts" trailing="Search" />
       <DemoBody position="relative">
         <Stack gap="$xs" paddingTop="$xxxl">
           <Contact {...pinned} />

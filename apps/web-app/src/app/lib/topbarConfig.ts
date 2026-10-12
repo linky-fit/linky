@@ -6,6 +6,7 @@ import type { TopbarButton } from "../types/appTypes";
 import type { I18nKey, Translate } from "../../i18n";
 
 export interface BackActionContext {
+  backFromContactNew: () => void;
   closeContactDetail: () => void;
   contactPayBackToChatId: ContactId | null;
   navigateToMainReturn: () => void;
@@ -23,7 +24,6 @@ interface BuildTopbarRightArgs {
   hiddenTransactionsShown: boolean;
   isProfileEditing: boolean;
   openReceiveScan: () => void;
-  openScan: () => void;
   route: Route;
   t: Translate;
   toggleContactsFilter: () => void;
@@ -42,6 +42,7 @@ interface BuildTopbarRightArgs {
 export const resolveBackAction = (
   route: Route,
   {
+    backFromContactNew,
     closeContactDetail,
     contactPayBackToChatId,
     navigateToMainReturn,
@@ -146,6 +147,7 @@ export const resolveBackAction = (
       return () => navigateTo({ route: "evoluServers" });
 
     case "contactNew":
+      return backFromContactNew;
     case "contact":
       return closeContactDetail;
 
@@ -180,6 +182,7 @@ export const resolveBackAction = (
 };
 
 export const buildTopbar = ({
+  backFromContactNew,
   closeContactDetail,
   contactPayBackToChatId,
   navigateToMainReturn,
@@ -191,6 +194,7 @@ export const buildTopbar = ({
   if (route.kind === "profile" || route.kind === "settings") return null;
 
   const onClick = resolveBackAction(route, {
+    backFromContactNew,
     closeContactDetail,
     contactPayBackToChatId,
     navigateToMainReturn,
@@ -279,7 +283,6 @@ export const buildTopbarRight = ({
   hiddenTransactionsShown,
   isProfileEditing,
   openReceiveScan,
-  openScan,
   route,
   t,
   toggleContactsFilter,
@@ -288,7 +291,7 @@ export const buildTopbarRight = ({
 }: BuildTopbarRightArgs): TopbarButton | null => {
   if (route.kind === "contacts") {
     return {
-      icon: "Filter",
+      icon: "Search",
       isActive: contactsFilterIsActive,
       label: t("contactsFilterToggle"),
       onClick: toggleContactsFilter,
@@ -379,14 +382,6 @@ export const buildTopbarRight = ({
           spdPayload: route.spdPayload,
           editing: true,
         }),
-    };
-  }
-
-  if (route.kind === "contactNew") {
-    return {
-      icon: "ScanLine",
-      label: t("contactLoadQr"),
-      onClick: openScan,
     };
   }
 

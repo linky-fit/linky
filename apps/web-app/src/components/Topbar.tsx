@@ -69,7 +69,7 @@ export function Topbar({
         }
       : state.topbar;
   const desktopTopbarRight =
-    state.topbarRight?.icon === "Filter" ? null : state.topbarRight;
+    state.topbarRight?.icon === "Search" ? null : state.topbarRight;
 
   const topbar = desktopDetail ? desktopTopbar : state.topbar;
   const topbarRight = desktopDetail ? desktopTopbarRight : state.topbarRight;
@@ -109,9 +109,11 @@ export function Topbar({
     trailing: topbarRight ? (
       <TopbarAction
         button={topbarRight}
-        {...(topbarRight.icon === "ScanLine"
-          ? { guide: "scan-contact-button" }
-          : {})}
+        {...(route.kind === "contact" || route.kind === "chat"
+          ? { guide: "contact-edit" }
+          : route.kind === "profile"
+            ? { guide: "profile-edit" }
+            : {})}
       />
     ) : null,
   };

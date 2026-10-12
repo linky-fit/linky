@@ -2,16 +2,16 @@ import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render } from "../test/render";
 import { NearbyAvatar, NearbyBanner, NearbyRow } from "./nearby";
+import { nearbyRowCapacity } from "./nearby-layout";
 
 describe("NearbyAvatar", () => {
-  it("shows the trade badge and names it for assistive technology", async () => {
+  it("shows the badge and names it for assistive technology", async () => {
     const button = (
       await render(
         <NearbyAvatar
           name="Alex Rivers"
           label="Alex"
-          trade="buy"
-          badgeLabel="Buys BTC"
+          badge={{ label: "Buys BTC", tone: "accent" }}
           onPress={() => {}}
         />,
       )
@@ -21,7 +21,7 @@ describe("NearbyAvatar", () => {
     expect(button?.getAttribute("aria-label")).toBe("Alex Rivers, Buys BTC");
   });
 
-  it("shows no badge without a trade", async () => {
+  it("shows no badge by default", async () => {
     const button = (
       await render(<NearbyAvatar name="Alex Rivers" onPress={() => {}} />)
     ).querySelector("button");
@@ -51,6 +51,14 @@ describe("NearbyRow", () => {
     ).querySelector("[role=group]");
     expect(group?.getAttribute("aria-label")).toBe("Nearby");
     expect(group?.querySelectorAll("button")).toHaveLength(2);
+  });
+});
+
+describe("nearbyRowCapacity", () => {
+  it("counts whole avatars with the gaps between them", () => {
+    expect(nearbyRowCapacity(350)).toBe(5);
+    expect(nearbyRowCapacity(200)).toBe(3);
+    expect(nearbyRowCapacity(0)).toBe(1);
   });
 });
 

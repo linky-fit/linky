@@ -6,6 +6,10 @@ import {
   IconButton,
   ListRow,
   LoadingState,
+  NearbyAvatar,
+  type NearbyBadge,
+  NearbyRow,
+  nearbyRowCapacity,
   Notice,
   Row,
   ScrollView,
@@ -22,15 +26,19 @@ import {
   useContactEditorParams,
 } from "../app/hooks/contacts/useContactEditor";
 import { useTranslation } from "../app/hooks/shell";
+import { useScanCommands } from "../app/hooks/shell/scan";
 import { contactGroupsAtom } from "../app/state/contacts/readModel";
 import type { Route } from "../types/route";
 import { useIdentityScan, useNearbyIdentities } from "../app/hooks/useBeacon";
 import { getContactQueryPrefill } from "../app/lib/contactQueryPrefill";
+import type { ContactNewStep } from "../app/types/appTypes";
+import { isLightningAddress } from "../lnurlPay";
 
 import type { Translate } from "../i18n";
 import { readClipboardText } from "../platform/clipboard";
 import { normalizeContactGroups } from "../utils/contactGroups";
 import {
+  firstName,
   formatShortLightningAddress,
   formatShortNpub,
 } from "../utils/formatting";
@@ -178,6 +186,7 @@ export function ContactFields({
 
 interface ContactSearchCandidate {
   existingContactId?: string;
+  isSelf?: boolean;
   isExactMatch: boolean;
   lnAddress: string;
   name: string;
@@ -204,14 +213,11 @@ interface ContactSearchResults {
   query: string;
 }
 
-/** One secondary line: the lightning address when known, else the short npub. */
-const shortIdentity = (lnAddress: string, npub: string): string =>
-  lnAddress ? formatShortLightningAddress(lnAddress) : formatShortNpub(npub);
+/** Suggested people shown until the row is measured. */
+const DEFAULT_SUGGESTED_PEOPLE = 3;
 
 interface SearchCandidateRowProps {
   candidate: ContactSearchCandidate;
-  /** Shows one secondary line, as the suggestion rows do. */
-  compact?: boolean;
   isSavingContact: boolean;
   onAdd: (candidate: ContactSearchCandidate) => Promise<void>;
   t: Translate;
@@ -220,7 +226,6 @@ interface SearchCandidateRowProps {
 
 function SearchCandidateRow({
   candidate,
-  compact = false,
   isSavingContact,
   onAdd,
   t,
@@ -228,6 +233,7 @@ function SearchCandidateRow({
 }: SearchCandidateRowProps) {
   const displayName =
     (candidate.name || candidate.query || "").trim() || t("contact");
+  const opens = Boolean(candidate.existingContactId || candidate.isSelf);
   return (
     <ListRow
       testID={testID}
@@ -241,28 +247,24 @@ function SearchCandidateRow({
         </Text>
       }
       description={
-        compact ? (
-          shortIdentity(candidate.lnAddress, candidate.npub)
-        ) : (
-          <Stack gap="$xxs">
-            {candidate.lnAddress ? (
-              <Text variant="caption" color="$colorMuted" numberOfLines={1}>
-                {formatShortLightningAddress(candidate.lnAddress)}
-              </Text>
-            ) : null}
+        <Stack gap="$xxs">
+          {candidate.lnAddress ? (
             <Text variant="caption" color="$colorMuted" numberOfLines={1}>
-              {formatShortNpub(candidate.npub)}
+              {formatShortLightningAddress(candidate.lnAddress)}
             </Text>
-          </Stack>
-        )
+          ) : null}
+          <Text variant="caption" color="$colorMuted" numberOfLines={1}>
+            {formatShortNpub(candidate.npub)}
+          </Text>
+        </Stack>
       }
       trailing={
         <Button
-          icon={candidate.existingContactId ? "User" : "UserPlus"}
+          icon={opens ? "User" : "UserPlus"}
           onPress={() => void onAdd(candidate)}
           loading={isSavingContact}
         >
-          {candidate.existingContactId ? t("openContact") : t("saveContact")}
+          {opens ? t("openContact") : t("saveContact")}
         </Button>
       }
     />
@@ -329,6 +331,9 @@ interface ContactNewPageProps {
   groupNames: string[];
   handleSaveContact: () => void;
   isSavingContact: boolean;
+  openScan: () => void;
+  setStep: (step: ContactNewStep) => void;
+  step: ContactNewStep;
   searchNewContact: (
     query?: string,
     onProgress?: (result: ContactSearchResult) => void,
@@ -344,11 +349,13 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
   groupNames,
   handleSaveContact,
   isSavingContact,
+  openScan,
   searchNewContact,
   setForm,
+  setStep,
+  step,
   t,
 }) => {
-  const [step, setStep] = React.useState<"search" | "details">("search");
   const [searchError, setSearchError] = React.useState<string | null>(null);
   const [searchIsBusy, setSearchIsBusy] = React.useState(false);
   const [searchResults, setSearchResults] =
@@ -357,20 +364,43 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
     string | null
   >(null);
   const lastSearchedQueryRef = React.useRef("");
-  const searchInputRef = React.useRef<HTMLInputElement | null>(null);
   const searchQueryRef = React.useRef("");
   const searchRequestSeqRef = React.useRef(0);
 
   const searchQuery = form.npub.trim();
-  const showSuggestions =
-    step === "search" && !searchQuery && contactSuggestions.length > 0;
+  const [rowWidth, setRowWidth] = React.useState<number | null>(null);
   useIdentityScan();
   const nearbyCandidates = useNearbyCandidates(
     useNearbyIdentities(),
     searchNewContact,
   );
-  const showNearby =
-    step === "search" && !searchQuery && nearbyCandidates.length > 0;
+  // Nearby people first, then new Linky users, each npub once, as many as fit beside each other.
+  const suggestedPeople = React.useMemo(() => {
+    const seen = new Set<string>();
+    const people: {
+      badge: NearbyBadge;
+      candidate: ContactSearchCandidate;
+    }[] = [];
+    const add = (candidate: ContactSearchCandidate, badge: NearbyBadge) => {
+      if (seen.has(candidate.npub)) return;
+      seen.add(candidate.npub);
+      people.push({ badge, candidate });
+    };
+    for (const candidate of nearbyCandidates)
+      add(candidate, { label: t("nearby"), tone: "accent" });
+    for (const suggestion of contactSuggestions)
+      add(
+        { ...suggestion, isExactMatch: false },
+        { label: t("contactSuggestionNew"), tone: "neutral" },
+      );
+    return people.slice(
+      0,
+      rowWidth === null
+        ? DEFAULT_SUGGESTED_PEOPLE
+        : nearbyRowCapacity(rowWidth),
+    );
+  }, [contactSuggestions, nearbyCandidates, rowWidth, t]);
+  const showSuggestedPeople = !searchQuery && suggestedPeople.length > 0;
 
   React.useEffect(() => {
     searchQueryRef.current = searchQuery;
@@ -380,16 +410,7 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
     if (form.lnAddress.trim()) {
       setStep("details");
     }
-  }, [form.lnAddress]);
-
-  React.useEffect(() => {
-    if (step !== "search") return;
-    const timer = window.setTimeout(() => {
-      searchInputRef.current?.focus({ preventScroll: true });
-    }, 120);
-
-    return () => window.clearTimeout(timer);
-  }, [step]);
+  }, [form.lnAddress, setStep]);
 
   const clearSearchFeedback = React.useCallback(() => {
     setSearchError(null);
@@ -488,17 +509,12 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
     setStep("details");
   };
 
-  const addSuggestion = async (suggestion: ContactSuggestionCandidate) => {
-    await addNewContactFromSearchResult({
-      ...suggestion,
-      isExactMatch: false,
-    });
-  };
+  // A lightning address can be saved before any lookup settles; other queries only once nothing was found.
+  const queryIsLightningAddress = isLightningAddress(searchQuery);
   const canCreateContactFromSearch =
-    !searchResults &&
     Boolean(searchQuery) &&
-    manualCreateQuery === searchQuery &&
-    !searchIsBusy;
+    (queryIsLightningAddress ||
+      (!searchResults && manualCreateQuery === searchQuery && !searchIsBusy));
   // Stays visible under partial results until every lookup has settled.
   const showSearchLoader =
     Boolean(searchQuery) &&
@@ -507,13 +523,20 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
 
   const searchStep = (
     <>
+      <Text color="$colorMuted">{t("contactNewIntro")}</Text>
+
+      <Button
+        icon="ScanLine"
+        onPress={openScan}
+        disabled={isSavingContact}
+        data-guide="scan-contact-button"
+      >
+        {t("contactLoadQr")}
+      </Button>
+
       <TextField
-        ref={(node) => {
-          searchInputRef.current =
-            node instanceof HTMLInputElement ? node : null;
-        }}
         label={t("contactSearchLabel")}
-        hint={t("contactSearchHint")}
+        hideLabel
         value={form.npub}
         onChange={(event) => {
           lastSearchedQueryRef.current = "";
@@ -535,7 +558,6 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
         }}
         placeholder={t("contactSearchPlaceholder")}
         autoComplete="off"
-        autoFocus
         data-guide="contact-search-input"
         trailing={
           <IconButton
@@ -547,6 +569,18 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
           />
         }
       />
+
+      {canCreateContactFromSearch ? (
+        <Button
+          variant="secondary"
+          alignSelf="flex-start"
+          onPress={createManualFromSearch}
+        >
+          {queryIsLightningAddress
+            ? t("contactSaveLightningAddress")
+            : t("contactSearchCreateFromQuery")}
+        </Button>
+      ) : null}
 
       {searchResults ? (
         <Stack gap="$xs">
@@ -567,83 +601,42 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
 
       {showSearchLoader ? <LoadingState label={t("contactSearching")} /> : null}
 
-      {canCreateContactFromSearch ? (
-        <Button
-          variant="secondary"
-          alignSelf="flex-start"
-          onPress={createManualFromSearch}
-          disabled={searchIsBusy}
-        >
-          {t("contactSearchCreateFromQuery")}
-        </Button>
-      ) : null}
-
-      {showNearby || showSuggestions ? (
-        <Stack
-          flexGrow={1}
-          justifyContent="flex-end"
-          paddingTop="$xxl"
-          gap="$lg"
-        >
-          {showNearby ? (
-            <Section title={t("nearby")}>
-              {nearbyCandidates.map((candidate) => (
-                <SearchCandidateRow
-                  key={candidate.npub}
-                  candidate={candidate}
-                  compact
-                  isSavingContact={isSavingContact}
-                  onAdd={addNewContactFromSearchResult}
-                  t={t}
-                />
-              ))}
-            </Section>
-          ) : null}
-          {showSuggestions ? (
-            <Section title={t("contactSuggestionsTitle")}>
-              {contactSuggestions.map((suggestion) => {
+      {showSuggestedPeople ? (
+        <Stack flexGrow={1} justifyContent="flex-end" paddingTop="$xxl">
+          <Section title={t("contactSuggestionsTitle")}>
+            <NearbyRow accessibilityLabel={t("contactSuggestionsTitle")}>
+              {suggestedPeople.map(({ badge, candidate }) => {
                 const displayName =
-                  (suggestion.name || suggestion.query || "").trim() ||
+                  (candidate.name || candidate.query || "").trim() ||
                   t("contact");
                 return (
-                  <ListRow
-                    key={suggestion.npub}
-                    leading={
-                      <Avatar
-                        name={displayName}
-                        uri={suggestion.pictureUrl ?? undefined}
-                      />
-                    }
-                    title={
-                      <Text fontWeight="$semibold" numberOfLines={1}>
-                        {displayName}
-                      </Text>
-                    }
-                    description={shortIdentity(
-                      suggestion.displayLnAddress,
-                      suggestion.npub,
-                    )}
-                    trailing={
-                      <Button
-                        icon="UserPlus"
-                        onPress={() => void addSuggestion(suggestion)}
-                        loading={isSavingContact}
-                      >
-                        {t("saveContact")}
-                      </Button>
+                  <NearbyAvatar
+                    key={candidate.npub}
+                    name={displayName}
+                    imageUrl={candidate.pictureUrl ?? undefined}
+                    label={firstName(displayName)}
+                    badge={badge}
+                    onPress={() =>
+                      void addNewContactFromSearchResult(candidate)
                     }
                   />
                 );
               })}
-            </Section>
-          ) : null}
+            </NearbyRow>
+          </Section>
         </Stack>
       ) : null}
     </>
   );
 
   return (
-    <Stack gap="$md" minHeight="100%">
+    <Stack
+      gap="$md"
+      minHeight="100%"
+      onLayout={({ nativeEvent }) => {
+        if (nativeEvent.layout.width > 0) setRowWidth(nativeEvent.layout.width);
+      }}
+    >
       {step === "search" ? (
         searchStep
       ) : (
@@ -663,14 +656,6 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
             >
               {t("saveContact")}
             </Button>
-            <Button
-              variant="secondary"
-              icon="ArrowLeft"
-              onPress={() => setStep("search")}
-              disabled={isSavingContact}
-            >
-              {t("back")}
-            </Button>
           </Row>
         </>
       )}
@@ -681,6 +666,7 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
 export const ContactNewRoute: FC<{ route: Route }> = ({ route }) => {
   const { t } = useTranslation();
   const { groupNames } = useAtomValue(contactGroupsAtom);
+  const { openScan } = useScanCommands();
   const editor = useContactEditor(useContactEditorParams(route));
   return (
     <ContactNewPage
@@ -690,8 +676,11 @@ export const ContactNewRoute: FC<{ route: Route }> = ({ route }) => {
       groupNames={groupNames}
       handleSaveContact={editor.handleSaveContact}
       isSavingContact={editor.isSavingContact}
+      openScan={openScan}
       searchNewContact={editor.searchNewContact}
       setForm={editor.setForm}
+      setStep={editor.setContactNewStep}
+      step={editor.contactNewStep}
       t={t}
     />
   );

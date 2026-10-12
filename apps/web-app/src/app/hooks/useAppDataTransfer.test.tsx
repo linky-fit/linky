@@ -42,7 +42,9 @@ type HookParams = Parameters<typeof useAppDataTransfer>[0];
 
 const mount = async (
   wallet: WalletImports = walletUnavailable,
-  stored: Pick<HookParams, "contacts" | "contactsRepository"> | null = null,
+  stored: Partial<
+    Pick<HookParams, "contacts" | "contactsRepository" | "currentNpub">
+  > | null = null,
 ) => {
   const insert = vi.fn();
   const update = vi.fn();
@@ -63,6 +65,7 @@ const mount = async (
           throw new Error("Unexpected contact update");
         },
       },
+      currentNpub: null,
       ...stored,
       ...wallet,
       pushToast,
@@ -216,5 +219,32 @@ describe("useAppDataTransfer", () => {
       "Mallory",
       "Bobby",
     ]);
+  });
+
+  it("never imports the account's own npub as a contact", async () => {
+    const insert = vi.fn<HookParams["contactsRepository"]["insert"]>(
+      () => Effect.void,
+    );
+    const update = vi.fn<HookParams["contactsRepository"]["update"]>(
+      () => Effect.void,
+    );
+    const { transfer } = await mount(walletUnavailable, {
+      contactsRepository: { insert, update },
+      currentNpub: "npub1me",
+    });
+    const file = Object.assign(new File([], "backup.txt"), {
+      text: async () =>
+        JSON.stringify({
+          contacts: [
+            { name: "Me", npub: "npub1me" },
+            { name: "Alice", npub: "npub1alice" },
+          ],
+        }),
+    });
+
+    await act(() => transfer.handleImportAppDataFilePicked(file));
+
+    expect(update).not.toHaveBeenCalled();
+    expect(insert.mock.calls.map(([row]) => row.npub)).toEqual(["npub1alice"]);
   });
 });
