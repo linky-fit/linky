@@ -35,6 +35,8 @@ import {
   KeyValueStore,
   type KeyValueStoreService,
 } from "../../ports/KeyValueStore";
+import { ProofStore } from "../../ports/ProofStore";
+import type { StoredProof } from "../../ports/ProofStore";
 import { errorMessage } from "../../internal/errorMessage";
 import { loadWallet } from "./loadWallet";
 
@@ -188,6 +190,34 @@ export const classifyMintError = (
   return new MintRejected({ mint, code: null, detail });
 };
 
+const isOlder = (proof: StoredProof, than: StoredProof): boolean =>
+  proof.createdAt < than.createdAt ||
+  (proof.createdAt === than.createdAt && proof.mint < than.mint);
+
+/**
+ * NUT-13 derives secrets from the seed, keyset id and counter but not the
+ * mint, so a mint listing another mint's keyset id would re-derive proofs the
+ * wallet already holds there. A keyset belongs to the mint of its oldest
+ * stored proof; returns that proof when it names a different mint.
+ */
+export const foreignKeysetProof = (
+  mint: MintUrl,
+  wallet: LoadedWallet,
+  proofs: ReadonlyArray<StoredProof>,
+): StoredProof | undefined => {
+  const listed = new Set(wallet.keyChain.getKeysets().map(({ id }) => id));
+  const oldest = new Map<string, StoredProof>();
+  for (const proof of proofs) {
+    const current = oldest.get(proof.keysetId);
+    if (
+      listed.has(proof.keysetId) &&
+      (current === undefined || isOlder(proof, current))
+    )
+      oldest.set(proof.keysetId, proof);
+  }
+  return [...oldest.values()].find((proof) => proof.mint !== mint);
+};
+
 export type WalletLoader = (
   mint: MintUrl,
   unit: CurrencyUnit,
@@ -204,8 +234,23 @@ export type WalletLoader = (
 export const makeWalletInstances = (
   kv: KeyValueStoreService,
   load: WalletLoader,
+  storedProofs: Effect.Effect<ReadonlyArray<StoredProof>>,
 ) => {
   const inFlight = new Map<string, Promise<LoadedWallet>>();
+
+  const rejectForeignKeysets = (mint: MintUrl, wallet: LoadedWallet) =>
+    Effect.flatMap(storedProofs, (proofs) => {
+      const foreign = foreignKeysetProof(mint, wallet, proofs);
+      return foreign === undefined
+        ? Effect.void
+        : Effect.fail(
+            new MintRejected({
+              mint,
+              code: null,
+              detail: `keyset ${foreign.keysetId} belongs to ${foreign.mint}`,
+            }),
+          );
+    });
 
   const awaitLoad = (
     mint: MintUrl,
@@ -234,16 +279,21 @@ export const makeWalletInstances = (
     Effect.suspend(() => {
       const key = `${mint}|${unit}`;
       const cached = inFlight.get(key);
-      if (cached !== undefined) return awaitLoad(mint, key, cached);
-
-      const loading = load(mint, unit);
-      inFlight.set(key, loading);
+      const loading = cached ?? load(mint, unit);
+      if (cached === undefined) inFlight.set(key, loading);
+      // Checked on cached loads too: proofs synced since may now own a keyset.
       return awaitLoad(mint, key, loading).pipe(
-        Effect.tap(() => kv.set(seenMintKey(mint), mint)),
+        Effect.tap((wallet) => rejectForeignKeysets(mint, wallet)),
+        Effect.tap(() =>
+          cached === undefined ? kv.set(seenMintKey(mint), mint) : Effect.void,
+        ),
       );
     });
 
-  /** One load past the cache: neither cached nor recorded as seen. */
+  /**
+   * One load past the cache: neither cached nor recorded as seen, and not
+   * checked for foreign keysets, so it must never derive outputs.
+   */
   const loadFresh = (
     mint: MintUrl,
     unit: CurrencyUnit,
@@ -267,8 +317,18 @@ export class WalletInstances extends Context.Service<WalletInstances>()(
     make: Effect.gen(function* () {
       const { bip39Seed } = yield* CashuSeed;
       const kv = yield* KeyValueStore;
-      return makeWalletInstances(kv, (mint, unit) =>
-        loadWallet({ Mint, Wallet, mintUrl: mint, unit, bip39seed: bip39Seed }),
+      const proofStore = yield* ProofStore;
+      return makeWalletInstances(
+        kv,
+        (mint, unit) =>
+          loadWallet({
+            Mint,
+            Wallet,
+            mintUrl: mint,
+            unit,
+            bip39seed: bip39Seed,
+          }),
+        proofStore.loadAll,
       );
     }),
   },

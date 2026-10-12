@@ -1,13 +1,25 @@
 import type { GetInfoResponse } from "@cashu/cashu-ts";
 import {
   HttpResponseError,
+  Keyset,
   MintInfo as CashuMintInfo,
   MintOperationError,
 } from "@cashu/cashu-ts";
 import { Effect, Exit, Fiber } from "effect";
-import { CurrencyUnit, MintUrl } from "../../domain/primitives";
+import {
+  Amount,
+  CurrencyUnit,
+  KeysetId,
+  MintUrl,
+  ProofId,
+  UnixSeconds,
+} from "../../domain/primitives";
 import type { KeyValueStoreService } from "../../ports/KeyValueStore";
-import { fakeWallet as stubWallet } from "../../testing/fakeWallet";
+import { StoredProof } from "../../ports/ProofStore";
+import {
+  fakeKeyChain,
+  fakeWallet as stubWallet,
+} from "../../testing/fakeWallet";
 import type { LoadedWallet, WalletLoader } from "./WalletInstances";
 import {
   classifyMintError,
@@ -46,6 +58,8 @@ const stubKv = (sets: Array<[string, string]>): KeyValueStoreService => ({
   releaseLease: () => Effect.die("not under test"),
 });
 
+const noProofs = Effect.succeed([]);
+
 describe("makeWalletInstances", () => {
   it("shares one load between concurrent callers for the same mint/unit", async () => {
     const wallet = fakeWallet("01aaaa");
@@ -56,7 +70,7 @@ describe("makeWalletInstances", () => {
         setTimeout(() => resolve(wallet), 0);
       });
     };
-    const instances = makeWalletInstances(stubKv([]), load);
+    const instances = makeWalletInstances(stubKv([]), load, noProofs);
 
     const exit = await Effect.runPromiseExit(
       Effect.all([instances.get(mint, sat), instances.get(mint, sat)], {
@@ -77,7 +91,7 @@ describe("makeWalletInstances", () => {
       calls += 1;
       return Promise.resolve(fakeWallet(`keyset-${unit}`));
     };
-    const instances = makeWalletInstances(stubKv(sets), load);
+    const instances = makeWalletInstances(stubKv(sets), load, noProofs);
 
     const first = await Effect.runPromise(instances.get(mint, sat));
     const second = await Effect.runPromise(instances.get(mint, sat));
@@ -103,7 +117,7 @@ describe("makeWalletInstances", () => {
         ? Promise.reject(new TypeError("fetch failed"))
         : Promise.resolve(wallet);
     };
-    const instances = makeWalletInstances(stubKv([]), load);
+    const instances = makeWalletInstances(stubKv([]), load, noProofs);
 
     const failed = await Effect.runPromiseExit(instances.get(mint, sat));
     expect(failed).toEqual(
@@ -129,7 +143,7 @@ describe("makeWalletInstances", () => {
         ? new Promise(() => undefined)
         : Promise.resolve(wallet);
     };
-    const instances = makeWalletInstances(stubKv([]), load);
+    const instances = makeWalletInstances(stubKv([]), load, noProofs);
 
     const exit = await Effect.runPromiseExit(
       Effect.gen(function* () {
@@ -159,7 +173,7 @@ describe("makeWalletInstances", () => {
         ? Promise.reject(new TypeError("fetch failed"))
         : Promise.resolve(fakeWallet(`01aa0${calls}`));
     };
-    const instances = makeWalletInstances(stubKv(sets), load);
+    const instances = makeWalletInstances(stubKv(sets), load, noProofs);
 
     const first = await Effect.runPromise(instances.loadFresh(mint, sat));
     const second = await Effect.runPromise(instances.loadFresh(mint, sat));
@@ -174,6 +188,99 @@ describe("makeWalletInstances", () => {
     await Effect.runPromise(instances.get(mint, sat));
     expect(calls).toBe(4);
     expect(sets).toEqual([[seenMintKey(mint), mint]]);
+  });
+});
+
+describe("keyset ownership", () => {
+  const honest = MintUrl.make("https://honest.example");
+  const impostor = MintUrl.make("https://impostor.example");
+  const keyset = "00ad268c4d1f5826";
+
+  const listing = (active = true): LoadedWallet =>
+    stubWallet({
+      keysetId: keyset,
+      keyChain: fakeKeyChain([new Keyset(keyset, "sat", active)]),
+    });
+
+  const heldAt = (holder: MintUrl, createdAt: number): StoredProof =>
+    new StoredProof({
+      id: ProofId.make(`${holder}-${createdAt}`),
+      mint: holder,
+      unit: sat,
+      keysetId: KeysetId.make(keyset),
+      amount: Amount.make(1),
+      secret: `secret-${holder}-${createdAt}`,
+      C: "02" + "cd".repeat(32),
+      dleq: null,
+      state: "available",
+      operationId: null,
+      createdAt: UnixSeconds.make(createdAt),
+    });
+
+  const rejectedBy = (holder: MintUrl) =>
+    Exit.fail(
+      expect.objectContaining({
+        _tag: "MintRejected",
+        mint: impostor,
+        detail: `keyset ${keyset} belongs to ${holder}`,
+      }),
+    );
+
+  it("rejects a mint listing a keyset held at another mint and does not record it as seen", async () => {
+    const sets: Array<[string, string]> = [];
+    const instances = makeWalletInstances(
+      stubKv(sets),
+      () => Promise.resolve(listing()),
+      Effect.succeed([heldAt(honest, 1)]),
+    );
+
+    expect(await Effect.runPromiseExit(instances.get(impostor, sat))).toEqual(
+      rejectedBy(honest),
+    );
+    expect(sets).toEqual([]);
+  });
+
+  it("checks inactive keysets too, so an impostor cannot restore through them", async () => {
+    const instances = makeWalletInstances(
+      stubKv([]),
+      () => Promise.resolve(listing(false)),
+      Effect.succeed([heldAt(honest, 1)]),
+    );
+
+    expect(await Effect.runPromiseExit(instances.get(impostor, sat))).toEqual(
+      rejectedBy(honest),
+    );
+  });
+
+  it("gives a keyset held at two mints to the holder of its oldest proof", async () => {
+    const instances = makeWalletInstances(
+      stubKv([]),
+      () => Promise.resolve(listing()),
+      Effect.succeed([heldAt(impostor, 2), heldAt(honest, 1)]),
+    );
+
+    expect(
+      Exit.isSuccess(await Effect.runPromiseExit(instances.get(honest, sat))),
+    ).toBe(true);
+    expect(await Effect.runPromiseExit(instances.get(impostor, sat))).toEqual(
+      rejectedBy(honest),
+    );
+  });
+
+  it("rejects a cached wallet once synced proofs put its keyset at another mint", async () => {
+    const proofs: StoredProof[] = [];
+    const instances = makeWalletInstances(
+      stubKv([]),
+      () => Promise.resolve(listing()),
+      Effect.sync(() => proofs),
+    );
+
+    await Effect.runPromise(instances.get(impostor, sat));
+    proofs.push(heldAt(honest, 1));
+
+    expect(await Effect.runPromiseExit(instances.get(impostor, sat))).toEqual(
+      rejectedBy(honest),
+    );
   });
 });
 
