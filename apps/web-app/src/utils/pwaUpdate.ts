@@ -1,3 +1,5 @@
+import { isDevBuild } from "../platform/buildEnv";
+
 type Listener = (needRefresh: boolean) => void;
 
 const STARTUP_AUTO_UPDATE_WINDOW_MS = 5_000;
@@ -108,7 +110,7 @@ const countSwClients = (): Promise<number | null> => {
 // every other case falls back to the update banner. Auto-applying is skipped
 // whenever other tabs are open because SKIP_WAITING reloads all of them.
 export const handlePwaUpdateAvailable = async () => {
-  if (import.meta.env.DEV) {
+  if (isDevBuild) {
     await applyPwaUpdate();
     return;
   }

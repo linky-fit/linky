@@ -11,16 +11,18 @@ import {
   type MintUrl,
 } from "@linky-fit/linkshu";
 import { GENERIC_MINT_ICON_DATA_URL } from "@linky-fit/linkshu";
+import { envMainMintUrl } from "../platform/buildEnv";
 export {
   GENERIC_MINT_ICON_DATA_URL,
   getMintIconOverride,
 } from "@linky-fit/linkshu";
-const envMainMintUrl = (import.meta.env.VITE_MAIN_MINT_URL ?? "").trim();
+const configuredMainMintUrl = (envMainMintUrl ?? "").trim();
 
 /** Where funds go when the configured default mint is a hidden test mint. */
 export const FALLBACK_PRODUCTION_MINT_URL = "https://cashu.cz";
 
-export const MAIN_MINT_URL = envMainMintUrl || FALLBACK_PRODUCTION_MINT_URL;
+export const MAIN_MINT_URL =
+  configuredMainMintUrl || FALLBACK_PRODUCTION_MINT_URL;
 
 // An explicit development mint keeps preset discovery and recovery local.
 export const PRODUCTION_MINTS = [
@@ -30,8 +32,8 @@ export const PRODUCTION_MINTS = [
   "https://cashu.21m.lol",
 ];
 
-export const PRESET_MINTS = envMainMintUrl
-  ? [envMainMintUrl]
+export const PRESET_MINTS = configuredMainMintUrl
+  ? [configuredMainMintUrl]
   : [
       PRODUCTION_MINTS[0],
       "https://testnut.cashu.space",

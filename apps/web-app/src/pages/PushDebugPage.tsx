@@ -17,6 +17,11 @@ import {
   unregisterPushNotifications,
 } from "../utils/pushNotifications";
 import { safeLocalStorageGet, safeLocalStorageKeys } from "../utils/storage";
+import {
+  envNotificationServerUrl,
+  envPushServerUrl,
+} from "../platform/buildEnv";
+
 interface PushDebugMessage {
   receivedAtIso: string;
   text: string;
@@ -230,10 +235,7 @@ export function PushDebugPage(): React.ReactElement {
     {
       ...report,
       env: {
-        pushServerUrl:
-          import.meta.env.VITE_PUSH_SERVER_URL ??
-          import.meta.env.VITE_NOTIFICATION_SERVER_URL ??
-          null,
+        pushServerUrl: envPushServerUrl ?? envNotificationServerUrl ?? null,
         vapidPublicKey: safeLocalStorageGet("linky.push_vapid_public_key"),
       },
       recentMessages: messages,

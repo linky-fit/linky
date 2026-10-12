@@ -5,6 +5,7 @@ import { asNonEmptyString } from "../utils/validation";
 import type { PlatformPorts, SecretRead } from "./ports";
 import { isNativePlatform } from "./runtime";
 import { readNativeSecret } from "./secretStorage";
+import { envEvoluServerUrls, isDevBuild, isE2eBuild } from "./buildEnv";
 
 // Undefined: the shell has no native store, so the localStorage copy is the secret.
 const toSecretRead = (value: string | null | undefined): SecretRead => {
@@ -36,11 +37,9 @@ export const makeWebPlatformPorts = (): PlatformPorts => ({
   kv: localStorageKv,
   secrets: { read: readSecret },
   config: {
-    evoluRelayDefaults: parseEvoluRelayUrls(
-      import.meta.env.VITE_EVOLU_SERVER_URLS,
-    ),
-    isE2e: import.meta.env.VITE_E2E === "1",
-    isDev: import.meta.env.DEV,
+    evoluRelayDefaults: parseEvoluRelayUrls(envEvoluServerUrls),
+    isE2e: isE2eBuild,
+    isDev: isDevBuild,
   },
   lifecycle: {
     reload: () => globalThis.location.reload(),

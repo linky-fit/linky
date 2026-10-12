@@ -2,6 +2,7 @@ import React from "react";
 
 import { clientInspectorStore } from "./clientInspectorStore";
 import { safeLocalStorageGet, safeLocalStorageSet } from "../../utils/storage";
+import { isDevBuild } from "../../platform/buildEnv";
 
 const INSPECTOR_ENABLED_STORAGE_KEY = "linky.inspector_enabled";
 const INSPECTOR_LOGS_ENABLED_STORAGE_KEY = "linky.inspector_logs_enabled";
@@ -25,7 +26,7 @@ export const resolveInspectorEnabled = (
 ): boolean => storedPreference ?? isDev;
 
 export const getInspectorEnabled = (): boolean =>
-  resolveInspectorEnabled(preference, import.meta.env.DEV);
+  resolveInspectorEnabled(preference, isDevBuild);
 
 export const getInspectorLogsEnabled = (): boolean => logsPreference;
 
@@ -37,7 +38,7 @@ export const resolveInspectorEmissionEnabled = (
 
 export const getInspectorEmissionEnabled = (): boolean =>
   resolveInspectorEmissionEnabled(
-    import.meta.env.DEV,
+    isDevBuild,
     getInspectorEnabled(),
     getInspectorLogsEnabled(),
   );
@@ -94,7 +95,7 @@ export const useInspectorEmissionEnabled = (): boolean => {
   const inspectorEnabled = useInspectorEnabled();
   const inspectorLogsEnabled = useInspectorLogsEnabled();
   return resolveInspectorEmissionEnabled(
-    import.meta.env.DEV,
+    isDevBuild,
     inspectorEnabled,
     inspectorLogsEnabled,
   );
