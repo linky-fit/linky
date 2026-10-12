@@ -65,6 +65,13 @@ const counterKey = deterministicCounterKey({
 
 // 6 sats in; the "mint" hands back 5 (its input fee).
 const sourceProofs = [proof(4, "src-a"), proof(2, "src-b")];
+const keysetOfAnotherMint = new MintRejected({
+  mint,
+  code: null,
+  detail: "keyset 009a1f293253e41e belongs to https://owner.example",
+  keysetOwner: MintUrl.make("https://owner.example"),
+});
+
 const sourceToken = TokenText.make(
   getEncodedToken({ mint, unit: "sat", proofs: sourceProofs }),
 );
@@ -841,6 +848,21 @@ describe("Receive.receive", () => {
     expect(exit.value.operations.map((operation) => operation.kind)).toEqual([
       "deferredReceive",
     ]);
+  });
+
+  it("fails, without deferring, a token whose mint presents another mint's keyset", async () => {
+    const { wallet } = makeWallet({
+      receive: () => Promise.reject(new Error("must not be called")),
+    });
+    const { run } = makeHarness(wallet, {
+      load: () => Effect.fail(keysetOfAnotherMint),
+    });
+
+    const exit = await run(receiveAndInspect(sourceToken));
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure).toEqual(keysetOfAnotherMint);
+    expect(exit.value.operations).toEqual([]);
   });
 
   it("defers a token whose mint binds the wallet to a keyset it cannot derive from", async () => {
@@ -2126,6 +2148,32 @@ describe("Receive.resumeDeferred", () => {
       _tag: "AmountConsumedByFee",
     });
     expect(receiveCounters).toEqual([]);
+  });
+
+  it("closes a deferral as failed once its mint presents another mint's keyset", async () => {
+    const { wallet } = makeWallet({
+      receive: () => Promise.reject(new Error("must not be called")),
+    });
+    const { run } = makeHarness(wallet, {
+      load: () => Effect.fail(keysetOfAnotherMint),
+    });
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* seedTransfer("deferredReceive", "pending", mint, sourceToken, 6);
+        return { results: yield* resumeDeferred, ...(yield* inventory) };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.results.map((result) => result.status)).toEqual([
+      "closed",
+    ]);
+    const [closed] = exit.value.operations;
+    expect(closed?.status).toBe("failed");
+    expect(JSON.parse(closed?.error ?? "")).toMatchObject({
+      _tag: "MintRejected",
+      keysetOwner: "https://owner.example",
+    });
   });
 
   it("closes a deferral whose text does not decode as failed", async () => {
