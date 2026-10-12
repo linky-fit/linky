@@ -31,7 +31,11 @@ import {
   setColorModePreference,
   type ColorModePreference,
 } from "../utils/colorMode";
-import { analyzeSlip39Input, SLIP39_WORD_COUNT } from "../utils/slip39Input";
+import {
+  analyzeSlip39Words,
+  fillSlip39Words,
+  SLIP39_WORD_COUNT,
+} from "../utils/slip39Input";
 import { AvatarPhotoInput } from "./AvatarPhotoInput";
 import type { FilePickerHandle } from "../utils/pickFile";
 import { StickyTopBar } from "./StickyTopBar";
@@ -50,11 +54,11 @@ interface UnauthenticatedLayoutProps {
   openReturningOnboarding: () => void;
   onPendingOnboardingPhotoError: (error: unknown) => void;
   onPendingOnboardingPhotoSelected: (dataUrl: string) => void;
+  pasteReturningSlip39: (text: string, fromIndex: number) => number;
   pasteReturningSlip39FromClipboard: () => Promise<void>;
   pickPendingOnboardingPhoto: () => Promise<void>;
   savePendingOnboardingBackupToPasswordManager: () => Promise<void>;
-  selectReturningSlip39Suggestion: (value: string) => void;
-  setReturningSlip39Input: (value: string) => void;
+  setReturningSlip39Words: (words: readonly string[]) => void;
   setOnboardingStep: React.Dispatch<React.SetStateAction<OnboardingStep>>;
   setLang: (lang: Lang) => void;
   setPendingOnboardingName: (value: string) => void;
@@ -84,8 +88,13 @@ const nextColorModePreference = (current: ColorModePreference) =>
 const formatTemplate = (template: string, vars: Record<string, string>) =>
   template.replace(/\{(\w+)\}/g, (_match, key: string) => vars[key] ?? "");
 
-// Keeps the seed field focused (and the phone keyboard open) while tapping helpers.
+// Keeps the word field focused (and the phone keyboard open) while tapping helpers.
 const keepInputFocus = (event: React.PointerEvent) => event.preventDefault();
+
+const SLIP39_WORD_INDEXES = Array.from(
+  { length: SLIP39_WORD_COUNT },
+  (_, index) => index,
+);
 
 const StepHeading = ({ title, hint }: { title: string; hint?: string }) => (
   <Stack gap="$xs">
@@ -147,11 +156,11 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
   openReturningOnboarding,
   onPendingOnboardingPhotoError,
   onPendingOnboardingPhotoSelected,
+  pasteReturningSlip39,
   pasteReturningSlip39FromClipboard,
   pickPendingOnboardingPhoto,
   savePendingOnboardingBackupToPasswordManager,
-  selectReturningSlip39Suggestion,
-  setReturningSlip39Input,
+  setReturningSlip39Words,
   setOnboardingStep,
   setLang,
   setPendingOnboardingName,
@@ -172,6 +181,13 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
     () => setSelfieCaptureIsOpen(false),
     [],
   );
+  const [activeWordIndex, setActiveWordIndex] = React.useState<number | null>(
+    null,
+  );
+  const wordInputRefs = React.useRef<
+    Array<React.ComponentRef<typeof TextField> | null>
+  >([]);
+  const focusWord = (index: number) => wordInputRefs.current[index]?.focus();
 
   const menuButton = (disabled = false) => (
     <IconButton
@@ -234,32 +250,38 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
     );
 
   const renderReturnStep = (step: ReturningOnboardingStep) => {
-    const analysis = analyzeSlip39Input(step.input);
-    const canSubmit =
-      analysis.wordCount === SLIP39_WORD_COUNT &&
-      analysis.invalidWords.length === 0;
+    const analysis = analyzeSlip39Words(step.words, activeWordIndex);
+    const invalidWords = analysis.invalidIndexes.map(
+      (index) => step.words[index] ?? "",
+    );
     const helperMessage = step.error
       ? step.error
-      : analysis.wordCount > SLIP39_WORD_COUNT
-        ? t("onboardingReturnTooManyWords")
-        : analysis.invalidWords.length > 0
-          ? formatTemplate(t("onboardingReturnUnknownWords"), {
-              words: analysis.invalidWords.slice(0, 3).join(", "),
-            })
-          : analysis.hasSeparatorFixups
-            ? t("onboardingReturnSeparatorHint")
-            : analysis.wordCount > 0
-              ? formatTemplate(t("onboardingReturnWordCount"), {
-                  count: String(analysis.wordCount),
-                  total: String(SLIP39_WORD_COUNT),
-                })
-              : t("onboardingReturnHint");
+      : invalidWords.length > 0
+        ? formatTemplate(t("onboardingReturnUnknownWords"), {
+            words: invalidWords.slice(0, 3).join(", "),
+          })
+        : formatTemplate(t("onboardingReturnWordCount"), {
+            count: String(analysis.filledCount),
+            total: String(SLIP39_WORD_COUNT),
+          });
     const helperColor = step.error
       ? "$dangerText"
-      : analysis.wordCount > SLIP39_WORD_COUNT ||
-          analysis.invalidWords.length > 0
+      : invalidWords.length > 0
         ? "$warningText"
         : "$colorMuted";
+
+    const writeWord = (index: number, value: string) => {
+      const fill = fillSlip39Words(step.words, index, value);
+      setReturningSlip39Words(fill.words);
+      if (fill.nextIndex !== index) focusWord(fill.nextIndex);
+    };
+    const pasteInto = (index: number, text: string) => {
+      focusWord(pasteReturningSlip39(text, index));
+    };
+    const pickSuggestion = (word: string) => {
+      if (activeWordIndex === null) return;
+      writeWord(activeWordIndex, `${word} `);
+    };
 
     return (
       <Stack flexGrow={1}>
@@ -279,42 +301,60 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
             />
 
             <Stack gap="$sm">
-              <TextField
-                id="onboarding-return-seed"
-                label={t("seed")}
-                hideLabel
-                name="password"
-                type="password"
-                value={step.input}
-                onChangeText={setReturningSlip39Input}
-                onPaste={(event) => {
-                  const text = event.clipboardData?.getData("text") ?? "";
-                  if (!text) return;
+              <Button
+                variant="secondary"
+                icon="ClipboardPaste"
+                onPress={() => void pasteReturningSlip39FromClipboard()}
+                disabled={onboardingIsBusy}
+              >
+                {t("onboardingReturnPasteButton")}
+              </Button>
+              <Text variant="caption" color="$colorMuted" textAlign="center">
+                {t("onboardingReturnManualHint")}
+              </Text>
+            </Stack>
 
-                  event.preventDefault();
-                  setReturningSlip39Input(text);
-
-                  const pastedAnalysis = analyzeSlip39Input(text);
-                  if (pastedAnalysis.isCompleteCandidate) {
-                    void submitReturningSlip39(text);
-                  }
-                }}
-                placeholder={t("onboardingReturnPlaceholder")}
-                autoCapitalize="none"
-                autoCorrect="off"
-                autoComplete="current-password"
-                autoFocus
-                trailing={
-                  <IconButton
-                    icon="ClipboardPaste"
-                    size="sm"
-                    accessibilityLabel={t("onboardingReturnPasteButton")}
-                    onPointerDown={keepInputFocus}
-                    onPress={() => void pasteReturningSlip39FromClipboard()}
-                    disabled={onboardingIsBusy}
-                  />
-                }
-              />
+            <Stack gap="$sm">
+              <Row flexWrap="wrap" gap="$sm">
+                {SLIP39_WORD_INDEXES.map((index) => (
+                  <Stack key={index} flexBasis="40%" flexGrow={1}>
+                    <TextField
+                      ref={(element) => {
+                        wordInputRefs.current[index] = element;
+                      }}
+                      id={`onboarding-return-word-${index + 1}`}
+                      label={formatTemplate(t("onboardingReturnWord"), {
+                        index: String(index + 1),
+                      })}
+                      hideLabel
+                      value={step.words[index] ?? ""}
+                      onChangeText={(value) => writeWord(index, value)}
+                      onFocus={() => setActiveWordIndex(index)}
+                      onBlur={() =>
+                        setActiveWordIndex((current) =>
+                          current === index ? null : current,
+                        )
+                      }
+                      onPaste={(event) => {
+                        const text = event.clipboardData?.getData("text") ?? "";
+                        if (!text.trim()) return;
+                        event.preventDefault();
+                        pasteInto(index, text);
+                      }}
+                      invalid={analysis.invalidIndexes.includes(index)}
+                      trailing={String(index + 1)}
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      autoFocus={index === 0}
+                      // The first slot takes the whole phrase a password manager saved for this site and fans it out over the grid.
+                      {...(index === 0
+                        ? { autoComplete: "current-password", name: "password" }
+                        : { autoComplete: "off" })}
+                    />
+                  </Stack>
+                ))}
+              </Row>
 
               <Text
                 variant="caption"
@@ -322,6 +362,9 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
                 role={step.error ? "status" : undefined}
               >
                 {helperMessage}
+              </Text>
+              <Text variant="caption" color="$colorMuted">
+                {t("onboardingReturnAcademicHint")}
               </Text>
 
               {analysis.suggestions.length > 0 ? (
@@ -335,7 +378,7 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
                     <Chip
                       key={word}
                       label={word}
-                      onPress={() => selectReturningSlip39Suggestion(word)}
+                      onPress={() => pickSuggestion(word)}
                       disabled={onboardingIsBusy}
                     />
                   ))}
@@ -345,7 +388,7 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
           </StepBody>
 
           <StepActions>
-            <SubmitButton disabled={onboardingIsBusy || !canSubmit}>
+            <SubmitButton disabled={onboardingIsBusy || !analysis.isComplete}>
               {t("onboardingReturnConfirm")}
             </SubmitButton>
           </StepActions>

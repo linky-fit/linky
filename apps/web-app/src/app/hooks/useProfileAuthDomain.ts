@@ -50,8 +50,11 @@ import { triggerPasswordManagerSeedSave } from "../../platform/passwordManager";
 import { CASHU_ONBOARDING_SET_MAIN_MINT_STORAGE_KEY } from "../../utils/constants";
 import { getDefaultNip05IdentifierFromAddress } from "../../utils/nostrNip05";
 import {
-  applySlip39Suggestion,
+  analyzeSlip39Words,
+  emptySlip39Words,
+  fillSlip39Words,
   normalizeSlip39Input,
+  slip39WordsToInput,
 } from "../../utils/slip39Input";
 import {
   createSlip39Seed,
@@ -112,8 +115,9 @@ export type { PendingIdentitySwitch };
 
 export interface ReturningOnboardingStep {
   error: string | null;
-  input: string;
   kind: "returning";
+  /** One slot per SLIP-39 word, empty until typed or pasted. */
+  words: readonly string[];
 }
 
 interface PreparingOnboardingStep {
@@ -167,6 +171,7 @@ interface UseProfileAuthDomainResult {
   openReturningOnboarding: () => void;
   onPendingOnboardingPhotoError: (error: unknown) => void;
   onPendingOnboardingPhotoSelected: (dataUrl: string) => void;
+  pasteReturningSlip39: (text: string, fromIndex: number) => number;
   pasteReturningSlip39FromClipboard: () => Promise<void>;
   pickPendingOnboardingPhoto: () => Promise<void>;
   requestPasteNostrKeys: () => Promise<void>;
@@ -174,10 +179,9 @@ interface UseProfileAuthDomainResult {
   savePendingOnboardingBackupToPasswordManager: () => Promise<void>;
   seedMnemonic: string | null;
   shufflePendingOnboardingAvatar: () => void;
-  selectReturningSlip39Suggestion: (value: string) => void;
   cashuSeedMnemonic: string | null;
   slip39Seed: string | null;
-  setReturningSlip39Input: (value: string) => void;
+  setReturningSlip39Words: (words: readonly string[]) => void;
   setOnboardingStep: React.Dispatch<React.SetStateAction<OnboardingStep>>;
   setPendingOnboardingName: (value: string) => void;
   submitReturningSlip39: (inputOverride?: string) => Promise<void>;
@@ -824,27 +828,16 @@ export const useProfileAuthDomain = ({
     setOnboardingStep({
       kind: "returning",
       error: null,
-      input: "",
+      words: emptySlip39Words(),
     });
   }, [onboardingIsBusy]);
 
-  const setReturningSlip39Input = React.useCallback(
-    (value: string) => {
+  const setReturningSlip39Words = React.useCallback(
+    (words: readonly string[]) => {
       updateReturningOnboardingStep((current) => ({
         ...current,
         error: null,
-        input: value,
-      }));
-    },
-    [updateReturningOnboardingStep],
-  );
-
-  const selectReturningSlip39Suggestion = React.useCallback(
-    (value: string) => {
-      updateReturningOnboardingStep((current) => ({
-        ...current,
-        error: null,
-        input: applySlip39Suggestion(current.input, value),
+        words,
       }));
     },
     [updateReturningOnboardingStep],
@@ -858,35 +851,26 @@ export const useProfileAuthDomain = ({
         typeof inputOverride === "string"
           ? inputOverride
           : onboardingStep?.kind === "returning"
-            ? onboardingStep.input
+            ? slip39WordsToInput(onboardingStep.words)
             : "";
       const normalizedSlip39 = normalizeSlip39Input(rawInput);
-
-      updateReturningOnboardingStep((current) => ({
-        ...current,
-        error: null,
-        input: normalizedSlip39,
-      }));
-
-      if (!normalizedSlip39) {
-        const message = t("pasteEmpty");
+      const fail = (message: string) => {
         updateReturningOnboardingStep((current) => ({
           ...current,
           error: message,
-          input: normalizedSlip39,
         }));
         pushToast(message);
+      };
+
+      updateReturningOnboardingStep((current) => ({ ...current, error: null }));
+
+      if (!normalizedSlip39) {
+        fail(t("pasteEmpty"));
         return;
       }
 
       if (!looksLikeSlip39Share(normalizedSlip39)) {
-        const message = t("onboardingInvalidSeed");
-        updateReturningOnboardingStep((current) => ({
-          ...current,
-          error: message,
-          input: normalizedSlip39,
-        }));
-        pushToast(message);
+        fail(t("onboardingInvalidSeed"));
         return;
       }
 
@@ -894,13 +878,7 @@ export const useProfileAuthDomain = ({
       try {
         const derived = await deriveNostrKeysFromSlip39(normalizedSlip39);
         if (!derived) {
-          const message = t("onboardingInvalidSeed");
-          updateReturningOnboardingStep((current) => ({
-            ...current,
-            error: message,
-            input: normalizedSlip39,
-          }));
-          pushToast(message);
+          fail(t("onboardingInvalidSeed"));
           return;
         }
 
@@ -927,6 +905,32 @@ export const useProfileAuthDomain = ({
     ],
   );
 
+  /**
+   * Writes pasted text into the grid from `fromIndex` and submits once every
+   * slot holds a word; answers with the slot to focus otherwise.
+   */
+  const pasteReturningSlip39 = React.useCallback(
+    (text: string, fromIndex: number): number => {
+      const words =
+        onboardingStep?.kind === "returning"
+          ? onboardingStep.words
+          : emptySlip39Words();
+      const fill = fillSlip39Words(words, fromIndex, text);
+      const error =
+        fill.overflow > 0 ? t("onboardingReturnTooManyWords") : null;
+      updateReturningOnboardingStep((current) => ({
+        ...current,
+        error,
+        words: fill.words,
+      }));
+      if (!error && analyzeSlip39Words(fill.words, null).isComplete) {
+        void submitReturningSlip39(slip39WordsToInput(fill.words));
+      }
+      return fill.nextIndex;
+    },
+    [onboardingStep, submitReturningSlip39, t, updateReturningOnboardingStep],
+  );
+
   const pasteReturningSlip39FromClipboard = React.useCallback(async () => {
     if (onboardingIsBusy) return;
 
@@ -943,22 +947,11 @@ export const useProfileAuthDomain = ({
         return;
       }
 
-      updateReturningOnboardingStep((current) => ({
-        ...current,
-        error: null,
-        input: raw,
-      }));
-      await submitReturningSlip39(raw);
+      pasteReturningSlip39(raw, 0);
     } catch {
       pushToast(t("pasteNotAvailable"));
     }
-  }, [
-    onboardingIsBusy,
-    pushToast,
-    submitReturningSlip39,
-    t,
-    updateReturningOnboardingStep,
-  ]);
+  }, [onboardingIsBusy, pasteReturningSlip39, pushToast, t]);
 
   const switchIdentity = React.useCallback(
     async (
@@ -1204,6 +1197,7 @@ export const useProfileAuthDomain = ({
     openReturningOnboarding,
     onPendingOnboardingPhotoSelected,
     onPendingOnboardingPhotoError,
+    pasteReturningSlip39,
     pasteReturningSlip39FromClipboard,
     pendingIdentitySwitch,
     pickPendingOnboardingPhoto,
@@ -1211,11 +1205,10 @@ export const useProfileAuthDomain = ({
     requestLogout,
     savePendingOnboardingBackupToPasswordManager,
     shufflePendingOnboardingAvatar,
-    selectReturningSlip39Suggestion,
     cashuSeedMnemonic,
     seedMnemonic,
     slip39Seed,
-    setReturningSlip39Input,
+    setReturningSlip39Words,
     setOnboardingStep,
     setPendingOnboardingName,
     submitReturningSlip39,

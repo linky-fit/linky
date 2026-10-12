@@ -169,14 +169,13 @@ export const de = {
   onboardingReturnTitle: "Willkommen zurück",
   onboardingReturnIntro:
     "Gib deine 20 SLIP-39-Wörter ein. Du kannst sie eintippen oder hier einfügen.",
-  onboardingReturnHint:
-    "Verwende 20 durch Leerzeichen oder Kommas getrennte SLIP-39-Wörter.",
-  onboardingReturnPlaceholder: "academic acid acne ...",
   onboardingReturnPasteButton: "Aus Zwischenablage einfügen",
+  onboardingReturnManualHint: "Oder gib die Wörter einzeln ein.",
+  onboardingReturnWord: "Wort {index}",
+  onboardingReturnAcademicHint:
+    "Das 3. und 4. Wort einer Linky-Sicherung ist immer „academic“, das ist kein Tippfehler.",
   onboardingReturnConfirm: "Weiter",
   onboardingReturnWordCount: "{count}/{total} Wörter",
-  onboardingReturnSeparatorHint:
-    "Kommas und Zeilenumbrüche werden automatisch in Leerzeichen umgewandelt.",
   onboardingReturnTooManyWords: "Zu viele Wörter.",
   onboardingReturnUnknownWords: "Unbekanntes Wort: {words}",
   onboardingReturnSuggestions: "Wortvorschläge",

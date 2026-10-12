@@ -131,7 +131,8 @@ test("gates a signed-out wallet without render loops and restores from SLIP-39",
   errors.assertClean();
 
   await page.getByRole("button", { name: "I already have a profile" }).click();
-  await page.getByLabel("Keys").fill(slip39Share);
+  // The first slot takes the whole phrase and fans it out over the grid.
+  await page.getByLabel("Word 1", { exact: true }).fill(slip39Share);
   const reloadFinished = page.waitForEvent("load");
   await page.getByRole("button", { name: "Continue" }).click();
 
@@ -157,7 +158,8 @@ test("restores an account when private browsing disables OPFS", async ({
     .getByRole("button", { name: "Continue with temporary session" })
     .click();
   await page.getByRole("button", { name: "I already have a profile" }).click();
-  await page.getByLabel("Keys").fill(slip39Share);
+  // The first slot takes the whole phrase and fans it out over the grid.
+  await page.getByLabel("Word 1", { exact: true }).fill(slip39Share);
   const reloadFinished = page.waitForEvent("load");
   await page.getByRole("button", { name: "Continue" }).click();
 

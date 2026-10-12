@@ -168,14 +168,13 @@ export const pt = {
   onboardingReturnTitle: "Bem-vindo de volta",
   onboardingReturnIntro:
     "Digite suas 20 palavras SLIP-39. Você pode digitá-las manualmente ou colá-las aqui.",
-  onboardingReturnHint:
-    "Use 20 palavras SLIP-39 separadas por espaços ou vírgulas.",
-  onboardingReturnPlaceholder: "academic acid acne ...",
   onboardingReturnPasteButton: "Colar da área de transferência",
+  onboardingReturnManualHint: "Ou digite as palavras uma a uma.",
+  onboardingReturnWord: "Palavra {index}",
+  onboardingReturnAcademicHint:
+    "A 3ª e a 4ª palavra de um backup Linky são sempre “academic”, não é um erro.",
   onboardingReturnConfirm: "Continuar",
   onboardingReturnWordCount: "{count}/{total} palavras",
-  onboardingReturnSeparatorHint:
-    "Vírgulas e quebras de linha são convertidas em espaços automaticamente.",
   onboardingReturnTooManyWords: "Palavras demais.",
   onboardingReturnUnknownWords: "Palavra desconhecida: {words}",
   onboardingReturnSuggestions: "Sugestões de palavras",

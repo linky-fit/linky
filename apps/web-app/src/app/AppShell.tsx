@@ -102,14 +102,14 @@ const UnauthenticatedAppShell = () => {
     openReturningOnboarding,
     onPendingOnboardingPhotoError,
     onPendingOnboardingPhotoSelected,
+    pasteReturningSlip39,
     pasteReturningSlip39FromClipboard,
     pickPendingOnboardingPhoto,
     savePendingOnboardingBackupToPasswordManager,
-    selectReturningSlip39Suggestion,
     setLang,
     setOnboardingStep,
     setPendingOnboardingName,
-    setReturningSlip39Input,
+    setReturningSlip39Words,
     submitReturningSlip39,
     t,
     toasts,
@@ -143,13 +143,13 @@ const UnauthenticatedAppShell = () => {
           setOnboardingStep={setOnboardingStep}
           createNewAccount={createNewAccount}
           shufflePendingOnboardingAvatar={shufflePendingOnboardingAvatar}
+          pasteReturningSlip39={pasteReturningSlip39}
           pasteReturningSlip39FromClipboard={pasteReturningSlip39FromClipboard}
           pickPendingOnboardingPhoto={pickPendingOnboardingPhoto}
-          selectReturningSlip39Suggestion={selectReturningSlip39Suggestion}
           savePendingOnboardingBackupToPasswordManager={
             savePendingOnboardingBackupToPasswordManager
           }
-          setReturningSlip39Input={setReturningSlip39Input}
+          setReturningSlip39Words={setReturningSlip39Words}
           setLang={setLang}
           setPendingOnboardingName={setPendingOnboardingName}
           submitReturningSlip39={submitReturningSlip39}

@@ -52,16 +52,16 @@ export const useUnauthenticatedAppShellComposition = () => {
     onPendingOnboardingPhotoError: onboarding.onPendingOnboardingPhotoError,
     onPendingOnboardingPhotoSelected:
       onboarding.onPendingOnboardingPhotoSelected,
+    pasteReturningSlip39: onboarding.pasteReturningSlip39,
     pasteReturningSlip39FromClipboard:
       onboarding.pasteReturningSlip39FromClipboard,
     pickPendingOnboardingPhoto: onboarding.pickPendingOnboardingPhoto,
     savePendingOnboardingBackupToPasswordManager:
       onboarding.savePendingOnboardingBackupToPasswordManager,
-    selectReturningSlip39Suggestion: onboarding.selectReturningSlip39Suggestion,
     setLang,
     setOnboardingStep: onboarding.setOnboardingStep,
     setPendingOnboardingName: onboarding.setPendingOnboardingName,
-    setReturningSlip39Input: onboarding.setReturningSlip39Input,
+    setReturningSlip39Words: onboarding.setReturningSlip39Words,
     submitReturningSlip39: onboarding.submitReturningSlip39,
     t,
     toasts,

@@ -5,14 +5,21 @@ export const SLIP39_WORD_COUNT = 20;
 const SUGGESTION_LIMIT = 6;
 const SLIP39_WORD_SET = new Set(SLIP39_WORD_LIST);
 
-interface Slip39InputAnalysis {
-  activeFragment: string;
-  hasSeparatorFixups: boolean;
-  invalidWords: readonly string[];
-  isCompleteCandidate: boolean;
-  normalizedInput: string;
+interface Slip39WordsFill {
+  /** The slot to focus next: after the last word written, or the same slot while its word is still being typed. */
+  nextIndex: number;
+  /** How many of the typed words found no slot. */
+  overflow: number;
+  words: readonly string[];
+}
+
+interface Slip39WordsAnalysis {
+  filledCount: number;
+  invalidIndexes: readonly number[];
+  /** Every slot holds a word from the list. */
+  isComplete: boolean;
+  /** Completions for the slot being typed in. */
   suggestions: readonly string[];
-  wordCount: number;
 }
 
 const splitSlip39Input = (value: string): readonly string[] =>
@@ -26,68 +33,69 @@ const splitSlip39Input = (value: string): readonly string[] =>
 export const normalizeSlip39Input = (value: string): string =>
   splitSlip39Input(value).join(" ");
 
-export const analyzeSlip39Input = (value: string): Slip39InputAnalysis => {
-  const rawValue = value;
-  const normalizedInput = normalizeSlip39Input(rawValue);
-  const words = normalizedInput ? normalizedInput.split(" ") : [];
-  const loweredInput = rawValue.toLowerCase();
-  const endsWithSeparator = /[\s,;]+$/.test(loweredInput);
-  const rawFragments = loweredInput.split(/[\s,;]+/);
-  const activeFragment = endsWithSeparator
-    ? ""
-    : (rawFragments[rawFragments.length - 1] ?? "").trim();
-  const prefixMatches = activeFragment
-    ? SLIP39_WORD_LIST.filter((word) => word.startsWith(activeFragment)).slice(
-        0,
-        SUGGESTION_LIMIT,
-      )
-    : [];
+export const emptySlip39Words = (): readonly string[] =>
+  Array.from({ length: SLIP39_WORD_COUNT }, () => "");
 
-  const invalidWords = words.filter((word, index) => {
-    const isOpenPrefix =
-      !endsWithSeparator &&
-      index === words.length - 1 &&
-      word === activeFragment &&
-      prefixMatches.length > 0;
+export const slip39WordsToInput = (words: readonly string[]): string =>
+  words.filter((word) => word.length > 0).join(" ");
 
-    if (isOpenPrefix) return false;
-    return !SLIP39_WORD_SET.has(word);
-  });
+/** Writes typed or pasted text into the grid from `index`; several words fan out over the following slots. */
+export const fillSlip39Words = (
+  words: readonly string[],
+  index: number,
+  value: string,
+): Slip39WordsFill => {
+  const tokens = splitSlip39Input(value);
+  const next = [...words];
+  if (tokens.length === 0) {
+    next[index] = "";
+    return { nextIndex: index, overflow: 0, words: next };
+  }
 
-  const suggestions =
-    activeFragment.length > 0 && !SLIP39_WORD_SET.has(activeFragment)
-      ? prefixMatches
-      : [];
+  let written = 0;
+  for (const token of tokens) {
+    const slot = index + written;
+    if (slot >= SLIP39_WORD_COUNT) break;
+    next[slot] = token;
+    written += 1;
+  }
 
+  const wordIsDone = tokens.length > 1 || /[\s,;]$/.test(value);
   return {
-    activeFragment,
-    hasSeparatorFixups: /[,;\n\r]/.test(rawValue),
-    invalidWords,
-    isCompleteCandidate:
-      words.length === SLIP39_WORD_COUNT && invalidWords.length === 0,
-    normalizedInput,
-    suggestions,
-    wordCount: words.length,
+    nextIndex: wordIsDone
+      ? Math.min(index + written, SLIP39_WORD_COUNT - 1)
+      : index,
+    overflow: tokens.length - written,
+    words: next,
   };
 };
 
-export const applySlip39Suggestion = (
-  value: string,
-  suggestion: string,
-): string => {
-  const normalizedSuggestion = normalizeSlip39Input(suggestion);
-  if (!normalizedSuggestion) return normalizeSlip39Input(value);
+export const analyzeSlip39Words = (
+  words: readonly string[],
+  activeIndex: number | null,
+): Slip39WordsAnalysis => {
+  const activeWord = activeIndex === null ? "" : (words[activeIndex] ?? "");
+  const suggestions =
+    activeWord.length > 0 && !SLIP39_WORD_SET.has(activeWord)
+      ? SLIP39_WORD_LIST.filter((word) => word.startsWith(activeWord)).slice(
+          0,
+          SUGGESTION_LIMIT,
+        )
+      : [];
 
-  const analysis = analyzeSlip39Input(value);
-  const words = analysis.normalizedInput
-    ? analysis.normalizedInput.split(" ")
-    : [];
+  const invalidIndexes = words.flatMap((word, index) => {
+    if (!word || SLIP39_WORD_SET.has(word)) return [];
+    // The slot being typed in stays neutral while the fragment can still become a word.
+    if (index === activeIndex && suggestions.length > 0) return [];
+    return [index];
+  });
 
-  if (analysis.activeFragment && words.length > 0) {
-    words[words.length - 1] = normalizedSuggestion;
-    return words.join(" ");
-  }
-
-  if (words.length === 0) return normalizedSuggestion;
-  return `${words.join(" ")} ${normalizedSuggestion}`;
+  return {
+    filledCount: words.filter((word) => word.length > 0).length,
+    invalidIndexes,
+    isComplete:
+      words.length === SLIP39_WORD_COUNT &&
+      words.every((word) => SLIP39_WORD_SET.has(word)),
+    suggestions,
+  };
 };

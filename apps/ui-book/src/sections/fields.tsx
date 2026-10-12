@@ -25,6 +25,30 @@ export const fields: Section = {
             error="Enter a complete address"
           />
           <UI.TextField label="Read-only example" value="Disabled" disabled />
+          <UI.Stack gap="$xs">
+            <UI.Row gap="$sm">
+              <UI.Stack flex={1}>
+                <UI.TextField
+                  label="Word 1"
+                  hideLabel
+                  defaultValue="academic"
+                  trailing="1"
+                />
+              </UI.Stack>
+              <UI.Stack flex={1}>
+                <UI.TextField
+                  label="Word 2"
+                  hideLabel
+                  defaultValue="acadmic"
+                  invalid
+                  trailing="2"
+                />
+              </UI.Stack>
+            </UI.Row>
+            <UI.Text variant="caption" color="$warningText">
+              Unknown word: acadmic
+            </UI.Text>
+          </UI.Stack>
           <UI.TextField
             label="Note"
             multiline
