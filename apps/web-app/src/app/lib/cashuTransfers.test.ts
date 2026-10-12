@@ -2,8 +2,15 @@ import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import { TokenTransfer } from "@linky-fit/linkshu";
 import type { StoredOperation } from "@linky-fit/linkshu";
-import { createTransferFixture } from "../../testUtils/cashuInventory";
-import { isShownDeferredReceive, takenTokenTexts } from "./cashuTransfers";
+import {
+  createStoredProofFixture,
+  createTransferFixture,
+} from "../../testUtils/cashuInventory";
+import {
+  isShownDeferredReceive,
+  sentTokenClaims,
+  takenTokenTexts,
+} from "./cashuTransfers";
 
 const transfer = (
   id: string,
@@ -93,5 +100,38 @@ describe("isShownDeferredReceive", () => {
     expect(isShownDeferredReceive(deferral("pending", "sat"))).toBe(true);
     expect(isShownDeferredReceive(deferral("pending", "usd"))).toBe(false);
     expect(isShownDeferredReceive(deferral("done", "sat"))).toBe(false);
+  });
+});
+
+describe("sentTokenClaims", () => {
+  const proof = (
+    id: string,
+    operationId: string,
+    state: "handedOut" | "spent",
+  ) => createStoredProofFixture({ id, operationId, state });
+
+  it("marks an own send claimed once every proof it handed out is spent", () => {
+    const claimed = transfer("AQEBAQEBAQEBAQEBAQEBAQ", "send", "done");
+    const partial = transfer("AgICAgICAgICAgICAgICAg", "send", "done");
+    const returned = transfer("AwMDAwMDAwMDAwMDAwMDAw", "send", "returned");
+    const received = transfer("BAQEBAQEBAQEBAQEBAQEBA", "receive", "done");
+
+    const claims = sentTokenClaims(
+      [claimed, partial, returned, received],
+      [
+        proof("BQUFBQUFBQUFBQUFBQUFBQ", claimed.id, "spent"),
+        proof("BgYGBgYGBgYGBgYGBgYGBg", claimed.id, "spent"),
+        proof("BwcHBwcHBwcHBwcHBwcHBw", partial.id, "spent"),
+        proof("CAgICAgICAgICAgICAgICA", partial.id, "handedOut"),
+        proof("CQkJCQkJCQkJCQkJCQkJCQ", returned.id, "spent"),
+        proof("CgoKCgoKCgoKCgoKCgoKCg", received.id, "spent"),
+      ],
+    );
+
+    expect([...claims]).toEqual([
+      [claimed.tokenText, true],
+      [partial.tokenText, false],
+      [returned.tokenText, false],
+    ]);
   });
 });

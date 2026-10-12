@@ -114,6 +114,7 @@ export const useWalletTokens = () => {
   const checkIssuedCashuTokensAndDeleteClaimed = useCheckIssuedTokenClaims();
   const returnCashuTokenToWallet = useReturnTokenToWallet();
   const { cashuBalance } = useWalletBalance();
+  const walletTransfers = useWalletInventory().transfers;
   const walletOpRunning = useAtomValue(walletOpRunningAtom);
   const [cashuEmitAmount, setCashuEmitAmount] = useAtom(issueTokenAmountAtom);
   const [cashuBulkCheckIsBusy, setCashuBulkCheckIsBusy] = useAtom(
@@ -207,10 +208,16 @@ export const useWalletTokens = () => {
           setStatus(null);
           pushToast(t("cashuCheckOk"));
           return "ok";
-        case "Spent":
-          setStatus(t("cashuInvalid"));
-          pushToast(t("cashuInvalid"));
+        case "Spent": {
+          const isSend = walletTransfers.some(
+            (transfer) =>
+              String(transfer.id) === id && transfer.kind === "send",
+          );
+          const message = t(isSend ? "cashuTokenClaimed" : "cashuInvalid");
+          setStatus(message);
+          pushToast(message);
           return "invalid";
+        }
         case "Unavailable":
           setStatus(t("cashuCheckFailed"));
           pushToast(t("cashuCheckFailed"));
@@ -222,7 +229,7 @@ export const useWalletTokens = () => {
           return "skipped";
       }
     },
-    [commands, pushToast, setStatus, t],
+    [commands, pushToast, setStatus, t, walletTransfers],
   );
 
   const checkAllCashuTokensAndDeleteInvalid = React.useCallback(async () => {

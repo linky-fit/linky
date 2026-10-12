@@ -1,4 +1,8 @@
-import type { StoredOperation, TokenTransfer } from "@linky-fit/linkshu";
+import type {
+  StoredOperation,
+  StoredProof,
+  TokenTransfer,
+} from "@linky-fit/linkshu";
 import { isStoredCashuErrorTransient } from "./cashuStoredError";
 
 /** A transfer the user is still waiting on: something can still happen to it. */
@@ -57,5 +61,34 @@ export const takenTokenTexts = (
           operation.tokenText === null ? [] : [operation.tokenText],
         ),
     ].filter((text) => !resumable.has(text)),
+  );
+};
+
+/**
+ * The wallet's own sends by token text: true once the recipient claimed it,
+ * i.e. the mint reported every proof it handed out spent. A returned send's
+ * proofs were spent by the wallet itself.
+ */
+export const sentTokenClaims = (
+  transfers: ReadonlyArray<TokenTransfer>,
+  proofs: ReadonlyArray<StoredProof>,
+): ReadonlyMap<string, boolean> => {
+  const allSpentByOperation = new Map<string, boolean>();
+  for (const proof of proofs) {
+    if (proof.operationId === null) continue;
+    allSpentByOperation.set(
+      proof.operationId,
+      (allSpentByOperation.get(proof.operationId) ?? true) &&
+        proof.state === "spent",
+    );
+  }
+  return new Map(
+    transfers
+      .filter((transfer) => transfer.kind === "send")
+      .map((transfer) => [
+        transfer.tokenText,
+        transfer.status !== "returned" &&
+          (allSpentByOperation.get(transfer.id) ?? false),
+      ]),
   );
 };

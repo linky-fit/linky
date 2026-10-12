@@ -52,7 +52,10 @@ import {
   isPrivatePdfPayload,
   parsePrivateImageMessage,
 } from "../app/lib/privateImageMessage";
-import type { CashuTokenMessageInfo } from "../app/lib/tokenMessageInfo";
+import {
+  cashuTokenStateKey,
+  type CashuTokenMessageInfo,
+} from "../app/lib/tokenMessageInfo";
 import { isStandaloneCashuTokenMessage } from "../app/lib/tokenText";
 import type {
   ChatReactionChip,
@@ -411,6 +414,7 @@ function ChatMessageComponent({
   const renderCashuTokenPill = React.useCallback(
     (info: CashuTokenMessageInfo, key?: string) => {
       const amountText = formatDisplayedAmountText(info.amount ?? 0);
+      const stateKey = cashuTokenStateKey(info);
       return (
         <CashuTokenPill
           key={key}
@@ -419,7 +423,7 @@ function ChatMessageComponent({
           accessibilityLabel={[
             amountText,
             info.mintDisplay,
-            info.isValid ? null : t("cashuInvalid"),
+            stateKey && t(stateKey),
           ]
             .filter(Boolean)
             .join(" · ")}
