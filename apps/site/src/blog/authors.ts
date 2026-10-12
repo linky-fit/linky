@@ -31,3 +31,14 @@ export const karelson: Author = {
   nostr: "npub1ejg8mwu74wspqrna4fx5wgz7jf8anceegst2ufvlcka442fceguqc6d8rf",
   linky: "npub1ejg8mwu74wspqrna4fx5wgz7jf8anceegst2ufvlcka442fceguqc6d8rf",
 };
+
+export const dejv: Author = {
+  name: "Dejv",
+  avatar: "/blog/authors/dejv.jpg",
+  bio: {
+    en: "First developer at Linky. Also dev lead at Vexl.",
+    cs: "První vývojář Linky. Zároveň vede vývoj ve Vexlu.",
+  },
+  linky: "dejv",
+  x: "Kaladivo",
+};
