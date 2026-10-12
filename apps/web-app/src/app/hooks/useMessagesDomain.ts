@@ -262,12 +262,13 @@ export const useMessagesDomain = ({
 
   const retentionPruneTimerRef = React.useRef<number | null>(null);
   const retentionPruneInFlightRef = React.useRef(false);
+  // Bumped after each pass, so the overflow check reruns on what it left.
+  const [retentionPrunePasses, setRetentionPrunePasses] = React.useState(0);
 
-  const pruneRetention = React.useCallback(() => {
-    if (retentionPruneInFlightRef.current) return;
-
+  const pruneRetention = React.useCallback(async () => {
     retentionPruneInFlightRef.current = true;
     try {
+      const removals: Array<Promise<WriteOutcome>> = [];
       const byContact = new Map<string, LocalNostrMessage[]>();
       for (const message of nostrMessagesLocal) {
         const contactId = trimString(message.contactId);
@@ -302,7 +303,7 @@ export const useMessagesDomain = ({
       for (const message of nostrMessagesLocal) {
         const messageId = trimString(message.id);
         if (!messageId || keepIds.has(messageId)) continue;
-        removeNostrMessage(message);
+        removals.push(removeNostrMessage(message));
       }
 
       const keptRumorIds = new Set<string>();
@@ -326,10 +327,12 @@ export const useMessagesDomain = ({
       for (const reaction of nostrReactionsLocal) {
         const reactionId = trimString(reaction.id);
         if (!reactionId || keepReactionIds.has(reactionId)) continue;
-        removeNostrReaction(reactionId);
+        removals.push(removeNostrReaction(reactionId));
       }
+      await allWrites(removals);
     } finally {
       retentionPruneInFlightRef.current = false;
+      setRetentionPrunePasses((passes) => passes + 1);
     }
   }, [
     nostrMessagesLocal,
@@ -337,6 +340,8 @@ export const useMessagesDomain = ({
     removeNostrMessage,
     removeNostrReaction,
   ]);
+
+  const pruneRetentionRef = useLatest(pruneRetention);
 
   // Before hydration a reaction's message may not have arrived yet, so it would look orphaned.
   React.useEffect(() => {
@@ -375,12 +380,22 @@ export const useMessagesDomain = ({
       return;
     }
 
-    if (retentionPruneTimerRef.current != null) return;
+    if (
+      retentionPruneTimerRef.current != null ||
+      retentionPruneInFlightRef.current
+    )
+      return;
     retentionPruneTimerRef.current = window.setTimeout(() => {
       retentionPruneTimerRef.current = null;
-      pruneRetention();
+      void pruneRetentionRef.current();
     }, RETENTION_PRUNE_THROTTLE_MS);
-  }, [hydrated, nostrMessagesLocal, nostrReactionsLocal, pruneRetention]);
+  }, [
+    hydrated,
+    nostrMessagesLocal,
+    nostrReactionsLocal,
+    pruneRetentionRef,
+    retentionPrunePasses,
+  ]);
 
   React.useEffect(() => {
     return () => {
