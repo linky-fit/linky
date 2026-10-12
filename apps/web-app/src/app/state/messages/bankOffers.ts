@@ -124,6 +124,8 @@ export interface BankPaymentOfferRequest {
   amountSat?: unknown;
   amountText: string;
   contacts: readonly ContactRowLike[];
+  /** The bank transfer's currency code; anything unsupported is dropped. */
+  currency?: unknown;
   singleTabRiskAccepted?: boolean;
   spdPayload?: unknown;
   staggerDelaySec?: unknown;

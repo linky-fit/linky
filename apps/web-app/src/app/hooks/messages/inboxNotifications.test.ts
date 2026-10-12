@@ -216,6 +216,7 @@ describe("notifyBankOfferSnapshot", () => {
     clientId: null,
     content: "{}",
     createdAtSec: SENT_AT,
+    currency: null,
     expiresAtSec: null,
     extensionSec: null,
     initiatedAtSec: SENT_AT,

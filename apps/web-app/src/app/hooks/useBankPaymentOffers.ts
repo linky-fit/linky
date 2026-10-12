@@ -32,8 +32,10 @@ import {
   isBankPaymentOfferCanceled,
   isBankPaymentOfferStaggerQueueOpen,
   ownBankPaymentOfferExpiries,
+  readBankPaymentOfferCurrency,
   recentBankPaymentOfferOutcomesByPeer,
   type AppliedBankPaymentOfferSnapshot,
+  type BankPaymentOfferCurrency,
   type BankPaymentOfferOutcome,
   type BankOfferStatus,
   type BankPaymentOffer,
@@ -361,6 +363,7 @@ export const useBankPaymentOffers = ({
     async (args: {
       amountSat: number | null;
       amountText: string;
+      currency: BankPaymentOfferCurrency | null;
       expiresAtSec?: number;
       offerId: BankOfferId;
       offerer: Pubkey;
@@ -450,6 +453,7 @@ export const useBankPaymentOffers = ({
                 const sent = await sendOffered({
                   amountSat: locked.amountSat,
                   amountText: locked.amountText,
+                  currency: locked.currency ?? null,
                   expiresAtSec: locked.expiresAtSec,
                   offerId: locked.offerId,
                   offerer: me,
@@ -534,6 +538,7 @@ export const useBankPaymentOffers = ({
           ? Math.round(amountSatRaw)
           : null;
       const amountText = args.amountText.trim();
+      const currency = readBankPaymentOfferCurrency(args.currency);
       const delaySec = clampBankPaymentOfferStaggerDelaySec(
         Number(args.staggerDelaySec ?? 0),
       );
@@ -585,6 +590,7 @@ export const useBankPaymentOffers = ({
           const sent = await sendOffered({
             amountSat,
             amountText,
+            currency,
             offerId,
             offerer: myPubHex,
             to: recipient.peer,
@@ -604,6 +610,7 @@ export const useBankPaymentOffers = ({
         const queue = bankPaymentOfferStaggerQueue({
           amountSat,
           amountText,
+          currency,
           delaySec,
           firstSentAtSec: first.sentAtSec,
           offerId,

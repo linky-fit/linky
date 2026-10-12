@@ -749,6 +749,13 @@ function ChatMessageComponent({
             : { value: bankPaymentOfferInfo.amountText }
       }
     >
+      {!unmatchedBankOfferStatus && bankPaymentOfferInfo.currency !== null ? (
+        <Pill
+          size="sm"
+          label={bankPaymentOfferInfo.currency}
+          testID="chat-bank-payment-offer-currency"
+        />
+      ) : null}
       {bankOfferDescription ? (
         <CardNote>{bankOfferDescription}</CardNote>
       ) : null}

@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { BankOfferId } from "@linky-fit/linkstr";
+import { Schema } from "effect";
 import { me, other, payer, snapshot, START } from "../testing/offers";
 import {
   applyBankPaymentOfferSnapshot,
   emptyBankPaymentOfferState,
 } from "./state";
 import {
+  BankPaymentOfferStaggerRecord,
   bankPaymentOfferStaggerDue,
   bankPaymentOfferStaggerQueue,
   isBankPaymentOfferStaggerQueueOpen,
@@ -15,6 +17,7 @@ import {
 const queue = bankPaymentOfferStaggerQueue({
   amountSat: 100,
   amountText: "250 Kč",
+  currency: "CZK",
   delaySec: 10,
   firstSentAtSec: START,
   offerId: BankOfferId.make("offer-1"),
@@ -25,6 +28,7 @@ const queue = bankPaymentOfferStaggerQueue({
 describe("bank payment offer stagger", () => {
   it("schedules delayed recipients against the first send's expiry", () => {
     expect(queue).toMatchObject({
+      currency: "CZK",
       expiresAtSec: START + 300,
       pending: [
         { dueAtSec: START + 10, peer: payer },
@@ -34,6 +38,7 @@ describe("bank payment offer stagger", () => {
     expect(
       bankPaymentOfferStaggerQueue({
         ...queue!,
+        currency: "CZK",
         delaySec: 10,
         firstSentAtSec: START,
         peers: [],
@@ -48,6 +53,20 @@ describe("bank payment offer stagger", () => {
     expect(isBankPaymentOfferStaggerRecordExpired(queue!, START - 1)).toBe(
       true,
     );
+  });
+
+  it("round-trips the currency and still decodes a record stored without it", () => {
+    const decode = Schema.decodeUnknownSync(
+      Schema.fromJsonString(BankPaymentOfferStaggerRecord),
+    );
+    expect(decode(JSON.stringify(queue))).toEqual(queue);
+    const legacy = Object.fromEntries(
+      Object.entries(queue!).filter(([key]) => key !== "currency"),
+    );
+    expect(decode(JSON.stringify(legacy))).toEqual(legacy);
+    expect(() =>
+      decode(JSON.stringify({ ...legacy, currency: "gold" })),
+    ).toThrow();
   });
 
   it("tells due recipients apart from already offered ones and reports the next due time", () => {

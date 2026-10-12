@@ -48,6 +48,7 @@ export const snapshot = (
     expiresAtSec: null,
     extensionSec: null,
     spdPayload: null,
+    currency: null,
     statusUpdatedAtSec: START,
     clientId: null,
     sentAt: START,
@@ -83,6 +84,7 @@ export const receiptFor = (
       amountText: draft.amountText,
       bankPaidAtSec:
         draft.bankPaidAtSec ?? (draft.status === "bank_paid" ? sentAt : null),
+      currency: draft.currency ?? null,
       expiresAtSec: draft.expiresAtSec ?? null,
       extensionSec: draft.extensionSec ?? null,
       initiatedAtSec:

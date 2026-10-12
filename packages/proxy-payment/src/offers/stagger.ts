@@ -1,5 +1,9 @@
 import { BankOfferId, Pubkey } from "@linky-fit/linkstr";
 import { Schema } from "effect";
+import {
+  BANK_PAYMENT_OFFER_CURRENCIES,
+  type BankPaymentOfferCurrency,
+} from "../bankQr/bankPayment";
 import { NonBlankString, PositiveFiniteNumber } from "../internal/schema";
 import { findBankPaymentOffer, type BankPaymentOffer } from "./offer";
 import { BANK_PAYMENT_OFFER_PHASE_TTL_SEC } from "./status";
@@ -13,6 +17,10 @@ const StaggerRecipient = Schema.Struct({
 export const BankPaymentOfferStaggerRecord = Schema.Struct({
   amountSat: Schema.NullOr(PositiveFiniteNumber),
   amountText: NonBlankString,
+  // Optional so records persisted by builds without it still decode.
+  currency: Schema.optional(
+    Schema.NullOr(Schema.Literals(BANK_PAYMENT_OFFER_CURRENCIES)),
+  ),
   createdAtSec: PositiveFiniteNumber,
   expiresAtSec: PositiveFiniteNumber,
   offerId: BankOfferId,
@@ -27,6 +35,7 @@ export type BankPaymentOfferStaggerRecord =
 export const bankPaymentOfferStaggerQueue = (args: {
   amountSat: number | null;
   amountText: string;
+  currency: BankPaymentOfferCurrency | null;
   delaySec: number;
   firstSentAtSec: number;
   offerId: BankOfferId;
@@ -38,6 +47,7 @@ export const bankPaymentOfferStaggerQueue = (args: {
     : {
         amountSat: args.amountSat,
         amountText: args.amountText,
+        currency: args.currency,
         createdAtSec: args.firstSentAtSec,
         expiresAtSec: args.firstSentAtSec + BANK_PAYMENT_OFFER_PHASE_TTL_SEC,
         offerId: args.offerId,

@@ -457,7 +457,7 @@ describe("SpdPaymentPage offer recipients", () => {
       requestButton(container)?.click();
     });
     expect(onRequestReimbursement).toHaveBeenCalledWith(
-      expect.objectContaining({ spdPayload }),
+      expect.objectContaining({ currency: "CZK", spdPayload }),
     );
   });
 });

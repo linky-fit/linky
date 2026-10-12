@@ -94,6 +94,7 @@ const snapshot = (
     expiresAtSec: null,
     extensionSec: null,
     spdPayload: null,
+    currency: null,
     statusUpdatedAtSec: UnixSeconds.make(sentAt),
     clientId: null,
     sentAt: UnixSeconds.make(sentAt),
@@ -142,6 +143,7 @@ const receipt = (draft: BankOfferDraft): BankOfferReceipt => {
       amountSat: draft.amountSat ?? null,
       clientId,
       createdAt: sentAt,
+      currency: draft.currency ?? null,
       expiresAtSec: draft.expiresAtSec ?? null,
       initiatedAtSec: draft.initiatedAtSec ?? null,
       offerId: draft.offerId,
@@ -383,14 +385,17 @@ describe("useBankPaymentOffers", () => {
         amountSat: 100,
         amountText: "250 Kč",
         contacts,
+        currency: "CZK",
         spdPayload: SPD,
         staggerDelaySec: 10,
       });
       expect(requested?.chatId).toBe("contact-1");
     });
     expect(sendBankOfferMock).toHaveBeenCalledTimes(1);
+    expect(sendBankOfferMock.mock.calls[0]?.[0].currency).toBe("CZK");
     const [queued] = readBankPaymentOfferStaggerRecords(owner.pubkey);
     expect(queued).toMatchObject({
+      currency: "CZK",
       expiresAtSec: NOW + 300,
       pending: [{ dueAtSec: NOW + 10, peer: second.pubkey }],
     });

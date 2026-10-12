@@ -26,7 +26,7 @@ for (const { offer, event: snapshot } of accepted) notify(offer, snapshot);
 state = applyBankPaymentOfferReceipt(state, peerPubkey, receipt).state;
 ```
 
-A thread is the decoded content (`BankPaymentOfferInfo`) plus its identity on the wire and two milestones a later cancellation or another winner does not erase: `acceptedAtSec`, the first evidence seen that the peer accepted it (`showsBankPaymentOfferAcceptance`), and `bankDetailsSentAtSec`, the first evidence that the peer received the bank details (`showsBankPaymentOfferBankDetails`); `decodeBankPaymentOffer(content)` reads the content JSON back, lenient about every optional field.
+A thread is the decoded content (`BankPaymentOfferInfo`) plus its identity on the wire and two milestones a later cancellation or another winner does not erase: `acceptedAtSec`, the first evidence seen that the peer accepted it (`showsBankPaymentOfferAcceptance`), and `bankDetailsSentAtSec`, the first evidence that the peer received the bank details (`showsBankPaymentOfferBankDetails`); `decodeBankPaymentOffer(content)` reads the content JSON back, lenient about every optional field. `currency` is the bank transfer's currency, read from the snapshot or from the bank QR once it arrives, and `null` for offers from builds that did not send it; `amountText` stays the offerer's own rendering of the amount.
 
 ## Authorization
 
@@ -39,7 +39,7 @@ A thread is the decoded content (`BankPaymentOfferInfo`) plus its identity on th
 - a payer snapshot other than `bank_paid` arrives once the thread has left `offered`: a payer's first answer is final;
 - the status is not terminal and either the offer already ended for another peer or the phase has expired (`isBankPaymentOfferExpired`).
 
-A payer snapshot with no known thread, or `bank_paid` before `bank_details_sent`, waits in `pending` (at most 256, oldest dropped) and is replayed in `sentAt` order once the offerer's snapshot for that peer is accepted. Payer copies never change `expiresAtSec`, `extensionSec` or `spdPayload`; those stay as the offerer sent them, and `bankPaidAtSec` is stamped from the payer's `sentAt`.
+A payer snapshot with no known thread, or `bank_paid` before `bank_details_sent`, waits in `pending` (at most 256, oldest dropped) and is replayed in `sentAt` order once the offerer's snapshot for that peer is accepted. Payer copies never change `expiresAtSec`, `extensionSec`, `spdPayload` or `currency`; those stay as the offerer sent them, and `bankPaidAtSec` is stamped from the payer's `sentAt`.
 
 A stale snapshot or receipt still stamps the milestones it proves (`acceptedAtSec`, `bankDetailsSentAtSec`) on a thread that lacks them, without changing its status or being reported as accepted.
 
@@ -69,11 +69,11 @@ All selectors take `state.offers` and are pure; the consumer's effects run on th
 
 ## Drafts
 
-`bankPaymentOfferedDraft({ to, offerId, offerer, amountText, amountSat, expiresAtSec? })` opens a thread, or returns `null` for an invalid pubkey, offer id or empty amount. `bankPaymentOfferResponseDraft(offer, nextStatus, me, nowSec, options?)` builds the next snapshot of a known thread from its authorized fields, or `null` when `me` may not send `nextStatus` on it. It is dated (`sentAt`) at `nowSec` or the thread's last update, whichever is later, so a peer whose clock runs ahead never finds the answer older than the snapshot it answers; at the same second the staleness rank orders them. `options` carry an extension (`expiresAtSec`, `extensionSec`), the bank QR to hand over (`spdPayload`) and `withPush`. Both stamp a fresh `clientId` and the wire text (`bankPaymentOfferMessageText`).
+`bankPaymentOfferedDraft({ to, offerId, offerer, amountText, amountSat, currency?, expiresAtSec? })` opens a thread, or returns `null` for an invalid pubkey, offer id or empty amount. `bankPaymentOfferResponseDraft(offer, nextStatus, me, nowSec, options?)` builds the next snapshot of a known thread from its authorized fields (`currency` included, so every snapshot repeats it), or `null` when `me` may not send `nextStatus` on it. It is dated (`sentAt`) at `nowSec` or the thread's last update, whichever is later, so a peer whose clock runs ahead never finds the answer older than the snapshot it answers; at the same second the staleness rank orders them. `options` carry an extension (`expiresAtSec`, `extensionSec`), the bank QR to hand over (`spdPayload`) and `withPush`. Both stamp a fresh `clientId` and the wire text (`bankPaymentOfferMessageText`).
 
 ## Stagger
 
-`bankPaymentOfferStaggerQueue({ peers, delaySec, firstSentAtSec, ... })` turns the recipients after the first one into a `BankPaymentOfferStaggerRecord` (a `Schema`, persistable), or `null` for no peers: each peer is due at `firstSentAtSec + (index + 1) * delaySec` and the queue expires with the first send's phase. `bankPaymentOfferStaggerDue(record, offers, nowSec)` splits due peers into `send` and `alreadyOffered` (another tab sent it) and reports `nextDueAtSec`. `isBankPaymentOfferStaggerRecordExpired(record, nowSec)` treats a future `createdAtSec` as expired too. `isBankPaymentOfferStaggerQueueOpen(record, offers)` is false once any recipient moved past `offered`/`declined`; the consumer then drops the queue.
+`bankPaymentOfferStaggerQueue({ peers, delaySec, firstSentAtSec, currency, ... })` turns the recipients after the first one into a `BankPaymentOfferStaggerRecord` (a `Schema`, persistable; a record stored without `currency` still decodes), or `null` for no peers: each peer is due at `firstSentAtSec + (index + 1) * delaySec` and the queue expires with the first send's phase. `bankPaymentOfferStaggerDue(record, offers, nowSec)` splits due peers into `send` and `alreadyOffered` (another tab sent it) and reports `nextDueAtSec`. `isBankPaymentOfferStaggerRecordExpired(record, nowSec)` treats a future `createdAtSec` as expired too. `isBankPaymentOfferStaggerQueueOpen(record, offers)` is false once any recipient moved past `offered`/`declined`; the consumer then drops the queue.
 
 ## Advertised currencies
 
