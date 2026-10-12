@@ -9,7 +9,7 @@ import {
   type ConversationsRepository,
   type UnknownSendersRepository,
 } from "@linky-fit/linksync";
-import { Effect } from "effect";
+import { Duration, Effect } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
 import { LOCAL_PENDING_PAYMENTS_STORAGE_KEY_PREFIX } from "../../../utils/constants";
@@ -106,6 +106,23 @@ const nostrMessageIdOf = (message: NewLocalNostrMessage): MessageId | null => {
   return isRumorId(rumorId) ? nostrMessageIdFor(rumorId) : null;
 };
 
+// Store calls are bounded on their own; a write can still wait on hydration.
+const SLOW_CHAT_WRITE_MS = 10_000;
+const MAX_CHAT_WRITE = Duration.seconds(60);
+
+const reportChatWrite = (
+  tag: "messages.queuedWriteSlow" | "messages.queuedWriteFailed",
+  what: string,
+  state: string,
+): void => {
+  console.warn(`[linky][messages] ${what} write ${state}`);
+  reportAppLog({
+    tag,
+    summary: `A queued ${what} write ${state}`,
+    payload: { what, state },
+  });
+};
+
 export const pendingPaymentsKeyFor = (appOwnerId: string | null) =>
   appOwnerId
     ? `${LOCAL_PENDING_PAYMENTS_STORAGE_KEY_PREFIX}.${appOwnerId}`
@@ -124,10 +141,31 @@ const makeChatWrites = ({
   // id on its pending row) must find the row.
   let writeQueue: Promise<void> = Promise.resolve();
   const queueWrite: ChatWrites["queueWrite"] = (what, effect) => {
-    const outcome = writeQueue.then(() => runWrite(effect));
+    const outcome = writeQueue.then(() => {
+      const slow = setTimeout(
+        () =>
+          reportChatWrite(
+            "messages.queuedWriteSlow",
+            what,
+            "still running after 10 s",
+          ),
+        SLOW_CHAT_WRITE_MS,
+      );
+      return runWrite(
+        Effect.timeoutOrElse(effect, {
+          duration: MAX_CHAT_WRITE,
+          orElse: () =>
+            Effect.fail(new Error("did not finish within 60 s, abandoned")),
+        }),
+      ).finally(() => clearTimeout(slow));
+    });
     writeQueue = outcome.then((settled) => {
-      if (settled.ok) return;
-      console.warn(`[linky][messages] ${what} write failed`, settled);
+      if (!settled.ok)
+        reportChatWrite(
+          "messages.queuedWriteFailed",
+          what,
+          `failed: ${settled.error}`,
+        );
     });
     return outcome;
   };

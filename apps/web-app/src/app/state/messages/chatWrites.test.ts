@@ -98,6 +98,34 @@ describe("chatWritesAtom", () => {
     expect(row?.status).toBe("sent");
   });
 
+  it("abandons a queued write that never settles, logs it and runs the next one", async () => {
+    const { writes } = await boot();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.useFakeTimers();
+    try {
+      const stuck = writes.queueWrite("message", Effect.never);
+      const next = writes.queueWrite("reaction", Effect.void);
+
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(warn).toHaveBeenLastCalledWith(
+        "[linky][messages] message write still running after 10 s",
+      );
+
+      await vi.advanceTimersByTimeAsync(50_000);
+      expect(await stuck).toEqual({
+        ok: false,
+        error: "did not finish within 60 s, abandoned",
+      });
+      expect(await next).toEqual({ ok: true });
+      expect(warn).toHaveBeenLastCalledWith(
+        "[linky][messages] message write failed: did not finish within 60 s, abandoned",
+      );
+    } finally {
+      vi.useRealTimers();
+      warn.mockRestore();
+    }
+  });
+
   it("queues an offline payment under the owner's key", async () => {
     const { appOwnerId, writes } = await boot();
     const contactId = createId<"Contact">();

@@ -170,6 +170,10 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "An offline payment was sent after reconnecting and failed after it may have created a token. It is not retried, so it can never be paid twice; its chat placeholder shows the error.",
   "paymentRequest.authorizationLost":
     "The reviewed request or approved recipient changed during token creation. Delivery was stopped and the app attempted to return the pending transfer to the wallet; a failed return leaves it recoverable.",
+  "messages.queuedWriteSlow":
+    "A message or reaction write has been running for 10 seconds while every later chat write waits behind it. Each store call fails on its own after 10 seconds (see WriteSlow and ReadSlow), so a write this slow is chaining several slow calls or waiting for the account to hydrate.",
+  "messages.queuedWriteFailed":
+    "A message or reaction write in the serial chat queue failed, or was abandoned after 60 seconds so the writes behind it can run. The payload names the write and the error.",
   "messages.deleted":
     "The user deleted a message for both sides: the local row became a placeholder (deletedAtSec set, text replaced), its reactions went, and a NIP-09 deletion request (kind 5 with a k tag naming the message kind) was queued for the peer. The rumor link is the deletion, the message link the deleted rumor id.",
   "messages.deletedByPeer":
