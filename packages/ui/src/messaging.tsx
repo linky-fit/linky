@@ -485,12 +485,15 @@ export interface EmojiPickerProps {
   accessibilityLabel: string;
   emojis: readonly string[];
   onSelect: (emoji: string) => void;
+  /** Shows a plus button after the emojis, e.g. to reveal the full set; `label` is its accessibility label. */
+  more?: LabeledAction | undefined;
 }
 
 export function EmojiPicker({
   accessibilityLabel,
   emojis,
   onSelect,
+  more,
 }: EmojiPickerProps) {
   return (
     <Row role="group" aria-label={accessibilityLabel} flexWrap="wrap" gap="$xs">
@@ -508,6 +511,71 @@ export function EmojiPicker({
           <Text variant="heading">{emoji}</Text>
         </Pressable>
       ))}
+      {more ? (
+        <Pressable
+          aria-label={more.label}
+          width="$control"
+          height="$control"
+          justifyContent="center"
+          borderRadius="$pill"
+          hoverStyle={{ backgroundColor: "$neutralSoft" }}
+          onPress={more.onPress}
+        >
+          <Icon name="Plus" color="$colorMuted" />
+        </Pressable>
+      ) : null}
     </Row>
+  );
+}
+
+export interface EmojiCatalogGroup {
+  key: string;
+  /** Tab name, read by assistive tech; the tab shows `icon`. */
+  label: string;
+  icon: IconName;
+  emojis: readonly string[];
+}
+
+export interface EmojiCatalogProps {
+  accessibilityLabel: string;
+  groups: readonly EmojiCatalogGroup[];
+  onSelect: (emoji: string) => void;
+}
+
+/** The full emoji set behind icon tabs, one group shown at a time; the grid scrolls within a fixed height. */
+export function EmojiCatalog({
+  accessibilityLabel,
+  groups,
+  onSelect,
+}: EmojiCatalogProps) {
+  const [activeKey, setActiveKey] = useState(groups[0]?.key ?? "");
+  const active = groups.find((group) => group.key === activeKey) ?? groups[0];
+  return (
+    <Stack gap="$sm">
+      <Row role="tablist" gap="$xxs" justifyContent="space-between">
+        {groups.map((group) => (
+          <IconButton
+            key={group.key}
+            icon={group.icon}
+            accessibilityLabel={group.label}
+            size="sm"
+            variant={group.key === active?.key ? "secondary" : "ghost"}
+            role="tab"
+            aria-selected={group.key === active?.key}
+            onPress={() => setActiveKey(group.key)}
+          />
+        ))}
+      </Row>
+      {active ? (
+        // Remounting on a tab change starts the grid at its top.
+        <ScrollView key={active.key} maxHeight="$qr" flexGrow={0}>
+          <EmojiPicker
+            accessibilityLabel={`${accessibilityLabel}: ${active.label}`}
+            emojis={active.emojis}
+            onSelect={onSelect}
+          />
+        </ScrollView>
+      ) : null}
+    </Stack>
   );
 }

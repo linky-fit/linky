@@ -1,15 +1,16 @@
 import {
   Divider,
+  EmojiCatalog,
   EmojiPicker,
   ListRow,
-  ScrollView,
   Sheet,
 } from "@linky-fit/ui";
 import type { IconName } from "@linky-fit/ui";
-import { useState, type FC } from "react";
+import { useMemo, useState, type FC } from "react";
 import {
   QUICK_REACTION_EMOJIS,
-  REACTION_EMOJIS,
+  REACTION_EMOJI_GROUPS,
+  type ReactionEmojiGroupId,
 } from "../app/lib/reactionEmojis";
 
 interface MessageImageActions {
@@ -27,6 +28,7 @@ interface MessageActionsMenuProps {
   labels: {
     copy: string;
     edit: string;
+    emojiGroups: Record<ReactionEmojiGroupId, string>;
     menu: string;
     moreEmojis: string;
     react: string;
@@ -61,6 +63,16 @@ export const MessageActionsMenu: FC<MessageActionsMenuProps> = ({
   onReply,
 }) => {
   const [emojisExpanded, setEmojisExpanded] = useState(false);
+  const emojiGroups = useMemo(
+    () =>
+      REACTION_EMOJI_GROUPS.map((group) => ({
+        key: group.id,
+        label: labels.emojiGroups[group.id],
+        icon: group.icon,
+        emojis: group.emojis,
+      })),
+    [labels.emojiGroups],
+  );
   // Every message has its own menu and a closing Sheet lingers in the DOM, so mount it only while open.
   if (!isOpen) return null;
   const actions: MenuAction[] = [];
@@ -96,24 +108,29 @@ export const MessageActionsMenu: FC<MessageActionsMenuProps> = ({
       hideTitle
     >
       {canReplyOrReact ? (
-        <ScrollView maxHeight="$qr" flexGrow={0}>
-          <EmojiPicker
+        emojisExpanded ? (
+          <EmojiCatalog
             accessibilityLabel={labels.react}
-            emojis={emojisExpanded ? REACTION_EMOJIS : QUICK_REACTION_EMOJIS}
+            groups={emojiGroups}
             onSelect={(emoji) => {
               onReact(emoji);
               close();
             }}
-            {...(emojisExpanded
-              ? {}
-              : {
-                  more: {
-                    label: labels.moreEmojis,
-                    onPress: () => setEmojisExpanded(true),
-                  },
-                })}
           />
-        </ScrollView>
+        ) : (
+          <EmojiPicker
+            accessibilityLabel={labels.react}
+            emojis={QUICK_REACTION_EMOJIS}
+            onSelect={(emoji) => {
+              onReact(emoji);
+              close();
+            }}
+            more={{
+              label: labels.moreEmojis,
+              onPress: () => setEmojisExpanded(true),
+            }}
+          />
+        )
       ) : null}
       <Divider />
       {actions.map((action) => (

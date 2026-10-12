@@ -15,10 +15,12 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 ### en-US
 
 - Notifications on Android phones without Google Play Services (e.g. GrapheneOS): install a UnifiedPush app such as ntfy and turn notifications on in Settings.
+- Message reactions: a plus button opens the full emoji list.
 
 ### cs-CZ
 
 - Notifikace na Androidu bez Google Play Services (např. GrapheneOS): nainstalujte UnifiedPush aplikaci, třeba ntfy, a zapněte notifikace v Nastavení.
+- Reakce na zprávy: tlačítko plus otevře celý seznam emoji.
 
 ## [26.10.3] - 2026-10-05
 
