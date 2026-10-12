@@ -419,9 +419,8 @@ self.addEventListener("install", (event) => {
   event.waitUntil(flushPushDebugLog());
 });
 
-// vite-plugin-pwa registerType:"prompt" — the client posts SKIP_WAITING when
-// the user accepts the update banner; without this the new SW would sit in
-// the waiting state forever.
+// platform/serviceWorker.ts posts SKIP_WAITING when the user accepts the
+// update banner; without this the new SW would sit in the waiting state forever.
 self.addEventListener("message", (event: ExtendableMessageEvent) => {
   const data: unknown = event.data;
   if (

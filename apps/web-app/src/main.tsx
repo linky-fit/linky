@@ -4,7 +4,6 @@ import { Capacitor } from "@capacitor/core";
 import { StrictMode } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
-import { registerSW } from "virtual:pwa-register";
 import {
   fontFamily,
   fontWeight,
@@ -54,6 +53,7 @@ import {
 } from "./utils/pwaUpdate";
 import { getUnknownErrorMessage, isRecord } from "./utils/unknown";
 import { isDevBuild, isE2eBuild } from "./platform/buildEnv";
+import { registerServiceWorker } from "./platform/serviceWorker";
 
 type BufferFromArgs =
   | [arrayLike: ArrayLike<number> | ArrayBufferView]
@@ -171,8 +171,7 @@ if (!getGlobalProcess()) {
   Reflect.set(B.prototype, patchMarker, true);
 })();
 
-const updateSW = registerSW({
-  immediate: true,
+const updateSW = registerServiceWorker({
   onOfflineReady() {
     appendPushDebugLog("client", "pwa offline ready");
   },
@@ -180,7 +179,7 @@ const updateSW = registerSW({
     appendPushDebugLog("client", "pwa update available");
     void handlePwaUpdateAvailable();
   },
-  onRegisteredSW(swUrl, registration) {
+  onRegistered(swUrl, registration) {
     appendPushDebugLog("client", "pwa sw registered", {
       hasActive: Boolean(registration?.active),
       hasInstalling: Boolean(registration?.installing),
@@ -189,8 +188,7 @@ const updateSW = registerSW({
       swUrl,
     });
 
-    // vite-plugin-pwa does not auto-poll for SW updates when an
-    // onRegisteredSW callback is supplied. Trigger manual update checks
+    // Workbox does not poll for SW updates. Trigger manual update checks
     // on a 30s interval plus on focus/visibility/online so an update is
     // noticed shortly after a deploy. Detected waiting workers fire the
     // onNeedRefresh callback above, which either auto-applies the update
