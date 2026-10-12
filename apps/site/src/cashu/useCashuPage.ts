@@ -108,7 +108,13 @@ const formatCashuDisplayAmount = (
     : 0;
 
   if (displayCurrency === "btc") {
-    return { value: formatInteger(normalizedAmount, lang), unit: "₿" };
+    return {
+      value: new Intl.NumberFormat(normalizeLocale(lang), {
+        maximumFractionDigits: 8,
+        minimumFractionDigits: 0,
+      }).format(normalizedAmount / satsPerBtc),
+      unit: "₿",
+    };
   }
 
   if (displayCurrency !== "sat" && fiatRates) {

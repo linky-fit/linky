@@ -62,6 +62,34 @@ describe("formatDisplayAmountParts", () => {
     });
   });
 
+  it("shows ₿ as bitcoin with up to eight decimal places", () => {
+    expect(
+      formatDisplayAmountParts(123_456, {
+        displayCurrency: "btc",
+        fiatRates: null,
+        lang: "en",
+      }),
+    ).toMatchObject({
+      amountText: "0.00123456",
+      approxPrefix: "",
+      unitLabel: "₿",
+    });
+    expect(
+      formatDisplayAmountParts(150_000_000, {
+        displayCurrency: "btc",
+        fiatRates: null,
+        lang: "cs",
+      }).amountText,
+    ).toBe("1,5");
+    expect(
+      formatDisplayAmountParts(21, {
+        displayCurrency: "btc",
+        fiatRates: null,
+        lang: "en",
+      }).amountText,
+    ).toBe("0.00000021");
+  });
+
   it("masks all amounts in hidden mode", () => {
     expect(
       formatDisplayAmountParts(123456, {
@@ -128,5 +156,56 @@ describe("applyAmountInputKeyWithDraft", () => {
 
     expect(displayValue).toBe("12.34");
     expect(amountSat).toBe("24680");
+  });
+
+  it("types ₿ as bitcoin with up to eight decimal places", () => {
+    const options: DisplayAmountOptions = {
+      displayCurrency: "btc",
+      fiatRates: null,
+      lang: "en",
+    };
+    let amountSat = "";
+    let displayValue: string | null = null;
+
+    for (const key of ["0", ".", "0", "0", "0", "0", "0", "0", "2", "1", "9"]) {
+      const result = applyAmountInputKeyWithDraft(
+        amountSat,
+        displayValue,
+        key,
+        options,
+        true,
+      );
+      amountSat = result.amountSat;
+      displayValue = result.displayValue;
+    }
+
+    expect(displayValue).toBe("0.00000021");
+    expect(amountSat).toBe("21");
+  });
+
+  it("continues a sat amount as its exact bitcoin value", () => {
+    const result = applyAmountInputKeyWithDraft(
+      "100000",
+      null,
+      "5",
+      { displayCurrency: "btc", fiatRates: null, lang: "en" },
+      true,
+    );
+
+    expect(result.displayValue).toBe("0.0015");
+    expect(result.amountSat).toBe("150000");
+  });
+
+  it("takes whole bitcoins when decimals are off", () => {
+    const result = applyAmountInputKeyWithDraft(
+      "",
+      null,
+      "2",
+      { displayCurrency: "btc", fiatRates: null, lang: "en" },
+      false,
+    );
+
+    expect(result.displayValue).toBe("2");
+    expect(result.amountSat).toBe("200000000");
   });
 });
