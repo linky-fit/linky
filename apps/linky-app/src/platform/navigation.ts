@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 
 /**
  * The routing seam: the web app keeps its route in the URL hash
@@ -50,3 +50,10 @@ export const navigateToRoutePath = (
 export const navigateAwayTo = (url: string): void => {
   window.location.assign(url);
 };
+
+/** Wraps the app shell in what the router needs; hash routing needs nothing. */
+export const NavigationRoot = ({
+  children,
+}: {
+  readonly children: ReactNode;
+}): ReactNode => children;

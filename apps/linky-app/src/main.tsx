@@ -698,6 +698,7 @@ const bootstrap = async () => {
       { makeWebPlatformPorts },
       { loadSession, mirrorPushNsec },
       { probeLocalDatabase },
+      { NavigationRoot },
     ] = await Promise.all([
       import("./App.tsx"),
       import("./ErrorBoundary.tsx"),
@@ -706,6 +707,7 @@ const bootstrap = async () => {
       import("./platform/ports.web.ts"),
       import("./platform/session.ts"),
       import("./evolu.ts"),
+      import("./platform/navigation.ts"),
     ]);
     console.log("[linky][boot] app modules loaded");
 
@@ -764,8 +766,10 @@ const bootstrap = async () => {
                 signalBootFailure();
               }}
             >
-              <BootCommitSignal onCommit={recordAppCommit} />
-              <App />
+              <NavigationRoot>
+                <BootCommitSignal onCommit={recordAppCommit} />
+                <App />
+              </NavigationRoot>
             </ErrorBoundary>
           </RegistryContext.Provider>
         </StrictMode>,

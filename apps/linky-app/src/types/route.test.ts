@@ -310,6 +310,10 @@ describe("routePathFromLegacyHash", () => {
       "#wallet/recurring/new?contact=c1&cashu=cashuA",
     ],
     ["an unknown route", "#unknown"],
+    [
+      "a bank payment, whose path holds the SPAYD",
+      `#wallet/bank-payment/${encodeURIComponent("SPD*1.0*ACC:CZ6508000000192000145399*AM:1.00")}`,
+    ],
     ["a route with an invalid id", "#contact/not-an-id"],
     ["an empty hash", ""],
   ])("leaves %s to its own handler", (_name, hash) => {

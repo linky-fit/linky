@@ -267,6 +267,8 @@ const ROUTE_QUERY_PARAMS: Partial<Record<Route["kind"], readonly string[]>> = {
  * `contacts`), or null for anything that is not a known route: command links
  * such as `#add/…`, `#nostrconnect…`, `#linkauth…` or a `?cashu=` query stay
  * fragments for their own handlers, so no fragment secret reaches a path.
+ * A bank payment carries its SPAYD (account, amount, message) in the route,
+ * so it is null too.
  */
 export const routePathFromLegacyHash = (hash: string): string | null => {
   const value = hash.replace(/^#/, "");
@@ -274,7 +276,7 @@ export const routePathFromLegacyHash = (hash: string): string | null => {
   const path = queryStart < 0 ? value : value.slice(0, queryStart);
   const route = parseRoutePath(path);
   if (route.kind === "wallet" && path !== "wallet") return null;
-  if (path.startsWith("add/")) return null;
+  if (path.startsWith("add/") || route.kind === "bankPayment") return null;
 
   const params = new URLSearchParams(
     queryStart < 0 ? "" : value.slice(queryStart + 1),
