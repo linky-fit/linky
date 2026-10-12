@@ -1,4 +1,6 @@
 import { Effect, Layer, Option } from "effect";
+import type { Filter } from "nostr-tools";
+import type { RelayUrl } from "../domain/primitives";
 import { SignedWrapEvent } from "../internal/nostrEvent";
 import { NostrTransport } from "../services/NostrTransport";
 import type { NostrTransportService } from "../services/NostrTransport";
@@ -9,9 +11,24 @@ import {
   WireFetched,
   WirePlainPublished,
   WirePublished,
+  WireRequestResent,
   WireSubscribed,
   WireSubscriptionEnded,
 } from "./events";
+
+const reportResent =
+  (
+    inspector: InspectorService,
+    relay: RelayUrl,
+    filter: Filter,
+    onRequestResent: (() => void) | undefined,
+  ) =>
+  () => {
+    inspector.emit(
+      () => new WireRequestResent({ relay, filter }, { disableChecks: true }),
+    );
+    onRequestResent?.();
+  };
 
 const tapWire = (
   inner: NostrTransportService,
@@ -52,7 +69,15 @@ const tapWire = (
           );
           onEvent(event);
         },
-        options,
+        {
+          ...options,
+          onRequestResent: reportResent(
+            inspector,
+            relay,
+            filter,
+            options?.onRequestResent,
+          ),
+        },
       );
     }).pipe(
       Effect.tap((reason) =>
@@ -78,31 +103,41 @@ const tapWire = (
         ),
       ),
     ),
-  fetch: (relay, filter) =>
-    inner.fetch(relay, filter).pipe(
-      Effect.tap((events) =>
-        Effect.sync(() =>
-          inspector.emit(
-            () =>
-              new WireFetched(
-                { relay, filter, events, detail: null },
-                { disableChecks: true },
-              ),
+  fetch: (relay, filter, options) =>
+    inner
+      .fetch(relay, filter, {
+        ...options,
+        onRequestResent: reportResent(
+          inspector,
+          relay,
+          filter,
+          options?.onRequestResent,
+        ),
+      })
+      .pipe(
+        Effect.tap((events) =>
+          Effect.sync(() =>
+            inspector.emit(
+              () =>
+                new WireFetched(
+                  { relay, filter, events, detail: null },
+                  { disableChecks: true },
+                ),
+            ),
+          ),
+        ),
+        Effect.tapError((error) =>
+          Effect.sync(() =>
+            inspector.emit(
+              () =>
+                new WireFetched(
+                  { relay, filter, events: [], detail: error.detail },
+                  { disableChecks: true },
+                ),
+            ),
           ),
         ),
       ),
-      Effect.tapError((error) =>
-        Effect.sync(() =>
-          inspector.emit(
-            () =>
-              new WireFetched(
-                { relay, filter, events: [], detail: error.detail },
-                { disableChecks: true },
-              ),
-          ),
-        ),
-      ),
-    ),
 });
 
 /**

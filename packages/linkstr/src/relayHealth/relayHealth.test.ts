@@ -112,6 +112,29 @@ describe("observeTransport", () => {
     );
   });
 
+  it("passes the subscriber's other options through", async () => {
+    const subscriptions: Array<CapturedSubscription> = [];
+    const alreadyHaveEvent = () => true;
+    const onRequestResent = () => {};
+
+    await withObserved(subscribingTransport(subscriptions), () =>
+      Effect.gen(function* () {
+        const transport = yield* NostrTransport;
+        yield* Effect.forkScoped(
+          transport.subscribe(relayA, { kinds: [1059] }, () => {}, {
+            alreadyHaveEvent,
+            onRequestResent,
+          }),
+        );
+        yield* eventually(() => subscriptions.length === 1);
+
+        expect(subscriptions[0]?.options).toEqual(
+          expect.objectContaining({ alreadyHaveEvent, onRequestResent }),
+        );
+      }),
+    );
+  });
+
   it("marks a relay connected on the first received event and delivers it", async () => {
     const subscriptions: Array<CapturedSubscription> = [];
     const received: Array<string> = [];

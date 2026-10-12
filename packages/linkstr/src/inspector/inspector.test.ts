@@ -400,9 +400,10 @@ describe("Inspector", () => {
     const fetchingTransport: NostrTransportService = {
       publish: () => Effect.die("publish not under test"),
       subscribe: () => Effect.die("subscribe not under test"),
-      fetch: (relay, filter) =>
+      fetch: (relay, filter, options) =>
         Effect.suspend(() => {
           expect(filter.authors).toEqual([bob.pubkey]);
+          options?.onRequestResent?.();
           return relay === relayA
             ? Effect.succeed([])
             : Effect.die("only relayA configured");
@@ -419,6 +420,14 @@ describe("Inspector", () => {
 
         expect(collected.find((event) => event._tag === "WireFetched")).toEqual(
           expect.objectContaining({ relay: relayA, events: [], detail: null }),
+        );
+        expect(
+          collected.find((event) => event._tag === "WireRequestResent"),
+        ).toEqual(
+          expect.objectContaining({
+            relay: relayA,
+            filter: expect.objectContaining({ authors: [bob.pubkey] }),
+          }),
         );
         expect(
           collected.find((event) => event._tag === "PlainOperationSucceeded"),

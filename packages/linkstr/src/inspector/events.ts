@@ -109,6 +109,15 @@ export class WireSubscriptionEnded extends Schema.TaggedClass<WireSubscriptionEn
   },
 ) {}
 
+/** The relay left a REQ without EOSE halfway to the EOSE timeout, so it was sent again. */
+export class WireRequestResent extends Schema.TaggedClass<WireRequestResent>()(
+  "WireRequestResent",
+  {
+    relay: RelayUrl,
+    filter: Schema.Unknown,
+  },
+) {}
+
 /** A raw relay event as received; relay-controlled, so untyped. */
 export class WireEventReceived extends Schema.TaggedClass<WireEventReceived>()(
   "WireEventReceived",
@@ -193,6 +202,7 @@ export type InspectorEvent =
   | WireFetched
   | WireSubscribed
   | WireSubscriptionEnded
+  | WireRequestResent
   | WireEventReceived
   | InboxWrapDeduped
   | InboxWalkGivenUp

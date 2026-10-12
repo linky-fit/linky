@@ -28,6 +28,13 @@ const event = wrapRumorFor(
   pubkey,
 );
 
+const laterFields = { ...rumorFields, content: "🔥" };
+const laterEvent = wrapRumorFor(
+  new Rumor({ ...laterFields, id: getEventHash(laterFields) }),
+  secretKey,
+  pubkey,
+);
+
 const relayOk = RelayUrl.make("wss://ok.test");
 const relayRejecting = RelayUrl.make("wss://rejecting.test");
 const relayDown = RelayUrl.make("wss://down.test");
@@ -219,6 +226,76 @@ describe("makeRelayPoolTransport subscribe", () => {
     );
   });
 
+  it("re-sends a REQ the relay dropped and replays its stored events once", async () => {
+    const { pool, subscriptions } = makeSubscribingPool();
+    const received: Array<string> = [];
+    let eoses = 0;
+    let resent = 0;
+
+    const closedWhileRunning = await Effect.runPromise(
+      Effect.gen(function* () {
+        yield* Effect.forkChild(
+          makeRelayPoolTransport(pool, {
+            eoseTimeout: Duration.millis(100),
+          }).subscribe(
+            relayOk,
+            { kinds: [0] },
+            (incoming) => {
+              received.push(incoming.id);
+            },
+            {
+              onEose: () => {
+                eoses += 1;
+              },
+              onRequestResent: () => {
+                resent += 1;
+              },
+            },
+          ),
+        );
+        yield* eventually(() => subscriptions.length === 1);
+        const [dropped] = subscriptions;
+        dropped?.params.onevent(event);
+        yield* eventually(() => subscriptions.length === 2);
+        const answering = subscriptions[1];
+        answering?.params.onevent(event);
+        answering?.params.oneose?.();
+        answering?.params.onevent(laterEvent);
+        return subscriptions.map(({ closedByClient }) => closedByClient);
+      }),
+    );
+
+    expect(received).toEqual([event.id, laterEvent.id]);
+    expect(eoses).toBe(1);
+    expect(resent).toBe(1);
+    expect(closedWhileRunning).toEqual([true, false]);
+  });
+
+  it("signals EOSE at the deadline and keeps only the re-sent REQ open", async () => {
+    const { pool, subscriptions } = makeSubscribingPool();
+    let eoses = 0;
+
+    const closedWhileRunning = await Effect.runPromise(
+      Effect.gen(function* () {
+        yield* Effect.forkChild(
+          makeRelayPoolTransport(pool, {
+            eoseTimeout: Duration.millis(50),
+          }).subscribe(relayOk, { kinds: [0] }, () => {}, {
+            onEose: () => {
+              eoses += 1;
+            },
+          }),
+        );
+        yield* eventually(() => eoses === 1);
+        subscriptions[1]?.params.oneose?.();
+        return subscriptions.map(({ closedByClient }) => closedByClient);
+      }),
+    );
+
+    expect(eoses).toBe(1);
+    expect(closedWhileRunning).toEqual([true, false]);
+  });
+
   it("closes the subscription when interrupted", async () => {
     const { pool, subscriptions } = makeSubscribingPool();
 
@@ -270,7 +347,7 @@ describe("makeRelayPoolTransport fetch", () => {
       Effect.gen(function* () {
         const fiber = yield* Effect.forkChild(
           makeRelayPoolTransport(pool, {
-            fetchEoseTimeout: Duration.millis(50),
+            eoseTimeout: Duration.millis(50),
           }).fetch(relayOk, { kinds: [0] }),
         );
         yield* eventually(() => subscriptions.length === 1);
@@ -281,6 +358,71 @@ describe("makeRelayPoolTransport fetch", () => {
 
     expect(result.map((received) => received.id)).toEqual([event.id]);
     expect(subscriptions[0]?.closedByClient).toBe(true);
+  });
+
+  it("re-sends a REQ the relay dropped and resolves with the answer", async () => {
+    const { pool, subscriptions } = makeSubscribingPool();
+    let resent = 0;
+
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const fiber = yield* Effect.forkChild(
+          makeRelayPoolTransport(pool, {
+            eoseTimeout: Duration.millis(100),
+          }).fetch(
+            relayOk,
+            { kinds: [0] },
+            {
+              onRequestResent: () => {
+                resent += 1;
+              },
+            },
+          ),
+        );
+        yield* eventually(() => subscriptions.length === 1);
+        // Like nostr-rs-relay aborting a query after its first rows.
+        subscriptions[0]?.params.onevent(event);
+        yield* eventually(() => subscriptions.length === 2);
+        const answering = subscriptions[1];
+        answering?.params.onevent(event);
+        answering?.params.onevent(laterEvent);
+        answering?.params.oneose?.();
+        return yield* Fiber.join(fiber);
+      }),
+    );
+
+    expect(result.map((received) => received.id)).toEqual([
+      event.id,
+      laterEvent.id,
+    ]);
+    expect(resent).toBe(1);
+    expect(subscriptions.every(({ closedByClient }) => closedByClient)).toBe(
+      true,
+    );
+  });
+
+  it("resolves with the first REQ's late EOSE after re-sending it", async () => {
+    const { pool, subscriptions } = makeSubscribingPool();
+
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const fiber = yield* Effect.forkChild(
+          makeRelayPoolTransport(pool, {
+            eoseTimeout: Duration.millis(100),
+          }).fetch(relayOk, { kinds: [0] }),
+        );
+        yield* eventually(() => subscriptions.length === 2);
+        const [slow] = subscriptions;
+        slow?.params.onevent(event);
+        slow?.params.oneose?.();
+        return yield* Fiber.join(fiber);
+      }),
+    );
+
+    expect(result.map((received) => received.id)).toEqual([event.id]);
+    expect(subscriptions.every(({ closedByClient }) => closedByClient)).toBe(
+      true,
+    );
   });
 
   it("resolves empty when the relay answers EOSE with nothing", async () => {
@@ -301,22 +443,23 @@ describe("makeRelayPoolTransport fetch", () => {
   });
 
   it.each([
-    ["stays silent", () => undefined],
+    ["stays silent", () => undefined, 2],
     [
       "closes the subscription",
       (params: RelaySubscriptionParams) =>
         params.onclose?.("auth-required: sign in"),
+      1,
     ],
   ])(
     "fails with RelayUnreachable when the relay %s without EOSE or events",
-    async (_case, misbehave) => {
+    async (_case, misbehave, expectedRequests) => {
       const { pool, subscriptions } = makeSubscribingPool();
 
       const exit = await Effect.runPromiseExit(
         Effect.gen(function* () {
           const fiber = yield* Effect.forkChild(
             makeRelayPoolTransport(pool, {
-              fetchEoseTimeout: Duration.millis(50),
+              eoseTimeout: Duration.millis(50),
             }).fetch(relayOk, { kinds: [0] }),
           );
           yield* eventually(() => subscriptions.length === 1);
@@ -333,6 +476,7 @@ describe("makeRelayPoolTransport fetch", () => {
         ),
       );
       expect(subscriptions[0]?.params.eoseTimeout).toBeGreaterThan(50);
+      expect(subscriptions).toHaveLength(expectedRequests);
     },
   );
 

@@ -27,6 +27,7 @@ const tapHealth = (
           onEvent(event);
         },
         {
+          ...options,
           onEose: () => {
             health.reportSeen(relay);
             options?.onEose?.();
@@ -41,8 +42,8 @@ const tapHealth = (
         Effect.sync(() => health.reportUnreachable(relay, error.detail)),
       ),
     ),
-  fetch: (relay, filter) =>
-    inner.fetch(relay, filter).pipe(
+  fetch: (relay, filter, options) =>
+    inner.fetch(relay, filter, options).pipe(
       Effect.tap(() => Effect.sync(() => health.reportSeen(relay))),
       Effect.tapError((error) =>
         Effect.sync(() => health.reportUnreachable(relay, error.detail)),
