@@ -161,13 +161,13 @@ export const cs = {
   onboardingReturnTitle: "Vítej zpět",
   onboardingReturnIntro:
     "Zde si můžete obnovit svůj účet nebo jej používat současně na více zařízeních. Pokud již účet máte, přejděte do pokročilého nastavení, zkopírujte své klíče a následně je sem vložte.",
-  onboardingReturnHint: "Zadejte svých 20 slov.",
-  onboardingReturnPlaceholder: "academic acid acne ...",
   onboardingReturnPasteButton: "Vložit ze schránky",
+  onboardingReturnManualHint: "Nebo zadejte slova jedno po druhém.",
+  onboardingReturnWord: "Slovo {index}",
+  onboardingReturnAcademicHint:
+    "3. a 4. slovo je v záloze Linky vždy „academic“, není to překlep.",
   onboardingReturnConfirm: "Pokračovat",
   onboardingReturnWordCount: "{count}/{total} slov",
-  onboardingReturnSeparatorHint:
-    "Čárky a odřádkování automaticky převedu na mezery.",
   onboardingReturnTooManyWords: "Zadali jste příliš mnoho slov.",
   onboardingReturnUnknownWords: "Neznámé slovo: {words}",
   onboardingReturnSuggestions: "Návrhy slov",

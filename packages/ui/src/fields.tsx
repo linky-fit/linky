@@ -58,13 +58,14 @@ const fieldA11y = (
   label: string,
   error: string | undefined,
   hint: string | undefined,
+  invalid = false,
 ) =>
   ({
     id,
     "aria-label": label,
-    "aria-invalid": Boolean(error),
+    "aria-invalid": Boolean(error) || invalid,
     "aria-describedby": error || hint ? `${id}-description` : undefined,
-    borderColor: error ? "$danger" : "$transparent",
+    borderColor: error || invalid ? "$danger" : "$transparent",
   }) as const;
 
 export interface TextFieldProps extends Omit<InputProps, "size"> {
@@ -72,6 +73,8 @@ export interface TextFieldProps extends Omit<InputProps, "size"> {
   hideLabel?: boolean | undefined;
   hint?: string | undefined;
   error?: string | undefined;
+  /** Marks the field invalid without its own message, for a grid of fields whose problems one shared line explains. */
+  invalid?: boolean | undefined;
   /** Sits inside the field at its end, e.g. an `sm` IconButton to clear or paste; a string is a muted suffix such as a unit. */
   trailing?: ReactNode;
   ref?: Ref<ComponentRef<typeof Input>> | undefined;
@@ -82,6 +85,7 @@ export function TextField({
   hideLabel,
   hint,
   error,
+  invalid = false,
   trailing,
   id,
   disabled,
@@ -105,7 +109,7 @@ export function TextField({
         <Input
           unstyled
           {...fieldStyle}
-          {...fieldA11y(fieldId, label, error, hint)}
+          {...fieldA11y(fieldId, label, error, hint, invalid)}
           disabled={disabled}
           multiline={multiline}
           {...(multiline ? { rows: 4, whiteSpace: "pre-wrap" } : {})}

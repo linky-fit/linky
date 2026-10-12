@@ -164,13 +164,13 @@ export const en = {
   onboardingReturnTitle: "Welcome back",
   onboardingReturnIntro:
     "Enter your 20 SLIP-39 words. You can type them manually or paste them here.",
-  onboardingReturnHint: "Use 20 SLIP-39 words separated by spaces or commas.",
-  onboardingReturnPlaceholder: "academic acid acne ...",
   onboardingReturnPasteButton: "Paste from clipboard",
+  onboardingReturnManualHint: "Or type the words one by one.",
+  onboardingReturnWord: "Word {index}",
+  onboardingReturnAcademicHint:
+    "Words 3 and 4 of a Linky backup are always “academic”, so that is not a typo.",
   onboardingReturnConfirm: "Continue",
   onboardingReturnWordCount: "{count}/{total} words",
-  onboardingReturnSeparatorHint:
-    "Commas and line breaks are converted to spaces automatically.",
   onboardingReturnTooManyWords: "Too many words.",
   onboardingReturnUnknownWords: "Unknown word: {words}",
   onboardingReturnSuggestions: "Word suggestions",

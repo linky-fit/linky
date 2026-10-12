@@ -21,6 +21,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - A proxy payment offer shows the bank transfer's currency (CZK, EUR, BRL) next to the amount.
 - Tapping a token in a chat switches the display unit, like the wallet balance.
 - Add contact: scanning a contact's QR is the main button, nearby people and new Linky users show as avatars at the bottom, and a typed lightning address can be saved right away. A deleted contact can show up among the suggestions again, and adding them brings the contact back.
+- Restoring an account: paste the whole backup with one button, or type the 20 words into separate fields with each word checked against the SLIP-39 list.
 - Your own profile can no longer be saved as a contact from any flow, including a data import.
 - The ₿ unit shows bitcoin (0.00123456 ₿) instead of sats with a bitcoin symbol, and the keypad takes up to eight decimal places in it.
 - Decimal places on the amount keypad are on by default; turn them off in Settings under Units.
@@ -35,6 +36,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - Klepnutí na token v chatu přepne jednotku, stejně jako u zůstatku.
 - Přidat kontakt: hlavní tlačítko načte QR kontaktu, lidé v okolí a noví uživatelé Linky jsou dole jako avatary a zapsanou lightning adresu jde rovnou uložit. Smazaný kontakt se může v návrzích objevit znovu a jeho přidání ho obnoví.
 - Vlastní profil už nejde uložit jako kontakt, ani importem dat.
+- Obnova účtu: celou zálohu vložíte jedním tlačítkem, nebo zadáte 20 slov do samostatných polí a každé slovo se kontroluje proti seznamu SLIP-39.
 - Jednotka ₿ zobrazuje bitcoin (0,00123456 ₿) místo satů se symbolem bitcoinu a klávesnice v ní přijme až osm desetinných míst.
 - Desetinná místa na klávesnici částky jsou ve výchozím stavu zapnutá; vypnout jdou v Nastavení v Jednotkách.
 
