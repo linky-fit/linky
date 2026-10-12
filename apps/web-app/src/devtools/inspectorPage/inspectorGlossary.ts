@@ -132,6 +132,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "Outgoing: linkstr signed a gift wrap and handed it to the listed relays; the payload includes per-relay accepted/failed results. One operation usually produces two wraps: a copy for the recipient and a copy for the sender's own devices.",
   WireSubscribed:
     "linkstr opened a live subscription with this filter at the relay; matching events stream in as WireEventReceived rows until it closes.",
+  WireRequestResent:
+    "The relay sent neither EOSE nor CLOSED for a subscription or fetch within half the EOSE timeout, so linkstr sent the same filter again on a fresh subscription; whichever answers first is kept. Relays drop queries this way under load.",
   WireEventReceived:
     "An event delivered by a relay on an open subscription, before decryption or routing. Follow its wrap id to see what the inbox made of it.",
   InboxWalkGivenUp:

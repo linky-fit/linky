@@ -206,6 +206,16 @@ export const linkstrEventToRow = (
         context: { relay: event.relay },
         payload: event,
       };
+    case "WireRequestResent":
+      return {
+        at,
+        channel: "nostr.wire",
+        tag: event._tag,
+        summary: `REQ ${filterKindsLabel(event.filter)} resent @ ${event.relay} — no EOSE yet`,
+        links: {},
+        context: { relay: event.relay },
+        payload: event,
+      };
     case "WireEventReceived":
       return {
         at,

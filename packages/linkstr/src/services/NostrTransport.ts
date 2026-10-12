@@ -36,13 +36,23 @@ export class RelayUnreachable extends Schema.TaggedError<RelayUnreachable>()(
  * yields what arrived; one that sends neither, or closes the subscription
  * first, fails with `RelayUnreachable`, so an empty result means the relay
  * really holds nothing.
+ *
+ * Relays under load drop a REQ without sending EOSE or CLOSED, so subscribing
+ * and fetching send a REQ still without EOSE halfway to the EOSE timeout once
+ * more, on a fresh subscription, and keep whichever answers first. A relay
+ * that cannot be reached is not asked again.
  */
-export interface SubscribeOptions {
+export interface RequestOptions {
+  /** Invoked when the relay left the REQ unanswered and it is sent again. */
+  readonly onRequestResent?: () => void;
+}
+
+export interface SubscribeOptions extends RequestOptions {
   readonly alreadyHaveEvent?: (id: string) => boolean;
   /**
    * Invoked when the relay signals end-of-stored-events for the subscription.
-   * nostr-tools synthesizes EOSE after its eose timeout (~4.4s default) when
-   * a relay never sends one, so with the pool transport this always fires.
+   * The pool transport fires it at the EOSE timeout when the relay never
+   * sends one, so with the pool transport this always fires.
    */
   readonly onEose?: () => void;
 }
@@ -61,6 +71,7 @@ export interface NostrTransportService {
   readonly fetch: (
     relay: RelayUrl,
     filter: Filter,
+    options?: RequestOptions,
   ) => Effect.Effect<ReadonlyArray<NostrToolsEvent>, RelayUnreachable>;
 }
 
@@ -100,7 +111,92 @@ export interface RelayPool {
 
 const CONNECTION_TIMEOUT_MS = 6_000;
 const DEFAULT_PUBLISH_TIMEOUT = Duration.seconds(10);
-const DEFAULT_FETCH_EOSE_TIMEOUT = Duration.seconds(5);
+const DEFAULT_EOSE_TIMEOUT = Duration.seconds(5);
+
+interface StoredEventsRequest {
+  readonly onevent: (event: NostrToolsEvent) => void;
+  readonly alreadyHaveEvent: ((id: string) => boolean) | undefined;
+  /** The first EOSE, from whichever REQ sent it. */
+  readonly oneose: () => void;
+  /** No REQ answered with EOSE within the EOSE timeout. */
+  readonly ondeadline: () => void;
+  readonly onclose: (reason: string) => void;
+  readonly onresent: (() => void) | undefined;
+}
+
+interface SentRequest {
+  open: boolean;
+  handle: RelaySubscriptionHandle | null;
+}
+
+/**
+ * Sends `filter` as a REQ and, when no EOSE arrived halfway to the timeout,
+ * once more on a fresh subscription; until the replay ends, an event both
+ * deliver arrives once. The first EOSE closes the other REQ, and so does the
+ * deadline, which keeps the newer one. A CLOSED on either ends both.
+ */
+const requestStoredEvents = (
+  connection: RelayConnection,
+  filter: Filter,
+  eoseTimeoutMs: number,
+  params: StoredEventsRequest,
+): RelaySubscriptionHandle => {
+  const sent: Array<SentRequest> = [];
+  const delivered = new Set<string>();
+  let replaying = true;
+  const close = (request: SentRequest) => {
+    if (!request.open) return;
+    request.open = false;
+    request.handle?.close();
+  };
+  const endReplay = (keep: SentRequest | null) => {
+    replaying = false;
+    clearTimeout(timer);
+    delivered.clear();
+    for (const request of sent) if (request !== keep) close(request);
+  };
+  const send = () => {
+    const request: SentRequest = { open: true, handle: null };
+    sent.push(request);
+    request.handle = connection.subscribe([filter], {
+      onevent: (event) => {
+        if (!request.open) return;
+        if (replaying) {
+          if (delivered.has(event.id)) return;
+          delivered.add(event.id);
+        }
+        params.onevent(event);
+      },
+      ...(params.alreadyHaveEvent === undefined
+        ? {}
+        : { alreadyHaveEvent: params.alreadyHaveEvent }),
+      oneose: () => {
+        if (!request.open || !replaying) return;
+        endReplay(request);
+        params.oneose();
+      },
+      onclose: (reason) => {
+        if (!request.open) return;
+        request.open = false;
+        endReplay(null);
+        params.onclose(reason);
+      },
+      // Keeps nostr-tools from faking an EOSE before the deadline below.
+      eoseTimeout: eoseTimeoutMs * 2,
+    });
+  };
+  let timer = setTimeout(() => {
+    params.onresent?.();
+    send();
+    if (!replaying) return;
+    timer = setTimeout(() => {
+      endReplay(sent.at(-1) ?? null);
+      params.ondeadline();
+    }, eoseTimeoutMs / 2);
+  }, eoseTimeoutMs / 2);
+  send();
+  return { close: () => endReplay(null) };
+};
 
 /**
  * `SimplePool.publish` resolves — not rejects — with a "connection failure: …"
@@ -113,12 +209,13 @@ export const makeRelayPoolTransport = (
   options?: {
     allowInsecureLocalhost?: boolean | undefined;
     publishTimeout?: Duration.Duration;
-    fetchEoseTimeout?: Duration.Duration;
+    eoseTimeout?: Duration.Duration;
   },
 ): NostrTransportService => {
   const publishTimeout = options?.publishTimeout ?? DEFAULT_PUBLISH_TIMEOUT;
-  const fetchEoseTimeout =
-    options?.fetchEoseTimeout ?? DEFAULT_FETCH_EOSE_TIMEOUT;
+  const eoseTimeoutMs = Duration.toMillis(
+    options?.eoseTimeout ?? DEFAULT_EOSE_TIMEOUT,
+  );
 
   const ensureRelay = (relay: RelayUrl): Promise<RelayConnection> => {
     if (
@@ -189,16 +286,17 @@ export const makeRelayPoolTransport = (
     Effect.callback<string, RelayUnreachable>((resume) => {
       let handle: RelaySubscriptionHandle | null = null;
       let interrupted = false;
-      const alreadyHaveEvent = options?.alreadyHaveEvent;
-      const onEose = options?.onEose;
+      const onEose = () => options?.onEose?.();
       ensureRelay(relay).then(
         (connection) => {
           if (interrupted) return;
-          handle = connection.subscribe([filter], {
+          handle = requestStoredEvents(connection, filter, eoseTimeoutMs, {
             onevent: onEvent,
-            ...(alreadyHaveEvent === undefined ? {} : { alreadyHaveEvent }),
-            ...(onEose === undefined ? {} : { oneose: onEose }),
+            alreadyHaveEvent: options?.alreadyHaveEvent,
+            oneose: onEose,
+            ondeadline: onEose,
             onclose: (reason) => resume(Effect.succeed(reason)),
+            onresent: options?.onRequestResent,
           });
         },
         (reason) =>
@@ -214,22 +312,19 @@ export const makeRelayPoolTransport = (
       });
     });
 
-  // The EOSE timeout lives inside the callback body (not Effect.timeout) so a
-  // relay that never sends EOSE still yields the events collected so far.
   const fetchFromRelay = (
     relay: RelayUrl,
     filter: Filter,
+    options?: RequestOptions,
   ): Effect.Effect<ReadonlyArray<NostrToolsEvent>, RelayUnreachable> =>
     Effect.callback<ReadonlyArray<NostrToolsEvent>, RelayUnreachable>(
       (resume) => {
         const events: Array<NostrToolsEvent> = [];
         let handle: RelaySubscriptionHandle | null = null;
-        let timer: ReturnType<typeof setTimeout> | null = null;
         let done = false;
         const settle = (unanswered: string | null) => {
           if (done) return;
           done = true;
-          if (timer !== null) clearTimeout(timer);
           handle?.close();
           resume(
             unanswered !== null && events.length === 0
@@ -237,22 +332,18 @@ export const makeRelayPoolTransport = (
               : Effect.succeed(events),
           );
         };
-        const eoseTimeoutMs = Duration.toMillis(fetchEoseTimeout);
         ensureRelay(relay).then(
           (connection) => {
             if (done) return;
-            timer = setTimeout(
-              () => settle(`no EOSE within ${eoseTimeoutMs} ms`),
-              eoseTimeoutMs,
-            );
-            handle = connection.subscribe([filter], {
+            handle = requestStoredEvents(connection, filter, eoseTimeoutMs, {
               onevent: (event) => {
                 events.push(event);
               },
+              alreadyHaveEvent: undefined,
               oneose: () => settle(null),
+              ondeadline: () => settle(`no EOSE within ${eoseTimeoutMs} ms`),
               onclose: (reason) => settle(`closed before EOSE: ${reason}`),
-              // Keeps nostr-tools from faking an EOSE before the timer above.
-              eoseTimeout: eoseTimeoutMs * 2,
+              onresent: options?.onRequestResent,
             });
           },
           (reason) => {
@@ -267,7 +358,6 @@ export const makeRelayPoolTransport = (
         );
         return Effect.sync(() => {
           done = true;
-          if (timer !== null) clearTimeout(timer);
           handle?.close();
         });
       },

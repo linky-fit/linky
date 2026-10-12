@@ -71,6 +71,7 @@ The resubscribe loops of the inbox and profile watch flip an unreachable relay b
 | Wire            | `WirePlainPublished`                                           | one signed plain event pushed                                          |
 | Wire            | `WireSubscribed`, `WireSubscriptionEnded`, `WireEventReceived` | subscription lifecycle and raw arrivals, per relay                     |
 | Wire            | `WireFetched`                                                  | one one-shot fetch answered or failed                                  |
+| Wire            | `WireRequestResent`                                            | a subscription or fetch REQ got no EOSE in time and was sent again     |
 
 Operation names are `<vertical>.<operation>` (`chat.sendText`, `bankOffers.send`, `profiles.fetchProfile`, `inbox.fetchWrapEvent`, …). Rows correlate through shared ids: `OperationSucceeded.selfCopy.wrapId` and `recipientCopy.wrapId` match two `WirePublished.wrapId`s; `rumorId` / `clientId` tie a send to its `InboxRouted` echo and to outbox rows. `InboxRouted.rumorKind` is how an unknown kind shows up.
 
