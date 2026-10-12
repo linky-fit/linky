@@ -222,7 +222,7 @@ describe("keyset ownership", () => {
       expect.objectContaining({
         _tag: "MintRejected",
         mint: impostor,
-        detail: `keyset ${keyset} belongs to ${holder}`,
+        detail: `its keyset belongs to ${holder}`,
       }),
     );
 
