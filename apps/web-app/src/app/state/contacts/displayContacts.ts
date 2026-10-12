@@ -1,5 +1,7 @@
 import { encodeNpub, Pubkey } from "@linky-fit/linkstr";
+import { Option } from "effect";
 import { Atom } from "effect/reactivity";
+import { keepUnchangedRows } from "../../../utils/structuralSharing";
 import { isBlockedPubkey } from "../../lib/blockList";
 import { mergeBankPaymentOffersIntoLastMessageByContactId } from "../../lib/bankPaymentOfferRows";
 import {
@@ -42,7 +44,7 @@ const encodeUnknownNpub = (pubkeyHex: string | null): string | null => {
 
 /** Unknown senders with a conversation, without blocked peers or the user. */
 export const unknownSendersAtom = Atom.keepAlive(
-  Atom.readable((get): ReadonlyArray<UnknownSender> => {
+  Atom.readable((get): UnknownSender[] => {
     const messages = get(localMessagesAtom);
     const ownPubkey = normalizePubkeyHex(get(currentPubkeyAtom));
     const unknownNames = get(unknownNamesAtom);
@@ -87,6 +89,9 @@ export const unknownSendersAtom = Atom.keepAlive(
       });
     }
 
-    return Array.from(unknownById.values());
+    return keepUnchangedRows(
+      Option.getOrUndefined(get.self<UnknownSender[]>()),
+      Array.from(unknownById.values()),
+    );
   }),
 );
