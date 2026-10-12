@@ -10,11 +10,14 @@ import {
   RestoreReport,
   SendReceipt,
   TokenText,
+  TokenTransfer,
   type RestoreProgress,
 } from "@linky-fit/linkshu";
 import { AtomRegistry, RegistryContext } from "@linky-fit/linkstr-react";
 import { act, useEffect } from "react";
+import { Schema } from "effect";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createTransferFixture } from "../../../testUtils/cashuInventory";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import type {
   RecoverTokensOutcome,
@@ -26,10 +29,12 @@ import {
   useWalletTokens,
 } from "./useWalletTokens";
 
-const { fake, navigateTo, ui } = vi.hoisted(() => {
+const { fake, inventory, navigateTo, ui } = vi.hoisted(() => {
   const fake: { current: Partial<TokensCommands> | null } = { current: null };
+  const inventory: { transfers: TokenTransfer[] } = { transfers: [] };
   return {
     fake,
+    inventory,
     navigateTo: vi.fn(),
     ui: { pushToast: vi.fn(), setStatus: vi.fn() },
   };
@@ -44,7 +49,7 @@ vi.mock("../shell", async () =>
 );
 vi.mock("./useWalletInventory", () => ({
   useWalletBalance: () => ({ cashuBalance: 100 }),
-  useWalletInventory: () => ({ transfers: [] }),
+  useWalletInventory: () => inventory,
 }));
 vi.mock("../../state/wallet/tokens", async (importOriginal) => {
   const actual =
@@ -112,6 +117,7 @@ const render = async () => {
 
 afterEach(() => {
   fake.current = null;
+  inventory.transfers = [];
   vi.clearAllMocks();
 });
 
@@ -136,6 +142,26 @@ describe("useWalletTokens", () => {
     const ui = await render();
 
     await act(() => ui.current().reclaimCashuTransfer(tokenId));
+
+    expect(ui.pushToast).toHaveBeenCalledWith(message);
+    await ui.view.unmount();
+  });
+
+  it.each([
+    ["send", "cashuTokenClaimed"],
+    ["receive", "cashuInvalid"],
+  ] as const)("reports a spent %s as %s on a check", async (kind, message) => {
+    inventory.transfers = [
+      Schema.decodeUnknownSync(TokenTransfer)(
+        createTransferFixture({ id: tokenId, kind }),
+      ),
+    ];
+    fake.current = {
+      checkToken: vi.fn(async () => ({ _tag: "Spent" }) as const),
+    };
+    const ui = await render();
+
+    await act(() => ui.current().checkAndRefreshCashuToken(tokenId));
 
     expect(ui.pushToast).toHaveBeenCalledWith(message);
     await ui.view.unmount();

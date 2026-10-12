@@ -420,6 +420,7 @@ describe("ChatMessage cashu token pill", () => {
     memo: null,
     mintDisplay: "mint.example",
     mintUrl: "https://mint.example",
+    sent: null,
     tokenRaw: "cashuBtoken",
     unit: "sat",
   });

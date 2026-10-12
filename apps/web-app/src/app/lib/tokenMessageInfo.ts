@@ -1,5 +1,6 @@
 import { parseTokenText } from "@linky-fit/linkshu";
 import { decodeBankPaymentOffer } from "@linky-fit/proxy-payment";
+import type { I18nKey } from "../../i18n";
 import { parsePrivateImageMessage } from "./privateImageMessage";
 import { extractCashuTokenFromText } from "./tokenText";
 import { boundedMemo } from "../../utils/boundedMemo";
@@ -14,6 +15,8 @@ export interface CashuTokenMessageInfo {
   memo: string | null;
   mintDisplay: string | null;
   mintUrl: string | null;
+  /** Set when the wallet sent this token: whether its recipient claimed it. */
+  sent: "claimed" | "unclaimed" | null;
   tokenRaw: string;
   unit: string | null;
 }
@@ -54,10 +57,13 @@ export const getCashuTokenMessageInfo = (
   /** Token texts the wallet's transfers carry (sent or received). */
   knownTokenTexts: ReadonlySet<string> = new Set(),
   allowTestMints = true,
+  /** The wallet's own sends by token text, true once claimed. */
+  sentTokenClaims: ReadonlyMap<string, boolean> = new Map(),
 ): CashuTokenMessageInfo | null => {
   const token = tokenInMessage(text);
   if (!token) return null;
   const { parsed, tokenRaw } = token;
+  const claimed = sentTokenClaims.get(tokenRaw);
 
   return {
     tokenRaw,
@@ -70,5 +76,15 @@ export const getCashuTokenMessageInfo = (
     // Best-effort: "valid" means no transfer carries this text yet; a token
     // whose proofs the wallet holds is caught by linkshu's receive dedup.
     isValid: !knownTokenTexts.has(tokenRaw),
+    sent: claimed === undefined ? null : claimed ? "claimed" : "unclaimed",
   };
+};
+
+/** What a token pill announces besides its amount: an own claimed send, or a token taken elsewhere. */
+export const cashuTokenStateKey = (
+  info: CashuTokenMessageInfo,
+): I18nKey | null => {
+  if (info.sent === "claimed") return "cashuTokenClaimed";
+  if (info.sent !== null || info.isValid) return null;
+  return "cashuInvalid";
 };

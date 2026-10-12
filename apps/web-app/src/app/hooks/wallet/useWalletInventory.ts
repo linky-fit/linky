@@ -9,6 +9,7 @@ import {
 } from "../../../utils/mint";
 import {
   isShownDeferredReceive,
+  sentTokenClaims,
   takenTokenTexts,
 } from "../../lib/cashuTransfers";
 import { getCashuTokenMessageInfo } from "../../lib/tokenMessageInfo";
@@ -102,17 +103,26 @@ export const useWalletBalance = () => {
   };
 };
 
-/** What a token in a message is worth and whether the wallet already took it. */
+/** What a token in a message is worth and what the wallet knows about it. */
 export const useCashuTokenMessageInfo = () => {
   const allowTestMints = useAtomValue(allowTestMintsAtom);
-  const { operations, transfers } = useWalletInventory();
+  const { allProofs, operations, transfers } = useWalletInventory();
   const knownTransferTexts = React.useMemo(
     () => takenTokenTexts(transfers, operations),
     [operations, transfers],
   );
+  const sentClaims = React.useMemo(
+    () => sentTokenClaims(transfers, allProofs),
+    [allProofs, transfers],
+  );
   return React.useCallback(
     (text: string) =>
-      getCashuTokenMessageInfo(text, knownTransferTexts, allowTestMints),
-    [allowTestMints, knownTransferTexts],
+      getCashuTokenMessageInfo(
+        text,
+        knownTransferTexts,
+        allowTestMints,
+        sentClaims,
+      ),
+    [allowTestMints, knownTransferTexts, sentClaims],
   );
 };

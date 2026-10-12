@@ -5,6 +5,7 @@ import {
   type PrivateImageMessagePayload,
 } from "./privateImageMessage";
 import {
+  cashuTokenStateKey,
   getCashuTokenMessageInfo,
   readCashuTokenMemo,
 } from "./tokenMessageInfo";
@@ -103,5 +104,34 @@ describe("getCashuTokenMessageInfo", () => {
       getCashuTokenMessageInfo(buildCashuToken(), new Set(), false)
         ?.isHiddenTestMint,
     ).toBe(false);
+  });
+});
+
+describe("cashuTokenStateKey", () => {
+  const token = buildCashuToken();
+  const stateOf = (
+    taken: boolean,
+    sentClaims: ReadonlyMap<string, boolean> = new Map(),
+  ) => {
+    const info = getCashuTokenMessageInfo(
+      token,
+      new Set(taken ? [token] : []),
+      true,
+      sentClaims,
+    );
+    return info && cashuTokenStateKey(info);
+  };
+
+  it("announces an own send the recipient claimed as claimed, not as an error", () => {
+    expect(stateOf(true, new Map([[token, true]]))).toBe("cashuTokenClaimed");
+  });
+
+  it("announces nothing for an own send that is still out", () => {
+    expect(stateOf(true, new Map([[token, false]]))).toBeNull();
+  });
+
+  it("keeps the error for a token the wallet took that it did not send", () => {
+    expect(stateOf(true)).toBe("cashuInvalid");
+    expect(stateOf(false)).toBeNull();
   });
 });

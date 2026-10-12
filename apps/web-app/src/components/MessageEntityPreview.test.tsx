@@ -29,6 +29,7 @@ describe("MessageEntityPreview", () => {
           memo: null,
           mintDisplay: "mint.example",
           mintUrl: "https://mint.example",
+          sent: null,
           tokenRaw: "cashuABC123",
           unit: "sat",
         })}
@@ -61,6 +62,7 @@ describe("MessageEntityPreview", () => {
           memo: null,
           mintDisplay: "cashu.cz",
           mintUrl: "https://cashu.cz",
+          sent: null,
           tokenRaw: "cashuAexample",
           unit: "sat",
         })}
