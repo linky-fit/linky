@@ -82,6 +82,31 @@ const evolu = createEvolu({ ...deps, createDbWorker })(schema, config);
 const db = createEvoluShardDb(evolu, ownerSync);
 ```
 
+Without workers, as on React Native, run the same database worker on the calling thread with `createInProcessOwnerSyncDbWorker` from `@linky-fit/linksync/evolu/worker`, and hand it to `trackOwnerSync` in place of the web worker. Evolu's database work then shares the thread with the UI.
+
+```ts
+import {
+  createConsole,
+  createRandom,
+  createRandomBytes,
+  createTime,
+  createWebSocket,
+} from "@evolu/common";
+import { trackOwnerSync } from "@linky-fit/linksync/evolu";
+import { createInProcessOwnerSyncDbWorker } from "@linky-fit/linksync/evolu/worker";
+
+const { createDbWorker, ownerSync } = trackOwnerSync(() =>
+  createInProcessOwnerSyncDbWorker({
+    console: createConsole(),
+    createSqliteDriver, // e.g. an expo-sqlite driver
+    createWebSocket,
+    random: createRandom(),
+    randomBytes: createRandomBytes(),
+    time: createTime(),
+  }),
+);
+```
+
 An owner counts as synced once a relay has finished a sync round for it, and `ownerSync` holds the owners reported since the worker started, so a page that opens later learns them too. An owner whose answers from a relay so far are all protocol errors stays unsynced, so hydration and pointer repair wait for it; `ownerSync.subscribeFailures(listener)` reports each such error while the page is open. The round detection relies on Evolu sending its next request from the microtasks of the response it got, and on the protocol header the worker reads, so every `package.json` pins the Evolu packages to exact versions; recheck both before moving a pin.
 
 ## Linky database

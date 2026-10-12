@@ -1,4 +1,4 @@
-import type { CreateWebSocket, OwnerId } from "@evolu/common";
+import type { CreateWebSocket, OwnerId, Worker } from "@evolu/common";
 import {
   createBuffer,
   idBytesTypeValueLength,
@@ -196,4 +196,42 @@ export const runOwnerSyncDbWorker = (
       markSynced(data.owner.id);
     dbWorker.postMessage(data);
   });
+};
+
+/**
+ * Runs the owner-sync database worker in this thread, for runtimes without
+ * workers such as React Native; hand it to `trackOwnerSync`.
+ */
+export const createInProcessOwnerSyncDbWorker = (
+  deps: DbWorkerPlatformDeps,
+): Worker<PageMessage, WorkerMessage> => {
+  let toPage: ((message: WorkerMessage) => void) | null = null;
+  // Queued until the page listens, since trackOwnerSync asks for the synced
+  // owners before Evolu subscribes.
+  const queued: WorkerMessage[] = [];
+  // Each message in its own microtask, as events across a real worker: page
+  // callbacks may call back into the worker while it is still inside a SQLite
+  // transaction, and one that throws loses only its own message.
+  const deliver = (message: WorkerMessage) =>
+    queueMicrotask(() => toPage?.(message));
+  let toWorker: (event: { readonly data: PageMessage }) => void = () => {};
+  runOwnerSyncDbWorker(
+    {
+      postMessage: (message) => {
+        if (toPage) deliver(message);
+        else queued.push(message);
+      },
+      addEventListener: (_type, listener) => {
+        toWorker = listener;
+      },
+    },
+    deps,
+  );
+  return {
+    postMessage: (data) => toWorker({ data }),
+    onMessage: (callback) => {
+      toPage = callback;
+      for (const message of queued.splice(0)) deliver(message);
+    },
+  };
 };
