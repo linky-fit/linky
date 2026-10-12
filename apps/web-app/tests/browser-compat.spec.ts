@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { setBaseStorage, MOBILE_VIEWPORT } from "./helpers/appState";
 import { addContactByNpub } from "./helpers/contacts";
+import { EVOLU_WORKER_BUNDLE } from "./helpers/bundles";
 import { watchAppErrors } from "./helpers/diagnostics";
 import { createSeedIdentity, setSeedLoginStorage } from "./helpers/identity";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
@@ -36,7 +37,7 @@ test("an old Safari without newer built-ins, BroadcastChannel or Web Locks boots
   await page.addInitScript(removeNewBuiltins);
   await page.addInitScript(removeCrossTabApis);
   let workerRequests = 0;
-  await page.route(/\/assets\/evoluDb\.worker-[^/]+\.js$/, async (route) => {
+  await page.route(EVOLU_WORKER_BUNDLE, async (route) => {
     workerRequests += 1;
     const response = await route.fetch();
     await route.fulfill({
