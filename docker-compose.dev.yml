@@ -10,6 +10,10 @@ services:
       - "${LINKY_E2E_NOSTR_PORT:-7777}:8080"
     volumes:
       - nostr-relay-data:/usr/src/app/db
+      - ./docker/nostr-relay/config.toml:/usr/src/app/config.toml:ro
+    # Logs every query the relay drops without EOSE, so the failure dump shows it.
+    environment:
+      RUST_LOG: info,nostr_rs_relay::repo::sqlite=debug
     # `up --wait` must wait for the port, not the process: the app never retries
     # a relay that was unreachable at subscribe time. bash explicitly — /dev/tcp
     # is a bash builtin, the image's /bin/sh is dash, and it ships no curl/wget.
