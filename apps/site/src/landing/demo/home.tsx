@@ -146,7 +146,9 @@ export function ContactsScreen({
       <DemoTopBar title="Contacts" trailing="Search" />
       <DemoBody position="relative">
         <Stack gap="$xs" paddingTop="$xxxl">
-          <Contact {...pinned} />
+          <Tap on={pinned.person === tapped} data-guide="contact-card">
+            <Contact {...pinned} />
+          </Tap>
           <Section title="Proxy payments">
             {contactList(proxyPayments, tapped)}
           </Section>

@@ -15,7 +15,7 @@ import {
 } from "@linky-fit/ui";
 import type { ReactNode } from "react";
 import { DemoBody, DemoTopBar } from "./chrome";
-import { Arrive } from "./flow";
+import { Arrive, Tap } from "./flow";
 import { noop } from "./noop";
 import type { Person } from "./people";
 
@@ -86,10 +86,12 @@ export function Token({ amount, memo }: { amount: string; memo: string }) {
 export function ChatScreen({
   contact,
   tapEdit = false,
+  tapPay = false,
   children,
 }: {
   contact: Person;
   tapEdit?: boolean;
+  tapPay?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -116,14 +118,11 @@ export function ChatScreen({
               >
                 Request
               </Button>
-              <Button
-                flex={1}
-                variant="secondary"
-                icon="HandCoins"
-                onPress={noop}
-              >
-                Pay
-              </Button>
+              <Tap on={tapPay} flex={1} data-guide="chat-pay">
+                <Button variant="secondary" icon="HandCoins" onPress={noop}>
+                  Pay
+                </Button>
+              </Tap>
             </Row>
           }
         >

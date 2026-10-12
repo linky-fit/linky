@@ -156,14 +156,15 @@ const generalSettings: SettingsRow[] = [
   { icon: "Smartphone", title: "Tilt to show profile", toggle: false },
 ];
 
-function SettingsScene({ tapBlocked }: { tapBlocked: boolean }) {
+/** The Settings tab with a touch on the row titled `tapped`. */
+export function SettingsScene({ tapped }: { tapped?: string | undefined }) {
   return (
     <>
       <DemoTopBar title="Settings" />
       <DemoBody paddingTop="$lg">
         <Section title="General">
           {generalSettings.map(({ icon, title, value, toggle }) => (
-            <Tap key={title} on={title === "Blocked" && tapBlocked}>
+            <Tap key={title} on={title === tapped}>
               <ListRow
                 icon={icon}
                 title={title}
@@ -266,7 +267,11 @@ export function ContactBlockScreen() {
           ),
           enter: "back",
         },
-        { node: <SettingsScene tapBlocked={at("tapBlocked")} /> },
+        {
+          node: (
+            <SettingsScene tapped={at("tapBlocked") ? "Blocked" : undefined} />
+          ),
+        },
         { node: <BlockedScene />, enter: "push" },
       ]}
     />
