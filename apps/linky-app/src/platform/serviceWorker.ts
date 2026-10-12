@@ -1,10 +1,9 @@
 import { Workbox } from "workbox-window";
-import { isDevBuild } from "./buildEnv";
+import { devServiceWorkerUrl, isDevBuild } from "./buildEnv";
 
-// vite-plugin-pwa serves the development worker as an ES module under its own
-// name; the build bundles it into one classic script. A changed type counts as
-// an update, so production keeps the type existing installs registered.
-const SW_URL = isDevBuild ? "/dev-sw.js?dev-sw" : "/sw.js";
+// The build bundles the worker into one classic script. A changed URL or type
+// counts as an update, so production keeps what existing installs registered.
+const SW_URL = isDevBuild ? devServiceWorkerUrl : "/sw.js";
 const SW_TYPE = isDevBuild ? "module" : "classic";
 
 interface RegisterServiceWorkerOptions {
@@ -28,7 +27,8 @@ export const registerServiceWorker = ({
   onRegistered,
   onRegisterError,
 }: RegisterServiceWorkerOptions): (() => Promise<void>) => {
-  if (!("serviceWorker" in navigator)) return () => Promise.resolve();
+  if (!("serviceWorker" in navigator) || SW_URL === null)
+    return () => Promise.resolve();
 
   const workbox = new Workbox(SW_URL, { scope: "/", type: SW_TYPE });
   let updatePrompted = false;

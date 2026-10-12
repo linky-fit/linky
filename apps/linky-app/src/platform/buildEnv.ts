@@ -2,6 +2,8 @@
 // replaces just this file. Values are fixed at build time.
 
 export const isDevBuild: boolean = import.meta.env.DEV;
+/** vite-plugin-pwa serves the development service worker as an ES module under its own name. */
+export const devServiceWorkerUrl: string | null = "/dev-sw.js?dev-sw";
 /** Installs the Playwright test hooks (`window.__linkyE2E`) in a production build. */
 export const isE2eBuild = import.meta.env.VITE_E2E === "1";
 export const allowInsecureLocalhostRelays =
