@@ -11,6 +11,8 @@ export interface Author {
   nostr?: string;
   /** The X handle without the `@`. */
   x?: string;
+  /** The id in the author's Linky profile link, linky.fit/p/<id>: a Linky name or an npub. */
+  linky?: string;
 }
 
 export interface ArticleTranslation {
@@ -21,19 +23,41 @@ export interface ArticleTranslation {
   Body: ComponentType;
 }
 
+/** At least one language; readers of the others get English, or the first language the article has. */
+export type ArticleTranslations = Partial<
+  Record<SiteLocale, ArticleTranslation>
+>;
+
 export interface Article {
   /** The ISO date of the first publication. */
   publishedOn: string;
   author: Author;
   cover: string;
-  translations: Localized<ArticleTranslation>;
+  translations: ArticleTranslations;
 }
 
-/** The article in the reader's language when it has one, in English otherwise. */
+/** The order in which a reader without the article's language is served: English first. */
+const fallbackLanguages: SiteLocale[] = ["en", "cs", "de"];
+
+const pickTranslation = (
+  translations: ArticleTranslations,
+  locale: SiteLocale,
+): { language: SiteLocale; translation: ArticleTranslation } => {
+  for (const language of [locale, ...fallbackLanguages]) {
+    const translation = translations[language];
+    if (translation) return { language, translation };
+  }
+  throw new Error("An article needs at least one translation");
+};
+
+/** The article in the reader's language when it has one, in English or its only language otherwise. */
 export const translateArticle = (article: Article, locale: SiteLocale) => {
-  const language = article.translations[locale] ? locale : "en";
+  const { language, translation } = pickTranslation(
+    article.translations,
+    locale,
+  );
   return {
-    ...(article.translations[language] ?? article.translations.en),
+    ...translation,
     language,
     bio: article.author.bio[language] ?? article.author.bio.en,
     publishedOn: new Intl.DateTimeFormat(language, {
