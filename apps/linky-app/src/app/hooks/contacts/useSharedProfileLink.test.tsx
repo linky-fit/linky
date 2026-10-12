@@ -42,8 +42,14 @@ const Probe = (params: Params) => {
 
 const openHashLink = async (hash: string) => {
   await act(async () => {
+    const oldURL = window.location.href;
     window.history.replaceState(null, "", hash);
-    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    window.dispatchEvent(
+      new HashChangeEvent("hashchange", {
+        oldURL,
+        newURL: window.location.href,
+      }),
+    );
   });
 };
 

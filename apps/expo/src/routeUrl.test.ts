@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { legacyHashTarget, routePathForUrl, urlPathFor } from "./routeUrl.ts";
+import {
+  legacyHashTarget,
+  routePathForUrl,
+  routerStartUrl,
+  urlPathFor,
+} from "./routeUrl.ts";
 
 const memoryStore = () => {
   const values = new Map<string, string>();
@@ -90,5 +95,14 @@ describe("routePathForUrl", () => {
     expect(
       routePathForUrl("/wallet/recurring/new", "?contact=c1", memoryStore()),
     ).toBe("wallet/recurring/new?contact=c1");
+  });
+});
+
+describe("routerStartUrl", () => {
+  it("drops a command link's fragment and keeps the path and search", () => {
+    expect(
+      routerStartUrl("https://linky.example/wallet?x=1#wallet?cashu=cashuA")
+        .href,
+    ).toBe("https://linky.example/wallet?x=1");
   });
 });

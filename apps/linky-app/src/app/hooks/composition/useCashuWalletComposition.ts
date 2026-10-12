@@ -414,6 +414,8 @@ export const useCashuWalletComposition = ({
     canPayCashuRequest: walletPayments.canPayCashuRequest,
     cashuBalance,
     cashuIsBusy,
+    /** saveCashuFromText can receive: the wallet is loaded and its commands exist. */
+    cashuReceiveReady: walletLoaded && receiveCashuToken !== null,
     cashuTokensHydratedRef,
     isCashuTokenKnownAny,
     isCashuTokenStored,

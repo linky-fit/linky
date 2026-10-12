@@ -52,8 +52,11 @@ export const FEEDBACK_CONTACT_NPUB =
 export { PAYMENT_ANALYTICS_RECIPIENT_NPUB } from "@linky-fit/linkstr";
 export const NO_GROUP_FILTER = "__linky_no_group__";
 
+/** The first pending deep link, as one string: releases before the queue read only this. */
 export const PENDING_DEEP_LINK_TEXT_STORAGE_KEY =
   "linky.pendingDeepLinkText.v1";
+/** Every pending deep link, oldest first, as a JSON array of strings. */
+export const PENDING_DEEP_LINKS_STORAGE_KEY = "linky.pending_deep_links.v1";
 
 export const PENDING_SHARED_PROFILE_NPUB_STORAGE_KEY =
   "linky.pending_shared_profile_npub";

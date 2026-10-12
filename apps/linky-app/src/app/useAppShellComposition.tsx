@@ -240,6 +240,7 @@ export const useAppShellComposition = ({
     addNewContactFromIdentifier: messaging.addNewContactFromIdentifier,
     canPayCashuRequest: wallet.canPayCashuRequest,
     cashuBalance: wallet.cashuBalance,
+    cashuReceiveReady: wallet.cashuReceiveReady,
     contacts: messaging.contacts,
     contactsLatestRef: messaging.contactsLatestRef,
     contactsOnboardingDismissedSynced,

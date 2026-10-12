@@ -50,7 +50,7 @@ const navigationSyntax = [
   },
 ];
 const routeReadMessage =
-  "Read the route with currentRoutePath() or useCurrentRoutePath() from platform/navigation.ts; only inbound command links read the hash themselves.";
+  "Read the route with currentRoutePath() or useCurrentRoutePath() from platform/navigation.ts; inbound command links go through platform/hashLinks.ts.";
 const routeReadSyntax = [
   {
     selector:
@@ -59,14 +59,8 @@ const routeReadSyntax = [
   },
   { selector: "Literal[value='hashchange']", message: routeReadMessage },
 ];
-/** Inbound command links (`#add/…`, `#nostrconnect…`, `#linkauth…`, `?cashu=`, `?notificationOpen=`) read the hash themselves. */
-const commandLinkFiles = [
-  "src/app/hooks/composition/useScanNativeComposition.ts",
-  "src/app/hooks/contacts/useSharedProfileLink.ts",
-  "src/app/lib/notificationOpenTarget.ts",
-  "src/sharedProfileLink.ts",
-  "src/siteLogin.ts",
-];
+/** Inbound command links (`#add/…`, `#nostrconnect…`, `#linkauth…`, `?cashu=`, `?notificationOpen=`) are read from the hash in one place. */
+const commandLinkFiles = ["src/platform/hashLinks.ts"];
 
 const backSyntax = [
   {
@@ -120,7 +114,6 @@ export const platformSeamRatchet = [
   "src/app/hooks/cashu/useDeferredReceiveRetry.ts",
   "src/app/hooks/cashu/useTokenQr.ts",
   "src/app/hooks/composition/useScanNativeComposition.ts",
-  "src/app/hooks/contacts/useSharedProfileLink.ts",
   "src/app/hooks/guide/useContactsGuide.ts",
   "src/app/hooks/guide/useContactsOnboardingProgress.ts",
   "src/app/hooks/layout/useNativeBackHandler.ts",
@@ -152,7 +145,6 @@ export const platformSeamRatchet = [
   "src/app/lib/keryxCacheStorage.ts",
   "src/app/lib/keryxHtml.ts",
   "src/app/lib/messageEditorDom.ts",
-  "src/app/lib/notificationOpenTarget.ts",
   "src/app/lib/pdfPreview.ts",
   "src/app/lib/privateImageFile.ts",
   "src/app/lib/privateImageMessage.ts",
@@ -183,8 +175,6 @@ export const platformSeamRatchet = [
   "src/pages/ProfilePage.tsx",
   "src/pages/PushDebugPage.tsx",
   "src/profileCache.ts",
-  "src/sharedProfileLink.ts",
-  "src/siteLogin.ts",
   "src/utils/blossomUploadProxy.ts",
   "src/utils/bootDiagnostics.ts",
   "src/utils/browserPreferences.ts",

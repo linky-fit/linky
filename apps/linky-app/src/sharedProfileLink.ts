@@ -1,5 +1,4 @@
 import { decodeNpub } from "@linky-fit/linkstr";
-import { navigateToRoutePath } from "./platform/navigation";
 import { buildProfileShareUrl } from "./utils/profileShareUrl";
 
 const ADD_CONTACT_HASH = /^#add\/(npub1[a-z0-9]+)$/i;
@@ -8,13 +7,6 @@ const ADD_CONTACT_HASH = /^#add\/(npub1[a-z0-9]+)$/i;
 export const readAddContactNpubFromHash = (hash: string): string | null => {
   const npub = ADD_CONTACT_HASH.exec(hash)?.[1]?.toLowerCase();
   return npub && decodeNpub(npub) ? npub : null;
-};
-
-/** Takes an `#add/<npub>` link out of the address bar and its history entry. */
-export const takeAddContactHashLink = (): string | null => {
-  const npub = readAddContactNpubFromHash(window.location.hash);
-  if (npub) navigateToRoutePath("contacts", { replace: true });
-  return npub;
 };
 
 /** Prefers the claimed linky.fit name, which reads better in a chat than an npub. */

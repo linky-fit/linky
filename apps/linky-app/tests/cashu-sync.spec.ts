@@ -19,7 +19,7 @@ import { createSeedIdentity, setSeedLoginStorage } from "./helpers/identity";
 import { stubFiatRates } from "./helpers/network";
 import { expectNoBootErrorPanel, watchAppErrors } from "./helpers/diagnostics";
 import { topUp } from "./helpers/wallet";
-import { gotoRoute } from "./helpers/routes";
+import { expectRoute, gotoRoute } from "./helpers/routes";
 
 declare global {
   interface Window {
@@ -235,4 +235,31 @@ test("token recovery buttons find missing funds and reclaim handed-out proofs", 
     "Available · 59 sat",
   );
   await expect(page.locator('[aria-label="Handed out"]')).toHaveCount(0);
+});
+
+// The manifest's web+cashu handler opens `/#wallet?cashu=<token>` in both
+// builds; the receive has to wait until the wallet's storage is ready.
+test("a Cashu protocol link is received on a cold load and while the app is open", async ({
+  page,
+}) => {
+  const identity = await createSeedIdentity();
+  const [coldToken, openToken] = await Promise.all([
+    fundToken(16),
+    fundToken(8),
+  ]);
+  await setBaseStorage(page);
+  await setSeedLoginStorage(page, identity);
+  await stubFiatRates(page);
+  await page.setViewportSize(MOBILE_VIEWPORT);
+
+  await page.goto(`/#wallet?cashu=${coldToken}`);
+  await expectRoute(page, "wallet");
+  await expect.poll(() => readBalanceSat(page)).toBeGreaterThan(0);
+  const afterCold = await readBalanceSat(page);
+
+  await page.evaluate((token) => {
+    window.location.hash = `#wallet?cashu=${token}`;
+  }, openToken);
+  await expect.poll(() => readBalanceSat(page)).toBeGreaterThan(afterCold);
+  await expectRoute(page, "wallet");
 });

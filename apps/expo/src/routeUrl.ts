@@ -92,3 +92,16 @@ export const legacyHashTarget = (
   const target = routePathFromLegacyHash(hash);
   return target === null ? null : `/${target}`;
 };
+
+/**
+ * The URL expo-router starts from: the current one without its fragment. A
+ * fragment left here is a command link its handler takes and clears, and
+ * expo-router would write it back to the address bar when it replays its
+ * first navigation (React's dev effect replay does), handing the link over
+ * twice.
+ */
+export const routerStartUrl = (href: string): URL => {
+  const url = new URL(href);
+  url.hash = "";
+  return url;
+};

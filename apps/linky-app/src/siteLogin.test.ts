@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   describeSiteLogin,
   readNostrConnectUriFromHash,
-  takeSiteLoginHashLink,
+  readSiteLoginHashLink,
   type SiteLoginRequest,
 } from "./siteLogin";
 import {
@@ -66,31 +66,18 @@ describe("a site login web link", () => {
   it.each([
     ["nostrconnect", URI],
     ["linkauth", LINKAUTH],
-  ])(
-    "%s is taken out of the address bar, leaving the wallet route",
-    (_name, link) => {
-      window.history.replaceState(null, "", `/?ref=x#${link}`);
-      const length = window.history.length;
-
-      expect(takeSiteLoginHashLink()).toBe(link);
-      expect(window.location.search).toBe("?ref=x");
-      expect(window.location.hash).toBe("#wallet");
-      expect(window.history.length).toBe(length);
-      expect(takeSiteLoginHashLink()).toBeNull();
-    },
-  );
-
-  it("hands a linkauth link on as the signer reads it", () => {
-    window.history.replaceState(null, "", `/#${LINKAUTH}`);
-
-    expect(isLinkauthLink(takeSiteLoginHashLink() ?? "")).toBe(true);
+  ])("reads a %s link from its fragment", (_name, link) => {
+    expect(readSiteLoginHashLink(`#${link}`)).toBe(link);
   });
 
-  it("leaves other hashes alone", () => {
-    window.history.replaceState(null, "", "/#contacts");
+  it("hands a linkauth link on as the signer reads it", () => {
+    expect(isLinkauthLink(readSiteLoginHashLink(`#${LINKAUTH}`) ?? "")).toBe(
+      true,
+    );
+  });
 
-    expect(takeSiteLoginHashLink()).toBeNull();
-    expect(window.location.hash).toBe("#contacts");
+  it("reads nothing from other hashes", () => {
+    expect(readSiteLoginHashLink("#contacts")).toBeNull();
   });
 });
 

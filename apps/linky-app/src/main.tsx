@@ -699,6 +699,7 @@ const bootstrap = async () => {
       { loadSession, mirrorPushNsec },
       { probeLocalDatabase },
       { NavigationRoot },
+      { captureLaunchHashLink },
     ] = await Promise.all([
       import("./App.tsx"),
       import("./ErrorBoundary.tsx"),
@@ -708,8 +709,10 @@ const bootstrap = async () => {
       import("./platform/session.ts"),
       import("./evolu.ts"),
       import("./platform/navigation.ts"),
+      import("./platform/hashLinks.ts"),
     ]);
     console.log("[linky][boot] app modules loaded");
+    captureLaunchHashLink();
 
     setStage("load-session");
     const ports = makeWebPlatformPorts();

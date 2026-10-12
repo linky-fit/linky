@@ -60,7 +60,7 @@ test("only platform/buildEnv.ts reads import.meta.env", async () => {
   ).toEqual([]);
 }, 30_000);
 
-test("only platform/navigation.ts and command-link readers read the hash", async () => {
+test("only platform/navigation.ts and platform/hashLinks.ts read the hash", async () => {
   const eslint = new ESLint({
     cwd: import.meta.dirname,
     ruleFilter: ({ ruleId }) => ruleId === "no-restricted-syntax",
@@ -78,6 +78,6 @@ test("only platform/navigation.ts and command-link readers read the hash", async
       expect.stringContaining("currentRoutePath()"),
     ]);
     expect(await lint(code, "src/platform/navigation.ts")).toEqual([]);
-    expect(await lint(code, "src/siteLogin.ts")).toEqual([]);
+    expect(await lint(code, "src/platform/hashLinks.ts")).toEqual([]);
   }
 });

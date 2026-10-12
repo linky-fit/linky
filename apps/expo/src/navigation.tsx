@@ -13,7 +13,12 @@ import {
   safeSessionStorageGet,
   safeSessionStorageSet,
 } from "@linky-fit/linky-app/src/utils/storage.ts";
-import { legacyHashTarget, routePathForUrl, urlPathFor } from "./routeUrl.ts";
+import {
+  legacyHashTarget,
+  routePathForUrl,
+  routerStartUrl,
+  urlPathFor,
+} from "./routeUrl.ts";
 
 const spdStore = { get: safeSessionStorageGet, set: safeSessionStorageSet };
 
@@ -53,8 +58,11 @@ export const navigateAwayTo = (url: string): void => {
 };
 
 /** Moves a hash-routed URL (`/#chat/abc`) to its path; command links keep their fragment. */
-const redirectLegacyHash = (navigate: (href: string) => void): void => {
-  const target = legacyHashTarget(window.location.hash, spdStore);
+const redirectLegacyHash = (
+  hash: string,
+  navigate: (href: string) => void,
+): void => {
+  const target = legacyHashTarget(hash, spdStore);
   if (target !== null) navigate(target);
 };
 
@@ -65,13 +73,19 @@ export const NavigationRoot = ({
 }): ReactNode => {
   // expo-router would start from the URL it saw when it loaded.
   const [location] = useState(() => {
-    redirectLegacyHash((href) => window.history.replaceState(null, "", href));
-    return new URL(window.location.href);
+    redirectLegacyHash(window.location.hash, (href) =>
+      window.history.replaceState(null, "", href),
+    );
+    return routerStartUrl(window.location.href);
   });
   // An open app gets a link as a hash change, not a fresh load.
   useEffect(() => {
-    const onHashChange = () =>
-      redirectLegacyHash((href) => openUrlPath(href, true));
+    // A navigation that already replaced this fragment wins over it.
+    const onHashChange = (event: HashChangeEvent) => {
+      const hash = new URL(event.newURL).hash;
+      if (window.location.hash !== hash) return;
+      redirectLegacyHash(hash, (href) => openUrlPath(href, true));
+    };
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
