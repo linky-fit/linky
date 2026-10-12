@@ -1,19 +1,25 @@
 import {
+  decodeNpub,
   identityFromNsec,
   parsePubkey,
   type NostrSecretKey,
   type Pubkey,
 } from "@linky-fit/linkstr";
+import { boundedMemo } from "../../../utils/boundedMemo";
 import { UNKNOWN_CONTACT_ID_PREFIX } from "../../../utils/constants";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import type { ContactIdentityRowLike } from "../../types/appTypes";
 
+// A few hundred peers recur across thousands of messages; decoding validates on the curve.
+const PUBKEY_MEMO_CAPACITY = 2_000;
+const parsePubkeyOnce = boundedMemo(parsePubkey, PUBKEY_MEMO_CAPACITY);
+
+/** `decodeNpub`, decoding each npub once. */
+export const decodeNpubOnce = boundedMemo(decodeNpub, PUBKEY_MEMO_CAPACITY);
+
 export const normalizePubkeyHex = (
   value: string | null | undefined,
-): Pubkey | null => {
-  const normalized = (value ?? "").trim().toLowerCase();
-  return parsePubkey(normalized);
-};
+): Pubkey | null => parsePubkeyOnce((value ?? "").trim().toLowerCase());
 
 // Unknown senders stay out of contacts until the user adds them; the UI
 // names their conversations `unknown:<pubkeyHex>`.
