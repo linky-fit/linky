@@ -26,7 +26,7 @@ import {
 } from "../app/lib/keryxCache";
 import { sanitizeAnnouncementHtml } from "../app/lib/keryxHtml";
 import { KeryxFooter } from "../components/KeryxCompany";
-import { formatDate } from "../utils/formatting";
+import { formatTimeAgo } from "../utils/formatting";
 
 const hostOf = (url: string): string => {
   try {
@@ -99,7 +99,7 @@ export function KeryxAnnouncementPage({
             <Pill label={t("keryxPrivate")} tone="info" size="sm" />
           ) : null}
           <Text variant="caption" color="$colorMuted">
-            {formatDate(announcement.datePublished, lang)}
+            {formatTimeAgo(Date.parse(announcement.datePublished) / 1000, lang)}
           </Text>
         </Row>
         <Text variant="caption" mono color="$colorMuted">

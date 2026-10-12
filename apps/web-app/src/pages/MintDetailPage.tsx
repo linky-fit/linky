@@ -35,7 +35,7 @@ import { MintFees } from "../components/MintFees";
 import { MintIcon } from "../components/MintIcon";
 import { MintMoveFundsForm } from "../components/MintMoveFundsForm";
 import { navigateTo } from "../hooks/useRouting";
-import { normalizeLocale } from "../utils/formatting";
+import { formatTimeAgo } from "../utils/formatting";
 import {
   formatMintLabel,
   isHiddenTestMint,
@@ -207,9 +207,7 @@ export function MintDetailPage({ mintUrl }: MintDetailPageProps) {
               {lastCheckedAtSec ? (
                 <Text variant="caption" color="$colorMuted">
                   {t("mintLastChecked")}:{" "}
-                  {new Date(lastCheckedAtSec * 1000).toLocaleString(
-                    normalizeLocale(lang),
-                  )}
+                  {formatTimeAgo(lastCheckedAtSec, lang)}
                 </Text>
               ) : null}
             </Stack>

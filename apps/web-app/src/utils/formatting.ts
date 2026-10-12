@@ -1,5 +1,7 @@
 import { normalizeProfileName } from "./profileName";
 import type { Translate } from "../i18n";
+import { nowSeconds } from "./time";
+
 export const firstName = (name: string): string =>
   name.trim().split(/\s+/)[0] ?? name;
 
@@ -127,11 +129,6 @@ const getDateTimeFormatter = (
   return formatter;
 };
 
-export const formatDate = (iso: string, lang?: string): string =>
-  new Date(iso).toLocaleDateString(normalizeLocale(lang), {
-    dateStyle: "medium",
-  });
-
 export const formatInteger = (value: number, lang?: string): string => {
   const locale = normalizeLocale(lang);
   let formatter = numberFormatters.get(locale);
@@ -145,26 +142,50 @@ export const formatInteger = (value: number, lang?: string): string => {
 };
 
 const relativeTimeFormatters = new Map<string, Intl.RelativeTimeFormat>();
+const pastDateFormatters = new Map<string, Intl.DateTimeFormat>();
 
-export const formatRelativeTime = (
-  unixSeconds: number,
-  lang?: string,
-): string => {
-  if (!Number.isFinite(unixSeconds) || unixSeconds <= 0) return "";
-  const locale = normalizeLocale(lang);
+const getRelativeTimeFormatter = (locale: string): Intl.RelativeTimeFormat => {
   let formatter = relativeTimeFormatters.get(locale);
   if (!formatter) {
-    formatter = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+    formatter = new Intl.RelativeTimeFormat(locale, {
+      numeric: "auto",
+      style: "narrow",
+    });
     relativeTimeFormatters.set(locale, formatter);
   }
-  const deltaSeconds = Math.round(unixSeconds - Date.now() / 1000);
-  const abs = Math.abs(deltaSeconds);
-  if (abs < 60) return formatter.format(deltaSeconds, "second");
-  if (abs < 3600)
-    return formatter.format(Math.trunc(deltaSeconds / 60), "minute");
-  if (abs < 86400)
-    return formatter.format(Math.trunc(deltaSeconds / 3600), "hour");
-  return formatter.format(Math.trunc(deltaSeconds / 86400), "day");
+  return formatter;
+};
+
+const getPastDateFormatter = (locale: string): Intl.DateTimeFormat => {
+  let formatter = pastDateFormatters.get(locale);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, { dateStyle: "medium" });
+    pastDateFormatters.set(locale, formatter);
+  }
+  return formatter;
+};
+
+const MINUTE_SEC = 60;
+const HOUR_SEC = 60 * MINUTE_SEC;
+const DAY_SEC = 24 * HOUR_SEC;
+const RELATIVE_LIMIT_SEC = 7 * DAY_SEC;
+
+/** "now", "5m ago", "2h ago", "yesterday", "3d ago", then a plain date. */
+export const formatTimeAgo = (unixSeconds: number, lang?: string): string => {
+  if (!Number.isFinite(unixSeconds) || unixSeconds <= 0) return "";
+  const locale = normalizeLocale(lang);
+  // Clock skew can put a timestamp slightly in the future; show it as "now".
+  const ageSec = Math.max(0, nowSeconds() - unixSeconds);
+  if (ageSec >= RELATIVE_LIMIT_SEC) {
+    return getPastDateFormatter(locale).format(new Date(unixSeconds * 1000));
+  }
+  const formatter = getRelativeTimeFormatter(locale);
+  if (ageSec < MINUTE_SEC) return formatter.format(0, "second");
+  if (ageSec < HOUR_SEC)
+    return formatter.format(-Math.floor(ageSec / MINUTE_SEC), "minute");
+  if (ageSec < DAY_SEC)
+    return formatter.format(-Math.floor(ageSec / HOUR_SEC), "hour");
+  return formatter.format(-Math.floor(ageSec / DAY_SEC), "day");
 };
 
 export const formatContactMessageTimestamp = (

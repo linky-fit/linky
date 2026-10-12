@@ -28,7 +28,7 @@ import {
 } from "../components/KeryxCompany";
 import { useArmedAction } from "../hooks/useArmedAction";
 import { navigateTo } from "../hooks/useRouting";
-import { formatDate } from "../utils/formatting";
+import { formatTimeAgo } from "../utils/formatting";
 
 export function KeryxCompanyPage({
   id,
@@ -190,7 +190,7 @@ export function KeryxCompanyPage({
                       : "Megaphone"
                 }
                 title={announcement.title}
-                description={`${announcementSourceName(entry, announcement)} · ${formatDate(announcement.datePublished, lang)}`}
+                description={`${announcementSourceName(entry, announcement)} · ${formatTimeAgo(Date.parse(announcement.datePublished) / 1000, lang)}`}
                 trailing={
                   isPrivate ? (
                     <Pill label={t("keryxPrivate")} tone="info" size="sm" />

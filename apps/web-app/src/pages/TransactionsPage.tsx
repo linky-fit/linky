@@ -51,7 +51,7 @@ import {
 } from "../app/hooks/useLinksync";
 import type { Translate } from "../i18n";
 import { getLightningInvoicePreview } from "@linky-fit/linkshu";
-import { formatInteger, normalizeLocale } from "../utils/formatting";
+import { formatInteger, formatTimeAgo } from "../utils/formatting";
 import { asNonEmptyString } from "../utils/validation";
 
 interface ContactSummary {
@@ -363,7 +363,6 @@ export function TransactionsPage(): React.ReactElement {
     Record<string, boolean>
   >({});
   const [visibleCount, setVisibleCount] = React.useState(TRANSACTION_PAGE_SIZE);
-  const locale = React.useMemo(() => normalizeLocale(lang), [lang]);
 
   const contactRows = useContactRows();
   const cashuOperations = useWalletOperations();
@@ -471,21 +470,9 @@ export function TransactionsPage(): React.ReactElement {
     [contactsById, t],
   );
 
-  const dateFormatter = React.useMemo(
-    () =>
-      new Intl.DateTimeFormat(locale, {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    [locale],
-  );
   const formatDateText = React.useCallback(
-    (createdAtSec: number): string =>
-      dateFormatter.format(new Date(createdAtSec * 1000)),
-    [dateFormatter],
+    (createdAtSec: number): string => formatTimeAgo(createdAtSec, lang),
+    [lang],
   );
 
   const formatAmountText = React.useCallback(

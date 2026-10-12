@@ -37,6 +37,7 @@ import type { CashuOperationId } from "../evolu";
 import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey } from "../i18n";
 import { buildCashuShareUrl } from "../utils/deepLinks";
+import { formatTimeAgo } from "../utils/formatting";
 import { canWriteNfc, useWriteCashuTokenToNfc } from "../app/hooks/shell/nfc";
 import { useShareCashuToken } from "../app/hooks/shell/share";
 
@@ -281,7 +282,7 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
         />
 
         <Text color="$colorMuted">
-          {`${t("cashuCreated")} ${new Date(transfer.createdAt * 1000).toLocaleString(lang)}`}
+          {`${t("cashuCreated")} ${formatTimeAgo(transfer.createdAt, lang)}`}
         </Text>
 
         {!isFailedReceive && statusKey !== null

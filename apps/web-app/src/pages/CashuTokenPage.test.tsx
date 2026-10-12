@@ -9,6 +9,7 @@ import { CashuOperationId, ContactId } from "@linky-fit/linksync";
 import { QRCode } from "@linky-fit/ui";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { ANIMATED_QR_FRAME_MS } from "../utils/animatedQr";
+import { formatTimeAgo } from "../utils/formatting";
 import { CashuTokenPage } from "./CashuTokenPage";
 import { createStoredProofFixture } from "../testUtils/cashuInventory";
 
@@ -341,9 +342,7 @@ it("shows the creation timestamp on token detail", async () => {
       ]}
     />,
   );
-  expect(container.textContent).toContain(
-    new Date("2026-09-11T12:00:00Z").toLocaleString(),
-  );
+  expect(container.textContent).toContain(formatTimeAgo(createdAt));
   expect(container.textContent).toContain("cashuCreated");
   expect(container.textContent).toContain("cashuHandoffIssued");
   await unmount();
