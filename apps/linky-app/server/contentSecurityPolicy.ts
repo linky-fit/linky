@@ -19,6 +19,10 @@ export const contentSecurityPolicy = (
   const localConnections = allowLocalhost
     ? " http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:*"
     : "";
+  // Local mints serve their icons over http too.
+  const localImages = allowLocalhost
+    ? " http://localhost:* http://127.0.0.1:*"
+    : "";
   return [
     "default-src 'self'",
     "base-uri 'self'",
@@ -29,7 +33,7 @@ export const contentSecurityPolicy = (
     `script-src 'self' 'wasm-unsafe-eval' ${hashes.join(" ")}`,
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self'",
-    "img-src 'self' data: blob: https:",
+    `img-src 'self' data: blob: https:${localImages}`,
     "media-src 'self' blob: data:",
     `connect-src 'self' https: wss: blob: data:${localConnections}`,
     "form-action 'self'",
