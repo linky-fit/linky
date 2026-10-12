@@ -952,7 +952,11 @@ export const pt = {
   scanRequiresHttps:
     "A câmera exige um contexto seguro (HTTPS). Abra o Linky por https ou instale-o como PWA.",
   scanPermissionDenied:
-    "Permissão da câmera negada. No Brave: toque no cadeado → Configurações do site → Câmera → Permitir e recarregue.",
+    "Permissão da câmera negada. Permita a câmera para este site nas configurações de site do navegador e recarregue.",
+  scanPermissionDeniedAndroid:
+    "Permissão da câmera negada. Permita em Configurações → Apps → Linky → Permissões → Câmera.",
+  scanPermissionDeniedIos:
+    "Permissão da câmera negada. Permita em Ajustes → Linky → Câmera.",
   scanGallery: "Galeria",
   scanSwitchCamera: "Trocar câmera",
   scanCameraPreview: "Prévia da câmera",

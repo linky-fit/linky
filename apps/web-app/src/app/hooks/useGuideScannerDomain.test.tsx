@@ -4,6 +4,7 @@ import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import type { Translate } from "../../i18n";
+import type { PlatformTarget } from "../../platform/runtime";
 import { createAnimatedQrFrames } from "../../utils/animatedQr";
 import { scanDiagnosticsAtom, scanIsOpenAtom } from "../state/shell/scan";
 import { useGuideScannerDomain } from "./useGuideScannerDomain";
@@ -36,6 +37,13 @@ vi.mock("../../platform/nativeBridge", () => ({
     return { stop: native.stop };
   },
   supportsNativeQrScan: () => true,
+}));
+const platform = vi.hoisted((): { target: PlatformTarget } => ({
+  target: "android",
+}));
+vi.mock("../../platform/runtime", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../platform/runtime")>()),
+  getPlatformTarget: () => platform.target,
 }));
 // The walkthrough reads the beacon, whose store needs the whole native bridge.
 vi.mock("./useBeacon", () => ({
@@ -146,4 +154,25 @@ describe("native scanner stream", () => {
     expect(registry.get(scanIsOpenAtom)).toBe(false);
     await rendered.unmount();
   });
+
+  it.each([
+    ["android", "scanPermissionDeniedAndroid"],
+    ["ios", "scanPermissionDeniedIos"],
+  ] as const)(
+    "points a denied camera on %s to the system settings",
+    async (target, message) => {
+      platform.target = target;
+      const { pushToast, rendered } = await setup();
+      await act(async () => {
+        native.onResult?.({
+          cancelled: false,
+          message: "Camera permission denied",
+          value: null,
+        });
+      });
+
+      expect(pushToast).toHaveBeenCalledWith(message);
+      await rendered.unmount();
+    },
+  );
 });

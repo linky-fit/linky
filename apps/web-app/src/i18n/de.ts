@@ -952,7 +952,12 @@ export const de = {
   scanCameraError: "Kamera nicht verfügbar.",
   scanRequiresHttps:
     "Zum Scannen ist eine sichere HTTPS-Verbindung erforderlich.",
-  scanPermissionDenied: "Der Kamerazugriff wurde abgelehnt.",
+  scanPermissionDenied:
+    "Der Kamerazugriff wurde abgelehnt. Erlaube die Kamera für diese Seite in den Website-Einstellungen deines Browsers und lade die Seite neu.",
+  scanPermissionDeniedAndroid:
+    "Der Kamerazugriff wurde abgelehnt. Erlaube ihn unter Einstellungen → Apps → Linky → Berechtigungen → Kamera.",
+  scanPermissionDeniedIos:
+    "Der Kamerazugriff wurde abgelehnt. Erlaube ihn unter Einstellungen → Linky → Kamera.",
   scanGallery: "Galerie",
   scanSwitchCamera: "Kamera wechseln",
   scanCameraPreview: "Kameravorschau",

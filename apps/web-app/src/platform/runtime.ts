@@ -7,7 +7,7 @@ import {
   type TelemetryEnvironmentFacts,
 } from "@linky-fit/linkstr";
 
-type PlatformTarget = "android" | "ios" | "web";
+export type PlatformTarget = "android" | "ios" | "web";
 
 export const getTelemetryAppHost = (): string | null => {
   if (typeof window === "undefined") {
