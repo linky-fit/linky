@@ -25,8 +25,8 @@ export function Body() {
       <Heading>Smazání a blokování kontaktů</Heading>
       <Paragraph>
         Místo archivace lze kontakt z Linky odstranit. Stačí klepnout na ikonku
-        koše v horní liště. Konverzace zmizí a v případě, že vám ten člověk
-        znovu napíše, kontakt se vrátí s celou historií.
+        koše v horní liště. Konverzace zmizí a v případě, že vám dotyčný znovu
+        napíše, kontakt se vrátí s celou historií.
       </Paragraph>
       <Paragraph>
         V Linky taky jde zablokovat spam. V takovém případě vám zablokovaný
