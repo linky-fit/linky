@@ -21,6 +21,7 @@ import {
 } from "../app/lib/bankPaymentOfferLabels";
 import type {
   BankOfferStatus,
+  BankPaymentOfferCurrency,
   BankPaymentOfferInfo,
 } from "@linky-fit/proxy-payment";
 import {
@@ -218,12 +219,22 @@ const RecipientProgress = ({ status, t }: RecipientProgressProps) => {
   );
 };
 
-const OfferAmount = ({ amount }: { amount: number | string }) => (
-  <DisplayAmount amount={amount} testID="bank-payment-amount" />
+interface OfferAmountProps {
+  amount: number | string;
+  /** The bank transfer's currency; the amount stays in the display unit. */
+  currency: BankPaymentOfferCurrency | null;
+}
+
+const OfferAmount = ({ amount, currency }: OfferAmountProps) => (
+  <Stack alignItems="center" gap="$xs">
+    <DisplayAmount amount={amount} testID="bank-payment-amount" />
+    {currency !== null ? (
+      <Pill size="sm" label={currency} testID="bank-payment-currency" />
+    ) : null}
+  </Stack>
 );
 
-interface RequesterIntroProps {
-  amount: number | string;
+interface RequesterIntroProps extends OfferAmountProps {
   requesterName: string;
   status: BankOfferStatus;
   t: Translate;
@@ -231,6 +242,7 @@ interface RequesterIntroProps {
 
 const RequesterIntro = ({
   amount,
+  currency,
   requesterName,
   status,
   t,
@@ -245,7 +257,7 @@ const RequesterIntro = ({
     <Text variant="title" textAlign="center">
       {t("bankPaymentOfferRequestedBy").replace("{name}", requesterName)}
     </Text>
-    <OfferAmount amount={amount} />
+    <OfferAmount amount={amount} currency={currency} />
     <RecipientProgress status={status} t={t} />
   </Stack>
 );
@@ -369,7 +381,10 @@ export function OwnerOfferView({
   return (
     <BankPaymentScreen>
       <Stack alignItems="center" gap="$sm">
-        <OfferAmount amount={activeEntry.info.amountSat ?? activeAmountText} />
+        <OfferAmount
+          amount={activeEntry.info.amountSat ?? activeAmountText}
+          currency={activeEntry.info.currency}
+        />
         <RecipientProgress status={activeEntry.info.status} t={t} />
         {remainingSec !== null
           ? timerWithExtension(activeEntry, remainingSec)
@@ -451,7 +466,12 @@ export function RejectedOfferView({
   return (
     <ClosedOfferState
       actionLabel={t("chatImageBackToChat")}
-      amount={<OfferAmount amount={entry.info.amountSat ?? amountText} />}
+      amount={
+        <OfferAmount
+          amount={entry.info.amountSat ?? amountText}
+          currency={entry.info.currency}
+        />
+      }
       closeOffer={closeOffer}
       description={t("bankPaymentOfferRejectedDescription").replace(
         "{name}",
@@ -509,6 +529,7 @@ export function IncomingOfferView({
       <StateCopy>
         <RequesterIntro
           amount={entry.info.amountSat ?? amountText}
+          currency={entry.info.currency}
           requesterName={requesterName}
           status={entry.info.status}
           t={t}
@@ -588,7 +609,10 @@ export function WaitingForSatsOfferView({
     <BankPaymentScreen fill>
       <StateCopy>
         <StateTitle>{t("bankPaymentOfferWaitingForSatsTitle")}</StateTitle>
-        <OfferAmount amount={entry.info.amountSat ?? amountText} />
+        <OfferAmount
+          amount={entry.info.amountSat ?? amountText}
+          currency={entry.info.currency}
+        />
         <RecipientProgress status={entry.info.status} t={t} />
       </StateCopy>
 
@@ -646,6 +670,7 @@ export function AwaitingBankDetailsOfferView({
       <StateCopy>
         <RequesterIntro
           amount={entry.info.amountSat ?? amountText}
+          currency={entry.info.currency}
           requesterName={requesterName}
           status={entry.info.status}
           t={t}
@@ -710,6 +735,7 @@ export function BankDetailsOfferView({
       <Stack alignItems="center" gap="$xs">
         <RequesterIntro
           amount={entry.info.amountSat ?? amountText}
+          currency={entry.info.currency}
           requesterName={requesterName}
           status={entry.info.status}
           t={t}

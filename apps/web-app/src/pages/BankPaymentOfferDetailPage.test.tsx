@@ -325,6 +325,33 @@ describe("BankPaymentOfferDetailPage", () => {
     expect(appShellMock.cycleDisplayCurrency).toHaveBeenCalledOnce();
   });
 
+  it("shows the bank transfer's currency under an incoming offer's amount", async () => {
+    const createdAtSec = Math.floor(Date.now() / 1_000);
+    const offered: LocalNostrMessage = {
+      ...createOfferMessage(),
+      content: createLinkyBankPaymentOfferEvent({
+        amountSat: 1_000,
+        amountText: "1,000 sat",
+        clientId: "client-offer-1",
+        createdAt: createdAtSec,
+        currency: "CZK",
+        offerId: "offer-1",
+        offererPublicKey: OFFERER_PUBKEY,
+        recipientPublicKey: RECIPIENT_PUBKEY,
+        senderPublicKey: OFFERER_PUBKEY,
+      }).content,
+    };
+    const container = await renderOffer({
+      bankPaymentOfferMessages: [offered],
+    });
+
+    expect(
+      container.querySelector('[data-testid="bank-payment-currency"]')
+        ?.textContent,
+    ).toBe("CZK");
+    expect(buttonByText(container, "bankPaymentOfferAccept")).not.toBeNull();
+  });
+
   it("names the accepting contact in the offerer summary", async () => {
     const named = (key: string) =>
       key === "bankPaymentOfferProgressAcceptedByName"

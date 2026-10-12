@@ -1,7 +1,10 @@
-import { UnixSeconds } from "@linky-fit/linkstr";
+import { BankOfferId, UnixSeconds } from "@linky-fit/linkstr";
 import { describe, expect, it } from "vitest";
 import { me, payer, snapshot, START } from "../testing/offers";
-import { bankPaymentOfferResponseDraft } from "./drafts";
+import {
+  bankPaymentOfferedDraft,
+  bankPaymentOfferResponseDraft,
+} from "./drafts";
 import {
   applyBankPaymentOfferSnapshot,
   emptyBankPaymentOfferState,
@@ -13,6 +16,7 @@ const offer = (...steps: [Parameters<typeof snapshot>[0], boolean][]) => {
       applyBankPaymentOfferSnapshot(
         current,
         snapshot(status, self, {
+          currency: "CZK",
           expiresAtSec: UnixSeconds.make(START + 200),
           spdPayload: "SPD*1.0*ACC:CZ6508000000192000145399",
         }),
@@ -36,6 +40,7 @@ describe("bankPaymentOfferResponseDraft", () => {
     );
     expect(draft).toMatchObject({
       amountSat: 1000,
+      currency: "CZK",
       initiatedAtSec: START,
       offerer: me,
       spdPayload: "SPD*1.0*ACC:CZ6508000000192000145399",
@@ -43,6 +48,23 @@ describe("bankPaymentOfferResponseDraft", () => {
       to: payer,
     });
     expect(draft?.expiresAtSec).toBeUndefined();
+  });
+
+  it("opens a thread with the currency only when one is given", () => {
+    const args = {
+      amountSat: 1000,
+      amountText: "~60 sat",
+      offerId: BankOfferId.make("offer-1"),
+      offerer: me,
+      to: payer,
+    };
+    expect(bankPaymentOfferedDraft({ ...args, currency: "CZK" })).toMatchObject(
+      { currency: "CZK" },
+    );
+    expect(bankPaymentOfferedDraft(args)?.currency).toBeUndefined();
+    expect(
+      bankPaymentOfferedDraft({ ...args, currency: null })?.currency,
+    ).toBeUndefined();
   });
 
   it("refuses statuses of the other role and lets options extend the phase", () => {

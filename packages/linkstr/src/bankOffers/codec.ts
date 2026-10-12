@@ -52,6 +52,7 @@ export interface BankOfferContent {
   extensionSec: number | null;
   amountSat: number | null;
   spdPayload: string | null;
+  currency: string | null;
 }
 
 /** The single definition of the offer-message wire shape; key order is part of
@@ -82,6 +83,7 @@ export const encodeBankOfferContent = (content: BankOfferContent): string =>
       : { extensionSec: content.extensionSec }),
     ...(content.amountSat === null ? {} : { amountSat: content.amountSat }),
     ...(content.spdPayload === null ? {} : { spdPayload: content.spdPayload }),
+    ...(content.currency === null ? {} : { currency: content.currency }),
   });
 
 export const encodeBankOfferRumor = (
@@ -105,6 +107,7 @@ export const encodeBankOfferRumor = (
     extensionSec: draft.extensionSec ?? null,
     amountSat: draft.amountSat ?? null,
     spdPayload: draft.spdPayload ?? null,
+    currency: draft.currency ?? null,
   });
 
   return rumorWithHash({
@@ -224,6 +227,7 @@ export const decodeBankOfferRumor = (
         expiresAtSec: unixSeconds(record.expiresAtSec),
         extensionSec: positiveInt(record.extensionSec),
         spdPayload: trimmedString(record.spdPayload),
+        currency: trimmedString(record.currency),
         statusUpdatedAtSec: unixSeconds(record.statusUpdatedAtSec),
         clientId: clientIdOf(rumor.tags),
         sentAt: rumor.created_at,

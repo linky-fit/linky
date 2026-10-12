@@ -61,6 +61,8 @@ interface SpdPaymentPageProps {
     amountSat: number | null;
     amountText: string;
     contacts: ContactRowLike[];
+    /** The bank transfer's currency code; `amountText` is in the display unit. */
+    currency: string;
     singleTabRiskAccepted: boolean;
     spdPayload: string;
     staggerDelaySec: number;
@@ -475,6 +477,7 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
         amountSat,
         amountText,
         contacts: selectedOfferContacts,
+        currency: currencyCode,
         singleTabRiskAccepted,
         spdPayload: activePayment.payload,
         staggerDelaySec: offerDelaySec,

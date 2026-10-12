@@ -22,6 +22,7 @@ export const createLinkyBankPaymentOfferEvent = (args: {
   bankPaidAtSec?: number | null;
   clientId: string;
   createdAt: number;
+  currency?: string | null;
   expiresAtSec?: number | null;
   extensionSec?: number | null;
   initiatedAtSec?: number | null;
@@ -42,6 +43,7 @@ export const createLinkyBankPaymentOfferEvent = (args: {
     bankPaidAtSec:
       unixSeconds(args.bankPaidAtSec) ??
       (status === "bank_paid" ? sentAt : null),
+    currency: args.currency ?? null,
     expiresAtSec: unixSeconds(args.expiresAtSec),
     extensionSec: args.extensionSec ?? null,
     initiatedAtSec:

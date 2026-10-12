@@ -76,11 +76,12 @@ describe("bank offer content encoding", () => {
     extensionSec: 60,
     amountSat: 50_000,
     spdPayload: "SPD*1.0*ACC:CZ123",
+    currency: "CZK",
   };
 
-  it("writes every field in wire order", () => {
+  it("writes every field in wire order, the currency last", () => {
     expect(encodeBankOfferContent(content)).toBe(
-      `{"amountText":"1 000 Kč","offerId":"offer-1","offererPublicKey":"${alice.pubkey}","status":"offered","statusUpdatedAtSec":1754000000,"text":"Zaplatíš za mě bankovní platbu?","type":"linky.bank_payment_offer","version":1,"initiatedAtSec":1753999880,"bankPaidAtSec":1753999990,"expiresAtSec":1754000300,"extensionSec":60,"amountSat":50000,"spdPayload":"SPD*1.0*ACC:CZ123"}`,
+      `{"amountText":"1 000 Kč","offerId":"offer-1","offererPublicKey":"${alice.pubkey}","status":"offered","statusUpdatedAtSec":1754000000,"text":"Zaplatíš za mě bankovní platbu?","type":"linky.bank_payment_offer","version":1,"initiatedAtSec":1753999880,"bankPaidAtSec":1753999990,"expiresAtSec":1754000300,"extensionSec":60,"amountSat":50000,"spdPayload":"SPD*1.0*ACC:CZ123","currency":"CZK"}`,
     );
   });
 
@@ -95,6 +96,7 @@ describe("bank offer content encoding", () => {
         extensionSec: null,
         amountSat: null,
         spdPayload: null,
+        currency: null,
       }),
     ).toBe(
       `{"amountText":"1 000 Kč","offerId":"offer-1","offererPublicKey":"${alice.pubkey}","status":"offered","text":"Zaplatíš za mě bankovní platbu?","type":"linky.bank_payment_offer","version":1}`,
@@ -267,6 +269,7 @@ describe("bank offer rumor decoding", () => {
         expiresAtSec: 1_754_000_300.9,
         extensionSec: "60",
         spdPayload: "  SPD  ",
+        currency: " czk ",
       }),
     });
 
@@ -282,8 +285,25 @@ describe("bank offer rumor decoding", () => {
           expiresAtSec: 1_754_000_300,
           extensionSec: null,
           spdPayload: "SPD",
+          currency: "czk",
         }),
       ),
+    );
+  });
+
+  it("carries the draft's currency and reads a snapshot without one as null", () => {
+    const rumor = encodeBankOfferRumor(
+      new BankOfferDraft({ ...draft, status: "offered", currency: "CZK" }),
+      alice.pubkey,
+      sentAt,
+      clientId,
+    );
+    expect(rumor.content.endsWith(`,"currency":"CZK"}`)).toBe(true);
+    expect(decodeBankOfferRumor(rumor, bob.pubkey)).toEqual(
+      Result.succeed(expect.objectContaining({ currency: "CZK" })),
+    );
+    expect(decodeBankOfferRumor(legacyRumor(), bob.pubkey)).toEqual(
+      Result.succeed(expect.objectContaining({ currency: null })),
     );
   });
 

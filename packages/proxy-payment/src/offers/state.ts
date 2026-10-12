@@ -210,6 +210,7 @@ export const applyBankPaymentOfferSnapshot = (
           expiresAtSec: known.expiresAtSec,
           extensionSec: known.extensionSec,
           spdPayload: known.spdPayload,
+          currency: known.currency,
         }),
   });
   const info = decodeBankPaymentOffer(content);

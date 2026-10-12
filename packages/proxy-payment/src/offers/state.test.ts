@@ -165,10 +165,11 @@ describe("applyBankPaymentOfferSnapshot", () => {
     expect(book.apply(snapshot("bank_paid", false))).toHaveLength(1);
   });
 
-  it("preserves expiry, extension and bank details from the offerer", () => {
+  it("preserves expiry, extension, bank details and currency from the offerer", () => {
     const book = new Book();
     book.apply(
       snapshot("bank_details_sent", true, {
+        currency: "CZK",
         expiresAtSec: UnixSeconds.make(START + 60),
         extensionSec: 30,
         spdPayload: "SPD*trusted",
@@ -177,6 +178,7 @@ describe("applyBankPaymentOfferSnapshot", () => {
     expect(
       book.apply(
         snapshot("bank_paid", false, {
+          currency: "EUR",
           expiresAtSec: UnixSeconds.make(START + 99_999),
           extensionSec: 99_999,
           spdPayload: "SPD*attacker",
@@ -185,6 +187,7 @@ describe("applyBankPaymentOfferSnapshot", () => {
       )[0],
     ).toMatchObject({
       bankPaidAtSec: START,
+      currency: "CZK",
       expiresAtSec: START + 60,
       extensionSec: 30,
       spdPayload: "SPD*trusted",

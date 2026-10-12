@@ -189,11 +189,12 @@ Kind 24135. Tags, in order: `p` to, `p` author, `client`, `["offer", offerId]`, 
   "expiresAtSec": 1758200600,
   "extensionSec": 300,
   "amountSat": 10000,
-  "spdPayload": "SPD*1.0*…"
+  "spdPayload": "SPD*1.0*…",
+  "currency": "CZK"
 }
 ```
 
-Decoding requires the marker, the reader among the `p` tags, and `type`, `offerId`, `amountText` plus a known `status` in the content. `offererPublicKey` falls back to the `offerer` tag. Every other field is optional and dropped when malformed rather than failing the snapshot.
+Decoding requires the marker, the reader among the `p` tags, and `type`, `offerId`, `amountText` plus a known `status` in the content. `offererPublicKey` falls back to the `offerer` tag. Every other field is optional and dropped when malformed rather than failing the snapshot. `currency` is the bank transfer's currency, optional because older clients neither send it nor read it; `amountText` stays the offerer's own rendering of the amount.
 
 ### Receiving
 

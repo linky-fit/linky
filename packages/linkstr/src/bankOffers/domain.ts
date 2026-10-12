@@ -20,6 +20,7 @@ export const BankOfferStatus = Schema.Literals([
 export type BankOfferStatus = typeof BankOfferStatus.Type;
 
 const PositiveInt = Schema.Int.check(Schema.isGreaterThan(0));
+const CurrencyCode = Schema.String.check(Schema.isPattern(/^[A-Z]{3}$/));
 
 export class BankOfferDraft extends Schema.Class<BankOfferDraft>(
   "BankOfferDraft",
@@ -36,6 +37,8 @@ export class BankOfferDraft extends Schema.Class<BankOfferDraft>(
   expiresAtSec: Schema.optional(UnixSeconds),
   extensionSec: Schema.optional(PositiveInt),
   spdPayload: Schema.optional(Schema.Trimmed.check(Schema.isNonEmpty())),
+  /** The bank transfer's ISO 4217 code; older clients ignore it. */
+  currency: Schema.optional(CurrencyCode),
   pushMark: Schema.optional(Schema.Boolean),
   clientId: Schema.optional(ClientId),
   sentAt: Schema.optional(UnixSeconds),

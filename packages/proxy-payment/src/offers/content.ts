@@ -7,6 +7,11 @@ import {
 } from "@linky-fit/linkstr";
 import { Option, Schema } from "effect";
 import {
+  getBankPaymentOfferCurrency,
+  isBankPaymentOfferCurrency,
+  type BankPaymentOfferCurrency,
+} from "../bankQr/bankPayment";
+import {
   asNonEmptyString,
   isPositiveFiniteNumber,
   NonBlankString,
@@ -17,6 +22,9 @@ export interface BankPaymentOfferInfo {
   amountSat: number | null;
   amountText: string;
   bankPaidAtSec: number | null;
+  /** The bank transfer's currency: from the snapshot, else the bank QR once it
+   * arrives; `null` for an offer from a build that sent neither. */
+  currency: BankPaymentOfferCurrency | null;
   expiresAtSec: number | null;
   extensionSec: number | null;
   initiatedAtSec: number | null;
@@ -68,6 +76,7 @@ const OfferContent = Schema.Struct({
   amountSat: Schema.optional(Schema.Unknown),
   amountText: NonBlankString,
   bankPaidAtSec: Schema.optional(Schema.Unknown),
+  currency: Schema.optional(Schema.Unknown),
   expiresAtSec: Schema.optional(Schema.Unknown),
   extensionSec: Schema.optional(Schema.Unknown),
   initiatedAtSec: Schema.optional(Schema.Unknown),
@@ -89,6 +98,14 @@ const readPositiveSeconds = (value: unknown): number | null =>
 const readPubkey = (value: unknown): Pubkey | null =>
   Option.getOrNull(Schema.decodeUnknownOption(Pubkey)(value));
 
+/** The supported currency code `value` names, else `null`. */
+export const readBankPaymentOfferCurrency = (
+  value: unknown,
+): BankPaymentOfferCurrency | null => {
+  const code = asNonEmptyString(value)?.toUpperCase() ?? "";
+  return isBankPaymentOfferCurrency(code) ? code : null;
+};
+
 export const decodeBankPaymentOffer = (
   content: string,
 ): BankPaymentOfferInfo | null => {
@@ -98,18 +115,22 @@ export const decodeBankPaymentOffer = (
   if (!message) return null;
 
   const amountText = message.amountText.trim();
+  const spdPayload = asNonEmptyString(message.spdPayload);
   return {
     amountSat: isPositiveFiniteNumber(message.amountSat)
       ? Math.round(message.amountSat)
       : null,
     amountText,
     bankPaidAtSec: readPositiveSeconds(message.bankPaidAtSec),
+    currency:
+      readBankPaymentOfferCurrency(message.currency) ??
+      (spdPayload === null ? null : getBankPaymentOfferCurrency(spdPayload)),
     expiresAtSec: readPositiveSeconds(message.expiresAtSec),
     extensionSec: readPositiveSeconds(message.extensionSec),
     initiatedAtSec: readPositiveSeconds(message.initiatedAtSec),
     offerId: message.offerId,
     offererPublicKey: readPubkey(message.offererPublicKey),
-    spdPayload: asNonEmptyString(message.spdPayload),
+    spdPayload,
     status: message.status,
     statusUpdatedAtSec: readPositiveSeconds(message.statusUpdatedAtSec),
     text:
@@ -121,6 +142,7 @@ interface SnapshotFields {
   amountSat: number | null;
   amountText: string;
   bankPaidAtSec: number | null;
+  currency: string | null;
   expiresAtSec: number | null;
   extensionSec: number | null;
   initiatedAtSec: number | null;
@@ -158,4 +180,5 @@ export const bankOfferContentFromSnapshot = (
     extensionSec: snapshot.extensionSec,
     amountSat: snapshot.amountSat,
     spdPayload: snapshot.spdPayload,
+    currency: snapshot.currency,
   });

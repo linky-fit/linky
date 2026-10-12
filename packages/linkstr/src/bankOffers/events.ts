@@ -17,6 +17,8 @@ const snapshotFields = {
   expiresAtSec: Schema.NullOr(UnixSeconds),
   extensionSec: Schema.NullOr(Schema.Int),
   spdPayload: Schema.NullOr(Schema.String),
+  /** As the snapshot carried it; `@linky-fit/proxy-payment` validates it. */
+  currency: Schema.NullOr(Schema.String),
   statusUpdatedAtSec: Schema.NullOr(UnixSeconds),
   clientId: Schema.NullOr(ClientId),
   sentAt: UnixSeconds,

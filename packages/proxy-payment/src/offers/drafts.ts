@@ -7,6 +7,7 @@ import {
   type BankOfferStatus,
 } from "@linky-fit/linkstr";
 import { Schema } from "effect";
+import type { BankPaymentOfferCurrency } from "../bankQr/bankPayment";
 import { bankPaymentOfferMessageText } from "./content";
 import {
   bankPaymentOfferBankPaidAtSec,
@@ -42,6 +43,7 @@ export const newBankPaymentOfferClientId = (): ClientId =>
 export const bankPaymentOfferedDraft = (args: {
   amountSat: number | null;
   amountText: string;
+  currency?: BankPaymentOfferCurrency | null;
   expiresAtSec?: number | null;
   offerId: BankOfferId;
   offerer: Pubkey;
@@ -54,6 +56,7 @@ export const bankPaymentOfferedDraft = (args: {
   }
   const amountSat = positiveInt(args.amountSat);
   const expiresAtSec = positiveUnixSeconds(args.expiresAtSec);
+  const currency = args.currency ?? null;
   return new BankOfferDraft({
     to: args.to,
     offerId: args.offerId,
@@ -63,6 +66,7 @@ export const bankPaymentOfferedDraft = (args: {
     text,
     ...(amountSat === undefined ? {} : { amountSat }),
     ...(expiresAtSec === undefined ? {} : { expiresAtSec }),
+    ...(currency === null ? {} : { currency }),
     clientId: newBankPaymentOfferClientId(),
   });
 };
@@ -131,6 +135,7 @@ export const bankPaymentOfferResponseDraft = (
     ...(expiresAtSec === undefined ? {} : { expiresAtSec }),
     ...(extensionSec === undefined ? {} : { extensionSec }),
     ...(isNonEmptyTrimmedString(spdPayload) ? { spdPayload } : {}),
+    ...(offer.currency === null ? {} : { currency: offer.currency }),
     ...(options.withPush === undefined ? {} : { pushMark: options.withPush }),
     clientId: newBankPaymentOfferClientId(),
     ...(sentAt === undefined ? {} : { sentAt }),

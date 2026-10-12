@@ -51,6 +51,33 @@ describe("decodeBankPaymentOffer", () => {
     expect(info.bankPaidAtSec).toBe(START + 125);
     expect(bankPaymentOfferResponseDurationSec(info, 0)).toBe(125);
   });
+
+  it.each([
+    {
+      name: "the snapshot's currency",
+      overrides: { currency: "EUR" },
+      expected: "EUR",
+    },
+    {
+      name: "the bank QR when the snapshot has no currency",
+      overrides: { spdPayload: "SPD*1.0*ACC:CZ6508000000192000145399*CC:CZK" },
+      expected: "CZK",
+    },
+    {
+      name: "the bank QR over a junk currency",
+      overrides: { currency: "gold", spdPayload: "SPD*1.0*ACC:CZ65*CC:EUR" },
+      expected: "EUR",
+    },
+    {
+      name: "null without either",
+      overrides: { currency: "xyz" },
+      expected: null,
+    },
+  ])("reads the currency from $name", ({ expected, overrides }) => {
+    expect(decode(snapshot("offered", true, overrides)).currency).toBe(
+      expected,
+    );
+  });
 });
 
 describe("isBankPaymentOfferExpired", () => {

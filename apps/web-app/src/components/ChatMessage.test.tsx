@@ -446,6 +446,7 @@ describe("ChatMessage bank payment offer actions", () => {
       amountSat: 10,
       amountText: "10 sat",
       bankPaidAtSec: 1_700_000_000,
+      currency: null,
       expiresAtSec: 1_700_000_300,
       extensionSec: null,
       initiatedAtSec: 1_699_999_900,
@@ -489,6 +490,7 @@ describe("ChatMessage bank payment offer actions", () => {
           amountSat: 10,
           amountText: "10 sat",
           bankPaidAtSec,
+          currency: null,
           expiresAtSec: null,
           extensionSec: null,
           initiatedAtSec: 1_699_999_900,
@@ -515,6 +517,7 @@ describe("ChatMessage bank payment offer actions", () => {
         amountSat: 10,
         amountText: "10 sat",
         bankPaidAtSec: 1_700_000_000,
+        currency: null,
         expiresAtSec: null,
         extensionSec: null,
         initiatedAtSec: 1_699_999_900,
@@ -532,5 +535,32 @@ describe("ChatMessage bank payment offer actions", () => {
     );
     expect(card?.textContent).toContain("bankPaymentOfferStatusSettled");
     expect(card?.textContent).toContain("10");
+  });
+
+  it("shows the bank transfer's currency next to an incoming offer's amount", async () => {
+    const container = await renderChatMessage("offer", {
+      bankPaymentOfferInfo: {
+        amountSat: 10,
+        amountText: "10 sat",
+        bankPaidAtSec: null,
+        currency: "CZK",
+        expiresAtSec: null,
+        extensionSec: null,
+        initiatedAtSec: 1_699_999_900,
+        offerId: BankOfferId.make("offer-1"),
+        offererPublicKey: makeIdentity().pubkey,
+        spdPayload: null,
+        status: "offered",
+        statusUpdatedAtSec: 1_700_000_000,
+        text: "offer",
+      },
+      direction: "in",
+    });
+
+    expect(
+      container.querySelector(
+        '[data-testid="chat-bank-payment-offer-currency"]',
+      )?.textContent,
+    ).toBe("CZK");
   });
 });
