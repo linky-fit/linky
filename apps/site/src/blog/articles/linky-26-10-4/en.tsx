@@ -74,6 +74,17 @@ export function Body() {
         SLIP-39 word list.
       </Paragraph>
 
+      <Heading>Replay the tutorial</Heading>
+      <Paragraph>
+        Settings has a new Tutorial page. It lists the getting-started steps,
+        and you can replay any of them, even the ones you've already done. Handy
+        when you forget where something is, or when you show Linky to a friend.
+      </Paragraph>
+      <DemoFigure
+        screen="tutorial-replay"
+        caption="Dave opens Settings > Tutorial and replays how to pay a contact."
+      />
+
       <Heading>Also in this release</Heading>
       <BulletList
         items={[
@@ -117,10 +128,6 @@ export function Body() {
           <>
             Linky no longer deletes old messages on its own. Before, it trimmed
             long histories on every device.
-          </>,
-          <>
-            Settings &gt; Tutorial lists the getting-started steps and replays
-            any of them, even ones you already finished.
           </>,
           <>
             A proxy payment offer shows whether the bank transfer is in CZK, EUR
