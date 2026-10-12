@@ -6,9 +6,13 @@ import {
   type RecommendedRelays,
 } from "./recommendedRelays";
 import { safeLocalStorageGetJson, safeLocalStorageSetJson } from "./storage";
+import {
+  allowInsecureLocalhostRelays,
+  envNostrRelays,
+  envNostrSearchRelays,
+} from "../platform/buildEnv";
 
-export const ALLOW_INSECURE_LOCALHOST_RELAYS =
-  import.meta.env.VITE_ALLOW_INSECURE_LOCALHOST_RELAYS === "1";
+export const ALLOW_INSECURE_LOCALHOST_RELAYS = allowInsecureLocalhostRelays;
 
 export const isRelayUrl = (value: string): value is RelayUrl =>
   Schema.is(RelayUrl)(value) &&
@@ -16,7 +20,7 @@ export const isRelayUrl = (value: string): value is RelayUrl =>
 
 const envRelays = Array.from(
   new Set(
-    (import.meta.env.VITE_NOSTR_RELAYS ?? "")
+    (envNostrRelays ?? "")
       .split(",")
       .map((url) => url.trim())
       .filter(isRelayUrl),
@@ -60,7 +64,7 @@ const DEFAULT_NOSTR_SEARCH_RELAYS = [
 
 const envSearchRelays = Array.from(
   new Set(
-    (import.meta.env.VITE_NOSTR_SEARCH_RELAYS ?? "")
+    (envNostrSearchRelays ?? "")
       .split(",")
       .map((url) => url.trim())
       .filter(isRelayUrl),

@@ -10,14 +10,13 @@ import {
   type RecommendedRelays,
 } from "../../utils/recommendedRelays";
 import { recommendedRelaysAtom } from "../state/messages/relays";
+import { envEvoluServerUrls, envNostrRelays } from "../../platform/buildEnv";
 
 const RECOMMENDED_RELAYS_URL = "https://linky.fit/recommended-relays";
 const REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 // Dev and e2e builds point at local services and never fetch the endpoint.
-const usesEnvRelays = Boolean(
-  import.meta.env.VITE_NOSTR_RELAYS || import.meta.env.VITE_EVOLU_SERVER_URLS,
-);
+const usesEnvRelays = Boolean(envNostrRelays || envEvoluServerUrls);
 
 const fetchRecommendedRelays = async (): Promise<RecommendedRelays | null> => {
   try {

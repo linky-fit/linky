@@ -53,6 +53,7 @@ import {
   recordPwaRegistered,
 } from "./utils/pwaUpdate";
 import { getUnknownErrorMessage, isRecord } from "./utils/unknown";
+import { isDevBuild, isE2eBuild } from "./platform/buildEnv";
 
 type BufferFromArgs =
   | [arrayLike: ArrayLike<number> | ArrayBufferView]
@@ -732,7 +733,7 @@ const bootstrap = async () => {
     registry.get(evoluRelaySettingsAtom);
     const opened = registry.get(evoluAtom);
     console.log("[linky][boot] evolu loaded", { opened: opened !== null });
-    if (import.meta.env.DEV || import.meta.env.VITE_E2E === "1") {
+    if (isDevBuild || isE2eBuild) {
       const { installLinkyE2eHooks } =
         await import("./devtools/e2e/installLinkyE2eHooks.ts");
       installLinkyE2eHooks(registry);
@@ -749,7 +750,7 @@ const bootstrap = async () => {
       window.dispatchEvent(new Event("linky-app-mounted"));
       dynamicImportFetchRetry.clear();
       evoluOpenRetry.clear();
-      if (Capacitor.getPlatform() === "android" && !import.meta.env.DEV) {
+      if (Capacitor.getPlatform() === "android" && !isDevBuild) {
         void import("./platform/nativeLiveUpdate.ts").then(
           ({ startNativeLiveUpdates }) => startNativeLiveUpdates(),
         );

@@ -27,3 +27,35 @@ test("every file on the platform seam ratchet still reaches past the seam", asyn
     .map((result) => result.filePath);
   expect(clean).toEqual([]);
 }, 30_000);
+
+test("only platform/buildEnv.ts reads import.meta.env", async () => {
+  const eslint = new ESLint({
+    cwd: import.meta.dirname,
+    ruleFilter: ({ ruleId }) => ruleId === "no-restricted-syntax",
+  });
+  const lint = async (code, filePath) => {
+    const [result] = await eslint.lintText(code, { filePath });
+    return result.messages.map((message) => message.message);
+  };
+  const envMessage = "Read build-time env from platform/buildEnv.ts.";
+
+  for (const code of [
+    "export const a = import.meta.env.DEV;",
+    'export const b = import.meta["env"].DEV;',
+    "const { env } = import.meta;\nexport const c = env.DEV;",
+  ]) {
+    expect(await lint(code, "src/utils/mint.ts")).toContain(envMessage);
+  }
+  expect(
+    await lint(
+      'export const url = new URL("./x.js", import.meta.url);',
+      "src/utils/mint.ts",
+    ),
+  ).toEqual([]);
+  expect(
+    await lint(
+      "export const isDev = import.meta.env.DEV;",
+      "src/platform/buildEnv.ts",
+    ),
+  ).toEqual([]);
+}, 30_000);

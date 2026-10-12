@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { Effect } from "effect";
 import { AtomRegistry } from "effect/reactivity";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { makeWebPlatformPorts } from "../../../platform/ports.web";
 import {
   makeTestAppRegistry,
@@ -32,9 +32,13 @@ const custom = "wss://sync.example.com";
 const userKey = "linky.evoluServers.user.v1";
 
 /** Boots the way main.tsx does for a signed-in session and returns the registry. */
-const boot = (appMnemonic: string | null = null) => {
+const boot = (
+  appMnemonic: string | null = null,
+  evoluRelayDefaults: string[] = [],
+) => {
+  const ports = makeWebPlatformPorts();
   const registry = makeTestAppRegistry({
-    ports: makeWebPlatformPorts(),
+    ports: { ...ports, config: { ...ports.config, evoluRelayDefaults } },
     session: signedInSession({ appMnemonic }),
   });
   registry.get(evoluAtom);
@@ -53,9 +57,7 @@ beforeEach(() => {
   localStorage.clear();
   createDatabase.mockClear();
   openLinkyStore.mockReset();
-  vi.stubEnv("VITE_EVOLU_SERVER_URLS", "");
 });
-afterEach(() => vi.unstubAllEnvs());
 
 describe("Evolu relay upgrade to recommended relays", () => {
   it("keeps the untouched old defaults that are not recommended as the user's", () => {
@@ -80,8 +82,7 @@ it("boots with the cached recommendation from the endpoint", () => {
 });
 
 it("keeps environment overrides isolated from production", () => {
-  vi.stubEnv("VITE_EVOLU_SERVER_URLS", "ws://localhost:4001");
-  boot("seed");
+  boot("seed", ["ws://localhost:4001"]);
   expect(localStorage.getItem(userKey)).toBe("[]");
   expectTransports(["ws://localhost:4001"]);
 });

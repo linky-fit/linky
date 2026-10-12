@@ -1,9 +1,9 @@
 import { NonNegativeAmount, WalletBalances } from "@linky-fit/linkshu";
 import { isHiddenTestMint } from "../../utils/mint";
+import { isDevBuild, isE2eBuild } from "../../platform/buildEnv";
 
 /** Dev and E2E builds run against a local FakeWallet mint, so they allow test mints. */
-const allowTestMintsBuildDefault =
-  import.meta.env.DEV || import.meta.env.VITE_E2E === "1";
+const allowTestMintsBuildDefault = isDevBuild || isE2eBuild;
 
 export const resolveAllowTestMints = (
   stored: boolean | null,

@@ -11,6 +11,7 @@ import {
 } from "./inspectorEnabled";
 import { INSPECTOR_REPORT_PATH } from "./inspectorRows";
 import type { InspectorRow } from "./inspectorRows";
+import { isDevBuild } from "../../platform/buildEnv";
 
 // App side of the inspector: prepare each row once, then fan it out to every
 // active sink. Production builds have no HTTP reporting path.
@@ -98,7 +99,7 @@ const flushPendingRows = (): void => {
 
 // Keeps rows reported right before navigating away, e.g. a login returning to its site.
 // React Native and node have no global addEventListener.
-if (import.meta.env.DEV && "addEventListener" in globalThis) {
+if (isDevBuild && "addEventListener" in globalThis) {
   globalThis.addEventListener("pagehide", flushPendingRows);
 }
 
@@ -130,7 +131,7 @@ export const reportInspectorRows = (rows: InspectorRow[]): void => {
   }
 
   // Rows hold decrypted plaintext, so they may leave the device only in dev.
-  if (!import.meta.env.DEV) return;
+  if (!isDevBuild) return;
 
   pendingRows.push(...preparedRows);
   if (pendingRows.length > MAX_PENDING_ROWS) {

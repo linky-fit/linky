@@ -33,11 +33,13 @@ import { isNativePlatform } from "../platform/runtime";
 import { appendPushDebugLog } from "./pushDebugLog";
 import { base64 } from "@scure/base";
 import { nowSeconds } from "./time";
+import {
+  envNotificationServerUrl,
+  envPushServerUrl,
+} from "../platform/buildEnv";
 
 const PUSH_SERVER_URL =
-  import.meta.env.VITE_PUSH_SERVER_URL ||
-  import.meta.env.VITE_NOTIFICATION_SERVER_URL ||
-  "https://push.linky.fit";
+  envPushServerUrl || envNotificationServerUrl || "https://push.linky.fit";
 
 const VAPID_KEY_STORAGE_KEY = "linky.push_vapid_public_key";
 const PUSH_INSTALLATION_ID_STORAGE_KEY = "linky.push_installation_id";

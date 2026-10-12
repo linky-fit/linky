@@ -22,6 +22,20 @@ const storageSyntax = [
     message: storageMessage,
   },
 ];
+const envMessage = "Read build-time env from platform/buildEnv.ts.";
+const envSyntax = [
+  {
+    selector:
+      "MemberExpression[object.type='MetaProperty'][property.name='env']",
+    message: envMessage,
+  },
+  // import.meta used other than as import.meta.<name>, e.g. import.meta["env"] or const { env } = import.meta.
+  {
+    selector:
+      "MetaProperty[meta.name='import']:not(MemberExpression[computed=false] > MetaProperty.object)",
+    message: envMessage,
+  },
+];
 const onLocation = (path) =>
   `:matches([${path}.object.name='location'], [${path}.object.property.name='location'])`;
 const navigationSyntax = [
@@ -126,7 +140,6 @@ export const platformSeamRatchet = [
   "src/app/lib/privateImageFile.ts",
   "src/app/lib/privateImageMessage.ts",
   "src/app/lib/pwaNotifications.ts",
-  "src/app/lib/testMintGate.ts",
   "src/app/routes/AppRouteContent.tsx",
   "src/components/ChatMessage.tsx",
   "src/components/ChatMessageEditor.tsx",
@@ -165,9 +178,6 @@ export const platformSeamRatchet = [
   "src/utils/colorMode.ts",
   "src/utils/formatting.ts",
   "src/utils/image.ts",
-  "src/utils/mint.ts",
-  "src/utils/nostrRelays.ts",
-  "src/utils/npubCashServer.ts",
   "src/utils/pickFile.ts",
   "src/utils/pushContactNamesStorage.ts",
   "src/utils/pushNotifications.ts",
@@ -218,6 +228,19 @@ export default defineConfig([
           message: evoluMessage,
         })),
       ],
+      "no-restricted-syntax": [
+        "error",
+        ...restrictedSyntax,
+        ...backSyntax,
+        ...storageSyntax,
+        ...navigationSyntax,
+        ...envSyntax,
+      ],
+    },
+  },
+  {
+    files: ["src/platform/buildEnv.ts"],
+    rules: {
       "no-restricted-syntax": [
         "error",
         ...restrictedSyntax,
@@ -333,6 +356,7 @@ export default defineConfig([
         ...restrictedSyntax,
         ...backSyntax,
         ...navigationSyntax,
+        ...envSyntax,
       ],
     },
   },
@@ -344,6 +368,7 @@ export default defineConfig([
         ...restrictedSyntax,
         ...backSyntax,
         ...storageSyntax,
+        ...envSyntax,
       ],
     },
   },
