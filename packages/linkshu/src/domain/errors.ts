@@ -81,13 +81,18 @@ export class ReceiveDeferred extends Schema.TaggedError<ReceiveDeferred>()(
   },
 ) {}
 
-/** Definitive protocol rejection by the mint (NUT error code when known). */
+/**
+ * Definitive protocol rejection by the mint (NUT error code when known).
+ * `keysetOwner` names the mint a listed keyset belongs to when the mint was
+ * refused for presenting it; such a mint never becomes usable.
+ */
 export class MintRejected extends Schema.TaggedError<MintRejected>()(
   "MintRejected",
   {
     mint: MintUrl,
     code: Schema.NullOr(Schema.Int),
     detail: Schema.String,
+    keysetOwner: Schema.optional(MintUrl),
   },
 ) {}
 

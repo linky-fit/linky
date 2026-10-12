@@ -248,6 +248,7 @@ export const makeWalletInstances = (
               mint,
               code: null,
               detail: `keyset ${foreign.keysetId} belongs to ${foreign.mint}`,
+              keysetOwner: foreign.mint,
             }),
           );
     });

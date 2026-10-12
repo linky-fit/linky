@@ -117,18 +117,22 @@ export class Receive extends Context.Service<Receive>()("linkshu/Receive", {
         if (Result.isSuccess(outcome)) return outcome.success;
         if (yield* Ref.get(recorded)) return deferredResult(deferred, "failed");
         const error = outcome.failure;
+        const closeFailed = closeAs(deferred, {
+          status: "failed",
+          error: encodeStoredError(error),
+        });
         switch (error._tag) {
           case "TokenAlreadyKnown":
             return yield* closeAs(deferred, { status: "done" });
           case "TokenAlreadySpent":
           case "AmountConsumedByFee":
           case "TokenParseFailed":
-            return yield* closeAs(deferred, {
-              status: "failed",
-              error: encodeStoredError(error),
-            });
-          case "MintUnreachable":
+            return yield* closeFailed;
           case "MintRejected":
+            return error.keysetOwner === undefined
+              ? deferredResult(deferred, "pending")
+              : yield* closeFailed;
+          case "MintUnreachable":
           case "CounterLockTimeout":
           case "TokenLocked": // only a pass or receive with its key finishes it
             return deferredResult(deferred, "pending");

@@ -820,7 +820,8 @@ const deferReceive = (
 /**
  * What a mint that cannot be loaded, refreshed or asked means before
  * anything is written: a fresh token is deferred, a retried deferral stays
- * as it is, and a retried transfer fails with the mint's error.
+ * as it is, and a retried transfer fails with the mint's error. A mint
+ * presenting another mint's keyset never becomes usable, so it fails all three.
  */
 const whenMintUnusable =
   (ctx: ReceiveContext, parsed: ReceivableToken, origin: Origin) =>
@@ -830,6 +831,8 @@ const whenMintUnusable =
     never,
     ReceiveDeferred | TokenAlreadyKnown | MintUnreachable | MintRejected
   > => {
+    if (error._tag === "MintRejected" && error.keysetOwner !== undefined)
+      return Effect.fail(error);
     switch (origin._tag) {
       case "fresh":
         return deferReceive(ctx, parsed, error, origin.automatic);
