@@ -92,6 +92,8 @@ const readPubkey = (value: unknown): Pubkey | null =>
 export const decodeBankPaymentOffer = (
   content: string,
 ): BankPaymentOfferInfo | null => {
+  // Chat text runs through here too; only a JSON object can be an offer.
+  if (!content.trimStart().startsWith("{")) return null;
   const message = Option.getOrNull(decodeOfferContent(content));
   if (!message) return null;
 

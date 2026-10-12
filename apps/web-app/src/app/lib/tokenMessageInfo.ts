@@ -2,6 +2,7 @@ import { parseTokenText } from "@linky-fit/linkshu";
 import { decodeBankPaymentOffer } from "@linky-fit/proxy-payment";
 import { parsePrivateImageMessage } from "./privateImageMessage";
 import { extractCashuTokenFromText } from "./tokenText";
+import { boundedMemo } from "../../utils/boundedMemo";
 import { isHiddenTestMint } from "../../utils/mint";
 
 export interface CashuTokenMessageInfo {
@@ -36,12 +37,8 @@ export const getMintDisplay = (
   }
 };
 
-export const getCashuTokenMessageInfo = (
-  text: string,
-  /** Token texts the wallet's transfers carry (sent or received). */
-  knownTokenTexts: ReadonlySet<string> = new Set(),
-  allowTestMints = true,
-): CashuTokenMessageInfo | null => {
+// Every chat row and preview asks again on each render; message text never changes in place.
+const tokenInMessage = boundedMemo((text: string) => {
   if (decodeBankPaymentOffer(text)) return null;
   if (parsePrivateImageMessage(text)) return null;
 
@@ -49,7 +46,18 @@ export const getCashuTokenMessageInfo = (
   if (!tokenRaw) return null;
 
   const parsed = parseTokenText(tokenRaw);
-  if (!parsed) return null;
+  return parsed && { parsed, tokenRaw };
+}, 5_000);
+
+export const getCashuTokenMessageInfo = (
+  text: string,
+  /** Token texts the wallet's transfers carry (sent or received). */
+  knownTokenTexts: ReadonlySet<string> = new Set(),
+  allowTestMints = true,
+): CashuTokenMessageInfo | null => {
+  const token = tokenInMessage(text);
+  if (!token) return null;
+  const { parsed, tokenRaw } = token;
 
   return {
     tokenRaw,
