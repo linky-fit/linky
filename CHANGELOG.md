@@ -12,41 +12,27 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ## [Unreleased]
 
+## [26.10.4] - 2026-10-12
+
 ### en-US
 
-- Notifications on Android phones without Google Play Services (e.g. GrapheneOS): install a UnifiedPush app such as ntfy and turn notifications on in Settings.
-- Contacts are deleted instead of archived: the trash icon on the edit page removes the contact at once, the toast can undo it, and a new message brings the contact back.
-- Message reactions: a plus button opens the full emoji list.
-- A message can be deleted from its menu, except tokens, payment requests and offers; both sides keep only a "Message deleted" placeholder.
-- Tutorial in Settings: replay any getting-started step, with new steps for a Linky name, groups, proxy payments and the beacon.
-- A proxy payment offer shows the bank transfer's currency (CZK, EUR, BRL) next to the amount.
-- Tapping a token in a chat switches the display unit, like the wallet balance.
-- Add contact: scanning a contact's QR is the main button, nearby people and new Linky users show as avatars at the bottom, and a typed lightning address can be saved right away. A deleted contact can show up among the suggestions again, and adding them brings the contact back.
-- Restoring an account: paste the whole backup with one button, or type the 20 words into separate fields with each word checked against the SLIP-39 list.
-- Settings: a Nostr identity page under Master keys shows the identity in use with its profile, copies its npub or nsec, and keeps a pasted custom identity attached so you can switch between it and the derived one, or remove it and paste another; switching back asks about the profile only when it cannot be loaded. Each card shows the identity's lightning address, and a switch keeps the identity's own picture.
-- Your own profile can no longer be saved as a contact from any flow, including a data import.
-- The ₿ unit shows bitcoin (0.00123456 ₿) instead of sats with a bitcoin symbol, and the keypad takes up to eight decimal places in it.
-- Decimal places on the amount keypad are on by default; turn them off in Settings under Units.
-- Blocking a saved contact: the Block button on the edit page, or Block in the toast after deleting one. Settings lists everyone you blocked and unblocks them, on all your devices.
-- In the Android and iOS app, the status bar (time, battery) stays readable in light mode.
+- Delete a message for both sides; react with any emoji.
+- Delete contacts with undo, block them and unblock them in Settings, on all your devices.
+- Notifications without Google Play Services via UnifiedPush (e.g. ntfy).
+- Restore an account with one paste or 20 checked words.
+- Settings: a Nostr identity page to switch to a custom identity and back; replay the tutorial.
+- ₿ shows bitcoin with 8 decimals; tap a token in a chat to switch units.
+- Add contact is built around QR scanning.
 
 ### cs-CZ
 
-- Notifikace na Androidu bez Google Play Services (např. GrapheneOS): nainstalujte UnifiedPush aplikaci, třeba ntfy, a zapněte notifikace v Nastavení.
-- Kontakty se místo archivace mažou: ikona koše v úpravě kontaktu ho hned odstraní, z oznámení jde akci vrátit a nová zpráva kontakt opět zobrazí.
-- Reakce na zprávy: tlačítko plus otevře celý seznam emoji.
-- Z menu zprávy jde smazat zprávu, kromě tokenů, žádostí o platbu a nabídek; oběma stranám zůstane jen zástupný text „Zpráva byla smazána“.
-- Tutoriál v Nastavení: kterýkoli krok Začínáme jde projít znovu, nově i Linky jméno, skupiny, proxy platby a maják.
-- Nabídka proxy platby ukazuje měnu bankovního převodu (CZK, EUR, BRL) vedle částky.
-- Klepnutí na token v chatu přepne jednotku, stejně jako u zůstatku.
-- Přidat kontakt: hlavní tlačítko načte QR kontaktu, lidé v okolí a noví uživatelé Linky jsou dole jako avatary a zapsanou lightning adresu jde rovnou uložit. Smazaný kontakt se může v návrzích objevit znovu a jeho přidání ho obnoví.
-- Nastavení: stránka Nostr identita pod Hlavními klíči ukazuje používanou identitu s profilem, kopíruje její npub nebo nsec a vloženou vlastní identitu drží připojenou, takže jde přepínat mezi ní a odvozenou, nebo ji odebrat a vložit jinou; přepnutí zpět se na profil ptá, jen když ho nejde načíst. Každá karta ukazuje lightning adresu identity a přepnutí ponechá identitě její obrázek.
-- Vlastní profil už nejde uložit jako kontakt, ani importem dat.
-- Obnova účtu: celou zálohu vložíte jedním tlačítkem, nebo zadáte 20 slov do samostatných polí a každé slovo se kontroluje proti seznamu SLIP-39.
-- Jednotka ₿ zobrazuje bitcoin (0,00123456 ₿) místo satů se symbolem bitcoinu a klávesnice v ní přijme až osm desetinných míst.
-- Desetinná místa na klávesnici částky jsou ve výchozím stavu zapnutá; vypnout jdou v Nastavení v Jednotkách.
-- Blokování uloženého kontaktu: tlačítko Blokovat na stránce úprav, nebo Blokovat v oznámení po smazání. V Nastavení najdete všechny zablokované a můžete je odblokovat, na všech svých zařízeních.
-- V aplikaci pro Android a iOS zůstává stavový řádek (čas, baterie) čitelný i ve světlém režimu.
+- Smazání zprávy u obou stran; reakce jakýmkoli emoji.
+- Kontakty jde smazat i vrátit zpět, zablokovat a v Nastavení odblokovat, na všech zařízeních.
+- Notifikace bez Google Play Services přes UnifiedPush (např. ntfy).
+- Obnova účtu jedním vložením či 20 kontrolovanými slovy.
+- Nastavení: Nostr identita s přepnutím na vlastní identitu a zpět; opakování tutoriálu.
+- ₿ ukazuje bitcoin s 8 desetinnými místy; klepnutím na token v chatu přepnete jednotku.
+- Přidat kontakt stojí na skenování QR.
 
 ## [26.10.3] - 2026-10-05
 
