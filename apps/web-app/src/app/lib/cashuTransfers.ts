@@ -66,29 +66,35 @@ export const takenTokenTexts = (
 
 /**
  * The wallet's own sends by token text: true once the recipient claimed it,
- * i.e. the mint reported every proof it handed out spent. A returned send's
+ * i.e. the mint reported spent proofs covering the whole amount, so a send
+ * whose proofs have not all synced yet stays unclaimed. A returned send's
  * proofs were spent by the wallet itself.
  */
 export const sentTokenClaims = (
   transfers: ReadonlyArray<TokenTransfer>,
   proofs: ReadonlyArray<StoredProof>,
 ): ReadonlyMap<string, boolean> => {
-  const allSpentByOperation = new Map<string, boolean>();
+  const spentByOperation = new Map<string, { amount: number; all: boolean }>();
   for (const proof of proofs) {
     if (proof.operationId === null) continue;
-    allSpentByOperation.set(
-      proof.operationId,
-      (allSpentByOperation.get(proof.operationId) ?? true) &&
-        proof.state === "spent",
-    );
+    const spent = spentByOperation.get(proof.operationId);
+    spentByOperation.set(proof.operationId, {
+      amount: (spent?.amount ?? 0) + proof.amount,
+      all: (spent?.all ?? true) && proof.state === "spent",
+    });
   }
   return new Map(
     transfers
       .filter((transfer) => transfer.kind === "send")
-      .map((transfer) => [
-        transfer.tokenText,
-        transfer.status !== "returned" &&
-          (allSpentByOperation.get(transfer.id) ?? false),
-      ]),
+      .map((transfer) => {
+        const spent = spentByOperation.get(transfer.id);
+        return [
+          transfer.tokenText,
+          transfer.status !== "returned" &&
+            spent !== undefined &&
+            spent.all &&
+            spent.amount === transfer.amount,
+        ];
+      }),
   );
 };

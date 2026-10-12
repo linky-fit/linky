@@ -6,6 +6,7 @@ import {
   type Pubkey,
 } from "@linky-fit/linkstr";
 import { Schema } from "effect";
+import { onStorageKeyChangedInAnotherTab } from "../../platform/storageEvents";
 import { BLOCKED_NOSTR_PUBKEYS_STORAGE_KEY } from "../../utils/constants";
 import {
   safeLocalStorageGet,
@@ -47,10 +48,20 @@ export const isBlockedPubkey = (pubkey: string): boolean => {
 
 const blockListListeners = new Set<() => void>();
 
-/** Calls `listener` after each write that changes the block list; returns the unsubscribe. */
+/**
+ * Calls `listener` after each write, in this tab or another, that changes the
+ * block list; returns the unsubscribe.
+ */
 export const subscribeBlockList = (listener: () => void): (() => void) => {
   blockListListeners.add(listener);
-  return () => blockListListeners.delete(listener);
+  const stopOtherTabs = onStorageKeyChangedInAnotherTab(
+    BLOCKED_NOSTR_PUBKEYS_STORAGE_KEY,
+    listener,
+  );
+  return () => {
+    blockListListeners.delete(listener);
+    stopOtherTabs();
+  };
 };
 
 const writeBlockList = (blockList: ReadonlyArray<Pubkey>): void => {

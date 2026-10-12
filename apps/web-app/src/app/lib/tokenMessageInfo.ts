@@ -80,11 +80,16 @@ export const getCashuTokenMessageInfo = (
   };
 };
 
-/** What a token pill announces besides its amount: an own claimed send, or a token taken elsewhere. */
+/**
+ * What a token pill announces besides its amount: an own claimed send, or a
+ * token taken elsewhere. An incoming copy of an own send is a token like any other.
+ */
 export const cashuTokenStateKey = (
   info: CashuTokenMessageInfo,
+  outgoing: boolean,
 ): I18nKey | null => {
-  if (info.sent === "claimed") return "cashuTokenClaimed";
-  if (info.sent !== null || info.isValid) return null;
+  const ownSend = outgoing ? info.sent : null;
+  if (ownSend === "claimed") return "cashuTokenClaimed";
+  if (ownSend !== null || info.isValid) return null;
   return "cashuInvalid";
 };

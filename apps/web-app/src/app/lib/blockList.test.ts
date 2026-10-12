@@ -315,4 +315,20 @@ describe("block list storage", () => {
     unblockPubkey(alice.pubkey);
     expect(listener).toHaveBeenCalledTimes(2);
   });
+
+  it("tells subscribers when another tab changes the block list, until they unsubscribe", () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeBlockList(listener);
+    const storageEvent = (key: string) =>
+      window.dispatchEvent(new StorageEvent("storage", { key }));
+
+    storageEvent("linky.unrelated");
+    expect(listener).not.toHaveBeenCalled();
+    storageEvent(BLOCKED_NOSTR_PUBKEYS_STORAGE_KEY);
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+    storageEvent(BLOCKED_NOSTR_PUBKEYS_STORAGE_KEY);
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
 });
