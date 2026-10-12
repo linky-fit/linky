@@ -76,16 +76,16 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "A Nostr contact was saved after the duplicate check. The contact link identifies the new row; the insert itself runs in the background.",
   "contacts.sharedProfileOpened":
     "A profile link (`#add/<npub>` from a linky.fit profile page) was opened once the account hydrated. The contact link identifies the saved or already existing contact whose conversation opens next; created tells which.",
-  "conversations.archived":
-    "User archived a contact's chat: the contact row (contacts scope) records the archive time and the conversation's read cursor moves there. The contact and conversation links identify both rows.",
+  "contacts.deleted":
+    "User deleted a contact: the contact row (contacts scope) records the deletion time in archivedAtSec and the conversation's read cursor moves there; the row and its messages stay. The contact and conversation links identify both rows.",
   "unknownSenders.messageStored":
     "A message to or from a peer who is not a contact was stored in the unknown senders scope, which syncs to the user's other devices and keeps fewer shards than conversations. Fires once per message; a refetch of a stored rumor is skipped. Message, rumor and pubkey links identify it.",
   "unknownSenders.movedToContact":
-    "An unknown sender turned out to be a contact (saved, matched by npub or lightning address, or restored from the archive), and their messages moved from the unknown senders scope into the contact's conversation under the same ids. Pubkey, contact and conversation links identify both sides; the payload counts the moved messages.",
+    "An unknown sender turned out to be a contact (saved, matched by npub or lightning address, or restored after a deletion), and their messages moved from the unknown senders scope into the contact's conversation under the same ids. Pubkey, contact and conversation links identify both sides; the payload counts the moved messages.",
   "unknownSenders.removed":
     "The user blocked an unknown sender and their messages were removed from the unknown senders scope on every device. The pubkey link identifies the sender.",
-  "conversations.unarchived":
-    "A contact left the archive, either by the user restoring it or because an incoming message newer than the archive time arrived; it clears the archive on the contact and on its conversation, where older app versions keep it.",
+  "contacts.restored":
+    "A deleted contact came back, either by the user undoing the deletion or because an incoming message newer than the deletion time arrived; it clears archivedAtSec on the contact and on its conversation, where older app versions keep it.",
   ShardsForgotten:
     "Explicit local forget of old chat shards, conversations and unknown senders' messages alike. Payload lists scope, index and whether owner data was deleted; owner links correlate with shard rotation and subscription rows. Evolu 7 reports deleted: false.",
   ShardsSubscribed:

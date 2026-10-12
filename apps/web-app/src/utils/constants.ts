@@ -49,7 +49,6 @@ export const FEEDBACK_CONTACT_NPUB =
   "npub1kkht6jvgr8mt4844saf80j5jjwyy6fdy90sxsuxt4hfv8pel499s96jvz8";
 export { PAYMENT_ANALYTICS_RECIPIENT_NPUB } from "@linky-fit/linkstr";
 export const NO_GROUP_FILTER = "__linky_no_group__";
-export const ARCHIVED_CONTACTS_FILTER = "__linky_archived_contacts__";
 
 export const PENDING_DEEP_LINK_TEXT_STORAGE_KEY =
   "linky.pendingDeepLinkText.v1";

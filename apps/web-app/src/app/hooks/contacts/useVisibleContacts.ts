@@ -1,6 +1,6 @@
 import React from "react";
 import { parseStatusFilterValue } from "../../../nostrStatus";
-import { ARCHIVED_CONTACTS_FILTER } from "../../../utils/constants";
+import { isDeletedContact } from "../../../utils/contactName";
 import type { ContactIdLike, ContactNameRowLike } from "../../types/appTypes";
 
 type ContactRow = ContactNameRowLike;
@@ -46,15 +46,6 @@ export const useVisibleContacts = <TContact extends ContactRow>({
   unreadByContactId,
 }: UseVisibleContactsParams<TContact>): VisibleContactsResult<TContact> => {
   return React.useMemo(() => {
-    const isArchivedContact = (contact: TContact): boolean => {
-      const archivedAtSec = contact.archivedAtSec ?? 0;
-      return Number.isFinite(archivedAtSec) && archivedAtSec > 0;
-    };
-
-    const isUnknownContact = (contact: TContact): boolean => {
-      return contact.isUnknownContact === true;
-    };
-
     const matchesSearch = (item: (typeof contactsSearchData)[number]) => {
       if (contactsSearchParts.length === 0) return true;
       return contactsSearchParts.every((part) => item.haystack.includes(part));
@@ -63,34 +54,28 @@ export const useVisibleContacts = <TContact extends ContactRow>({
     const filtered = (() => {
       if (!activeGroup) {
         return contactsSearchData.filter(
-          (item) => !isArchivedContact(item.contact),
-        );
-      }
-      if (activeGroup === ARCHIVED_CONTACTS_FILTER) {
-        return contactsSearchData.filter(
-          (item) =>
-            isArchivedContact(item.contact) && !isUnknownContact(item.contact),
+          (item) => !isDeletedContact(item.contact),
         );
       }
       if (activeGroup === noGroupFilterValue) {
         return contactsSearchData.filter(
           (item) =>
             (item.groupNames ?? []).length === 0 &&
-            !isArchivedContact(item.contact),
+            !isDeletedContact(item.contact),
         );
       }
       const statusFilterCurrency = parseStatusFilterValue(activeGroup);
       if (statusFilterCurrency) {
         return contactsSearchData.filter(
           (item) =>
-            !isArchivedContact(item.contact) &&
+            !isDeletedContact(item.contact) &&
             (item.statusFilterValues ?? []).includes(statusFilterCurrency),
         );
       }
       return contactsSearchData.filter(
         (item) =>
           (item.groupNames ?? []).includes(activeGroup) &&
-          !isArchivedContact(item.contact),
+          !isDeletedContact(item.contact),
       );
     })();
 

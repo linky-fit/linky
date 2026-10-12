@@ -12,6 +12,7 @@ import { Effect } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { deriveDefaultProfile } from "../../../derivedProfile";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
+import { isDeletedContact } from "../../../utils/contactName";
 import { formatShortNpub } from "../../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import { buildUnknownContactId } from "../../hooks/messages/contactIdentity";
@@ -30,10 +31,14 @@ import { unknownNamesAtom } from "./chatContacts";
 import { contactsAtom } from "./readModel";
 
 export interface ContactsCommands {
-  /** Archives the contact and marks its chat read; a newer incoming message restores it. */
-  readonly archiveContact: (id: ContactId) => Promise<WriteOutcome>;
-  /** Restores an archived contact and takes over what its npub sent while unknown. */
-  readonly unarchiveContact: (id: ContactId) => Promise<WriteOutcome>;
+  /**
+   * Deletes the contact: the row and its messages stay, `archivedAtSec` (a
+   * frozen column name) records the deletion and the chat is marked read, so
+   * only an incoming message newer than that brings the contact back.
+   */
+  readonly deleteContact: (id: ContactId) => Promise<WriteOutcome>;
+  /** Restores a deleted contact and takes over what its npub sent while unknown. */
+  readonly restoreContact: (id: ContactId) => Promise<WriteOutcome>;
 }
 
 const makeContactsCommands = ({
@@ -45,31 +50,31 @@ const makeContactsCommands = ({
   readonly conversations: ConversationsRepository;
   readonly messages: MessagesCommands;
 }): ContactsCommands => ({
-  archiveContact: async (id) => {
-    const archivedAtSec = PositiveInt.orThrow(Math.ceil(Date.now() / 1e3));
+  deleteContact: async (id) => {
+    const deletedAtSec = PositiveInt.orThrow(Math.ceil(Date.now() / 1e3));
     const outcome = await runWrite(
       Effect.andThen(
-        contacts.archive(id, archivedAtSec),
+        contacts.archive(id, deletedAtSec),
         Effect.flatMap(conversations.ensureDirect(id), (chat) =>
-          conversations.markSeen(chat.id, archivedAtSec),
+          conversations.markSeen(chat.id, deletedAtSec),
         ),
       ),
     );
     if (outcome.ok)
       reportAppLog({
-        tag: "conversations.archived",
-        summary: "Archived a contact's conversation",
+        tag: "contacts.deleted",
+        summary: "Deleted a contact",
         links: { contact: id, conversation: directConversationIdFor(id) },
-        payload: { archivedAtSec },
+        payload: { deletedAtSec },
       });
     return outcome;
   },
-  unarchiveContact: async (id) => {
+  restoreContact: async (id) => {
     const outcome = await runWrite(contacts.unarchive(id));
     if (!outcome.ok) return outcome;
     reportAppLog({
-      tag: "conversations.unarchived",
-      summary: "Restored a contact's conversation from the archive",
+      tag: "contacts.restored",
+      summary: "Restored a deleted contact",
       links: { contact: id, conversation: directConversationIdFor(id) },
       payload: { contactId: id },
     });
@@ -83,7 +88,7 @@ const makeContactsCommands = ({
         Effect.catchCause((cause) =>
           Effect.sync(() => {
             console.warn(
-              "[linky][contacts] unarchived contact read failed",
+              "[linky][contacts] restored contact read failed",
               cause,
             );
             return null;
@@ -131,8 +136,11 @@ export type SaveNpubContact = (
 export const saveNpubContactAtom = Atom.keepAlive(
   Atom.readable((get) =>
     AsyncResult.map(
-      get(contactsRepositoryAtom),
-      (contactsRepository): SaveNpubContact => {
+      AsyncResult.all({
+        contactsRepository: get(contactsRepositoryAtom),
+        commands: get(contactsCommandsAtom),
+      }),
+      ({ commands, contactsRepository }): SaveNpubContact => {
         const pending = new Map<string, SavedNpubContact>();
         get.subscribe(contactsAtom, (contacts) => {
           for (const contact of contacts) {
@@ -148,7 +156,12 @@ export const saveNpubContactAtom = Atom.keepAlive(
             .find(
               (contact) => normalizeNpubIdentifier(contact.npub ?? "") === npub,
             );
-          if (existing) return { contact: existing, created: false, npub };
+          if (existing) {
+            // A deleted contact comes back instead of being saved twice.
+            if (isDeletedContact(existing))
+              void commands.restoreContact(existing.id);
+            return { contact: existing, created: false, npub };
+          }
           const pendingContact = pending.get(npub);
           if (pendingContact) return { ...pendingContact, created: false };
           const bestName =

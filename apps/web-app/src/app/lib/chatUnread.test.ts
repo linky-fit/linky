@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   collectUnreadNewestIncomingByContactId,
-  contactsToUnarchive,
+  contactsToRestore,
   isConversationUnread,
   resolveChatLastSeenAdvance,
   summarizeConversationReadTimes,
@@ -168,13 +168,13 @@ describe("collectUnreadNewestIncomingByContactId", () => {
   });
 });
 
-describe("contactsToUnarchive", () => {
-  const archived = (id: string, archivedAtSec: number | null) => ({
+describe("contactsToRestore", () => {
+  const deleted = (id: string, archivedAtSec: number | null) => ({
     id,
     archivedAtSec,
   });
 
-  it("restores an archived contact only for unread messages newer than the archive", () => {
+  it("restores a deleted contact only for unread messages newer than the deletion", () => {
     const unread = collectUnreadNewestIncomingByContactId(
       [
         { ...message("in", 80), contactId: "quiet" },
@@ -187,18 +187,14 @@ describe("contactsToUnarchive", () => {
     );
 
     expect(
-      contactsToUnarchive(
-        [
-          archived("quiet", 90),
-          archived("writes", 150),
-          archived("active", null),
-        ],
+      contactsToRestore(
+        [deleted("quiet", 90), deleted("writes", 150), deleted("active", null)],
         unread,
       ).map((contact) => contact.id),
     ).toEqual(["writes"]);
   });
 
-  it("keeps a contact archived when its chat has no visible cursor and only older messages", () => {
+  it("keeps a contact deleted when its chat has no visible cursor and only older messages", () => {
     const unread = collectUnreadNewestIncomingByContactId(
       [{ ...message("in", 120), contactId: "old" }],
       new Map(),
@@ -206,6 +202,6 @@ describe("contactsToUnarchive", () => {
     );
 
     expect(unread.get("old")).toBe(120);
-    expect(contactsToUnarchive([archived("old", 130)], unread)).toEqual([]);
+    expect(contactsToRestore([deleted("old", 130)], unread)).toEqual([]);
   });
 });

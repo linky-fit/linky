@@ -1,7 +1,7 @@
 /**
- * An npub saved as several contacts, one active and the others archived, keeps
- * receiving into the active contact: an archived duplicate never takes the
- * message and so never comes back from the archive as a second conversation.
+ * An npub saved as several contacts, one active and the others deleted, keeps
+ * receiving into the active contact: a deleted duplicate never takes the
+ * message and so never comes back as a second conversation.
  *
  * Needs the docker stack up — see playwright.config.ts.
  */
@@ -43,13 +43,13 @@ test("a message from a duplicated npub lands on the active contact", async ({
 
     const contactsIndex = Number((await shardIndexes(page)).contacts ?? 0);
     const contactsOwner = await shardOwnerId(page, "contacts", contactsIndex);
-    // The archived duplicate is written first, so it is the older row.
-    const archivedId = await createRowId(page);
+    // The deleted duplicate is written first, so it is the older row.
+    const deletedId = await createRowId(page);
     await upsertRow(
       page,
       "contact",
       {
-        id: archivedId,
+        id: deletedId,
         name: "Hynek",
         npub: hynek.npub,
         archivedAtSec: Math.floor(Date.now() / 1000) - 3600,
@@ -74,11 +74,11 @@ test("a message from a duplicated npub lands on the active contact", async ({
         `[data-guide='contact-card'][data-guide-contact-id='${id}']`,
       );
     await expect(card(activeId)).toContainText("Yes 😀", { timeout: 30_000 });
-    await expect(card(archivedId)).toHaveCount(0);
-    const archived = (await shardRows(page, "contacts", "contact")).find(
-      (row) => row.id === archivedId,
+    await expect(card(deletedId)).toHaveCount(0);
+    const deleted = (await shardRows(page, "contacts", "contact")).find(
+      (row) => row.id === deletedId,
     );
-    expect(archived?.archivedAtSec).toBeGreaterThan(0);
+    expect(deleted?.archivedAtSec).toBeGreaterThan(0);
   } finally {
     await context.close();
   }

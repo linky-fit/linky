@@ -5,6 +5,7 @@ import type { Route } from "../../../types/route";
 import { parseProfileGeneralStatus } from "../../../nostrStatus";
 import { getContactGroups } from "../../../utils/contactGroups";
 import { formatShortNpub } from "../../../utils/formatting";
+import { isDeletedContact } from "../../../utils/contactName";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import { unknownNamesAtom } from "../../state/contacts/chatContacts";
 import { unknownSendersAtom } from "../../state/contacts/displayContacts";
@@ -289,7 +290,7 @@ export const useProxyPaymentPayerContacts = () => {
     });
     return contacts
       .flatMap((contact) => {
-        if ((contact.archivedAtSec ?? 0) > 0) return [];
+        if (isDeletedContact(contact)) return [];
         const npub = normalizeNpubIdentifier(contact.npub ?? "");
         const currencies = npub
           ? parseProfileGeneralStatus(statusByNpub[npub]).currencies

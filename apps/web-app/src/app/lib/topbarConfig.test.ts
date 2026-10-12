@@ -177,6 +177,7 @@ describe("buildTopbarRight", () => {
     const args = {
       chatEditContactId: null,
       contactsFilterIsActive: false,
+      deleteEditedContact: vi.fn(),
       hiddenTransactionsShown: false,
       isProfileEditing: false,
       openReceiveScan: vi.fn(),
@@ -206,15 +207,38 @@ describe("buildTopbarRight", () => {
     ).toBeNull();
   });
 
+  it("deletes the edited contact from the contact edit page", () => {
+    const deleteEditedContact = vi.fn();
+    const button = buildTopbarRight({
+      chatEditContactId: null,
+      contactsFilterIsActive: false,
+      deleteEditedContact,
+      hiddenTransactionsShown: false,
+      isProfileEditing: false,
+      openReceiveScan: vi.fn(),
+      route: { kind: "contactEdit", id: contactId },
+      t: (key) => key,
+      toggleContactsFilter: vi.fn(),
+      toggleHiddenTransactions: vi.fn(),
+      openMenu: vi.fn(),
+    });
+
+    button?.onClick();
+
+    expect(button?.icon).toBe("Trash2");
+    expect(button?.label).toBe("deleteContact");
+    expect(deleteEditedContact).toHaveBeenCalledTimes(1);
+  });
+
   it("opens the receive scanner from the top-up page", () => {
     const openReceiveScan = vi.fn();
     const button = buildTopbarRight({
       chatEditContactId: null,
       contactsFilterIsActive: false,
+      deleteEditedContact: vi.fn(),
       hiddenTransactionsShown: false,
       isProfileEditing: false,
       openReceiveScan,
-      openScan: vi.fn(),
       route: { kind: "topup" },
       t: (key) => key,
       toggleContactsFilter: vi.fn(),
@@ -233,6 +257,7 @@ describe("buildTopbarRight", () => {
     const button = buildTopbarRight({
       chatEditContactId: null,
       contactsFilterIsActive: true,
+      deleteEditedContact: vi.fn(),
       hiddenTransactionsShown: false,
       isProfileEditing: false,
       openReceiveScan: vi.fn(),
@@ -256,6 +281,7 @@ describe("buildTopbarRight", () => {
     const button = buildTopbarRight({
       chatEditContactId: null,
       contactsFilterIsActive: false,
+      deleteEditedContact: vi.fn(),
       hiddenTransactionsShown: true,
       isProfileEditing: false,
       openReceiveScan: vi.fn(),

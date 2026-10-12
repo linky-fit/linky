@@ -1,5 +1,5 @@
-// A seed restore on a clean browser, after the account archived a chat long
-// ago, rotated its message shards past that archive, read part of a chat,
+// A seed restore on a clean browser, after the account deleted a contact long
+// ago, rotated its message shards past that deletion, read part of a chat,
 // heard from unknown senders and blocked one of them.
 import { appOwnerFromMnemonic } from "@linky-fit/linksync";
 import { expect, test, type Browser, type Page } from "@playwright/test";
@@ -35,7 +35,7 @@ import {
 test.use({ actionTimeout: 20_000 });
 
 const BACKDATE_MARGIN_SEC = 2 * 24 * 60 * 60;
-const ROTATIONS_PAST_ARCHIVE = 4;
+const ROTATIONS_PAST_DELETION = 4;
 const Y_TEXTS = ["Y one", "Y two", "Y three"] as const;
 
 const openDevice = async (
@@ -84,15 +84,15 @@ const sendInOpenChat = async (page: Page, text: string) => {
     .toBe(true);
 };
 
-const contactArchivedAt = async (page: Page, contactId: string) =>
+const contactDeletedAt = async (page: Page, contactId: string) =>
   (await shardRows(page, "contacts", "contact")).find(
     (row) => row.id === contactId,
   )?.archivedAtSec ?? null;
 
-/** Whether each chat is marked unread; archived ones are read under the Archive filter. */
+/** Whether each listed chat is marked unread; a deleted contact is listed nowhere. */
 const unreadDots = async (
   page: Page,
-  ids: { archived: string; listed: ReadonlyArray<string> },
+  ids: { deleted: string; listed: ReadonlyArray<string> },
 ) => {
   await page.goto("/#contacts");
   const dots: Record<string, boolean> = {};
@@ -100,20 +100,7 @@ const unreadDots = async (
     await expect(card(page, id)).toBeVisible();
     dots[id] = (await card(page, id).getAttribute("data-unread")) === "true";
   }
-  await expect(card(page, ids.archived)).toHaveCount(0);
-  const archiveFilter = page.getByRole("button", {
-    name: "Archive",
-    exact: true,
-  });
-  if (!(await archiveFilter.isVisible()))
-    await page
-      .getByRole("button", { name: "Search and filter contacts", exact: true })
-      .click();
-  await archiveFilter.click();
-  await expect(card(page, ids.archived)).toBeVisible();
-  dots[ids.archived] =
-    (await card(page, ids.archived).getAttribute("data-unread")) === "true";
-  await archiveFilter.click();
+  await expect(card(page, ids.deleted)).toHaveCount(0);
   return dots;
 };
 
@@ -124,7 +111,7 @@ const syncedInboxCursor = async (page: Page): Promise<number | null> => {
   return row === undefined ? null : Number(row.value);
 };
 
-test("a seed restore keeps the account's archive, blocks and history intact", async ({
+test("a seed restore keeps the account's deleted contact, blocks and history intact", async ({
   browser,
 }, testInfo) => {
   const baseURL = testInfo.project.use.baseURL;
@@ -140,7 +127,7 @@ test("a seed restore keeps the account's archive, blocks and history intact", as
     await aInboxReady();
 
     const xId =
-      await test.step("A chats with X, then archives the chat", async () => {
+      await test.step("A chats with X, then deletes the contact", async () => {
         const id = await addContactByNpub(a.page, x.npub);
         await sendInOpenChat(a.page, "Hi X");
         await sendDirectMessage(x.nsec, account.npub, "Hi from X");
@@ -149,16 +136,17 @@ test("a seed restore keeps the account's archive, blocks and history intact", as
         ).toBeVisible();
         await a.page.goto(`/#contact/${id}/edit`);
         await a.page
-          .getByRole("button", { name: "Archive contact", exact: true })
+          .getByRole("banner")
+          .getByRole("button", { name: "Delete contact", exact: true })
           .click();
-        await expect.poll(() => contactArchivedAt(a.page, id)).not.toBeNull();
+        await expect.poll(() => contactDeletedAt(a.page, id)).not.toBeNull();
         return id;
       });
-    const archivedAtSec = await contactArchivedAt(a.page, xId);
+    const deletedAtSec = await contactDeletedAt(a.page, xId);
 
-    await test.step("the messages scope rotates four shards past the archive", async () => {
+    await test.step("the messages scope rotates four shards past the deletion", async () => {
       const fillerId = await addContactByNpub(a.page, filler.npub);
-      for (let index = 1; index <= ROTATIONS_PAST_ARCHIVE; index += 1) {
+      for (let index = 1; index <= ROTATIONS_PAST_DELETION; index += 1) {
         await a.page.goto("/#evolu-current-data");
         await a.page
           .getByRole("button", { name: "Rotate messages shard", exact: true })
@@ -212,10 +200,10 @@ test("a seed restore keeps the account's archive, blocks and history intact", as
 
     const listedIds = [yId, unknownId(z)];
     const aDots = await unreadDots(a.page, {
-      archived: xId,
+      deleted: xId,
       listed: listedIds,
     });
-    expect(aDots).toEqual({ [xId]: false, [yId]: true, [unknownId(z)]: true });
+    expect(aDots).toEqual({ [yId]: true, [unknownId(z)]: true });
     const aPointers = await shardIndexes(a.page);
     const forgottenOwner = await shardOwnerId(a.page, "messages", 0);
 
@@ -269,9 +257,9 @@ test("a seed restore keeps the account's archive, blocks and history intact", as
     expect(await isHydrated(b.page)).toBe(true);
     expect(await awaitingFirstHydration()).toBeNull();
 
-    await test.step("B keeps X archived though its conversation sits in a forgotten shard", async () => {
+    await test.step("B keeps X deleted though its conversation sits in a forgotten shard", async () => {
       expect(await syncOwnerIds(b.page)).not.toContain(forgottenOwner);
-      expect(await contactArchivedAt(b.page, xId)).toBe(archivedAtSec);
+      expect(await contactDeletedAt(b.page, xId)).toBe(deletedAtSec);
     });
 
     await test.step("B marks the same chats unread as A before opening any", async () => {
@@ -284,7 +272,7 @@ test("a seed restore keeps the account's archive, blocks and history intact", as
         )
         .toEqual([...Y_TEXTS].sort());
       expect(
-        await unreadDots(b.page, { archived: xId, listed: listedIds }),
+        await unreadDots(b.page, { deleted: xId, listed: listedIds }),
       ).toEqual(aDots);
     });
 
@@ -324,15 +312,15 @@ test("a seed restore keeps the account's archive, blocks and history intact", as
       expect(await shardIndexes(b.page)).toEqual(aPointers);
     });
 
-    await test.step("back on A nothing was unarchived or regressed", async () => {
+    await test.step("back on A nothing was restored or regressed", async () => {
       await a.page.reload();
       await expect.poll(() => isHydrated(a.page)).toBe(true);
-      expect(await contactArchivedAt(a.page, xId)).toBe(archivedAtSec);
+      expect(await contactDeletedAt(a.page, xId)).toBe(deletedAtSec);
       expect(await shardIndexes(a.page)).toEqual(aPointers);
       // B opened Y's chat, and that read syncs.
       await expect
-        .poll(() => unreadDots(a.page, { archived: xId, listed: listedIds }))
-        .toEqual({ [xId]: false, [yId]: false, [unknownId(z)]: true });
+        .poll(() => unreadDots(a.page, { deleted: xId, listed: listedIds }))
+        .toEqual({ [yId]: false, [unknownId(z)]: true });
       await a.page.goto(`/#chat/${yId}`);
       await expectBubbles(a.page, Y_TEXTS);
     });

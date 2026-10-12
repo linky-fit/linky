@@ -2,10 +2,16 @@ import { formatShortNpub } from "./formatting";
 import { normalizeProfileName } from "./profileName";
 
 interface NamedContact {
+  /** Set on a deleted contact, which no longer competes for its name. */
+  archivedAtSec?: number | string | null | undefined;
   name?: string | null | undefined;
   nameSetByUser?: number | boolean | null | undefined;
   npub?: string | null | undefined;
 }
+
+/** Deleted contacts keep their row; `archivedAtSec` (a frozen column name) records the deletion. */
+export const isDeletedContact = (contact: NamedContact): boolean =>
+  Number(contact.archivedAtSec ?? 0) > 0;
 
 export const hasLocalContactName = (contact: NamedContact): boolean =>
   contact.nameSetByUser === 1 || contact.nameSetByUser === true;
@@ -28,6 +34,7 @@ export const createContactNameFormatter = (
 ) => {
   const identitiesByName = new Map<string, Set<string>>();
   for (const contact of contacts) {
+    if (isDeletedContact(contact)) continue;
     const key = collisionKey(getContactName(contact));
     if (!key) continue;
     const identities = identitiesByName.get(key) ?? new Set<string>();

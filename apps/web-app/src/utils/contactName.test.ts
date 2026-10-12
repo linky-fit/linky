@@ -66,6 +66,21 @@ describe("remote profile names", () => {
     expect(createContactNameFormatter([first, first])(first)).toBe("Alice");
   });
 
+  it("stops disambiguating once the other contact with that name is deleted", () => {
+    const kept = { name: "Alice", npub: alice };
+    const deleted = {
+      name: "Alice",
+      npub: other,
+      archivedAtSec: 1_700_000_000,
+    };
+    expect(createContactNameFormatter([kept, deleted])(kept)).toBe("Alice");
+    expect(
+      createContactNameFormatter([kept, { ...deleted, archivedAtSec: null }])(
+        kept,
+      ),
+    ).toBe(`Alice (${formatShortNpub(alice)})`);
+  });
+
   it("treats differently formatted copies of one npub as a single identity", () => {
     const stored = { name: "Alice", npub: alice };
     const scanned = { name: "Alice", npub: ` ${alice.toUpperCase()} ` };

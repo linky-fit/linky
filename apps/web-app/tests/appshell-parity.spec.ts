@@ -240,22 +240,37 @@ test("supports chat reply, edit, reaction toggle, and copy actions", async ({
     page.locator('[aria-live="polite"]').getByText("Copied to clipboard"),
   ).toBeVisible();
 
+  await chatInput.fill("Message to delete");
+  await sendButton.click();
+  const doomedBubble = page
+    .getByTestId("chat-message")
+    .filter({ hasText: "Message to delete" })
+    .first();
+  await expect(doomedBubble).toBeVisible();
+  await doomedBubble.getByTestId("chat-bubble").click({ button: "right" });
+  await page
+    .getByRole("dialog", { name: "Message actions" })
+    .getByRole("button", { name: "Delete", exact: true })
+    .click();
+  await expect(
+    page.getByTestId("chat-message").filter({ hasText: "Message to delete" }),
+  ).toHaveCount(0);
+  await expect(page.locator("[data-deleted='true']")).toContainText(
+    "Message deleted",
+  );
+
   await page.goto(`/#contact/${encodeURIComponent(contactId)}/edit`);
-  const archiveButton = page.getByRole("button", {
-    name: "Archive contact",
-    exact: true,
-  });
-  await archiveButton.click();
+  await page
+    .getByRole("banner")
+    .getByRole("button", { name: "Delete contact", exact: true })
+    .click();
   await page.waitForURL(/#(?:contacts)?$/, { timeout: 10_000 });
   await expect(
-    page.locator('[aria-live="polite"]').getByText("Contact archived."),
+    page.locator('[aria-live="polite"]').getByText("Contact deleted."),
   ).toBeVisible();
 
+  // The row and its messages stay, so the chat still opens by its address.
   await expect(page.locator("[data-guide='contact-card']")).toHaveCount(0);
-  await page.goto(`/#contact/${encodeURIComponent(contactId)}`);
-  await expect(
-    page.getByText("Archived contact", { exact: true }),
-  ).toBeVisible();
   await page.goto(`/#chat/${encodeURIComponent(contactId)}`);
   await expect(
     page
