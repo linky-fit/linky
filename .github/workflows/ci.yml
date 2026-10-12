@@ -172,6 +172,9 @@ jobs:
           - { bundler: expo, routing: path, check: app-e2e-expo, cache: linky-app-expo }
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # The Expo build is not deployed yet; its leg reports without failing the
+    # run that releases wait for.
+    continue-on-error: ${{ matrix.bundler == 'expo' }}
     env:
       LINKY_E2E_WEB_BUNDLER: ${{ matrix.bundler }}
       LINKY_E2E_ROUTING: ${{ matrix.routing }}
