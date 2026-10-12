@@ -151,8 +151,35 @@ function ChatScene({ at }: { at: At }) {
 
 function PayScene({ at }: { at: At }) {
   const pressed = useCues(digitTicks);
-  const amount = Number(digits.slice(0, pressed).join(""));
   const typedNote = useTyped(note, noteTicks);
+  return (
+    <PayPage
+      amount={Number(digits.slice(0, pressed).join(""))}
+      note={typedNote}
+      pressedKey={digits[pressed - 1]}
+      press={pressed}
+      tapNote={at("tapNote")}
+      tapSubmit={at("tapSubmit")}
+    />
+  );
+}
+
+/** Paying Mia: `amount` typed so far, with touches on the note, on `pressedKey` (`press` counts presses) or on Pay. */
+export function PayPage({
+  amount = 0,
+  note: typedNote = "",
+  pressedKey,
+  press = 0,
+  tapNote = false,
+  tapSubmit = false,
+}: {
+  amount?: number;
+  note?: string;
+  pressedKey?: string | undefined;
+  press?: number;
+  tapNote?: boolean;
+  tapSubmit?: boolean;
+}) {
   return (
     <>
       <DemoTopBar
@@ -186,36 +213,38 @@ function PayScene({ at }: { at: At }) {
             </Button>
           </Stack>
         </Row>
-        <Card>
-          <Stack alignSelf="center">
-            <Amount
-              value={amount.toLocaleString("en-US")}
-              unit="sat"
-              size="lg"
+        <Stack gap="$md" data-guide="pay-step3">
+          <Card>
+            <Stack alignSelf="center">
+              <Amount
+                value={amount.toLocaleString("en-US")}
+                unit="sat"
+                size="lg"
+              />
+            </Stack>
+          </Card>
+          <Tap on={tapNote}>
+            <TextField
+              label="Note"
+              hideLabel
+              placeholder="Add a note"
+              value={typedNote}
+              onChangeText={noop}
+              textAlign="center"
             />
-          </Stack>
-        </Card>
-        <Tap on={at("tapNote")}>
-          <TextField
-            label="Note"
-            hideLabel
-            placeholder="Add a note"
-            value={typedNote}
-            onChangeText={noop}
-            textAlign="center"
-          />
-        </Tap>
-        <TappedKeypad pressedKey={digits[pressed - 1]} press={pressed} />
-        <Tap on={at("tapSubmit")}>
-          <Button
-            icon="HandCoins"
-            disabled={amount === 0}
-            loading={at("tapSubmit")}
-            onPress={noop}
-          >
-            Pay
-          </Button>
-        </Tap>
+          </Tap>
+          <TappedKeypad pressedKey={pressedKey} press={press} />
+          <Tap on={tapSubmit}>
+            <Button
+              icon="HandCoins"
+              disabled={amount === 0}
+              loading={tapSubmit}
+              onPress={noop}
+            >
+              Pay
+            </Button>
+          </Tap>
+        </Stack>
       </DemoBody>
     </>
   );

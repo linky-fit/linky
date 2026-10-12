@@ -12,6 +12,7 @@ import { useInView } from "./playback";
 import { RecurringListScreen } from "./recurring";
 import { RestorePasteScreen } from "./restorePaste";
 import { TokenShareScreen } from "./token";
+import { TutorialReplayScreen } from "./tutorialReplay";
 
 const demoScreens: Record<Screen, ComponentType> = {
   "chat-payment": ChatPayFlowScreen,
@@ -26,6 +27,7 @@ const demoScreens: Record<Screen, ComponentType> = {
   "recurring-list": RecurringListScreen,
   "restore-paste": RestorePasteScreen,
   "token-share": TokenShareScreen,
+  "tutorial-replay": TutorialReplayScreen,
 };
 
 /** The app's surface under the phone's status bar. */

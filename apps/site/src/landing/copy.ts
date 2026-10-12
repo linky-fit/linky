@@ -14,6 +14,7 @@ export type Screen =
   | "recurring-list"
   | "restore-paste"
   | "token-share"
+  | "tutorial-replay"
   | "wallet";
 
 export interface Feature {
