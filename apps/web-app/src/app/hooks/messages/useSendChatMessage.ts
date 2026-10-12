@@ -7,11 +7,13 @@ import {
   Pubkey,
   RumorId,
   TextMessageDraft,
+  UnixSeconds,
 } from "@linky-fit/linkstr";
 import { useLinkstrCommands } from "@linky-fit/linkstr-react";
 import { Cause, Result, Exit, Schema } from "effect";
 import React from "react";
 import { appendPushDebugLog } from "../../../utils/pushDebugLog";
+import { nowSeconds } from "../../../utils/time";
 import { makeLocalId } from "../../../utils/validation";
 import {
   chatAttachmentErrorKey,
@@ -157,7 +159,7 @@ export const useSendChatMessage = <
             return previousReplyToId === activeReplyToId ? null : previous;
           });
         };
-        const createdAtSec = Math.ceil(Date.now() / 1e3);
+        const createdAtSec = UnixSeconds.make(nowSeconds());
 
         let draft: TextMessageDraft | ImageMessageDraft;
         if (imageFile) {
@@ -169,6 +171,7 @@ export const useSendChatMessage = <
             to: contactPubHex,
             image: image.success,
             clientId,
+            sentAt: createdAtSec,
             ...(replyTo === undefined ? {} : { replyTo }),
             ...(root === undefined ? {} : { root }),
           });
@@ -181,6 +184,7 @@ export const useSendChatMessage = <
             to: contactPubHex,
             content: content.success,
             clientId,
+            sentAt: createdAtSec,
             ...(replyTo === undefined ? {} : { replyTo }),
             ...(root === undefined ? {} : { root }),
           });
@@ -229,10 +233,7 @@ export const useSendChatMessage = <
           return "stored";
         }
 
-        updateLocalNostrMessage(pendingId, {
-          createdAtSec: exit.value.sentAt,
-          rumorId: exit.value.rumorId,
-        });
+        updateLocalNostrMessage(pendingId, { rumorId: exit.value.rumorId });
 
         appendPushDebugLog("client", "chat send enqueued", {
           clientId,
