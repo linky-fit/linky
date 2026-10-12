@@ -4,12 +4,6 @@ import { DemoFigure, Heading, Paragraph } from "../../prose";
 export function Body() {
   return (
     <>
-      <Paragraph>
-        Linky 26.10.4 je venku. Většina novinek se týká toho, co ve vašem Linky
-        zůstane: které zprávy zůstanou v konverzaci, kdo zůstane v kontaktech a
-        kdo vám vůbec může napsat.
-      </Paragraph>
-
       <Heading>Smazání zprávy u obou stran</Heading>
       <Paragraph>
         Odeslanou zprávu jste zatím mohli jen upravit, teď jde i smazat. Na long
