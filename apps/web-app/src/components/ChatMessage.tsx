@@ -18,7 +18,11 @@ import {
 } from "@linky-fit/ui";
 import type { Tone } from "@linky-fit/ui";
 import React from "react";
-import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
+import {
+  useDisplayAmounts,
+  useDisplayCurrencyCycle,
+  useTranslation,
+} from "../app/hooks/shell";
 import {
   bankPaymentOfferStatusTones,
   formatRemainingTime,
@@ -255,6 +259,11 @@ function ChatMessageComponent({
   const { t } = useTranslation();
   const { formatDisplayedAmountParts, formatDisplayedAmountText } =
     useDisplayAmounts();
+  const { allowedDisplayCurrencies, cycleDisplayCurrency } =
+    useDisplayCurrencyCycle();
+  // A tap on a token pill switches the display unit, like the wallet balance.
+  const cycleUnitOnPress =
+    allowedDisplayCurrencies.length > 1 ? cycleDisplayCurrency : undefined;
   const paymentCardAmount = (amountSat: number): PaymentCardAmount => {
     const parts = formatDisplayedAmountParts(amountSat);
     return {
@@ -420,11 +429,18 @@ function ChatMessageComponent({
               ? { hint: info.memo }
               : {})}
           tone={!info.isValid || info.isHiddenTestMint ? "neutral" : "accent"}
+          onPress={cycleUnitOnPress}
           onMintIconError={onMintIconError}
         />
       );
     },
-    [formatDisplayedAmountText, getMintIconUrl, onMintIconError, t],
+    [
+      cycleUnitOnPress,
+      formatDisplayedAmountText,
+      getMintIconUrl,
+      onMintIconError,
+      t,
+    ],
   );
 
   const inlineMessageContent = React.useMemo(() => {

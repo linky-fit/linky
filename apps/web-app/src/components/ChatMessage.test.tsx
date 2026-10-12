@@ -6,6 +6,7 @@ import { makeIdentity } from "@linky-fit/linkstr/testing";
 import type { BankPaymentOfferInfo } from "@linky-fit/proxy-payment";
 import type { CashuPaymentRequestMessageInfo } from "../app/lib/paymentRequestMessage";
 import { serializePrivateImageMessage } from "../app/lib/privateImageMessage";
+import type { CashuTokenMessageInfo } from "../app/lib/tokenMessageInfo";
 import type { LocalNostrMessage } from "../app/types/appTypes";
 import {
   ChatMessage,
@@ -28,8 +29,15 @@ vi.mock("../devtools/inspector", () => ({
   reportInspectorRows: vi.fn(),
 }));
 
+const { cycleDisplayCurrencyMock } = vi.hoisted(() => ({
+  cycleDisplayCurrencyMock: vi.fn(),
+}));
+
 vi.mock("../app/hooks/shell", async () =>
-  (await import("../testUtils/shellHooks")).shellHooksMock(),
+  (await import("../testUtils/shellHooks")).shellHooksMock({
+    allowedDisplayCurrencies: ["sat", "btc"],
+    cycleDisplayCurrency: cycleDisplayCurrencyMock,
+  }),
 );
 
 const makeMessage = (
@@ -62,6 +70,7 @@ interface RenderChatMessageOptions {
   canReplyOrReact?: boolean;
   canSettleBankPaymentOffer?: boolean;
   direction?: "in" | "out";
+  getCashuTokenMessageInfo?: (text: string) => CashuTokenMessageInfo | null;
   getNpubMessageContactInfo?: (npub: string) => NpubMessageContactInfo | null;
   onAddNpubContacts?: (npubs: readonly string[], messageId: string) => void;
   contactsGroupAssignment?: MessageContactsGroupAssignment | null;
@@ -116,7 +125,9 @@ const renderChatMessage = async (
       chatSeenLabel="seen"
       declineInfo={null}
       formatChatDayLabel={() => "day"}
-      getCashuTokenMessageInfo={() => null}
+      getCashuTokenMessageInfo={
+        options.getCashuTokenMessageInfo ?? (() => null)
+      }
       getMintIconUrl={() => ({
         failed: false,
         host: null,
@@ -398,6 +409,34 @@ describe("ChatMessage image message actions", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("ChatMessage cashu token pill", () => {
+  const tokenInfo = (): CashuTokenMessageInfo => ({
+    amount: 21,
+    isHiddenTestMint: false,
+    isValid: true,
+    memo: null,
+    mintDisplay: "mint.example",
+    mintUrl: "https://mint.example",
+    tokenRaw: "cashuBtoken",
+    unit: "sat",
+  });
+
+  it("switches the display unit on a tap, like the wallet balance", async () => {
+    const container = await renderChatMessage("cashuBtoken", {
+      getCashuTokenMessageInfo: () => tokenInfo(),
+    });
+
+    const pill = container.querySelector<HTMLElement>(
+      '[data-testid="cashu-token-pill"]',
+    );
+    expect(pill?.textContent).toContain("21 sat");
+    await act(async () => {
+      pill?.click();
+    });
+    expect(cycleDisplayCurrencyMock).toHaveBeenCalledOnce();
   });
 });
 
