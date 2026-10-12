@@ -1,5 +1,6 @@
 import {
   derivePubkey,
+  encodeNprofile,
   encodeNpub,
   NostrSecretKey,
   type Pubkey,
@@ -10,6 +11,7 @@ import type {
   LocalNostrMessage,
   LocalNostrReaction,
 } from "../app/types/appTypes";
+import { buildCashuPaymentRequestMessage } from "../app/lib/paymentRequestMessage";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { ChatComposer, ChatNearbyBanner, ChatPage } from "./ChatPage";
 
@@ -27,17 +29,21 @@ vi.mock("../app/hooks/shell", async () =>
 );
 
 const rows = vi.hoisted(() => {
+  const canDelete = new Map<string, boolean>();
   const rendered: string[] = [];
-  return { rendered };
+  return { canDelete, rendered };
 });
 
 vi.mock("../components/ChatMessage", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../components/ChatMessage")>()),
   ChatMessage: memo(function ChatMessageProbe({
+    canDelete,
     message,
   }: {
+    canDelete: boolean;
     message: LocalNostrMessage;
   }) {
+    rows.canDelete.set(message.id, canDelete);
     rows.rendered.push(message.id);
     return null;
   }),
@@ -249,6 +255,7 @@ describe("ChatPage message rows", () => {
     onCancelReply: vi.fn(),
     onCopy: vi.fn(),
     onDeclinePaymentRequest: vi.fn(async () => {}),
+    onDelete: vi.fn(),
     onEdit: vi.fn(),
     onOpenNpubContact: vi.fn(),
     onPayPaymentRequest: vi.fn(async () => {}),
@@ -267,6 +274,7 @@ describe("ChatPage message rows", () => {
   });
 
   afterEach(() => {
+    rows.canDelete.clear();
     rows.rendered = [];
     vi.unstubAllGlobals();
   });
@@ -309,6 +317,33 @@ describe("ChatPage message rows", () => {
       />,
     );
     expect(rows.rendered).toEqual(["second", "third"]);
+    await unmount();
+  });
+
+  it("offers Delete only on messages that carry no payment", async () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: false }));
+    const request = {
+      ...message("request", 200),
+      content: buildCashuPaymentRequestMessage({
+        amount: 21,
+        mintUrls: [],
+        recipientNprofile: encodeNprofile(
+          derivePubkey(NostrSecretKey.make(new Uint8Array(32).fill(1))),
+          [],
+        ),
+        requestId: "request-1",
+      }),
+    };
+    const { unmount } = await renderIntoDocument(
+      <ChatPage
+        {...pageProps([message("plain", 100), request], new Map(), false)}
+      />,
+    );
+
+    expect(Object.fromEntries(rows.canDelete)).toEqual({
+      plain: true,
+      request: false,
+    });
     await unmount();
   });
 

@@ -61,6 +61,7 @@ import { ContactPill } from "./ContactPill";
 
 import type { I18nKey, Translate } from "../i18n";
 import { LinkPreviewCard } from "./LinkPreviewCard";
+import { isDeletedMessage } from "../app/lib/deletedMessage";
 import type { ReactionEmojiGroupId } from "../app/lib/reactionEmojis";
 import { MessageActionsMenu } from "./MessageActionsMenu";
 import { MessageReactions } from "./MessageReactions";
@@ -86,6 +87,9 @@ const MESSAGE_INLINE_ENTITY_PATTERN =
 interface ChatMessageProps {
   actionLabels: {
     copy: string;
+    delete: string;
+    /** Body of the placeholder a deleted message leaves behind. */
+    deleted: string;
     edit: string;
     edited: string;
     emojiGroups: Record<ReactionEmojiGroupId, string>;
@@ -100,6 +104,7 @@ interface ChatMessageProps {
   bankPaymentOfferPeerNotice: BankPaymentOfferPeerNotice | null;
   canOpenBankPaymentOfferDetails: boolean;
   canSettleBankPaymentOffer: boolean;
+  canDelete: boolean;
   canEdit: boolean;
   canActOnPaymentRequest: boolean;
   canReplyOrReact: boolean;
@@ -116,6 +121,7 @@ interface ChatMessageProps {
   messageElRef?: (el: HTMLDivElement | null, messageId: string) => void;
   nextMessage: LocalNostrMessage | null;
   onCopy: (message: LocalNostrMessage) => void;
+  onDelete: (message: LocalNostrMessage) => void;
   onOpenBankPaymentOfferDetails: (
     message: LocalNostrMessage,
     offer: BankPaymentOfferInfo,
@@ -208,6 +214,7 @@ function ChatMessageComponent({
   bankPaymentOfferPeerNotice,
   canOpenBankPaymentOfferDetails,
   canSettleBankPaymentOffer,
+  canDelete,
   canEdit,
   canActOnPaymentRequest,
   canReplyOrReact,
@@ -224,6 +231,7 @@ function ChatMessageComponent({
   messageElRef,
   nextMessage,
   onCopy,
+  onDelete,
   onDeclinePaymentRequest,
   onEdit,
   onMintIconError,
@@ -255,6 +263,7 @@ function ChatMessageComponent({
     };
   };
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const isDeleted = isDeletedMessage(message);
   const [hovered, setHovered] = React.useState(false);
   const [privateImageBlob, setPrivateImageBlob] = React.useState<Blob | null>(
     null,
@@ -580,6 +589,8 @@ function ChatMessageComponent({
   const refocusAfterMenuRef = React.useRef<HTMLElement | null>(null);
 
   const openMenu = React.useCallback(() => {
+    // A placeholder has nothing to reply to, react to, copy or delete.
+    if (isDeleted) return;
     // Close the keyboard while the action sheet is up; remember the field so
     // closeMenu can bring the keyboard back.
     const active = document.activeElement;
@@ -593,7 +604,7 @@ function ChatMessageComponent({
       active.blur();
     }
     setMenuOpen(true);
-  }, []);
+  }, [isDeleted]);
 
   const closeMenu = React.useCallback(() => {
     setMenuOpen(false);
@@ -827,8 +838,15 @@ function ChatMessageComponent({
     </PaymentCard>
   ) : null;
 
-  const messageBody =
-    bankOfferCard ??
+  const messageBody = isDeleted ? (
+    <Row gap="$xs" alignItems="center">
+      <Icon name="Trash2" size="sm" color="$colorMuted" />
+      <Text color="$colorMuted" fontStyle="italic">
+        {actionLabels.deleted}
+      </Text>
+    </Row>
+  ) : (
+    (bankOfferCard ??
     paymentRequestCard ??
     (isDeclineMessage ? (
       <Pill label={t("paymentRequestDeclinedMessage")} tone="neutral" />
@@ -850,12 +868,14 @@ function ChatMessageComponent({
       renderCashuTokenPill(tokenInfo)
     ) : (
       <MessageText>{inlineMessageContent ?? content}</MessageText>
-    ));
+    )))
+  );
 
   return (
     <React.Fragment key={messageId}>
       <MessageActionsMenu
         canCopy={!privateImageInfo}
+        canDelete={canDelete}
         canEdit={canEdit}
         canReplyOrReact={canReplyOrReact}
         imageActions={imageActions}
@@ -869,6 +889,7 @@ function ChatMessageComponent({
         onEdit={() => onEdit(message)}
         onReact={(emoji) => onReact(message, emoji)}
         onCopy={() => onCopy(message)}
+        onDelete={() => onDelete(message)}
         onClose={closeMenu}
       />
       {showDaySeparator ? (
@@ -889,6 +910,7 @@ function ChatMessageComponent({
           data-rumor-id={rumorId ?? undefined}
           data-reply-to-id={replyToId ?? undefined}
           data-root-message-id={rootMessageId ?? undefined}
+          data-deleted={isDeleted ? "true" : undefined}
           userSelect="none"
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
@@ -903,23 +925,25 @@ function ChatMessageComponent({
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
           accessory={
-            <Stack
-              opacity={hovered || menuOpen ? 1 : 0}
-              focusWithinStyle={{ opacity: 1 }}
-            >
-              <IconButton
-                icon="Ellipsis"
-                size="sm"
-                accessibilityLabel={actionLabels.menu}
-                onPress={() => (menuOpen ? closeMenu() : openMenu())}
-              />
-            </Stack>
+            isDeleted ? null : (
+              <Stack
+                opacity={hovered || menuOpen ? 1 : 0}
+                focusWithinStyle={{ opacity: 1 }}
+              >
+                <IconButton
+                  icon="Ellipsis"
+                  size="sm"
+                  accessibilityLabel={actionLabels.menu}
+                  onPress={() => (menuOpen ? closeMenu() : openMenu())}
+                />
+              </Stack>
+            )
           }
           footer={
-            reactions.length > 0 || showTime ? (
+            (reactions.length > 0 && !isDeleted) || showTime ? (
               <Stack alignSelf="stretch" gap="$xs">
                 <MessageReactions
-                  reactions={reactions}
+                  reactions={isDeleted ? [] : reactions}
                   onReact={(emoji) => onReact(message, emoji)}
                 />
                 {showTime ? (
@@ -937,7 +961,7 @@ function ChatMessageComponent({
             ) : null
           }
         >
-          {replyQuoteText ? (
+          {replyQuoteText && !isDeleted ? (
             <Stack
               testID="chat-reply-quote"
               borderLeftWidth={border.emphasis}

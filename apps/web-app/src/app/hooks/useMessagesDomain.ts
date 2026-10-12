@@ -108,6 +108,7 @@ export const useMessagesDomain = ({
   useUnknownSenderOverlayMigration({ appOwnerId, hydrated, unknownSenders });
   const {
     appendLocalNostrReaction,
+    markLocalNostrMessageDeleted,
     removeLocalNostrMessagesByContactId,
     removeNostrReaction,
     softDeleteLocalNostrReaction,
@@ -272,6 +273,7 @@ export const useMessagesDomain = ({
     nostrMessagesLocal,
     nostrMessagesRecent,
     knownReactionKeysRef,
+    markLocalNostrMessageDeleted,
     nostrReactionsLocal,
     pendingPaymentsKey,
     reactionsByMessageId,

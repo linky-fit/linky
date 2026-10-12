@@ -50,6 +50,7 @@ const messageRow = (overrides: Partial<MessageRow> = {}): MessageRow => ({
   editedFromId: null,
   isEdited: null,
   originalContent: null,
+  deletedAtSec: null,
   ...system,
   ...overrides,
 });
@@ -127,6 +128,7 @@ describe("write rows", () => {
         editedFromId: null,
         isEdited: false,
         originalContent: null,
+        deletedAtSec: null,
       },
       "pending:local-1",
     );
@@ -141,6 +143,25 @@ describe("write rows", () => {
       rumorId: "rumor-1",
       localOnly: "1",
     });
+  });
+
+  it("keeps the deletion of a message stored as a placeholder", () => {
+    const row = toMessageWriteRow(
+      createId<"Message">(),
+      conversationId,
+      {
+        contactId,
+        direction: "in",
+        content: "[deleted]",
+        wrapId: "",
+        rumorId: "rumor-1",
+        pubkey: "peer",
+        createdAtSec: 1_700_000_001,
+        deletedAtSec: 1_700_000_001,
+      },
+      "rumor-1",
+    );
+    expect(row).toMatchObject({ deletedAtSec: 1_700_000_001 });
   });
 
   it("rejects a message without content and a reaction without a target", () => {

@@ -10,6 +10,7 @@ const message: StoredMessageFields = {
   clientId: null,
   content: "original",
   createdAtSec: 100,
+  deletedAtSec: null,
   editedAtSec: 123,
   editedFromId: null,
   isEdited: null,
@@ -33,6 +34,21 @@ const reaction: StoredReactionFields = {
 };
 
 describe("message updates", () => {
+  it("keeps a deleted message's text out, whatever update was queued before", () => {
+    expect(
+      buildMessageUpdate(
+        "message",
+        {
+          content: "edited",
+          originalContent: "original",
+          replyToContent: "quoted",
+          status: "sent",
+        },
+        { ...message, content: "[deleted]", deletedAtSec: 200 },
+      ),
+    ).toEqual({ id: "message", status: "sent" });
+  });
+
   it("writes an acknowledgment once, and keeps the first sent wrap", () => {
     expect(
       buildMessageUpdate(

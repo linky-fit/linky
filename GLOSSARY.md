@@ -58,6 +58,10 @@ _Avoid_: post, note, event
 A newer version of an own message that replaces its text but keeps its identity, so reactions and replies still point to it.
 _Avoid_: correction, revision
 
+**Deleted message**:
+A message either participant deleted for both sides: its text and reactions go at once and a placeholder keeps its place in the chat, while the peer gets a deletion request to do the same.
+_Avoid_: unsent message, retracted message, recalled message, removed message
+
 **Reaction**:
 An emoji a participant attaches to a message.
 _Avoid_: like, emote

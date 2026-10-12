@@ -1,4 +1,9 @@
 import type { LocalNostrMessage } from "../../types/appTypes";
+import {
+  carriesPayment,
+  DELETED_MESSAGE_CONTENT,
+  isDeletedMessage,
+} from "../../lib/deletedMessage";
 import { trimString } from "../../../utils/validation";
 
 type ConversationScope = Pick<LocalNostrMessage, "contactId" | "direction">;
@@ -193,9 +198,10 @@ export const dedupeNostrMessagesByPriority = (
     }
 
     const alternateMessage = nextMessage === current ? message : current;
-    deduped[existingIndex] = mergeMessageMetadata(
-      nextMessage,
-      alternateMessage,
+    deduped[existingIndex] = mergeDeletion(
+      mergeMessageMetadata(nextMessage, alternateMessage),
+      current,
+      message,
     );
     const nextWrapId = trimString(nextMessage.wrapId);
     const nextClientKey = getLocalNostrMessageClientKey(nextMessage);
@@ -203,10 +209,86 @@ export const dedupeNostrMessagesByPriority = (
     if (nextWrapId) indexByWrapId.set(nextWrapId, existingIndex);
     if (nextClientKey) indexByClientKey.set(nextClientKey, existingIndex);
     if (nextRumorKey) indexByRumorKey.set(nextRumorKey, existingIndex);
+    // A later row naming the dropped copy's rumor id, like a deletion, still finds the message.
+    const droppedRumorKey = getLocalNostrMessageRumorKey(alternateMessage);
+    if (droppedRumorKey) indexByRumorKey.set(droppedRumorKey, existingIndex);
   }
 
   deduped.sort((a, b) => a.createdAtSec - b.createdAtSec);
-  return deduped;
+  return applyDeletions(deduped);
+};
+
+const asDeleted = (
+  message: LocalNostrMessage,
+  deletedAtSec: number,
+): LocalNostrMessage => ({
+  ...message,
+  content: DELETED_MESSAGE_CONTENT,
+  deletedAtSec,
+  originalContent: null,
+  replyToContent: null,
+});
+
+/** A deletion of either copy deletes the merged message, unless the other copy carries a payment. */
+const mergeDeletion = (
+  merged: LocalNostrMessage,
+  a: LocalNostrMessage,
+  b: LocalNostrMessage,
+): LocalNostrMessage => {
+  const deleted = isDeletedMessage(a) ? a : isDeletedMessage(b) ? b : null;
+  if (!deleted) return merged;
+  const other = deleted === a ? b : a;
+  if (!isDeletedMessage(other) && carriesPayment(other.content))
+    return mergeMessageMetadata(other, deleted);
+  return asDeleted(merged, deleted.deletedAtSec ?? 0);
+};
+
+const conversationRumorKey = (message: LocalNostrMessage): string => {
+  const contactId = trimString(message.contactId);
+  const rumorId = trimString(message.rumorId);
+  return contactId && rumorId ? `${contactId}|${rumorId}` : "";
+};
+
+/**
+ * A peer's deletion can land on a device before the deleted row syncs to it,
+ * leaving an incoming placeholder beside the own message it names. Every row
+ * of a conversation under a deleted rumor id shows as one deleted message, at
+ * the first row's place, unless a row under it carries a payment: then the
+ * deletion is dropped.
+ */
+const applyDeletions = (messages: LocalNostrMessage[]): LocalNostrMessage[] => {
+  const deletedAtByKey = new Map<string, number>();
+  for (const message of messages) {
+    const key = conversationRumorKey(message);
+    if (key && isDeletedMessage(message))
+      deletedAtByKey.set(key, message.deletedAtSec ?? 0);
+  }
+  if (deletedAtByKey.size === 0) return messages;
+
+  const protectedKeys = new Set<string>();
+  for (const message of messages) {
+    const key = conversationRumorKey(message);
+    if (
+      deletedAtByKey.has(key) &&
+      !isDeletedMessage(message) &&
+      carriesPayment(message.content)
+    )
+      protectedKeys.add(key);
+  }
+
+  const shown = new Set<string>();
+  return messages.flatMap((message) => {
+    const key = conversationRumorKey(message);
+    const deletedAtSec = deletedAtByKey.get(key);
+    if (deletedAtSec === undefined) return [message];
+    if (protectedKeys.has(key))
+      return isDeletedMessage(message) ? [] : [message];
+    if (shown.has(key)) return [];
+    shown.add(key);
+    return [
+      isDeletedMessage(message) ? message : asDeleted(message, deletedAtSec),
+    ];
+  });
 };
 
 export const dedupeChatMessages = (

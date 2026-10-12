@@ -116,6 +116,10 @@ export const toLocalNostrMessage = (
     editedFromId: asNonEmptyString(row.editedFromId),
     isEdited: isSqliteTrueish(row.isEdited),
     originalContent: asNonEmptyString(row.originalContent),
+    deletedAtSec:
+      row.deletedAtSec === null
+        ? null
+        : toPositiveInt(row.deletedAtSec, nowSec()),
     ...(clientId ? { clientId } : {}),
   };
 };
@@ -169,6 +173,9 @@ export const localMessageFrom = (
     editedFromId: asNonEmptyString(message.editedFromId),
     isEdited: Boolean(message.isEdited),
     originalContent: asNonEmptyString(message.originalContent),
+    deletedAtSec: message.deletedAtSec
+      ? toPositiveInt(message.deletedAtSec, nowSec())
+      : null,
     ...(clientId ? { clientId } : {}),
   };
 };
@@ -251,6 +258,9 @@ const toMessageContent = (
   const editedAtSec = message.editedAtSec
     ? decode(PositiveInt, toPositiveInt(message.editedAtSec, createdAtSec))
     : undefined;
+  const deletedAtSec = message.deletedAtSec
+    ? decode(PositiveInt, toPositiveInt(message.deletedAtSec, createdAtSec))
+    : undefined;
 
   const row: Mutable<MessageContent> = {
     direction: NonEmptyString100.orThrow(direction),
@@ -278,6 +288,7 @@ const toMessageContent = (
   if (message.isEdited) row.isEdited = NonEmptyString100.orThrow("1");
   const originalContent = optionalText(NonEmptyString, message.originalContent);
   if (originalContent) row.originalContent = originalContent;
+  if (deletedAtSec) row.deletedAtSec = deletedAtSec;
   return row;
 };
 

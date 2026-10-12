@@ -548,6 +548,8 @@ export const cs = {
   chatEmojiGroupFlags: "Vlajky",
   chatMessageActions: "Akce zprávy",
   chatEditAction: "Upravit",
+  chatDeleteAction: "Smazat",
+  chatMessageDeleted: "Zpráva byla smazána",
   chatSaveAction: "Uložit",
   chatReplyingTo: "Odpovídáte na",
   chatReplyUnavailable: "Původní zpráva není dostupná",

@@ -63,7 +63,7 @@ Two gift wraps, self and peer, never push-marked ([wire conventions](./concepts.
 | reaction   | 7    | `p` targetAuthor, `p` to, `p` author, `e` target, `k` `14` or `15`, `client` | the emoji |
 | retraction | 5    | `p` to, `p` author, one `e` per retracted reaction id, `client`              | empty     |
 
-The reaction's `e` tag is the target message's rumor id, the same id in both users' inboxes. Decoding requires an `e` tag holding a rumor id, an `Emoji` content, and a `k` tag that is absent, `14` or `15`. A retraction keeps the `e` values that are rumor ids and needs at least one.
+The reaction's `e` tag is the target message's rumor id, the same id in both users' inboxes. Decoding requires an `e` tag holding a rumor id, an `Emoji` content, and a `k` tag that is absent, `14` or `15`. A retraction keeps the `e` values that are rumor ids and needs at least one; a kind 5 whose `k` tag names `14` or `15` is a message deletion instead ([chat.md](./chat.md#wire-format)).
 
 ## Receiving
 

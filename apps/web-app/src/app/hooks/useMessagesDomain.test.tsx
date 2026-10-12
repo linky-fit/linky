@@ -428,6 +428,7 @@ describe("useMessagesDomain", () => {
           identitySinceSec: null,
           isBlockedPubkey: () => false,
           logPayStep: () => undefined,
+          markLocalNostrMessageDeleted: current.markLocalNostrMessageDeleted,
           messages: current.nostrMessagesLocal,
           resolveContactId: () => null,
           updateLocalNostrMessage: current.updateLocalNostrMessage,

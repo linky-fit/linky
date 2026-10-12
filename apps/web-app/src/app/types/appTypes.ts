@@ -98,6 +98,8 @@ export interface LocalNostrMessage {
   contactId: string;
   content: string;
   createdAtSec: number;
+  /** Set once either side deleted it; the row stays as a placeholder. */
+  deletedAtSec?: number | null;
   direction: "in" | "out";
   editedAtSec?: number | null;
   editedFromId?: string | null;

@@ -23,16 +23,20 @@ import type { LinkstrIdentityService } from "../services/LinkstrIdentity";
 import { extractWholeCashuToken } from "./cashuToken";
 import {
   CashuTokenText,
+  DeleteMessageDraft,
   EditMessageDraft,
   ImageMessageDraft,
   PrivateImage,
   TextMessageDraft,
   TokenMessageDraft,
 } from "./domain";
+import type { DeletedMessageKind } from "./domain";
 import {
+  ChatMessageDeleted,
   ChatMessageReceived,
   ImageBody,
   OwnChatMessageConfirmed,
+  OwnChatMessageDeletionConfirmed,
   TextBody,
   TokenBody,
 } from "./events";
@@ -40,6 +44,14 @@ import type { ChatInboxEvent, MessageBody } from "./events";
 
 export const CHAT_TEXT_KIND = 14;
 export const CHAT_IMAGE_KIND = 15;
+/** NIP-09 deletion request; a `k` tag naming a chat kind tells it apart from a reaction retraction. */
+export const CHAT_DELETION_KIND = 5;
+
+const deletedKindTag: Record<DeletedMessageKind, string> = {
+  text: String(CHAT_TEXT_KIND),
+  image: String(CHAT_IMAGE_KIND),
+};
+const chatKindTags = new Set(Object.values(deletedKindTag));
 
 const decodePrivateImage = Schema.decodeUnknownResult(PrivateImage);
 const isCashuTokenText = Schema.is(CashuTokenText);
@@ -155,6 +167,31 @@ export const encodeEditRumor = (
     ],
     content: draft.content,
   });
+
+export const encodeDeletionRumor = (
+  draft: DeleteMessageDraft,
+  author: Pubkey,
+  sentAt: UnixSeconds,
+  clientId: ClientId,
+): Rumor =>
+  rumorWithHash({
+    pubkey: author,
+    created_at: sentAt,
+    kind: CHAT_DELETION_KIND,
+    tags: [
+      ["p", draft.to],
+      ["p", author],
+      ["e", draft.deleteOf],
+      ["k", deletedKindTag[draft.deleteOfKind]],
+      ["client", clientId],
+    ],
+    content: "",
+  });
+
+/** A kind 5 rumor whose `k` tag names a chat kind; other kind 5 rumors are reaction retractions. */
+export const isChatDeletionRumor = (rumor: Rumor): boolean =>
+  rumor.kind === CHAT_DELETION_KIND &&
+  tagValues(rumor.tags, "k").some((value) => chatKindTags.has(value.trim()));
 
 const resolvePeer = (
   rumor: Rumor,
@@ -373,6 +410,36 @@ export const decodeChatRumor = (
       root,
       editOf,
       clientId,
+      sentAt: rumor.created_at,
+    });
+  });
+
+export const decodeChatDeletionRumor = (
+  rumor: Rumor,
+  me: Pubkey,
+): Result.Result<ChatInboxEvent, DropReason> =>
+  Result.gen(function* () {
+    const peer = yield* resolvePeer(rumor, me);
+    const deleteOf = firstTrimmedTagValue(rumor.tags, "e");
+    const deletionId = rumor.id;
+    if (deleteOf === null || !isRumorId(deleteOf) || !isRumorId(deletionId)) {
+      return yield* Result.fail<DropReason>("invalid-deletion");
+    }
+    if (rumor.pubkey === me) {
+      const clientTag = firstTagValue(rumor.tags, "client");
+      return new OwnChatMessageDeletionConfirmed({
+        deletionId,
+        deleteOf,
+        to: peer,
+        clientId:
+          clientTag !== null && isClientId(clientTag) ? clientTag : null,
+        sentAt: rumor.created_at,
+      });
+    }
+    return new ChatMessageDeleted({
+      deletionId,
+      deleteOf,
+      from: peer,
       sentAt: rumor.created_at,
     });
   });

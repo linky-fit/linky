@@ -4,6 +4,7 @@ import type {
 } from "../../types/appTypes";
 import { asNonEmptyString, trimString } from "../../../utils/validation";
 import { nowSeconds } from "../../../utils/time";
+import { isDeletedMessage } from "../../lib/deletedMessage";
 import { isSqliteTrueish } from "./messageRows";
 
 export interface NostrMessageUpdatePayload {
@@ -40,6 +41,7 @@ export interface StoredMessageFields {
   readonly clientId: string | null;
   readonly content: string | null;
   readonly createdAtSec: number | null;
+  readonly deletedAtSec: number | null;
   readonly editedAtSec: number | null;
   readonly editedFromId: string | null;
   readonly isEdited: string | null;
@@ -84,6 +86,8 @@ const MESSAGE_TEXT_FIELDS = [
   "editedFromId",
   "originalContent",
 ] satisfies readonly (keyof StoredMessageFields)[];
+const MESSAGE_PLAINTEXT_FIELDS: ReadonlySet<keyof StoredMessageFields> =
+  new Set(["content", "originalContent", "replyToContent"]);
 const MESSAGE_BOOLEAN_FIELDS = [
   "localOnly",
   "isEdited",
@@ -117,8 +121,11 @@ export const buildMessageUpdate = (
   }
   if (updates.status !== undefined && status(updates.status) !== currentStatus)
     payload.status = status(updates.status);
+  // An update queued before a deletion landed must not bring the text back.
+  const deleted = isDeletedMessage(current);
   for (const field of MESSAGE_TEXT_FIELDS) {
     if (updates[field] === undefined) continue;
+    if (deleted && MESSAGE_PLAINTEXT_FIELDS.has(field)) continue;
     const next =
       field === "content" ? updates[field] : asNonEmptyString(updates[field]);
     if (next?.trim() && next !== (asNonEmptyString(current[field]) ?? ""))

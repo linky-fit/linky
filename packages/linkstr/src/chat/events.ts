@@ -50,8 +50,33 @@ export class OwnChatMessageConfirmed extends Schema.TaggedClass<OwnChatMessageCo
   },
 ) {}
 
+/** A peer asked to drop a message of your conversation; `deleteOf` is its rumor id. */
+export class ChatMessageDeleted extends Schema.TaggedClass<ChatMessageDeleted>()(
+  "ChatMessageDeleted",
+  {
+    deletionId: RumorId,
+    deleteOf: RumorId,
+    from: Pubkey,
+    sentAt: UnixSeconds,
+  },
+) {}
+
+/** Echo of our own deletion — from this device or another one. */
+export class OwnChatMessageDeletionConfirmed extends Schema.TaggedClass<OwnChatMessageDeletionConfirmed>()(
+  "OwnChatMessageDeletionConfirmed",
+  {
+    deletionId: RumorId,
+    deleteOf: RumorId,
+    to: Pubkey,
+    clientId: Schema.NullOr(ClientId),
+    sentAt: UnixSeconds,
+  },
+) {}
+
 export const ChatInboxEvent = Schema.Union([
   ChatMessageReceived,
   OwnChatMessageConfirmed,
+  ChatMessageDeleted,
+  OwnChatMessageDeletionConfirmed,
 ]);
 export type ChatInboxEvent = typeof ChatInboxEvent.Type;

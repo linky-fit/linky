@@ -546,6 +546,8 @@ export const en = {
   chatEmojiGroupFlags: "Flags",
   chatMessageActions: "Message actions",
   chatEditAction: "Edit",
+  chatDeleteAction: "Delete",
+  chatMessageDeleted: "Message deleted",
   chatSaveAction: "Save",
   chatReplyingTo: "Replying to",
   chatReplyUnavailable: "Original message unavailable",

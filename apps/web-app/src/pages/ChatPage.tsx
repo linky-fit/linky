@@ -40,6 +40,7 @@ import {
 import { useChatScroll } from "../app/hooks/messages/chatScroll";
 import {
   useChatComposer,
+  useChatDelete,
   useChatMessages,
   useChatReactions,
   useChatSend,
@@ -117,6 +118,7 @@ import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 import { boundedMemo } from "../utils/boundedMemo";
 import { pickFiles } from "../utils/pickFile";
 import { nowSeconds } from "../utils/time";
+import { isDeletedMessage } from "../app/lib/deletedMessage";
 
 interface Contact {
   id: string;
@@ -155,6 +157,7 @@ interface ChatPageProps {
   contactsGroupAssignment: MessageContactsGroupAssignment | null;
   onBlockUnknownContact: () => Promise<void>;
   onCopy: (message: LocalNostrMessage) => void;
+  onDelete: (message: LocalNostrMessage) => void;
   onDeclinePaymentRequest: (message: LocalNostrMessage) => Promise<void>;
   onSettleBankPaymentOffer: (message: LocalNostrMessage) => Promise<void>;
   onEdit: (message: LocalNostrMessage) => void;
@@ -263,6 +266,7 @@ const openBankPaymentOfferDetails = (
 interface ChatMessageViewModel extends ParsedChatMessage {
   bankPaymentOfferPeerNotice: BankPaymentOfferPeerNotice | null;
   canActOnPaymentRequest: boolean;
+  canDelete: boolean;
   canEdit: boolean;
   canReplyOrReact: boolean;
   canSettleBankPaymentOffer: boolean;
@@ -367,6 +371,7 @@ interface ChatMessageListProps {
   getNpubMessageContactInfo: ChatPageProps["getNpubMessageContactInfo"];
   lang: string;
   onCopy: ChatPageProps["onCopy"];
+  onDelete: ChatPageProps["onDelete"];
   onAddNpubContacts: ChatPageProps["onAddNpubContacts"];
   contactsGroupAssignment: ChatPageProps["contactsGroupAssignment"];
   onDeclinePaymentRequest: (message: LocalNostrMessage) => void;
@@ -394,6 +399,7 @@ type MessageRowActions = Pick<
   | "onAddNpubContacts"
   | "onCopy"
   | "onDeclinePaymentRequest"
+  | "onDelete"
   | "onEdit"
   | "onOpenNpubContact"
   | "onPayPaymentRequest"
@@ -413,6 +419,7 @@ const useStableRowActions = (actions: MessageRowActions): MessageRowActions => {
       onCopy: (message) => latest.current.onCopy(message),
       onDeclinePaymentRequest: (message) =>
         latest.current.onDeclinePaymentRequest(message),
+      onDelete: (message) => latest.current.onDelete(message),
       onEdit: (message) => latest.current.onEdit(message),
       onOpenNpubContact: (npub) => latest.current.onOpenNpubContact(npub),
       onPayPaymentRequest: (message, requestInfo) =>
@@ -441,6 +448,7 @@ const ChatMessageList = memo(function ChatMessageList({
   getNpubMessageContactInfo,
   lang,
   onCopy,
+  onDelete,
   onAddNpubContacts,
   contactsGroupAssignment,
   onDeclinePaymentRequest,
@@ -460,6 +468,8 @@ const ChatMessageList = memo(function ChatMessageList({
   const actionLabels = useMemo(
     () => ({
       copy: t("copy"),
+      delete: t("chatDeleteAction"),
+      deleted: t("chatMessageDeleted"),
       edit: t("chatEditAction"),
       edited: t("chatEdited"),
       emojiGroups: {
@@ -549,9 +559,11 @@ const ChatMessageList = memo(function ChatMessageList({
       const fallbackReplyContent =
         (message.replyToContent ?? "").trim() || null;
       const repliedMessage = replyToId ? byRumorId.get(replyToId) : null;
+      const isDeleted = isDeletedMessage(message);
       const replyQuoteText = replyToId
         ? formatChatMessagePreviewText({
             content: repliedMessage?.content ?? fallbackReplyContent ?? "",
+            deleted: repliedMessage ? isDeletedMessage(repliedMessage) : false,
             direction: repliedMessage?.direction ?? null,
             formatDisplayedAmountText,
             t,
@@ -587,12 +599,20 @@ const ChatMessageList = memo(function ChatMessageList({
         canEdit:
           message.direction === "out" &&
           Boolean(rumorId) &&
+          !isDeleted &&
           !parsed.isCashuToken &&
           !parsed.paymentRequestInfo &&
           !parsed.privateImageInfo &&
           !parsed.bankPaymentOfferInfo &&
           !parsed.declineInfo,
-        canReplyOrReact: Boolean(rumorId),
+        canDelete:
+          Boolean(rumorId) &&
+          !isDeleted &&
+          !parsed.isCashuToken &&
+          !parsed.paymentRequestInfo &&
+          !parsed.bankPaymentOfferInfo &&
+          !parsed.declineInfo,
+        canReplyOrReact: Boolean(rumorId) && !isDeleted,
         canSettleBankPaymentOffer,
         isSeen,
         message,
@@ -667,6 +687,7 @@ const ChatMessageList = memo(function ChatMessageList({
               }
               onMintIconError={markMintIconFailed}
               actionLabels={actionLabels}
+              canDelete={viewModel.canDelete}
               canEdit={viewModel.canEdit}
               canReplyOrReact={viewModel.canReplyOrReact}
               reactions={viewModel.reactions}
@@ -691,6 +712,7 @@ const ChatMessageList = memo(function ChatMessageList({
                 viewModel.bankPaymentOfferInfo ? cashuIsBusy : false
               }
               onCopy={onCopy}
+              onDelete={onDelete}
               onAddNpubContacts={onAddNpubContacts}
               contactsGroupAssignment={contactsGroupAssignment}
               onEdit={onEdit}
@@ -1299,6 +1321,7 @@ export const ChatPage: FC<ChatPageProps> = ({
   onBlockUnknownContact,
   onCopy,
   onDeclinePaymentRequest,
+  onDelete,
   onEdit,
   onOpenNpubContact,
   onPayPaymentRequest,
@@ -1326,6 +1349,7 @@ export const ChatPage: FC<ChatPageProps> = ({
     onDeclinePaymentRequest: (message) => {
       void onDeclinePaymentRequest(message);
     },
+    onDelete,
     onEdit,
     onOpenNpubContact,
     onPayPaymentRequest: (message, requestInfo) => {
@@ -1381,6 +1405,7 @@ export const ChatPage: FC<ChatPageProps> = ({
     );
     return formatChatMessagePreviewText({
       content: repliedMessage?.content ?? "",
+      deleted: repliedMessage ? isDeletedMessage(repliedMessage) : false,
       direction: repliedMessage?.direction ?? null,
       formatDisplayedAmountText,
       t,
@@ -1488,6 +1513,7 @@ export const ChatRoute: FC<{ route: Route }> = ({ route }) => {
     selectedContact,
   );
   const onCopy = useCopyChatMessage();
+  const onDelete = useChatDelete(selectedContact);
   const { addUnknownContactFromChat, blockUnknownContactFromChat } =
     useUnknownSenderActions(route, selectedContact);
   const { addNpubMessageContacts, contactsGroupAssignment } =
@@ -1533,6 +1559,7 @@ export const ChatRoute: FC<{ route: Route }> = ({ route }) => {
       onCancelReply={composer.onCancelReply}
       onCopy={onCopy}
       onDeclinePaymentRequest={send.onDeclineChatPaymentRequest}
+      onDelete={onDelete}
       onEdit={composer.onEditChatMessage}
       onOpenNpubContact={onOpenNpubContact}
       onPayPaymentRequest={payChatPaymentRequest}

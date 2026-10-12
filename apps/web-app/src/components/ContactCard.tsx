@@ -7,6 +7,7 @@ import { hasMessageEntityPreview } from "../app/lib/messageEntityPreview";
 import type { CashuTokenMessageInfo } from "../app/lib/tokenMessageInfo";
 import type { ContactRowLike, LocalNostrMessage } from "../app/types/appTypes";
 import { parseProfileGeneralStatus } from "../nostrStatus";
+import { isDeletedMessage } from "../app/lib/deletedMessage";
 import { getContactName } from "../utils/contactName";
 import { formatContactMessageTimestamp } from "../utils/formatting";
 import { CashuTokenPill } from "./CashuTokenPill";
@@ -61,6 +62,7 @@ export const ContactCard: React.FC<ContactCardProps> = React.memo(
       rawDirection === "in" || rawDirection === "out" ? rawDirection : null;
     const displayText = formatChatMessagePreviewText({
       content: lastText,
+      deleted: lastMessage ? isDeletedMessage(lastMessage) : false,
       direction: previewDirection,
       formatDisplayedAmountText,
       t,

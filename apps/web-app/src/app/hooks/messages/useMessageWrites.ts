@@ -4,7 +4,9 @@ import {
   createId,
   directConversationIdFor,
   MessageId,
+  NonEmptyString,
   nostrReactionIdFor,
+  PositiveInt,
   ReactionId,
   RowNotFound,
   type ConversationsRepository,
@@ -14,8 +16,10 @@ import { RegistryContext, useAtomSuspense } from "@linky-fit/linkstr-react";
 import { Effect } from "effect";
 import React from "react";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
+import { nowSeconds } from "../../../utils/time";
 import { makeLocalId, trimString } from "../../../utils/validation";
-import { NO_WRITE, type WriteOutcome } from "../../lib/storeWrite";
+import { DELETED_MESSAGE_CONTENT } from "../../lib/deletedMessage";
+import { allWrites, NO_WRITE, type WriteOutcome } from "../../lib/storeWrite";
 import { chatWritesAtom } from "../../state/messages/chatWrites";
 import {
   contactMessagesAtom,
@@ -24,9 +28,13 @@ import {
 import type {
   AppendedRow,
   AppendLocalNostrReaction,
+  LocalNostrMessage,
   UpdateLocalNostrReaction,
 } from "../../types/appTypes";
-import { readUnknownContactIdPubkey } from "./contactIdentity";
+import {
+  isUnknownContactId,
+  readUnknownContactIdPubkey,
+} from "./contactIdentity";
 import { toReactionPatch, toReactionWriteRow } from "./messageRows";
 import { buildReactionUpdate } from "./messageUpdates";
 
@@ -150,6 +158,38 @@ export const useMessageWrites = ({
     [conversations, write],
   );
 
+  // A deleted message stays as a placeholder: the text and the reactions
+  // that point at it (by rumor id) go, the row and its place in the chat stay.
+  const markLocalNostrMessageDeleted = React.useCallback(
+    (message: LocalNostrMessage): Promise<WriteOutcome> => {
+      const messageId = parseMessageId(message.id);
+      if (!messageId) return NO_WRITE;
+      const patch = {
+        content: NonEmptyString.orThrow(DELETED_MESSAGE_CONTENT),
+        deletedAtSec: PositiveInt.orThrow(nowSeconds()),
+        originalContent: null,
+        replyToContent: null,
+      };
+      const writes = [
+        write(
+          "message deletion",
+          isUnknownContactId(message.contactId)
+            ? unknownSenders.update(messageId, patch)
+            : conversations.messages.update(messageId, patch),
+        ),
+      ];
+      const rumorId = trimString(message.rumorId);
+      if (rumorId) {
+        for (const reaction of registry.get(localReactionsAtom)) {
+          if (trimString(reaction.messageId) !== rumorId) continue;
+          writes.push(removeNostrReaction(reaction.id));
+        }
+      }
+      return allWrites(writes);
+    },
+    [conversations, registry, removeNostrReaction, unknownSenders, write],
+  );
+
   const softDeleteLocalNostrReaction = React.useCallback(
     (id: string) => {
       const normalizedId = trimString(id);
@@ -196,6 +236,7 @@ export const useMessageWrites = ({
 
   return {
     appendLocalNostrReaction,
+    markLocalNostrMessageDeleted,
     removeLocalNostrMessagesByContactId,
     removeNostrReaction,
     softDeleteLocalNostrReaction,

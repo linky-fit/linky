@@ -99,6 +99,7 @@ describe("unknown senders repository", () => {
         editedFromId: NonEmptyString1000.orThrow(rumor(7)),
         isEdited: NonEmptyString100.orThrow("1"),
         originalContent: NonEmptyString.orThrow("hi"),
+        deletedAtSec: PositiveInt.orThrow(6),
       }),
     );
     const [stored] = messagesFrom(unknownSenders, alice);

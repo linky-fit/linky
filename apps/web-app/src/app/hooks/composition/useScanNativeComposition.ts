@@ -71,6 +71,7 @@ const isWrapId = Schema.is(WrapId);
 const inboxPeerPubkey = (event: WrapInboxEvent): string | null => {
   switch (event._tag) {
     case "ChatMessageReceived":
+    case "ChatMessageDeleted":
     case "ReactionAdded":
     case "ReactionRetracted":
     case "PaymentNoticeReceived":
@@ -79,6 +80,7 @@ const inboxPeerPubkey = (event: WrapInboxEvent): string | null => {
     case "AppMessageReceived":
       return event.from;
     case "OwnChatMessageConfirmed":
+    case "OwnChatMessageDeletionConfirmed":
     case "OwnBankOfferSnapshotConfirmed":
     case "OwnSeenReceiptConfirmed":
       return event.to;

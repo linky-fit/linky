@@ -14,12 +14,14 @@ import { encodeAppMessageRumor } from "../appMessages/codec";
 import { AppMessageDraft } from "../appMessages/domain";
 import { Chat } from "../chat/Chat";
 import {
+  encodeDeletionRumor,
   encodeEditRumor,
   encodeImageMessageRumor,
   encodeTextMessageRumor,
   encodeTokenMessageRumor,
 } from "../chat/codec";
 import {
+  DeleteMessageDraft,
   EditMessageDraft,
   ImageMessageDraft,
   TextMessageDraft,
@@ -102,6 +104,11 @@ const normalizeOperation = (
         _tag: operation._tag,
         draft: new EditMessageDraft({ ...operation.draft, clientId, sentAt }),
       };
+    case "chat.delete":
+      return {
+        _tag: operation._tag,
+        draft: new DeleteMessageDraft({ ...operation.draft, clientId, sentAt }),
+      };
     case "reaction":
       return {
         _tag: operation._tag,
@@ -130,6 +137,8 @@ const encodeOperationRumor = (
       return encodeImageMessageRumor(operation.draft, author, sentAt, clientId);
     case "chat.edit":
       return encodeEditRumor(operation.draft, author, sentAt, clientId);
+    case "chat.delete":
+      return encodeDeletionRumor(operation.draft, author, sentAt, clientId);
     case "reaction":
       return encodeReactionRumor(operation.draft, author, sentAt, clientId);
     case "appMessage":
@@ -215,6 +224,8 @@ export class Outbox extends Context.Service<Outbox>()("linkstr/Outbox", {
           return chat.sendImage(operation.draft);
         case "chat.edit":
           return chat.edit(operation.draft);
+        case "chat.delete":
+          return chat.deleteMessage(operation.draft);
         case "reaction":
           return reactions.react(operation.draft);
         case "paymentTelemetry":
