@@ -6,11 +6,9 @@ import {
   buildStatusFilterValue,
   parseProfileGeneralStatus,
 } from "../../../nostrStatus";
-import {
-  ARCHIVED_CONTACTS_FILTER,
-  NO_GROUP_FILTER,
-} from "../../../utils/constants";
+import { NO_GROUP_FILTER } from "../../../utils/constants";
 import { getContactGroups } from "../../../utils/contactGroups";
+import { isDeletedContact } from "../../../utils/contactName";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import {
   activeContactGroupAtom,
@@ -40,7 +38,7 @@ export const statusFilterSummary = (
   const currencyCounts = new Map<string, number>();
 
   for (const contact of displayContacts) {
-    if ((contact.archivedAtSec ?? 0) > 0) continue;
+    if (isDeletedContact(contact)) continue;
     const normalizedNpub = normalizeNpubIdentifier(contact.npub ?? "");
     if (!normalizedNpub) continue;
 
@@ -153,16 +151,6 @@ export const useContactsListView = () => {
         value: NO_GROUP_FILTER,
       });
     }
-    const archivedCount = displayContacts.filter(
-      (contact) => (contact.archivedAtSec ?? 0) > 0,
-    ).length;
-    if (archivedCount > 0) {
-      options.push({
-        count: archivedCount,
-        label: t("archiveFilter"),
-        value: ARCHIVED_CONTACTS_FILTER,
-      });
-    }
     for (const groupName of groupNames) {
       options.push({
         count: groupCounts.get(groupName) ?? 0,
@@ -178,26 +166,13 @@ export const useContactsListView = () => {
       });
     }
     return options.sort((left, right) => {
-      const leftSpecialOrder =
-        left.value === ARCHIVED_CONTACTS_FILTER
-          ? 2
-          : left.value === NO_GROUP_FILTER
-            ? 1
-            : 0;
-      const rightSpecialOrder =
-        right.value === ARCHIVED_CONTACTS_FILTER
-          ? 2
-          : right.value === NO_GROUP_FILTER
-            ? 1
-            : 0;
-      if (leftSpecialOrder !== rightSpecialOrder) {
-        return leftSpecialOrder - rightSpecialOrder;
-      }
+      const leftIsNoGroup = left.value === NO_GROUP_FILTER;
+      const rightIsNoGroup = right.value === NO_GROUP_FILTER;
+      if (leftIsNoGroup !== rightIsNoGroup) return leftIsNoGroup ? 1 : -1;
       if (right.count !== left.count) return right.count - left.count;
       return left.label.localeCompare(right.label);
     });
   }, [
-    displayContacts,
     groupCounts,
     groupNames,
     statusFilterCounts,

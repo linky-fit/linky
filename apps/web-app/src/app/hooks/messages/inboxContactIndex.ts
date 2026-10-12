@@ -1,5 +1,8 @@
 import { decodeNpub } from "@linky-fit/linkstr";
-import { createContactNameFormatter } from "../../../utils/contactName";
+import {
+  createContactNameFormatter,
+  isDeletedContact,
+} from "../../../utils/contactName";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import { trimString } from "../../../utils/validation";
 import type { ContactNameRowLike } from "../../types/appTypes";
@@ -10,26 +13,23 @@ export type InboxContactRowLike = ContactNameRowLike & {
   nameSetByUser?: number | null | undefined;
 };
 
-const isArchived = (contact: InboxContactRowLike): boolean =>
-  (contact.archivedAtSec ?? 0) > 0;
-
 // Row order follows the physical createdAt, which a shard move resets, so
-// duplicates of one npub are ranked by archive state and id instead.
+// duplicates of one npub are ranked by deletion state and id instead.
 const byRoutingPreference = (
   a: InboxContactRowLike,
   b: InboxContactRowLike,
 ): number => {
-  const archivedDiff = Number(isArchived(a)) - Number(isArchived(b));
-  if (archivedDiff !== 0) return archivedDiff;
+  const deletedDiff = Number(isDeletedContact(a)) - Number(isDeletedContact(b));
+  if (deletedDiff !== 0) return deletedDiff;
   const aId = trimString(a.id);
   const bId = trimString(b.id);
   return aId < bId ? -1 : aId > bId ? 1 : 0;
 };
 
 /**
- * Maps a sender pubkey to the contact its messages land on. Archived contacts
- * stay in the index: when no active contact shares their npub, their incoming
- * messages land on them, which then restores them from the archive.
+ * Maps a sender pubkey to the contact its messages land on. Deleted contacts
+ * stay in the index: when no live contact shares their npub, their incoming
+ * messages land on them, which then restores them.
  */
 export const buildContactIndex = (
   contacts: readonly InboxContactRowLike[],

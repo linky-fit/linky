@@ -95,8 +95,8 @@ export const collectUnreadNewestIncomingByContactId = (
   return unreadByContactId;
 };
 
-/** Archived contacts with an unread incoming message newer than the archive. */
-export const contactsToUnarchive = <
+/** Deleted contacts with an unread incoming message newer than the deletion. */
+export const contactsToRestore = <
   C extends { id: string; archivedAtSec: number | null },
 >(
   contacts: readonly C[],

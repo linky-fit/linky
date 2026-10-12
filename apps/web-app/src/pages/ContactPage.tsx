@@ -9,10 +9,7 @@ import {
 } from "@linky-fit/ui";
 import { useEffect, useState, type FC } from "react";
 import { useAtomValue } from "@linky-fit/linkstr-react";
-import {
-  useOpenContactPay,
-  useRestoreArchivedContact,
-} from "../app/hooks/contacts/useContactActions";
+import { useOpenContactPay } from "../app/hooks/contacts/useContactActions";
 import {
   useNostrStatusByNpub,
   useRoutePeopleContact,
@@ -36,10 +33,8 @@ import {
 } from "../utils/formatting";
 import { resolveVerifiedNip05Identifier } from "../utils/nostrNip05";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
-import { PageCard } from "../components/PageCard";
 
 interface Contact {
-  archivedAtSec?: number | string | null;
   id: ContactId;
   name?: string | null;
   groupName?: string | null;
@@ -56,7 +51,6 @@ interface ContactPageProps {
   nostrPictureByNpub: Record<string, string | null>;
   openContactPay: (id: ContactId) => void;
   payWithCashuEnabled: boolean;
-  restoreArchivedContact: () => void;
   selectedContact: Contact | null;
   statusText: string | null;
   t: Translate;
@@ -108,7 +102,6 @@ export const ContactPage: FC<ContactPageProps> = ({
   nostrPictureByNpub,
   openContactPay,
   payWithCashuEnabled,
-  restoreArchivedContact,
   selectedContact,
   statusText,
   t,
@@ -137,7 +130,6 @@ export const ContactPage: FC<ContactPageProps> = ({
     hasLightningAddress || (payWithCashuEnabled && canMessage);
   const canStartPay = cashuBalance > 0 && canPayThisContact;
   const isFeedbackContact = npub === feedbackContactNpub;
-  const isArchivedContact = Number(selectedContact.archivedAtSec ?? 0) > 0;
   const payLabel = isFeedbackContact ? t("donate") : t("pay");
   const messageLabel = isFeedbackContact ? t("feedback") : t("sendMessage");
   const contactStatus = formatDisplayGeneralStatus({
@@ -145,7 +137,7 @@ export const ContactPage: FC<ContactPageProps> = ({
     providesLabel: t("contactStatusProvides"),
   });
   return (
-    <PageCard elevated>
+    <Stack gap="$md">
       <Stack alignItems="center" gap="$sm">
         <Avatar name={name} uri={url ?? undefined} size="lg" />
         <Text variant="display" textAlign="center" numberOfLines={2}>
@@ -155,9 +147,6 @@ export const ContactPage: FC<ContactPageProps> = ({
           <Text variant="label" color="$colorMuted" textAlign="center">
             {contactStatus}
           </Text>
-        ) : null}
-        {isArchivedContact ? (
-          <Pill size="sm" label={t("archivedContactBadge")} tone="neutral" />
         ) : null}
         {groups.length > 0 ? (
           <Row gap="$sm" flexWrap="wrap" justifyContent="center">
@@ -194,16 +183,6 @@ export const ContactPage: FC<ContactPageProps> = ({
         ) : null}
       </Stack>
 
-      {isArchivedContact ? (
-        <Button
-          variant="secondary"
-          icon="ArchiveRestore"
-          onPress={restoreArchivedContact}
-        >
-          {t("restoreArchivedContact")}
-        </Button>
-      ) : null}
-
       {canPayThisContact && (
         <Button
           icon={isFeedbackContact ? "HeartHandshake" : "HandCoins"}
@@ -226,7 +205,7 @@ export const ContactPage: FC<ContactPageProps> = ({
           {messageLabel}
         </Button>
       )}
-    </PageCard>
+    </Stack>
   );
 };
 
@@ -239,7 +218,6 @@ export const ContactRoute: FC<{ route: Route }> = ({ route }) => {
   const { cashuBalance, cashuIsBusy } = useWalletBalance();
   const payWithCashuEnabled = useAtomValue(payWithCashuEnabledAtom);
   const openContactPay = useOpenContactPay();
-  const restoreArchivedContact = useRestoreArchivedContact();
   const npub = normalizeNpubIdentifier(selectedContact?.npub ?? "");
   return (
     <ContactPage
@@ -250,9 +228,6 @@ export const ContactRoute: FC<{ route: Route }> = ({ route }) => {
       nostrPictureByNpub={nostrPictureByNpub}
       openContactPay={openContactPay}
       payWithCashuEnabled={payWithCashuEnabled}
-      restoreArchivedContact={() => {
-        if (route.kind === "contact") void restoreArchivedContact(route.id);
-      }}
       selectedContact={selectedContact}
       statusText={npub ? (statusByNpub[npub] ?? null) : null}
       t={t}

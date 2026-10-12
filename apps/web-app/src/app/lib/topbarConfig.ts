@@ -19,6 +19,7 @@ interface BuildTopbarArgs extends BackActionContext {
 interface BuildTopbarRightArgs {
   chatEditContactId: ContactId | null;
   contactsFilterIsActive: boolean;
+  deleteEditedContact: () => void;
   hiddenTransactionsShown: boolean;
   isProfileEditing: boolean;
   openReceiveScan: () => void;
@@ -211,7 +212,12 @@ export const buildTopbar = ({
 const SHOWS_MENU_BUTTON: Record<
   Exclude<
     Route["kind"],
-    "chat" | "contact" | "contactNew" | "evoluServers" | "nostrRelays" | "topup"
+    | "chat"
+    | "contact"
+    | "contactEdit"
+    | "evoluServers"
+    | "nostrRelays"
+    | "topup"
   >,
   boolean
 > = {
@@ -228,7 +234,7 @@ const SHOWS_MENU_BUTTON: Record<
   cashuTokenNew: false,
   cashuTokens: false,
   cashuProofs: false,
-  contactEdit: false,
+  contactNew: false,
   contactPay: true,
   contacts: false,
   chatStorage: false,
@@ -269,6 +275,7 @@ const SHOWS_MENU_BUTTON: Record<
 export const buildTopbarRight = ({
   chatEditContactId,
   contactsFilterIsActive,
+  deleteEditedContact,
   hiddenTransactionsShown,
   isProfileEditing,
   openReceiveScan,
@@ -340,6 +347,15 @@ export const buildTopbarRight = ({
       icon: "Pencil",
       label: t("editContact"),
       onClick: () => navigateTo({ route: "contactEdit", id: route.id }),
+    };
+  }
+
+  // Deleting runs on one click; the toast that follows offers to undo it.
+  if (route.kind === "contactEdit") {
+    return {
+      icon: "Trash2",
+      label: t("deleteContact"),
+      onClick: deleteEditedContact,
     };
   }
 

@@ -15,7 +15,10 @@ import {
 } from "../../state/contacts/contactsList";
 import { profileDraftAtom } from "../../state/contacts/profiles";
 import { hiddenTransactionsShownAtom } from "../../state/shell/topbar";
-import { useCloseContactDetail } from "../contacts/useContactActions";
+import {
+  useCloseContactDetail,
+  useDeleteContact,
+} from "../contacts/useContactActions";
 import { useToggleContactsFilter } from "../contacts/useContactsList";
 import {
   useChatContact,
@@ -36,6 +39,7 @@ export const useTopbar = () => {
   const route = useRouting();
   const { t } = useTranslation();
   const closeContactDetail = useCloseContactDetail();
+  const deleteContact = useDeleteContact();
   const contactPayBackToChatId = useNavIntent("contactPayBackToChat");
   const { navigateToMainReturn, openMenu } = useMainMenu();
   const { openReceiveScan, openScan } = useScanCommands();
@@ -67,6 +71,9 @@ export const useTopbar = () => {
         : null,
     contactsFilterIsActive:
       contactsSearch.trim() !== "" || activeGroup !== null,
+    deleteEditedContact: () => {
+      if (route.kind === "contactEdit") void deleteContact(route.id);
+    },
     hiddenTransactionsShown,
     isProfileEditing,
     openReceiveScan,

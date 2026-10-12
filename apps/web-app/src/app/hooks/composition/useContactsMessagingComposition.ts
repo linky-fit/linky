@@ -32,14 +32,11 @@ import {
   loadCachedProfile,
   releaseAllAvatarObjectUrls,
 } from "../../../profileCache";
-import {
-  ARCHIVED_CONTACTS_FILTER,
-  NO_GROUP_FILTER,
-} from "../../../utils/constants";
+import { NO_GROUP_FILTER } from "../../../utils/constants";
 import { getBestNostrName } from "../../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import { setStoredPushContactNames } from "../../../utils/pushContactNamesStorage";
-import { contactsToUnarchive } from "../../lib/chatUnread";
+import { contactsToRestore } from "../../lib/chatUnread";
 import { NO_WRITE, runWrite, type WriteOutcome } from "../../lib/storeWrite";
 import {
   pendingUnknownContactAddAtom,
@@ -501,7 +498,6 @@ export const useContactsMessagingComposition = ({
   );
 
   React.useEffect(() => {
-    if (activeGroup === ARCHIVED_CONTACTS_FILTER) return;
     if (!isStatusFilterValue(activeGroup)) return;
 
     const selectedCurrency = parseStatusFilterValue(activeGroup);
@@ -536,24 +532,24 @@ export const useContactsMessagingComposition = ({
     return nostrMessagesRecent.some((m) => m.direction === "out");
   }, [nostrMessagesRecent]);
 
-  const { unarchiveContact } = useAtomSuspense(contactsCommandsAtom).value;
+  const { restoreContact } = useAtomSuspense(contactsCommandsAtom).value;
 
   useFeedbackContactWatcher(contacts);
 
   // The in-flight set keeps the effect from repeating the write before the
   // restored row is read back.
-  const unarchivingRef = React.useRef(new Set<string>());
+  const restoringRef = React.useRef(new Set<string>());
   React.useEffect(() => {
     if (!accountHydrated) return;
-    for (const contact of contactsToUnarchive(contacts, unreadByContactId)) {
+    for (const contact of contactsToRestore(contacts, unreadByContactId)) {
       const contactId = contact.id.trim();
-      if (unarchivingRef.current.has(contactId)) continue;
-      unarchivingRef.current.add(contactId);
-      void unarchiveContact(contact.id).finally(() => {
-        unarchivingRef.current.delete(contactId);
+      if (restoringRef.current.has(contactId)) continue;
+      restoringRef.current.add(contactId);
+      void restoreContact(contact.id).finally(() => {
+        restoringRef.current.delete(contactId);
       });
     }
-  }, [accountHydrated, contacts, unarchiveContact, unreadByContactId]);
+  }, [accountHydrated, contacts, restoreContact, unreadByContactId]);
 
   // Only a contacts change re-checks the pending add, so it is read here
   // rather than subscribed to.

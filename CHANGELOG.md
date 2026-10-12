@@ -15,6 +15,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 ### en-US
 
 - Notifications on Android phones without Google Play Services (e.g. GrapheneOS): install a UnifiedPush app such as ntfy and turn notifications on in Settings.
+- Contacts are deleted instead of archived: the trash icon on the edit page removes the contact at once, the toast can undo it, and a new message brings the contact back.
 - Message reactions: a plus button opens the full emoji list.
 - A message can be deleted from its menu, except tokens, payment requests and offers; both sides keep only a "Message deleted" placeholder.
 - A proxy payment offer shows the bank transfer's currency (CZK, EUR, BRL) next to the amount.
@@ -25,6 +26,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 ### cs-CZ
 
 - Notifikace na Androidu bez Google Play Services (např. GrapheneOS): nainstalujte UnifiedPush aplikaci, třeba ntfy, a zapněte notifikace v Nastavení.
+- Kontakty se místo archivace mažou: ikona koše v úpravě kontaktu ho hned odstraní, z oznámení jde akci vrátit a nová zpráva kontakt opět zobrazí.
 - Reakce na zprávy: tlačítko plus otevře celý seznam emoji.
 - Z menu zprávy jde smazat zprávu, kromě tokenů, žádostí o platbu a nabídek; oběma stranám zůstane jen zástupný text „Zpráva byla smazána“.
 - Nabídka proxy platby ukazuje měnu bankovního převodu (CZK, EUR, BRL) vedle částky.

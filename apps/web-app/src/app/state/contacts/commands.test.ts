@@ -55,7 +55,7 @@ const boot = async () => {
 };
 
 describe("contacts commands", () => {
-  it("archives a contact with its chat read, then restores it with what its npub sent meanwhile", async () => {
+  it("deletes a contact with its chat read, then restores it with what its npub sent meanwhile", async () => {
     const { commands, contacts, conversations, unknownSenders } = await boot();
     const peer = makeIdentity();
     const id = createId<"Contact">();
@@ -67,11 +67,11 @@ describe("contacts commands", () => {
       }),
     );
 
-    expect(await commands.archiveContact(id)).toEqual({ ok: true });
-    const archived = await Effect.runPromise(contacts.byId(id));
-    expect(archived?.archivedAtSec).toBeGreaterThan(0);
+    expect(await commands.deleteContact(id)).toEqual({ ok: true });
+    const deleted = await Effect.runPromise(contacts.byId(id));
+    expect(deleted?.archivedAtSec).toBeGreaterThan(0);
     expect(reportAppLog).toHaveBeenCalledWith(
-      expect.objectContaining({ tag: "conversations.archived" }),
+      expect.objectContaining({ tag: "contacts.deleted" }),
     );
 
     const unknownContactId = `${UNKNOWN_CONTACT_ID_PREFIX}${peer.pubkey}`;
@@ -92,7 +92,7 @@ describe("contacts commands", () => {
     if (!row) throw new Error("unstorable message");
     await Effect.runPromise(unknownSenders.insert(row));
 
-    expect(await commands.unarchiveContact(id)).toEqual({ ok: true });
+    expect(await commands.restoreContact(id)).toEqual({ ok: true });
     expect((await Effect.runPromise(contacts.byId(id)))?.archivedAtSec).toBe(
       null,
     );
@@ -111,13 +111,13 @@ describe("contacts commands", () => {
     await Effect.runPromise(
       contacts.insert({ id, name: NonEmptyString1000.orThrow("Bob") }),
     );
-    expect(await commands.archiveContact(id)).toEqual({ ok: true });
+    expect(await commands.deleteContact(id)).toEqual({ ok: true });
     vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.spyOn(contacts, "byId").mockReturnValueOnce(
       Effect.die(new Error("database closed")),
     );
 
-    expect(await commands.unarchiveContact(id)).toEqual({ ok: true });
+    expect(await commands.restoreContact(id)).toEqual({ ok: true });
     vi.restoreAllMocks();
     expect((await Effect.runPromise(contacts.byId(id)))?.archivedAtSec).toBe(
       null,

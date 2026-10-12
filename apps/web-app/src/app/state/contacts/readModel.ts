@@ -2,7 +2,7 @@ import { NonEmptyString1000 } from "@linky-fit/linksync";
 import { Option } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { getContactGroups } from "../../../utils/contactGroups";
-import { getContactName } from "../../../utils/contactName";
+import { getContactName, isDeletedContact } from "../../../utils/contactName";
 import { keepUnchangedRows } from "../../../utils/structuralSharing";
 import {
   joinContactChatState,
@@ -72,8 +72,7 @@ export const contactGroupsAtom = Atom.keepAlive(
     let ungrouped = 0;
 
     for (const contact of get(contactsAtom)) {
-      const archivedAtSec = contact.archivedAtSec ?? 0;
-      if (Number.isFinite(archivedAtSec) && archivedAtSec > 0) continue;
+      if (isDeletedContact(contact)) continue;
 
       const groups = getContactGroups(contact);
       if (groups.length === 0) {

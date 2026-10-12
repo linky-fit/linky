@@ -15,6 +15,7 @@ import {
   normalizeContactGroups,
   serializeContactGroups,
 } from "../../../utils/contactGroups";
+import { isDeletedContact } from "../../../utils/contactName";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import type { MessageContactsGroupAssignment } from "../../../components/ChatMessage";
 import { blockPubkey } from "../../lib/blockList";
@@ -98,39 +99,17 @@ export const useOpenContactPay = () => {
   );
 };
 
-/** Restores an archived contact and returns to the contact list. */
-export const useRestoreArchivedContact = () => {
-  const { t } = useTranslation();
-  const setStatus = useSetStatus();
-  const { unarchiveContact } = useAtomSuspense(contactsCommandsAtom).value;
-  const closeContactDetail = useCloseContactDetail();
-  return React.useCallback(
-    async (id: ContactId) => {
-      const result = await unarchiveContact(id);
-      if (result.ok) {
-        setStatus(t("contactRestored"));
-        closeContactDetail();
-        return;
-      }
-      setStatus(`${t("errorPrefix")}: ${result.error}`);
-    },
-    [closeContactDetail, setStatus, t, unarchiveContact],
-  );
-};
-
-// Archiving marks the chat read; the messages stay on this contact and a
-// newer incoming message restores it. It runs on one click; the toast offers
-// to undo it.
-export const useArchiveContact = () => {
+// Deleting runs on one click; the toast that follows offers to undo it.
+export const useDeleteContact = () => {
   const { t } = useTranslation();
   const setStatus = useSetStatus();
   const pushToast = usePushToast();
   const contactsCommands = useAtomSuspense(contactsCommandsAtom).value;
   const closeContactDetail = useCloseContactDetail();
 
-  const undoArchiveContact = React.useCallback(
+  const undoDeleteContact = React.useCallback(
     async (id: ContactId) => {
-      const result = await contactsCommands.unarchiveContact(id);
+      const result = await contactsCommands.restoreContact(id);
       setStatus(
         result.ok
           ? t("contactRestored")
@@ -142,17 +121,17 @@ export const useArchiveContact = () => {
 
   return React.useCallback(
     async (id: ContactId) => {
-      const result = await contactsCommands.archiveContact(id);
+      const result = await contactsCommands.deleteContact(id);
       if (!result.ok) {
         setStatus(`${t("errorPrefix")}: ${result.error}`);
         return;
       }
       closeContactDetail();
-      pushToast(t("contactArchived"), {
+      pushToast(t("contactDeleted"), {
         action: {
-          label: t("undoArchiveContact"),
+          label: t("undoDeleteContact"),
           onClick: () => {
-            void undoArchiveContact(id);
+            void undoDeleteContact(id);
           },
         },
       });
@@ -163,7 +142,7 @@ export const useArchiveContact = () => {
       pushToast,
       setStatus,
       t,
-      undoArchiveContact,
+      undoDeleteContact,
     ],
   );
 };
@@ -190,65 +169,6 @@ const useRemoveContactMessages = () =>
     conversations: useConversationsRepository(),
     unknownSenders: useUnknownSendersRepository(),
   }).removeLocalNostrMessagesByContactId;
-
-/** Blocks the saved contact being edited, drops its messages and removes it. */
-export const useBlockEditedContact = (
-  route: Route,
-  selectedContact: { id: ContactId; npub?: string | null } | null,
-) => {
-  const { t } = useTranslation();
-  const setStatus = useSetStatus();
-  const contactsRepository = useContactsRepository();
-  const blockPubkeyAndPublishMuteList = useBlockPubkey();
-  const removeLocalNostrMessagesByContactId = useRemoveContactMessages();
-  const closeContactDetail = useCloseContactDetail();
-
-  return React.useCallback(async () => {
-    if (route.kind !== "contactEdit") return;
-    if (!selectedContact?.id) return;
-
-    const normalizedNpub = normalizeNpubIdentifier(selectedContact.npub ?? "");
-    if (!normalizedNpub) {
-      setStatus(t("chatMissingContactNpub"));
-      return;
-    }
-
-    const blockedPubkey = decodeNpub(normalizedNpub);
-
-    if (!blockedPubkey) {
-      setStatus(t("chatMissingContactNpub"));
-      return;
-    }
-
-    await blockPubkeyAndPublishMuteList(blockedPubkey);
-
-    const contactId = selectedContact.id.trim();
-    if (contactId) {
-      removeLocalNostrMessagesByContactId(contactId);
-    }
-
-    const result = await runWrite(
-      contactsRepository.remove(selectedContact.id),
-    );
-
-    if (result.ok) {
-      setStatus(t("contactBlocked"));
-      closeContactDetail();
-      return;
-    }
-
-    setStatus(`${t("errorPrefix")}: ${result.error}`);
-  }, [
-    blockPubkeyAndPublishMuteList,
-    closeContactDetail,
-    contactsRepository,
-    removeLocalNostrMessagesByContactId,
-    route.kind,
-    selectedContact,
-    setStatus,
-    t,
-  ]);
-};
 
 /** Saving or blocking the unknown sender whose conversation is open. */
 export const useUnknownSenderActions = (
@@ -353,7 +273,9 @@ export const useOpenNpubMessageContact = () => {
       if (!npub) return;
 
       const existing = contacts.find(
-        (contact) => normalizeNpubIdentifier(contact.npub ?? "") === npub,
+        (contact) =>
+          !isDeletedContact(contact) &&
+          normalizeNpubIdentifier(contact.npub ?? "") === npub,
       );
       if (existing?.id) {
         navigateTo({ route: "contact", id: existing.id });
@@ -404,6 +326,7 @@ export const useNpubMessageContacts = () => {
     (rawNpubs: readonly string[], messageId: string) => {
       const savedNpubs = new Set(
         contacts.flatMap((contact) => {
+          if (isDeletedContact(contact)) return [];
           const npub = normalizeNpubIdentifier(contact.npub ?? "");
           return npub ? [npub] : [];
         }),

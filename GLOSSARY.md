@@ -28,6 +28,10 @@ _Avoid_: user info, card
 A person the user saved, known by their public key.
 _Avoid_: friend, buddy, user
 
+**Deleted contact**:
+A contact the user removed with one tap; the row and its messages stay, the toast offers to undo it, and an incoming message newer than the deletion brings the contact back. Nothing lists deleted contacts.
+_Avoid_: archived contact, hidden contact
+
 **Profile link**:
 A `linky.fit/p/<name or npub>` page the user shares; opening it in Linky saves the user as a contact and opens the conversation, after onboarding if needed.
 _Avoid_: invite link, share link

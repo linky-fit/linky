@@ -25,6 +25,8 @@ vi.mock("@linky-fit/linkstr-react", async (importOriginal) => {
 vi.mock("./useContactSuggestions", () => ({
   useContactSuggestions: () => {},
 }));
+const routing = vi.hoisted(() => ({ navigateTo: vi.fn() }));
+vi.mock("../../../hooks/useRouting", () => routing);
 
 type Params = Parameters<typeof useContactEditor>[0];
 const contactId = createId<"Contact">();
@@ -37,6 +39,7 @@ const params: Params = {
     update: () => Effect.void,
   },
   currentNpub: null,
+  restoreContact: vi.fn(async () => ({ ok: true as const })),
   route: { kind: "contactEdit", id: contactId },
   selectedContactMetadata: null,
   selectedContact: initialContact,
@@ -117,5 +120,46 @@ it("looks an npub up by its kind-0 profile only, without a relay text search", a
     kind: "found",
     contacts: [expect.objectContaining({ npub, isExactMatch: true })],
   });
+  await view.unmount();
+});
+
+it("restores a deleted contact instead of adding it again", async () => {
+  const pubkey = derivePubkey(NostrSecretKey.make(new Uint8Array(32).fill(8)));
+  const npub = encodeNpub(pubkey);
+  const deletedId = createId<"Contact">();
+  const insert = vi.fn(() => Effect.void);
+  const restoreContact = vi.fn(async () => ({ ok: true as const }));
+  const adders: Array<
+    ReturnType<typeof useContactEditor>["addNewContactFromSearchResult"]
+  > = [];
+  const Adder = () => {
+    const { addNewContactFromSearchResult } = useContactEditor({
+      ...params,
+      contacts: [{ id: deletedId, npub, archivedAtSec: 10 }],
+      contactsRepository: { insert, update: () => Effect.void },
+      restoreContact,
+      route: { kind: "contactNew" },
+    });
+    React.useEffect(() => {
+      adders.push(addNewContactFromSearchResult);
+    }, [addNewContactFromSearchResult]);
+    return null;
+  };
+  const view = await renderIntoDocument(<Adder />);
+
+  await act(async () => {
+    await adders.at(-1)?.({
+      isExactMatch: true,
+      lnAddress: "",
+      name: "Alice",
+      npub,
+      pictureUrl: null,
+      query: npub,
+    });
+  });
+
+  expect(restoreContact).toHaveBeenCalledWith(deletedId);
+  expect(insert).not.toHaveBeenCalled();
+  expect(routing.navigateTo).toHaveBeenCalledWith({ route: "contacts" });
   await view.unmount();
 });

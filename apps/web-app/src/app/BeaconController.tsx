@@ -12,6 +12,7 @@ import type {
 import React from "react";
 import { navigateTo } from "../hooks/useRouting";
 import type { NativeBeaconKey } from "../platform/nativeBridge";
+import { isDeletedContact } from "../utils/contactName";
 import { formatShortNpub } from "../utils/formatting";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 import { useBeacon, useBeaconSupport } from "./hooks/useBeacon";
@@ -48,6 +49,7 @@ const useBeaconContacts = (
     const hidden = new Set(readBlockList());
     if (ownPubkey) hidden.add(ownPubkey);
     return rows.flatMap((row) => {
+      if (isDeletedContact(row)) return [];
       const npub = normalizeNpubIdentifier(row.npub ?? "");
       const pubkey = npub ? parsePubkey(npub) : null;
       if (!npub || !pubkey || hidden.has(pubkey)) return [];

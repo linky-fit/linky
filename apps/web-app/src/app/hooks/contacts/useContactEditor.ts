@@ -13,6 +13,7 @@ import {
 import {
   useAtom,
   useAtomSet,
+  useAtomSuspense,
   useAtomValue,
   useLinkstrCommands,
 } from "@linky-fit/linkstr-react";
@@ -31,6 +32,7 @@ import {
   getContactGroups,
   serializeContactGroups,
 } from "../../../utils/contactGroups";
+import { isDeletedContact } from "../../../utils/contactName";
 import { getBestNostrName } from "../../../utils/formatting";
 import {
   DEFAULT_NIP05_DOMAIN,
@@ -45,7 +47,8 @@ import {
   resolveContactProfile,
 } from "../../lib/contactProfile";
 import { getContactQueryPrefill } from "../../lib/contactQueryPrefill";
-import { runWrite } from "../../lib/storeWrite";
+import { runWrite, type WriteOutcome } from "../../lib/storeWrite";
+import { contactsCommandsAtom } from "../../state/contacts/commands";
 import {
   contactFormAtom,
   contactNewPrefillAtom,
@@ -116,6 +119,8 @@ interface UseContactEditorParams {
   contacts: readonly ContactRow[];
   contactsRepository: Pick<ContactsRepository, "insert" | "update">;
   currentNpub: string | null;
+  /** Brings a deleted contact back; a duplicate of one is restored, not added twice. */
+  restoreContact: (id: ContactId) => Promise<WriteOutcome>;
   route: Route;
   selectedContactMetadata: ProfileMetadata | null | undefined;
   selectedContact: SelectedContactRow | null;
@@ -194,10 +199,12 @@ export const useContactEditorParams = (
   }, [metadataByNpub, selectedContactNpub]);
   const setStatus = useSetStatus();
   const { t } = useTranslation();
+  const { restoreContact } = useAtomSuspense(contactsCommandsAtom).value;
   return {
     contacts,
     contactsRepository,
     currentNpub,
+    restoreContact,
     route,
     selectedContact,
     selectedContactMetadata,
@@ -230,9 +237,9 @@ export const useContactEditorWatchers = ({
   const contactSuggestionKnownNpubsKey = Array.from(
     new Set(
       [
-        ...contacts.map((contact) =>
-          normalizeNpubIdentifier(contact.npub ?? ""),
-        ),
+        ...contacts
+          .filter((contact) => !isDeletedContact(contact))
+          .map((contact) => normalizeNpubIdentifier(contact.npub ?? "")),
         normalizeNpubIdentifier(currentNpub ?? ""),
       ].filter((npub): npub is string => Boolean(npub)),
     ),
@@ -310,6 +317,7 @@ export const useContactEditorWatchers = ({
     selectedContactMetadata,
     selectedContact,
     setContactEditInitial,
+    setContactNewStep,
     setContactNewPrefill,
     setEditingId,
     setForm,
@@ -334,6 +342,7 @@ export const useContactEditor = ({
   contacts,
   contactsRepository,
   currentNpub,
+  restoreContact,
   route,
   selectedContactMetadata,
   selectedContact,
@@ -363,6 +372,31 @@ export const useContactEditor = ({
     setEditingId(null);
     setContactEditInitial(null);
   }, [setContactEditInitial, setEditingId, setForm]);
+
+  // A duplicate of a deleted contact is restored, not added twice.
+  const restoreDuplicate = React.useCallback(
+    async (id: ContactId) => {
+      setIsSavingContact(true);
+      const result = await restoreContact(id);
+      if (result.ok) {
+        setRecentlyAddedContactId(id);
+        setStatus(t("contactRestored"));
+        clearContactForm();
+        navigateTo({ route: "contacts" });
+      } else {
+        setStatus(`${t("errorPrefix")}: ${result.error}`);
+      }
+      setIsSavingContact(false);
+    },
+    [
+      clearContactForm,
+      restoreContact,
+      setIsSavingContact,
+      setRecentlyAddedContactId,
+      setStatus,
+      t,
+    ],
+  );
 
   const updateContactFields = React.useCallback(
     ({ id, ...patch }: ContactFieldsPatch) =>
@@ -458,9 +492,13 @@ export const useContactEditor = ({
       });
 
       if (duplicate?.id) {
+        setIsSavingContact(false);
+        if (isDeletedContact(duplicate)) {
+          await restoreDuplicate(ContactId.orThrow(duplicate.id));
+          return;
+        }
         setStatus(t("contactExists"));
         navigateTo({ route: "contact", id: ContactId.orThrow(duplicate.id) });
-        setIsSavingContact(false);
         return;
       }
     }
@@ -639,6 +677,7 @@ export const useContactEditor = ({
     form.name,
     form.npub,
     isSavingContact,
+    restoreDuplicate,
     route.kind,
     selectedContact,
     setRecentlyAddedContactId,
@@ -852,6 +891,10 @@ export const useContactEditor = ({
         (contact) => normalizeNpubIdentifier(contact.npub ?? "") === npub,
       );
       if (duplicate?.id) {
+        if (isDeletedContact(duplicate)) {
+          await restoreDuplicate(ContactId.orThrow(duplicate.id));
+          return;
+        }
         setStatus(t("contactExists"));
         navigateTo({ route: "contact", id: ContactId.orThrow(duplicate.id) });
         return;
@@ -901,6 +944,7 @@ export const useContactEditor = ({
       contactsRepository,
       currentNpub,
       isSavingContact,
+      restoreDuplicate,
       setRecentlyAddedContactId,
       setStatus,
       t,
