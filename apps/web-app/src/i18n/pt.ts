@@ -212,9 +212,15 @@ export const pt = {
   masterKeys: "Chaves mestras",
   masterKeysShow: "Mostrar",
   masterKeysHide: "Ocultar",
-  pasteCustomNostrKeys: "Colar chaves nostr próprias",
-  switchToDefaultIdentity: "Voltar à identidade padrão",
-  copyNostrKeys: "Copiar chaves nostr",
+  pasteCustomNostrKeys: "Colar uma identidade Nostr própria",
+  switchToDefaultIdentity: "Voltar à identidade derivada",
+  copyNsec: "Copiar nsec",
+  nostrIdentityUsingDerived: "Você está usando a identidade criada no Linky.",
+  nostrIdentityUsingCustom: "Você está usando sua própria identidade Nostr.",
+  nostrIdentityDerivedTitle: "Identidade criada no Linky",
+  nostrIdentityCustomTitle: "Identidade Nostr própria",
+  nostrIdentityCustomHint:
+    "Cole um nsec para aparecer aos outros com uma identidade Nostr que você já tem.",
   sensitiveActionArmedHint: "Ação sensível. Toque mais uma vez para confirmar.",
   derive: "Derivar",
   nostrKeysCopied: "Chaves nostr copiadas para a área de transferência.",
@@ -299,10 +305,11 @@ export const pt = {
   cashuPaymentMeltBody:
     "Nenhum mint sozinho cobre este pagamento. Mover todos os tokens de {fromMint} para o mint principal {toMint}? Você pode confirmar o pagamento original de novo depois da conversão.",
   cashuPaymentMeltConfirm: "Mover para o mint principal",
-  nostrPasteArmedHint:
-    "Colar chaves Nostr substitui as atuais. Toque mais uma vez para confirmar.",
+  nostrIdentityInUse: "Em uso",
+  nostrIdentitySwitchTo: "Usar esta identidade",
+  nostrIdentityRemove: "Remover identidade",
   defaultIdentityArmedHint:
-    "Isto volta para a identidade criada pela sua seed de recuperação. Toque mais uma vez para confirmar.",
+    "Isto volta para a identidade derivada da sua seed de recuperação. Toque mais uma vez para confirmar.",
   nostrPasteInvalid: "Chave Nostr inválida (esperado nsec…).",
   nostrKeySwitchProfilePublishFailed:
     "Não foi possível publicar seu perfil com a nova chave. As chaves não foram trocadas — tente de novo.",

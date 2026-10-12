@@ -102,9 +102,18 @@ export const profileForIdentitySwitch = ({
     source === "nostr" && nostrProfile ? nostrProfile : linkyProfile;
   const extraFields = (nostrProfile ?? linkyProfile).extraFields;
   const nip05 = getProfileNip05(lightningAddress, nostrProfile?.nip05);
+  // The picture belongs to the identity: whichever profile is shown, its own stays.
+  const picture = nostrProfile?.picture ?? shown.picture;
 
   return new ProfileMetadata({
-    ...Struct.omit(shown, ["extraFields", "lud06", "lud16", "nip05"]),
+    ...Struct.omit(shown, [
+      "extraFields",
+      "lud06",
+      "lud16",
+      "nip05",
+      "picture",
+    ]),
+    ...(picture ? { picture } : {}),
     lud16: lightningAddress,
     ...(nip05 ? { nip05 } : {}),
     ...(extraFields ? { extraFields } : {}),

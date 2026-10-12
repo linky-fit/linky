@@ -3,7 +3,6 @@ import { useAtom, useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
 import { isStatusFilterValue } from "../../nostrStatus";
 import type { Route } from "../../types/route";
-import { ARCHIVED_CONTACTS_FILTER } from "../../utils/constants";
 import { activeContactGroupAtom } from "../state/contacts/contactsList";
 import {
   contactGroupsAtom,
@@ -44,7 +43,6 @@ export const useContactsDomain = ({
   React.useEffect(() => {
     if (!activeGroup) return;
     if (activeGroup === noGroupFilterValue) return;
-    if (activeGroup === ARCHIVED_CONTACTS_FILTER) return;
     if (isStatusFilterValue(activeGroup)) return;
     if (!groupNames.includes(activeGroup)) {
       setActiveGroup(null);

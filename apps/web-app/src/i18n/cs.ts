@@ -205,9 +205,15 @@ export const cs = {
   masterKeys: "Hlavní klíče",
   masterKeysShow: "Zobrazit",
   masterKeysHide: "Skrýt",
-  pasteCustomNostrKeys: "Vložit vlastní nostr klíče",
-  switchToDefaultIdentity: "Přepnout zpět na výchozí identitu",
-  copyNostrKeys: "Zkopírovat nostr klíče",
+  pasteCustomNostrKeys: "Vložit vlastní Nostr identitu",
+  switchToDefaultIdentity: "Přepnout zpět na odvozenou identitu",
+  copyNsec: "Kopírovat nsec",
+  nostrIdentityUsingDerived: "Používáte identitu vytvořenou v Linky.",
+  nostrIdentityUsingCustom: "Používáte vlastní Nostr identitu.",
+  nostrIdentityDerivedTitle: "Identita vytvořená v Linky",
+  nostrIdentityCustomTitle: "Vlastní Nostr identita",
+  nostrIdentityCustomHint:
+    "Vložte nsec, pokud chcete vystupovat pod Nostr identitou, kterou už máte.",
   sensitiveActionArmedHint:
     "Citlivá akce. Klikněte ještě jednou pro potvrzení.",
   derive: "Derivovat",
@@ -291,10 +297,11 @@ export const cs = {
   cashuPaymentMeltBody:
     "V žádném mintu není dost pro tuto platbu. Převést všechny tokeny z {fromMint} do hlavního mintu {toMint}? Po převodu můžete původní platbu znovu potvrdit.",
   cashuPaymentMeltConfirm: "Převést do hlavního mintu",
-  nostrPasteArmedHint:
-    "Vložením Nostr klíčů přepíšete aktuální. Klikněte ještě jednou pro potvrzení.",
+  nostrIdentityInUse: "Používaná",
+  nostrIdentitySwitchTo: "Používat tuto identitu",
+  nostrIdentityRemove: "Odebrat identitu",
   defaultIdentityArmedHint:
-    "Tímto se přepnete zpět na identitu z vaší obnovovací fráze. Klikněte ještě jednou pro potvrzení.",
+    "Tímto se přepnete zpět na identitu odvozenou z vašich hlavních klíčů. Klikněte ještě jednou pro potvrzení.",
   nostrPasteInvalid: "Neplatný Nostr klíč (očekávám nsec…).",
   nostrKeySwitchProfilePublishFailed:
     "Profil se nepodařilo publikovat pod novým klíčem. Klíče nebyly změněny — zkuste to znovu.",

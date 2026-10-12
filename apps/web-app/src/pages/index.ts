@@ -30,6 +30,7 @@ export { AppearancePage } from "./AppearancePage";
 export { ReceiveMethodPage } from "./ReceiveMethodPage";
 export { ManualPayRoute } from "./ManualPayPage";
 export { MasterKeysPage } from "./MasterKeysPage";
+export { NostrIdentityPage } from "./NostrIdentityPage";
 export { MintDetailPage } from "./MintDetailPage";
 export { MintNewPage } from "./MintNewPage";
 export { MintsPage } from "./MintsPage";

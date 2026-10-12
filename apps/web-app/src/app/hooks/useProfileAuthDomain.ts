@@ -38,8 +38,11 @@ import { readClipboardText } from "../../platform/clipboard";
 import {
   clearIdentitySecrets,
   persistIdentitySecrets,
+  readStoredAttachedNsec,
   readStoredCashuMnemonic,
   readStoredSlip39Seed,
+  removeStoredAttachedNsec,
+  writeStoredAttachedNsec,
   writeStoredCashuMnemonic,
 } from "../../platform/identitySecrets";
 import { reportAppLog } from "../../devtools/inspector/appLog";
@@ -65,11 +68,16 @@ import {
 import { looksLikeSlip39Share } from "@linky-fit/identity";
 import { myProfileMetadataAtom } from "../state/contacts/profiles";
 import {
+  attachedNpubAtom,
+  attachedNsecAtom,
+  defaultNpubAtom,
   defaultNsecAtom,
   logoutArmedAtom,
+  nostrIdentitySourceAtom,
   pendingIdentitySwitchAtom,
   seedMnemonicAtom,
   slip39SeedAtom,
+  type NostrIdentitySource,
   type PendingIdentitySwitch,
 } from "../state/session/identity";
 import { currentNpubAtom } from "../state/session/session";
@@ -77,11 +85,7 @@ import { useMessagesCommands } from "./messages/useMessagesCommands";
 import { buildLinkstrConfig } from "./useLinkstrConfigSync";
 import { clearLegacyLaneStorage } from "../migrations/laneToShardMigration";
 import { runWrite } from "../lib/storeWrite";
-import {
-  getInitialNostrIdentitySource,
-  localStorageKv,
-  safeLocalStorageSet,
-} from "../../utils/storage";
+import { localStorageKv, safeLocalStorageSet } from "../../utils/storage";
 import type { FilePickerHandle } from "../../utils/pickFile";
 import { nowSeconds } from "../../utils/time";
 import { prepareProfilePicture } from "../lib/profilePicture";
@@ -94,7 +98,7 @@ import {
 import { fetchOwnedLightningAddress } from "../../utils/npubCashInfo";
 import type { I18nKey, Translate } from "../../i18n";
 
-type NostrIdentitySource = "custom" | "derived";
+export type { NostrIdentitySource };
 
 export interface PendingOnboardingProfile {
   error: string | null;
@@ -156,9 +160,15 @@ interface UseProfileAuthDomainResult {
   answerPendingIdentitySwitch: (
     source: IdentityProfileSource | null,
   ) => Promise<void>;
+  /** The custom identity kept on this device, in use or not. */
+  attachedIdentityNpub: string | null;
   /** Whether a custom identity is active, so the seed's own identity can be switched back to. */
   canSwitchToDefaultIdentity: boolean;
+  /** The npub the recovery seed derives, once derived. */
+  derivedIdentityNpub: string | null;
+  nostrIdentitySource: NostrIdentitySource;
   pendingIdentitySwitch: PendingIdentitySwitch | null;
+  switchToAttachedIdentity: () => Promise<void>;
   switchToDefaultIdentity: () => Promise<void>;
   confirmPendingOnboardingProfile: () => Promise<void>;
   createNewAccount: () => Promise<void>;
@@ -174,6 +184,8 @@ interface UseProfileAuthDomainResult {
   pasteReturningSlip39: (text: string, fromIndex: number) => number;
   pasteReturningSlip39FromClipboard: () => Promise<void>;
   pickPendingOnboardingPhoto: () => Promise<void>;
+  /** Forgets the attached custom identity; refused while it is in use. */
+  removeAttachedIdentity: () => Promise<void>;
   requestPasteNostrKeys: () => Promise<void>;
   requestLogout: (options: { evoluConnected: boolean }) => void;
   savePendingOnboardingBackupToPasswordManager: () => Promise<void>;
@@ -206,13 +218,17 @@ export const useProfileAuthDomain = ({
   >(null);
   const [slip39Seed, setSlip39Seed] = useAtom(slip39SeedAtom);
   const seedMnemonic = useAtomValue(seedMnemonicAtom);
-  const [activeNostrIdentitySource, setActiveNostrIdentitySource] =
-    React.useState<NostrIdentitySource>(() => getInitialNostrIdentitySource());
+  const [activeNostrIdentitySource, setActiveNostrIdentitySource] = useAtom(
+    nostrIdentitySourceAtom,
+  );
   const [logoutArmed, setLogoutArmed] = useAtom(logoutArmedAtom);
   const [pendingIdentitySwitch, setPendingIdentitySwitch] = useAtom(
     pendingIdentitySwitchAtom,
   );
   const [defaultNsec, setDefaultNsec] = useAtom(defaultNsecAtom);
+  const [defaultNpub, setDefaultNpub] = useAtom(defaultNpubAtom);
+  const [attachedNsec, setAttachedNsec] = useAtom(attachedNsecAtom);
+  const [attachedNpub, setAttachedNpub] = useAtom(attachedNpubAtom);
   // Cancelling clears it, so a check that resolves afterwards changes nothing.
   const identityCheckRef = React.useRef<object | null>(null);
   const onboardingPhotoInputRef = React.useRef<FilePickerHandle | null>(null);
@@ -224,21 +240,24 @@ export const useProfileAuthDomain = ({
     let cancelled = false;
 
     void (async () => {
-      const [storedCashuMnemonic, storedSlip39Seed] = await Promise.all([
-        readStoredCashuMnemonic(),
-        readStoredSlip39Seed(),
-      ]);
+      const [storedCashuMnemonic, storedSlip39Seed, storedAttachedNsec] =
+        await Promise.all([
+          readStoredCashuMnemonic(),
+          readStoredSlip39Seed(),
+          readStoredAttachedNsec(),
+        ]);
 
       if (cancelled) return;
       setCashuSeedMnemonic(storedCashuMnemonic);
       setSlip39Seed(storedSlip39Seed);
       setIsSeedLogin(Boolean(storedSlip39Seed));
+      setAttachedNsec(storedAttachedNsec?.trim() || null);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [setSlip39Seed]);
+  }, [setAttachedNsec, setSlip39Seed]);
   const decodeNsecPrivateBytes = React.useCallback(async (nsec: string) => {
     const raw = nsec.trim();
     if (!raw) return null;
@@ -301,17 +320,20 @@ export const useProfileAuthDomain = ({
     const normalizedSeed = (slip39Seed ?? "").trim();
     if (!normalizedSeed) {
       setDefaultNsec(null);
+      setDefaultNpub(null);
       return;
     }
 
     let cancelled = false;
     void deriveNostrKeysFromSlip39(normalizedSeed).then((derived) => {
-      if (!cancelled) setDefaultNsec(derived?.nsec.trim() || null);
+      if (cancelled) return;
+      setDefaultNsec(derived?.nsec.trim() || null);
+      setDefaultNpub(derived?.npub.trim() || null);
     });
     return () => {
       cancelled = true;
     };
-  }, [slip39Seed, setDefaultNsec]);
+  }, [slip39Seed, setDefaultNpub, setDefaultNsec]);
 
   React.useEffect(() => {
     if (!isSeedLogin) return;
@@ -462,6 +484,8 @@ export const useProfileAuthDomain = ({
       options?: {
         /** Published under the new identity before anything is stored. */
         profileToPublish?: ProfileMetadata;
+        /** The custom identity this device keeps attached, stored with the switch. */
+        attachNsec?: string;
         identitySource?: NostrIdentitySource;
         invalidMessageKey?: I18nKey;
         persistSyncedIdentity?: boolean;
@@ -517,6 +541,8 @@ export const useProfileAuthDomain = ({
         return;
       }
 
+      if (options?.attachNsec)
+        await writeStoredAttachedNsec(options.attachNsec);
       await persistIdentitySecrets({
         appMnemonic,
         cashuMnemonic: derivedCashuMnemonic,
@@ -558,6 +584,7 @@ export const useProfileAuthDomain = ({
       currentNsec,
       deriveAppMnemonicFromSlip39,
       messagesCommands,
+      setActiveNostrIdentitySource,
       publishProfileForNewKey,
       pushToast,
       t,
@@ -959,7 +986,16 @@ export const useProfileAuthDomain = ({
       target: IdentitySwitchTarget,
       profileToPublish: ProfileMetadata,
     ) => {
+      // The custom identity stays attached to this device, so the user can
+      // come back to it after switching to the derived one.
+      const customNsec =
+        target === "custom"
+          ? nsec
+          : activeNostrIdentitySource === "custom"
+            ? (currentNsec ?? "").trim()
+            : "";
       await setIdentityFromNsecAndReload(nsec, (slip39Seed ?? "").trim(), {
+        ...(customNsec ? { attachNsec: customNsec } : {}),
         identitySource: target === "custom" ? "custom" : "derived",
         invalidMessageKey: "nostrPasteInvalid",
         profileToPublish,
@@ -968,12 +1004,26 @@ export const useProfileAuthDomain = ({
           target === "custom" ? Math.ceil(Date.now() / 1000) : null,
       });
     },
-    [setIdentityFromNsecAndReload, slip39Seed],
+    [
+      activeNostrIdentitySource,
+      currentNsec,
+      setIdentityFromNsecAndReload,
+      slip39Seed,
+    ],
   );
 
-  /** Checks the identity's profile, then switches or waits for the user's choice. */
+  /**
+   * Checks the identity's profile, then switches. A freshly pasted identity
+   * waits for the user to choose its profile; an identity the user already
+   * had keeps the profile it has, so the switch asks nothing more unless the
+   * profile could not be fetched.
+   */
   const startIdentitySwitch = React.useCallback(
-    async (nsec: string, target: IdentitySwitchTarget) => {
+    async (
+      nsec: string,
+      target: IdentitySwitchTarget,
+      { chooseProfile }: { chooseProfile: boolean },
+    ) => {
       const secretKey = await decodeNsecPrivateBytes(nsec);
       if (!secretKey) {
         pushToast(t("nostrPasteInvalid"));
@@ -999,7 +1049,8 @@ export const useProfileAuthDomain = ({
       });
       if (identityCheckRef.current !== checkToken) return;
       identityCheckRef.current = null;
-      if (check.kind === "none") {
+      // An unchecked identity may have a profile of its own, so the user picks one even when switching back.
+      if (check.kind === "none" || (check.kind === "found" && !chooseProfile)) {
         setPendingIdentitySwitch({ phase: "switching", npub, pubkey, target });
         try {
           await switchIdentity(
@@ -1008,8 +1059,8 @@ export const useProfileAuthDomain = ({
             profileForIdentitySwitch({
               lightningAddress,
               linkyProfile,
-              nostrProfile: null,
-              source: "linky",
+              nostrProfile: check.kind === "found" ? check.metadata : null,
+              source: check.kind === "found" ? "nostr" : "linky",
             }),
           );
         } finally {
@@ -1064,7 +1115,7 @@ export const useProfileAuthDomain = ({
         return;
       }
 
-      await startIdentitySwitch(raw, "custom");
+      await startIdentitySwitch(raw, "custom", { chooseProfile: true });
     } finally {
       setOnboardingIsBusy(false);
     }
@@ -1075,11 +1126,51 @@ export const useProfileAuthDomain = ({
 
     setOnboardingIsBusy(true);
     try {
-      await startIdentitySwitch(defaultNsec, "default");
+      await startIdentitySwitch(defaultNsec, "default", {
+        chooseProfile: false,
+      });
     } finally {
       setOnboardingIsBusy(false);
     }
   }, [defaultNsec, onboardingIsBusy, startIdentitySwitch]);
+
+  const switchToAttachedIdentity = React.useCallback(async () => {
+    if (onboardingIsBusy || !attachedNsec) return;
+
+    setOnboardingIsBusy(true);
+    try {
+      await startIdentitySwitch(attachedNsec, "custom", {
+        chooseProfile: false,
+      });
+    } finally {
+      setOnboardingIsBusy(false);
+    }
+  }, [attachedNsec, onboardingIsBusy, startIdentitySwitch]);
+
+  const removeAttachedIdentity = React.useCallback(async () => {
+    if (!attachedNsec || attachedNsec === (currentNsec ?? "").trim()) return;
+    await removeStoredAttachedNsec();
+    setAttachedNsec(null);
+    reportAppLog({
+      tag: "identitySwitch.attachedRemoved",
+      summary: "User removed the attached custom identity from this device",
+      payload: { npub: attachedNpub },
+    });
+  }, [attachedNpub, attachedNsec, currentNsec, setAttachedNsec]);
+
+  React.useEffect(() => {
+    if (!attachedNsec) {
+      setAttachedNpub(null);
+      return;
+    }
+    let cancelled = false;
+    void deriveNpubFromNsec(attachedNsec).then((npub) => {
+      if (!cancelled) setAttachedNpub(npub);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [attachedNsec, deriveNpubFromNsec, setAttachedNpub]);
 
   const answerPendingIdentitySwitch = React.useCallback(
     async (source: IdentityProfileSource | null) => {
@@ -1184,13 +1275,16 @@ export const useProfileAuthDomain = ({
 
   return {
     answerPendingIdentitySwitch,
+    attachedIdentityNpub: attachedNpub,
     canSwitchToDefaultIdentity:
       defaultNsec !== null && defaultNsec !== (currentNsec ?? "").trim(),
     confirmPendingOnboardingProfile,
     createNewAccount,
     currentNpub,
+    derivedIdentityNpub: defaultNpub,
     isSeedLogin,
     logoutArmed,
+    nostrIdentitySource: activeNostrIdentitySource,
     onboardingIsBusy,
     onboardingPhotoInputRef,
     onboardingStep,
@@ -1201,6 +1295,7 @@ export const useProfileAuthDomain = ({
     pasteReturningSlip39FromClipboard,
     pendingIdentitySwitch,
     pickPendingOnboardingPhoto,
+    removeAttachedIdentity,
     requestPasteNostrKeys,
     requestLogout,
     savePendingOnboardingBackupToPasswordManager,
@@ -1212,6 +1307,7 @@ export const useProfileAuthDomain = ({
     setOnboardingStep,
     setPendingOnboardingName,
     submitReturningSlip39,
+    switchToAttachedIdentity,
     switchToDefaultIdentity,
   };
 };

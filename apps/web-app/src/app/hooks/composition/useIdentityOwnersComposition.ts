@@ -58,6 +58,8 @@ export const useIdentityOwnersComposition = ({
     answerPendingIdentitySwitch: profileAuth.answerPendingIdentitySwitch,
     requestLogout: profileAuth.requestLogout,
     requestPasteNostrKeys: profileAuth.requestPasteNostrKeys,
+    removeAttachedIdentity: profileAuth.removeAttachedIdentity,
+    switchToAttachedIdentity: profileAuth.switchToAttachedIdentity,
     switchToDefaultIdentity: profileAuth.switchToDefaultIdentity,
   });
 

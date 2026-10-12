@@ -16,9 +16,17 @@ _Avoid_: wallet mnemonic
 The Nostr key pair the user appears as to others.
 _Avoid_: account, user, profile
 
+**Derived identity**:
+The identity whose key comes from the recovery seed; the account uses it unless a custom identity is active.
+_Avoid_: default identity
+
 **Custom identity**:
 An identity whose secret key the user pasted in instead of deriving it from the recovery seed.
 _Avoid_: imported account, nsec login
+
+**Attached identity**:
+The custom identity a device keeps after the user switched back to the derived one, so it can be used again or removed; a device holds at most one.
+_Avoid_: saved nsec, secondary account
 
 **Profile**:
 The public metadata an identity publishes about itself, such as name, picture and lightning address.

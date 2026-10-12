@@ -12,6 +12,8 @@ export {
 } from "@linky-fit/linkshu";
 export const NOSTR_NSEC_STORAGE_KEY = "linky.nostr_nsec";
 export const NOSTR_SLIP39_SEED_STORAGE_KEY = "linky.nostr_slip39_seed";
+/** The custom identity's nsec kept on this device while the derived identity is in use. */
+export const NOSTR_ATTACHED_NSEC_STORAGE_KEY = "linky.nostr_attached_nsec";
 export const CASHU_BIP85_MNEMONIC_STORAGE_KEY = "linky.cashu_bip85_mnemonic";
 export const NOSTR_IDENTITY_SOURCE_STORAGE_KEY =
   "linky.nostr_identity_source.v1";
