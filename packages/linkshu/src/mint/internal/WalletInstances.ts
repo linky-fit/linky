@@ -247,7 +247,7 @@ export const makeWalletInstances = (
             new MintRejected({
               mint,
               code: null,
-              detail: `keyset ${foreign.keysetId} belongs to ${foreign.mint}`,
+              detail: `its keyset belongs to ${foreign.mint}`,
               keysetOwner: foreign.mint,
             }),
           );

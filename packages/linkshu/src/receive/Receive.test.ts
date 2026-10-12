@@ -68,7 +68,7 @@ const sourceProofs = [proof(4, "src-a"), proof(2, "src-b")];
 const keysetOfAnotherMint = new MintRejected({
   mint,
   code: null,
-  detail: "keyset 009a1f293253e41e belongs to https://owner.example",
+  detail: "its keyset belongs to https://owner.example",
   keysetOwner: MintUrl.make("https://owner.example"),
 });
 
