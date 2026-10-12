@@ -36,8 +36,8 @@ export const dejv: Author = {
   name: "Dejv",
   avatar: "/blog/authors/dejv.jpg",
   bio: {
-    en: "First developer at Linky. Also dev lead at Vexl.",
-    cs: "První vývojář Linky. Zároveň vede vývoj ve Vexlu.",
+    en: "First developer at Linky. Dev lead at Vexl.",
+    cs: "První vývojář Linky. Vede vývoj ve Vexlu.",
   },
   linky: "dejv",
   x: "Kaladivo",
