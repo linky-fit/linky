@@ -11,14 +11,41 @@ const pathRouting = process.env.LINKY_E2E_ROUTING === "path";
 export const routeUrl = (routePath: string): string =>
   pathRouting ? `/${routePath}` : `/#${routePath}`;
 
+// The router may leave characters such as `:` unescaped; route paths encode
+// each segment as routePathFor does.
+const canonicalPath = (pathname: string): string =>
+  pathname
+    .split("/")
+    .filter(Boolean)
+    .map((segment) => encodeURIComponent(decodeURIComponent(segment)))
+    .join("/");
+
 const routePathOfUrl = (url: URL): string =>
-  pathRouting ? `${url.pathname.slice(1)}${url.search}` : url.hash.slice(1);
+  pathRouting
+    ? `${canonicalPath(url.pathname)}${url.search}`
+    : url.hash.slice(1);
 
 export const routePathOf = (page: Page): string =>
   routePathOfUrl(new URL(page.url()));
 
-export const gotoRoute = async (page: Page, routePath: string) =>
-  page.goto(routeUrl(routePath));
+/**
+ * Opens a route. A page already showing the app changes route without a
+ * reload, as a hash change does, so app state and the load count survive.
+ */
+export const gotoRoute = async (
+  page: Page,
+  routePath: string,
+): Promise<void> => {
+  const url = routeUrl(routePath);
+  if (!pathRouting || !page.url().startsWith("http")) {
+    await page.goto(url);
+    return;
+  }
+  await page.evaluate((target) => {
+    window.history.pushState(null, "", target);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }, url);
+};
 
 const matches = (routePath: string, pattern: string | RegExp): boolean =>
   typeof pattern === "string" ? routePath === pattern : pattern.test(routePath);
