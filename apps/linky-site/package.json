@@ -15,7 +15,8 @@
     "test": "vitest run",
     "typecheck": "tsc -b",
     "preview": "vite preview",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "zapstore:screenshots": "bun scripts/zapstore-screenshots.ts"
   },
   "dependencies": {
     "react": "^19.2.3",

@@ -1,6 +1,8 @@
 # Zapstore publishing
 
-The `zapstore` job in `.github/workflows/release-linky.yml` publishes the same signed `linky.apk` the release workflow uploads to GitHub Releases: a clean runner downloads it, verifies the pinned `zsp` binary checksum and runs `zsp publish zapstore.yaml`. The job needs the `ZAPSTORE_NSEC` environment secret and fails, without printing anything, when the secret is missing or is not an `nsec`.
+The `zapstore` job in `.github/workflows/release-linky.yml` publishes the same signed `linky.apk` the release workflow uploads to GitHub Releases: a clean runner downloads it, verifies the pinned `zsp` binary checksum and runs `zsp publish zapstore.yaml`. Its store images come from the `zapstore-screenshots` job, which renders the site's phone demos with `bun run zapstore:screenshots` into the git-ignored `apps/linky-site/zapstore-screenshots/` and hands them over as an artifact. To change which screens Zapstore shows, edit the list in `apps/linky-site/scripts/zapstore-screenshots.ts` and the `images` in `zapstore.yaml` together.
+
+The job needs the `ZAPSTORE_NSEC` environment secret and fails, without printing anything, when the secret is missing or is not an `nsec`.
 
 ## One-time setup
 
@@ -12,6 +14,7 @@ The `zapstore` job in `.github/workflows/release-linky.yml` publishes the same s
 
    ```bash
    go install github.com/zapstore/zsp@v0.4.14
+   bun run zapstore:screenshots
    read -r -s ZAPSTORE_NSEC
    SIGN_WITH="$ZAPSTORE_NSEC" zsp publish --wizard
    unset ZAPSTORE_NSEC

@@ -2,20 +2,26 @@ import type { SiteLocale } from "../sitePreferences";
 
 export type CtaMode = "google-play" | "web" | "zapstore";
 
-export type Screen =
-  | "chat-payment"
-  | "chat-request"
-  | "contact-block"
-  | "contacts"
-  | "message-actions"
-  | "profile-open"
-  | "profile-share"
-  | "proxy-offer"
-  | "recurring-list"
-  | "restore-paste"
-  | "token-share"
-  | "tutorial-replay"
-  | "wallet";
+const screens = [
+  "chat-payment",
+  "chat-request",
+  "contact-block",
+  "contacts",
+  "message-actions",
+  "profile-open",
+  "profile-share",
+  "proxy-offer",
+  "recurring-list",
+  "restore-paste",
+  "token-share",
+  "tutorial-replay",
+  "wallet",
+] as const;
+
+export type Screen = (typeof screens)[number];
+
+export const isScreen = (value: string | null): value is Screen =>
+  screens.some((screen) => screen === value);
 
 export interface Feature {
   title: string;

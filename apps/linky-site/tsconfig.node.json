@@ -10,6 +10,7 @@
     "api/**/*.ts",
     "build/**/*.ts",
     "playwright.config.ts",
+    "scripts/**/*.ts",
     "tests/**/*.ts"
   ]
 }
