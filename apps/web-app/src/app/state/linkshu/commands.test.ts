@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import {
   Bip39Seed,
   linkshuServices,

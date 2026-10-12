@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { createId, NonEmptyString1000, PositiveInt } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { AtomRegistry } from "effect/reactivity";

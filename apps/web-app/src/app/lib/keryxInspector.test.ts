@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { KeryxMetadataInvalid } from "@linky-fit/keryx";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";

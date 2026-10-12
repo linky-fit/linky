@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { encodeNpub, encodeNsec } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { Effect } from "effect";

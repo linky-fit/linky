@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { createIdFromString } from "@linky-fit/linksync";
 import {
   Amount,

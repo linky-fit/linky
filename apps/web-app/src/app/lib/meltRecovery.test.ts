@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import {
   Amount,
   MeltReceipt,

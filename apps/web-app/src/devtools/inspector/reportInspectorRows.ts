@@ -97,7 +97,10 @@ const flushPendingRows = (): void => {
 };
 
 // Keeps rows reported right before navigating away, e.g. a login returning to its site.
-if (import.meta.env.DEV) window.addEventListener("pagehide", flushPendingRows);
+// React Native and node have no global addEventListener.
+if (import.meta.env.DEV && "addEventListener" in globalThis) {
+  globalThis.addEventListener("pagehide", flushPendingRows);
+}
 
 const scheduleFlush = (): void => {
   if (flushTimeoutId !== null) return;
