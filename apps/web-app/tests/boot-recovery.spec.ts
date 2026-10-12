@@ -9,10 +9,13 @@ import { addContactByNpub } from "./helpers/contacts";
 import { BOOT_DIAGNOSTIC_TEST_PHRASES } from "../src/utils/bootDiagnosticSecrets.fixture";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
 import { EVOLU_RELAY_URL } from "./helpers/stack";
+import {
+  EVOLU_WORKER_BUNDLE,
+  EVOLU_WORKER_REQUEST,
+  MAIN_BUNDLE,
+} from "./helpers/bundles";
 
 test.use({ serviceWorkers: "block" });
-
-const MAIN_BUNDLE = /\/(?:src\/main\.tsx|assets\/index-[^/]+\.js)(?:\?.*)?$/;
 
 test.beforeEach(async ({ page }) => {
   await stubFiatRates(page);
@@ -122,7 +125,7 @@ test("recovers when the authenticated app never commits", async ({ page }) => {
     },
     [nsec, mnemonic],
   );
-  await page.route("**/*Db.worker*", async (route) => {
+  await page.route(EVOLU_WORKER_REQUEST, async (route) => {
     databaseWorkerRequests += 1;
     await route.abort();
   });
@@ -160,7 +163,7 @@ test("a SQLite pool lock failure before or after other acquisitions preserves lo
     }
   });
   let failureTiming: "before" | "after" | null = null;
-  await page.route(/\/assets\/evoluDb\.worker-[^/]+\.js$/, async (route) => {
+  await page.route(EVOLU_WORKER_BUNDLE, async (route) => {
     if (failureTiming === null) return route.continue();
     const fault = `
       const openHandle = FileSystemFileHandle.prototype.createSyncAccessHandle;
