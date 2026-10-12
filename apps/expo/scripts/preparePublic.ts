@@ -1,6 +1,8 @@
 // Writes public/, which Expo serves in dev and copies into the export: the
 // index.html template, the PWA manifest and the web app's static files.
-import { cp, mkdir, rm } from "node:fs/promises";
+// Dev and build write the same files, so a build never changes what a
+// running dev server serves; the build adds the CSP to the export instead.
+import { cp, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { transform } from "esbuild";
 import { contentSecurityPolicy } from "@linky-fit/linky-app/server/contentSecurityPolicy.ts";
@@ -28,31 +30,41 @@ const escapeAttribute = (value: string): string =>
   value.replaceAll("&", "&amp;").replaceAll('"', "&quot;");
 
 /** apps/linky-app/index.html with what the Vite plugins add; Expo appends its bundle scripts. */
-const indexHtml = async (dev: boolean): Promise<string> => {
+const indexHtml = async (): Promise<string> => {
   const source = await Bun.file(join(webApp, "index.html")).text();
   const entry = '<script type="module" src="/src/main.tsx"></script>';
   if (!source.includes(entry)) throw new Error(`index.html lost ${entry}`);
-  const html = source
+  return source
     .replace(entry, "")
     .replace("<head>", `<head>\n${await bootDiagnosticRedactionScript()}`)
     .replace(
       "</head>",
       '<link rel="stylesheet" href="/fonts/manrope.css">\n<link rel="manifest" href="/manifest.webmanifest">\n</head>',
     );
-  // Metro dev evaluates lazy bundles with eval(), so CSP is build-only as with Vite.
-  if (dev) return html;
+};
+
+/**
+ * Adds the CSP meta to an exported index.html. Build-only, as with Vite:
+ * Metro dev evaluates lazy bundles with eval(), which the policy blocks.
+ */
+export const addContentSecurityPolicy = async (
+  indexHtmlPath: string,
+): Promise<void> => {
+  const html = await Bun.file(indexHtmlPath).text();
   const policy = contentSecurityPolicy(
     html,
     process.env.EXPO_PUBLIC_ALLOW_INSECURE_LOCALHOST_RELAYS === "1",
   );
-  return html.replace(
-    "<head>",
-    `<head>\n<meta http-equiv="Content-Security-Policy" content="${escapeAttribute(policy)}">`,
+  await Bun.write(
+    indexHtmlPath,
+    html.replace(
+      "<head>",
+      `<head>\n<meta http-equiv="Content-Security-Policy" content="${escapeAttribute(policy)}">`,
+    ),
   );
 };
 
-export const preparePublic = async ({ dev }: { dev: boolean }) => {
-  await rm(publicDir, { recursive: true, force: true });
+export const preparePublic = async (): Promise<void> => {
   // dereference: Expo copies public/ as is, symlinks included.
   const copy = (from: string, to: string, filter?: (path: string) => boolean) =>
     cp(from, join(publicDir, to), {
@@ -75,8 +87,7 @@ export const preparePublic = async ({ dev }: { dev: boolean }) => {
     join(publicDir, "manifest.webmanifest"),
     JSON.stringify(webManifest),
   );
-  await Bun.write(join(publicDir, "index.html"), await indexHtml(dev));
+  await Bun.write(join(publicDir, "index.html"), await indexHtml());
 };
 
-if (import.meta.main)
-  await preparePublic({ dev: process.argv.includes("--dev") });
+if (import.meta.main) await preparePublic();

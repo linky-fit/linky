@@ -5,7 +5,7 @@
   "type": "module",
   "main": "index.ts",
   "scripts": {
-    "dev": "bun scripts/preparePublic.ts --dev && expo start --web --port 5180",
+    "dev": "bun scripts/preparePublic.ts && expo start --web --port 5180",
     "build": "bun scripts/build.ts",
     "preview": "bun scripts/serve.ts 5181",
     "typecheck": "tsc -b",
