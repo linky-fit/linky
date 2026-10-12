@@ -136,6 +136,7 @@ export function Body() {
             světlém režimu a otevřený chat se méně překresluje, což poznáte v
             dlouhých konverzacích.
           </>,
+          <>Aplikace pro Android teď vyžaduje Android 7.0 nebo novější.</>,
         ]}
       />
 
