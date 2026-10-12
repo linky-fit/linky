@@ -7,18 +7,25 @@
   "scripts": {
     "dev": "bun scripts/preparePublic.ts --dev && expo start --web --port 5180",
     "build": "bun scripts/build.ts",
-    "preview": "expo serve --port 5181",
-    "typecheck": "tsc --noEmit",
+    "preview": "bun scripts/serve.ts 5181",
+    "typecheck": "tsc -b",
     "eslint": "eslint --fix .",
-    "prettier": "prettier --write ."
+    "prettier": "prettier --write .",
+    "test": "bun test src"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.15",
     "@linky-fit/linky-app": "workspace:*",
+    "effect": "^4.0.0",
     "expo": "~57.0.21",
+    "expo-constants": "~57.0.21",
+    "expo-linking": "~57.0.12",
+    "expo-router": "~57.0.26",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
     "react-native-web": "0.21.3"
   },
   "devDependencies": {

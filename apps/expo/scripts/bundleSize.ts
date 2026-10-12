@@ -3,7 +3,7 @@ import { gzipSync } from "node:zlib";
 
 // Total gzip size of the exported app JS, set a little above the current
 // build. Raise it deliberately when a change is worth the bytes.
-const BUDGET_GZIP_BYTES = 1950 * 1024;
+const BUDGET_GZIP_BYTES = 2150 * 1024;
 
 export const checkBundleSize = async (dist: string): Promise<void> => {
   let total = 0;

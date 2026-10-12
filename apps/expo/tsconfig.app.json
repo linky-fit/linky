@@ -1,0 +1,9 @@
+{
+  "extends": "@linky-fit/config/tsconfig/app",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "types": []
+  },
+  "include": ["app", "src", "../linky-app/src/vite-env.d.ts"],
+  "exclude": ["src/**/*.test.ts"]
+}
