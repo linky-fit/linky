@@ -938,7 +938,11 @@ export const en = {
   scanRequiresHttps:
     "Camera requires a secure context (HTTPS). Open Linky over https or install it as a PWA.",
   scanPermissionDenied:
-    "Camera permission denied. In Brave: click the lock icon → Site settings → Camera → Allow, then reload.",
+    "Camera permission denied. Allow the camera for this site in your browser's site settings, then reload.",
+  scanPermissionDeniedAndroid:
+    "Camera permission denied. Allow it in Settings → Apps → Linky → Permissions → Camera.",
+  scanPermissionDeniedIos:
+    "Camera permission denied. Allow it in Settings → Linky → Camera.",
   scanGallery: "Gallery",
   scanSwitchCamera: "Switch camera",
   scanCameraPreview: "Camera preview",

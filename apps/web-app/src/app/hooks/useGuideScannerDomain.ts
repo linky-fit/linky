@@ -13,6 +13,7 @@ import {
   type NativeScanStreamHandle,
   supportsNativeQrScan,
 } from "../../platform/nativeBridge";
+import { getPlatformTarget, type PlatformTarget } from "../../platform/runtime";
 import type { Route } from "../../types/route";
 import { appendPushDebugLog } from "../../utils/pushDebugLog";
 import type { ContactRowLike } from "../types/appTypes";
@@ -31,9 +32,15 @@ import {
   type ScanEntryPoint,
 } from "../state/shell/scan";
 import { useContactsGuide } from "./guide/useContactsGuide";
-import type { Translate } from "../../i18n";
+import type { I18nKey, Translate } from "../../i18n";
 
 export type { ScanDiagnostics };
+
+const SCAN_PERMISSION_DENIED_KEY: Record<PlatformTarget, I18nKey> = {
+  android: "scanPermissionDeniedAndroid",
+  ios: "scanPermissionDeniedIos",
+  web: "scanPermissionDenied",
+};
 
 /** Enough of a value to recognise the format, short enough for one line. */
 const SCAN_VALUE_PREVIEW_CHARS = 28;
@@ -324,7 +331,7 @@ export const useGuideScannerDomain = ({
       });
       pushToast(
         /permission/i.test(message) || /denied/i.test(message)
-          ? t("scanPermissionDenied")
+          ? t(SCAN_PERMISSION_DENIED_KEY[getPlatformTarget()])
           : message || t("scanCameraError"),
       );
       closeScan();
@@ -530,7 +537,7 @@ export const useGuideScannerDomain = ({
 
           pushToast(
             isPermissionDenied
-              ? t("scanPermissionDenied")
+              ? t(SCAN_PERMISSION_DENIED_KEY[getPlatformTarget()])
               : t("scanCameraError"),
           );
           stopScanStream();

@@ -944,7 +944,11 @@ export const cs = {
   scanRequiresHttps:
     "Kamera vyžaduje bezpečné připojení (HTTPS). Otevřete Linky přes https nebo jako nainstalovanou PWA.",
   scanPermissionDenied:
-    "Přístup ke kameře byl zamítnut. V Brave klikněte na zámek → Nastavení webu → Kamera → Povolit a stránku obnovte.",
+    "Přístup ke kameře byl zamítnut. Povolte kameru pro tento web v nastavení webu v prohlížeči a stránku obnovte.",
+  scanPermissionDeniedAndroid:
+    "Přístup ke kameře byl zamítnut. Povolte ho v Nastavení → Aplikace → Linky → Oprávnění → Fotoaparát.",
+  scanPermissionDeniedIos:
+    "Přístup ke kameře byl zamítnut. Povolte ho v Nastavení → Linky → Fotoaparát.",
   scanGallery: "Galerie",
   scanSwitchCamera: "Přepnout kameru",
   scanCameraPreview: "Náhled kamery",
