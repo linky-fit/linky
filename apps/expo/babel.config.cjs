@@ -19,9 +19,25 @@ const viteCompat = ({ types: t }) => {
     t.identifier("origin"),
   );
 
+  // Set by scripts/build.ts, which bundles the worker outside Metro.
+  const evoluWorkerUrl = process.env.LINKY_EVOLU_WORKER_URL;
+
   return {
     name: "linky-vite-compat",
     visitor: {
+      // A non-literal URL also keeps Metro from bundling the worker itself.
+      NewExpression(path) {
+        const [url] = path.node.arguments;
+        if (
+          evoluWorkerUrl &&
+          t.isIdentifier(path.node.callee, { name: "URL" }) &&
+          t.isStringLiteral(url) &&
+          url.value.endsWith("/evoluDb.worker.ts")
+        )
+          path.replaceWith(
+            t.binaryExpression("+", origin, t.stringLiteral(evoluWorkerUrl)),
+          );
+      },
       // Vite `define`s; metro.config.cjs sets the env vars Expo then inlines.
       ReferencedIdentifier(path) {
         const env = appGlobals.get(path.node.name);

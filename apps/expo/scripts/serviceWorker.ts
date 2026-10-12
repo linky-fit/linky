@@ -2,57 +2,21 @@
 // vite-plugin-pwa's injectManifest does for the Vite build.
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { join } from "node:path";
 import { injectManifest } from "workbox-build";
-import {
-  appCommitSha,
-  appVersion,
-} from "@linky-fit/linky-app/server/buildInfo.ts";
-
-const webApp = dirname(
-  Bun.resolveSync("@linky-fit/linky-app/package.json", import.meta.dir),
-);
-const viteBuildEnv = join(webApp, "src/platform/buildEnv.ts");
-const expoBuildEnv = join(import.meta.dir, "../src/buildEnv.ts");
+import { bundleWithBun } from "./bundleWithBun.ts";
 
 export const buildServiceWorker = async (dist: string): Promise<void> => {
   const outdir = await mkdtemp(join(tmpdir(), "linky-sw-"));
   try {
-    const built = await Bun.build({
-      entrypoints: [join(webApp, "src/sw.ts")],
+    const swSrc = await bundleWithBun("src/sw.ts", {
       outdir,
       naming: "sw.js",
       // Registered as a classic script, like the Vite build's /sw.js.
       format: "iife",
-      target: "browser",
-      minify: true,
-      // Inlines EXPO_PUBLIC_* as Expo does; unset ones read as undefined.
-      env: "EXPO_PUBLIC_*",
-      define: {
-        "process.env": "{}",
-        "process.env.NODE_ENV": '"production"',
-        __DEV__: "false",
-        __APP_VERSION__: JSON.stringify(appVersion),
-        __APP_COMMIT_SHA__: JSON.stringify(appCommitSha),
-      },
-      plugins: [
-        {
-          name: "expo-build-env",
-          setup(build) {
-            build.onResolve({ filter: /\/buildEnv$/ }, ({ path, importer }) =>
-              resolve(dirname(importer), `${path}.ts`) === viteBuildEnv
-                ? { path: expoBuildEnv }
-                : undefined,
-            );
-          },
-        },
-      ],
     });
-    if (!built.success)
-      throw new AggregateError(built.logs, "sw.ts build failed");
-
     const { count, size, warnings } = await injectManifest({
-      swSrc: join(outdir, "sw.js"),
+      swSrc,
       swDest: join(dist, "sw.js"),
       globDirectory: dist,
       globPatterns: ["**/*.{js,wasm,css,html,woff2}"],
