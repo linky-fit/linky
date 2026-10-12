@@ -1,0 +1,7 @@
+{
+  "expo": {
+    "name": "Linky",
+    "slug": "linky",
+    "web": { "bundler": "metro", "output": "single", "name": "Linky" }
+  }
+}

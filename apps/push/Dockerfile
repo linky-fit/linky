@@ -5,6 +5,7 @@ WORKDIR /app
 COPY package.json bun.lock ./
 COPY patches patches
 COPY apps/desktop/package.json apps/desktop/package.json
+COPY apps/expo/package.json apps/expo/package.json
 COPY apps/fazole-app/package.json apps/fazole-app/package.json
 COPY apps/fazole-site/package.json apps/fazole-site/package.json
 COPY apps/linkshu-cli/package.json apps/linkshu-cli/package.json

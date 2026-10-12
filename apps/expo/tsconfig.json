@@ -1,0 +1,9 @@
+{
+  "extends": "@linky-fit/config/tsconfig/base",
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "types": ["bun", "node"]
+  },
+  "include": ["src", "scripts", "server", "../linky-app/src/vite-env.d.ts"]
+}
