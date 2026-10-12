@@ -34,6 +34,8 @@ import { createSecretKey } from "../../testUtils/nostrKeys";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import { UNKNOWN_CONTACT_ID_PREFIX } from "../../utils/constants";
 import type { NewLocalNostrMessage } from "../types/appTypes";
+import type { Route } from "../../types/route";
+import { contactsAtom } from "../state/contacts/readModel";
 import { chatWritesAtom } from "../state/messages/chatWrites";
 import { applyChatMessageReceived } from "./messages/chatInbox";
 
@@ -92,9 +94,10 @@ const storeRegistry = async (store: LinkyStore) => {
 const renderDomain = async (
   store: LinkyStore,
   contacts: ReadonlyArray<{ readonly id: ContactId }> = [],
+  route: Route = { kind: "contacts" },
 ) => {
   const domainRef: { current: MessagesDomain | null } = { current: null };
-  const params = domainParams(store);
+  const params = { ...domainParams(store), route };
   for (const { id } of contacts)
     await Effect.runPromise(
       makeContactsRepository(store).insert({
@@ -119,7 +122,7 @@ const renderDomain = async (
     if (!domainRef.current) throw new Error("hook did not render");
     return domainRef.current;
   };
-  return { chatWrites, domain, view, ...params };
+  return { chatWrites, domain, registry, view, ...params };
 };
 
 const rumorId = RumorId.make("a".repeat(64));
@@ -392,6 +395,56 @@ describe("useMessagesDomain", () => {
     expect(await reactions()).toHaveLength(0);
     await view.unmount();
     vi.useRealTimers();
+  });
+
+  it("keeps the open conversation and unchanged rows when another conversation gets a message", async () => {
+    const { store } = makeTestLinkyStore();
+    const open = createId<"Contact">();
+    const other = createId<"Contact">();
+    const { domain, registry, view } = await renderDomain(
+      store,
+      [{ id: open }, { id: other }],
+      { kind: "chat", id: open },
+    );
+    const message = (
+      contactId: ContactId,
+      content: string,
+      createdAtSec: number,
+    ): NewLocalNostrMessage => ({
+      contactId,
+      content,
+      createdAtSec,
+      direction: "in",
+      pubkey: PEER,
+      rumorId: null,
+      wrapId: `wrap-${content}`,
+    });
+
+    await act(async () => {
+      domain().appendLocalNostrMessage(message(open, "first", 100));
+      domain().appendLocalNostrMessage(message(other, "elsewhere", 101));
+    });
+    const chat = domain().chatMessages;
+    const [first] = chat;
+    const contacts = registry.get(contactsAtom);
+    expect(chat.map((row) => row.content)).toEqual(["first"]);
+
+    await act(async () => {
+      domain().appendLocalNostrMessage(message(other, "elsewhere again", 102));
+    });
+    expect(domain().nostrMessagesLocal).toHaveLength(3);
+    expect(domain().chatMessages).toBe(chat);
+    expect(registry.get(contactsAtom)).toBe(contacts);
+
+    await act(async () => {
+      domain().appendLocalNostrMessage(message(open, "second", 103));
+    });
+    expect(domain().chatMessages.map((row) => row.content)).toEqual([
+      "first",
+      "second",
+    ]);
+    expect(domain().chatMessages[0]).toBe(first);
+    await view.unmount();
   });
 
   it("keeps messages that share a client id with another sender or direction", async () => {

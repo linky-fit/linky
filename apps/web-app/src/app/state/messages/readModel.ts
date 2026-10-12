@@ -1,6 +1,11 @@
 import type { MessageRow, ReactionRow } from "@linky-fit/linksync";
 import { Option } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
+import {
+  keepUnchangedLists,
+  keepUnchangedRows,
+  sameItems,
+} from "../../../utils/structuralSharing";
 import { trimString } from "../../../utils/validation";
 import { buildUnknownContactId } from "../../hooks/messages/contactIdentity";
 import {
@@ -30,6 +35,7 @@ import {
 } from "../session/store";
 
 const NO_ROWS: ReadonlyArray<never> = [];
+const NO_MESSAGES: LocalNostrMessage[] = [];
 
 const messageRowsResultAtom = liveAtom(
   conversationsRepositoryAtom,
@@ -109,10 +115,13 @@ export const localMessagesAtom = Atom.keepAlive(
       );
       return message ? [message] : [];
     });
-    return dedupeNostrMessagesByPriority([
-      ...get(contactMessagesAtom),
-      ...unknownSenderMessages,
-    ]).sort((a, b) => a.createdAtSec - b.createdAtSec);
+    return keepUnchangedRows(
+      Option.getOrUndefined(get.self<LocalNostrMessage[]>()),
+      dedupeNostrMessagesByPriority([
+        ...get(contactMessagesAtom),
+        ...unknownSenderMessages,
+      ]).sort((a, b) => a.createdAtSec - b.createdAtSec),
+    );
   }),
 );
 
@@ -168,7 +177,10 @@ export const localReactionsAtom = Atom.keepAlive(
       parsed.push(normalized);
     }
     parsed.sort((a, b) => a.createdAtSec - b.createdAtSec);
-    return parsed;
+    return keepUnchangedRows(
+      Option.getOrUndefined(get.self<LocalNostrReaction[]>()),
+      parsed,
+    );
   }),
 );
 
@@ -182,6 +194,7 @@ export interface MessagesByContact {
 
 export const messagesByContactAtom = Atom.keepAlive(
   Atom.readable((get): MessagesByContact => {
+    const previous = Option.getOrUndefined(get.self<MessagesByContact>());
     const messages = get(localMessagesAtom);
     const byContact = new Map<string, LocalNostrMessage[]>();
     const lastBy = new Map<string, LocalNostrMessage>();
@@ -199,29 +212,54 @@ export const messagesByContactAtom = Atom.keepAlive(
       }
     }
 
-    const recentSlice =
-      messages.length > 100 ? messages.slice(-100) : [...messages];
+    const recentMessages = messages.slice(-100).reverse();
 
     return {
-      messagesByContactId: byContact,
+      messagesByContactId: keepUnchangedLists(
+        previous?.messagesByContactId,
+        byContact,
+      ),
       lastMessageByContactId: lastBy,
-      recentMessages: [...recentSlice].reverse(),
+      recentMessages:
+        previous && sameItems(previous.recentMessages, recentMessages)
+          ? previous.recentMessages
+          : recentMessages,
     };
   }),
 );
 
-/** One contact's conversation, without duplicate copies of a message. */
-export const chatMessagesFor = (
-  byContact: MessagesByContact,
+const contactMessagesFamily = Atom.family((contactId: string) =>
+  Atom.readable(
+    (get) =>
+      get(messagesByContactAtom).messagesByContactId.get(contactId) ??
+      NO_MESSAGES,
+  ),
+);
+
+const chatMessagesFamily = Atom.family((contactId: string) =>
+  Atom.readable((get) =>
+    dedupeChatMessages(get(contactMessagesFamily(contactId))),
+  ),
+);
+
+const noChatMessagesAtom = Atom.readable(() => NO_MESSAGES);
+
+/**
+ * One contact's conversation, without duplicate copies of a message; it
+ * changes only with that conversation.
+ */
+export const chatMessagesAtom = (
   contactId: string | null,
-): LocalNostrMessage[] => {
+): Atom.Atom<LocalNostrMessage[]> => {
   const id = trimString(contactId);
-  if (!id) return [];
-  return dedupeChatMessages(byContact.messagesByContactId.get(id) ?? []);
+  return id ? chatMessagesFamily(id) : noChatMessagesAtom;
 };
 
 export const reactionsByMessageIdAtom = Atom.keepAlive(
   Atom.readable((get) => {
+    const previous = Option.getOrUndefined(
+      get.self<ReadonlyMap<string, LocalNostrReaction[]>>(),
+    );
     const byMessage = new Map<string, LocalNostrReaction[]>();
     for (const reaction of get(localReactionsAtom)) {
       const messageId = trimString(reaction.messageId);
@@ -230,6 +268,6 @@ export const reactionsByMessageIdAtom = Atom.keepAlive(
       if (list) list.push(reaction);
       else byMessage.set(messageId, [reaction]);
     }
-    return byMessage;
+    return keepUnchangedLists(previous, byMessage);
   }),
 );

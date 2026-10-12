@@ -3,6 +3,7 @@ import { Option } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { getContactGroups } from "../../../utils/contactGroups";
 import { getContactName } from "../../../utils/contactName";
+import { keepUnchangedRows } from "../../../utils/structuralSharing";
 import {
   joinContactChatState,
   type ContactWithChatState,
@@ -48,9 +49,12 @@ const withNormalizedName = (
 /** The saved contacts with their conversation's read cursors, newest first. */
 export const contactsAtom = Atom.keepAlive(
   Atom.readable((get) =>
-    joinContactChatState(get(contactRowsAtom), get(conversationRowsAtom))
-      .map(withNormalizedName)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    keepUnchangedRows(
+      Option.getOrUndefined(get.self<ContactWithChatState[]>()),
+      joinContactChatState(get(contactRowsAtom), get(conversationRowsAtom))
+        .map(withNormalizedName)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    ),
   ),
 );
 

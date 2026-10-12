@@ -24,8 +24,7 @@ import {
 import { chatWritesAtom } from "../../state/messages/chatWrites";
 import { bankPaymentOfferMessagesAtom } from "../../state/messages/bankOffers";
 import {
-  chatMessagesFor,
-  messagesByContactAtom,
+  chatMessagesAtom,
   reactionsByMessageIdAtom,
 } from "../../state/messages/readModel";
 import { currentNsecAtom } from "../../state/session/session";
@@ -62,7 +61,6 @@ export const withChatOffers = (
 
 /** The conversation the route shows, offers included on the chat route. */
 export const useChatMessages = (route: Route) => {
-  const messagesByContact = useAtomValue(messagesByContactAtom);
   const bankPaymentOfferMessages = useAtomValue(bankPaymentOfferMessagesAtom);
   const chatId =
     route.kind === "chat"
@@ -70,10 +68,7 @@ export const useChatMessages = (route: Route) => {
       : route.kind === "bankPaymentOffer"
         ? route.chatId
         : null;
-  const contactMessages = React.useMemo(
-    () => chatMessagesFor(messagesByContact, chatId),
-    [chatId, messagesByContact],
-  );
+  const contactMessages = useAtomValue(chatMessagesAtom(chatId));
   const chatMessages = React.useMemo(
     () => withChatOffers(route, contactMessages, bankPaymentOfferMessages),
     [bankPaymentOfferMessages, contactMessages, route],

@@ -64,7 +64,7 @@ interface RenderChatMessageOptions {
   getNpubMessageContactInfo?: (npub: string) => NpubMessageContactInfo | null;
   onAddNpubContacts?: (npubs: readonly string[], messageId: string) => void;
   contactsGroupAssignment?: MessageContactsGroupAssignment | null;
-  onSettleBankPaymentOffer?: () => Promise<void>;
+  onSettleBankPaymentOffer?: (message: LocalNostrMessage) => Promise<void>;
   paymentRequestInfo?: CashuPaymentRequestMessageInfo | null;
 }
 
@@ -435,7 +435,9 @@ describe("ChatMessage bank payment offer actions", () => {
       settleButton?.click();
     });
 
-    expect(onSettleBankPaymentOffer).toHaveBeenCalledOnce();
+    expect(onSettleBankPaymentOffer).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ id: "message-1" }),
+    );
   });
 
   it.each([

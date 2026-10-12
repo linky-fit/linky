@@ -114,15 +114,21 @@ interface ChatMessageProps {
   messageElRef?: (el: HTMLDivElement | null, messageId: string) => void;
   nextMessage: LocalNostrMessage | null;
   onCopy: (message: LocalNostrMessage) => void;
-  onOpenBankPaymentOfferDetails: () => void;
-  onSettleBankPaymentOffer: () => Promise<void>;
-  onDeclinePaymentRequest: () => void;
+  onOpenBankPaymentOfferDetails: (
+    message: LocalNostrMessage,
+    offer: BankPaymentOfferInfo,
+  ) => void;
+  onSettleBankPaymentOffer: (message: LocalNostrMessage) => Promise<void>;
+  onDeclinePaymentRequest: (message: LocalNostrMessage) => void;
   onEdit: (message: LocalNostrMessage) => void;
   onMintIconError: (url: string) => void;
   onAddNpubContacts: (npubs: readonly string[], messageId: string) => void;
   contactsGroupAssignment: MessageContactsGroupAssignment | null;
   onOpenNpubContact: (npub: string) => void;
-  onPayPaymentRequest: (requestInfo: CashuPaymentRequestMessageInfo) => void;
+  onPayPaymentRequest: (
+    message: LocalNostrMessage,
+    requestInfo: CashuPaymentRequestMessageInfo,
+  ) => void;
   onReact: (message: LocalNostrMessage, emoji: string) => void;
   onReply: (message: LocalNostrMessage) => void;
   payPaymentRequestBusy: boolean;
@@ -346,7 +352,7 @@ function ChatMessageComponent({
 
     setIsSettlingBankPaymentOffer(true);
     try {
-      await onSettleBankPaymentOffer();
+      await onSettleBankPaymentOffer(message);
     } finally {
       setIsSettlingBankPaymentOffer(false);
     }
@@ -748,7 +754,9 @@ function ChatMessageComponent({
             flex={1}
             icon="Info"
             variant={canSettleBankPaymentOffer ? "secondary" : "primary"}
-            onPress={onOpenBankPaymentOfferDetails}
+            onPress={() =>
+              onOpenBankPaymentOfferDetails(message, bankPaymentOfferInfo)
+            }
           >
             {t("details")}
           </Button>
@@ -800,7 +808,7 @@ function ChatMessageComponent({
                 ? t("payInsufficient")
                 : undefined
             }
-            onPress={() => onPayPaymentRequest(paymentRequestInfo)}
+            onPress={() => onPayPaymentRequest(message, paymentRequestInfo)}
           >
             {t("pay")}
           </Button>
@@ -808,7 +816,7 @@ function ChatMessageComponent({
             flex={1}
             icon="X"
             variant="secondary"
-            onPress={onDeclinePaymentRequest}
+            onPress={() => onDeclinePaymentRequest(message)}
           >
             {t("decline")}
           </Button>

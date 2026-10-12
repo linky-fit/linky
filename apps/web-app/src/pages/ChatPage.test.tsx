@@ -4,10 +4,14 @@ import {
   NostrSecretKey,
   type Pubkey,
 } from "@linky-fit/linkstr";
-import { act, createRef, type ComponentProps } from "react";
+import { act, createRef, memo, type ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type {
+  LocalNostrMessage,
+  LocalNostrReaction,
+} from "../app/types/appTypes";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
-import { ChatComposer, ChatNearbyBanner } from "./ChatPage";
+import { ChatComposer, ChatNearbyBanner, ChatPage } from "./ChatPage";
 
 const nearby = vi.hoisted(() => ({
   states: new Map<string, "nearby" | "buy" | "sell">(),
@@ -21,6 +25,23 @@ vi.mock("../app/hooks/useBeacon", () => ({
 vi.mock("../app/hooks/shell", async () =>
   (await import("../testUtils/shellHooks")).shellHooksMock(),
 );
+
+const rows = vi.hoisted(() => {
+  const rendered: string[] = [];
+  return { rendered };
+});
+
+vi.mock("../components/ChatMessage", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../components/ChatMessage")>()),
+  ChatMessage: memo(function ChatMessageProbe({
+    message,
+  }: {
+    message: LocalNostrMessage;
+  }) {
+    rows.rendered.push(message.id);
+    return null;
+  }),
+}));
 
 type Props = ComponentProps<typeof ChatComposer>;
 
@@ -169,6 +190,157 @@ describe("ChatNearbyBanner", () => {
       <ChatNearbyBanner npub={npub} t={(key) => key} />,
     );
     expect(container.querySelector('[role="status"]')).toBeNull();
+    await unmount();
+  });
+});
+
+describe("ChatPage message rows", () => {
+  type PageProps = ComponentProps<typeof ChatPage>;
+
+  const message = (id: string, createdAtSec: number): LocalNostrMessage => ({
+    contactId: "contact",
+    content: `text ${id}`,
+    createdAtSec,
+    direction: "in",
+    id,
+    pubkey: "peer",
+    rumorId: `rumor-${id}`,
+    wrapId: `wrap-${id}`,
+  });
+
+  const chatMessageElByIdRef = { current: new Map<string, HTMLDivElement>() };
+  const chatMessagesRef = createRef<HTMLDivElement>();
+
+  const pageProps = (
+    chatMessages: LocalNostrMessage[],
+    reactionsByMessageId: ReadonlyMap<string, LocalNostrReaction[]>,
+    cashuIsBusy: boolean,
+  ): PageProps => ({
+    addChatAttachments: vi.fn(),
+    bankPaymentOfferMessages: [],
+    cashuBalance: 100,
+    cashuBalanceAfterMelt: 100,
+    cashuIsBusy,
+    chatAttachments: [],
+    chatDraft: "",
+    chatMessageElByIdRef,
+    chatMessages,
+    chatMessagesRef,
+    chatOwnPubkeyHex: null,
+    chatSendIsBusy: false,
+    contactsGroupAssignment: null,
+    editContext: null,
+    feedbackContactNpub: "",
+    getCashuTokenMessageInfo: () => null,
+    getMintIconUrl: () => ({
+      failed: false,
+      host: null,
+      origin: null,
+      url: null,
+    }),
+    getNpubMessageContactInfo: () => null,
+    lang: "en",
+    markMintIconFailed: vi.fn(),
+    mentionContacts: [],
+    onAddNpubContacts: vi.fn(),
+    onAddUnknownContact: vi.fn(async () => {}),
+    onBlockUnknownContact: vi.fn(async () => {}),
+    onCancelEdit: vi.fn(),
+    onCancelReply: vi.fn(),
+    onCopy: vi.fn(),
+    onDeclinePaymentRequest: vi.fn(async () => {}),
+    onEdit: vi.fn(),
+    onOpenNpubContact: vi.fn(),
+    onPayPaymentRequest: vi.fn(async () => {}),
+    onReact: vi.fn(),
+    onReply: vi.fn(),
+    onSettleBankPaymentOffer: vi.fn(async () => {}),
+    openContactPay: vi.fn(),
+    payWithCashuEnabled: false,
+    reactionsByMessageId,
+    removeChatAttachment: vi.fn(),
+    replyContext: null,
+    selectedContact: { id: "contact", unknownPubkeyHex: "a".repeat(64) },
+    sendChatImage: vi.fn(async () => true),
+    sendChatMessage: vi.fn(async () => {}),
+    setChatDraft: vi.fn(),
+  });
+
+  afterEach(() => {
+    rows.rendered = [];
+    vi.unstubAllGlobals();
+  });
+
+  it("re-renders only the rows whose content or neighbours changed", async () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: false }));
+    const first = message("first", 100);
+    const second = message("second", 200);
+    const reactions = new Map([
+      [
+        "rumor-first",
+        [
+          {
+            createdAtSec: 150,
+            emoji: "👍",
+            id: "reaction",
+            messageId: "rumor-first",
+            reactorPubkey: "peer",
+            status: "sent" as const,
+            wrapId: "reaction-wrap",
+          },
+        ],
+      ],
+    ]);
+    const { rerender, unmount } = await renderIntoDocument(
+      <ChatPage {...pageProps([first, second], reactions, false)} />,
+    );
+    expect(rows.rendered).toEqual(["first", "second"]);
+    rows.rendered = [];
+
+    // Fresh callbacks, getters, reaction map and wallet state, as every parent render brings.
+    await rerender(
+      <ChatPage {...pageProps([first, second], new Map(reactions), true)} />,
+    );
+    expect(rows.rendered).toEqual([]);
+
+    await rerender(
+      <ChatPage
+        {...pageProps([first, second, message("third", 300)], reactions, true)}
+      />,
+    );
+    expect(rows.rendered).toEqual(["second", "third"]);
+    await unmount();
+  });
+
+  it("re-renders a row showing a token or an npub when its getter changes", async () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: false }));
+    const plain = message("plain", 100);
+    const token = { ...message("token", 200), content: "cashuBtoken" };
+    const npub = { ...message("npub", 300), content: "hi nostr:npub1abc" };
+    const props = pageProps([plain, token, npub], new Map(), false);
+    const { rerender, unmount } = await renderIntoDocument(
+      <ChatPage {...props} />,
+    );
+    rows.rendered = [];
+
+    const getCashuTokenMessageInfo = () => null;
+    await rerender(
+      <ChatPage
+        {...props}
+        getCashuTokenMessageInfo={getCashuTokenMessageInfo}
+      />,
+    );
+    expect(rows.rendered).toEqual(["token"]);
+    rows.rendered = [];
+
+    await rerender(
+      <ChatPage
+        {...props}
+        getCashuTokenMessageInfo={getCashuTokenMessageInfo}
+        getNpubMessageContactInfo={() => null}
+      />,
+    );
+    expect(rows.rendered).toEqual(["npub"]);
     await unmount();
   });
 });

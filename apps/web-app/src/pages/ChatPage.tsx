@@ -91,7 +91,10 @@ import {
   type CashuPaymentRequestMessageInfo,
 } from "../app/lib/paymentRequestMessage";
 import { parsePrivateImageMessage } from "../app/lib/privateImageMessage";
-import type { CashuTokenMessageInfo } from "../app/lib/tokenMessageInfo";
+import {
+  getCashuTokenMessageInfo as readCashuTokenMessageInfo,
+  type CashuTokenMessageInfo,
+} from "../app/lib/tokenMessageInfo";
 import type {
   ChatReactionChip,
   LocalNostrMessage,
@@ -111,6 +114,7 @@ import type { Translate } from "../i18n";
 import { formatChatDayLabel, normalizeLocale } from "../utils/formatting";
 import type { MintIcon } from "../utils/mint";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
+import { boundedMemo } from "../utils/boundedMemo";
 import { pickFiles } from "../utils/pickFile";
 import { nowSeconds } from "../utils/time";
 
@@ -167,7 +171,7 @@ interface ChatPageProps {
     intent?: "pay" | "request",
   ) => void;
   payWithCashuEnabled: boolean;
-  reactionsByMessageId: Map<string, LocalNostrReaction[]>;
+  reactionsByMessageId: ReadonlyMap<string, LocalNostrReaction[]>;
   replyContext: ReplyContext | null;
   selectedContact: Contact | null;
   sendChatImage: (
@@ -189,10 +193,72 @@ interface IndexedBankPaymentOffer {
 interface ParsedChatMessage {
   bankPaymentOfferInfo: BankPaymentOfferInfo | null;
   declineInfo: ReturnType<typeof parseLinkyPaymentRequestDeclineMessage>;
+  /** The row may show a token, so the wallet's token state can change it. */
+  hasCashuText: boolean;
+  /** The row may show an npub, so the contacts can change it. */
+  hasNpubText: boolean;
   isCashuToken: boolean;
   paymentRequestInfo: CashuPaymentRequestMessageInfo | null;
   privateImageInfo: ReturnType<typeof parsePrivateImageMessage>;
 }
+
+// Content never changes in place, so a conversation's rows keep their parsed parts across renders.
+const parseChatMessageContent = boundedMemo(
+  (content: string): ParsedChatMessage => {
+    const isCashuToken = readCashuTokenMessageInfo(content) !== null;
+    return {
+      bankPaymentOfferInfo: decodeBankPaymentOffer(content),
+      declineInfo: parseLinkyPaymentRequestDeclineMessage(content),
+      hasCashuText: isCashuToken || /cashu/i.test(content),
+      hasNpubText: /npub1/i.test(content),
+      isCashuToken,
+      paymentRequestInfo: parseCashuPaymentRequestMessage(content),
+      privateImageInfo: parsePrivateImageMessage(content),
+    };
+  },
+  5_000,
+);
+
+const NO_REACTIONS: readonly ChatReactionChip[] = [];
+
+const chipsByReactions = new WeakMap<
+  readonly LocalNostrReaction[],
+  { ownPubkeyHex: string | null; chips: readonly ChatReactionChip[] }
+>();
+
+const reactionChipsFor = (
+  reactions: readonly LocalNostrReaction[] | undefined,
+  ownPubkeyHex: string | null,
+): readonly ChatReactionChip[] => {
+  if (!reactions) return NO_REACTIONS;
+  const cached = chipsByReactions.get(reactions);
+  if (cached?.ownPubkeyHex === ownPubkeyHex) return cached.chips;
+  const chips = aggregateReactions(reactions, ownPubkeyHex);
+  chipsByReactions.set(reactions, { ownPubkeyHex, chips });
+  return chips;
+};
+
+// A row whose text has no token or npub never asks for one, so it gets these
+// instead of getters that change with the wallet and the contacts.
+const noTokenInfo = (): CashuTokenMessageInfo | null => null;
+const noNpubInfo = (): NpubMessageContactInfo | null => null;
+const noMintIcon = (): MintIcon => ({
+  failed: false,
+  host: null,
+  origin: null,
+  url: null,
+});
+
+const openBankPaymentOfferDetails = (
+  message: LocalNostrMessage,
+  offer: BankPaymentOfferInfo,
+) => {
+  const offerId = offer.offerId.trim();
+  const chatId = message.contactId.trim();
+  if (!offerId || !chatId) return;
+  setBankPaymentOfferMinimized(chatId, offerId, false);
+  navigateTo({ route: "bankPaymentOffer", chatId, offerId });
+};
 
 interface ChatMessageViewModel extends ParsedChatMessage {
   bankPaymentOfferPeerNotice: BankPaymentOfferPeerNotice | null;
@@ -203,10 +269,6 @@ interface ChatMessageViewModel extends ParsedChatMessage {
   isSeen: boolean;
   message: LocalNostrMessage;
   nextMessage: LocalNostrMessage | null;
-  onDeclinePaymentRequest: () => void;
-  onOpenBankPaymentOfferDetails: () => void;
-  onPayPaymentRequest: (requestInfo: CashuPaymentRequestMessageInfo) => void;
-  onSettleBankPaymentOffer: () => Promise<void>;
   payPaymentRequestDisabled: boolean;
   paymentRequestStatus: "declined" | "paid" | "requested" | null;
   previousMessage: LocalNostrMessage | null;
@@ -220,7 +282,7 @@ const buildBankPaymentOfferIndex = (
   const byOfferId = new Map<string, IndexedBankPaymentOffer[]>();
 
   for (const message of messages) {
-    const info = decodeBankPaymentOffer(message.content);
+    const info = parseChatMessageContent(message.content).bankPaymentOfferInfo;
     if (!info) continue;
 
     const indexed = {
@@ -307,10 +369,13 @@ interface ChatMessageListProps {
   onCopy: ChatPageProps["onCopy"];
   onAddNpubContacts: ChatPageProps["onAddNpubContacts"];
   contactsGroupAssignment: ChatPageProps["contactsGroupAssignment"];
-  onDeclinePaymentRequest: ChatPageProps["onDeclinePaymentRequest"];
+  onDeclinePaymentRequest: (message: LocalNostrMessage) => void;
   onEdit: ChatPageProps["onEdit"];
   onOpenNpubContact: ChatPageProps["onOpenNpubContact"];
-  onPayPaymentRequest: ChatPageProps["onPayPaymentRequest"];
+  onPayPaymentRequest: (
+    message: LocalNostrMessage,
+    requestInfo: CashuPaymentRequestMessageInfo,
+  ) => void;
   onReact: ChatPageProps["onReact"];
   onReply: ChatPageProps["onReply"];
   onSettleBankPaymentOffer: ChatPageProps["onSettleBankPaymentOffer"];
@@ -318,10 +383,48 @@ interface ChatMessageListProps {
   /** Peer's reported seen window; 0 bounds mean no receipt yet. */
   peerSeenSinceSec: number;
   peerSeenUpToSec: number;
-  reactionsByMessageId: Map<string, LocalNostrReaction[]>;
+  reactionsByMessageId: ReadonlyMap<string, LocalNostrReaction[]>;
   selectedContactId: string;
   t: Translate;
 }
+
+type MessageRowActions = Pick<
+  ChatMessageListProps,
+  | "markMintIconFailed"
+  | "onAddNpubContacts"
+  | "onCopy"
+  | "onDeclinePaymentRequest"
+  | "onEdit"
+  | "onOpenNpubContact"
+  | "onPayPaymentRequest"
+  | "onReact"
+  | "onReply"
+  | "onSettleBankPaymentOffer"
+>;
+
+/** The row actions with a lasting identity, so a message row re-renders only when what it shows changes. */
+const useStableRowActions = (actions: MessageRowActions): MessageRowActions => {
+  const latest = useLatest(actions);
+  return useMemo(
+    () => ({
+      markMintIconFailed: (url) => latest.current.markMintIconFailed(url),
+      onAddNpubContacts: (npubs, messageId) =>
+        latest.current.onAddNpubContacts(npubs, messageId),
+      onCopy: (message) => latest.current.onCopy(message),
+      onDeclinePaymentRequest: (message) =>
+        latest.current.onDeclinePaymentRequest(message),
+      onEdit: (message) => latest.current.onEdit(message),
+      onOpenNpubContact: (npub) => latest.current.onOpenNpubContact(npub),
+      onPayPaymentRequest: (message, requestInfo) =>
+        latest.current.onPayPaymentRequest(message, requestInfo),
+      onReact: (message, emoji) => latest.current.onReact(message, emoji),
+      onReply: (message) => latest.current.onReply(message),
+      onSettleBankPaymentOffer: (message) =>
+        latest.current.onSettleBankPaymentOffer(message),
+    }),
+    [latest],
+  );
+};
 
 const ChatMessageList = memo(function ChatMessageList({
   bankPaymentOfferMessages,
@@ -395,19 +498,9 @@ const ChatMessageList = memo(function ChatMessageList({
 
   const viewModels = useMemo<ChatMessageViewModel[]>(() => {
     const byRumorId = new Map<string, LocalNostrMessage>();
-    const parsedByMessage = new Map<LocalNostrMessage, ParsedChatMessage>();
-
     for (const message of chatMessages) {
-      const content = message.content;
       const rumorId = (message.rumorId ?? "").trim();
       if (rumorId) byRumorId.set(rumorId, message);
-      parsedByMessage.set(message, {
-        bankPaymentOfferInfo: decodeBankPaymentOffer(content),
-        declineInfo: parseLinkyPaymentRequestDeclineMessage(content),
-        isCashuToken: Boolean(getCashuTokenMessageInfo(content)),
-        paymentRequestInfo: parseCashuPaymentRequestMessage(content),
-        privateImageInfo: parsePrivateImageMessage(content),
-      });
     }
 
     const latestRequestResponseByRumorId = new Map<
@@ -416,8 +509,8 @@ const ChatMessageList = memo(function ChatMessageList({
     >();
     for (const message of chatMessages) {
       const replyToId = (message.replyToId ?? "").trim();
-      const parsed = parsedByMessage.get(message);
-      if (!replyToId || !parsed) continue;
+      if (!replyToId) continue;
+      const parsed = parseChatMessageContent(message.content);
       if (!parsed.isCashuToken && !parsed.declineInfo) continue;
 
       const createdAtSec = message.createdAtSec || 0;
@@ -432,13 +525,7 @@ const ChatMessageList = memo(function ChatMessageList({
     const offersById = buildBankPaymentOfferIndex(bankPaymentOfferMessages);
 
     return chatMessages.map((message, index) => {
-      const parsed = parsedByMessage.get(message) ?? {
-        bankPaymentOfferInfo: null,
-        declineInfo: null,
-        isCashuToken: false,
-        paymentRequestInfo: null,
-        privateImageInfo: null,
-      };
+      const parsed = parseChatMessageContent(message.content);
       const rumorId = (message.rumorId ?? "").trim();
       const createdAtSec = message.createdAtSec || 0;
       const isSeen =
@@ -501,20 +588,6 @@ const ChatMessageList = memo(function ChatMessageList({
         message,
         nextMessage:
           index + 1 < chatMessages.length ? chatMessages[index + 1] : null,
-        onDeclinePaymentRequest: () => {
-          void onDeclinePaymentRequest(message);
-        },
-        onOpenBankPaymentOfferDetails: () => {
-          const offerId = (parsed.bankPaymentOfferInfo?.offerId ?? "").trim();
-          const chatId = message.contactId.trim();
-          if (!offerId || !chatId) return;
-          setBankPaymentOfferMinimized(chatId, offerId, false);
-          navigateTo({ route: "bankPaymentOffer", chatId, offerId });
-        },
-        onPayPaymentRequest: (requestInfo) => {
-          void onPayPaymentRequest(message, requestInfo);
-        },
-        onSettleBankPaymentOffer: () => onSettleBankPaymentOffer(message),
         payPaymentRequestDisabled:
           !parsed.paymentRequestInfo ||
           cashuIsBusy ||
@@ -524,11 +597,11 @@ const ChatMessageList = memo(function ChatMessageList({
           : null,
         previousMessage: index > 0 ? chatMessages[index - 1] : null,
         reactions: rumorId
-          ? aggregateReactions(
-              reactionsByMessageId.get(rumorId) ?? [],
+          ? reactionChipsFor(
+              reactionsByMessageId.get(rumorId),
               chatOwnPubkeyHex,
             )
-          : [],
+          : NO_REACTIONS,
         replyQuoteText,
       };
     });
@@ -539,10 +612,6 @@ const ChatMessageList = memo(function ChatMessageList({
     chatMessages,
     chatOwnPubkeyHex,
     formatDisplayedAmountText,
-    getCashuTokenMessageInfo,
-    onDeclinePaymentRequest,
-    onPayPaymentRequest,
-    onSettleBankPaymentOffer,
     peerSeenSinceSec,
     peerSeenUpToSec,
     reactionsByMessageId,
@@ -577,9 +646,15 @@ const ChatMessageList = memo(function ChatMessageList({
               nextMessage={viewModel.nextMessage}
               locale={locale}
               formatChatDayLabel={formatChatDayLabelForLang}
-              getCashuTokenMessageInfo={getCashuTokenMessageInfo}
-              getMintIconUrl={getMintIconUrl}
-              getNpubMessageContactInfo={getNpubMessageContactInfo}
+              getCashuTokenMessageInfo={
+                viewModel.hasCashuText ? getCashuTokenMessageInfo : noTokenInfo
+              }
+              getMintIconUrl={
+                viewModel.hasCashuText ? getMintIconUrl : noMintIcon
+              }
+              getNpubMessageContactInfo={
+                viewModel.hasNpubText ? getNpubMessageContactInfo : noNpubInfo
+              }
               onMintIconError={markMintIconFailed}
               actionLabels={actionLabels}
               canEdit={viewModel.canEdit}
@@ -592,17 +667,19 @@ const ChatMessageList = memo(function ChatMessageList({
               bankPaymentOfferPeerNotice={viewModel.bankPaymentOfferPeerNotice}
               canOpenBankPaymentOfferDetails={canOpenBankPaymentOfferDetails}
               canSettleBankPaymentOffer={viewModel.canSettleBankPaymentOffer}
-              onOpenBankPaymentOfferDetails={
-                viewModel.onOpenBankPaymentOfferDetails
-              }
-              onDeclinePaymentRequest={viewModel.onDeclinePaymentRequest}
-              onPayPaymentRequest={viewModel.onPayPaymentRequest}
-              onSettleBankPaymentOffer={viewModel.onSettleBankPaymentOffer}
+              onOpenBankPaymentOfferDetails={openBankPaymentOfferDetails}
+              onDeclinePaymentRequest={onDeclinePaymentRequest}
+              onPayPaymentRequest={onPayPaymentRequest}
+              onSettleBankPaymentOffer={onSettleBankPaymentOffer}
               canActOnPaymentRequest={viewModel.canActOnPaymentRequest}
               payPaymentRequestDisabled={viewModel.payPaymentRequestDisabled}
-              payPaymentRequestBusy={cashuIsBusy}
+              payPaymentRequestBusy={
+                viewModel.paymentRequestInfo ? cashuIsBusy : false
+              }
               replyQuoteText={viewModel.replyQuoteText}
-              settleBankPaymentOfferBusy={cashuIsBusy}
+              settleBankPaymentOfferBusy={
+                viewModel.bankPaymentOfferInfo ? cashuIsBusy : false
+              }
               onCopy={onCopy}
               onAddNpubContacts={onAddNpubContacts}
               contactsGroupAssignment={contactsGroupAssignment}
@@ -1232,6 +1309,22 @@ export const ChatPage: FC<ChatPageProps> = ({
   const { t } = useTranslation();
   const { formatDisplayedAmountText } = useDisplayAmounts();
   const composeInputRef = useRef<HTMLDivElement | null>(null);
+  const rowActions = useStableRowActions({
+    markMintIconFailed,
+    onAddNpubContacts,
+    onCopy,
+    onDeclinePaymentRequest: (message) => {
+      void onDeclinePaymentRequest(message);
+    },
+    onEdit,
+    onOpenNpubContact,
+    onPayPaymentRequest: (message, requestInfo) => {
+      void onPayPaymentRequest(message, requestInfo);
+    },
+    onReact,
+    onReply,
+    onSettleBankPaymentOffer,
+  });
   const npub = selectedContact
     ? normalizeNpubIdentifier(selectedContact.npub ?? "")
     : null;
@@ -1330,21 +1423,12 @@ export const ChatPage: FC<ChatPageProps> = ({
         getMintIconUrl={getMintIconUrl}
         getNpubMessageContactInfo={getNpubMessageContactInfo}
         lang={lang}
-        onCopy={onCopy}
-        onAddNpubContacts={onAddNpubContacts}
+        {...rowActions}
         contactsGroupAssignment={contactsGroupAssignment}
-        onDeclinePaymentRequest={onDeclinePaymentRequest}
-        onEdit={onEdit}
-        onOpenNpubContact={onOpenNpubContact}
-        onPayPaymentRequest={onPayPaymentRequest}
-        onSettleBankPaymentOffer={onSettleBankPaymentOffer}
-        onReact={onReact}
-        onReply={onReply}
         peerSeenSinceSec={selectedContact.chatPeerSeenSinceSec ?? 0}
         peerSeenUpToSec={selectedContact.chatPeerSeenAtSec ?? 0}
         reactionsByMessageId={reactionsByMessageId}
         selectedContactId={selectedContact.id}
-        markMintIconFailed={markMintIconFailed}
         t={t}
       />
 

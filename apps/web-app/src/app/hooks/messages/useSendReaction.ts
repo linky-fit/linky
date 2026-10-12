@@ -38,7 +38,7 @@ interface UseSendReactionParams<
 > {
   appendLocalNostrReaction: AppendLocalNostrReaction;
   currentNsec: string | null;
-  reactionsByMessageId: Map<string, LocalNostrReaction[]>;
+  reactionsByMessageId: ReadonlyMap<string, LocalNostrReaction[]>;
   route: TRoute;
   selectedContact: TContact | null;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;

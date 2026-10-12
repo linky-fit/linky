@@ -27,7 +27,7 @@ import {
   pendingPaymentsKeyFor,
 } from "../state/messages/chatWrites";
 import {
-  chatMessagesFor,
+  chatMessagesAtom,
   localMessagesAtom,
   localReactionsAtom,
   messageRowsAtom,
@@ -393,14 +393,10 @@ export const useMessagesDomain = ({
 
   const pendingPaymentsKey = pendingPaymentsKeyFor(appOwnerId);
 
-  const messagesByContact = useAtomValue(messagesByContactAtom);
   const { lastMessageByContactId, recentMessages: nostrMessagesRecent } =
-    messagesByContact;
+    useAtomValue(messagesByContactAtom);
   const reactionsByMessageId = useAtomValue(reactionsByMessageIdAtom);
-  const chatMessages = React.useMemo(
-    () => chatMessagesFor(messagesByContact, activeChatRouteId),
-    [activeChatRouteId, messagesByContact],
-  );
+  const chatMessages = useAtomValue(chatMessagesAtom(activeChatRouteId));
 
   return {
     appendLocalNostrMessage: chatWrites.appendLocalNostrMessage,

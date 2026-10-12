@@ -10,6 +10,7 @@ import {
 import { useRouting } from "../../hooks/useRouting";
 import { ContactsPage } from "../../pages/ContactsPage";
 import { WalletPage } from "../../pages/WalletPage";
+import { boundedMemo } from "../../utils/boundedMemo";
 import { createContactNameFormatter } from "../../utils/contactName";
 import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
 import { nowSeconds } from "../../utils/time";
@@ -34,7 +35,6 @@ import { useActiveBankPaymentOfferContacts } from "../hooks/useBankPaymentOffers
 import { useOpenFeedbackContact } from "../hooks/useFeedbackContact";
 import { useCashuTokenMessageInfo } from "../hooks/wallet/useWalletInventory";
 import { useTokenContactSend } from "../hooks/wallet/useWalletTokens";
-import { parsePrivateImageMessage } from "../lib/privateImageMessage";
 import {
   activeContactGroupAtom,
   contactsFilterOpenAtom,
@@ -124,6 +124,11 @@ const useContactCardRenderer = () => {
   );
   const unreadByContactId = useAtomValue(unreadByContactIdAtom);
   const getCashuTokenMessageInfo = useCashuTokenMessageInfo();
+  // One info object per preview text, so token rows keep their props until the wallet changes.
+  const tokenInfoFor = React.useMemo(
+    () => boundedMemo(getCashuTokenMessageInfo, 1_000),
+    [getCashuTokenMessageInfo],
+  );
   const { getMintIconUrl, markMintIconFailed } = useMintIcons();
   const getNpubMessageContactInfo = useNpubMessageContactInfo();
   const { pendingCashuTokenContactPickId, sendCashuTokenToContact } =
@@ -169,11 +174,7 @@ const useContactCardRenderer = () => {
           isActive={(contact.id ?? "") === getDesktopActiveContactId(route)}
           isUnknownContact={Boolean(contact.isUnknownContact)}
           statusText={npub ? (nostrStatusByNpub[npub] ?? null) : null}
-          tokenInfo={
-            lastText && !parsePrivateImageMessage(lastText)
-              ? getCashuTokenMessageInfo(lastText)
-              : null
-          }
+          tokenInfo={lastText ? tokenInfoFor(lastText) : null}
           getMintIconUrl={getMintIconUrl}
           getNpubMessageContactInfo={getNpubMessageContactInfo}
           onSelect={handleSelectContact}
@@ -184,7 +185,6 @@ const useContactCardRenderer = () => {
     [
       displayContactById,
       formatContactName,
-      getCashuTokenMessageInfo,
       getMintIconUrl,
       getNpubMessageContactInfo,
       handleSelectContact,
@@ -193,6 +193,7 @@ const useContactCardRenderer = () => {
       nostrPictureByNpub,
       nostrStatusByNpub,
       route,
+      tokenInfoFor,
       unreadByContactId,
     ],
   );
