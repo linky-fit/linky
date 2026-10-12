@@ -48,4 +48,18 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     : resolution;
 };
 
+// Loaded on the first request: `expo export` starts this server too.
+config.server.enhanceMiddleware = (metroMiddleware) => {
+  let devMiddleware;
+  return (req, res, next) => {
+    devMiddleware ??= jiti(
+      path.join(__dirname, "server/devMiddleware.ts"),
+    ).withDevMiddleware(metroMiddleware, {
+      port: config.server.port,
+      serverRoot: config.server.unstable_serverRoot,
+    });
+    return devMiddleware(req, res, next);
+  };
+};
+
 module.exports = config;
