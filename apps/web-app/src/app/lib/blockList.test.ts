@@ -16,6 +16,7 @@ import {
   mergeMuteList,
   readBlockChanges,
   readBlockList,
+  subscribeBlockList,
   toMuteListChanges,
   unblockPubkey,
   type BlockChange,
@@ -290,5 +291,28 @@ describe("block list storage", () => {
     expect(toMuteListChanges(readBlockChanges())).toEqual([
       change(alice.pubkey, true, 1_000),
     ]);
+  });
+
+  it("tells subscribers when the block list changes, until they unsubscribe", () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeBlockList(listener);
+    blockPubkey(alice.pubkey);
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    adoptMuteList(
+      muteList([alice.pubkey], 1_001, [change(alice.pubkey, true, 1_000)]),
+    );
+    expect(listener).toHaveBeenCalledTimes(1);
+    adoptMuteList(
+      muteList([bob.pubkey], 1_002, [
+        change(alice.pubkey, true, 1_000),
+        change(bob.pubkey, true, 1_002),
+      ]),
+    );
+    expect(listener).toHaveBeenCalledTimes(2);
+
+    unsubscribe();
+    unblockPubkey(alice.pubkey);
+    expect(listener).toHaveBeenCalledTimes(2);
   });
 });

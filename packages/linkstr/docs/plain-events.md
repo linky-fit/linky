@@ -122,7 +122,9 @@ Two plain replaceable events with empty content: kind 10002 (NIP-65) with one `[
 
 `fetchOwnMuteList()` asks every read and write relay for your kind 10000 and returns the newest as a `FetchedMuteList`, or `null` when every relay answered and none holds one. Its `changes` are the timed changes it carries, empty when its content is missing or another client encrypted it. When no answering relay holds a list but some relay did not answer, it fails with `SomeRelaysUnanswered`, since the silent relay may hold the only list. Each relay gets 4 s, so a silent relay delays the result by that much at most. Fetch at startup so a new device learns who you blocked elsewhere, and again right before a publish, so the publish does not drop what another device added.
 
-In React, call the `publishMuteList` command with the complete pubkey list and its options whenever the list changes; it returns the same `PlainEventReceipt`, whose `sentAt` is the published list's `createdAt`. The `fetchOwnMuteList` command runs `fetchOwnMuteList`.
+`watchOwnMuteList(options?)` keeps a running session current: a scoped `Stream<FetchedMuteList>` over the same read and write relays, decoded as `fetchOwnMuteList` decodes, stored lists first and then live ones, resubscribing with backoff from `resubscribeDelay` (5 s by default). It emits only lists newer than the last one it emitted, so a lagging relay's older list never follows a newer one; the first list it emits may still be older than one you fetched. Your own publishes come back through it as well. Merge each list as you merge a fetched one, and publish only when the merged list differs from the newest list a fresh fetch returns: your own list echoing back then publishes nothing, and neither does an older list. Closing the scope ends the subscriptions.
+
+In React, call the `publishMuteList` command with the complete pubkey list and its options whenever the list changes; it returns the same `PlainEventReceipt`, whose `sentAt` is the published list's `createdAt`. The `fetchOwnMuteList` command runs `fetchOwnMuteList`. For the watch, set `muteListWatchHandlerAtom` to `{ onList }` and keep `muteListWatchAtom` mounted ([react.md](./react.md#mute-list-watch)).
 
 ```ts
 import { Effect } from "effect";
@@ -132,7 +134,7 @@ const publishBlocked = (blocked: ReadonlyArray<Pubkey>) =>
   Effect.flatMap(MuteList, (muteList) => muteList.publishMuteList(blocked));
 ```
 
-Publishing does not block anyone by itself, and there is no watch of your own mute list. Muting is enforced on receive by you: `WrapInbox` still delivers wraps from muted senders, so drop events whose `from` is on your block list in the inbox handler (and check `to` on `Own…Confirmed` facts if you hide a whole conversation).
+Publishing does not block anyone by itself. Muting is enforced on receive by you: `WrapInbox` still delivers wraps from muted senders, so drop events whose `from` is on your block list in the inbox handler (and check `to` on `Own…Confirmed` facts if you hide a whole conversation).
 
 ### Wire format
 
@@ -140,7 +142,7 @@ Kind 10000, plain and replaceable: one `["p", pubkey]` per muted contact, readab
 
 ### Errors
 
-`NoRelayAcceptedEvent` (publish); the local block still applies, republish later. `AllRelaysUnreachable`, `SomeRelaysUnanswered` and `NoReadRelaysConfigured` (fetch); keep the local list and do not publish, since a publish replaces a list you have not seen.
+`NoRelayAcceptedEvent` (publish); the local block still applies, republish later. `AllRelaysUnreachable`, `SomeRelaysUnanswered` and `NoReadRelaysConfigured` (fetch); keep the local list and do not publish, since a publish replaces a list you have not seen. `NoReadRelaysConfigured` (watch) when there are no read or write relays.
 
 ## App data (NIP-78)
 

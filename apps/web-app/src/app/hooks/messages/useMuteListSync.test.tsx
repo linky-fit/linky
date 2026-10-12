@@ -10,7 +10,7 @@ import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { Exit } from "effect";
 import { AtomRegistry } from "effect/reactivity";
 import React, { act } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { assert, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import {
   blockPubkey,
@@ -41,7 +41,10 @@ vi.mock("@linky-fit/linkstr-react", async (importOriginal) => ({
   }),
 }));
 
-import { RegistryContext } from "@linky-fit/linkstr-react";
+import {
+  muteListWatchHandlerAtom,
+  RegistryContext,
+} from "@linky-fit/linkstr-react";
 import { useMuteListSync } from "./useMuteListSync";
 
 const [me, blockedElsewhere, blockedHere] = [
@@ -72,6 +75,14 @@ const render = async (enabled: boolean) => {
   const view = await renderIntoDocument(withRegistry(enabled));
   return {
     synced,
+    /** Delivers a list as the mute list watch would. */
+    watch: (remote: FetchedMuteList) =>
+      act(async () => {
+        const handler = registry.get(muteListWatchHandlerAtom);
+        if (handler === null) throw new Error("the watch is closed");
+        handler.onList(remote);
+        for (let tick = 0; tick < 10; tick += 1) await Promise.resolve();
+      }),
     enable: () => view.rerender(withRegistry(true)),
     unmount: () => view.unmount(),
   };
@@ -83,7 +94,7 @@ const list = (
   changes: FetchedMuteList["changes"] = [],
 ) =>
   new FetchedMuteList({
-    eventId: EventId.make("e".repeat(64)),
+    eventId: EventId.make(createdAt.toString(16).padStart(64, "0")),
     pubkeys,
     changes,
     createdAt: UnixSeconds.make(createdAt),
@@ -231,5 +242,71 @@ describe("useMuteListSync", () => {
     expect(publishMock).not.toHaveBeenCalled();
     expect(hasMergedMuteList(me.pubkey)).toBe(false);
     await probe.unmount();
+  });
+
+  describe("for the rest of the session", () => {
+    it("merges a newer list another device published, without publishing it back", async () => {
+      const probe = await render(true);
+      await settle();
+      relay.list = otherDevicesList(2_000);
+
+      await probe.watch(relay.list);
+
+      expect(readBlockList()).toEqual([blockedElsewhere.pubkey]);
+      expect(publishMock).not.toHaveBeenCalled();
+      await probe.unmount();
+    });
+
+    it("takes this device's own publish echoing back as a no-op", async () => {
+      blockPubkey(blockedHere.pubkey);
+      const probe = await render(true);
+      await settle();
+      expect(publishMock).toHaveBeenCalledTimes(1);
+      const [fetches, echo] = [fetchMock.mock.calls.length, relay.list];
+      assert(echo !== null);
+
+      await probe.watch(echo);
+
+      expect(publishMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledTimes(fetches);
+      expect(readBlockList()).toEqual([blockedHere.pubkey]);
+      await probe.unmount();
+    });
+
+    it("publishes nothing for an older list the relays' newest replaced", async () => {
+      relay.list = otherDevicesList(1_000);
+      const probe = await render(true);
+      await settle();
+      unblockPubkey(blockedElsewhere.pubkey);
+      blockPubkey(blockedHere.pubkey);
+      relay.list = list(
+        [blockedHere.pubkey],
+        3_000,
+        toMuteListChanges(readBlockChanges()),
+      );
+      const fetches = fetchMock.mock.calls.length;
+
+      await probe.watch(otherDevicesList(1_000));
+
+      expect(readBlockList()).toEqual([blockedHere.pubkey]);
+      expect(fetchMock).toHaveBeenCalledTimes(fetches + 1);
+      expect(publishMock).not.toHaveBeenCalled();
+      await probe.unmount();
+    });
+
+    it("publishes a change of its own the delivered list and the relays both lack", async () => {
+      const probe = await render(true);
+      await settle();
+      blockPubkey(blockedHere.pubkey);
+      relay.list = otherDevicesList(2_000);
+
+      await probe.watch(relay.list);
+
+      expect(publishMock).toHaveBeenCalledTimes(1);
+      expect(new Set(relay.list?.pubkeys)).toEqual(
+        new Set([blockedElsewhere.pubkey, blockedHere.pubkey]),
+      );
+      await probe.unmount();
+    });
   });
 });

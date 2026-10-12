@@ -2,7 +2,6 @@ import { encodeNpub, Pubkey } from "@linky-fit/linkstr";
 import { Option } from "effect";
 import { Atom } from "effect/reactivity";
 import { keepUnchangedRows } from "../../../utils/structuralSharing";
-import { isBlockedPubkey } from "../../lib/blockList";
 import { mergeBankPaymentOffersIntoLastMessageByContactId } from "../../lib/bankPaymentOfferRows";
 import {
   isUnknownContactId,
@@ -15,6 +14,7 @@ import {
   messagesByContactAtom,
 } from "../messages/readModel";
 import { currentPubkeyAtom } from "../session/session";
+import { blockListAtom } from "./blockList";
 import { unknownNamesAtom } from "./chatContacts";
 
 /** The newest message per conversation, proxy payment offers included. */
@@ -48,6 +48,7 @@ export const unknownSendersAtom = Atom.keepAlive(
     const messages = get(localMessagesAtom);
     const ownPubkey = normalizePubkeyHex(get(currentPubkeyAtom));
     const unknownNames = get(unknownNamesAtom);
+    const blocked = new Set(get(blockListAtom));
     const unknownById = new Map<string, UnknownSender>();
 
     for (const [contactId, lastMessage] of get(
@@ -65,7 +66,7 @@ export const unknownSendersAtom = Atom.keepAlive(
         .map((message) => normalizePubkeyHex(message.pubkey))
         .find((pubkey) => {
           if (!pubkey) return false;
-          if (isBlockedPubkey(pubkey)) return false;
+          if (blocked.has(pubkey)) return false;
           if (ownPubkey && ownPubkey === pubkey) return false;
           return true;
         });
@@ -75,7 +76,7 @@ export const unknownSendersAtom = Atom.keepAlive(
         candidatePubkeyFromThread ??
         candidatePubkeyFromLast ??
         null;
-      if (unknownPubkeyHex && isBlockedPubkey(unknownPubkeyHex)) continue;
+      if (unknownPubkeyHex && blocked.has(unknownPubkeyHex)) continue;
       if (unknownPubkeyHex && ownPubkey && unknownPubkeyHex === ownPubkey) {
         continue;
       }
