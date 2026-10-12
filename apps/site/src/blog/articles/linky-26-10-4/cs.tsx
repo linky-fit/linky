@@ -7,60 +7,44 @@ export function Body() {
       <Paragraph>
         Linky 26.10.4 je venku. Většina novinek se týká toho, co ve vašem Linky
         zůstane: které zprávy zůstanou v konverzaci, kdo zůstane v kontaktech a
-        kdo vám vůbec může napsat. Začnu tím, pak přijdou notifikace na Androidu
-        bez Googlu, nová obnova účtu a zbytek vydání.
+        kdo vám vůbec může napsat.
       </Paragraph>
 
       <Heading>Smazání zprávy u obou stran</Heading>
       <Paragraph>
-        Odeslanou zprávu jste zatím mohli jen upravit. Teď má menu zprávy i
-        Smazat. Na telefonu podržte na zprávě prst, na počítači klikněte na tři
-        tečky vedle ní. Pak zvolte Smazat. Text i reakce zmizí na obou
-        telefonech a oběma zůstane na jejím místě „Zpráva byla smazána“, takže
-        konverzace dál dává smysl.
-      </Paragraph>
-      <Paragraph>
-        Smazat jde jakoukoli zprávu v konverzaci včetně fotek a souborů, i tu od
-        druhé strany. Tokeny, žádosti o platbu a nabídky proxy plateb tlačítko
-        Smazat nemají. Druhá strana potřebuje také verzi 26.10.4. Starší verze
-        zprávu dál ukazuje.
+        Odeslanou zprávu jste zatím mohli jen upravit, teď jde i smazat. Na long
+        press nebo press na 3 tečky otevřete submenu a zvolte Smazat. Text i
+        reakce zmizí na obou telefonech a oběma zůstane na jejím místě „Zpráva
+        byla smazána“. Funguje to stejně jako třeba v Signalu.
       </Paragraph>
 
       <Heading>Reakce jakýmkoli emoji</Heading>
       <Paragraph>
-        Řádek reakcí ve stejném menu měl šest emoji. Vedle nich je teď tlačítko
-        plus, které otevře celý seznam emoji rozdělený do záložek jako na
-        klávesnici. Vybrané emoji se pod zprávou ukáže jako každá jiná reakce.
+        Řádek s reakcemi nemá už jen šest emoji, ale lze vybrat z celého seznamu
+        emoji.
       </Paragraph>
       <DemoFigure
         screen="message-actions"
-        caption="Dave reaguje na zprávu od Mii emoji z celého seznamu a pak smaže zprávu, která patřila mámě."
+        caption="Dave chtěl poslat zprávu mámě, ale poslal ji Mie. Nevadí, prostě ji smaže!"
       />
 
       <Heading>Smazání a blokování kontaktů</Heading>
       <Paragraph>
-        Kontakty se dřív přesouvaly do archivu, druhého seznamu, který skoro
-        nikdo neotevíral. Teď je smažete. Otevřete úpravu kontaktu a klepněte na
-        ikonu koše nahoře. Kontakt hned zmizí a oznámení nabídne Vrátit zpět.
-        Konverzace se neztratí: když vám ten člověk znovu napíše, kontakt se
-        vrátí i s celou historií.
+        Místo archivace lze kontakt z Linky odstranit. Stačí klepnout na ikonku
+        koše v horní liště. Konverzace zmizí a v případě, že vám ten člověk
+        znovu napíše, kontakt se vrátí s celou historií.
       </Paragraph>
       <Paragraph>
-        To se hodí pro někoho, s kým jste si jen přestali psát, ale ne na spam.
-        Proto stejné oznámení nabízí i Blokovat a úprava kontaktu má tlačítko
-        Blokovat, které kontakt smaže a zablokuje naráz. Linky pak všechno, co
-        ten člověk pošle, ignoruje. Nic se neuloží ani nezobrazí a žádná zpráva
-        ho zpátky nevrátí.
+        V Linky taky jde zablokovat spam. V takovém případě vám zablokovaný
+        profil nebude moct napsat a nic se neuloží ani nezobrazí.
       </Paragraph>
       <DemoFigure
         screen="contact-block"
         caption="Dave smaže kontakt, který mu posílá spam, zablokuje ho z oznámení a najde ho v Nastavení na stránce Blokovaní."
       />
       <Paragraph>
-        V Nastavení přibyla stránka Blokovaní se všemi, koho jste zablokovali, a
-        u každého je tlačítko Odblokovat. Blokování i odblokování se
-        synchronizuje na všechna vaše zařízení a na ostatních platí hned. Po
-        odblokování projdou nové zprávy.
+        Odblokovat zablokované kontakty jde v Nastavení. Blokace se automaticky
+        synchronizuje mezi zařízeními.
       </Paragraph>
 
       <Heading>Notifikace na Androidu bez Googlu</Heading>
@@ -81,22 +65,17 @@ export function Body() {
 
       <Heading>Obnova účtu jedním vložením</Heading>
       <Paragraph>
-        Při obnově účtu jste dosud psali všech 20 slov zálohy do jednoho pole.
-        Správce hesel ho neuměl vyplnit a překlep se v něm hledal špatně.
-        Obrazovka obnovy má teď tlačítko Vložit ze schránky, které vezme celou
-        zálohu najednou. Vyplní všech 20 polí a samo pokračuje dál.
+        Hezčí obnova účtu ze SLIP-39. Spíš kosmetická změna, ale může být taky
+        užitečná. Seed jde samozřejmě pořád vložit ze schránky zařízení.
       </Paragraph>
       <DemoFigure
         screen="restore-paste"
         caption="Dave obnoví účet na novém telefonu vložením zálohy."
       />
       <Paragraph>
-        Pokud máte slova na papíře, napište je do 20 polí jedno po druhém. Linky
-        každé slovo zkontroluje proti seznamu slov SLIP-39, označí ta, která
-        nezná, a při psaní nabízí slova k doplnění. 3. a 4. slovo je v záloze
-        Linky vždy „academic“, není to překlep. Správce hesel, který má zálohu
-        uloženou pro app.linky.fit, umí vyplnit první pole a Linky slova rozdělí
-        do ostatních.
+        Pokud si svůj recovery seed pamatujete nazpaměť (ok, woow 😅), nebo ho z
+        jiného důvodu píšete ručně, Linky vám teď hezky doplňuje slova podle
+        slovníku SLIP-39.
       </Paragraph>
 
       <Heading>Co je v této verzi dál</Heading>
@@ -170,22 +149,8 @@ export function Body() {
         vydaná verze. Všechno z tohoto článku tam běželo jako první.
       </Paragraph>
       <Paragraph>
-        Nightly sdílí účty s aktuálním vydáním. Obnovte v ní účet ze svých
-        hlavních klíčů, teď už jedním vložením, a připojí se jako další
-        zařízení. Běží na vlastní adrese, takže má i vlastní lokální úložiště.
-        Verzi nightly najdete v Nastavení &gt; Pokročilé.
-      </Paragraph>
-      <Paragraph>
         Počítejte s tím, že tu a tam něco drhne. Když na to narazíte, dejte nám
         vědět.
-      </Paragraph>
-
-      <Heading>Vyzkoušejte to</Heading>
-      <Paragraph>
-        Linky běží v prohlížeči na{" "}
-        <TextLink href="https://app.linky.fit">app.linky.fit</TextLink> a
-        najdete ho i na Google Play a Zapstore. Podržte prst na zprávě, klepněte
-        na plus a vyberte emoji, které ve starém řádku nebylo.
       </Paragraph>
     </>
   );

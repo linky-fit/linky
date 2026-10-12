@@ -7,63 +7,46 @@ export function Body() {
       <Paragraph>
         Linky 26.10.4 is out. Most of it is about deciding what stays in your
         Linky: which messages stay in a chat, who stays in your contacts and who
-        can write to you at all. I'll start there, then cover notifications on
-        Android phones without Google, the new restore screen and the rest of
-        the release.
+        can write to you at all.
       </Paragraph>
 
       <Heading>Delete a message for both sides</Heading>
       <Paragraph>
-        Until now you could only edit a message after sending it. Now the
-        message menu has Delete. Long-press a message on the phone, or use the
-        three dots next to it on a computer, and tap Delete. The text and its
-        reactions disappear on both phones, and both of you keep a "Message
-        deleted" placeholder in its place, so the conversation still reads in
-        order.
-      </Paragraph>
-      <Paragraph>
-        It works on any message in the conversation, photos and files included,
-        and on the other person's messages too. Tokens, payment requests and
-        proxy payment offers have no Delete. The other person needs 26.10.4 as
-        well. An older version keeps showing the message.
+        Until now you could only edit a message after sending it. Now you can
+        delete it too. Long-press it or tap the three dots to open its menu, and
+        pick Delete. The text and its reactions disappear on both phones, and
+        both of you keep a "Message deleted" placeholder in its place. It works
+        the same way as in Signal.
       </Paragraph>
 
       <Heading>React with any emoji</Heading>
       <Paragraph>
-        The reaction row in the same menu had six emojis. Next to them is now a
-        plus button that opens the full emoji list, grouped into tabs the way
-        your keyboard groups them. Whatever you pick shows up under the message
-        like any other reaction.
+        The reaction row isn't limited to six emojis anymore. You can pick any
+        emoji from the full list.
       </Paragraph>
       <DemoFigure
         screen="message-actions"
-        caption="Dave reacts to Mia's message with an emoji from the full list, then deletes a message meant for his mom."
+        caption="Dave meant to send a message to his mom, but sent it to Mia. No problem, he just deletes it!"
       />
 
       <Heading>Delete and block contacts</Heading>
       <Paragraph>
-        Contacts used to go to an archive, a second list that hardly anyone
-        opened. Now you delete them. Open the contact's edit page and tap the
-        trash icon in the top bar. The contact disappears right away and a toast
-        offers Undo. The conversation isn't lost. If that person writes to you
-        again, the contact comes back with the whole history.
+        Instead of archiving a contact, you can now remove it from Linky. Just
+        tap the trash icon in the top bar. The conversation disappears, and if
+        that person writes to you again, the contact comes back with the whole
+        history.
       </Paragraph>
       <Paragraph>
-        That's what you want for someone you just stopped talking to, but not
-        for spam. So the same toast also offers Block, and the edit page has a
-        Block button that deletes and blocks in one step. Linky then ignores
-        everything that person sends. Nothing gets stored or shown, and no
-        message brings them back.
+        You can also block spam in Linky. A blocked profile can't write to you,
+        and nothing they send gets stored or shown.
       </Paragraph>
       <DemoFigure
         screen="contact-block"
         caption="Dave deletes a contact who keeps sending him spam, blocks him from the toast and finds him under Settings > Blocked."
       />
       <Paragraph>
-        Settings has a new Blocked page with everyone you blocked and an Unblock
-        button for each. Blocks and unblocks sync to all your devices and take
-        effect on the others right away. After an unblock, new messages get
-        through.
+        You can unblock blocked contacts in Settings. Blocks sync between your
+        devices automatically.
       </Paragraph>
 
       <Heading>Notifications on Android without Google</Heading>
@@ -83,23 +66,18 @@ export function Body() {
 
       <Heading>Restore with one paste</Heading>
       <Paragraph>
-        Restoring an account used to mean typing all 20 words of your recovery
-        seed into one text field. Password managers couldn't fill it, and a typo
-        was hard to find. The restore screen now has a Paste from clipboard
-        button that takes the whole backup at once. It fills all 20 fields and
-        continues by itself.
+        A nicer way to restore your account from SLIP-39. It's mostly a cosmetic
+        change, but it can come in handy. You can of course still paste the seed
+        from your device's clipboard.
       </Paragraph>
       <DemoFigure
         screen="restore-paste"
         caption="Dave restores his account on a new phone by pasting his backup."
       />
       <Paragraph>
-        If you have the words on paper, type them into the 20 fields one by one.
-        Linky checks each word against the SLIP-39 word list, marks the ones it
-        doesn't know and suggests words as you type. Words 3 and 4 of a Linky
-        backup are always "academic". That's not a typo. A password manager that
-        saved your backup for app.linky.fit can also fill the first field, and
-        Linky spreads the words over the rest.
+        If you know your recovery seed by heart (OK, wow 😅), or type it by hand
+        for some other reason, Linky now completes the words for you from the
+        SLIP-39 word list.
       </Paragraph>
 
       <Heading>Also in this release</Heading>
@@ -172,21 +150,7 @@ export function Body() {
         production relays, mints and sync servers as the release. Everything in
         this post ran there first.
       </Paragraph>
-      <Paragraph>
-        Nightly shares accounts with the current release. Restore your recovery
-        seed there, now with one paste, and it joins your account as one more
-        device. It lives on its own address, so it keeps its own local storage.
-        Settings &gt; Advanced shows which nightly version you're on.
-      </Paragraph>
       <Paragraph>Expect rough edges. When you hit one, tell us.</Paragraph>
-
-      <Heading>Try it</Heading>
-      <Paragraph>
-        Linky runs in the browser at{" "}
-        <TextLink href="https://app.linky.fit">app.linky.fit</TextLink>, and
-        it's also on Google Play and Zapstore. Long-press a message, tap the
-        plus and pick an emoji the old row didn't have.
-      </Paragraph>
     </>
   );
 }
