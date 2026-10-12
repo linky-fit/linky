@@ -72,6 +72,17 @@ export function Body() {
         slovníku SLIP-39.
       </Paragraph>
 
+      <Heading>Tutoriál kdykoli znovu</Heading>
+      <Paragraph>
+        V Nastavení přibyla stránka Tutoriál. Najdete na ní kroky Začínáme a
+        kterýkoli z nich si můžete projít znovu, i když už ho máte hotový. Hodí
+        se, když zapomenete, kde něco je, nebo když ukazujete Linky kamarádovi.
+      </Paragraph>
+      <DemoFigure
+        screen="tutorial-replay"
+        caption="Dave si v Nastavení na stránce Tutoriál znovu projde, jak zaplatit kontaktu."
+      />
+
       <Heading>Co je v této verzi dál</Heading>
       <BulletList
         items={[
@@ -115,10 +126,6 @@ export function Body() {
           <>
             Linky už samo nemaže staré zprávy. Dřív dlouhé historie zkracovalo
             na všech zařízeních.
-          </>,
-          <>
-            V Nastavení v Tutoriálu najdete všechny kroky Začínáme a kterýkoli z
-            nich můžete projít znovu, i když už ho máte splněný.
           </>,
           <>
             Nabídka proxy platby ukazuje hned vedle částky, jestli je bankovní
