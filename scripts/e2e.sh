@@ -28,7 +28,8 @@ compose=(docker compose -f "$root/docker-compose.dev.yml" --profile e2e)
 case "${1-}" in
   down) exec "${compose[@]}" down --volumes ;;
   site) shift && app=linky-site ;;
-  expo) shift && app=linky-app && LINKY_E2E_WEB_BUNDLER=expo && set -- --project=local-stack "$@" ;;
+  # The Expo app routes with path URLs; the specs read LINKY_E2E_ROUTING.
+  expo) shift && app=linky-app && LINKY_E2E_WEB_BUNDLER=expo && export LINKY_E2E_ROUTING=path && set -- --project=local-stack "$@" ;;
   *) app=linky-app && set -- --project=local-stack "$@" ;;
 esac
 export LINKY_E2E_WEB_IMAGE="linky-app:$name-$LINKY_E2E_WEB_BUNDLER"

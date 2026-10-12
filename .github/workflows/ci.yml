@@ -168,12 +168,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { bundler: vite, check: app-e2e, cache: linky-app }
-          - { bundler: expo, check: app-e2e-expo, cache: linky-app-expo }
+          - { bundler: vite, routing: hash, check: app-e2e, cache: linky-app }
+          - { bundler: expo, routing: path, check: app-e2e-expo, cache: linky-app-expo }
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       LINKY_E2E_WEB_BUNDLER: ${{ matrix.bundler }}
+      LINKY_E2E_ROUTING: ${{ matrix.routing }}
 
     steps:
       - name: Checkout
