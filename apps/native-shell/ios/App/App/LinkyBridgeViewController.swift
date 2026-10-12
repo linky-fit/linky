@@ -6,5 +6,6 @@ final class LinkyBridgeViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(LinkySecretStoragePlugin())
         bridge?.registerPluginInstance(LinkyScannerPlugin())
         bridge?.registerPluginInstance(LinkyBeaconPlugin())
+        bridge?.registerPluginInstance(LinkyStatusBarPlugin())
     }
 }

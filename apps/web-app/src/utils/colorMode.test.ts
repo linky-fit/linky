@@ -1,10 +1,17 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { setNativeStatusBarColorMode } from "../platform/nativeBridge";
+
+vi.mock("../platform/nativeBridge", () => ({
+  setNativeStatusBarColorMode: vi.fn(),
+}));
 
 const loadColorMode = async () => {
   vi.resetModules();
   return import("./colorMode");
 };
+
+const systemThemeEvents = new EventTarget();
 
 const stubSystemPrefersLight = (matches: boolean) => {
   vi.spyOn(window, "matchMedia").mockImplementation(
@@ -12,11 +19,13 @@ const stubSystemPrefersLight = (matches: boolean) => {
       matches,
       media: query,
       onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
+      addEventListener:
+        systemThemeEvents.addEventListener.bind(systemThemeEvents),
+      removeEventListener:
+        systemThemeEvents.removeEventListener.bind(systemThemeEvents),
       addListener: () => {},
       removeListener: () => {},
-      dispatchEvent: () => false,
+      dispatchEvent: systemThemeEvents.dispatchEvent.bind(systemThemeEvents),
     }),
   );
 };
@@ -47,6 +56,20 @@ describe("colorMode", () => {
     expect((await loadColorMode()).getColorModePreference()).toBe("dark");
   });
 
+  it("notifies subscribers when the system theme changes", async () => {
+    stubSystemPrefersLight(false);
+    const colorMode = await loadColorMode();
+    const listener = vi.fn();
+    const unsubscribe = colorMode.subscribeColorMode(listener);
+
+    stubSystemPrefersLight(true);
+    systemThemeEvents.dispatchEvent(new Event("change"));
+    unsubscribe();
+
+    expect(listener).toHaveBeenCalledOnce();
+    expect(colorMode.getColorMode()).toBe("light");
+  });
+
   it("paints the document and browser chrome with the theme background", async () => {
     const { applyColorModeToDocument } = await loadColorMode();
     const { themes } = await import("@linky-fit/ui/tokens");
@@ -58,6 +81,7 @@ describe("colorMode", () => {
 
     expect(document.documentElement.dataset.colorMode).toBe("light");
     expect(meta.content).toBe(themes.light.background);
+    expect(setNativeStatusBarColorMode).toHaveBeenCalledWith("light");
     meta.remove();
   });
 });

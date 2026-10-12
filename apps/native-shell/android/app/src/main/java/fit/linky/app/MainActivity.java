@@ -30,6 +30,7 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import com.google.zxing.BarcodeFormat;
@@ -1214,6 +1215,17 @@ public class MainActivity extends BridgeActivity {
 		@JavascriptInterface
 		public int getKeyboardInsetPx() {
 			return latestKeyboardInsetPx;
+		}
+
+		@JavascriptInterface
+		public void setStatusBarColorMode(String mode) {
+			// Before Android 15 the status bar keeps the theme's opaque background, which suits its light icons.
+			if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+				return;
+			}
+			runOnUiThread(() -> WindowCompat
+				.getInsetsController(getWindow(), getWindow().getDecorView())
+				.setAppearanceLightStatusBars("light".equals(mode)));
 		}
 	}
 

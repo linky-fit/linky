@@ -4,6 +4,7 @@ import {
   type PluginListenerHandle,
 } from "@capacitor/core";
 import { isPubkey, Pubkey } from "@linky-fit/linkstr";
+import type { ColorMode } from "@linky-fit/ui/tokens";
 import { Option, Schema } from "effect";
 import {
   getPlatformTarget,
@@ -83,6 +84,12 @@ interface IosNfcPlugin {
 
 const LinkyNfc = registerPlugin<IosNfcPlugin>("LinkyNfc");
 
+interface IosStatusBarPlugin {
+  setColorMode(options: { mode: ColorMode }): Promise<void>;
+}
+
+const LinkyStatusBar = registerPlugin<IosStatusBarPlugin>("LinkyStatusBar");
+
 interface AndroidSecretStorageBridge {
   get?: (key: string) => string | null;
   remove?: (key: string) => void;
@@ -126,6 +133,7 @@ interface AndroidWindowInsetsBridge {
   getBottomInsetPx?: () => number | string;
   getKeyboardInsetPx?: () => number | string;
   getTopInsetPx?: () => number | string;
+  setStatusBarColorMode?: (mode: ColorMode) => void;
 }
 
 interface AndroidDeepLinksBridge {
@@ -371,6 +379,19 @@ const nativePxToCssPx = (value: number): number => {
   }
 
   return Math.round((value / dpr) * 100) / 100;
+};
+
+/** Makes the status bar icons readable on the app background in `mode`; a no-op on the web and on shells without the bridge. */
+export const setNativeStatusBarColorMode = (mode: ColorMode): void => {
+  const platform = getPlatformTarget();
+  if (platform === "android") {
+    getAndroidWindowInsetsBridge()?.setStatusBarColorMode?.(mode);
+  } else if (
+    platform === "ios" &&
+    Capacitor.isPluginAvailable("LinkyStatusBar")
+  ) {
+    void LinkyStatusBar.setColorMode({ mode }).catch(() => undefined);
+  }
 };
 
 const applyNativeSafeAreaInsets = () => {

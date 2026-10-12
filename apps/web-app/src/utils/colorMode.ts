@@ -1,5 +1,6 @@
 import { themes, type ColorMode } from "@linky-fit/ui/tokens";
 import type { I18nKey } from "../i18n";
+import { setNativeStatusBarColorMode } from "../platform/nativeBridge";
 import { safeLocalStorageGet, safeLocalStorageSet } from "./storage";
 
 export type ColorModePreference = ColorMode | "auto";
@@ -58,10 +59,11 @@ export const subscribeColorMode = (listener: () => void): (() => void) => {
   };
 };
 
-/** Syncs the CSS painted outside React (index.css, browser chrome) with `mode`. */
+/** Syncs what is painted outside React (index.css, browser chrome, native status bar) with `mode`. */
 export const applyColorModeToDocument = (mode: ColorMode): void => {
   document.documentElement.dataset.colorMode = mode;
   document
     .querySelector('meta[name="theme-color"]')
     ?.setAttribute("content", themes[mode].background);
+  setNativeStatusBarColorMode(mode);
 };

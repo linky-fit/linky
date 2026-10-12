@@ -1,11 +1,35 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { startNativeQrScanStream } from "./nativeBridge";
+import {
+  setNativeStatusBarColorMode,
+  startNativeQrScanStream,
+} from "./nativeBridge";
 
 const runtimeMocks = vi.hoisted(() => ({
   getPlatformTarget: vi.fn(() => "android"),
   isNativePlatform: vi.fn(() => true),
 }));
+
+const capacitorMocks = vi.hoisted(() => ({
+  availablePlugins: new Set<string>(),
+  setStatusBarColorMode: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("@capacitor/core", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@capacitor/core")>();
+  return {
+    ...actual,
+    Capacitor: {
+      ...actual.Capacitor,
+      isPluginAvailable: (name: string) =>
+        capacitorMocks.availablePlugins.has(name),
+    },
+    registerPlugin: (name: string) =>
+      name === "LinkyStatusBar"
+        ? { setColorMode: capacitorMocks.setStatusBarColorMode }
+        : actual.registerPlugin(name),
+  };
+});
 
 vi.mock("./runtime", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./runtime")>();
@@ -121,5 +145,61 @@ describe("startNativeQrScanStream", () => {
     expect(setScanViewport).not.toHaveBeenCalled();
     expect(startScan).toHaveBeenCalledOnce();
     expect(onResult).not.toHaveBeenCalled();
+  });
+});
+
+describe("setNativeStatusBarColorMode", () => {
+  beforeEach(() => {
+    capacitorMocks.availablePlugins.clear();
+    capacitorMocks.setStatusBarColorMode.mockClear();
+  });
+
+  afterEach(() => {
+    runtimeMocks.getPlatformTarget.mockReturnValue("android");
+    vi.unstubAllGlobals();
+  });
+
+  it("hands the color mode to the Android bridge", () => {
+    const setStatusBarColorMode = vi.fn();
+    vi.stubGlobal("LinkyNativeWindowInsets", { setStatusBarColorMode });
+
+    setNativeStatusBarColorMode("light");
+
+    expect(setStatusBarColorMode).toHaveBeenCalledWith("light");
+  });
+
+  it("does nothing on an Android shell that predates the bridge method", () => {
+    vi.stubGlobal("LinkyNativeWindowInsets", { getTopInsetPx: () => 0 });
+
+    expect(() => setNativeStatusBarColorMode("light")).not.toThrow();
+  });
+
+  it("hands the color mode to the iOS plugin and swallows its rejection", async () => {
+    runtimeMocks.getPlatformTarget.mockReturnValue("ios");
+    capacitorMocks.availablePlugins.add("LinkyStatusBar");
+    capacitorMocks.setStatusBarColorMode.mockRejectedValueOnce(
+      new Error("unimplemented"),
+    );
+
+    setNativeStatusBarColorMode("dark");
+    await Promise.resolve();
+
+    expect(capacitorMocks.setStatusBarColorMode).toHaveBeenCalledWith({
+      mode: "dark",
+    });
+  });
+
+  it("skips iOS shells without the plugin and the web", () => {
+    runtimeMocks.getPlatformTarget.mockReturnValue("ios");
+    setNativeStatusBarColorMode("light");
+    runtimeMocks.getPlatformTarget.mockReturnValue("web");
+    vi.stubGlobal("LinkyNativeWindowInsets", {
+      setStatusBarColorMode: () => {
+        throw new Error("unexpected call");
+      },
+    });
+    setNativeStatusBarColorMode("light");
+
+    expect(capacitorMocks.setStatusBarColorMode).not.toHaveBeenCalled();
   });
 });
