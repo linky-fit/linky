@@ -1,4 +1,4 @@
-import { Effect, Exit, Layer } from "effect";
+import { Effect, Exit, Layer, Stream } from "effect";
 import { finalizeEvent, verifyEvent } from "nostr-tools";
 import { RelayUrl, UnixSeconds } from "../domain/primitives";
 import { tagValues } from "../internal/nostrEvent";
@@ -41,6 +41,21 @@ const runWith = <A, E>(
         ),
       ),
     ),
+  );
+
+const muteList = (
+  pubkeys: ReadonlyArray<string>,
+  createdAt: number,
+  author = alice,
+) =>
+  finalizeEvent(
+    {
+      kind: 10000,
+      tags: pubkeys.map((pubkey) => ["p", pubkey]),
+      content: "",
+      created_at: createdAt,
+    },
+    author.secretKey,
   );
 
 describe("MuteList.publishMuteList", () => {
@@ -134,17 +149,6 @@ describe("MuteList.publishMuteList", () => {
 });
 
 describe("MuteList.fetchOwnMuteList", () => {
-  const muteList = (pubkeys: ReadonlyArray<string>, createdAt: number) =>
-    finalizeEvent(
-      {
-        kind: 10000,
-        tags: pubkeys.map((pubkey) => ["p", pubkey]),
-        content: "",
-        created_at: createdAt,
-      },
-      alice.secretKey,
-    );
-
   it("returns the newest list's valid p entries and its time", async () => {
     const asked: Array<string> = [];
     const exit = await runWith(
@@ -230,5 +234,46 @@ describe("MuteList.fetchOwnMuteList", () => {
     );
     assert(Exit.isSuccess(exit));
     expect(exit.value?.pubkeys).toEqual([bob.pubkey]);
+  });
+});
+
+describe("MuteList.watchOwnMuteList", () => {
+  it("streams your verified lists from every read and write relay, each newer than the last", async () => {
+    const forged = { ...muteList([carol.pubkey], 300), sig: "00".repeat(64) };
+    const events = [
+      muteList([bob.pubkey], 100),
+      muteList([carol.pubkey], 50),
+      forged,
+      muteList([carol.pubkey], 400, bob),
+      muteList([bob.pubkey], 100),
+      muteList([carol.pubkey], 200),
+    ];
+    const subscribed: Array<string> = [];
+    const exit = await runWith(
+      stubPlainTransport([], () => true, {
+        subscribe: (relay, _filter, onEvent) =>
+          Effect.sync(() => {
+            subscribed.push(relay);
+            if (relay === relayB) events.forEach(onEvent);
+          }).pipe(Effect.andThen(Effect.never)),
+      }),
+      Effect.scoped(
+        Effect.gen(function* () {
+          const muteList = yield* MuteList;
+          const lists = yield* muteList.watchOwnMuteList();
+          return yield* Stream.runCollect(Stream.take(lists, 2));
+        }),
+      ),
+      [relayB],
+    );
+
+    assert(Exit.isSuccess(exit));
+    expect(
+      exit.value.map(({ pubkeys, createdAt }) => ({ pubkeys, createdAt })),
+    ).toEqual([
+      { pubkeys: [bob.pubkey], createdAt: 100 },
+      { pubkeys: [carol.pubkey], createdAt: 200 },
+    ]);
+    expect(subscribed.sort()).toEqual([relayA, relayB]);
   });
 });

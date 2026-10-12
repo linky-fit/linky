@@ -1,3 +1,4 @@
+import type { FetchedMuteList } from "@linky-fit/linkstr";
 import { linkstrCommands } from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 import { Atom } from "effect/reactivity";
@@ -63,6 +64,33 @@ export const syncMuteListAtom = Atom.keepAlive(
       const merged = queue.then(sync);
       queue = merged;
       return merged;
+    };
+  }),
+);
+
+/**
+ * Merges a list the mute list watch delivered. When the merged list differs
+ * from it, a sync publishes over the relays' newest list if that one differs
+ * too, so this device's echo or an older list publishes nothing.
+ */
+export const mergeWatchedMuteListAtom = Atom.keepAlive(
+  Atom.readable((get) => {
+    const syncMuteList = get(syncMuteListAtom);
+    return (remote: FetchedMuteList): void => {
+      const merge = adoptMuteList(remote);
+      reportAppLog({
+        tag: "blockList.muteListReceived",
+        summary: `Newer mute list received: ${merge.added.length} blocked, ${merge.removed.length} unblocked${merge.publish ? ", syncing" : ""}`,
+        links: { wrap: [remote.eventId] },
+        payload: {
+          listCreatedAt: remote.createdAt,
+          added: merge.added,
+          removed: merge.removed,
+          blocked: merge.blockList.length,
+          publish: merge.publish,
+        },
+      });
+      if (merge.publish) void syncMuteList();
     };
   }),
 );

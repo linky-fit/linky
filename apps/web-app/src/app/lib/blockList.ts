@@ -45,8 +45,21 @@ export const isBlockedPubkey = (pubkey: string): boolean => {
   return normalized !== null && readBlockList().includes(normalized);
 };
 
-const writeBlockList = (blockList: ReadonlyArray<Pubkey>): void =>
+const blockListListeners = new Set<() => void>();
+
+/** Calls `listener` after each write that changes the block list; returns the unsubscribe. */
+export const subscribeBlockList = (listener: () => void): (() => void) => {
+  blockListListeners.add(listener);
+  return () => blockListListeners.delete(listener);
+};
+
+const writeBlockList = (blockList: ReadonlyArray<Pubkey>): void => {
+  const previous = safeLocalStorageGet(BLOCKED_NOSTR_PUBKEYS_STORAGE_KEY);
   safeLocalStorageSetJson(BLOCKED_NOSTR_PUBKEYS_STORAGE_KEY, blockList);
+  if (safeLocalStorageGet(BLOCKED_NOSTR_PUBKEYS_STORAGE_KEY) === previous)
+    return;
+  for (const listener of blockListListeners) listener();
+};
 
 /**
  * A pubkey's newest block or unblock on this device; `at` is 0 for a block

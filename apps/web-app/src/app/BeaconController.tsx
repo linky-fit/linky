@@ -9,6 +9,7 @@ import type {
   ConversationRow,
   MessageRow,
 } from "@linky-fit/linksync";
+import { useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
 import { navigateTo } from "../hooks/useRouting";
 import type { NativeBeaconKey } from "../platform/nativeBridge";
@@ -31,7 +32,7 @@ import {
   subscribeBeacon,
   takeBeaconPendingOpen,
 } from "./lib/beaconStore";
-import { readBlockList } from "./lib/blockList";
+import { blockListAtom } from "./state/contacts/blockList";
 
 const KEY_TABLE_DEBOUNCE_MS = 500;
 
@@ -45,8 +46,9 @@ const useBeaconContacts = (
   ownPubkey: Pubkey | null,
 ): ReadonlyArray<BeaconContact> => {
   const rows = useContactRows();
+  const blockList = useAtomValue(blockListAtom);
   return React.useMemo(() => {
-    const hidden = new Set(readBlockList());
+    const hidden = new Set(blockList);
     if (ownPubkey) hidden.add(ownPubkey);
     return rows.flatMap((row) => {
       if (isDeletedContact(row)) return [];
@@ -55,7 +57,7 @@ const useBeaconContacts = (
       if (!npub || !pubkey || hidden.has(pubkey)) return [];
       return [{ id: row.id, pubkey, name: row.name ?? formatShortNpub(npub) }];
     });
-  }, [ownPubkey, rows]);
+  }, [blockList, ownPubkey, rows]);
 };
 
 const byLastMessage = (
@@ -147,9 +149,10 @@ export const BeaconController = ({ currentNsec }: { currentNsec: string }) => {
   const supported = useBeaconSupport();
   const { enabled } = useBeacon();
   const contacts = useBeaconContacts(identity?.pubkey ?? null);
+  const blockList = useAtomValue(blockListAtom);
 
   React.useEffect(() => {
-    const hidden = new Set(readBlockList());
+    const hidden = new Set(blockList);
     if (identity) hidden.add(identity.pubkey);
     setBeaconPeers({
       supported,
@@ -161,7 +164,7 @@ export const BeaconController = ({ currentNsec }: { currentNsec: string }) => {
       },
       ownPubkey: identity?.pubkey ?? null,
     });
-  }, [contacts, identity, supported]);
+  }, [blockList, contacts, identity, supported]);
 
   React.useEffect(
     () => () =>

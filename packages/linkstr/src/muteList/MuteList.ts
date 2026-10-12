@@ -1,4 +1,16 @@
-import { Context, Duration, Effect, Layer, Option, Schema } from "effect";
+import {
+  Context,
+  Duration,
+  Effect,
+  Filter,
+  Layer,
+  Option,
+  Queue,
+  Result,
+  Schema,
+  Stream,
+} from "effect";
+import type { Cause, Scope } from "effect";
 import { decrypt, encrypt, getConversationKey } from "nostr-tools/nip44";
 import type { PlainEventReceipt } from "../domain/delivery";
 import type {
@@ -6,12 +18,21 @@ import type {
   NoRelayAcceptedEvent,
 } from "../domain/errors";
 import { NoReadRelaysConfigured, SomeRelaysUnanswered } from "../domain/errors";
-import { EventId, isPubkey, Pubkey, UnixSeconds } from "../domain/primitives";
+import {
+  EventId,
+  isPubkey,
+  Pubkey,
+  UnixSeconds,
+  type RelayUrl,
+} from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import { inspectPlainOperation } from "../internal/inspectPlainOperation";
-import { tagValues } from "../internal/nostrEvent";
+import { tagValues, type SignedPlainEvent } from "../internal/nostrEvent";
 import { deliverPlainEvent } from "../internal/plainDelivery";
+import { decodeVerifiedPlainEvent } from "../internal/plainEvent";
 import { fetchRawEvents, toPlainEvents } from "../internal/plainFetch";
+import { resubscribeForever } from "../internal/resubscribe";
+import { acquireStreamQueue } from "../internal/streamQueue";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
 import { NostrTransport } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
@@ -20,6 +41,7 @@ const MUTE_LIST_KIND = 10000;
 
 /** Callers hold their inbox on this fetch, so a silent relay must not stall it. */
 const FETCH_PER_RELAY_TIMEOUT = Duration.seconds(4);
+const DEFAULT_RESUBSCRIBE_DELAY = Duration.seconds(5);
 
 /** One block or unblock with its time, kept in the list's encrypted part. */
 export class MuteListChange extends Schema.Class<MuteListChange>(
@@ -48,6 +70,11 @@ export interface PublishMuteListOptions {
   readonly changes?: ReadonlyArray<MuteListChange>;
   /** The `createdAt` of the newest list you know; the new one is dated after it. */
   readonly replaces?: UnixSeconds;
+}
+
+export interface MuteListWatchOptions {
+  /** Base delay of the per-relay resubscribe backoff. */
+  readonly resubscribeDelay?: Duration.Duration;
 }
 
 const decodeChangeTags = Schema.decodeUnknownOption(
@@ -124,6 +151,37 @@ export class MuteList extends Context.Service<MuteList>()("linkstr/MuteList", {
       context.identity.pubkey,
     );
 
+    const relays: Effect.Effect<
+      ReadonlyArray<RelayUrl>,
+      NoReadRelaysConfigured
+    > = Effect.suspend(() => {
+      const all = [
+        ...new Set([
+          ...context.relayPolicy.readRelays,
+          ...context.relayPolicy.writeRelays,
+        ]),
+      ];
+      return all.length === 0
+        ? new NoReadRelaysConfigured()
+        : Effect.succeed(all);
+    });
+
+    const filter = {
+      kinds: [MUTE_LIST_KIND],
+      authors: [context.identity.pubkey],
+    };
+
+    const isOwnMuteList = (event: SignedPlainEvent): boolean =>
+      event.pubkey === context.identity.pubkey && event.kind === MUTE_LIST_KIND;
+
+    const decodeMuteList = (event: SignedPlainEvent): FetchedMuteList =>
+      new FetchedMuteList({
+        eventId: event.id,
+        pubkeys: [...new Set(tagValues(event.tags, "p"))].filter(isPubkey),
+        changes: decodeChanges(event.content, ownKey),
+        createdAt: UnixSeconds.make(event.created_at),
+      });
+
     const publishMuteList = (
       pubkeys: ReadonlyArray<Pubkey>,
       options: PublishMuteListOptions = {},
@@ -149,40 +207,69 @@ export class MuteList extends Context.Service<MuteList>()("linkstr/MuteList", {
       AllRelaysUnreachable | SomeRelaysUnanswered | NoReadRelaysConfigured
     > =>
       Effect.gen(function* () {
-        const relays = [
-          ...new Set([
-            ...context.relayPolicy.readRelays,
-            ...context.relayPolicy.writeRelays,
-          ]),
-        ];
-        if (relays.length === 0) return yield* new NoReadRelaysConfigured();
         const { events, failures } = yield* fetchRawEvents(
           context.transport,
-          relays,
-          { kinds: [MUTE_LIST_KIND], authors: [context.identity.pubkey] },
+          yield* relays,
+          filter,
           { perRelayTimeout: FETCH_PER_RELAY_TIMEOUT },
         );
-        const newest = toPlainEvents(events).find(
-          (event) =>
-            event.pubkey === context.identity.pubkey &&
-            event.kind === MUTE_LIST_KIND,
-        );
+        const newest = toPlainEvents(events).find(isOwnMuteList);
         // A silent relay may hold the only list, so "none" needs every relay's answer.
         if (newest === undefined && failures.length > 0)
           return yield* new SomeRelaysUnanswered({ failures });
         if (newest === undefined) return { result: null, eventIds: [] };
-        return {
-          result: new FetchedMuteList({
-            eventId: newest.id,
-            pubkeys: [...new Set(tagValues(newest.tags, "p"))].filter(isPubkey),
-            changes: decodeChanges(newest.content, ownKey),
-            createdAt: UnixSeconds.make(newest.created_at),
-          }),
-          eventIds: [newest.id],
-        };
+        return { result: decodeMuteList(newest), eventIds: [newest.id] };
       }).pipe(inspectPlainOperation(inspector, "muteList.fetchOwn", null));
 
-    return { publishMuteList, fetchOwnMuteList } as const;
+    /**
+     * Your stored and live mute lists on every read and write relay, each
+     * newer than the last one emitted. A scoped resource: closing the scope
+     * ends the subscriptions.
+     */
+    const watchOwnMuteList = (
+      options?: MuteListWatchOptions,
+    ): Effect.Effect<
+      Stream.Stream<FetchedMuteList>,
+      NoReadRelaysConfigured,
+      Scope.Scope
+    > =>
+      Effect.gen(function* () {
+        const raw = yield* acquireStreamQueue(
+          Queue.unbounded<unknown, Cause.Done>(),
+        );
+        yield* Effect.forEach(yield* relays, (relay) =>
+          Effect.forkScoped(
+            resubscribeForever(
+              context.transport.subscribe(relay, filter, (event) => {
+                Queue.offerUnsafe(raw, event);
+              }),
+              options?.resubscribeDelay ?? DEFAULT_RESUBSCRIBE_DELAY,
+            ),
+          ),
+        );
+        let newestSeen = 0;
+        const isNewer = (event: SignedPlainEvent): boolean => {
+          if (event.created_at <= newestSeen) return false;
+          newestSeen = event.created_at;
+          return true;
+        };
+        return Stream.fromQueue(raw).pipe(
+          Stream.filterMap(
+            Filter.fromPredicateOption((event) =>
+              Result.match(decodeVerifiedPlainEvent(event), {
+                onFailure: () => Option.none<SignedPlainEvent>(),
+                onSuccess: (verified) =>
+                  isOwnMuteList(verified) && isNewer(verified)
+                    ? Option.some(verified)
+                    : Option.none(),
+              }),
+            ),
+          ),
+          Stream.map(decodeMuteList),
+        );
+      });
+
+    return { publishMuteList, fetchOwnMuteList, watchOwnMuteList } as const;
   }),
 }) {
   static readonly layer = Layer.effect(this, this.make);

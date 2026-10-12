@@ -108,6 +108,10 @@ For manual registration, set `outboxResultsHandlerAtom` to `{ onResult }` and mo
 
 `watchedProfilesAtom` (the pubkey set), `profileWatchHandlerAtom` (`{ onEvent }`) and `profileWatchAtom` follow the inbox pattern: set the handler once (through a ref, as above), mount `profileWatchAtom`, and set `watchedProfilesAtom` whenever the set changes; that resubscribes without rebuilding the runtime. Swapping the handler object also reopens the subscriptions. Facts are in [plain-events.md](./plain-events.md#watching).
 
+## Mute list watch
+
+`muteListWatchHandlerAtom` (`{ onList }`) and `muteListWatchAtom` follow the inbox pattern: set the handler once per identity session, keep `muteListWatchAtom` mounted, and each list `MuteList.watchOwnMuteList` emits reaches `onList`. Swapping the handler object or the config reopens the subscriptions. When to publish after a merge is in [plain-events.md](./plain-events.md#mute-list).
+
 ## Relay health and inspector
 
 - `relayHealthAtom`: `AsyncResult<ReadonlyMap<string, RelayHealthState>>`, keyed by plain string so UI code can look up its own relay list; read with `useAtomValue` and `AsyncResult.isSuccess`, treat a missing entry as "checking". It resets when the runtime is rebuilt.
