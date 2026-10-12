@@ -54,6 +54,17 @@ import type { PendingTopup } from "./internal/topupRecords";
 
 /** Bolt11 mint quotes settle in seconds. */
 const POLL_INTERVAL = Duration.seconds(5);
+
+/**
+ * A payer looks at an invoice for minutes at most; most quotes are never paid,
+ * so an older one is polled only as a fallback for a blocked NUT-17 socket.
+ */
+const pollIntervalFor = (ageSeconds: number): Duration.Duration =>
+  ageSeconds < 5 * 60
+    ? POLL_INTERVAL
+    : ageSeconds < 60 * 60
+      ? Duration.minutes(1)
+      : Duration.minutes(5);
 /** Transient poll failures are expected offline; a run of them is not. */
 const MAX_CONSECUTIVE_POLL_FAILURES = 10;
 
@@ -122,9 +133,10 @@ export class Topup extends Context.Service<Topup>()("linkshu/Topup", {
     const records = topupRecords({ kv, operationStore, inspector });
 
     /**
-     * Polls until the mint reports the invoice settled. Transient failures
-     * keep the poll alive — a topup must survive going offline — while a
-     * definitive rejection (an unknown quote) ends it immediately. Expiry
+     * Polls until the mint reports the invoice settled, slower as the quote
+     * ages (`pollIntervalFor`). Transient failures keep the poll alive — a
+     * topup must survive going offline — while a definitive rejection (an
+     * unknown quote) ends it immediately. Expiry
      * needs the mint's own UNPAID answer: declaring it on the deadline alone
      * would drop the record for a quote that was paid while unreachable.
      */
@@ -163,13 +175,14 @@ export class Topup extends Context.Service<Topup>()("linkshu/Topup", {
               });
             }
           }
-          yield* Effect.sleep(POLL_INTERVAL);
+          const age = (yield* nowSeconds) - pending.createdAt;
+          yield* Effect.sleep(pollIntervalFor(age));
         }
       });
 
     /**
-     * NUT-17 shortens the wait for settlement. Polling keeps its full speed
-     * because a proxy or CSP may block websockets even when the mint supports them.
+     * NUT-17 shortens the wait for settlement. Polling never stops because a
+     * proxy or CSP may block websockets even when the mint supports them.
      */
     const awaitSettled = (
       wallet: LoadedWallet,

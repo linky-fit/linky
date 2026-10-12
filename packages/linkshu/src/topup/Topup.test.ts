@@ -28,7 +28,7 @@ import { KeyValueStore } from "../ports/KeyValueStore";
 import { OperationStore } from "../ports/OperationStore";
 import type { StoredOperation } from "../ports/OperationStore";
 import { ProofStore } from "../ports/ProofStore";
-import { runOnTestClock } from "../testing/clock";
+import { runOnTestClock, settlePromises } from "../testing/clock";
 import {
   answerProofStates,
   fakeWallet,
@@ -508,6 +508,57 @@ describe("Topup", () => {
 
     expect(await storedProofs(storage)).toHaveLength(2);
     expect((await onlyTopup(storage)).status).toBe("done");
+  });
+
+  it("polls every 5 s for five minutes, then every minute, then every five minutes", async () => {
+    const storage = freshStorage();
+    await writePendingTopup(storage, { counter: null, createdAt: 1000 });
+    let checks = 0;
+    const { wallet } = makeWallet({
+      states: [],
+      check: () => {
+        checks += 1;
+        return Promise.resolve(quoteResponse("UNPAID"));
+      },
+    });
+    const { run } = makeHarness(wallet, storage);
+
+    /** Moves the clock `seconds` ahead in `step`s, letting each poll land. */
+    const advance = (seconds: number, step: number) =>
+      Effect.gen(function* () {
+        for (let left = seconds; left > 0; left -= step) {
+          yield* settlePromises;
+          yield* TestClock.adjust(`${Math.min(step, left)} seconds`);
+        }
+      });
+    const pollsOver = (seconds: number, step: number) =>
+      Effect.gen(function* () {
+        const before = checks;
+        yield* advance(seconds, step);
+        return checks - before;
+      });
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* TestClock.adjust("1000 seconds");
+        yield* (yield* Topup).resumePending();
+        yield* advance(2, 1);
+        const fresh = yield* pollsOver(60, 1); // age 2 → 62
+        yield* advance(330 - 62, 5);
+        const afterFiveMinutes = yield* pollsOver(120, 5); // 330 → 450
+        yield* advance(3690 - 450, 60);
+        const afterOneHour = yield* pollsOver(600, 60); // 3690 → 4290
+        return { fresh, afterFiveMinutes, afterOneHour };
+      }).pipe(Effect.provide(TestClock.layer())),
+    );
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value).toEqual({
+      fresh: 12,
+      afterFiveMinutes: 2,
+      afterOneHour: 2,
+    });
+    expect(await pendingTopups(storage)).toHaveLength(1);
   });
 
   it("fails with QuoteExpired and closes the operation once an unpaid quote expires", async () => {
