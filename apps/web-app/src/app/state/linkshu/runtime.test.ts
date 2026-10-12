@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { assert, describe, expect, it } from "vitest";
 import { p2pkPubkeyOf, parseP2pkPubkey } from "@linky-fit/linkshu";
 import { encodeNpub, encodeNsec } from "@linky-fit/linkstr";
