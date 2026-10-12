@@ -180,7 +180,10 @@ describe("switching to a custom identity", () => {
     });
     expect(domain.current?.pendingIdentitySwitch?.phase).toBe("checking");
 
-    await act(async () => domain.current?.answerPendingIdentitySwitch(null));
+    await act(async () => {
+      await domain.current?.answerPendingIdentitySwitch(null);
+      await request;
+    });
     expect(domain.current?.pendingIdentitySwitch).toBeNull();
 
     await act(async () => {
@@ -188,11 +191,30 @@ describe("switching to a custom identity", () => {
         check: { kind: "none" },
         lightningAddress: "bob@linky.fit",
       });
-      await request;
     });
     expect(domain.current?.pendingIdentitySwitch).toBeNull();
     expect(mocks.publishProfile).not.toHaveBeenCalled();
     expect(mocks.persistIdentitySecrets).not.toHaveBeenCalled();
+  });
+
+  it("lets the user paste again right after cancelling, while the abandoned check still runs", async () => {
+    deferredCheck();
+    const domain = await setup();
+
+    let request: Promise<void> | undefined;
+    await act(async () => {
+      request = domain.current?.requestPasteNostrKeys();
+    });
+    await act(async () => {
+      await domain.current?.answerPendingIdentitySwitch(null);
+      await request;
+    });
+    await act(async () => {
+      void domain.current?.requestPasteNostrKeys();
+    });
+
+    expect(domain.current?.pendingIdentitySwitch?.phase).toBe("checking");
+    expect(mocks.checkIdentityForSwitch).toHaveBeenCalledTimes(2);
   });
 
   it("offers the choice once the check finds a profile", async () => {

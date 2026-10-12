@@ -229,8 +229,7 @@ export const useProfileAuthDomain = ({
   const [defaultNpub, setDefaultNpub] = useAtom(defaultNpubAtom);
   const [attachedNsec, setAttachedNsec] = useAtom(attachedNsecAtom);
   const [attachedNpub, setAttachedNpub] = useAtom(attachedNpubAtom);
-  // Cancelling clears it, so a check that resolves afterwards changes nothing.
-  const identityCheckRef = React.useRef<object | null>(null);
+  const cancelIdentityCheckRef = React.useRef<(() => void) | null>(null);
   const onboardingPhotoInputRef = React.useRef<FilePickerHandle | null>(null);
   const [isSeedLogin, setIsSeedLogin] = React.useState(false);
   const setLinkstrConfig = useAtomSet(linkstrConfigAtom);
@@ -1037,18 +1036,24 @@ export const useProfileAuthDomain = ({
         myProfileMetadata ??
         (currentNpub ? loadCachedProfile(currentNpub)?.metadata : null) ??
         new ProfileMetadata({});
-      const checkToken = {};
-      identityCheckRef.current = checkToken;
-      setPendingIdentitySwitch({ phase: "checking", npub, pubkey, target });
-      const { check, lightningAddress } = await checkIdentityForSwitch({
-        fetchProfile,
-        lookupOwnedAddress: () => fetchOwnedLightningAddress(secretKey),
-        npub,
-        pubkey,
-        target,
+      // Cancelling settles the race at once, so the caller's busy flag is released without waiting for relays.
+      const cancelled = new Promise<null>((resolve) => {
+        cancelIdentityCheckRef.current = () => resolve(null);
       });
-      if (identityCheckRef.current !== checkToken) return;
-      identityCheckRef.current = null;
+      setPendingIdentitySwitch({ phase: "checking", npub, pubkey, target });
+      const checked = await Promise.race([
+        checkIdentityForSwitch({
+          fetchProfile,
+          lookupOwnedAddress: () => fetchOwnedLightningAddress(secretKey),
+          npub,
+          pubkey,
+          target,
+        }),
+        cancelled,
+      ]);
+      cancelIdentityCheckRef.current = null;
+      if (!checked) return;
+      const { check, lightningAddress } = checked;
       // An unchecked identity may have a profile of its own, so the user picks one even when switching back.
       if (check.kind === "none" || (check.kind === "found" && !chooseProfile)) {
         setPendingIdentitySwitch({ phase: "switching", npub, pubkey, target });
@@ -1175,7 +1180,7 @@ export const useProfileAuthDomain = ({
   const answerPendingIdentitySwitch = React.useCallback(
     async (source: IdentityProfileSource | null) => {
       if (pendingIdentitySwitch?.phase === "checking" && source === null) {
-        identityCheckRef.current = null;
+        cancelIdentityCheckRef.current?.();
         setPendingIdentitySwitch(null);
         reportAppLog({
           tag: "identitySwitch.profileChosen",
