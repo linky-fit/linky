@@ -11,7 +11,7 @@ import { useMemo } from "react";
 import type { InspectCashuProofStates } from "../app/hooks/composition/useLinkshuComposition";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import { useTokenProofStates } from "../hooks/useTokenProofStates";
-import { normalizeLocale } from "../utils/formatting";
+import { formatTimeAgo } from "../utils/formatting";
 
 interface CashuTokenProofStatusProps {
   /** The proofs a transfer handed out, as the inventory holds them. */
@@ -83,9 +83,7 @@ export const CashuTokenProofStatus = ({
             ) : null}
             {checkedAt !== null ? (
               <Text variant="caption" color="$colorMuted">
-                {`${t("cashuProofLastChecked")}: ${new Date(
-                  checkedAt * 1000,
-                ).toLocaleString(normalizeLocale(lang))}`}
+                {`${t("cashuProofLastChecked")}: ${formatTimeAgo(checkedAt, lang)}`}
               </Text>
             ) : null}
           </>

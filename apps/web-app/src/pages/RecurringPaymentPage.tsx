@@ -24,7 +24,7 @@ import {
 } from "../app/lib/recurringPaymentDisplay";
 import { RecurringContactAvatar } from "../components/RecurringContactAvatar";
 import { navigateTo } from "../hooks/useRouting";
-import { normalizeLocale } from "../utils/formatting";
+import { formatTimeAgo, normalizeLocale } from "../utils/formatting";
 import { formatMintHost } from "../utils/mint";
 import { nowSeconds } from "../utils/time";
 
@@ -119,7 +119,7 @@ export function RecurringPaymentPage({
         {order.lastRunAtSec !== null ? (
           <ListRow
             title={t("recurringLastRun")}
-            value={`${formatDate(order.lastRunAtSec)}${lastRun ? ` · ${lastRun}` : ""}`}
+            value={`${formatTimeAgo(order.lastRunAtSec, lang)}${lastRun ? ` · ${lastRun}` : ""}`}
           />
         ) : null}
         <ListRow

@@ -4,7 +4,7 @@ import React from "react";
 import { useTranslation } from "../app/hooks/shell";
 import { useRelaySettings } from "../app/hooks/settings/useRelaySettings";
 import { relayDotState, useRelayHealth } from "../app/hooks/useRelayHealth";
-import { formatRelativeTime } from "../utils/formatting";
+import { formatTimeAgo } from "../utils/formatting";
 export function NostrRelayPage(): React.ReactElement {
   const {
     isRecommendedRelay,
@@ -50,7 +50,7 @@ export function NostrRelayPage(): React.ReactElement {
             lastPublish.accepted
               ? t("relayPublishAccepted")
               : t("relayPublishRejected")
-          } · ${formatRelativeTime(lastPublish.at, lang)}`}
+          } · ${formatTimeAgo(lastPublish.at, lang)}`}
           testID="relayLastPublish"
         />
       ) : null}
