@@ -1,15 +1,22 @@
 // @vitest-environment jsdom
 import { NonEmptyString100, PositiveInt } from "@evolu/common";
+import { Effect } from "effect";
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { createId } from "@linky-fit/domain";
 import { makeTransactionsRepository } from "../repositories/transactions";
 import { linkyStore, runNow } from "../testing/linky";
-import { makeInMemoryShardDb } from "../core";
+import { makeInMemoryShardDb, ShardDbError } from "../core";
 import { linkyTableColumns, type LinkyDbSchema } from "../model/schema";
 import { createLinkyStore } from "../model/store";
 import { testAppOwner } from "../testing/toy";
-import { useHydrated, useRepositoryRows, useVisibleShards } from "./index";
+import {
+  useHydrated,
+  useLiveValue,
+  useRepositoryRows,
+  useVisibleShards,
+  type LiveSource,
+} from "./index";
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
@@ -64,6 +71,35 @@ describe("react bindings", () => {
     runNow(store.rotate("transactions"));
     await settle();
     expect(indexes).toEqual([0, 1]);
+    await view.unmount();
+  });
+
+  it("keeps the last value when a read fails", async () => {
+    const answers = [
+      Effect.succeed(1),
+      Effect.fail(new ShardDbError({ table: "t", message: "no answer" })),
+    ];
+    let notify = () => {};
+    const source: LiveSource<number> = {
+      all: Effect.suspend(() => answers.shift() ?? Effect.succeed(3)),
+      subscribe: (listener) => {
+        notify = listener;
+        return () => {};
+      },
+    };
+    let value = 0;
+    const view = await mount(() => {
+      value = useLiveValue(source, 0);
+      return null;
+    });
+    await settle();
+    expect(value).toBe(1);
+    notify();
+    await settle();
+    expect(value).toBe(1);
+    notify();
+    await settle();
+    expect(value).toBe(3);
     await view.unmount();
   });
 

@@ -305,7 +305,7 @@ export const makeWalletRepository = (store: LinkyStore): WalletRepository => {
         const stored = toStoredProof(row);
         return stored === null ? [] : [stored];
       }),
-    ),
+    ).pipe(Effect.orDie),
   };
 
   const operations: OperationStoreService = {
@@ -328,7 +328,7 @@ export const makeWalletRepository = (store: LinkyStore): WalletRepository => {
         const stored = toStoredOperation(row);
         return stored === null ? [] : [stored];
       }),
-    ),
+    ).pipe(Effect.orDie),
   };
 
   return {

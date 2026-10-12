@@ -65,7 +65,10 @@ export const syncedInboxCursorStore = ({
       return {
         load: Effect.gen(function* () {
           const localCursor = yield* local.load;
-          const synced = yield* cursors.get(pubkey);
+          const synced = yield* Effect.orElseSucceed(
+            cursors.get(pubkey),
+            () => null,
+          );
           const start =
             localCursor === null || (synced !== null && synced > localCursor)
               ? synced

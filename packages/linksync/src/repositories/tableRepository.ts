@@ -16,8 +16,8 @@ export type TableOf<Scope extends LinkyScope> =
 
 /** The shape every repository shares: rows merged across shards, writes to the active one. */
 export interface TableRepository<C extends Columns> {
-  readonly all: Effect.Effect<ReadonlyArray<Row<C>>>;
-  readonly byId: (id: C["id"]) => Effect.Effect<Row<C> | null>;
+  readonly all: Effect.Effect<ReadonlyArray<Row<C>>, ShardDbError>;
+  readonly byId: (id: C["id"]) => Effect.Effect<Row<C> | null, ShardDbError>;
   /** Writes a live row into the active shard, reviving a removed copy there, then runs `maybeRotate`. */
   readonly insert: (row: WriteRow<C>) => Effect.Effect<void, ShardDbError>;
   /**

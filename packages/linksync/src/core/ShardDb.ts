@@ -70,12 +70,12 @@ export interface ShardDb<S extends DbSchema> {
   /** Every row of the table across all owners, tombstones included. */
   readonly readTable: <T extends keyof S & string>(
     table: T,
-  ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
+  ) => Effect.Effect<ReadonlyArray<Row<S[T]>>, ShardDbError>;
   /** Every owner's copy of the row with this id, tombstones included. */
   readonly readCopies: <T extends keyof S & string>(
     table: T,
     id: string,
-  ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
+  ) => Effect.Effect<ReadonlyArray<Row<S[T]>>, ShardDbError>;
   /** Column-level writes; an `update` of an unknown `(ownerId, id)` creates a row. */
   readonly mutate: (
     mutations: ReadonlyArray<Mutation>,
@@ -94,7 +94,9 @@ export interface ShardDb<S extends DbSchema> {
   readonly isOwnerSynced: (ownerId: OwnerId) => boolean;
   /** Fires after more owners finished their sync round. */
   readonly subscribeOwnerSync: (listener: () => void) => () => void;
-  readonly ownerUsage: (ownerId: OwnerId) => Effect.Effect<OwnerUsage>;
+  readonly ownerUsage: (
+    ownerId: OwnerId,
+  ) => Effect.Effect<OwnerUsage, ShardDbError>;
   /** Evolu 7 cannot delete an owner; `null` until the port can. */
   readonly deleteOwner: ((ownerId: OwnerId) => Effect.Effect<void>) | null;
 }

@@ -98,6 +98,10 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "An Evolu relay answered a sync request with a protocol error (QuotaError, WriteKeyError, WriteError or SyncError). When the relay had already answered the owner without an error on the same connection, the owner's sync round ends there and what the relay held arrived in the rounds before (endsRound true). Otherwise the owner stays unsynced, so hydration and pointer repair keep waiting for it (endsRound false). The owner link names the owner; the payload names the error.",
   WriteUnconfirmed:
     "Evolu's worker did not report a local write applied within 10 seconds, which happens when Evolu drops the batch it was in. The write fails, so its caller retries or reports it like any failed write. Links name the shard owner and the row id.",
+  WriteSlow:
+    "Evolu's worker took a second or more to apply a local write batch. A batch still unapplied at the 10-second bound is reported then with answered false (the write fails, see WriteUnconfirmed) and again with answered true if the worker applies it later; no second row means the worker never did. The load gives the tables the store subscribes (whole-table queries the worker re-runs on every write and synced batch), the rows they hold, and the store's writes and reads still waiting. Links name the shard owners and row ids.",
+  ReadSlow:
+    "Evolu's worker took a second or more to answer a read (readTable, readCopies, ownerUsage, or the barrier that marks an owner synced). A read still unanswered at the 10-second bound is reported then with answered false and fails with ShardDbError, except the barrier, which keeps waiting; a later row with answered true means the worker answered late. The load is the same as on WriteSlow.",
   ShardPointerRepaired:
     "After hydration, a scope's shard pointer stood below a shard that holds rows, so this device moved it back up to the newest such shard and the shards in between are read again. It happens when a device wrote the pointer from a stale read, such as a seed restore on an older build. The payload gives scope, from and to; the owner link is the shard now active.",
   LaneMigrationStarted:

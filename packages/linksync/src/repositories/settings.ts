@@ -14,7 +14,7 @@ import { tableRepository, type TableRepository } from "./tableRepository";
 export interface SettingsRepository {
   readonly get: <K extends SettingKey>(
     key: K,
-  ) => Effect.Effect<SettingValues[K] | null>;
+  ) => Effect.Effect<SettingValues[K] | null, ShardDbError>;
   readonly set: <K extends SettingKey>(
     key: K,
     value: SettingValues[K],
@@ -30,7 +30,7 @@ export const readSetting = <A, I extends string>(
   table: SettingTable,
   id: SettingId,
   schema: Schema.Codec<A, I>,
-): Effect.Effect<A | null> =>
+): Effect.Effect<A | null, ShardDbError> =>
   Effect.map(table.byId(id), (row) =>
     row?.value == null
       ? null

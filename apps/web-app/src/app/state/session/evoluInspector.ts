@@ -1,5 +1,5 @@
 import type { OwnerId } from "@linky-fit/linksync";
-import type { LinkyEvoluEvent } from "@linky-fit/linksync/evolu";
+import type { LinkyEvoluEvent, SlowEvoluCall } from "@linky-fit/linksync/evolu";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
 import { getInspectorEmissionEnabled } from "../../../devtools/inspector/inspectorEnabled";
 import { reportInspectorRows } from "../../../devtools/inspector/reportInspectorRows";
@@ -18,6 +18,29 @@ export const reportShardsSubscribed = (
       summary: `Syncing the app owner and ${owners.length - 1} shards`,
       links: { owner: [...owners] },
       payload: { reason, owners: owners.length },
+    },
+  ]);
+};
+
+const reportSlowEvoluCall = (call: SlowEvoluCall): void => {
+  const what =
+    call.call === "write"
+      ? `a write to ${call.tables.join(", ")}`
+      : `${call.call} of ${call.tables.join(", ")}`;
+  const seconds = (call.elapsedMs / 1000).toFixed(1);
+  const { subscribedTables, subscribedRows } = call.load;
+  reportInspectorRows([
+    {
+      at: Date.now(),
+      channel: "evolu.sync",
+      tag: call.call === "write" ? "WriteSlow" : "ReadSlow",
+      summary: `${
+        call.answered
+          ? `Evolu answered ${what} after ${seconds} s`
+          : `Evolu has not answered ${what} after ${seconds} s`
+      } (${subscribedTables} subscribed tables, ${subscribedRows} rows)`,
+      links: { owner: [...call.owners], row: [...call.ids] },
+      payload: call,
     },
   ]);
 };
@@ -101,6 +124,9 @@ export const reportLinkyEvoluEvent = (event: LinkyEvoluEvent): void => {
           payload: event.write,
         },
       ]);
+      return;
+    case "SlowEvoluCall":
+      reportSlowEvoluCall(event.call);
       return;
     case "ShardPointersRepaired":
       reportInspectorRows(

@@ -11,7 +11,7 @@ type IdentityColumns = Omit<Patch<LinkyDbSchema["nostrIdentity"]>, "nsec"> & {
 
 export interface IdentityRepository {
   /** The active identity as the newest row says; null before the first `set`. */
-  readonly current: Effect.Effect<NostrIdentityRow | null>;
+  readonly current: Effect.Effect<NostrIdentityRow | null, ShardDbError>;
   readonly set: (
     identity: IdentityColumns,
   ) => Effect.Effect<void, ShardDbError>;

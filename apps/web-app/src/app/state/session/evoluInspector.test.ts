@@ -90,6 +90,58 @@ describe("reportLinkyEvoluEvent", () => {
         payload: { scope: "cashu", from: 0, to: 3 },
       },
     ],
+    [
+      {
+        _tag: "SlowEvoluCall",
+        call: {
+          call: "write",
+          tables: ["message"],
+          ids: ["row-1"],
+          owners: [shard],
+          elapsedMs: 10_000,
+          answered: false,
+          load: {
+            subscribedTables: 9,
+            subscribedRows: 1200,
+            pendingWrites: 2,
+            pendingReads: 0,
+          },
+        },
+      },
+      {
+        tag: "WriteSlow",
+        summary:
+          "Evolu has not answered a write to message after 10.0 s (9 subscribed tables, 1200 rows)",
+        links: { owner: [shard], row: ["row-1"] },
+        payload: expect.objectContaining({ call: "write", answered: false }),
+      },
+    ],
+    [
+      {
+        _tag: "SlowEvoluCall",
+        call: {
+          call: "readTable",
+          tables: ["cashuProof"],
+          ids: [],
+          owners: [],
+          elapsedMs: 1_460,
+          answered: true,
+          load: {
+            subscribedTables: 9,
+            subscribedRows: 1200,
+            pendingWrites: 0,
+            pendingReads: 1,
+          },
+        },
+      },
+      {
+        tag: "ReadSlow",
+        summary:
+          "Evolu answered readTable of cashuProof after 1.5 s (9 subscribed tables, 1200 rows)",
+        links: { owner: [], row: [] },
+        payload: expect.objectContaining({ call: "readTable", answered: true }),
+      },
+    ],
   ])("reports %o as its evolu.sync row", (event, row) => {
     reportLinkyEvoluEvent(event);
     expect(inspector.rows).toHaveBeenCalledWith([

@@ -5,7 +5,7 @@ import {
   sqliteFalse,
   sqliteTrue,
 } from "@evolu/common";
-import { Deferred, Duration, Effect } from "effect";
+import { Duration, Effect } from "effect";
 import type {
   Columns,
   Mutation,
@@ -38,7 +38,13 @@ import type { OwnerSync } from "./ownerSync";
  * validated (`onlyValidate`) before it is queued. A write resolves once
  * Evolu's worker has applied it (`onComplete`). A batch Evolu drops never
  * completes, so one still unapplied after a bound fails, leaves
- * the overlay and is reported through `onWriteUnconfirmed`.
+ * the overlay and is reported through `onWriteUnconfirmed`. A read the worker
+ * has not answered within the same bound fails too.
+ *
+ * Evolu keeps a `loadQuery` promise per query string and posts the query to
+ * its worker only when it creates that promise, so a read retried with the
+ * same string would wait on the unanswered one again. Until it answers, a
+ * read of that query sends a variant that matches the same rows.
  *
  * An owner the worker reports synced counts as synced only after a fresh
  * query has answered: the worker answers queries in order, so by then the
@@ -56,7 +62,8 @@ export interface EvoluRuntime {
 
 type LinkyTable = keyof LinkyDbSchema & string;
 
-const MAX_WRITE_COMPLETION_WAIT = Duration.seconds(10);
+const MAX_WORKER_WAIT = Duration.seconds(10);
+const SLOW_CALL_MS = 1_000;
 
 const isTable = (table: string): table is LinkyTable => table in LinkySchema;
 
@@ -108,13 +115,15 @@ const callUntyped = (
   return Reflect.apply(fn, target, args);
 };
 
-interface UntypedSelect {
-  selectFrom: (table: string) => {
-    selectAll: () => {
-      where: (column: string, op: "=", value: string) => unknown;
-    };
-  };
+interface Filterable {
+  where: (column: string, op: "=" | "!=", value: string) => Filterable;
 }
+
+interface UntypedSelect {
+  selectFrom: (table: string) => { selectAll: () => Filterable };
+}
+
+type BuildQuery = (db: UntypedSelect & UntypedHistorySelect) => Filterable;
 
 const overlayKey = (table: string, ownerId: OwnerId, id: string): string =>
   `${table}/${ownerId}/${id}`;
@@ -157,19 +166,57 @@ export interface UnconfirmedWrite {
   readonly id: string;
 }
 
+/** What the worker had on its plate when a call was slow. */
+export interface EvoluLoad {
+  /** Tables the adapter subscribed: queries the worker re-runs on every write and synced batch. */
+  readonly subscribedTables: number;
+  /** Rows those queries returned last. */
+  readonly subscribedRows: number;
+  /** The adapter's write batches the worker has not applied yet. */
+  readonly pendingWrites: number;
+  /** The adapter's reads the worker has not answered yet. */
+  readonly pendingReads: number;
+}
+
+/**
+ * A write or read the worker took at least a second to answer. A call still
+ * unanswered at the ten-second bound is reported then with `answered: false`,
+ * and once more if the worker answers later.
+ */
+export interface SlowEvoluCall {
+  readonly call:
+    | "write"
+    | "readTable"
+    | "readCopies"
+    | "ownerUsage"
+    | "barrier";
+  readonly tables: ReadonlyArray<string>;
+  /** Row ids the call wrote or read by id. */
+  readonly ids: ReadonlyArray<string>;
+  readonly owners: ReadonlyArray<OwnerId>;
+  readonly elapsedMs: number;
+  readonly answered: boolean;
+  readonly load: EvoluLoad;
+}
+
 export interface EvoluShardDbOptions {
   readonly onWriteUnconfirmed?: (write: UnconfirmedWrite) => void;
+  readonly onSlowCall?: (call: SlowEvoluCall) => void;
 }
+
+type CallTarget = Pick<SlowEvoluCall, "call" | "tables" | "ids" | "owners">;
 
 export const createEvoluShardDb = (
   evolu: EvoluRuntime,
   ownerSync: OwnerSync,
-  { onWriteUnconfirmed }: EvoluShardDbOptions = {},
+  { onWriteUnconfirmed, onSlowCall }: EvoluShardDbOptions = {},
 ): ShardDb<LinkyDbSchema> => {
   const overlay = new Map<string, OverlayEntry>();
   // Evolu queries are branded strings that Evolu keys its promise cache by;
   // they are passed back exactly as received.
   const queries = new Map<string, string>();
+  const subscribed = new Map<LinkyTable, number>();
+  const pending = { write: 0, read: 0 };
 
   const asQuery = (value: unknown): string => {
     if (typeof value !== "string")
@@ -177,22 +224,104 @@ export const createEvoluShardDb = (
     return value;
   };
 
+  const createQuery = (build: BuildQuery): string =>
+    asQuery(callUntyped(evolu, "createQuery", build));
+
+  const selectTable =
+    (table: LinkyTable): BuildQuery =>
+    (db) =>
+      db.selectFrom(table).selectAll();
+
   const tableQuery = (table: LinkyTable): string => {
     const cached = queries.get(table);
     if (cached !== undefined) return cached;
-    const query = asQuery(
-      callUntyped(evolu, "createQuery", (db: UntypedSelect) =>
-        db.selectFrom(table).selectAll(),
-      ),
-    );
+    const query = createQuery(selectTable(table));
     queries.set(table, query);
     return query;
   };
 
-  const loadRows = (query: string): Effect.Effect<ReadonlyArray<UntypedRow>> =>
-    Effect.promise(async () => {
-      const rows = await callUntyped(evolu, "loadQuery", query);
-      return Array.isArray(rows) ? rows.filter(isUntypedRow) : [];
+  const load = (): EvoluLoad => {
+    const tables = [...subscribed.keys()];
+    const rowCount = (table: LinkyTable): number => {
+      const rows = callUntyped(evolu, "getQueryRows", tableQuery(table));
+      return Array.isArray(rows) ? rows.length : 0;
+    };
+    return {
+      subscribedTables: tables.length,
+      subscribedRows: tables.reduce((sum, table) => sum + rowCount(table), 0),
+      pendingWrites: pending.write,
+      pendingReads: pending.read,
+    };
+  };
+
+  /** Counts the call as pending until `answer` settles and reports it when slow. */
+  const watch = <A>(target: CallTarget, answer: Promise<A>) => {
+    const kind = target.call === "write" ? "write" : "read";
+    const startedAt = Date.now();
+    const report = (answered: boolean) =>
+      onSlowCall?.({
+        ...target,
+        elapsedMs: Date.now() - startedAt,
+        answered,
+        load: load(),
+      });
+    pending[kind] += 1;
+    void answer.then(() => {
+      pending[kind] -= 1;
+      if (Date.now() - startedAt >= SLOW_CALL_MS) report(true);
+    });
+    return { unanswered: () => report(false) };
+  };
+
+  /** Waits for the worker's answer, failing once the bound passes. */
+  const bounded = <A>(
+    target: CallTarget,
+    answer: Promise<A>,
+    message: string,
+  ): Effect.Effect<A, ShardDbError> => {
+    const watched = watch(target, answer);
+    return Effect.promise(() => answer).pipe(
+      Effect.timeoutOrElse({
+        duration: MAX_WORKER_WAIT,
+        orElse: () =>
+          Effect.suspend(() => {
+            watched.unanswered();
+            return Effect.fail(
+              new ShardDbError({ table: target.tables.join(","), message }),
+            );
+          }),
+      }),
+    );
+  };
+
+  const unanswered = new Set<string>();
+  let variants = 0;
+
+  const loadRows = (
+    target: CallTarget,
+    query: string,
+    build: BuildQuery,
+  ): Effect.Effect<ReadonlyArray<UntypedRow>, ShardDbError> =>
+    Effect.suspend(() => {
+      const original = !unanswered.has(query);
+      const sent = original
+        ? query
+        : createQuery((db) =>
+            // No row has this id, so the variant matches what `query` does.
+            build(db).where("id", "!=", `linksync-retry-${(variants += 1)}`),
+          );
+      const answer = Promise.resolve(callUntyped(evolu, "loadQuery", sent));
+      if (original) void answer.then(() => unanswered.delete(query));
+      return bounded(target, answer, "Evolu did not answer the read").pipe(
+        Effect.tapError(() =>
+          Effect.sync(() => {
+            if (original) unanswered.add(query);
+          }),
+        ),
+        Effect.map((rows) =>
+          Array.isArray(rows) ? rows.filter(isUntypedRow) : [],
+        ),
+      );
     });
 
   const mergeOverlay = (
@@ -225,31 +354,42 @@ export const createEvoluShardDb = (
   // table name was validated against the schema and every row was guarded.
   function readTable<T extends LinkyTable>(
     table: T,
-  ): Effect.Effect<ReadonlyArray<Row<LinkyDbSchema[T]>>>;
+  ): Effect.Effect<ReadonlyArray<Row<LinkyDbSchema[T]>>, ShardDbError>;
   function readTable(
     table: string,
-  ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
+  ): Effect.Effect<ReadonlyArray<Row<Columns>>, ShardDbError> {
     if (!isTable(table)) return Effect.succeed([]);
-    return Effect.map(loadRows(tableQuery(table)), (rows) =>
-      mergeOverlay(table, rows.filter(isStoredRow).flatMap(withChangeTimes)),
+    const target: CallTarget = {
+      call: "readTable",
+      tables: [table],
+      ids: [],
+      owners: [],
+    };
+    return Effect.map(
+      loadRows(target, tableQuery(table), selectTable(table)),
+      (rows) =>
+        mergeOverlay(table, rows.filter(isStoredRow).flatMap(withChangeTimes)),
     );
   }
 
   function readCopies<T extends LinkyTable>(
     table: T,
     id: string,
-  ): Effect.Effect<ReadonlyArray<Row<LinkyDbSchema[T]>>>;
+  ): Effect.Effect<ReadonlyArray<Row<LinkyDbSchema[T]>>, ShardDbError>;
   function readCopies(
     table: string,
     id: string,
-  ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
+  ): Effect.Effect<ReadonlyArray<Row<Columns>>, ShardDbError> {
     if (!isTable(table)) return Effect.succeed([]);
-    const query = asQuery(
-      callUntyped(evolu, "createQuery", (db: UntypedSelect) =>
-        db.selectFrom(table).selectAll().where("id", "=", id),
-      ),
-    );
-    return Effect.map(loadRows(query), (rows) =>
+    const build: BuildQuery = (db) =>
+      selectTable(table)(db).where("id", "=", id);
+    const target: CallTarget = {
+      call: "readCopies",
+      tables: [table],
+      ids: [id],
+      owners: [],
+    };
+    return Effect.map(loadRows(target, createQuery(build), build), (rows) =>
       mergeOverlay(
         table,
         rows.filter(isStoredRow).flatMap(withChangeTimes),
@@ -285,7 +425,7 @@ export const createEvoluShardDb = (
   interface Queued {
     readonly mutation: Mutation;
     readonly entry: OverlayEntry;
-    readonly applied: Effect.Effect<void>;
+    readonly applied: Promise<void>;
   }
 
   /** Queues the mutation at once, so a batch stays one Evolu transaction. */
@@ -301,17 +441,14 @@ export const createEvoluShardDb = (
     if (!isMutationResult(validation))
       return fail("unexpected mutation result");
     if (!validation.ok) return fail(JSON.stringify(validation.error));
-    const completed = Deferred.makeUnsafe<void>();
-    callUntyped(evolu, mutation.kind, mutation.table, row, {
-      ownerId: mutation.ownerId,
-      onComplete: () => Deferred.doneUnsafe(completed, Effect.void),
+    const applied = new Promise<void>((onComplete) => {
+      callUntyped(evolu, mutation.kind, mutation.table, row, {
+        ownerId: mutation.ownerId,
+        onComplete,
+      });
     });
     const entry = record(mutation, new Date().toISOString());
-    return Effect.succeed({
-      mutation,
-      entry,
-      applied: Deferred.await(completed),
-    });
+    return Effect.succeed({ mutation, entry, applied });
   };
 
   const unconfirm = ({ mutation, entry }: Queued): void => {
@@ -328,40 +465,40 @@ export const createEvoluShardDb = (
     mutations: ReadonlyArray<Mutation>,
   ): Effect.Effect<void, ShardDbError> =>
     Effect.flatMap(Effect.forEach(mutations, queue), (batch) =>
-      Effect.all(
-        batch.map(({ applied }) => applied),
-        { discard: true },
+      bounded(
+        {
+          call: "write",
+          tables: [...new Set(mutations.map(({ table }) => table))],
+          ids: mutations.map(({ row }) => row.id),
+          owners: [...new Set(mutations.map(({ ownerId }) => ownerId))],
+        },
+        Promise.all(batch.map(({ applied }) => applied)),
+        "Evolu did not confirm the write",
       ).pipe(
-        Effect.timeoutOrElse({
-          duration: MAX_WRITE_COMPLETION_WAIT,
-          orElse: () =>
-            Effect.fail(
-              new ShardDbError({
-                table: [...new Set(mutations.map(({ table }) => table))].join(
-                  ",",
-                ),
-                message: "Evolu did not confirm the write",
-              }),
-            ),
-        }),
+        Effect.asVoid,
         Effect.tapError(() => Effect.sync(() => batch.forEach(unconfirm))),
       ),
     );
 
   // `evolu_history` keys rows by the owner id's bytes, not its base64url text.
-  const ownerUsage = (ownerId: OwnerId): Effect.Effect<OwnerUsage> => {
-    const query = asQuery(
-      callUntyped(evolu, "createQuery", (db: UntypedHistorySelect) =>
-        db
-          .selectFrom("evolu_history")
-          .select((eb) => [
-            eb.fn.count("timestamp").distinct().as("mutations"),
-            eb.fn.sum(eb.fn("length", ["value"])).as("bytes"),
-          ])
-          .where("ownerId", "=", ownerIdToOwnerIdBytes(ownerId)),
-      ),
-    );
-    return Effect.map(loadRows(query), (rows) => {
+  const ownerUsage = (
+    ownerId: OwnerId,
+  ): Effect.Effect<OwnerUsage, ShardDbError> => {
+    const build: BuildQuery = (db) =>
+      db
+        .selectFrom("evolu_history")
+        .select((eb) => [
+          eb.fn.count("timestamp").distinct().as("mutations"),
+          eb.fn.sum(eb.fn("length", ["value"])).as("bytes"),
+        ])
+        .where("ownerId", "=", ownerIdToOwnerIdBytes(ownerId));
+    const target: CallTarget = {
+      call: "ownerUsage",
+      tables: ["evolu_history"],
+      ids: [],
+      owners: [ownerId],
+    };
+    return Effect.map(loadRows(target, createQuery(build), build), (rows) => {
       const first = rows[0];
       const read = (column: string): number => Number(first?.[column] ?? 0);
       return { mutations: read("mutations"), bytes: read("bytes") };
@@ -378,20 +515,34 @@ export const createEvoluShardDb = (
     );
     if (reported.length === 0) return;
     barriers += 1;
-    const barrier = asQuery(
-      callUntyped(evolu, "createQuery", (db: UntypedSelect) =>
-        db
-          .selectFrom("shardPointer")
-          .selectAll()
-          .where("id", "=", `linksync-barrier-${barriers}`),
+    const barrier = createQuery((db) =>
+      selectTable("shardPointer")(db).where(
+        "id",
+        "=",
+        `linksync-barrier-${barriers}`,
       ),
     );
     const markReadable = () => {
       for (const ownerId of reported) readable.add(ownerId);
       for (const listener of syncListeners) listener();
     };
+    // Unbounded: an owner counts as synced only once the worker has answered.
     absorbing = absorbing
-      .then(() => callUntyped(evolu, "loadQuery", barrier))
+      .then(() => {
+        const answer = Promise.resolve(
+          callUntyped(evolu, "loadQuery", barrier),
+        );
+        watch(
+          {
+            call: "barrier",
+            tables: ["shardPointer"],
+            ids: [],
+            owners: reported,
+          },
+          answer,
+        );
+        return answer;
+      })
       .then(markReadable, markReadable);
   };
   ownerSync.subscribe(absorbSyncedOwners);
@@ -410,8 +561,12 @@ export const createEvoluShardDb = (
       if (typeof unsubscribe !== "function")
         throw new Error("evolu.subscribeQuery did not return a subscriber");
       const stop = unsubscribe(listener);
+      subscribed.set(table, (subscribed.get(table) ?? 0) + 1);
       return () => {
         if (typeof stop === "function") stop();
+        const left = (subscribed.get(table) ?? 1) - 1;
+        if (left > 0) subscribed.set(table, left);
+        else subscribed.delete(table);
       };
     },
     useOwner: (owner: SyncOwner) => evolu.useOwner(owner),
@@ -431,7 +586,9 @@ interface UntypedHistorySelect {
   selectFrom: (table: "evolu_history") => {
     select: (
       build: (eb: UntypedExpressionBuilder) => ReadonlyArray<object>,
-    ) => { where: (column: string, op: "=", value: Uint8Array) => object };
+    ) => {
+      where: (column: string, op: "=", value: Uint8Array) => Filterable;
+    };
   };
 }
 

@@ -1,5 +1,10 @@
 export { createEvoluShardDb } from "./evoluShardDb";
-export type { EvoluRuntime, UnconfirmedWrite } from "./evoluShardDb";
+export type {
+  EvoluLoad,
+  EvoluRuntime,
+  SlowEvoluCall,
+  UnconfirmedWrite,
+} from "./evoluShardDb";
 export {
   makeEvoluRelaySettings,
   normalizeEvoluRelayUrl,
