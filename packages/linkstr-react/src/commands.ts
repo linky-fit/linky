@@ -32,6 +32,7 @@ import type {
   RumorFixedOperation,
   SearchProfilesOptions,
   SeenReceiptDraft,
+  PublishMuteListOptions,
   StatusDraft,
   WrapId,
 } from "@linky-fit/linkstr";
@@ -136,9 +137,14 @@ const makeLinkstrCommands = (run: LinkstrRun) => ({
         relayLists.fetchOwnRelayLists(),
       ),
     ),
-  publishMuteList: (pubkeys: ReadonlyArray<Pubkey>) =>
+  publishMuteList: (
+    pubkeys: ReadonlyArray<Pubkey>,
+    options?: PublishMuteListOptions,
+  ) =>
     run(
-      Effect.flatMap(MuteList, (muteList) => muteList.publishMuteList(pubkeys)),
+      Effect.flatMap(MuteList, (muteList) =>
+        muteList.publishMuteList(pubkeys, options),
+      ),
     ),
   fetchOwnMuteList: () =>
     run(Effect.flatMap(MuteList, (muteList) => muteList.fetchOwnMuteList())),

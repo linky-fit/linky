@@ -12,7 +12,7 @@ interface UseMuteListSyncParams {
 
 /**
  * Merges the identity's newest mute list into the block list on each start and
- * publishes the union when the list lacks a block. `muteListSynced` holds the
+ * publishes the result when it differs from the list. `muteListSynced` holds the
  * inbox only until this device's first merge for the identity has run.
  */
 export const useMuteListSync = ({ enabled, pubkey }: UseMuteListSyncParams) => {
@@ -35,6 +35,5 @@ export const useMuteListSync = ({ enabled, pubkey }: UseMuteListSyncParams) => {
   return {
     muteListSynced:
       mergedBefore || (pubkey !== null && syncedPubkey === pubkey),
-    syncMuteList,
   };
 };

@@ -189,7 +189,11 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "reactions.retractionStored":
     "A retraction arrived for a reaction this device has not stored, so a removed copy was written in its place; any device that receives the reaction later finds it removed. The rumor link is the reaction's id, the pubkey link who retracted it.",
   "blockList.muteListMerged":
-    "The newest mute list was merged into this device's block list as a union: a pubkey blocked on either side stays blocked. Added lists the pubkeys the list brought; publish says the merged list goes out because the published one lacks an entry, or no relay holds one. A fetch that cannot tell whether a list exists merges nothing. The wrap link is the fetched list's event id.",
+    "The newest mute list was merged into this device's block list. Each block and unblock carries its time (in the list's encrypted content), and per pubkey the later change wins, a tie keeping the block; a block made here that no relay has confirmed yet also beats a later-dated unblock. A public entry without a time counts as blocked when its list was signed, or as the oldest block in a list with timed changes. Added and removed list what the merge changed locally; publish says the merged list goes out, after which the list is fetched again (up to three times) to confirm no concurrent publish replaced it. A fetch that cannot tell whether a list exists merges nothing. The wrap link is the fetched list's event id.",
+  "blockList.blocked":
+    "The user blocked a pubkey: a saved contact (which is deleted with it unless it already was) or an unknown sender. The mute list sync follows, so the user's other devices learn it.",
+  "blockList.unblocked":
+    "The user unblocked a pubkey, from Settings or by undoing a block. The mute list sync follows; new messages from the pubkey are accepted again.",
   "beacon.started":
     "The Bluetooth beacon service was started after the key table and trade were pushed to native code. The payload gives the contact count and the trade; keys never appear in the inspector.",
   "beacon.stopped":

@@ -1,6 +1,6 @@
 import { Effect, Exit, Layer } from "effect";
 import { finalizeEvent, verifyEvent } from "nostr-tools";
-import { RelayUrl } from "../domain/primitives";
+import { RelayUrl, UnixSeconds } from "../domain/primitives";
 import { tagValues } from "../internal/nostrEvent";
 import type { SignedPlainEvent } from "../internal/nostrEvent";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
@@ -10,7 +10,7 @@ import {
 } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
 import { makeIdentity, stubPlainTransport } from "../testing";
-import { MuteList } from "./MuteList";
+import { MuteList, MuteListChange } from "./MuteList";
 
 const alice = makeIdentity();
 const bob = makeIdentity();
@@ -66,6 +66,57 @@ describe("MuteList.publishMuteList", () => {
     ]);
   });
 
+  it("dates a list past the one it replaces, even within the same second", async () => {
+    const published: Array<SignedPlainEvent> = [];
+    const future = UnixSeconds.make(Math.floor(Date.now() / 1000) + 60);
+    const exit = await runWith(
+      stubPlainTransport(published),
+      Effect.flatMap(MuteList, (muteList) =>
+        muteList.publishMuteList([bob.pubkey], { replaces: future }),
+      ),
+    );
+
+    assert(Exit.isSuccess(exit));
+    expect(published[0]?.created_at).toBe(future + 1);
+    expect(exit.value.sentAt).toBe(future + 1);
+  });
+
+  it("carries timed changes encrypted, and reads them back", async () => {
+    const published: Array<SignedPlainEvent> = [];
+    const changes = [
+      new MuteListChange({
+        pubkey: bob.pubkey,
+        muted: true,
+        at: UnixSeconds.make(200),
+      }),
+      new MuteListChange({
+        pubkey: carol.pubkey,
+        muted: false,
+        at: UnixSeconds.make(150),
+      }),
+    ];
+    const transport = stubPlainTransport(published, () => true, {
+      fetch: () => Effect.sync(() => [...published]),
+    });
+    await runWith(
+      transport,
+      Effect.flatMap(MuteList, (muteList) =>
+        muteList.publishMuteList([bob.pubkey], { changes }),
+      ),
+    );
+
+    const event = published[0];
+    assert(event !== undefined);
+    expect(tagValues(event.tags, "p")).toEqual([bob.pubkey]);
+    expect(event.content).not.toContain(carol.pubkey);
+    const exit = await runWith(
+      transport,
+      Effect.flatMap(MuteList, (muteList) => muteList.fetchOwnMuteList()),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value?.changes).toEqual(changes);
+  });
+
   it("fails with NoRelayAcceptedEvent when no relay accepts", async () => {
     const exit = await runWith(
       stubPlainTransport([], () => false),
@@ -114,6 +165,29 @@ describe("MuteList.fetchOwnMuteList", () => {
     expect(exit.value?.createdAt).toBe(200);
     expect(exit.value?.eventId).toMatch(/^[0-9a-f]{64}$/);
     expect(asked).toEqual([relayA]);
+  });
+
+  it("reads no changes from content it cannot decrypt", async () => {
+    const exit = await runWith(
+      stubPlainTransport([], () => true, {
+        fetch: () =>
+          Effect.succeed([
+            finalizeEvent(
+              {
+                kind: 10000,
+                tags: [["p", bob.pubkey]],
+                content: "another client's private items",
+                created_at: 200,
+              },
+              alice.secretKey,
+            ),
+          ]),
+      }),
+      Effect.flatMap(MuteList, (muteList) => muteList.fetchOwnMuteList()),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value?.pubkeys).toEqual([bob.pubkey]);
+    expect(exit.value?.changes).toEqual([]);
   });
 
   it("returns null when no relay holds a list", async () => {

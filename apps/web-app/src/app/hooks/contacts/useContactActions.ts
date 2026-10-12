@@ -1,4 +1,4 @@
-import { decodeNpub } from "@linky-fit/linkstr";
+import { decodeNpub, type Pubkey } from "@linky-fit/linkstr";
 import { NonEmptyString1000, type ContactId } from "@linky-fit/linksync";
 import {
   RegistryContext,
@@ -18,7 +18,7 @@ import {
 import { isDeletedContact } from "../../../utils/contactName";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import type { MessageContactsGroupAssignment } from "../../../components/ChatMessage";
-import { blockPubkey } from "../../lib/blockList";
+import { blockPubkey, unblockPubkey } from "../../lib/blockList";
 import { runWrite } from "../../lib/storeWrite";
 import {
   pendingContactsGroupAssignmentAtom,
@@ -33,7 +33,10 @@ import {
   makeEmptyContactForm,
 } from "../../state/contacts/contactForm";
 import { syncMuteListAtom } from "../../state/contacts/muteList";
-import { contactGroupsAtom } from "../../state/contacts/readModel";
+import {
+  contactGroupsAtom,
+  contactsAtom,
+} from "../../state/contacts/readModel";
 import { currentNpubAtom, currentNsecAtom } from "../../state/session/session";
 import {
   contactPaymentIntentAtom,
@@ -100,15 +103,119 @@ export const useOpenContactPay = () => {
   );
 };
 
-// Deleting runs on one click; the toast that follows offers to undo it.
-export const useDeleteContact = () => {
+/** Blocks or unblocks a pubkey on this device and publishes the mute list, best effort. */
+export const useSetPubkeyBlocked = () => {
+  const currentNsec = useAtomValue(currentNsecAtom);
+  const syncMuteList = useAtomValue(syncMuteListAtom);
+  return React.useCallback(
+    (pubkey: Pubkey, blocked: boolean) => {
+      if (blocked) blockPubkey(pubkey);
+      else unblockPubkey(pubkey);
+      reportAppLog({
+        tag: blocked ? "blockList.blocked" : "blockList.unblocked",
+        summary: blocked ? "Blocked a pubkey" : "Unblocked a pubkey",
+        links: { pubkey: [pubkey] },
+        payload: { pubkey },
+      });
+      // The local block list applies either way; the mute list is best effort.
+      if (currentNsec) void syncMuteList();
+    },
+    [currentNsec, syncMuteList],
+  );
+};
+
+const contactPubkey = (npub: string | null | undefined): Pubkey | null => {
+  const normalized = normalizeNpubIdentifier(npub ?? "");
+  return normalized ? decodeNpub(normalized) : null;
+};
+
+/**
+ * Blocks a contact's npub, first deleting the contact unless it already is
+ * deleted when the block runs; the toast that follows offers to undo both.
+ */
+const useBlockContact = () => {
+  const registry = React.useContext(RegistryContext);
   const { t } = useTranslation();
   const setStatus = useSetStatus();
   const pushToast = usePushToast();
   const contactsCommands = useAtomSuspense(contactsCommandsAtom).value;
+  const setPubkeyBlocked = useSetPubkeyBlocked();
   const closeContactDetail = useCloseContactDetail();
 
-  const undoDeleteContact = React.useCallback(
+  return React.useCallback(
+    async (id: ContactId, pubkey: Pubkey) => {
+      // Read now: a toast runs this seconds later, when a message may have restored the contact.
+      const contact = registry.get(contactsAtom).find((row) => row.id === id);
+      const deletes = contact !== undefined && !isDeletedContact(contact);
+      if (deletes) {
+        const result = await contactsCommands.deleteContact(id);
+        if (!result.ok) {
+          setStatus(`${t("errorPrefix")}: ${result.error}`);
+          return;
+        }
+      }
+      setPubkeyBlocked(pubkey, true);
+      closeContactDetail();
+      pushToast(t("contactBlocked"), {
+        actions: [
+          {
+            label: t("undo"),
+            onClick: () => {
+              setPubkeyBlocked(pubkey, false);
+              if (!deletes) {
+                setStatus(t("contactUnblocked"));
+                return;
+              }
+              void contactsCommands
+                .restoreContact(id)
+                .then((result) =>
+                  setStatus(
+                    result.ok
+                      ? t("contactUnblocked")
+                      : `${t("errorPrefix")}: ${result.error}`,
+                  ),
+                );
+            },
+          },
+        ],
+      });
+    },
+    [
+      closeContactDetail,
+      contactsCommands,
+      pushToast,
+      registry,
+      setPubkeyBlocked,
+      setStatus,
+      t,
+    ],
+  );
+};
+
+/** Blocks and deletes the edited contact; null when it has no npub to block. */
+export const useBlockEditedContact = (
+  id: ContactId | null,
+): (() => void) | null => {
+  const contacts = useContacts();
+  const blockContact = useBlockContact();
+  const contact = contacts.find((row) => row.id === id);
+  const pubkey = contactPubkey(contact?.npub);
+  if (!id || !contact || !pubkey) return null;
+  return () => void blockContact(id, pubkey);
+};
+
+// Deleting runs on one click; the toast that follows offers to undo it, or
+// to go further and block the contact.
+export const useDeleteContact = () => {
+  const { t } = useTranslation();
+  const setStatus = useSetStatus();
+  const pushToast = usePushToast();
+  const contacts = useContacts();
+  const contactsCommands = useAtomSuspense(contactsCommandsAtom).value;
+  const closeContactDetail = useCloseContactDetail();
+  const blockContact = useBlockContact();
+
+  const undoDelete = React.useCallback(
     async (id: ContactId) => {
       const result = await contactsCommands.restoreContact(id);
       setStatus(
@@ -122,28 +229,35 @@ export const useDeleteContact = () => {
 
   return React.useCallback(
     async (id: ContactId) => {
+      const pubkey = contactPubkey(contacts.find((row) => row.id === id)?.npub);
       const result = await contactsCommands.deleteContact(id);
       if (!result.ok) {
         setStatus(`${t("errorPrefix")}: ${result.error}`);
         return;
       }
       closeContactDetail();
+      const undo = { label: t("undo"), onClick: () => void undoDelete(id) };
       pushToast(t("contactDeleted"), {
-        action: {
-          label: t("undoDeleteContact"),
-          onClick: () => {
-            void undoDeleteContact(id);
-          },
-        },
+        actions: pubkey
+          ? [
+              undo,
+              {
+                label: t("blockContact"),
+                onClick: () => void blockContact(id, pubkey),
+              },
+            ]
+          : [undo],
       });
     },
     [
+      blockContact,
       closeContactDetail,
+      contacts,
       contactsCommands,
       pushToast,
       setStatus,
       t,
-      undoDeleteContact,
+      undoDelete,
     ],
   );
 };
@@ -156,23 +270,6 @@ export const useBackFromContactNew = () => {
     if (step === "details") setStep("search");
     else closeContactDetail();
   }, [closeContactDetail, setStep, step]);
-};
-
-/** Blocks a pubkey on this device and publishes the mute list, best effort. */
-const useBlockPubkey = () => {
-  const currentNsec = useAtomValue(currentNsecAtom);
-  const syncMuteList = useAtomValue(syncMuteListAtom);
-  return React.useCallback(
-    async (pubkeyHex: string): Promise<boolean> => {
-      const pubkey = normalizePubkeyHex(pubkeyHex);
-      if (!pubkey) return false;
-      blockPubkey(pubkey);
-      // Local blocklist applies either way; the mute list is best effort.
-      if (currentNsec) void syncMuteList();
-      return true;
-    },
-    [currentNsec, syncMuteList],
-  );
 };
 
 const useRemoveContactMessages = () =>
@@ -191,7 +288,7 @@ export const useUnknownSenderActions = (
   const saveNpubContact = useSaveNpubContact();
   const messagesCommands = useMessagesCommands();
   const setPendingUnknownContactAdd = useAtomSet(pendingUnknownContactAddAtom);
-  const blockPubkeyAndPublishMuteList = useBlockPubkey();
+  const setPubkeyBlocked = useSetPubkeyBlocked();
   const removeLocalNostrMessagesByContactId = useRemoveContactMessages();
 
   const addUnknownContactFromChat = React.useCallback(async () => {
@@ -253,16 +350,16 @@ export const useUnknownSenderActions = (
 
     if (!unknownPubkeyHex) return;
 
-    await blockPubkeyAndPublishMuteList(unknownPubkeyHex);
+    setPubkeyBlocked(unknownPubkeyHex, true);
 
     removeLocalNostrMessagesByContactId(contactId);
     setStatus(t("chatUnknownContactBlocked"));
     navigateTo({ route: "contacts" });
   }, [
-    blockPubkeyAndPublishMuteList,
     removeLocalNostrMessagesByContactId,
     route.kind,
     selectedChatContact,
+    setPubkeyBlocked,
     setStatus,
     t,
   ]);

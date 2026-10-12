@@ -36,6 +36,7 @@ export type Route =
   | { kind: "settingsAppearance" }
   | { kind: "settingsUnits" }
   | { kind: "settingsTutorial" }
+  | { kind: "settingsBlocked" }
   | { kind: "settingsReceiveMethod" }
   | { kind: "settingsMasterKeys" }
   | { kind: "settingsNostrIdentity" }
@@ -103,6 +104,7 @@ export const parseRouteFromHash = (): Route => {
   if (hash === "#settings/appearance") return { kind: "settingsAppearance" };
   if (hash === "#settings/units") return { kind: "settingsUnits" };
   if (hash === "#settings/tutorial") return { kind: "settingsTutorial" };
+  if (hash === "#settings/blocked") return { kind: "settingsBlocked" };
   if (hash === "#settings/receive-method") {
     return { kind: "settingsReceiveMethod" };
   }

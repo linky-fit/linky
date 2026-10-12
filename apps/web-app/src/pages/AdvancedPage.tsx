@@ -201,6 +201,9 @@ export function AdvancedPage(): React.ReactElement {
           sendReadReceiptsEnabled,
           toggleSendReadReceipts,
         )}
+        {linkRow("Ban", t("blocked"), () =>
+          navigateTo({ route: "settingsBlocked" }),
+        )}
         {toggleRow(
           "Smartphone",
           t("showProfileQrOnTilt"),

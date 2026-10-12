@@ -131,7 +131,7 @@ The time up to which a device has fetched and stored the identity's incoming gif
 _Avoid_: since, checkpoint, last seen
 
 **Block list**:
-The peers the user blocked; nothing they send is shown or stored. Each device keeps its own and merges it with the mute list.
+The peers the user blocked; nothing they send is shown or stored. Each device keeps its own, with the time of every block and unblock, and merges it with the mute list: per peer the later change wins, so a block or an unblock on one device reaches the others.
 _Avoid_: ban list, ignore list
 
 **Mute list**:
