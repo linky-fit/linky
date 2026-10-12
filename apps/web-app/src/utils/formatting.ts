@@ -1,5 +1,8 @@
 import { normalizeProfileName } from "./profileName";
 import type { Translate } from "../i18n";
+export const firstName = (name: string): string =>
+  name.trim().split(/\s+/)[0] ?? name;
+
 export const getInitials = (name: string): string => {
   const normalized = name.trim();
   if (!normalized) return "?";

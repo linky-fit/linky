@@ -52,6 +52,7 @@ import { contactsCommandsAtom } from "../../state/contacts/commands";
 import {
   contactFormAtom,
   contactNewPrefillAtom,
+  contactNewStepAtom,
   contactSuggestionsAtom,
   makeEmptyContactForm,
   recentlyAddedContactIdAtom,
@@ -70,6 +71,8 @@ import type { Translate } from "../../../i18n";
 
 export interface ContactSearchCandidate {
   existingContactId?: string;
+  /** The user's own identity, which opens the profile instead of saving. */
+  isSelf?: boolean;
   /** The query resolved to exactly this profile (npub or verified NIP-05). */
   isExactMatch: boolean;
   lnAddress: string;
@@ -230,6 +233,7 @@ export const useContactEditorWatchers = ({
   const [contactNewPrefill, setContactNewPrefill] = useAtom(
     contactNewPrefillAtom,
   );
+  const setContactNewStep = useAtomSet(contactNewStepAtom);
   const previousRouteKindRef = React.useRef<Route["kind"] | null>(null);
   const readSavedContactNpub = useReadNavIntent("openSavedContactNpub");
   const setSavedContactNpub = useSetNavIntent("openSavedContactNpub");
@@ -271,6 +275,7 @@ export const useContactEditorWatchers = ({
         setContactNewPrefill(null);
       } else if (previousRouteKind !== "contactNew") {
         setForm(makeEmptyContactForm());
+        setContactNewStep("search");
       }
       return;
     }
@@ -361,6 +366,7 @@ export const useContactEditor = ({
   } = useContactFormState();
   const setRecentlyAddedContactId = useAtomSet(recentlyAddedContactIdAtom);
   const contactSuggestions = useAtomValue(contactSuggestionsAtom);
+  const [contactNewStep, setContactNewStep] = useAtom(contactNewStepAtom);
 
   const {
     fetchProfile: fetchProfileOneShot,
@@ -369,9 +375,10 @@ export const useContactEditor = ({
 
   const clearContactForm = React.useCallback(() => {
     setForm(makeEmptyContactForm());
+    setContactNewStep("search");
     setEditingId(null);
     setContactEditInitial(null);
-  }, [setContactEditInitial, setEditingId, setForm]);
+  }, [setContactEditInitial, setContactNewStep, setEditingId, setForm]);
 
   // A duplicate of a deleted contact is restored, not added twice.
   const restoreDuplicate = React.useCallback(
@@ -492,11 +499,12 @@ export const useContactEditor = ({
       });
 
       if (duplicate?.id) {
-        setIsSavingContact(false);
-        if (isDeletedContact(duplicate)) {
+        // A new contact restores a deleted duplicate; an edit keeps its own row.
+        if (!editingId && isDeletedContact(duplicate)) {
           await restoreDuplicate(ContactId.orThrow(duplicate.id));
           return;
         }
+        setIsSavingContact(false);
         setStatus(t("contactExists"));
         navigateTo({ route: "contact", id: ContactId.orThrow(duplicate.id) });
         return;
@@ -704,8 +712,10 @@ export const useContactEditor = ({
       fallback: { name: string; lnAddress: string; isExactMatch: boolean },
     ): ContactSearchCandidate => {
       const existingContactId = findExistingContactId(npub);
+      const isSelf = npub === normalizeNpubIdentifier(currentNpub ?? "");
       return {
         ...(existingContactId ? { existingContactId } : {}),
+        ...(isSelf ? { isSelf } : {}),
         isExactMatch: fallback.isExactMatch,
         lnAddress:
           getMetadataLightningAddress(metadata, npub) || fallback.lnAddress,
@@ -715,7 +725,7 @@ export const useContactEditor = ({
         query,
       };
     },
-    [findExistingContactId],
+    [currentNpub, findExistingContactId],
   );
 
   const resolveExactContact = React.useCallback(
@@ -1058,6 +1068,7 @@ export const useContactEditor = ({
     addNewContactFromSearchResult,
     clearContactForm,
     contactEditsSavable,
+    contactNewStep,
     contactSuggestions,
     editingId,
     form,
@@ -1066,6 +1077,7 @@ export const useContactEditor = ({
     selectedContactPublicProfile,
     resetEditedContactFieldFromNostr,
     searchNewContact,
+    setContactNewStep,
     setForm,
   };
 };

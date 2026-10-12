@@ -7,6 +7,7 @@ import {
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
+import { formatShortNpub } from "../utils/formatting";
 import { ContactNewPage } from "./ContactNewPage";
 
 const beacon = vi.hoisted(() => ({
@@ -19,6 +20,40 @@ vi.mock("../app/hooks/useBeacon", () => ({
   useNearbyIdentities: () => beacon.identities,
 }));
 
+type PageProps = React.ComponentProps<typeof ContactNewPage>;
+
+const suggestion = (name: string) => ({
+  displayLnAddress: `${name.toLowerCase()}@linky.fit`,
+  lnAddress: `${name.toLowerCase()}@linky.fit`,
+  name,
+  npub: `npub1${name.toLowerCase()}`,
+  pictureUrl: null,
+  query: `${name.toLowerCase()}@linky.fit`,
+});
+
+const renderPage = (overrides: Partial<PageProps> = {}) =>
+  renderIntoDocument(
+    <ContactNewPage
+      addNewContactFromSearchResult={async () => {}}
+      contactSuggestions={[]}
+      form={{ groups: [], lnAddress: "", name: "", npub: "" }}
+      groupNames={[]}
+      handleSaveContact={() => {}}
+      isSavingContact={false}
+      openScan={() => {}}
+      searchNewContact={async () => ({ kind: "empty" })}
+      setForm={() => {}}
+      setStep={() => {}}
+      step="search"
+      t={(key) => key}
+      {...overrides}
+    />,
+  );
+
+const buttonsOf = (root: Element | null) => [
+  ...(root?.querySelectorAll("button") ?? []),
+];
+
 describe("ContactNewPage", () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -26,7 +61,7 @@ describe("ContactNewPage", () => {
     document.body.innerHTML = "";
   });
 
-  it("scans for nearby npubs and lists them with their profile above the suggestions", async () => {
+  it("shows nearby npubs with their profile before new users, three until measured, as tappable avatars", async () => {
     const known = derivePubkey(NostrSecretKey.make(new Uint8Array(32).fill(4)));
     const unknown = derivePubkey(
       NostrSecretKey.make(new Uint8Array(32).fill(5)),
@@ -59,28 +94,11 @@ describe("ContactNewPage", () => {
         : { kind: "not_found" as const, query: query ?? "" },
     );
 
-    const { container, unmount } = await renderIntoDocument(
-      <ContactNewPage
-        addNewContactFromSearchResult={addNewContactFromSearchResult}
-        contactSuggestions={[
-          {
-            displayLnAddress: "eva@linky.fit",
-            lnAddress: "eva@linky.fit",
-            name: "Eva",
-            npub: "npub1eva",
-            pictureUrl: null,
-            query: "eva@linky.fit",
-          },
-        ]}
-        form={{ groups: [], lnAddress: "", name: "", npub: "" }}
-        groupNames={[]}
-        handleSaveContact={() => {}}
-        isSavingContact={false}
-        searchNewContact={searchNewContact}
-        setForm={() => {}}
-        t={(key) => key}
-      />,
-    );
+    const { container, unmount } = await renderPage({
+      addNewContactFromSearchResult,
+      contactSuggestions: [suggestion("Eva"), suggestion("Filip")],
+      searchNewContact,
+    });
 
     expect(beacon.useIdentityScan).toHaveBeenCalled();
     expect(searchNewContact).toHaveBeenCalledTimes(2);
@@ -88,17 +106,20 @@ describe("ContactNewPage", () => {
       [...container.querySelectorAll('[role="heading"]')].map(
         (element) => element.textContent,
       ),
-    ).toEqual(["nearby", "contactSuggestionsTitle"]);
-    expect(container.textContent).toContain("Dana Kral");
-    expect(container.textContent).toContain("dana@linky.fit");
-    expect(container.textContent).not.toContain(encodeNpub(known).slice(0, 10));
-    expect(container.textContent).not.toContain("Someone Else");
-    expect(container.textContent).toContain(encodeNpub(unknown).slice(0, 10));
-
-    const [addDana] = [...container.querySelectorAll("button")].filter(
-      (button) => button.textContent === "saveContact",
+    ).toEqual(["contactSuggestionsTitle"]);
+    const people = buttonsOf(
+      container.querySelector(
+        '[role="group"][aria-label="contactSuggestionsTitle"]',
+      ),
     );
-    await act(async () => addDana?.click());
+    expect(people.map((button) => button.getAttribute("aria-label"))).toEqual([
+      "Dana Kral, nearby",
+      `${formatShortNpub(encodeNpub(unknown))}, nearby`,
+      "Eva, contactSuggestionNew",
+    ]);
+    expect(container.textContent).not.toContain("Someone Else");
+
+    await act(async () => people[0]?.click());
     expect(addNewContactFromSearchResult).toHaveBeenCalledWith(
       expect.objectContaining({
         isExactMatch: false,
@@ -106,34 +127,77 @@ describe("ContactNewPage", () => {
         npub: encodeNpub(known),
       }),
     );
+    await act(async () => people[2]?.click());
+    expect(addNewContactFromSearchResult).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        isExactMatch: false,
+        name: "Eva",
+        npub: "npub1eva",
+      }),
+    );
     await unmount();
   });
 
-  it("opens contact details when a lightning address is prefilled", async () => {
-    const { container, root } = await renderIntoDocument(
-      <ContactNewPage
-        addNewContactFromSearchResult={async () => {}}
-        contactSuggestions={[]}
-        form={{
-          groups: [],
-          lnAddress: "alice@example.com",
-          name: "",
-          npub: "",
-        }}
-        groupNames={[]}
-        handleSaveContact={() => {}}
-        isSavingContact={false}
-        searchNewContact={async () => ({ kind: "empty" })}
-        setForm={() => {}}
-        t={(key) => key}
-      />,
+  it("opens the scanner from the QR button", async () => {
+    const openScan = vi.fn();
+    const { container, unmount } = await renderPage({ openScan });
+
+    const scan = buttonsOf(container).find(
+      (button) => button.textContent === "contactLoadQr",
     );
+    expect(scan?.getAttribute("data-guide")).toBe("scan-contact-button");
+    await act(async () => scan?.click());
+    expect(openScan).toHaveBeenCalledOnce();
+    await unmount();
+  });
+
+  it("offers to save a typed lightning address before the lookup settles", async () => {
+    const setForm = vi.fn();
+    const setStep = vi.fn();
+    const { container, unmount } = await renderPage({
+      form: { groups: [], lnAddress: "", name: "", npub: "alice@example.com" },
+      searchNewContact: () => new Promise(() => {}),
+      setForm,
+      setStep,
+    });
+
+    const save = buttonsOf(container).find(
+      (button) => button.textContent === "contactSaveLightningAddress",
+    );
+    expect(save).toBeDefined();
+    await act(async () => save?.click());
+    expect(setForm).toHaveBeenCalledWith({
+      groups: [],
+      lnAddress: "alice@example.com",
+      name: "",
+      npub: "",
+    });
+    expect(setStep).toHaveBeenCalledWith("details");
+    await unmount();
+  });
+
+  it("moves to the details when a lightning address is prefilled", async () => {
+    const setStep = vi.fn();
+    await renderPage({
+      form: { groups: [], lnAddress: "alice@example.com", name: "", npub: "" },
+      setStep,
+    });
+    expect(setStep).toHaveBeenCalledWith("details");
+  });
+
+  it("shows the details form without a back button of its own", async () => {
+    const { container, unmount } = await renderPage({
+      form: { groups: [], lnAddress: "alice@example.com", name: "", npub: "" },
+      step: "details",
+    });
 
     const inputs = container.querySelectorAll("input");
     expect(inputs).toHaveLength(3);
     expect(inputs[1]?.value).toBe("alice@example.com");
-
-    await act(async () => root.unmount());
+    expect(
+      buttonsOf(container).map((button) => button.textContent),
+    ).not.toContain("back");
+    await unmount();
   });
 
   it("lists search candidates and highlights the verified exact match", async () => {
@@ -155,22 +219,13 @@ describe("ContactNewPage", () => {
       query: "alice",
     };
 
-    const { container, root } = await renderIntoDocument(
-      <ContactNewPage
-        addNewContactFromSearchResult={async () => {}}
-        contactSuggestions={[]}
-        form={{ groups: [], lnAddress: "", name: "", npub: "alice" }}
-        groupNames={[]}
-        handleSaveContact={() => {}}
-        isSavingContact={false}
-        searchNewContact={async () => ({
-          contacts: [exact, similar],
-          kind: "found",
-        })}
-        setForm={() => {}}
-        t={(key) => key}
-      />,
-    );
+    const { container, unmount } = await renderPage({
+      form: { groups: [], lnAddress: "", name: "", npub: "alice" },
+      searchNewContact: async () => ({
+        contacts: [exact, similar],
+        kind: "found",
+      }),
+    });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(900);
     });
@@ -183,7 +238,36 @@ describe("ContactNewPage", () => {
     expect(rows[0]?.textContent).toContain("Alice");
     expect(rows[1]?.getAttribute("aria-selected")).toBe("false");
     expect(rows[1]?.textContent).toContain("Alice Cooper");
+    await unmount();
+  });
 
-    await act(async () => root.unmount());
+  it("offers to open, not save, the user's own identity", async () => {
+    vi.useFakeTimers();
+    const { container, unmount } = await renderPage({
+      form: { groups: [], lnAddress: "", name: "", npub: "npub1me" },
+      searchNewContact: async () => ({
+        contacts: [
+          {
+            isExactMatch: true,
+            isSelf: true,
+            lnAddress: "",
+            name: "Me",
+            npub: "npub1me",
+            pictureUrl: null,
+            query: "npub1me",
+          },
+        ],
+        kind: "found",
+      }),
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(900);
+    });
+
+    const row = container.querySelector(
+      '[data-testid="contact-new-search-result"]',
+    );
+    expect(row?.querySelector("button")?.textContent).toBe("openContact");
+    await unmount();
   });
 });

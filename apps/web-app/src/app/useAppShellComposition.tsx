@@ -8,7 +8,10 @@ import { useContactsMessagingComposition } from "./hooks/composition/useContacts
 import { useIdentityOwnersComposition } from "./hooks/composition/useIdentityOwnersComposition";
 import { useProfileComposition } from "./hooks/composition/useProfileComposition";
 import { useScanNativeComposition } from "./hooks/composition/useScanNativeComposition";
-import { useCloseContactDetail } from "./hooks/contacts/useContactActions";
+import {
+  useBackFromContactNew,
+  useCloseContactDetail,
+} from "./hooks/contacts/useContactActions";
 import { usePersistContactsOnboardingDismissed } from "./hooks/guide/useContactsOnboarding";
 import {
   useMainMenu,
@@ -307,12 +310,14 @@ export const useAppShellComposition = ({
   const { closeScan } = useScanCommands();
   const { navigateToMainReturn } = useMainMenu();
   const closeContactDetail = useCloseContactDetail();
+  const backFromContactNew = useBackFromContactNew();
   const contactPayBackToChatId = useNavIntent("contactPayBackToChat");
   const dismissTopModal = useDismissTopModal();
   useNativeBackHandler({
     closeScan,
     dismissTopModal,
     navigateBack: resolveBackAction(route, {
+      backFromContactNew,
       closeContactDetail,
       contactPayBackToChatId,
       navigateToMainReturn,

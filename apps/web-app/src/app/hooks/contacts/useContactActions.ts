@@ -29,6 +29,7 @@ import { contactsCommandsAtom } from "../../state/contacts/commands";
 import {
   contactFormAtom,
   contactNewPrefillAtom,
+  contactNewStepAtom,
   makeEmptyContactForm,
 } from "../../state/contacts/contactForm";
 import { syncMuteListAtom } from "../../state/contacts/muteList";
@@ -145,6 +146,16 @@ export const useDeleteContact = () => {
       undoDeleteContact,
     ],
   );
+};
+
+/** Back leaves the details form for the search first, and the page only from there. */
+export const useBackFromContactNew = () => {
+  const [step, setStep] = useAtom(contactNewStepAtom);
+  const closeContactDetail = useCloseContactDetail();
+  return React.useCallback(() => {
+    if (step === "details") setStep("search");
+    else closeContactDetail();
+  }, [closeContactDetail, setStep, step]);
 };
 
 /** Blocks a pubkey on this device and publishes the mute list, best effort. */
@@ -445,6 +456,7 @@ export const useOpenNewContactPage = () => {
   const registry = React.useContext(RegistryContext);
   return React.useCallback(() => {
     registry.set(payAmountAtom, "");
+    registry.set(contactNewStepAtom, "search");
     const prefill = registry.get(contactNewPrefillAtom);
     registry.set(contactNewPrefillAtom, null);
     registry.update(contactFormAtom, (draft) => ({

@@ -1,7 +1,7 @@
 import type { ContactId } from "@linky-fit/linksync";
 import { Atom } from "effect/reactivity";
 import type { ContactSuggestionCandidate } from "../../hooks/contacts/useContactSuggestions";
-import type { ContactFormState } from "../../types/appTypes";
+import type { ContactFormState, ContactNewStep } from "../../types/appTypes";
 
 /** The edited contact's fields as the edit form opened with them. */
 export interface ContactEditInitial {
@@ -34,6 +34,11 @@ export const contactFormAtom = Atom.keepAlive(
     initial: null,
     saving: false,
   }),
+);
+
+/** Which half of the add-contact page is open; the search until a person is picked. */
+export const contactNewStepAtom = Atom.keepAlive(
+  Atom.make<ContactNewStep>("search"),
 );
 
 /** What the next new-contact form opens with, such as a just-paid lightning address. */

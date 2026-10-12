@@ -75,11 +75,13 @@ export type {
 export { ContactRow, ListRow } from "./lists";
 export type { ContactRowProps, ListRowProps } from "./lists";
 export { NearbyAvatar, NearbyBanner, NearbyRow } from "./nearby";
+export { nearbyRowCapacity } from "./nearby-layout";
 export type {
   NearbyAvatarProps,
+  NearbyBadge,
+  NearbyBadgeTone,
   NearbyBannerProps,
   NearbyRowProps,
-  NearbyTrade,
 } from "./nearby";
 export { DataValue } from "./data-value";
 export type { DataValueProps } from "./data-value";

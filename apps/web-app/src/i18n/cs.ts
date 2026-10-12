@@ -636,17 +636,19 @@ export const cs = {
   contactsOnboardingTaskMessage: "Poslat zprávu",
   addContact: "Přidat kontakt",
   addAllContacts: "Přidat všechny",
-  contactLoadQr: "Načíst QR",
+  contactLoadQr: "Načíst QR kontaktu",
   search: "Vyhledat",
   contactSearching: "Hledám...",
   contactSearchLabel: "Vyhledat kontakt",
   contactSearchPlaceholder: "npub, NIP-05 nebo rezervované jméno",
-  contactSearchHint:
-    "Zadejte npub, NIP-05 nebo rezervované jméno, třeba alice.",
   contactSearchEmpty: "Zadejte, koho hledat.",
   contactSearchNoResult: "Nic jsem nenašel.",
   contactSearchCreateFromQuery: "Vytvořit kontakt",
-  contactSuggestionsTitle: "Noví uživatelé Linky",
+  contactSuggestionsTitle: "Návrhy",
+  contactSuggestionNew: "Nový",
+  contactSaveLightningAddress: "Uložit lightning adresu",
+  contactNewIntro:
+    "Přidávejte si pouze důvěryhodné kontakty, které osobně znáte.",
   contactIdentifierInvalid: "Zadejte platný npub nebo rezervované jméno.",
   noContactsYet: "Zatím žádné kontakty.",
 
@@ -666,7 +668,7 @@ export const cs = {
   contactEditTitle: "Úprava kontaktu",
   contactPayTitle: "Platba na kontakt",
   messagesTitle: "Zprávy",
-  newContact: "Přidat nový kontakt",
+  newContact: "Přidat kontakt",
   close: "Zavřít",
   continue: "Pokračovat",
 

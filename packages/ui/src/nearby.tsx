@@ -5,14 +5,16 @@ import { Avatar } from "./display";
 import { Icon } from "./icons";
 import { Row, ScrollView, Text } from "./layout";
 import { toneColors } from "./styles";
+import { nearbyRowGap as rowGap } from "./nearby-layout";
 import { border, opacity, space, typography } from "./tokens";
 
-/** Whether a beacon says its owner buys or sells bitcoin. */
-export type NearbyTrade = "buy" | "sell";
+export type NearbyBadgeTone = "accent" | "info" | "neutral";
 
-const tradeColors = { buy: toneColors.accent, sell: toneColors.info };
-
-const rowGap = space.xs;
+/** A short tag on the avatar ring, e.g. the owner's trade or how they were found. */
+export interface NearbyBadge {
+  label: string;
+  tone: NearbyBadgeTone;
+}
 
 const badgeHeight = typography.lineHeight.caption + 2 * border.emphasis;
 
@@ -24,21 +26,18 @@ export type NearbyAvatarProps = {
   /** Rings the user's own avatar in a quieter color than the contacts'. */
   isSelf?: boolean | undefined;
   onPress: () => void;
+  badge?: NearbyBadge | undefined;
   /** Defaults to the name followed by the badge. */
   accessibilityLabel?: string | undefined;
-} & (
-  | { trade: NearbyTrade; badgeLabel: string }
-  | { trade?: undefined; badgeLabel?: undefined }
-);
+};
 
-/** One person in a `NearbyRow`: a ringed avatar with the trade as a badge on the ring. */
+/** One person in a `NearbyRow`: a ringed avatar with an optional badge on the ring. */
 export function NearbyAvatar({
   name,
   imageUrl,
   label,
   isSelf = false,
-  trade,
-  badgeLabel,
+  badge,
   onPress,
   accessibilityLabel,
 }: NearbyAvatarProps) {
@@ -46,7 +45,7 @@ export function NearbyAvatar({
     <Pressable
       onPress={onPress}
       aria-label={
-        accessibilityLabel ?? (badgeLabel ? `${name}, ${badgeLabel}` : name)
+        accessibilityLabel ?? (badge ? `${name}, ${badge.label}` : name)
       }
       flexDirection="column"
       width="$row"
@@ -61,7 +60,7 @@ export function NearbyAvatar({
       >
         <Avatar name={name} uri={imageUrl} />
       </View>
-      {/* Pulled over the ring's bottom and into half of each row gap; kept without a trade so labels line up. */}
+      {/* Pulled over the ring's bottom and into half of each row gap; kept without a badge so labels line up. */}
       <View
         height={badgeHeight}
         marginTop={-space.sm}
@@ -69,7 +68,7 @@ export function NearbyAvatar({
         alignSelf="stretch"
         alignItems="center"
       >
-        {trade ? (
+        {badge ? (
           <View
             padding={border.emphasis}
             borderRadius="$pill"
@@ -79,15 +78,15 @@ export function NearbyAvatar({
             <View
               paddingHorizontal="$xxs"
               borderRadius="$pill"
-              backgroundColor={tradeColors[trade].background}
+              backgroundColor={toneColors[badge.tone].background}
             >
               <Text
                 variant="caption"
                 bold
-                color={tradeColors[trade].color}
+                color={toneColors[badge.tone].color}
                 numberOfLines={1}
               >
-                {badgeLabel}
+                {badge.label}
               </Text>
             </View>
           </View>

@@ -35,6 +35,7 @@ import {
   type CashuTransferLifecycle,
 } from "./composition/useLinkshuComposition";
 import { usePushToast, useTranslation } from "./shell";
+import { currentNpubAtom } from "../state/session/session";
 import { useContactsRepository } from "./useLinksync";
 import { useWalletInventory } from "./wallet/useWalletInventory";
 import type { Translate } from "../../i18n";
@@ -103,6 +104,7 @@ interface UseAppDataTransferParams<TContact extends ImportableContact> {
   cashuProofs: readonly StoredProof[];
   contacts: readonly TContact[];
   contactsRepository: Pick<ContactsRepository, "insert" | "update">;
+  currentNpub: string | null;
   /** Null until the wallet runtime is ready to restore wallet rows. */
   importCashuLegacyRows: CashuTransferLifecycle["importLegacyRows"] | null;
   importCashuOperation: CashuTransferLifecycle["importOperation"] | null;
@@ -116,6 +118,7 @@ export const useAppDataTransfer = <TContact extends ImportableContact>({
   cashuProofs,
   contacts,
   contactsRepository,
+  currentNpub,
   importCashuLegacyRows,
   importCashuOperation,
   importCashuProofs,
@@ -222,6 +225,7 @@ export const useAppDataTransfer = <TContact extends ImportableContact>({
           addressOnlyKeys.add(addressOnlyKey(contact.name, contact.lnAddress));
       }
       const insertedNpubs = new Set<string>();
+      const ownNpub = (currentNpub ?? "").trim();
 
       let addedContacts = 0;
       let updatedContacts = 0;
@@ -240,6 +244,8 @@ export const useAppDataTransfer = <TContact extends ImportableContact>({
         const groupNamesJson = sanitizeText(rec.groupNamesJson, 1000);
 
         if (!name && !npub && !lnAddress) continue;
+        // An export may carry the account itself as a contact; it never comes back in.
+        if (npub && npub === ownNpub) continue;
 
         const existing = npub ? existingByNpub.get(npub) : undefined;
         if (
@@ -346,6 +352,7 @@ export const useAppDataTransfer = <TContact extends ImportableContact>({
     [
       contacts,
       contactsRepository,
+      currentNpub,
       importCashuLegacyRows,
       importCashuOperation,
       importCashuProofs,
@@ -380,6 +387,7 @@ export const useAppDataActions = () => {
     cashuProofs: allProofs,
     contacts: useAtomValue(contactsAtom),
     contactsRepository: useContactsRepository(),
+    currentNpub: useAtomValue(currentNpubAtom),
     importCashuLegacyRows: lifecycle?.importLegacyRows ?? null,
     importCashuOperation: lifecycle?.importOperation ?? null,
     importCashuProofs: lifecycle?.importProofs ?? null,
