@@ -73,6 +73,16 @@ describe("privateImageMessage compact format", () => {
   });
 });
 
+describe("privateImageMessage legacy JSON format", () => {
+  it("parses whitespace-padded legacy JSON and rejects plain text", () => {
+    expect(parsePrivateImageMessage(`\n  ${JSON.stringify(base)}  \n`)).toEqual(
+      base,
+    );
+    expect(parsePrivateImageMessage("hello there")).toBeNull();
+    expect(parsePrivateImageMessage(`[${JSON.stringify(base)}]`)).toBeNull();
+  });
+});
+
 describe("chat attachment size checks", () => {
   const fileOfSize = (bytes: number, name: string, type: string) =>
     new File([new Uint8Array(bytes)], name, { type });

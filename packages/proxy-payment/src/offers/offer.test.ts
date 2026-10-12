@@ -27,7 +27,17 @@ describe("decodeBankPaymentOffer", () => {
       text: "Zaplatíš za mě bankovní platbu ve výši 500 CZK?",
     });
     expect(decodeBankPaymentOffer("not json")).toBeNull();
+    expect(decodeBankPaymentOffer("[]")).toBeNull();
     expect(decodeBankPaymentOffer('{"type":"other"}')).toBeNull();
+  });
+
+  it("decodes content surrounded by JSON whitespace", () => {
+    const content = bankOfferContentFromSnapshot(snapshot("offered", true));
+
+    expect(decodeBankPaymentOffer(`\n\t ${content} \r\n`)).toMatchObject({
+      offerId: "offer-1",
+      status: "offered",
+    });
   });
 
   it("keeps initiation and bank-payment confirmation times in later states", () => {

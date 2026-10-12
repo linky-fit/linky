@@ -500,6 +500,7 @@ export const parsePrivateImageMessage = (
     if (!isRecord(compactParsed)) return null;
     return parsePrivateImageRecord(compactParsed);
   }
+  if (!text.startsWith("{")) return null;
 
   let parsed: unknown;
   try {
