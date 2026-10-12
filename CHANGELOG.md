@@ -12,6 +12,30 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ## [Unreleased]
 
+## [26.10.5] - 2026-10-12
+
+### en-US
+
+- Requires Android 7.0 or newer.
+- Delete a message for both sides; react with any emoji.
+- Delete contacts with undo; block and unblock them on all your devices.
+- Notifications without Google Play Services via UnifiedPush (e.g. ntfy).
+- Restore an account with one paste or 20 checked words.
+- Settings: switch to a custom Nostr identity and back; replay the tutorial.
+- ₿ shows bitcoin with 8 decimals; tap a token in a chat to switch units.
+- Add contact is built around QR scanning.
+
+### cs-CZ
+
+- Vyžaduje Android 7.0+.
+- Smazání zprávy u obou stran; reakce jakýmkoli emoji.
+- Smazání kontaktů s vrácením, blokování a odblokování na všech zařízeních.
+- Notifikace bez Google Play Services přes UnifiedPush (např. ntfy).
+- Obnova účtu jedním vložením či 20 kontrolovanými slovy.
+- Nastavení: přepnutí na vlastní Nostr identitu a zpět; opakování tutoriálu.
+- ₿ ukazuje bitcoin s 8 desetinnými místy; klepnutím na token v chatu přepnete jednotku.
+- Přidat kontakt stojí na skenování QR.
+
 ## [26.10.4] - 2026-10-12
 
 ### en-US
