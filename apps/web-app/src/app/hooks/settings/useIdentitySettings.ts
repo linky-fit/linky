@@ -8,9 +8,12 @@ import { writeBrowserClipboardText } from "../../../platform/clipboard";
 import type { IdentityProfileSource } from "../../lib/keySwitchProfile";
 import { contactsOnboardingHasBackedUpKeysAtom } from "../../state/contacts/onboarding";
 import {
+  attachedNpubAtom,
   canSwitchToDefaultIdentityAtom,
+  defaultNpubAtom,
   identityCommandsAtom,
   logoutArmedAtom,
+  nostrIdentitySourceAtom,
   pendingIdentitySwitchAtom,
   seedMnemonicAtom,
   slip39SeedAtom,
@@ -46,14 +49,27 @@ export const useIdentitySettings = () => {
     async () => commands?.read().switchToDefaultIdentity(),
     [commands],
   );
+  const switchToAttachedIdentity = React.useCallback(
+    async () => commands?.read().switchToAttachedIdentity(),
+    [commands],
+  );
+  const removeAttachedIdentity = React.useCallback(
+    async () => commands?.read().removeAttachedIdentity(),
+    [commands],
+  );
   return {
     answerPendingIdentitySwitch,
+    attachedIdentityNpub: useAtomValue(attachedNpubAtom),
     canSwitchToDefaultIdentity: useAtomValue(canSwitchToDefaultIdentityAtom),
+    derivedIdentityNpub: useAtomValue(defaultNpubAtom),
     logoutArmed: useAtomValue(logoutArmedAtom),
+    nostrIdentitySource: useAtomValue(nostrIdentitySourceAtom),
     pendingIdentitySwitch: useAtomValue(pendingIdentitySwitchAtom),
+    removeAttachedIdentity,
     requestLogout,
     requestPasteNostrKeys,
     seedMnemonic: useSeedMnemonic(),
+    switchToAttachedIdentity,
     switchToDefaultIdentity,
   };
 };

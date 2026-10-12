@@ -10,14 +10,11 @@ import {
   Text,
 } from "@linky-fit/ui";
 import type { IconName } from "@linky-fit/ui";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback } from "react";
 import { useAtom, useAtomValue } from "@linky-fit/linkstr-react";
 import { useDedupeContacts } from "../app/hooks/contacts/useDedupeContacts";
 import { useEvoluStatusSummary } from "../app/hooks/settings/useEvoluSettings";
-import {
-  useCopyNostrKeys,
-  useIdentitySettings,
-} from "../app/hooks/settings/useIdentitySettings";
+import { useIdentitySettings } from "../app/hooks/settings/useIdentitySettings";
 import {
   useDisplayAmounts,
   usePushToast,
@@ -45,11 +42,8 @@ import {
 } from "../app/hooks/useRelayHealth";
 import { useExperimentalFeatures } from "../app/hooks/useExperimentalFeatures";
 import { usePushNotificationsSetting } from "../app/hooks/usePushNotificationsSetting";
-
-import { IdentityProfileChoiceSheet } from "../components/IdentityProfileChoiceSheet";
 import { useColorModePreference } from "../hooks/useColorMode";
 import { navigateTo } from "../hooks/useRouting";
-import type { I18nKey } from "../i18n";
 import {
   connectionStatus,
   type ConnectionState,
@@ -59,20 +53,8 @@ import { COLOR_MODE_PREFERENCE_LABEL_KEYS } from "../utils/colorMode";
 import { pickFile } from "../utils/pickFile";
 import { RECEIVE_METHOD_LABEL_KEYS } from "../utils/receiveMethod";
 
-type SecurityAction = "copyNostr" | "defaultIdentity" | "pasteNostr";
-
 export function AdvancedPage(): React.ReactElement {
-  const {
-    answerPendingIdentitySwitch,
-    canSwitchToDefaultIdentity,
-    logoutArmed,
-    pendingIdentitySwitch,
-    requestLogout,
-    requestPasteNostrKeys,
-    seedMnemonic,
-    switchToDefaultIdentity,
-  } = useIdentitySettings();
-  const copyNostrKeys = useCopyNostrKeys();
+  const { logoutArmed, requestLogout, seedMnemonic } = useIdentitySettings();
   const { dedupeContacts, dedupeContactsIsBusy } = useDedupeContacts();
   const defaultMintDisplay = useDefaultMintDisplay();
   const { evoluConnectedServerCount, evoluOverallStatus, evoluServerUrls } =
@@ -104,9 +86,6 @@ export function AdvancedPage(): React.ReactElement {
   const openFeedbackContact = useOpenFeedbackContact();
   const notifications = usePushNotificationsSetting();
   const colorModePreference = useColorModePreference();
-  const [armedSecurityAction, setArmedSecurityAction] =
-    useState<SecurityAction | null>(null);
-  const armTimeoutRef = useRef<number | null>(null);
   const hasSeedMnemonic = (seedMnemonic ?? "").trim().length > 0;
   const hasCurrentNsec = (currentNsec ?? "").trim().length > 0;
   const appVersionLabel = [
@@ -125,13 +104,6 @@ export function AdvancedPage(): React.ReactElement {
     [formatDisplayedAmountParts],
   );
 
-  const clearArmTimeout = useCallback(() => {
-    if (armTimeoutRef.current !== null) {
-      window.clearTimeout(armTimeoutRef.current);
-      armTimeoutRef.current = null;
-    }
-  }, []);
-
   const handleReloadApp = useCallback(async () => {
     if ("serviceWorker" in navigator) {
       try {
@@ -146,36 +118,6 @@ export function AdvancedPage(): React.ReactElement {
 
     window.location.reload();
   }, []);
-
-  const requestSecurityAction = useCallback(
-    (
-      action: SecurityAction,
-      run: () => void | Promise<void>,
-      hintKey: I18nKey = "sensitiveActionArmedHint",
-    ) => {
-      if (armedSecurityAction === action) {
-        clearArmTimeout();
-        setArmedSecurityAction(null);
-        void run();
-        return;
-      }
-
-      clearArmTimeout();
-      setArmedSecurityAction(action);
-      pushToast(t(hintKey));
-      armTimeoutRef.current = window.setTimeout(() => {
-        setArmedSecurityAction(null);
-        armTimeoutRef.current = null;
-      }, 5000);
-    },
-    [armedSecurityAction, clearArmTimeout, pushToast, t],
-  );
-
-  useEffect(() => {
-    return () => {
-      clearArmTimeout();
-    };
-  }, [clearArmTimeout]);
 
   const linkRow = (
     icon: IconName,
@@ -375,40 +317,12 @@ export function AdvancedPage(): React.ReactElement {
           disabled={!hasSeedMnemonic}
         />
         <ListRow
-          icon="Copy"
-          title={t("copyNostrKeys")}
-          testID="copy-nostr-keys"
-          destructive={armedSecurityAction === "copyNostr"}
-          onPress={() => requestSecurityAction("copyNostr", copyNostrKeys)}
+          icon="KeyRound"
+          title={t("nostrIdentity")}
+          testID="open-nostr-identity"
+          onPress={() => navigateTo({ route: "settingsNostrIdentity" })}
           disabled={!hasCurrentNsec}
         />
-        <ListRow
-          icon="UserRound"
-          title={t("pasteCustomNostrKeys")}
-          destructive={armedSecurityAction === "pasteNostr"}
-          onPress={() =>
-            requestSecurityAction(
-              "pasteNostr",
-              requestPasteNostrKeys,
-              "nostrPasteArmedHint",
-            )
-          }
-          disabled={!hasCurrentNsec || !hasSeedMnemonic}
-        />
-        {canSwitchToDefaultIdentity ? (
-          <ListRow
-            icon="Repeat"
-            title={t("switchToDefaultIdentity")}
-            destructive={armedSecurityAction === "defaultIdentity"}
-            onPress={() =>
-              requestSecurityAction(
-                "defaultIdentity",
-                switchToDefaultIdentity,
-                "defaultIdentityArmedHint",
-              )
-            }
-          />
-        ) : null}
         <ListRow
           icon="LogOut"
           title={t("logout")}
@@ -440,14 +354,6 @@ export function AdvancedPage(): React.ReactElement {
       >
         {appVersionLabel}
       </Text>
-
-      {pendingIdentitySwitch ? (
-        <IdentityProfileChoiceSheet
-          onAnswer={answerPendingIdentitySwitch}
-          pending={pendingIdentitySwitch}
-          t={t}
-        />
-      ) : null}
     </Stack>
   );
 }

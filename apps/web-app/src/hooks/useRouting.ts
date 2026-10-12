@@ -113,6 +113,7 @@ type NavigationAction =
   | { route: "settingsLanguage" }
   | { route: "settingsAppearance" }
   | { route: "settingsMasterKeys" }
+  | { route: "settingsNostrIdentity" }
   | { route: "keryxCompanies" }
   | { route: "keryxCompanyNew" }
   | { route: "keryxCompany"; id: KeryxSubscriptionId }
@@ -163,6 +164,9 @@ export const navigateTo = (action: NavigationAction): void => {
       break;
     case "settingsMasterKeys":
       window.location.assign("#settings/master-keys");
+      break;
+    case "settingsNostrIdentity":
+      window.location.assign("#settings/nostr-identity");
       break;
     case "keryxCompanies":
       window.location.assign("#settings/keryx");

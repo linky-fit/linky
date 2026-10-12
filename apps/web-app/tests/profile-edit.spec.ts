@@ -111,13 +111,15 @@ test("profile edits save after switching to a custom identity", async ({
   await page.goto("/#profile/edit");
   await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Alice");
 
-  await page.goto("/#advanced");
-  const paste = page.getByRole("button", { name: "Paste custom nostr keys" });
-  await paste.click();
+  await page.goto("/#settings/nostr-identity");
+  const paste = page.getByRole("button", {
+    name: "Paste a custom Nostr identity",
+  });
+  // The pasted identity has no profile, so Linky switches without asking.
   await switchIdentityAndAwaitReload(page, paste);
-  await page.goto("/#advanced");
+  await page.goto("/#settings/nostr-identity");
   await expect(
-    page.getByRole("button", { name: "Switch back to default identity" }),
+    page.getByRole("button", { name: "Switch back to the derived identity" }),
   ).toBeVisible();
   await expect
     .poll(() =>
@@ -186,19 +188,14 @@ test("profile edits save after switching to a custom identity", async ({
       }
     });
 
-    await test.step("switching back to the default identity hides the row again", async () => {
-      await page.goto("/#advanced");
+    await test.step("switching back to the derived identity keeps the custom one attached", async () => {
+      await page.goto("/#settings/nostr-identity");
       const switchBack = page.getByRole("button", {
-        name: "Switch back to default identity",
+        name: "Switch back to the derived identity",
       });
       await switchBack.click();
-      await switchBack.click();
-      // The default identity has its onboarding profile, so Linky asks.
-      await expect(page.getByTestId("identity-profile-preview")).toBeVisible();
-      await switchIdentityAndAwaitReload(
-        page,
-        page.getByRole("button", { name: "Switch identity" }),
-      );
+      // The second press confirms; the derived identity keeps its own profile, so Linky asks nothing more.
+      await switchIdentityAndAwaitReload(page, switchBack);
       await expect
         .poll(() =>
           page.evaluate(() =>
@@ -206,11 +203,17 @@ test("profile edits save after switching to a custom identity", async ({
           ),
         )
         .toBe("derived");
-      await page.goto("/#advanced");
+      await page.goto("/#settings/nostr-identity");
       await expect(
-        page.getByRole("button", { name: "Paste custom nostr keys" }),
+        page.getByRole("button", { name: "Use this identity" }),
       ).toBeVisible();
       await expect(switchBack).toHaveCount(0);
+      const remove = page.getByRole("button", { name: "Remove identity" });
+      await remove.click();
+      await remove.click();
+      await expect(
+        page.getByRole("button", { name: "Paste a custom Nostr identity" }),
+      ).toBeVisible();
     });
   } finally {
     pool.close([NOSTR_RELAY_URL]);
@@ -267,15 +270,27 @@ test("switching to a custom identity with a profile lets the user keep the Linky
     page.evaluate(() => localStorage.getItem("linky.nostr_identity_source.v1"));
   const choice = page.getByTestId("identity-profile-choice");
   const preview = page.getByTestId("identity-profile-preview");
+  /** Pastes the identity; a custom one in use is first switched away from and removed. */
   const requestSwitch = async (secretKey: Uint8Array) => {
-    await page.goto("/#advanced");
+    await page.goto("/#settings/nostr-identity");
+    if ((await identitySource()) === "custom") {
+      const switchBack = page.getByRole("button", {
+        name: "Switch back to the derived identity",
+      });
+      await switchBack.click();
+      await switchIdentityAndAwaitReload(page, switchBack);
+      await page.goto("/#settings/nostr-identity");
+      const remove = page.getByRole("button", { name: "Remove identity" });
+      await remove.click();
+      await remove.click();
+    }
     await page.evaluate(
       (nsec) => sessionStorage.setItem("test.clipboard", nsec),
       nip19.nsecEncode(secretKey),
     );
-    const paste = page.getByRole("button", { name: "Paste custom nostr keys" });
-    await paste.click();
-    await paste.click();
+    await page
+      .getByRole("button", { name: "Paste a custom Nostr identity" })
+      .click();
     await expect(choice).toBeVisible();
   };
   const switchIdentity = async () => {
@@ -291,7 +306,7 @@ test("switching to a custom identity with a profile lets the user keep the Linky
       await requestSwitch(bob);
       await page.getByRole("button", { name: "Cancel", exact: true }).click();
       await expect(choice).toBeHidden();
-      await expect(page).toHaveURL(/#advanced$/);
+      await expect(page).toHaveURL(/#settings\/nostr-identity$/);
       expect(await identitySource()).not.toBe("custom");
       expect(await newestRelayProfile(bobNpub)).toEqual({
         name: "Bob",
@@ -321,14 +336,14 @@ test("switching to a custom identity with a profile lets the user keep the Linky
     });
 
     await test.step("keeping the Linky profile overwrites the identity's own", async () => {
+      // Pasting another identity first returns to Alice, so hers is the Linky profile on offer.
       await requestSwitch(carol);
-      await expect(preview).toContainText("Bob");
+      await expect(preview).toContainText("Alice");
       await switchIdentity();
       await expect
         .poll(() => newestRelayProfile(carolNpub))
-        .toEqual({
-          name: "Bob",
-          about: "Bob's bio",
+        .toMatchObject({
+          name: "Alice",
           website: "https://carol.example",
           lud16: `${carolNpub}@linky.fit`,
         });

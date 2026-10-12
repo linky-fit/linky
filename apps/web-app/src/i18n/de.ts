@@ -212,9 +212,15 @@ export const de = {
   masterKeys: "Hauptschlüssel",
   masterKeysShow: "Anzeigen",
   masterKeysHide: "Ausblenden",
-  pasteCustomNostrKeys: "Eigene Nostr-Schlüssel einfügen",
-  switchToDefaultIdentity: "Zurück zur Standard-Identität",
-  copyNostrKeys: "Nostr-Schlüssel kopieren",
+  pasteCustomNostrKeys: "Eigene Nostr-Identität einfügen",
+  switchToDefaultIdentity: "Zurück zur abgeleiteten Identität",
+  copyNsec: "nsec kopieren",
+  nostrIdentityUsingDerived: "Du verwendest die in Linky erstellte Identität.",
+  nostrIdentityUsingCustom: "Du verwendest deine eigene Nostr-Identität.",
+  nostrIdentityDerivedTitle: "In Linky erstellte Identität",
+  nostrIdentityCustomTitle: "Eigene Nostr-Identität",
+  nostrIdentityCustomHint:
+    "Füge einen nsec ein, um unter einer Nostr-Identität aufzutreten, die du schon hast.",
   sensitiveActionArmedHint:
     "Sensible Aktion. Klicke zum Bestätigen noch einmal.",
   derive: "Ableiten",
@@ -300,10 +306,11 @@ export const de = {
   cashuPaymentMeltBody:
     "Kein einzelner Mint kann diese Zahlung decken. Alle Token von {fromMint} zum Haupt-Mint {toMint} übertragen? Danach kannst du die ursprüngliche Zahlung erneut bestätigen.",
   cashuPaymentMeltConfirm: "Zum Haupt-Mint übertragen",
-  nostrPasteArmedHint:
-    "Das Einfügen überschreibt die aktuellen Nostr-Schlüssel. Klicke zum Bestätigen noch einmal.",
+  nostrIdentityInUse: "In Verwendung",
+  nostrIdentitySwitchTo: "Diese Identität verwenden",
+  nostrIdentityRemove: "Identität entfernen",
   defaultIdentityArmedHint:
-    "Damit wechselst du zurück zur Identität aus deinem Wiederherstellungs-Seed. Klicke zum Bestätigen noch einmal.",
+    "Damit wechselst du zurück zur Identität, die aus deinem Wiederherstellungs-Seed abgeleitet wird. Klicke zum Bestätigen noch einmal.",
   nostrPasteInvalid: "Ungültiger Nostr-Schlüssel (nsec… erwartet).",
   nostrKeySwitchProfilePublishFailed:
     "Profil konnte nicht unter dem neuen Schlüssel veröffentlicht werden. Schlüssel wurden nicht gewechselt — bitte erneut versuchen.",

@@ -95,6 +95,9 @@ describe("parseRouteFromHash", () => {
     replaceHash("#settings/master-keys");
     expect(parseRouteFromHash()).toEqual({ kind: "settingsMasterKeys" });
 
+    replaceHash("#settings/nostr-identity");
+    expect(parseRouteFromHash()).toEqual({ kind: "settingsNostrIdentity" });
+
     replaceHash("#proxy");
     expect(parseRouteFromHash()).toEqual({ kind: "proxyPayments" });
 

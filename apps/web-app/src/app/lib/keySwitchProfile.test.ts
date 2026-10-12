@@ -130,6 +130,20 @@ describe("profileForIdentitySwitch", () => {
     );
   });
 
+  it("keeps the identity's own picture under the Linky profile", () => {
+    const profile = profileForIdentitySwitch({
+      lightningAddress: NEW_ADDRESS,
+      linkyProfile,
+      nostrProfile: new ProfileMetadata({
+        ...nostrProfile,
+        picture: "https://bob.example/bob.png",
+      }),
+      source: "linky",
+    });
+    expect(profile.name).toBe("Alice");
+    expect(profile.picture).toBe("https://bob.example/bob.png");
+  });
+
   it("imports the Nostr profile but keeps the Linky address", () => {
     expect(
       profileForIdentitySwitch({

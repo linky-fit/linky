@@ -34,6 +34,7 @@ export const getDesktopRouteSection = (route: Route): DesktopRouteSection => {
     case "settingsTutorial":
     case "settingsReceiveMethod":
     case "settingsMasterKeys":
+    case "settingsNostrIdentity":
     case "keryxCompanies":
     case "keryxCompanyNew":
     case "keryxCompany":
@@ -101,6 +102,7 @@ export const isDesktopSectionEntryRoute = (route: Route): boolean => {
     case "settingsTutorial":
     case "settingsReceiveMethod":
     case "settingsMasterKeys":
+    case "settingsNostrIdentity":
     case "keryxCompanies":
     case "advancedAutoPayLimit":
     case "advancedInspector":

@@ -1,6 +1,7 @@
 import { encodeNsec, ProfileMetadata } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { AtomRegistry, RegistryContext } from "@linky-fit/linkstr-react";
+import { Exit } from "effect";
 import { AsyncResult, type Atom } from "effect/reactivity";
 import { act, useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,9 +18,12 @@ const mocks = vi.hoisted(() => ({
   checkIdentityForSwitch: vi.fn(),
   derivedNsec: "",
   identitySource: "derived",
+  ownerMnemonic: ((): string | null => null)(),
+  pushToast: vi.fn(),
   persistIdentitySecrets: vi.fn(),
   publishProfile: vi.fn(),
   readClipboardText: vi.fn(),
+  writeStoredAttachedNsec: vi.fn(),
   calls: new Array<string>(),
   atomValues: new Map<unknown, unknown>(),
 }));
@@ -66,16 +70,22 @@ vi.mock("../../platform/identitySecrets", () => ({
     mocks.calls.push("clearIdentitySecrets");
   },
   persistIdentitySecrets: mocks.persistIdentitySecrets,
+  readStoredAttachedNsec: async () => null,
   readStoredCashuMnemonic: async () => "cashu mnemonic",
   readStoredSlip39Seed: async () => "slip39 seed",
+  removeStoredAttachedNsec: vi.fn(),
+  writeStoredAttachedNsec: mocks.writeStoredAttachedNsec,
   writeStoredCashuMnemonic: vi.fn(),
 }));
 
 vi.mock("../../utils/slip39Nostr", () => ({
   createSlip39Seed: vi.fn(),
   deriveCashuBip85MnemonicFromSlip39: async () => "cashu mnemonic",
-  deriveEvoluOwnerMnemonicFromSlip39: async () => null,
-  deriveNostrKeysFromSlip39: async () => ({ nsec: mocks.derivedNsec }),
+  deriveEvoluOwnerMnemonicFromSlip39: async () => mocks.ownerMnemonic,
+  deriveNostrKeysFromSlip39: async () => ({
+    npub: "npub1derived",
+    nsec: mocks.derivedNsec,
+  }),
 }));
 
 vi.mock("../../utils/storage", async (importOriginal) => ({
@@ -151,6 +161,7 @@ describe("switching to a custom identity", () => {
     // The seed derives the current identity, so no derived switch starts.
     mocks.derivedNsec = currentNsec;
     mocks.identitySource = "derived";
+    mocks.ownerMnemonic = null;
     mocks.readClipboardText.mockResolvedValue(pastedNsec);
     mocks.atomValues.set(
       myProfileMetadataAtom,
@@ -209,6 +220,73 @@ describe("switching to a custom identity", () => {
       lightningAddress: "bob@linky.fit",
     });
     expect(mocks.publishProfile).not.toHaveBeenCalled();
+  });
+
+  it("switches back to the derived identity with its own profile, without asking", async () => {
+    mocks.derivedNsec = pastedNsec;
+    mocks.identitySource = "custom";
+    mocks.ownerMnemonic =
+      "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+    mocks.publishProfile.mockResolvedValue(Exit.succeed(undefined));
+    const resolveCheck = deferredCheck();
+    const domain = await setup();
+    await act(async () => {});
+
+    let request: Promise<void> | undefined;
+    await act(async () => {
+      request = domain.current?.switchToDefaultIdentity();
+    });
+    await act(async () => {
+      resolveCheck({
+        check: {
+          kind: "found",
+          metadata: new ProfileMetadata({ name: "Alice before" }),
+        },
+        lightningAddress: "alice@linky.fit",
+      });
+      await request;
+    });
+
+    expect(mocks.pushToast).not.toHaveBeenCalled();
+    expect(domain.current?.pendingIdentitySwitch).toBeNull();
+    expect(mocks.publishProfile).toHaveBeenCalledOnce();
+    expect(mocks.publishProfile.mock.calls[0]?.[0]).toMatchObject({
+      name: "Alice before",
+    });
+    // The custom identity stays attached to the device.
+    expect(mocks.writeStoredAttachedNsec).toHaveBeenCalledWith(currentNsec);
+    expect(mocks.persistIdentitySecrets).toHaveBeenCalledWith(
+      expect.objectContaining({ identitySource: "derived", nsec: pastedNsec }),
+    );
+  });
+
+  it("asks for the profile when switching back cannot check the derived identity's", async () => {
+    mocks.derivedNsec = pastedNsec;
+    mocks.identitySource = "custom";
+    mocks.ownerMnemonic =
+      "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+    const resolveCheck = deferredCheck();
+    const domain = await setup();
+    await act(async () => {});
+
+    let request: Promise<void> | undefined;
+    await act(async () => {
+      request = domain.current?.switchToDefaultIdentity();
+    });
+    await act(async () => {
+      resolveCheck({
+        check: { kind: "unchecked" },
+        lightningAddress: "alice@linky.fit",
+      });
+      await request;
+    });
+
+    expect(domain.current?.pendingIdentitySwitch).toMatchObject({
+      phase: "choosing",
+      check: { kind: "unchecked" },
+    });
+    expect(mocks.publishProfile).not.toHaveBeenCalled();
+    expect(mocks.persistIdentitySecrets).not.toHaveBeenCalled();
   });
 
   it("offers the default identity only while a custom one is active", async () => {

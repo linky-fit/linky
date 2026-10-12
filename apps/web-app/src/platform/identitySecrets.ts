@@ -1,6 +1,7 @@
 import { INITIAL_MNEMONIC_STORAGE_KEY } from "../mnemonic";
 import {
   CASHU_BIP85_MNEMONIC_STORAGE_KEY,
+  NOSTR_ATTACHED_NSEC_STORAGE_KEY,
   NOSTR_IDENTITY_SOURCE_STORAGE_KEY,
   NOSTR_IDENTITY_SWITCHED_AT_SEC_STORAGE_KEY,
   NOSTR_NSEC_STORAGE_KEY,
@@ -134,6 +135,18 @@ export const readStoredNostrNsec = async (): Promise<string | null> => {
   return readStoredSecret(NOSTR_NSEC_STORAGE_KEY);
 };
 
+export const readStoredAttachedNsec = async (): Promise<string | null> => {
+  return readStoredSecret(NOSTR_ATTACHED_NSEC_STORAGE_KEY);
+};
+
+export const writeStoredAttachedNsec = async (nsec: string): Promise<void> => {
+  await writeStoredSecret(NOSTR_ATTACHED_NSEC_STORAGE_KEY, nsec);
+};
+
+export const removeStoredAttachedNsec = async (): Promise<void> => {
+  await removeStoredSecret(NOSTR_ATTACHED_NSEC_STORAGE_KEY);
+};
+
 export const readStoredSlip39Seed = async (): Promise<string | null> => {
   return readStoredSecret(NOSTR_SLIP39_SEED_STORAGE_KEY);
 };
@@ -216,6 +229,7 @@ export const clearIdentitySecrets = async (): Promise<void> => {
 
   await Promise.all([
     removeStoredSecret(NOSTR_NSEC_STORAGE_KEY),
+    removeStoredSecret(NOSTR_ATTACHED_NSEC_STORAGE_KEY),
     removeStoredSecret(NOSTR_SLIP39_SEED_STORAGE_KEY),
     removeStoredSecret(CASHU_BIP85_MNEMONIC_STORAGE_KEY),
     removeStoredSecret(INITIAL_MNEMONIC_STORAGE_KEY),

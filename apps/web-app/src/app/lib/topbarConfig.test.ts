@@ -63,6 +63,7 @@ describe("resolveBackAction", () => {
     expect(backHashFor({ kind: "settingsTutorial" })).toBe("#settings");
     expect(backHashFor({ kind: "settingsReceiveMethod" })).toBe("#settings");
     expect(backHashFor({ kind: "settingsMasterKeys" })).toBe("#settings");
+    expect(backHashFor({ kind: "settingsNostrIdentity" })).toBe("#settings");
     expect(backHashFor({ kind: "bankPaymentNew" })).toBe("#proxy");
     expect(backHashFor({ kind: "advancedAutoPayLimit" })).toBe("#settings");
     expect(backHashFor({ kind: "advancedInspector" })).toBe("#settings");

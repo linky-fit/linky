@@ -207,9 +207,15 @@ export const en = {
   masterKeys: "Master keys",
   masterKeysShow: "Show",
   masterKeysHide: "Hide",
-  pasteCustomNostrKeys: "Paste custom nostr keys",
-  switchToDefaultIdentity: "Switch back to default identity",
-  copyNostrKeys: "Copy nostr keys",
+  pasteCustomNostrKeys: "Paste a custom Nostr identity",
+  switchToDefaultIdentity: "Switch back to the derived identity",
+  copyNsec: "Copy nsec",
+  nostrIdentityUsingDerived: "You are using the identity created in Linky.",
+  nostrIdentityUsingCustom: "You are using your own Nostr identity.",
+  nostrIdentityDerivedTitle: "Identity created in Linky",
+  nostrIdentityCustomTitle: "Own Nostr identity",
+  nostrIdentityCustomHint:
+    "Paste an nsec to appear to others under a Nostr identity you already have.",
   sensitiveActionArmedHint: "Sensitive action. Click once more to confirm.",
   derive: "Derive",
   nostrKeysCopied: "Nostr keys copied to clipboard.",
@@ -289,10 +295,11 @@ export const en = {
   cashuPaymentMeltBody:
     "No single mint can cover this payment. Move all tokens from {fromMint} to the main mint {toMint}? You can confirm the original payment again after the melt.",
   cashuPaymentMeltConfirm: "Move to main mint",
-  nostrPasteArmedHint:
-    "Pasting Nostr keys will overwrite the current ones. Click once more to confirm.",
+  nostrIdentityInUse: "In use",
+  nostrIdentitySwitchTo: "Use this identity",
+  nostrIdentityRemove: "Remove identity",
   defaultIdentityArmedHint:
-    "This switches back to the identity your recovery seed creates. Click once more to confirm.",
+    "This switches back to the identity derived from your recovery seed. Click once more to confirm.",
   nostrPasteInvalid: "Invalid Nostr key (expected nsec…).",
   nostrKeySwitchProfilePublishFailed:
     "Could not publish your profile under the new key. Keys were not switched — try again.",
