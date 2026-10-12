@@ -257,6 +257,36 @@ export const parseRoutePath = (routePath: string): Route => {
   return { kind: "wallet" };
 };
 
+/** The query parameters a route reads; any other parameter in a legacy hash is a command. */
+const ROUTE_QUERY_PARAMS: Partial<Record<Route["kind"], readonly string[]>> = {
+  recurringPaymentNew: ["contact", "amount"],
+};
+
+/**
+ * The route path for a hash URL from before path routing (`#contacts` →
+ * `contacts`), or null for anything that is not a known route: command links
+ * such as `#add/…`, `#nostrconnect…`, `#linkauth…` or a `?cashu=` query stay
+ * fragments for their own handlers, so no fragment secret reaches a path.
+ */
+export const routePathFromLegacyHash = (hash: string): string | null => {
+  const value = hash.replace(/^#/, "");
+  const queryStart = value.indexOf("?");
+  const path = queryStart < 0 ? value : value.slice(0, queryStart);
+  const route = parseRoutePath(path);
+  if (route.kind === "wallet" && path !== "wallet") return null;
+  if (path.startsWith("add/")) return null;
+
+  const params = new URLSearchParams(
+    queryStart < 0 ? "" : value.slice(queryStart + 1),
+  );
+  const routeParams = ROUTE_QUERY_PARAMS[route.kind] ?? [];
+  if ([...params.keys()].some((key) => !routeParams.includes(key))) {
+    return null;
+  }
+  const query = params.toString();
+  return query ? `${path}?${query}` : path;
+};
+
 export type NavigationAction =
   | { route: "advanced" }
   | { route: "advancedAutoPayLimit" }

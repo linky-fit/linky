@@ -5,7 +5,12 @@ import {
   RecurringPaymentId,
 } from "@linky-fit/linksync";
 import { describe, expect, it } from "vitest";
-import { parseRoutePath, routePathFor, type NavigationAction } from "./route";
+import {
+  parseRoutePath,
+  routePathFor,
+  routePathFromLegacyHash,
+  type NavigationAction,
+} from "./route";
 import { parseNativeDeepLinkUrl } from "../utils/deepLinks";
 
 describe("parseRoutePath", () => {
@@ -274,6 +279,41 @@ describe("routePathFor", () => {
 
     expect(path).toBe("wallet/recurring/new?contact=contact-1&amount=10");
     expect(parseRoutePath(path)).toEqual({ kind: "recurringPaymentNew" });
+  });
+});
+
+describe("routePathFromLegacyHash", () => {
+  it.each([
+    ["#contacts", "contacts"],
+    ["#wallet", "wallet"],
+    ["#wallet/transactions", "wallet/transactions"],
+    ["#proxy", "proxy"],
+    [`#chat/${contactId}`, `chat/${contactId}`],
+    [`#contact/${contactId}/pay`, `contact/${contactId}/pay`],
+    [
+      "#wallet/recurring/new?contact=c1&amount=10",
+      "wallet/recurring/new?contact=c1&amount=10",
+    ],
+  ])("redirects %s to %s", (hash, path) => {
+    expect(routePathFromLegacyHash(hash)).toBe(path);
+  });
+
+  it.each([
+    ["an add-contact link", "#add/npub1abc"],
+    ["a nostrconnect link", `#nostrconnect://${"b".repeat(64)}?secret=s3cr3t`],
+    ["an encoded nostrconnect link", "#nostrconnect%3A%2F%2Fabc%3Fsecret%3Ds"],
+    ["a linkauth link", "#linkauth?nonce=n&cb=https%3A%2F%2Fsite.example"],
+    ["a cashu protocol link", "#wallet?cashu=cashuAeyJ0b2tlbiI6W119"],
+    ["a notification open", "#contacts?notificationOpen=%7B%7D"],
+    [
+      "a route with a param it does not read",
+      "#wallet/recurring/new?contact=c1&cashu=cashuA",
+    ],
+    ["an unknown route", "#unknown"],
+    ["a route with an invalid id", "#contact/not-an-id"],
+    ["an empty hash", ""],
+  ])("leaves %s to its own handler", (_name, hash) => {
+    expect(routePathFromLegacyHash(hash)).toBeNull();
   });
 });
 
