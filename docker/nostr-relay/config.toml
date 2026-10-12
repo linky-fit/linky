@@ -1,0 +1,5 @@
+# Unset keys keep nostr-rs-relay's defaults.
+[database]
+# 0.10.0 drops a query without EOSE when another reader thread holds its checkpoint lock; with one reader no sibling can.
+min_conn = 0
+max_conn = 1
