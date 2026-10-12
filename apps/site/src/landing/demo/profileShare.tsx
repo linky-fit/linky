@@ -22,13 +22,10 @@ import { size } from "@linky-fit/ui/tokens";
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { Message } from "./chat";
 import { DemoBody, DemoTabBar, DemoTopBar } from "./chrome";
-import { fill } from "./fill";
-import { FlowScenes, Tap } from "./flow";
+import { Arrive, DemoSheet, FlowScenes, Tap } from "./flow";
 import { noop } from "./noop";
 import { avatarUri, type Person } from "./people";
 import { useFlow } from "./playback";
-import "./chatPay.css";
-import "./profileShare.css";
 
 const profileLink = "https://linky.fit/p/dave";
 
@@ -51,10 +48,6 @@ function ProfileLinkPreview() {
       href={profileLink}
     />
   );
-}
-
-function Arrive({ children }: { children: ReactNode }) {
-  return <Stack className="chat-pay-arrive">{children}</Stack>;
 }
 
 /** A chat in Signal, the messenger the profile link travels through. */
@@ -169,77 +162,68 @@ const shareApps = [
 
 function ShareSheet({ tapSignal }: { tapSignal: boolean }) {
   return (
-    <Stack {...fill} zIndex="$overlay" justifyContent="flex-end">
-      <Stack
-        className="profile-share-backdrop"
-        {...fill}
-        backgroundColor="$colorStrong"
-      />
-      <Stack
-        className="profile-share-sheet"
-        gap="$lg"
-        padding="$xl"
-        paddingBottom="$huge"
-        borderTopLeftRadius="$card"
-        borderTopRightRadius="$card"
-        backgroundColor="$surface"
-      >
-        <Row gap="$md" alignItems="center">
-          <Avatar name="Dave" uri={avatarUri("Dave")} size="md" />
-          <Stack flex={1} gap="$xxs">
-            <Text variant="label" bold>
-              Dave on Linky
-            </Text>
-            <Text variant="caption" color="$colorMuted">
-              linky.fit/p/dave
-            </Text>
-          </Stack>
-          <IconButton
-            icon="X"
-            size="sm"
-            accessibilityLabel="Close"
-            onPress={noop}
-          />
-        </Row>
-        <Divider />
-        <Row justifyContent="space-between">
-          {shareApps.map(({ name, slug, color }) => (
-            <Stack key={slug} alignItems="center" gap="$xs">
-              <Tap on={slug === "signal" && tapSignal}>
-                <Stack
-                  width="$controlLg"
-                  height="$controlLg"
-                  borderRadius="$card"
-                  alignItems="center"
-                  justifyContent="center"
-                  style={{ backgroundColor: color }}
-                >
-                  <img
-                    src={`/brands/${slug}.svg`}
-                    alt=""
-                    width={size.iconLg}
-                    height={size.iconLg}
-                  />
-                </Stack>
-              </Tap>
-              <Text variant="caption">{name}</Text>
-            </Stack>
-          ))}
-        </Row>
-        <Stack gap="$xs">
-          <ListRow
-            leading={<Icon name="Copy" size="md" />}
-            title="Copy"
-            chevron={false}
-          />
-          <ListRow
-            leading={<Icon name="QrCode" size="md" />}
-            title="Show QR code"
-            chevron={false}
-          />
+    <DemoSheet
+      gap="$lg"
+      padding="$xl"
+      paddingBottom="$huge"
+      borderTopLeftRadius="$card"
+      borderTopRightRadius="$card"
+    >
+      <Row gap="$md" alignItems="center">
+        <Avatar name="Dave" uri={avatarUri("Dave")} size="md" />
+        <Stack flex={1} gap="$xxs">
+          <Text variant="label" bold>
+            Dave on Linky
+          </Text>
+          <Text variant="caption" color="$colorMuted">
+            linky.fit/p/dave
+          </Text>
         </Stack>
+        <IconButton
+          icon="X"
+          size="sm"
+          accessibilityLabel="Close"
+          onPress={noop}
+        />
+      </Row>
+      <Divider />
+      <Row justifyContent="space-between">
+        {shareApps.map(({ name, slug, color }) => (
+          <Stack key={slug} alignItems="center" gap="$xs">
+            <Tap on={slug === "signal" && tapSignal}>
+              <Stack
+                width="$controlLg"
+                height="$controlLg"
+                borderRadius="$card"
+                alignItems="center"
+                justifyContent="center"
+                style={{ backgroundColor: color }}
+              >
+                <img
+                  src={`/brands/${slug}.svg`}
+                  alt=""
+                  width={size.iconLg}
+                  height={size.iconLg}
+                />
+              </Stack>
+            </Tap>
+            <Text variant="caption">{name}</Text>
+          </Stack>
+        ))}
+      </Row>
+      <Stack gap="$xs">
+        <ListRow
+          leading={<Icon name="Copy" size="md" />}
+          title="Copy"
+          chevron={false}
+        />
+        <ListRow
+          leading={<Icon name="QrCode" size="md" />}
+          title="Show QR code"
+          chevron={false}
+        />
       </Stack>
-    </Stack>
+    </DemoSheet>
   );
 }
 

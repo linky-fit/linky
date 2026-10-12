@@ -5,11 +5,14 @@ export type CtaMode = "google-play" | "web" | "zapstore";
 export type Screen =
   | "chat-payment"
   | "chat-request"
+  | "contact-block"
   | "contacts"
+  | "message-actions"
   | "profile-open"
   | "profile-share"
   | "proxy-offer"
   | "recurring-list"
+  | "restore-paste"
   | "token-share"
   | "wallet";
 

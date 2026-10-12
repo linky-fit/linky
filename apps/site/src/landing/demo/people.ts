@@ -7,6 +7,7 @@ export const people = [
   "Eva Stone",
   "Jan Kral",
   "Lena Fox",
+  "Max Profit",
   "Mia Novak",
   "Mom",
   "Sam Ortiz",

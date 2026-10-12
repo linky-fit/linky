@@ -1,0 +1,18 @@
+/* Scrolls the form to its end: the top edge moves to the bottom, then the form lifts by its own height. */
+.restore-form {
+  top: 0;
+  transition:
+    top 800ms cubic-bezier(0.4, 0, 0.2, 1),
+    translate 800ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.restore-form.restore-form-end {
+  top: 100%;
+  translate: 0 -100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .restore-form {
+    transition: none;
+  }
+}

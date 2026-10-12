@@ -12,11 +12,13 @@ import {
   Text,
 } from "@linky-fit/ui";
 import { mintIcon } from "./chat";
-import { DemoBody, DemoTabBar, DemoTopBar } from "./chrome";
+import type { ReactNode } from "react";
+import { DemoBody, DemoTabBar, DemoTopBar, type Tab } from "./chrome";
+import { Tap } from "./flow";
 import { noop } from "./noop";
 import { avatarUri, type Person } from "./people";
 
-interface Conversation {
+export interface Conversation {
   person: Person;
   preview: string;
   /** The last message is a token of this amount, shown as a pill instead of the preview. */
@@ -117,23 +119,43 @@ function Contact({
   );
 }
 
-const contactList = (list: Conversation[]) => (
+const contactList = (list: Conversation[], tapped: Person | undefined) => (
   <Stack gap="$xs">
     {list.map((conversation) => (
-      <Contact key={conversation.person} {...conversation} />
+      <Tap key={conversation.person} on={conversation.person === tapped}>
+        <Contact {...conversation} />
+      </Tap>
     ))}
   </Stack>
 );
 
-export function ContactsScreen() {
+/** The Contacts tab; `latest` tops the conversations, `tapped` is touched and `children` float above, e.g. a toast. */
+export function ContactsScreen({
+  latest,
+  tapped,
+  tapTab,
+  children,
+}: {
+  latest?: Conversation | undefined;
+  tapped?: Person | undefined;
+  tapTab?: Tab | undefined;
+  children?: ReactNode;
+}) {
   return (
     <>
       <DemoTopBar title="Contacts" trailing="Search" />
       <DemoBody position="relative">
         <Stack gap="$xs" paddingTop="$xxxl">
           <Contact {...pinned} />
-          <Section title="Proxy payments">{contactList(proxyPayments)}</Section>
-          <Section title="Conversations">{contactList(conversations)}</Section>
+          <Section title="Proxy payments">
+            {contactList(proxyPayments, tapped)}
+          </Section>
+          <Section title="Conversations">
+            {contactList(
+              latest ? [latest, ...conversations] : conversations,
+              tapped,
+            )}
+          </Section>
         </Stack>
         <Stack position="absolute" right="$xl" bottom="$xxxl">
           <IconButton
@@ -145,7 +167,8 @@ export function ContactsScreen() {
           />
         </Stack>
       </DemoBody>
-      <DemoTabBar active="contacts" />
+      <DemoTabBar active="contacts" tap={tapTab} />
+      {children}
     </>
   );
 }

@@ -9,22 +9,26 @@ import {
   type IconName,
 } from "@linky-fit/ui";
 import type { ComponentProps } from "react";
+import { fill } from "./fill";
+import { Tap } from "./flow";
 import { noop } from "./noop";
 import { avatarUri, type Person } from "./people";
 
-type Tab = "profile" | "contacts" | "wallet" | "proxy" | "settings";
+export type Tab = "profile" | "contacts" | "wallet" | "proxy" | "settings";
 
-/** The app's top bar: a title or a contact, with optional icon actions. */
+/** The app's top bar: a title or a contact, with optional icon actions; `tapTrailing` touches the trailing one. */
 export function DemoTopBar({
   title,
   contact,
   leading,
   trailing,
+  tapTrailing = false,
 }: {
   title?: string;
   contact?: Person;
   leading?: IconName;
   trailing?: IconName;
+  tapTrailing?: boolean;
 }) {
   const action = (icon: IconName | undefined) =>
     icon ? (
@@ -49,15 +53,31 @@ export function DemoTopBar({
         ) : undefined
       }
       leading={action(leading)}
-      trailing={action(trailing)}
+      trailing={
+        trailing ? <Tap on={tapTrailing}>{action(trailing)}</Tap> : null
+      }
     />
   );
 }
 
-/** The app's docked section tabs, reaching under the home indicator. */
-export function DemoTabBar({ active }: { active: Tab }) {
+const tabs: readonly Tab[] = [
+  "profile",
+  "contacts",
+  "wallet",
+  "proxy",
+  "settings",
+];
+
+/** The app's docked section tabs, reaching under the home indicator, with a touch on `tap`. */
+export function DemoTabBar({
+  active,
+  tap,
+}: {
+  active: Tab;
+  tap?: Tab | undefined;
+}) {
   return (
-    <Stack backgroundColor="$surface" paddingBottom="$xl">
+    <Stack position="relative" backgroundColor="$surface" paddingBottom="$xl">
       <TabBar
         accessibilityLabel="Sections"
         value={active}
@@ -74,6 +94,12 @@ export function DemoTabBar({ active }: { active: Tab }) {
           { value: "settings", label: "Settings", icon: "Settings" },
         ]}
       />
+      {/* The tabs take no children, so the touch sits on a matching row above them. */}
+      <Row {...fill} bottom="$xl" gap="$none" pointerEvents="none">
+        {tabs.map((tab) => (
+          <Tap key={tab} on={tab === tap} flex={1} />
+        ))}
+      </Row>
     </Stack>
   );
 }

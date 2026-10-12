@@ -12,15 +12,14 @@ import {
   Text,
   TextField,
 } from "@linky-fit/ui";
-import { useLayoutEffect, useRef, type ReactNode } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { Message, Token } from "./chat";
 import { DemoBody, DemoTopBar } from "./chrome";
 import { fill } from "./fill";
-import { PaymentOverlay, Tap, TappedKeypad } from "./flow";
+import { Arrive, PaymentOverlay, Tap, TappedKeypad } from "./flow";
 import { noop } from "./noop";
 import { avatarUri } from "./people";
 import { useCues } from "./playback";
-import "./chatPay.css";
 
 // In time order: `useCues` reports how many have passed.
 const cues = {
@@ -58,10 +57,6 @@ const noteTicks = typingTicks(note, 2600);
 
 function useTyped(text: string, ticks: readonly number[]) {
   return Array.from(text).slice(0, useCues(ticks)).join("");
-}
-
-function Arrive({ children }: { children: ReactNode }) {
-  return <Stack className="chat-pay-arrive">{children}</Stack>;
 }
 
 function Composer({ at }: { at: At }) {
@@ -227,7 +222,7 @@ function PayScene({ at }: { at: At }) {
 }
 
 function chatLayerClass(at: At) {
-  if (at("sent")) return "chat-pay-back-in";
+  if (at("sent")) return "flow-back-in";
   return at("pay") ? "flow-push-out" : "";
 }
 
@@ -247,7 +242,7 @@ export function ChatPayFlowScreen() {
       </Stack>
       {at("pay") && !at("closed") ? (
         <Stack
-          className={`flow-scene ${sent ? "chat-pay-back-out" : "flow-push-in"}`}
+          className={`flow-scene ${sent ? "flow-back-out" : "flow-push-in"}`}
           {...fill}
           backgroundColor="$background"
         >

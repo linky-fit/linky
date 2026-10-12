@@ -3,22 +3,28 @@ import { useState, type ComponentType, type ReactNode, type Ref } from "react";
 import type { Screen } from "../copy";
 import { ChatPayFlowScreen } from "./chatPay";
 import { ChatRequestFlowScreen } from "./chatRequest";
+import { ContactBlockScreen } from "./contactBlock";
 import { ContactsScreen, WalletScreen } from "./home";
+import { MessageActionsScreen } from "./messageActions";
 import { ProfileOpenScreen, ProfileShareScreen } from "./profileShare";
 import { ProxyOfferScreen } from "./proxy";
 import { useInView } from "./playback";
 import { RecurringListScreen } from "./recurring";
+import { RestorePasteScreen } from "./restorePaste";
 import { TokenShareScreen } from "./token";
 
 const demoScreens: Record<Screen, ComponentType> = {
   "chat-payment": ChatPayFlowScreen,
   "chat-request": ChatRequestFlowScreen,
+  "contact-block": ContactBlockScreen,
   contacts: ContactsScreen,
+  "message-actions": MessageActionsScreen,
   wallet: WalletScreen,
   "profile-open": ProfileOpenScreen,
   "profile-share": ProfileShareScreen,
   "proxy-offer": ProxyOfferScreen,
   "recurring-list": RecurringListScreen,
+  "restore-paste": RestorePasteScreen,
   "token-share": TokenShareScreen,
 };
 

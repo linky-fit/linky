@@ -1,6 +1,7 @@
 import {
   Avatar,
   Button,
+  Chip,
   DaySeparator,
   Icon,
   IconButton,
@@ -14,16 +15,20 @@ import {
 } from "@linky-fit/ui";
 import type { ReactNode } from "react";
 import { DemoBody, DemoTopBar } from "./chrome";
+import { Arrive } from "./flow";
 import { noop } from "./noop";
 import type { Person } from "./people";
 
+/** A chat message; `reaction` is Dave's emoji on it, popping in under the bubble. */
 export function Message({
   outgoing = false,
   time,
+  reaction,
   children,
 }: {
   outgoing?: boolean;
   time?: string;
+  reaction?: string | undefined;
   children: ReactNode;
 }) {
   const body =
@@ -32,10 +37,21 @@ export function Message({
     <MessageBubble
       direction={outgoing ? "outgoing" : "incoming"}
       footer={
-        time ? (
-          <Text variant="caption" color="$colorMuted">
-            {time}
-          </Text>
+        reaction || time ? (
+          <>
+            {reaction ? (
+              <Arrive>
+                <Row gap="$xs">
+                  <Chip label={reaction} selected onPress={noop} />
+                </Row>
+              </Arrive>
+            ) : null}
+            {time ? (
+              <Text variant="caption" color="$colorMuted">
+                {time}
+              </Text>
+            ) : null}
+          </>
         ) : undefined
       }
     >
@@ -69,14 +85,21 @@ export function Token({ amount, memo }: { amount: string; memo: string }) {
 
 export function ChatScreen({
   contact,
+  tapEdit = false,
   children,
 }: {
   contact: Person;
+  tapEdit?: boolean;
   children: ReactNode;
 }) {
   return (
     <>
-      <DemoTopBar contact={contact} leading="ChevronLeft" trailing="Pencil" />
+      <DemoTopBar
+        contact={contact}
+        leading="ChevronLeft"
+        trailing="Pencil"
+        tapTrailing={tapEdit}
+      />
       <DemoBody gap="$sm" paddingTop="$lg">
         <DaySeparator label="Today" />
         {children}

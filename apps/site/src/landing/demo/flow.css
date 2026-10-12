@@ -75,6 +75,30 @@
   }
 }
 
+/* A long press: the finger lands and stays until the menu opens. */
+.flow-tap-hold {
+  animation: flow-tap-hold 900ms ease-out both;
+}
+
+@keyframes flow-tap-hold {
+  0% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+  15% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  80% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+}
+
 .flow-press {
   animation: flow-press 300ms ease-out 100ms;
 }
@@ -82,6 +106,68 @@
 @keyframes flow-press {
   40% {
     transform: scale(0.96);
+  }
+}
+
+/* Back navigation: the page slides away to the right and the previous one returns from the left. */
+.flow-back-in {
+  animation: flow-back-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes flow-back-in {
+  from {
+    transform: translateX(-30%);
+  }
+}
+
+.flow-back-out {
+  animation: flow-back-out 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  box-shadow: -12px 0 32px rgb(0 0 0 / 12%);
+}
+
+@keyframes flow-back-out {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.flow-arrive {
+  animation: flow-arrive 260ms ease-out both;
+}
+
+@keyframes flow-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.flow-sheet-backdrop {
+  animation: flow-fade-in 260ms ease-out both;
+}
+
+.flow-sheet {
+  animation: flow-sheet-in 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes flow-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+.flow-sheet-closing .flow-sheet-backdrop {
+  animation: flow-overlay-out 260ms ease-in both;
+}
+
+.flow-sheet-closing .flow-sheet {
+  animation: flow-sheet-out 260ms ease-in both;
+}
+
+@keyframes flow-sheet-out {
+  to {
+    transform: translateY(100%);
+    visibility: hidden;
   }
 }
 
@@ -101,6 +187,30 @@
   .flow-modal-in,
   .flow-push-in,
   .flow-push-out,
+  /* A long press: the finger lands and stays until the menu opens. */
+.flow-tap-hold {
+    animation: flow-tap-hold 900ms ease-out both;
+  }
+
+  @keyframes flow-tap-hold {
+    0% {
+      opacity: 0;
+      transform: scale(1.5);
+    }
+    15% {
+      opacity: 0.5;
+      transform: scale(1);
+    }
+    80% {
+      opacity: 0.5;
+      transform: scale(0.85);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(1.1);
+    }
+  }
+
   .flow-press {
     animation: none;
   }
