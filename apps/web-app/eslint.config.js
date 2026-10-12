@@ -105,7 +105,6 @@ export const platformSeamRatchet = [
   "src/app/hooks/useGuideScannerDomain.ts",
   "src/app/hooks/useKeryxMedia.ts",
   "src/app/hooks/useLnurlAuth.ts",
-  "src/app/hooks/useMessagesDomain.ts",
   "src/app/hooks/usePaymentsDomain.ts",
   "src/app/hooks/useProfileAuthDomain.ts",
   "src/app/hooks/usePushNotificationsSetting.ts",
