@@ -39,6 +39,7 @@ import {
   mintUrl,
 } from "../../../packages/linkshu/tests/integration/helpers";
 import type { LinkyE2eHooks } from "../src/devtools/e2e/installLinkyE2eHooks";
+import { expectRoute, gotoRoute, waitForRoute } from "./helpers/routes";
 
 declare global {
   interface Window {
@@ -57,7 +58,7 @@ const cutOffMint = (context: BrowserContext) =>
   context.route(`${mintUrl}/**`, (route) => route.abort("connectionrefused"));
 
 const pasteUnreachableToken = async (page: Page, token: string) => {
-  await page.goto("/#wallet/token/new");
+  await gotoRoute(page, "wallet/token/new");
   await page.locator("textarea").fill(token);
   await expect(
     page.getByText("The mint is unreachable. The token is saved"),
@@ -106,7 +107,7 @@ test("a token waiting for its mint can be discarded, and another resumes when th
   await setSeedLoginStorage(page, await createSeedIdentity());
   await stubFiatRates(page);
   await stubThirdPartyAssets(page);
-  await page.goto("/#wallet");
+  await gotoRoute(page, "wallet");
   await waitForNetworkReady(page);
 
   const discardedToken = await fundToken(TOKEN_SAT);
@@ -118,12 +119,12 @@ test("a token waiting for its mint can be discarded, and another resumes when th
     await expect
       .poll(() => operationRows(page))
       .toEqual([["deferredReceive", "pending"]]);
-    await page.goto("/#advanced/mints");
+    await gotoRoute(page, "advanced/mints");
     const mintPending = mintChoice(page).getByTestId("mint-pending");
     await expect(mintPending).toHaveText(`${TOKEN_SAT} sat pending`);
     await page.reload();
     await expect(mintPending).toHaveText(`${TOKEN_SAT} sat pending`);
-    await page.goto("/#wallet");
+    await gotoRoute(page, "wallet");
     await expect(pendingLine(page)).toHaveText(`${TOKEN_SAT} sat pending`);
     expect(await readBalanceSat(page)).toBe(0);
   });
@@ -145,13 +146,13 @@ test("a token waiting for its mint can be discarded, and another resumes when th
     await expect
       .poll(() => operationRows(page))
       .toEqual([["deferredReceive", "done"]]);
-    await page.goto("/#wallet");
+    await gotoRoute(page, "wallet");
     await expect(pendingLine(page)).toHaveCount(0);
   });
 
   await test.step("a second kept token lands in the balance once the mint answers", async () => {
     await pasteUnreachableToken(page, resumedToken);
-    await page.goto("/#wallet");
+    await gotoRoute(page, "wallet");
     await expect(pendingLine(page)).toHaveText(
       `${RESUMED_TOKEN_SAT} sat pending`,
     );
@@ -170,7 +171,7 @@ test("a token waiting for its mint can be discarded, and another resumes when th
         ["receive", "done"],
       ]);
     await expect(pendingLine(page)).toHaveCount(0);
-    await page.goto("/#advanced/mints");
+    await gotoRoute(page, "advanced/mints");
     await expect(mintChoice(page)).toContainText(/\d+ sat/);
     await expect(mintChoice(page).getByTestId("mint-pending")).toHaveCount(0);
   });
@@ -199,16 +200,16 @@ const bootDevice = async (
 };
 
 const sendTokenInChat = async (page: Page, sat: number): Promise<void> => {
-  await page.goto("/#wallet/token/emit");
+  await gotoRoute(page, "wallet/token/emit");
   for (const digit of String(sat).split("")) {
     await page.getByRole("button", { exact: true, name: digit }).click();
   }
   await page.getByRole("button", { exact: true, name: "Issue" }).click();
-  await expect(page).toHaveURL(/#wallet\/token\/(?!emit$)[A-Za-z0-9_-]+$/);
+  await expectRoute(page, /^wallet\/token\/(?!emit$)[A-Za-z0-9_-]+$/);
   await page.getByRole("button", { name: "Send to Contact" }).click();
-  await page.waitForURL(/#contacts$/);
+  await waitForRoute(page, "contacts");
   await page.locator("[data-guide='contact-card']").first().click();
-  await page.waitForURL(/#chat\/[^/]+$/);
+  await waitForRoute(page, /^chat\/[^/]+$/);
 };
 
 /** Holds what the app sends to the Nostr relay until the returned release. */
@@ -236,7 +237,7 @@ test("a token discarded on one device stays discarded when another device replay
   const a = await bootDevice(browser, "A", aIdentity);
   const b = await bootDevice(browser, "B", bIdentity);
   for (const device of [a, b]) {
-    await device.page.goto("/#wallet");
+    await gotoRoute(device.page, "wallet");
     await waitForNetworkReady(device.page);
   }
 
@@ -247,7 +248,7 @@ test("a token discarded on one device stays discarded when another device replay
     await addContactByNpub(b.page, aIdentity.npub);
     await cutOffMint(b.context);
     await sendTokenInChat(a.page, TOKEN_SAT);
-    await b.page.goto("/#wallet");
+    await gotoRoute(b.page, "wallet");
     await expect(pendingLine(b.page)).toHaveText(`${TOKEN_SAT} sat pending`, {
       timeout: 60_000,
     });
@@ -278,7 +279,7 @@ test("a token discarded on one device stays discarded when another device replay
         const path = new URL(request.url()).pathname;
         if (RECEIVE_MINT_PATHS.includes(path)) receiveCalls.push(path);
       });
-      await restored.page.goto("/#wallet");
+      await gotoRoute(restored.page, "wallet");
       await waitForNetworkReady(restored.page);
       await expect
         .poll(() => operationRows(restored.page), { timeout: 60_000 })
@@ -292,7 +293,7 @@ test("a token discarded on one device stays discarded when another device replay
 
       releaseRelay();
       // The replayed message shows its token as taken, so auto-accept skips it.
-      await restored.page.goto("/#contacts");
+      await gotoRoute(restored.page, "contacts");
       await restored.page
         .locator("[data-guide='contact-card']")
         .first()
@@ -304,7 +305,7 @@ test("a token discarded on one device stays discarded when another device replay
       ).toBeVisible({ timeout: 60_000 });
       // eslint-disable-next-line no-restricted-properties -- proves no late re-receive follows the spent mark
       await restored.page.waitForTimeout(SETTLE_MS);
-      await restored.page.goto("/#wallet");
+      await gotoRoute(restored.page, "wallet");
       expect(await operationRows(restored.page)).toEqual([
         ["deferredReceive", "done"],
       ]);

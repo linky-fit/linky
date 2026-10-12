@@ -10,6 +10,7 @@ import { stubFiatRates } from "./helpers/network";
 import { expectNoBootErrorPanel, watchAppErrors } from "./helpers/diagnostics";
 import { EVOLU_QUOTA_RELAY_URL, EVOLU_RELAY_URL } from "./helpers/stack";
 import { topUp } from "./helpers/wallet";
+import { expectRoute, gotoRoute } from "./helpers/routes";
 
 test.use({ actionTimeout: 20_000 });
 
@@ -17,7 +18,7 @@ const recoveryRelay = EVOLU_RELAY_URL;
 
 // The recommended relay starts offline, so bringing it online adds capacity.
 const addRecoveryRelay = async (page: Page): Promise<void> => {
-  await page.goto(`/#evolu-server/${encodeURIComponent(recoveryRelay)}`);
+  await gotoRoute(page, `evolu-server/${encodeURIComponent(recoveryRelay)}`);
   await expect(
     page.getByRole("button", { name: "Clear Evolu storage", exact: true }),
   ).toHaveCount(0);
@@ -26,7 +27,7 @@ const addRecoveryRelay = async (page: Page): Promise<void> => {
     page.getByRole("button", { name: "Reload now", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Reload now", exact: true }).click();
-  await page.goto("/#wallet");
+  await gotoRoute(page, "wallet");
   await waitForNetworkReady(page);
 };
 
@@ -61,7 +62,7 @@ test("adding a relay with capacity syncs quota-rejected token history and spent 
       { quotaRelay: EVOLU_QUOTA_RELAY_URL, offlineRelay: recoveryRelay },
     );
     await stubFiatRates(page);
-    await page.goto("/#wallet");
+    await gotoRoute(page, "wallet");
     await waitForNetworkReady(page);
     devices.push({ context, page, errors, label });
   }
@@ -80,11 +81,11 @@ test("adding a relay with capacity syncs quota-rejected token history and spent 
     for (const device of devices) {
       await expect.poll(() => readBalanceSat(device.page)).toBe(512);
     }
-    await second.page.goto("/#wallet/tokens/proofs");
+    await gotoRoute(second.page, "wallet/tokens/proofs");
     await expect(
       second.page.getByLabel("Available", { exact: true }),
     ).toContainText("Available · 512 sat");
-    await second.page.goto("/#wallet");
+    await gotoRoute(second.page, "wallet");
     await second.context.setOffline(true);
     await second.page.route("**/v1/checkstate", (route) =>
       route.abort("internetdisconnected"),
@@ -92,18 +93,19 @@ test("adding a relay with capacity syncs quota-rejected token history and spent 
 
     await test.step("new spends exceed the real relay quota and remain local", async () => {
       for (let index = 0; index < 12; index += 1) {
-        await source.page.goto("/#wallet/token/emit");
+        await gotoRoute(source.page, "wallet/token/emit");
         await source.page
           .getByRole("button", { name: "2", exact: true })
           .click();
         await source.page
           .getByRole("button", { name: "Issue", exact: true })
           .click();
-        await expect(source.page).toHaveURL(
-          /#wallet\/token\/(?!emit$)[A-Za-z0-9_-]+$/,
+        await expectRoute(
+          source.page,
+          /^wallet\/token\/(?!emit$)[A-Za-z0-9_-]+$/,
         );
       }
-      await source.page.goto("/#evolu-servers");
+      await gotoRoute(source.page, "evolu-servers");
       await expect(source.page.getByRole("alert")).toContainText(
         "Sync storage limit reached",
       );
@@ -114,7 +116,7 @@ test("adding a relay with capacity syncs quota-rejected token history and spent 
         }),
       ).toBeDisabled();
       expect(await readBalanceSat(second.page)).toBe(512);
-      await source.page.goto("/#wallet");
+      await gotoRoute(source.page, "wallet");
       await expect.poll(() => readBalanceSat(source.page)).toBe(476);
     });
 
@@ -132,7 +134,7 @@ test("adding a relay with capacity syncs quota-rejected token history and spent 
     });
 
     await test.step("the stale device receives the spent proofs through Evolu", async () => {
-      await second.page.goto("/#wallet/tokens/proofs");
+      await gotoRoute(second.page, "wallet/tokens/proofs");
       const available = second.page.getByLabel("Available", { exact: true });
       await expect(available).toContainText("Available · 476 sat");
       await expect(available).toContainText(

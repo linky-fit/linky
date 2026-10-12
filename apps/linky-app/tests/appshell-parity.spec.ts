@@ -11,6 +11,12 @@ import { watchAppErrors } from "./helpers/diagnostics";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
 import { EVOLU_RELAY_URL, NOSTR_RELAY_URL } from "./helpers/stack";
 import { mintUrl } from "../../../packages/linkshu/tests/integration/helpers";
+import {
+  expectRoute,
+  gotoRoute,
+  routePathOf,
+  waitForRoute,
+} from "./helpers/routes";
 
 test.use({ serviceWorkers: "block" });
 
@@ -79,9 +85,9 @@ const createContactAndOpenChat = async (
   page: Page,
   labels = { add: "Add", saved: "Contact saved." },
 ): Promise<string> => {
-  await page.goto("/#");
+  await gotoRoute(page, "contacts");
   await page.locator("[data-guide='contact-add-button']").first().click();
-  await page.waitForURL(/#contact\/new$/, { timeout: 10_000 });
+  await waitForRoute(page, "contact/new", { timeout: 10_000 });
 
   const searchInput = page.locator("[data-guide='contact-search-input']");
   await expect(searchInput).toBeVisible();
@@ -92,7 +98,7 @@ const createContactAndOpenChat = async (
   ).toBeVisible({ timeout: 20_000 });
   await page.getByRole("button", { name: labels.add, exact: true }).click();
 
-  await page.waitForURL(/#(?:contacts)?$/, { timeout: 20_000 });
+  await waitForRoute(page, /^(?:contacts)?$/, { timeout: 20_000 });
   await expect(
     page.locator('[aria-live="polite"]').getByText(labels.saved),
   ).toBeVisible();
@@ -101,10 +107,10 @@ const createContactAndOpenChat = async (
     .poll(async () => contactCards.count(), { timeout: 20_000 })
     .toBeGreaterThan(0);
   await contactCards.first().click();
-  await page.waitForURL(/#chat\/[^/]+$/, { timeout: 10_000 });
+  await waitForRoute(page, /^chat\/[^/]+$/, { timeout: 10_000 });
   await expect(page.locator("[data-guide='chat-input']")).toBeVisible();
 
-  const contactMatch = new URL(page.url()).hash.match(/^#chat\/([^/]+)$/);
+  const contactMatch = routePathOf(page).match(/^chat\/([^/]+)$/);
   if (!contactMatch?.[1]) {
     throw new Error(`Could not parse contact id from ${page.url()}`);
   }
@@ -120,7 +126,7 @@ test("gates a signed-out wallet without render loops and restores from SLIP-39",
   await countReactCommits(page);
   await page.setViewportSize({ ...MOBILE_VIEWPORT });
 
-  await page.goto("/#wallet");
+  await gotoRoute(page, "wallet");
   await expect(
     page.getByRole("button", { name: "Create a profile" }),
   ).toBeVisible();
@@ -138,8 +144,8 @@ test("gates a signed-out wallet without render loops and restores from SLIP-39",
 
   // Restore intentionally resets the route to contacts.
   await reloadFinished;
-  await page.waitForURL(/#contacts$/, { timeout: 30_000 });
-  await page.goto("/#wallet");
+  await waitForRoute(page, "contacts", { timeout: 30_000 });
+  await gotoRoute(page, "wallet");
   await expect(page.getByLabel("Available balance")).toBeVisible({
     timeout: 30_000,
   });
@@ -153,7 +159,7 @@ test("restores an account when private browsing disables OPFS", async ({
   await disableOpfs(page);
   await page.setViewportSize({ width: 390, height: 844 });
 
-  await page.goto("/#wallet");
+  await gotoRoute(page, "wallet");
   await page
     .getByRole("button", { name: "Continue with temporary session" })
     .click();
@@ -166,8 +172,8 @@ test("restores an account when private browsing disables OPFS", async ({
   // The consent is remembered in sessionStorage, so the post-restore reload
   // must boot straight into the in-memory session without re-prompting.
   await reloadFinished;
-  await page.waitForURL(/#contacts$/, { timeout: 30_000 });
-  await page.goto("/#wallet");
+  await waitForRoute(page, "contacts", { timeout: 30_000 });
+  await gotoRoute(page, "wallet");
   await expect(page.getByLabel("Available balance")).toBeVisible({
     timeout: 30_000,
   });
@@ -261,19 +267,19 @@ test("supports chat reply, edit, reaction toggle, and copy actions", async ({
     "Message deleted",
   );
 
-  await page.goto(`/#contact/${encodeURIComponent(contactId)}/edit`);
+  await gotoRoute(page, `contact/${encodeURIComponent(contactId)}/edit`);
   await page
     .getByRole("banner")
     .getByRole("button", { name: "Delete contact", exact: true })
     .click();
-  await page.waitForURL(/#(?:contacts)?$/, { timeout: 10_000 });
+  await waitForRoute(page, /^(?:contacts)?$/, { timeout: 10_000 });
   await expect(
     page.locator('[aria-live="polite"]').getByText("Contact deleted."),
   ).toBeVisible();
 
   // The row and its messages stay, so the chat still opens by its address.
   await expect(page.locator("[data-guide='contact-card']")).toHaveCount(0);
-  await page.goto(`/#chat/${encodeURIComponent(contactId)}`);
+  await gotoRoute(page, `chat/${encodeURIComponent(contactId)}`);
   await expect(
     page
       .getByTestId("chat-message")
@@ -297,7 +303,7 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
 
   const contactId =
     await test.step("open and close the scanner, then save a contact so diagnostic tables contain real changes", async () => {
-      await page.goto("/#contact/new");
+      await gotoRoute(page, "contact/new");
       await page.locator("[data-guide='scan-contact-button']").click();
       const scanDialog = page.getByRole("dialog", {
         name: "Kontakt hinzufügen",
@@ -312,30 +318,30 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
     });
 
   await test.step("open the contact's pay, detail and chat routes", async () => {
-    const contactPath = `#contact/${encodeURIComponent(contactId)}`;
-    await page.goto(`/${contactPath}/pay`);
+    const contactPath = `contact/${encodeURIComponent(contactId)}`;
+    await gotoRoute(page, `${contactPath}/pay`);
     await page.getByRole("button", { name: "1", exact: true }).click();
     await page.getByRole("button", { name: "0", exact: true }).click();
     const paySend = page.locator("[data-guide='pay-send']");
     await expect(paySend).toBeVisible();
     await expect(paySend).toBeDisabled();
 
-    await page.goto(`/${contactPath}`);
+    await gotoRoute(page, contactPath);
     await expect(page.locator("[data-guide='contact-pay']")).toBeVisible();
     await page.locator("[data-guide='contact-message']").click();
-    await expect(page).toHaveURL(new RegExp(`#chat/${contactId}$`));
+    await expectRoute(page, `chat/${contactId}`);
     await expect(page.locator("[data-guide='chat-input']")).toBeVisible();
     await close.click();
-    await expect(page).toHaveURL(/#(?:contacts)?$/);
+    await expectRoute(page, /^(?:contacts)?$/);
   });
 
   await test.step("open German settings from the bottom navigation and inspect the mint", async () => {
     const tabs = page.getByRole("tablist");
     await tabs.getByRole("tab", { name: "Wallet", exact: true }).click();
-    await expect(page).toHaveURL(/#wallet$/);
+    await expectRoute(page, "wallet");
     await expect(page.getByLabel("Verfügbares Guthaben")).toBeVisible();
     await tabs.getByRole("tab", { name: "Einstellungen", exact: true }).click();
-    await expect(page).toHaveURL(/#settings$/);
+    await expectRoute(page, "settings");
     await expect(title).toHaveAccessibleName("Einstellungen");
     for (const name of [
       "Allgemein",
@@ -349,7 +355,7 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
       ).toBeVisible();
     }
     await page.getByRole("button", { name: /^Mint\b/ }).click();
-    await expect(page).toHaveURL(/#advanced\/mints$/);
+    await expectRoute(page, "advanced/mints");
     await expect(title).toHaveAccessibleName("Mints");
     await expect(
       page.getByRole("button", {
@@ -357,16 +363,17 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
       }),
     ).toHaveAttribute("aria-selected", "true");
     await close.click();
-    await expect(page).toHaveURL(/#settings$/);
+    await expectRoute(page, "settings");
   });
 
   await test.step("open the local Nostr relay and return through its parent routes", async () => {
     await page.getByRole("button", { name: /^Nostr \d+\/\d+/ }).click();
-    await expect(page).toHaveURL(/#nostr-relays$/);
+    await expectRoute(page, "nostr-relays");
     await expect(title).toHaveAccessibleName("Nostr-Relays");
     await page.getByRole("button", { name: NOSTR_RELAY_URL }).click();
-    await expect(page).toHaveURL(
-      new RegExp(`#nostr-relay/${encodeURIComponent(NOSTR_RELAY_URL)}$`),
+    await expectRoute(
+      page,
+      `nostr-relay/${encodeURIComponent(NOSTR_RELAY_URL)}`,
     );
     await expect(title).toHaveAccessibleName("Nostr-Relay");
     await expect(page.getByText("Status", { exact: true })).toBeVisible();
@@ -379,9 +386,9 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
       page.getByRole("button", { name: "Löschen", exact: true }),
     ).toHaveCount(0);
     await close.click();
-    await expect(page).toHaveURL(/#nostr-relays$/);
+    await expectRoute(page, "nostr-relays");
     await close.click();
-    await expect(page).toHaveURL(/#settings$/);
+    await expectRoute(page, "settings");
   });
 
   await test.step("inspect Evolu server, current data, history, and capacity", async () => {
@@ -389,11 +396,12 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
       page.getByRole("button", { name: "Chat-Speicher", exact: true }),
     ).toHaveCount(0);
     await page.getByRole("button", { name: /^Evolu \d+\/\d+/ }).click();
-    await expect(page).toHaveURL(/#evolu-servers$/);
+    await expectRoute(page, "evolu-servers");
     await expect(title).toHaveAccessibleName("Evolu-Server");
     await page.getByRole("button", { name: EVOLU_RELAY_URL }).click();
-    await expect(page).toHaveURL(
-      new RegExp(`#evolu-server/${encodeURIComponent(EVOLU_RELAY_URL)}$`),
+    await expectRoute(
+      page,
+      `evolu-server/${encodeURIComponent(EVOLU_RELAY_URL)}`,
     );
     await expect(
       page.getByText("Synchronisierung", { exact: true }),
@@ -402,11 +410,11 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
       page.getByRole("switch", { name: "Offline", exact: true }),
     ).toBeVisible();
     await close.click();
-    await expect(page).toHaveURL(/#evolu-servers$/);
+    await expectRoute(page, "evolu-servers");
     await page
       .getByRole("button", { name: "Chat-Speicher", exact: true })
       .click();
-    await expect(page).toHaveURL(/#advanced\/chat-storage$/);
+    await expectRoute(page, "advanced/chat-storage");
     await expect(title).toHaveAccessibleName("Chat-Speicher");
     await expect(
       page.getByText("Erstellte Chat-Shards", { exact: true }),
@@ -418,9 +426,9 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
       }),
     ).toBeDisabled();
     await close.click();
-    await expect(page).toHaveURL(/#evolu-servers$/);
+    await expectRoute(page, "evolu-servers");
     await page.getByText("Daten", { exact: true }).click();
-    await expect(page).toHaveURL(/#evolu-current-data$/);
+    await expectRoute(page, "evolu-current-data");
     await expect(title).toHaveAccessibleName("Daten");
     await expect(
       page.getByText("Aktiver Shard", { exact: true }).first(),
@@ -432,9 +440,9 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
       }),
     ).toBeVisible();
     await close.click();
-    await expect(page).toHaveURL(/#evolu-servers$/);
+    await expectRoute(page, "evolu-servers");
     await page.getByText("Verlauf", { exact: true }).click();
-    await expect(page).toHaveURL(/#evolu-history-data$/);
+    await expectRoute(page, "evolu-history-data");
     await expect(title).toHaveAccessibleName("Verlauf");
     for (const name of ["Tabelle", "Spalte", "Wert", "Zeitstempel"]) {
       await expect(
@@ -442,23 +450,23 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
       ).toBeVisible();
     }
     await close.click();
-    await expect(page).toHaveURL(/#evolu-servers$/);
-    await page.goto("/#evolu-data");
+    await expectRoute(page, "evolu-servers");
+    await gotoRoute(page, "evolu-data");
     await expect(title).toHaveAccessibleName("Speicher");
     await expect(page.getByText(/^\d+\.\d % des 1-MiB-Limits$/)).toBeVisible();
   });
 
   await test.step("open and cancel profile editing through the topbar", async () => {
-    await page.goto("/#profile");
+    await gotoRoute(page, "profile");
     await expect(title).toHaveAccessibleName("Profil");
     await banner
       .getByRole("button", { name: "Bearbeiten", exact: true })
       .click();
-    await expect(page).toHaveURL(/#profile\/edit$/);
+    await expectRoute(page, "profile/edit");
     await expect(title).toHaveAccessibleName("Profil");
     await expect(page.locator("#profileName")).toBeVisible();
     await close.click();
-    await expect(page).toHaveURL(/#profile$/);
+    await expectRoute(page, "profile");
     await expect(
       banner.getByRole("button", { name: "Bearbeiten", exact: true }),
     ).toBeVisible();

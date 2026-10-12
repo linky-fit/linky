@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { gotoRoute } from "./routes";
 
 /**
  * Types the amount, opens the invoice, and leaves before the claim completes,
@@ -7,7 +8,7 @@ import type { Page } from "@playwright/test";
  * the QR can be replaced by the paid overlay within tens of milliseconds.
  */
 export const topUp = async (page: Page, sats: number): Promise<void> => {
-  await page.goto("/#wallet/topup");
+  await gotoRoute(page, "wallet/topup");
   for (const digit of String(sats).split("")) {
     await page.getByRole("button", { exact: true, name: digit }).click();
   }
@@ -19,5 +20,5 @@ export const topUp = async (page: Page, sats: number): Promise<void> => {
   );
   await page.locator("[data-guide='topup-show-invoice']").click();
   await quoteCreated;
-  await page.goto("/#wallet");
+  await gotoRoute(page, "wallet");
 };

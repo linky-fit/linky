@@ -63,6 +63,7 @@ import {
   SPD_QR_PNG_BASE64,
   SPD_VARIABLE_SYMBOL,
 } from "./fixtures/bankPaymentQr";
+import { gotoRoute, routePathOf, waitForRoute } from "./helpers/routes";
 
 /** Within what relays and Evolu tolerate, and longer than A takes to answer. */
 const PAYER_CLOCK_AHEAD_MS = 60_000;
@@ -137,7 +138,7 @@ const bootAccount = async (
   await stubFiatRates(page);
   await stubThirdPartyAssets(page);
 
-  await page.goto("/#wallet");
+  await gotoRoute(page, "wallet");
   await waitForNetworkReady(page);
   await expectNoBootErrorPanel(page, label);
   await expectSingleLoad(page, label);
@@ -152,7 +153,7 @@ const bootAccount = async (
  * signed by the test; the settings page itself is only checked to exist.
  */
 const advertiseCzk = async (account: Account): Promise<void> => {
-  await account.page.goto("/#proxy");
+  await gotoRoute(account.page, "proxy");
   const czkSwitch = account.page.getByRole("switch", {
     name: "Payments in CZK",
   });
@@ -163,10 +164,10 @@ const advertiseCzk = async (account: Account): Promise<void> => {
 };
 
 const walletBalance = async (page: Page): Promise<number> => {
-  const currentHash = new URL(page.url()).hash || "#wallet";
-  await page.goto("/#wallet");
+  const currentRoute = routePathOf(page) || "wallet";
+  await gotoRoute(page, "wallet");
   const value = await readBalanceSat(page);
-  if (currentHash !== "#wallet") await page.goto(`/${currentHash}`);
+  if (currentRoute !== "wallet") await gotoRoute(page, currentRoute);
   return value;
 };
 
@@ -174,9 +175,7 @@ const paymentQr = (page: Page) =>
   page.getByRole("img", { name: "Bank payment QR code" });
 
 const offerDetailUrl = (page: Page) =>
-  new URL(page.url()).hash.match(
-    /^#chat\/([^/]+)\/bank-payment-offer\/([^/]+)$/,
-  );
+  routePathOf(page).match(/^chat\/([^/]+)\/bank-payment-offer\/([^/]+)$/);
 
 test("proxy payment: bank details reach exactly one acceptor, who is paid in sats", async ({
   browser,
@@ -223,9 +222,9 @@ test("proxy payment: bank details reach exactly one acceptor, who is paid in sat
       // ChatPage's auto-open effect bails on unknown contacts, so A must be a
       // real contact and the acceptors must sit on the chat route.
       const chatA = await addContactByNpub(b.page, a.identity.npub);
-      await b.page.goto(`/#chat/${encodeURIComponent(chatA)}`);
+      await gotoRoute(b.page, `chat/${encodeURIComponent(chatA)}`);
       const chatAForC = await addContactByNpub(c.page, a.identity.npub);
-      await c.page.goto(`/#chat/${encodeURIComponent(chatAForC)}`);
+      await gotoRoute(c.page, `chat/${encodeURIComponent(chatAForC)}`);
     });
 
     await test.step("all accounts finish inbox backfill", async () => {
@@ -234,7 +233,7 @@ test("proxy payment: bank details reach exactly one acceptor, who is paid in sat
 
     const offerId =
       await test.step("A scans the bank QR and offers it", async () => {
-        await a.page.goto("/#wallet");
+        await gotoRoute(a.page, "wallet");
         // Only the Send entry point (scanEntryPoint === "send") lets the
         // scanner accept a bank payment.
         await a.page.getByRole("button", { name: "Send" }).click();
@@ -254,7 +253,9 @@ test("proxy payment: bank details reach exactly one acceptor, who is paid in sat
           name: "spd-qr.png",
         });
 
-        await a.page.waitForURL(/#wallet\/bank-payment\//, { timeout: 30_000 });
+        await waitForRoute(a.page, /^wallet\/bank-payment\//, {
+          timeout: 30_000,
+        });
 
         // buildSpdRows renders ACC, X-VS and MSG from this fixture as rows;
         // AM/CC feed the header.
@@ -273,7 +274,7 @@ test("proxy payment: bank details reach exactly one acceptor, who is paid in sat
         await expect(cta).toBeEnabled();
         await cta.click();
 
-        await a.page.waitForURL(/#chat\/[^/]+\/bank-payment-offer\/[^/]+$/, {
+        await waitForRoute(a.page, /^chat\/[^/]+\/bank-payment-offer\/[^/]+$/, {
           timeout: 60_000,
         });
         const match = offerDetailUrl(a.page);
@@ -285,11 +286,11 @@ test("proxy payment: bank details reach exactly one acceptor, who is paid in sat
 
     await test.step("asking again for the same bank QR opens the live offer", async () => {
       await a.page.goBack();
-      await a.page.waitForURL(/#wallet\/bank-payment\//);
+      await waitForRoute(a.page, /^wallet\/bank-payment\//);
       const cta = a.page.getByRole("button", { name: "Ask 2 contacts to pay" });
       await expect(cta).toBeEnabled({ timeout: 60_000 });
       await cta.click();
-      await a.page.waitForURL(new RegExp(`bank-payment-offer/${offerId}$`), {
+      await waitForRoute(a.page, new RegExp(`bank-payment-offer/${offerId}$`), {
         timeout: 60_000,
       });
       expect(
@@ -306,7 +307,8 @@ test("proxy payment: bank details reach exactly one acceptor, who is paid in sat
       // accept — the concurrent second accept this test exists for would
       // silently not happen.
       for (const account of [b, c]) {
-        await account.page.waitForURL(
+        await waitForRoute(
+          account.page,
           new RegExp(`bank-payment-offer/${offerId}$`),
           { timeout: 60_000 },
         );
@@ -440,7 +442,7 @@ test("proxy payment: bank details reach exactly one acceptor, who is paid in sat
     await test.step("A settles and the winner is paid in sats", async () => {
       const winnerChatId = offererChatByRecipientNpub.get(winner.identity.npub);
       if (!winnerChatId) throw new Error("winner chat not found");
-      await a.page.goto(`/#chat/${encodeURIComponent(winnerChatId)}`);
+      await gotoRoute(a.page, `chat/${encodeURIComponent(winnerChatId)}`);
       const settle = a.page.getByRole("button", {
         name: "Mark done",
       });
@@ -462,7 +464,7 @@ test("proxy payment: bank details reach exactly one acceptor, who is paid in sat
       // Park the winner on the wallet page and stay there: re-mounting the
       // settled offer detail triggers its auto-return-to-chat effect, which
       // races with (and can clobber) a subsequent goto to #wallet.
-      await winner.page.goto("/#wallet");
+      await gotoRoute(winner.page, "wallet");
 
       await expect(settle).toBeEnabled();
       await settle.click();

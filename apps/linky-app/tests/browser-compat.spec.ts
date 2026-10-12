@@ -5,6 +5,7 @@ import { EVOLU_WORKER_BUNDLE } from "./helpers/bundles";
 import { watchAppErrors } from "./helpers/diagnostics";
 import { createSeedIdentity, setSeedLoginStorage } from "./helpers/identity";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
+import { expectRoute, gotoRoute } from "./helpers/routes";
 
 const removeNewBuiltins = () => {
   Reflect.deleteProperty(Array.prototype, "toSorted");
@@ -46,13 +47,13 @@ test("an old Safari without newer built-ins, BroadcastChannel or Web Locks boots
     });
   });
 
-  await page.goto("/#wallet");
+  await gotoRoute(page, "wallet");
   await expect(page.getByLabel("Available balance")).toBeVisible();
   const id = await addContactByNpub(page, (await createSeedIdentity()).npub);
   await page.reload();
-  await expect(page).toHaveURL(new RegExp(`#chat/${id}$`));
+  await expectRoute(page, `chat/${id}`);
   await expect(page.locator('[data-guide="chat-input"]')).toBeVisible();
-  await page.goto("/#contacts");
+  await gotoRoute(page, "contacts");
   await expect(page.locator('[data-guide="contact-card"]')).toHaveCount(1);
   expect(workerRequests).toBeGreaterThanOrEqual(2);
   errors.assertClean();

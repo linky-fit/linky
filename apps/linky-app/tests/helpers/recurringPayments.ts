@@ -25,6 +25,7 @@ import {
 } from "./identity";
 import { stubFiatRates, stubThirdPartyAssets } from "./network";
 import { topUp } from "./wallet";
+import { expectRoute, gotoRoute, routePathOf, waitForRoute } from "./routes";
 
 interface Account {
   page: Page;
@@ -80,7 +81,7 @@ export const test = base.extend<{ bootAccount: BootAccount }>({
         );
         await stubFiatRates(page);
         await stubThirdPartyAssets(page);
-        await page.goto("/#wallet");
+        await gotoRoute(page, "wallet");
         await waitForNetworkReady(page);
         await expectNoBootErrorPanel(page, label);
         await expectSingleLoad(page, label);
@@ -124,7 +125,7 @@ export const fundAndConnect = async (
   }
   const contactId = await addContactByNpub(a.page, b.identity.npub);
   await addContactByNpub(b.page, a.identity.npub);
-  await b.page.goto("/#wallet");
+  await gotoRoute(b.page, "wallet");
   await expect.poll(() => readBalanceSat(b.page)).toBe(0);
   return contactId;
 };
@@ -144,9 +145,9 @@ export const enterAmount = async (
 };
 
 export const openForm = async (page: Page): Promise<void> => {
-  await page.goto("/#wallet/transactions");
+  await gotoRoute(page, "wallet/transactions");
   await page.locator("[data-guide='recurring-add-button']").click();
-  await expect(page).toHaveURL(/#wallet\/recurring\/new$/);
+  await expectRoute(page, "wallet/recurring/new");
   await page.getByTestId("recurring-picker-contact").click();
 };
 
@@ -163,13 +164,13 @@ export const saveOrder = async (
   await page
     .getByRole("button", { name: "Set up recurring payment", exact: true })
     .click();
-  await expect(page).toHaveURL(/#wallet\/transactions$/);
+  await expectRoute(page, "wallet/transactions");
   const card = page.getByTestId("recurring-order-card");
   await expect(card).toHaveCount(1);
   await expect(card).toContainText("daily");
   await card.click();
-  await expect(page).toHaveURL(/#wallet\/recurring\/[^/]+$/);
-  return new URL(page.url()).hash;
+  await expectRoute(page, /^wallet\/recurring\/[^/]+$/);
+  return routePathOf(page);
 };
 
 const OrderState = Schema.Struct({
@@ -264,9 +265,9 @@ export const invoicePaid = async (
 
 /** Saves a contact that has only `LIGHTNING_ADDRESS`, so payments to it go over Lightning. */
 export const addLightningContact = async (page: Page): Promise<void> => {
-  await page.goto("/#contacts");
+  await gotoRoute(page, "contacts");
   await page.locator("[data-guide='contact-add-button']").first().click();
-  await page.waitForURL(/#contact\/new$/);
+  await waitForRoute(page, "contact/new");
   const search = page.locator("[data-guide='contact-search-input']");
   await search.fill(LIGHTNING_ADDRESS);
   await search.press("Enter");
@@ -274,7 +275,7 @@ export const addLightningContact = async (page: Page): Promise<void> => {
     .getByRole("button", { name: "Save lightning address", exact: true })
     .click({ timeout: 30_000 });
   await page.getByRole("button", { name: "Add", exact: true }).click();
-  await page.waitForURL(/#(?:contacts)?$/, { timeout: 20_000 });
+  await waitForRoute(page, /^(?:contacts)?$/, { timeout: 20_000 });
 };
 
 export const triggerSchedulerPass = async (page: Page): Promise<void> => {
@@ -358,16 +359,16 @@ export const detailValue = (page: Page, label: string) =>
 
 export const expectPaidHistory = async (
   page: Page,
-  hash: string,
+  orderPath: string,
 ): Promise<void> => {
-  await page.goto("/#wallet/transactions");
+  await gotoRoute(page, "wallet/transactions");
   const pill = page.getByTestId("transaction-recurring-pill");
   await expect(pill).toHaveText("daily");
   await page.getByTestId("transaction-card").filter({ has: pill }).click();
   await page
     .getByRole("button", { name: "Recurring payment", exact: true })
     .click();
-  await expect.poll(() => new URL(page.url()).hash).toBe(hash);
+  await expectRoute(page, orderPath);
   await expect(detailValue(page, "Payments made")).toHaveText("1");
   await expect(detailValue(page, "Last payment")).toContainText("paid");
 };

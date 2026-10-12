@@ -25,6 +25,7 @@ import {
   targetMintUrl,
   tokenOf,
 } from "../../../packages/linkshu/tests/integration/helpers";
+import { gotoRoute, waitForRoute } from "./helpers/routes";
 
 const SOURCE_MINT_URL = mintUrl;
 const SOURCE_HOST = new URL(mintUrl).host;
@@ -43,13 +44,13 @@ const fundTargetToken = async (amountSat: number): Promise<string> => {
 };
 
 const readMintBalanceSat = async (page: Page, mintUrl: string) => {
-  await page.goto(`/#advanced/mint/${encodeURIComponent(mintUrl)}`);
+  await gotoRoute(page, `advanced/mint/${encodeURIComponent(mintUrl)}`);
   const text = await page.getByLabel("Balance", { exact: true }).innerText();
   return Number(text.replace(/[^0-9]/g, "") || "0");
 };
 
 const setAllowTestMints = async (page: Page, allow: boolean) => {
-  await page.goto("/#settings");
+  await gotoRoute(page, "settings");
   const toggle = page.getByRole("switch", { name: "Allow test mints" });
   await expect(toggle).toBeChecked({ checked: !allow });
   // The switch follows the synced setting, so it flips once the write lands.
@@ -70,7 +71,7 @@ test("test mints can be hidden and funds move between mints", async ({
   await setSeedLoginStorage(page, await createSeedIdentity());
   await stubFiatRates(page);
   await stubThirdPartyAssets(page);
-  await page.goto("/#wallet");
+  await gotoRoute(page, "wallet");
   await waitForNetworkReady(page);
   await expectNoBootErrorPanel(page, "A");
   await expectSingleLoad(page, "A");
@@ -83,9 +84,9 @@ test("test mints can be hidden and funds move between mints", async ({
 
   await test.step("turning test mints off hides their funds and the mint", async () => {
     await setAllowTestMints(page, false);
-    await page.goto("/#wallet");
+    await gotoRoute(page, "wallet");
     await expect.poll(() => readBalanceSat(page)).toBe(0);
-    await page.goto("/#advanced/mints");
+    await gotoRoute(page, "advanced/mints");
     await expect(page.getByRole("button", { name: SOURCE_HOST })).toHaveCount(
       0,
     );
@@ -93,9 +94,9 @@ test("test mints can be hidden and funds move between mints", async ({
 
   await test.step("turning them back on reveals the untouched funds", async () => {
     await setAllowTestMints(page, true);
-    await page.goto("/#wallet");
+    await gotoRoute(page, "wallet");
     await expect.poll(() => readBalanceSat(page)).toBe(FUNDING_SAT);
-    await page.goto("/#advanced/mints");
+    await gotoRoute(page, "advanced/mints");
     await expect(
       page.getByRole("button", { name: new RegExp(`^${SOURCE_HOST}\\b`) }),
     ).toHaveAttribute("aria-selected", "true");
@@ -103,12 +104,12 @@ test("test mints can be hidden and funds move between mints", async ({
 
   let targetBefore = 0;
   await test.step("receive a token at the target mint", async () => {
-    await page.goto("/#wallet/token/new");
+    await gotoRoute(page, "wallet/token/new");
     await page
       .locator("textarea")
       .fill(await fundTargetToken(TARGET_TOKEN_SAT));
     // The import page moves to the token list once the receive settles.
-    await page.waitForURL(/#wallet\/tokens$/);
+    await waitForRoute(page, "wallet/tokens");
     await expect
       .poll(() => readMintBalanceSat(page, targetMintUrl))
       .toBeGreaterThan(0);
@@ -116,7 +117,10 @@ test("test mints can be hidden and funds move between mints", async ({
   });
 
   await test.step("estimate and move an explicit amount to the target mint", async () => {
-    await page.goto(`/#advanced/mint/${encodeURIComponent(SOURCE_MINT_URL)}`);
+    await gotoRoute(
+      page,
+      `advanced/mint/${encodeURIComponent(SOURCE_MINT_URL)}`,
+    );
     const moveForm = page.getByTestId("mint-move-form");
     await expect(moveForm.getByTestId("amount-display")).toHaveText(
       new RegExp(`^${FUNDING_SAT}\\s*sat$`, "i"),
@@ -154,20 +158,20 @@ test("test mints can be hidden and funds move between mints", async ({
   });
 
   await test.step("the add button makes a typed mint the default", async () => {
-    await page.goto("/#advanced/mints");
+    await gotoRoute(page, "advanced/mints");
     await page.getByRole("button", { name: "Add mint", exact: true }).click();
-    await page.waitForURL(/#advanced\/mints\/new$/);
+    await waitForRoute(page, "advanced/mints/new");
     // A bare host would get https:// prepended, which the local mint does not serve.
     await page.getByLabel("Mint URL").fill(targetMintUrl);
     await page.getByRole("button", { name: "Add", exact: true }).click();
 
-    await page.waitForURL(/#advanced\/mint\//);
+    await waitForRoute(page, /^advanced\/mint\//);
     await expect(
       page.getByTestId("mint-detail-badges").getByText("Default", {
         exact: true,
       }),
     ).toBeVisible();
-    await page.goto("/#advanced/mints");
+    await gotoRoute(page, "advanced/mints");
     await expect(
       page.getByRole("button", { name: new RegExp(`^${TARGET_HOST}\\b`) }),
     ).toHaveAttribute("aria-selected", "true");

@@ -31,6 +31,7 @@ import {
   waitForMuteListOnRelay,
   watchNostrInbox,
 } from "./helpers/relay";
+import { gotoRoute } from "./helpers/routes";
 
 test.use({ actionTimeout: 20_000 });
 
@@ -94,7 +95,7 @@ const unreadDots = async (
   page: Page,
   ids: { deleted: string; listed: ReadonlyArray<string> },
 ) => {
-  await page.goto("/#contacts");
+  await gotoRoute(page, "contacts");
   const dots: Record<string, boolean> = {};
   for (const id of ids.listed) {
     await expect(card(page, id)).toBeVisible();
@@ -123,7 +124,7 @@ test("a seed restore keeps the account's deleted contact, blocks and history int
   const heldRelay = await startSilentEvoluRelay();
   try {
     const aInboxReady = watchNostrInbox(a.page, account.npub);
-    await a.page.goto("/#wallet");
+    await gotoRoute(a.page, "wallet");
     await aInboxReady();
 
     const xId =
@@ -134,7 +135,7 @@ test("a seed restore keeps the account's deleted contact, blocks and history int
         await expect(
           a.page.getByTestId("chat-bubble").filter({ hasText: "Hi from X" }),
         ).toBeVisible();
-        await a.page.goto(`/#contact/${id}/edit`);
+        await gotoRoute(a.page, `contact/${id}/edit`);
         await a.page
           .getByRole("banner")
           .getByRole("button", { name: "Delete contact", exact: true })
@@ -147,7 +148,7 @@ test("a seed restore keeps the account's deleted contact, blocks and history int
     await test.step("the messages scope rotates four shards past the deletion", async () => {
       const fillerId = await addContactByNpub(a.page, filler.npub);
       for (let index = 1; index <= ROTATIONS_PAST_DELETION; index += 1) {
-        await a.page.goto("/#evolu-current-data");
+        await gotoRoute(a.page, "evolu-current-data");
         await a.page
           .getByRole("button", { name: "Rotate messages shard", exact: true })
           .click();
@@ -155,7 +156,7 @@ test("a seed restore keeps the account's deleted contact, blocks and history int
           .poll(async () => (await shardIndexes(a.page)).messages)
           .toBe(index);
         // A rotation leaves no empty shard behind in real use.
-        await a.page.goto(`/#chat/${fillerId}`);
+        await gotoRoute(a.page, `chat/${fillerId}`);
         await sendInOpenChat(a.page, `Filler ${index}`);
       }
     });
@@ -175,7 +176,7 @@ test("a seed restore keeps the account's deleted contact, blocks and history int
               )?.lastSeenAtSec,
           )
           .toBe(nowSec - 1);
-        await a.page.goto("/#contacts");
+        await gotoRoute(a.page, "contacts");
         await sendDirectMessage(y.nsec, account.npub, Y_TEXTS[2], nowSec + 1);
         await expect(card(a.page, id)).toHaveAttribute("data-unread", "true");
         return id;
@@ -235,7 +236,7 @@ test("a seed restore keeps the account's deleted contact, blocks and history int
     const bInboxReady = watchNostrInbox(b.page, account.npub);
 
     await test.step("B restores the seed and waits for the Evolu relay before anything else", async () => {
-      await b.page.goto("/#wallet");
+      await gotoRoute(b.page, "wallet");
       await expect(b.page.getByLabel("Available balance")).toBeVisible({
         timeout: 60_000,
       });
@@ -277,15 +278,15 @@ test("a seed restore keeps the account's deleted contact, blocks and history int
     });
 
     await test.step("B shows Y's messages once each", async () => {
-      await b.page.goto(`/#chat/${yId}`);
+      await gotoRoute(b.page, `chat/${yId}`);
       await expectBubbles(b.page, Y_TEXTS);
     });
 
     await test.step("B shows Z as an unknown sender and nothing from W", async () => {
-      await b.page.goto("/#contacts");
+      await gotoRoute(b.page, "contacts");
       await card(b.page, unknownId(z)).click();
       await expectBubbles(b.page, ["Hi from Z"]);
-      await b.page.goto("/#contacts");
+      await gotoRoute(b.page, "contacts");
       await expect(card(b.page, unknownId(w))).toHaveCount(0);
       expect(
         await b.page.evaluate(() =>
@@ -307,7 +308,7 @@ test("a seed restore keeps the account's deleted contact, blocks and history int
     });
 
     await test.step("B's Y chat gained no copies while it caught up", async () => {
-      await b.page.goto(`/#chat/${yId}`);
+      await gotoRoute(b.page, `chat/${yId}`);
       await expectBubbles(b.page, Y_TEXTS);
       expect(await shardIndexes(b.page)).toEqual(aPointers);
     });
@@ -321,7 +322,7 @@ test("a seed restore keeps the account's deleted contact, blocks and history int
       await expect
         .poll(() => unreadDots(a.page, { deleted: xId, listed: listedIds }))
         .toEqual({ [yId]: false, [unknownId(z)]: true });
-      await a.page.goto(`/#chat/${yId}`);
+      await gotoRoute(a.page, `chat/${yId}`);
       await expectBubbles(a.page, Y_TEXTS);
     });
 

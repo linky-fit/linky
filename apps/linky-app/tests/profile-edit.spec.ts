@@ -23,6 +23,7 @@ import {
 import { NOSTR_RELAY_URL } from "./helpers/stack";
 import { AVATAR_SIZE_PX } from "../src/utils/image";
 import { nowSeconds } from "../src/utils/time";
+import { expectRoute, gotoRoute } from "./helpers/routes";
 
 test.use({ serviceWorkers: "block", viewport: MOBILE_VIEWPORT });
 
@@ -38,7 +39,7 @@ const switchIdentityAndAwaitReload = async (
   const reloaded = page.waitForEvent("load");
   await button.click();
   await reloaded;
-  await expect(page).toHaveURL(/#contacts$/);
+  await expectRoute(page, "contacts");
 };
 
 const pickPhoto = async (page: Page, color: string): Promise<void> => {
@@ -108,16 +109,16 @@ test("profile edits save after switching to a custom identity", async ({
   await page.getByRole("button", { name: "Confirm profile" }).click();
   await expect(page.getByTestId("profile-qr-button")).toBeVisible();
   expect(photos.size).toBe(1);
-  await page.goto("/#profile/edit");
+  await gotoRoute(page, "profile/edit");
   await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Alice");
 
-  await page.goto("/#settings/nostr-identity");
+  await gotoRoute(page, "settings/nostr-identity");
   const paste = page.getByRole("button", {
     name: "Paste a custom Nostr identity",
   });
   // The pasted identity has no profile, so Linky switches without asking.
   await switchIdentityAndAwaitReload(page, paste);
-  await page.goto("/#settings/nostr-identity");
+  await gotoRoute(page, "settings/nostr-identity");
   await expect(
     page.getByRole("button", { name: "Switch back to the derived identity" }),
   ).toBeVisible();
@@ -131,7 +132,7 @@ test("profile edits save after switching to a custom identity", async ({
   const keySwitchTime = nowSeconds();
   const customKeyAddress = `${nip19.npubEncode(pubkey)}@linky.fit`;
 
-  await page.goto("/#profile");
+  await gotoRoute(page, "profile");
   await expect(page.getByTestId("profile-detail")).toContainText("Alice");
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   await expect(
@@ -189,7 +190,7 @@ test("profile edits save after switching to a custom identity", async ({
     });
 
     await test.step("switching back to the derived identity keeps the custom one attached", async () => {
-      await page.goto("/#settings/nostr-identity");
+      await gotoRoute(page, "settings/nostr-identity");
       const switchBack = page.getByRole("button", {
         name: "Switch back to the derived identity",
       });
@@ -203,7 +204,7 @@ test("profile edits save after switching to a custom identity", async ({
           ),
         )
         .toBe("derived");
-      await page.goto("/#settings/nostr-identity");
+      await gotoRoute(page, "settings/nostr-identity");
       await expect(
         page.getByRole("button", { name: "Use this identity" }),
       ).toBeVisible();
@@ -272,14 +273,14 @@ test("switching to a custom identity with a profile lets the user keep the Linky
   const preview = page.getByTestId("identity-profile-preview");
   /** Pastes the identity; a custom one in use is first switched away from and removed. */
   const requestSwitch = async (secretKey: Uint8Array) => {
-    await page.goto("/#settings/nostr-identity");
+    await gotoRoute(page, "settings/nostr-identity");
     if ((await identitySource()) === "custom") {
       const switchBack = page.getByRole("button", {
         name: "Switch back to the derived identity",
       });
       await switchBack.click();
       await switchIdentityAndAwaitReload(page, switchBack);
-      await page.goto("/#settings/nostr-identity");
+      await gotoRoute(page, "settings/nostr-identity");
       const remove = page.getByRole("button", { name: "Remove identity" });
       await remove.click();
       await remove.click();
@@ -306,7 +307,7 @@ test("switching to a custom identity with a profile lets the user keep the Linky
       await requestSwitch(bob);
       await page.getByRole("button", { name: "Cancel", exact: true }).click();
       await expect(choice).toBeHidden();
-      await expect(page).toHaveURL(/#settings\/nostr-identity$/);
+      await expectRoute(page, "settings/nostr-identity");
       expect(await identitySource()).not.toBe("custom");
       expect(await newestRelayProfile(bobNpub)).toEqual({
         name: "Bob",
@@ -331,7 +332,7 @@ test("switching to a custom identity with a profile lets the user keep the Linky
           website: "https://bob.example",
           lud16: `${bobNpub}@linky.fit`,
         });
-      await page.goto("/#profile");
+      await gotoRoute(page, "profile");
       await expect(page.getByTestId("profile-detail")).toContainText("Bob");
     });
 

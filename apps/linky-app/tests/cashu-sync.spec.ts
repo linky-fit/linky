@@ -19,6 +19,7 @@ import { createSeedIdentity, setSeedLoginStorage } from "./helpers/identity";
 import { stubFiatRates } from "./helpers/network";
 import { expectNoBootErrorPanel, watchAppErrors } from "./helpers/diagnostics";
 import { topUp } from "./helpers/wallet";
+import { gotoRoute } from "./helpers/routes";
 
 declare global {
   interface Window {
@@ -50,7 +51,7 @@ test("restored Cashu funds sync to an open second device and survive an owner ro
     await setBaseStorage(page);
     await setSeedLoginStorage(page, identity);
     await stubFiatRates(page);
-    await page.goto("/#wallet");
+    await gotoRoute(page, "wallet");
     await waitForNetworkReady(page);
     await expect.poll(() => readBalanceSat(page)).toBe(0);
     devices.push({ context, page, errors, label });
@@ -86,7 +87,7 @@ test("restored Cashu funds sync to an open second device and survive an owner ro
       });
 
     await test.step("restore on one device and receive the same funds over Evolu on the other", async () => {
-      await source.page.goto("/#wallet/tokens");
+      await gotoRoute(source.page, "wallet/tokens");
       await source.page
         .getByRole("button", { name: "Look for missing tokens", exact: true })
         .click();
@@ -97,7 +98,7 @@ test("restored Cashu funds sync to an open second device and survive an owner ro
       ).toBeVisible({
         timeout: 60_000,
       });
-      await source.page.goto("/#wallet");
+      await gotoRoute(source.page, "wallet");
       await expect.poll(() => readBalanceSat(source.page)).toBe(restoredAmount);
       await expect.poll(() => readBalanceSat(second.page)).toBe(restoredAmount);
     });
@@ -108,7 +109,7 @@ test("restored Cashu funds sync to an open second device and survive an owner ro
         { index: 1, amount: 64 },
         { index: 2, amount: 32 },
       ]) {
-        await source.page.goto("/#evolu-current-data");
+        await gotoRoute(source.page, "evolu-current-data");
         await source.page
           .getByRole("button", { name: "Rotate cashu shard", exact: true })
           .click();
@@ -127,7 +128,7 @@ test("restored Cashu funds sync to an open second device and survive an owner ro
         // One topup operation per rotated shard (the restore into shard zero
         // records none): the operation table is the one whose row count
         // tracks rotations, proofs vary per topup amount.
-        await source.page.goto("/#evolu-current-data");
+        await gotoRoute(source.page, "evolu-current-data");
         const operationTable = source.page.getByRole("table").filter({
           has: source.page.getByRole("columnheader", {
             name: "quoteId",
@@ -149,7 +150,7 @@ test("restored Cashu funds sync to an open second device and survive an owner ro
           ),
         );
         expect(new Set(owners).size).toBe(rotation.index);
-        await source.page.goto("/#wallet");
+        await gotoRoute(source.page, "wallet");
       }
     });
 
@@ -185,7 +186,7 @@ test("token recovery buttons find missing funds and reclaim handed-out proofs", 
   await setSeedLoginStorage(page, identity);
   await stubFiatRates(page);
   await page.setViewportSize(MOBILE_VIEWPORT);
-  await page.goto("/#wallet/tokens");
+  await gotoRoute(page, "wallet/tokens");
   await page
     .getByRole("button", { name: "Look for missing tokens", exact: true })
     .click();
@@ -208,7 +209,7 @@ test("token recovery buttons find missing funds and reclaim handed-out proofs", 
       exact: true,
     }),
   ).toBeVisible();
-  await page.goto("/#wallet/tokens");
+  await gotoRoute(page, "wallet/tokens");
   await page
     .getByRole("button", { name: "Inspect proofs", exact: true })
     .click();
