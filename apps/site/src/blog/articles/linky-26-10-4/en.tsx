@@ -4,12 +4,6 @@ import { DemoFigure, Heading, Paragraph } from "../../prose";
 export function Body() {
   return (
     <>
-      <Paragraph>
-        Linky 26.10.4 is out. Most of it is about deciding what stays in your
-        Linky: which messages stay in a chat, who stays in your contacts and who
-        can write to you at all.
-      </Paragraph>
-
       <Heading>Delete a message for both sides</Heading>
       <Paragraph>
         Until now you could only edit a message after sending it. Now you can
