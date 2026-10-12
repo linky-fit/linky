@@ -1,3 +1,4 @@
+import { navigateToRoutePath } from "../../platform/navigation";
 import { asNonEmptyString } from "../../utils/validation";
 import { normalizePubkeyHex } from "../hooks/messages/contactIdentity";
 import { unwrapNotificationOpenValue } from "./notificationOpen";
@@ -56,19 +57,16 @@ export const consumeNotificationOpenDetailFromHash = (): string | null => {
   const queryIndex = rawHash.indexOf("?");
   if (queryIndex < 0) return null;
 
-  const baseHash = rawHash.slice(0, queryIndex) || "#contacts";
+  const basePath = rawHash.slice(1, queryIndex);
   const params = new URLSearchParams(rawHash.slice(queryIndex + 1));
   const detail = params.get(NOTIFICATION_OPEN_HASH_PARAM);
   if (!detail) return null;
 
   params.delete(NOTIFICATION_OPEN_HASH_PARAM);
   const nextQuery = params.toString();
-  const nextHash = nextQuery ? `${baseHash}?${nextQuery}` : baseHash;
-  window.history.replaceState(
-    null,
-    "",
-    `${window.location.pathname}${window.location.search}${nextHash}`,
-  );
+  navigateToRoutePath(nextQuery ? `${basePath}?${nextQuery}` : basePath, {
+    replace: true,
+  });
 
   return detail;
 };

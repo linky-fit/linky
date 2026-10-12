@@ -11,7 +11,8 @@ import { defineConfig } from "eslint/config";
 
 const storageMessage =
   "Browser storage goes through utils/storage.ts (safeLocalStorage* / safeSessionStorage* helpers).";
-const navigateMessage = "Navigate with navigateTo() from hooks/useRouting.ts.";
+const navigateMessage =
+  "Navigate with navigateTo() from hooks/useRouting.ts; only platform/navigation.ts touches the URL.";
 const evoluMessage =
   "App code never calls the Evolu instance; read and write through the @linky-fit/linksync repositories (app/hooks/useLinksync.ts).";
 
@@ -47,6 +48,24 @@ const navigationSyntax = [
     selector: `AssignmentExpression[left.property.name=/^(hash|href)$/]${onLocation("left")}`,
     message: navigateMessage,
   },
+];
+const routeReadMessage =
+  "Read the route with currentRoutePath() or useCurrentRoutePath() from platform/navigation.ts; only inbound command links read the hash themselves.";
+const routeReadSyntax = [
+  {
+    selector:
+      "MemberExpression[property.name='hash']:matches([object.name='location'], [object.property.name='location'])",
+    message: routeReadMessage,
+  },
+  { selector: "Literal[value='hashchange']", message: routeReadMessage },
+];
+/** Inbound command links (`#add/…`, `#nostrconnect…`, `#linkauth…`, `?cashu=`, `?notificationOpen=`) read the hash themselves. */
+const commandLinkFiles = [
+  "src/app/hooks/composition/useScanNativeComposition.ts",
+  "src/app/hooks/contacts/useSharedProfileLink.ts",
+  "src/app/lib/notificationOpenTarget.ts",
+  "src/sharedProfileLink.ts",
+  "src/siteLogin.ts",
 ];
 
 const backSyntax = [
@@ -138,7 +157,6 @@ export const platformSeamRatchet = [
   "src/app/lib/privateImageFile.ts",
   "src/app/lib/privateImageMessage.ts",
   "src/app/lib/pwaNotifications.ts",
-  "src/app/routes/AppRouteContent.tsx",
   "src/components/ChatMessage.tsx",
   "src/components/ChatMessageEditor.tsx",
   "src/components/InstallPwaBanner.tsx",
@@ -153,7 +171,6 @@ export const platformSeamRatchet = [
   "src/hooks/useDesktopSplitView.ts",
   "src/hooks/useDocumentVisible.ts",
   "src/hooks/useOnline.ts",
-  "src/hooks/useRouting.ts",
   "src/lnurlAuth.ts",
   "src/lnurlPay.ts",
   "src/pages/AdvancedPage.tsx",
@@ -165,11 +182,9 @@ export const platformSeamRatchet = [
   "src/pages/EvoluReloadNotice.tsx",
   "src/pages/ProfilePage.tsx",
   "src/pages/PushDebugPage.tsx",
-  "src/pages/RecurringPaymentFormPage.tsx",
   "src/profileCache.ts",
   "src/sharedProfileLink.ts",
   "src/siteLogin.ts",
-  "src/types/route.ts",
   "src/utils/blossomUploadProxy.ts",
   "src/utils/bootDiagnostics.ts",
   "src/utils/browserPreferences.ts",
@@ -232,6 +247,7 @@ export default defineConfig([
         ...backSyntax,
         ...storageSyntax,
         ...navigationSyntax,
+        ...routeReadSyntax,
         ...envSyntax,
       ],
     },
@@ -245,6 +261,20 @@ export default defineConfig([
         ...backSyntax,
         ...storageSyntax,
         ...navigationSyntax,
+        ...routeReadSyntax,
+      ],
+    },
+  },
+  {
+    files: commandLinkFiles,
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...restrictedSyntax,
+        ...backSyntax,
+        ...storageSyntax,
+        ...navigationSyntax,
+        ...envSyntax,
       ],
     },
   },
@@ -354,18 +384,32 @@ export default defineConfig([
         ...restrictedSyntax,
         ...backSyntax,
         ...navigationSyntax,
+        ...routeReadSyntax,
         ...envSyntax,
       ],
     },
   },
   {
-    files: ["src/hooks/useRouting.ts", "src/utils/spdPayment.ts"],
+    files: ["src/platform/navigation.ts"],
     rules: {
       "no-restricted-syntax": [
         "error",
         ...restrictedSyntax,
         ...backSyntax,
         ...storageSyntax,
+        ...envSyntax,
+      ],
+    },
+  },
+  {
+    files: ["src/utils/spdPayment.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...restrictedSyntax,
+        ...backSyntax,
+        ...storageSyntax,
+        ...routeReadSyntax,
         ...envSyntax,
       ],
     },

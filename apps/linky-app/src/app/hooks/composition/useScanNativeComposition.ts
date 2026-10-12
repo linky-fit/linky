@@ -9,6 +9,7 @@ import { Exit, Schema } from "effect";
 import React from "react";
 import type { ContactsRepository } from "@linky-fit/linksync";
 import { navigateTo, useRouting } from "../../../hooks/useRouting";
+import { navigateToRoutePath } from "../../../platform/navigation";
 import {
   consumePendingIosNativeDeepLinkUrl,
   consumePendingNativeDeepLinkUrl,
@@ -500,13 +501,9 @@ export const useScanNativeComposition = ({
 
     updatePendingDeepLinkText(`cashu:${token}`);
 
-    const cleanHash = rawHash.split("?")[0] ?? "#wallet";
-    const nextHash = cleanHash || "#wallet";
-    window.history.replaceState(
-      null,
-      "",
-      `${window.location.pathname}${window.location.search}${nextHash}`,
-    );
+    navigateToRoutePath(rawHash.slice(1).split("?")[0] ?? "", {
+      replace: true,
+    });
   }, [updatePendingDeepLinkText]);
 
   React.useEffect(() => {

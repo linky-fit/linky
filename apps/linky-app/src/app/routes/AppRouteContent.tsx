@@ -68,6 +68,7 @@ import {
   TransactionsPage,
 } from "../../pages";
 import { useRouting } from "../../hooks/useRouting";
+import { useCurrentRoutePath } from "../../platform/navigation";
 import type { Route } from "../../types/route";
 import { useTranslation } from "../hooks/shell";
 import { useScanIsOpen } from "../hooks/shell/scan";
@@ -85,6 +86,7 @@ const assertNever = (route: never): never => {
 
 const RoutePage = (): React.ReactElement => {
   const route = useRouting();
+  const routePath = useCurrentRoutePath();
   const { t } = useTranslation();
 
   switch (route.kind) {
@@ -166,9 +168,9 @@ const RoutePage = (): React.ReactElement => {
     case "transactions":
       return <TransactionsPage />;
     case "recurringPaymentNew":
-      // The prefill lives in the hash query, which is not part of `route`;
-      // keying on it gives each "Repeat regularly…" entry a fresh form.
-      return <RecurringPaymentFormPage key={globalThis.location?.hash ?? ""} />;
+      // The prefill lives in the route path's query, which is not part of
+      // `route`; keying on it gives each "Repeat regularly…" entry a fresh form.
+      return <RecurringPaymentFormPage key={routePath} />;
     case "recurringPaymentEdit":
       return <RecurringPaymentFormPage editId={route.id} />;
     case "recurringPayment":

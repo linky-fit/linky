@@ -7,6 +7,7 @@ import {
   requestsDeviceAuthorization,
   type NostrConnectRequest,
 } from "@linky-fit/linkstr";
+import { navigateToRoutePath } from "./platform/navigation";
 import { safeDecodeURIComponent } from "./utils/url";
 
 /** A login Linky can approve: a foreign signer's relay request, or a site it verified. */
@@ -93,9 +94,6 @@ export const takeSiteLoginHashLink = (): string | null => {
   const { hash } = window.location;
   const link =
     readNostrConnectUriFromHash(hash) ?? readLinkauthLinkFromHash(hash);
-  if (link) {
-    const { pathname, search } = window.location;
-    window.history.replaceState(null, "", `${pathname}${search}#wallet`);
-  }
+  if (link) navigateToRoutePath("wallet", { replace: true });
   return link;
 };

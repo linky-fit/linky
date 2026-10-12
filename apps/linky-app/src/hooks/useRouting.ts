@@ -1,24 +1,29 @@
-import { useEffect, useState } from "react";
-import type { KeryxSubscriptionId } from "@linky-fit/linksync";
-import type { CashuOperationId, ContactId } from "../evolu";
+import { useMemo } from "react";
+import {
+  currentRoutePath,
+  navigateToRoutePath,
+  useCurrentRoutePath,
+} from "../platform/navigation";
 import {
   safeSessionStorageGet,
   safeSessionStorageRemove,
   safeSessionStorageSet,
 } from "../utils/storage";
 import {
-  BANK_PAYMENT_EDIT_SUFFIX,
-  parseRouteFromHash,
+  parseRoutePath,
+  routePathFor,
+  type NavigationAction,
   type Route,
 } from "../types/route";
 
 export const NATIVE_BACK_BUTTON_EVENT = "linky-native-back-button";
+// Holds a route path; values stored before route paths start with `#`.
 const BANK_PAYMENT_OFFER_RETURN_HASH_KEY =
   "linky.bank_payment_offer_return_hash.v1";
 
-const rememberBankPaymentOfferReturnHash = (): void => {
-  const currentRoute = parseRouteFromHash();
-  if (currentRoute.kind === "bankPaymentOffer") return;
+const rememberBankPaymentOfferReturnPath = (): void => {
+  const currentPath = currentRoutePath();
+  const currentRoute = parseRoutePath(currentPath);
   if (
     currentRoute.kind !== "chat" &&
     currentRoute.kind !== "contacts" &&
@@ -27,317 +32,38 @@ const rememberBankPaymentOfferReturnHash = (): void => {
     return;
   }
 
-  const returnHash =
-    currentRoute.kind === "wallet"
-      ? "#wallet"
-      : currentRoute.kind === "contacts"
-        ? "#contacts"
-        : window.location.hash;
-  safeSessionStorageSet(BANK_PAYMENT_OFFER_RETURN_HASH_KEY, returnHash);
+  const returnPath =
+    currentRoute.kind === "chat" ? currentPath : currentRoute.kind;
+  safeSessionStorageSet(BANK_PAYMENT_OFFER_RETURN_HASH_KEY, returnPath);
 };
 
 export const returnFromBankPaymentOffer = (fallbackChatId: string): void => {
-  const returnHash =
-    safeSessionStorageGet(BANK_PAYMENT_OFFER_RETURN_HASH_KEY) ?? "";
+  const stored = safeSessionStorageGet(BANK_PAYMENT_OFFER_RETURN_HASH_KEY);
   safeSessionStorageRemove(BANK_PAYMENT_OFFER_RETURN_HASH_KEY);
 
-  const normalizedReturnHash = returnHash.trim();
+  const returnPath = (stored ?? "").trim().replace(/^#/, "");
   if (
-    normalizedReturnHash === "#contacts" ||
-    normalizedReturnHash === "#wallet" ||
-    (normalizedReturnHash.startsWith("#chat/") &&
-      !normalizedReturnHash.includes("/bank-payment-offer/"))
+    returnPath === "contacts" ||
+    returnPath === "wallet" ||
+    (returnPath.startsWith("chat/") &&
+      !returnPath.includes("/bank-payment-offer/"))
   ) {
-    window.location.assign(normalizedReturnHash);
+    navigateToRoutePath(returnPath);
     return;
   }
 
   navigateTo({ route: "chat", id: fallbackChatId });
 };
 
-export const useRouting = () => {
-  const [route, setRoute] = useState<Route>(() => parseRouteFromHash());
-
-  useEffect(() => {
-    const onHashChange = () => setRoute(parseRouteFromHash());
-    window.addEventListener("hashchange", onHashChange);
-    return () => window.removeEventListener("hashchange", onHashChange);
-  }, []);
-
-  // The native back press is handled by `useNativeBackHandler`, which walks the
-  // route hierarchy instead of the browser history. See its doc comment for why
-  // `history.back()` is not usable here.
-
-  return route;
-};
-
-// Navigation types
-type NavigationAction =
-  | { route: "advanced" }
-  | { route: "advancedAutoPayLimit" }
-  | { route: "advancedInspector" }
-  | { route: "advancedInspectorTimeline" }
-  | { route: "advancedPushDebug" }
-  | { route: "cashuTokenEmit" }
-  | { route: "cashuToken"; id: CashuOperationId }
-  | { route: "cashuTokenNew" }
-  | { route: "cashuTokens" }
-  | { route: "cashuProofs" }
-  | { route: "chat"; id: string }
-  | { route: "contact"; id: ContactId }
-  | { route: "contactEdit"; id: ContactId }
-  | { route: "contactNew" }
-  | { route: "contactPay"; id: ContactId }
-  | { route: "contacts" }
-  | { route: "evoluCurrentData" }
-  | { route: "evoluData" }
-  | { route: "evoluHistoryData" }
-  | { route: "evoluServer"; id: string }
-  | { route: "evoluServerNew" }
-  | { route: "chatStorage" }
-  | { route: "evoluServers" }
-  | { route: "lnAddressPay"; lnAddress: string }
-  | { route: "manualPay" }
-  | { route: "bankPayment"; spdPayload: string; editing?: boolean }
-  | { route: "bankPaymentNew" }
-  | { route: "bankPaymentOffer"; chatId: string; offerId: string }
-  | { route: "mint"; mintUrl: string }
-  | { route: "mints" }
-  | { route: "mintNew" }
-  | { route: "nostrRelay"; id: string }
-  | { route: "nostrRelayNew" }
-  | { route: "nostrRelays" }
-  | { route: "profile" }
-  | { route: "profileEdit" }
-  | { route: "settings" }
-  | { route: "settingsLanguage" }
-  | { route: "settingsAppearance" }
-  | { route: "settingsMasterKeys" }
-  | { route: "settingsNostrIdentity" }
-  | { route: "keryxCompanies" }
-  | { route: "keryxCompanyNew" }
-  | { route: "keryxCompany"; id: KeryxSubscriptionId }
-  | { route: "keryxAnnouncement"; id: KeryxSubscriptionId; key: string }
-  | { route: "proxyPayments" }
-  | { route: "settingsUnits" }
-  | { route: "settingsTutorial" }
-  | { route: "settingsBlocked" }
-  | { route: "settingsReceiveMethod" }
-  | { route: "transactions" }
-  | {
-      route: "recurringPaymentNew";
-      prefill?: { amountSat?: number; contactId?: string };
-    }
-  | { route: "recurringPayment"; id: string }
-  | { route: "recurringPaymentEdit"; id: string }
-  | { route: "topup" }
-  | { route: "topupNoAmount" }
-  | { route: "topupInvoice" }
-  | { route: "wallet" };
-
-/** Leaves the app for another page, such as the site a login came from. */
-export const navigateAwayTo = (url: string): void => {
-  window.location.assign(url);
+// The native back press is handled by `useNativeBackHandler`, which walks the
+// route hierarchy instead of the browser history. See its doc comment for why
+// `history.back()` is not usable here.
+export const useRouting = (): Route => {
+  const path = useCurrentRoutePath();
+  return useMemo(() => parseRoutePath(path), [path]);
 };
 
 export const navigateTo = (action: NavigationAction): void => {
-  switch (action.route) {
-    case "contacts":
-      window.location.assign("#contacts");
-      break;
-    case "settings":
-      window.location.assign("#settings");
-      break;
-    case "settingsLanguage":
-      window.location.assign("#settings/language");
-      break;
-    case "settingsAppearance":
-      window.location.assign("#settings/appearance");
-      break;
-    case "settingsUnits":
-      window.location.assign("#settings/units");
-      break;
-    case "settingsTutorial":
-      window.location.assign("#settings/tutorial");
-      break;
-    case "settingsBlocked":
-      window.location.assign("#settings/blocked");
-      break;
-    case "settingsReceiveMethod":
-      window.location.assign("#settings/receive-method");
-      break;
-    case "settingsMasterKeys":
-      window.location.assign("#settings/master-keys");
-      break;
-    case "settingsNostrIdentity":
-      window.location.assign("#settings/nostr-identity");
-      break;
-    case "keryxCompanies":
-      window.location.assign("#settings/keryx");
-      break;
-    case "keryxCompanyNew":
-      window.location.assign("#settings/keryx/new");
-      break;
-    case "keryxCompany":
-      window.location.assign(
-        `#settings/keryx/${encodeURIComponent(action.id)}`,
-      );
-      break;
-    case "keryxAnnouncement":
-      window.location.assign(
-        `#settings/keryx/${encodeURIComponent(action.id)}/${encodeURIComponent(action.key)}`,
-      );
-      break;
-    case "proxyPayments":
-      window.location.assign("#proxy");
-      break;
-    case "advanced":
-      window.location.assign("#advanced");
-      break;
-    case "advancedAutoPayLimit":
-      window.location.assign("#advanced/auto-pay-limit");
-      break;
-    case "advancedInspector":
-      window.location.assign("#advanced/inspector");
-      break;
-    case "advancedInspectorTimeline":
-      window.location.assign("#advanced/inspector/timeline");
-      break;
-    case "advancedPushDebug":
-      window.location.assign("#advanced/push-debug");
-      break;
-    case "mints":
-      window.location.assign("#advanced/mints");
-      break;
-    case "mintNew":
-      window.location.assign("#advanced/mints/new");
-      break;
-    case "mint":
-      window.location.assign(
-        `#advanced/mint/${encodeURIComponent(action.mintUrl.trim())}`,
-      );
-      break;
-    case "contact":
-      window.location.assign(`#contact/${encodeURIComponent(action.id)}`);
-      break;
-    case "contactEdit":
-      window.location.assign(`#contact/${encodeURIComponent(action.id)}/edit`);
-      break;
-    case "contactPay":
-      window.location.assign(`#contact/${encodeURIComponent(action.id)}/pay`);
-      break;
-    case "chat":
-      window.location.assign(`#chat/${encodeURIComponent(action.id)}`);
-      break;
-    case "contactNew":
-      window.location.assign("#contact/new");
-      break;
-    case "wallet":
-      window.location.assign("#wallet");
-      break;
-    case "transactions":
-      window.location.assign("#wallet/transactions");
-      break;
-    case "recurringPaymentNew": {
-      const query = new URLSearchParams();
-      if (action.prefill?.contactId)
-        query.set("contact", action.prefill.contactId);
-      if (action.prefill?.amountSat) {
-        query.set("amount", String(action.prefill.amountSat));
-      }
-      const suffix = query.size > 0 ? `?${query.toString()}` : "";
-      window.location.assign(`#wallet/recurring/new${suffix}`);
-      break;
-    }
-    case "recurringPayment":
-      window.location.assign(
-        `#wallet/recurring/${encodeURIComponent(action.id)}`,
-      );
-      break;
-    case "recurringPaymentEdit":
-      window.location.assign(
-        `#wallet/recurring/${encodeURIComponent(action.id)}/edit`,
-      );
-      break;
-    case "topup":
-      window.location.assign("#wallet/topup");
-      break;
-    case "topupNoAmount":
-      window.location.assign("#wallet/topup/no-amount");
-      break;
-    case "topupInvoice":
-      window.location.assign("#wallet/topup/invoice");
-      break;
-    case "cashuProofs":
-      window.location.assign("#wallet/tokens/proofs");
-      break;
-    case "cashuTokens":
-      window.location.assign("#wallet/tokens");
-      break;
-    case "lnAddressPay":
-      window.location.assign(`#payln/${encodeURIComponent(action.lnAddress)}`);
-      break;
-    case "manualPay":
-      window.location.assign("#wallet/pay");
-      break;
-    case "bankPayment":
-      window.location.assign(
-        `#wallet/bank-payment/${encodeURIComponent(action.spdPayload.trim())}${action.editing ? BANK_PAYMENT_EDIT_SUFFIX : ""}`,
-      );
-      break;
-    case "bankPaymentNew":
-      window.location.assign("#wallet/bank-payment/new");
-      break;
-    case "bankPaymentOffer":
-      rememberBankPaymentOfferReturnHash();
-      window.location.assign(
-        `#chat/${encodeURIComponent(action.chatId.trim())}/bank-payment-offer/${encodeURIComponent(action.offerId.trim())}`,
-      );
-      break;
-    case "cashuTokenNew":
-      window.location.assign("#wallet/token/new");
-      break;
-    case "cashuTokenEmit":
-      window.location.assign("#wallet/token/emit");
-      break;
-    case "cashuToken":
-      window.location.assign(`#wallet/token/${encodeURIComponent(action.id)}`);
-      break;
-    case "profile":
-      window.location.assign("#profile");
-      break;
-    case "profileEdit":
-      window.location.assign("#profile/edit");
-      break;
-    case "nostrRelays":
-      window.location.assign("#nostr-relays");
-      break;
-    case "nostrRelay":
-      window.location.assign(`#nostr-relay/${encodeURIComponent(action.id)}`);
-      break;
-    case "nostrRelayNew":
-      window.location.assign("#nostr-relay/new");
-      break;
-    case "chatStorage":
-      window.location.assign("#advanced/chat-storage");
-      return;
-    case "evoluServers":
-      window.location.assign("#evolu-servers");
-      break;
-    case "evoluData":
-      window.location.assign("#evolu-data");
-      break;
-    case "evoluCurrentData":
-      window.location.assign("#evolu-current-data");
-      break;
-    case "evoluHistoryData":
-      window.location.assign("#evolu-history-data");
-      break;
-    case "evoluServer":
-      window.location.assign(`#evolu-server/${encodeURIComponent(action.id)}`);
-      break;
-    case "evoluServerNew":
-      window.location.assign("#evolu-server/new");
-      break;
-  }
+  if (action.route === "bankPaymentOffer") rememberBankPaymentOfferReturnPath();
+  navigateToRoutePath(routePathFor(action));
 };

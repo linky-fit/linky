@@ -59,3 +59,25 @@ test("only platform/buildEnv.ts reads import.meta.env", async () => {
     ),
   ).toEqual([]);
 }, 30_000);
+
+test("only platform/navigation.ts and command-link readers read the hash", async () => {
+  const eslint = new ESLint({
+    cwd: import.meta.dirname,
+    ruleFilter: ({ ruleId }) => ruleId === "no-restricted-syntax",
+  });
+  const lint = async (code, filePath) => {
+    const [result] = await eslint.lintText(code, { filePath });
+    return result.messages.map((message) => message.message);
+  };
+  const readHash = "export const hash = () => window.location.hash;";
+  const onHashChange =
+    'window.addEventListener("hashchange", () => undefined);';
+
+  for (const code of [readHash, onHashChange]) {
+    expect(await lint(code, "src/pages/ChatPage.tsx")).toEqual([
+      expect.stringContaining("currentRoutePath()"),
+    ]);
+    expect(await lint(code, "src/platform/navigation.ts")).toEqual([]);
+    expect(await lint(code, "src/siteLogin.ts")).toEqual([]);
+  }
+});

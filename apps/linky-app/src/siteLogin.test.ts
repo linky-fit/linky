@@ -15,7 +15,8 @@ import {
   linkauthFragment,
   nostrLogin,
 } from "./testUtils/siteLoginFixtures";
-import { parseRouteFromHash } from "./types/route";
+import { currentRoutePath } from "./platform/navigation";
+import { parseRoutePath } from "./types/route";
 
 const CLIENT = makeIdentity().pubkey;
 const uri = (query: string) =>
@@ -59,7 +60,7 @@ describe("a site login web link", () => {
     ["linkauth", LINKAUTH],
   ])("%s routes to the wallet before its hash is taken", (_name, link) => {
     window.history.replaceState(null, "", `/#${link}`);
-    expect(parseRouteFromHash()).toEqual({ kind: "wallet" });
+    expect(parseRoutePath(currentRoutePath())).toEqual({ kind: "wallet" });
   });
 
   it.each([

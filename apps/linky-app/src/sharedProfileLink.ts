@@ -1,4 +1,5 @@
 import { decodeNpub } from "@linky-fit/linkstr";
+import { navigateToRoutePath } from "./platform/navigation";
 import { buildProfileShareUrl } from "./utils/profileShareUrl";
 
 const ADD_CONTACT_HASH = /^#add\/(npub1[a-z0-9]+)$/i;
@@ -12,10 +13,7 @@ export const readAddContactNpubFromHash = (hash: string): string | null => {
 /** Takes an `#add/<npub>` link out of the address bar and its history entry. */
 export const takeAddContactHashLink = (): string | null => {
   const npub = readAddContactNpubFromHash(window.location.hash);
-  if (npub) {
-    const { pathname, search } = window.location;
-    window.history.replaceState(null, "", `${pathname}${search}#contacts`);
-  }
+  if (npub) navigateToRoutePath("contacts", { replace: true });
   return npub;
 };
 
