@@ -233,7 +233,12 @@ const ContactsContent = ({
             dismissContactsOnboarding={dismissContactsOnboarding}
             onShowHow={(key) => {
               if (!isContactsGuideKey(key)) return;
-              startContactsGuide(key);
+              startContactsGuide(
+                key,
+                contactsOnboardingTasks.tasks.some(
+                  (task) => task.key === key && task.done,
+                ),
+              );
             }}
             progressPercent={contactsOnboardingTasks.percent}
             t={t}

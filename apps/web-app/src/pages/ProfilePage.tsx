@@ -320,13 +320,15 @@ export function ProfilePage({
         <Text variant="display" textAlign="center">
           {displayName}
         </Text>
-        <QRCode
-          value={currentNpub}
-          accessibilityLabel={t("copy")}
-          tooltip={t("copy")}
-          badge="Copy"
-          onPress={() => void copyText(currentNpub)}
-        />
+        <Stack data-guide="profile-qr">
+          <QRCode
+            value={currentNpub}
+            accessibilityLabel={t("copy")}
+            tooltip={t("copy")}
+            badge="Copy"
+            onPress={() => void copyText(currentNpub)}
+          />
+        </Stack>
         <Button
           variant="secondary"
           size="sm"
@@ -437,7 +439,7 @@ export function ProfilePage({
         placeholder={t("name")}
       />
 
-      <Stack gap="$xs">
+      <Stack gap="$xs" data-guide="profile-ln-address">
         <Text variant="label" color="$colorSubtle">
           {t("lightningAddress")}
         </Text>

@@ -16,7 +16,10 @@ import { useTranslation } from "../shell";
 import { useSetting, useSettingsRepository } from "../useLinksync";
 import { useWalletBalance } from "../wallet/useWalletInventory";
 import { useStopContactsGuide } from "./useContactsGuideControls";
-import { contactsOnboardingTasksOf } from "./useContactsOnboardingProgress";
+import {
+  contactsOnboardingTasksOf,
+  useContactsOnboardingExtras,
+} from "./useContactsOnboardingProgress";
 
 /** Mirrors a dismissal into the synced setting, so the user's other devices hide the checklist too. */
 export const usePersistContactsOnboardingDismissed = () => {
@@ -41,10 +44,12 @@ export const useContactsOnboarding = () => {
   const { cashuBalance } = useWalletBalance();
   const persistDismissed = usePersistContactsOnboardingDismissed();
   const stopContactsGuide = useStopContactsGuide();
+  const extras = useContactsOnboardingExtras();
 
   const tasks = React.useMemo(
     () =>
       contactsOnboardingTasksOf({
+        ...extras,
         cashuBalance,
         contactsCount,
         contactsOnboardingHasBackedUpKeys: hasBackedUpKeys,
@@ -52,7 +57,15 @@ export const useContactsOnboarding = () => {
         contactsOnboardingHasSentMessage: hasSentMessage,
         t,
       }),
-    [cashuBalance, contactsCount, hasBackedUpKeys, hasPaid, hasSentMessage, t],
+    [
+      cashuBalance,
+      contactsCount,
+      extras,
+      hasBackedUpKeys,
+      hasPaid,
+      hasSentMessage,
+      t,
+    ],
   );
 
   const dismissContactsOnboarding = React.useCallback(() => {

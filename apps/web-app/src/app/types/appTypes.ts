@@ -201,7 +201,11 @@ export type ContactsGuideKey =
   | "topup"
   | "pay"
   | "message"
-  | "backup_keys";
+  | "backup_keys"
+  | "linky_name"
+  | "groups"
+  | "proxy_payment"
+  | "beacon";
 
 export interface ContactsGuideStep {
   bodyKey: I18nKey;

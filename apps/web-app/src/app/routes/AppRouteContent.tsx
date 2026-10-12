@@ -60,6 +60,7 @@ import {
   TopupInvoiceRoute,
   TopupNoAmountPage,
   TopupPage,
+  TutorialPage,
   RecurringPaymentFormPage,
   RecurringPaymentPage,
   TransactionsPage,
@@ -94,6 +95,8 @@ const RoutePage = (): React.ReactElement => {
       return <AdvancedPage />;
     case "settingsUnits":
       return <SettingsPage />;
+    case "settingsTutorial":
+      return <TutorialPage />;
     case "settingsLanguage":
       return <LanguagePage />;
     case "settingsAppearance":

@@ -57,6 +57,7 @@ export const resolveBackAction = (
     case "settingsLanguage":
     case "settingsAppearance":
     case "settingsUnits":
+    case "settingsTutorial":
     case "settingsReceiveMethod":
     case "settingsMasterKeys":
     case "keryxCompanies":
@@ -266,6 +267,7 @@ const SHOWS_MENU_BUTTON: Record<
   settingsMasterKeys: false,
   proxyPayments: false,
   settingsReceiveMethod: false,
+  settingsTutorial: false,
   settingsUnits: false,
   topupInvoice: false,
   topupNoAmount: false,
@@ -445,6 +447,7 @@ const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
   settingsMasterKeys: "masterKeys",
   proxyPayments: "proxyPayments",
   settingsReceiveMethod: "receiveMethod",
+  settingsTutorial: "tutorial",
   settingsUnits: "unit",
   topup: "topupTitle",
   topupInvoice: "topupInvoiceTitle",

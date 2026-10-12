@@ -5,6 +5,8 @@ import type { ContactsGuideKey } from "../../types/appTypes";
 import { kvSeededAtom } from "../platform";
 
 export interface ContactsGuideState {
+  /** The task was already done when the walkthrough started; a replay then runs to its last step instead of ending at once. */
+  readonly doneAtStart: boolean;
   readonly step: number;
   readonly task: ContactsGuideKey;
 }

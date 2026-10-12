@@ -85,6 +85,7 @@ export const WalletPage: React.FC<WalletPageProps> = React.memo(
               label={t("walletSend")}
               onPress={openScan}
               disabled={scanIsOpen}
+              dataGuide="wallet-send"
             />
           </Row>
           <Button

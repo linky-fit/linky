@@ -86,6 +86,9 @@ describe("parseRouteFromHash", () => {
     replaceHash("#settings/units");
     expect(parseRouteFromHash()).toEqual({ kind: "settingsUnits" });
 
+    replaceHash("#settings/tutorial");
+    expect(parseRouteFromHash()).toEqual({ kind: "settingsTutorial" });
+
     replaceHash("#settings/receive-method");
     expect(parseRouteFromHash()).toEqual({ kind: "settingsReceiveMethod" });
 
