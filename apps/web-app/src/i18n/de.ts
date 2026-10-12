@@ -729,7 +729,15 @@ export const de = {
   details: "Details",
   deleteArmedHint: "Klicke zum Löschen noch einmal.",
   deleteContact: "Kontakt löschen",
-  undoDeleteContact: "Rückgängig",
+  undo: "Rückgängig",
+  contactBlocked: "Kontakt blockiert.",
+  contactUnblocked: "Kontakt nicht mehr blockiert.",
+  blocked: "Blockiert",
+  blockedIntro:
+    "Nachrichten von blockierten Personen erreichen dich auf keinem deiner Geräte. Nach dem Aufheben kommen neue Nachrichten an; frühere kommen nicht zurück.",
+  blockedEmpty: "Du hast niemanden blockiert.",
+  unblock: "Blockierung aufheben",
+  unblocked: "Blockierung aufgehoben.",
   avatarCropTitle: "Profilfoto zuschneiden",
   avatarCropHelp:
     "Verschiebe und vergrößere das Foto, um einen quadratischen Ausschnitt zu wählen.",

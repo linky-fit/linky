@@ -27,6 +27,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - Your own profile can no longer be saved as a contact from any flow, including a data import.
 - The ₿ unit shows bitcoin (0.00123456 ₿) instead of sats with a bitcoin symbol, and the keypad takes up to eight decimal places in it.
 - Decimal places on the amount keypad are on by default; turn them off in Settings under Units.
+- Blocking a saved contact: the Block button on the edit page, or Block in the toast after deleting one. Settings lists everyone you blocked and unblocks them, on all your devices.
 
 ### cs-CZ
 
@@ -43,6 +44,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - Obnova účtu: celou zálohu vložíte jedním tlačítkem, nebo zadáte 20 slov do samostatných polí a každé slovo se kontroluje proti seznamu SLIP-39.
 - Jednotka ₿ zobrazuje bitcoin (0,00123456 ₿) místo satů se symbolem bitcoinu a klávesnice v ní přijme až osm desetinných míst.
 - Desetinná místa na klávesnici částky jsou ve výchozím stavu zapnutá; vypnout jdou v Nastavení v Jednotkách.
+- Blokování uloženého kontaktu: tlačítko Blokovat na stránce úprav, nebo Blokovat v oznámení po smazání. V Nastavení najdete všechny zablokované a můžete je odblokovat, na všech svých zařízeních.
 
 ## [26.10.3] - 2026-10-05
 

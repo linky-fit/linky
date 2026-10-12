@@ -13,12 +13,12 @@ export interface Toast {
   id: string;
   message: string;
   onClick?: () => void;
-  action?: ToastAction;
+  actions?: ReadonlyArray<ToastAction>;
 }
 
 export interface PushToastOptions {
   onClick?: () => void;
-  action?: ToastAction;
+  actions?: ReadonlyArray<ToastAction>;
 }
 
 export type PushToast = (message: string, options?: PushToastOptions) => void;
@@ -62,7 +62,7 @@ const makeToastCommands = (
           id,
           message: text,
           ...(options?.onClick ? { onClick: options.onClick } : {}),
-          ...(options?.action ? { action: options.action } : {}),
+          ...(options?.actions ? { actions: options.actions } : {}),
         },
       ];
       for (const dropped of next.slice(0, -MAX_VISIBLE_TOASTS)) {
@@ -77,7 +77,7 @@ const makeToastCommands = (
             remove(id);
             timers.delete(id);
           },
-          options?.action ? ACTION_TOAST_DURATION_MS : TOAST_DURATION_MS,
+          options?.actions ? ACTION_TOAST_DURATION_MS : TOAST_DURATION_MS,
         ),
       );
     },

@@ -49,4 +49,5 @@ export { RecurringPaymentFormPage } from "./RecurringPaymentFormPage";
 export { RecurringPaymentPage } from "./RecurringPaymentPage";
 export { TransactionsPage } from "./TransactionsPage";
 export { TutorialPage } from "./TutorialPage";
+export { BlockedPage } from "./BlockedPage";
 export { WalletPage } from "./WalletPage";

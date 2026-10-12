@@ -247,10 +247,11 @@ export const sendDirectMessage = (
   );
 };
 
-/** Block until the account's newest mute list on the relay lists the pubkey. */
+/** Block until the account's newest mute list on the relay lists the pubkey, or no longer does. */
 export const waitForMuteListOnRelay = async (
   npub: string,
   mutedPubkey: string,
+  listed = true,
 ): Promise<void> => {
   const author = npubToHex(npub);
   await expect
@@ -260,13 +261,17 @@ export const waitForMuteListOnRelay = async (
           { authors: [author], kinds: [10000], limit: 1 },
           10_000,
         ).catch(() => []);
+        // A failed query or a missing list proves neither way.
+        if (lists.length === 0) return !listed;
         return lists.some((list) =>
           list.tags.some((tag) => tag[0] === "p" && tag[1] === mutedPubkey),
         );
       },
-      { message: "the mute list on the relay lists the blocked pubkey" },
+      {
+        message: `the mute list on the relay ${listed ? "lists" : "no longer lists"} the pubkey`,
+      },
     )
-    .toBe(true);
+    .toBe(listed);
 };
 
 /**

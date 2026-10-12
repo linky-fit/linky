@@ -121,6 +121,7 @@ type NavigationAction =
   | { route: "proxyPayments" }
   | { route: "settingsUnits" }
   | { route: "settingsTutorial" }
+  | { route: "settingsBlocked" }
   | { route: "settingsReceiveMethod" }
   | { route: "transactions" }
   | {
@@ -158,6 +159,9 @@ export const navigateTo = (action: NavigationAction): void => {
       break;
     case "settingsTutorial":
       window.location.assign("#settings/tutorial");
+      break;
+    case "settingsBlocked":
+      window.location.assign("#settings/blocked");
       break;
     case "settingsReceiveMethod":
       window.location.assign("#settings/receive-method");

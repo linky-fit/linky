@@ -58,6 +58,7 @@ export const resolveBackAction = (
     case "settingsAppearance":
     case "settingsUnits":
     case "settingsTutorial":
+    case "settingsBlocked":
     case "settingsReceiveMethod":
     case "settingsMasterKeys":
     case "settingsNostrIdentity":
@@ -270,6 +271,7 @@ const SHOWS_MENU_BUTTON: Record<
   proxyPayments: false,
   settingsReceiveMethod: false,
   settingsTutorial: false,
+  settingsBlocked: false,
   settingsUnits: false,
   topupInvoice: false,
   topupNoAmount: false,
@@ -451,6 +453,7 @@ const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
   proxyPayments: "proxyPayments",
   settingsReceiveMethod: "receiveMethod",
   settingsTutorial: "tutorial",
+  settingsBlocked: "blocked",
   settingsUnits: "unit",
   topup: "topupTitle",
   topupInvoice: "topupInvoiceTitle",

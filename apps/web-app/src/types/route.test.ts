@@ -89,6 +89,9 @@ describe("parseRouteFromHash", () => {
     replaceHash("#settings/tutorial");
     expect(parseRouteFromHash()).toEqual({ kind: "settingsTutorial" });
 
+    replaceHash("#settings/blocked");
+    expect(parseRouteFromHash()).toEqual({ kind: "settingsBlocked" });
+
     replaceHash("#settings/receive-method");
     expect(parseRouteFromHash()).toEqual({ kind: "settingsReceiveMethod" });
 

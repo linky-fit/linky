@@ -32,7 +32,7 @@ describe("toasts", () => {
 
     commands.pushToast("plain");
     commands.pushToast("undo", {
-      action: { label: "Undo", onClick: () => {} },
+      actions: [{ label: "Undo", onClick: () => {} }],
     });
     vi.advanceTimersByTime(2500);
     expect(messages()).toEqual(["undo"]);

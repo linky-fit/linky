@@ -27,11 +27,14 @@ export const feedback: Section = {
       </UI.Stack>
     ),
     Toast: () => {
-      const [undone, setUndone] = useState(false);
+      const [title, setTitle] = useState("Contact deleted");
       return (
         <UI.Toast
-          title={undone ? "Undone" : "Contact saved"}
-          action={{ label: "Undo", onPress: () => setUndone(!undone) }}
+          title={title}
+          actions={[
+            { label: "Undo", onPress: () => setTitle("Contact restored") },
+            { label: "Block", onPress: () => setTitle("Contact blocked") },
+          ]}
         />
       );
     },

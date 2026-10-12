@@ -62,6 +62,7 @@ import {
   TopupNoAmountPage,
   TopupPage,
   TutorialPage,
+  BlockedPage,
   RecurringPaymentFormPage,
   RecurringPaymentPage,
   TransactionsPage,
@@ -98,6 +99,8 @@ const RoutePage = (): React.ReactElement => {
       return <SettingsPage />;
     case "settingsTutorial":
       return <TutorialPage />;
+    case "settingsBlocked":
+      return <BlockedPage />;
     case "settingsLanguage":
       return <LanguagePage />;
     case "settingsAppearance":

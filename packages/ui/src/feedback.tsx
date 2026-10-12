@@ -81,12 +81,16 @@ export function Notice({
   );
 }
 
-/** A toast is either pressable as a whole or carries one action button. */
+/** A toast is either pressable as a whole or carries action buttons. */
 export type ToastProps =
-  | { title: string; action?: LabeledAction | undefined; onPress?: never }
-  | { title: string; onPress: () => void; action?: never };
+  | {
+      title: string;
+      actions?: ReadonlyArray<LabeledAction> | undefined;
+      onPress?: never;
+    }
+  | { title: string; onPress: () => void; actions?: never };
 
-export function Toast({ title, action, onPress }: ToastProps) {
+export function Toast({ title, actions, onPress }: ToastProps) {
   const Frame = onPress ? Pressable : Row;
   return (
     <Frame
@@ -105,11 +109,16 @@ export function Toast({ title, action, onPress }: ToastProps) {
       <Text variant="label" fontWeight="$regular" flex={1}>
         {title}
       </Text>
-      {action ? (
-        <Button size="sm" variant="ghost" onPress={action.onPress}>
+      {actions?.map((action) => (
+        <Button
+          key={action.label}
+          size="sm"
+          variant="ghost"
+          onPress={action.onPress}
+        >
           {action.label}
         </Button>
-      ) : null}
+      ))}
     </Frame>
   );
 }

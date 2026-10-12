@@ -20,15 +20,15 @@ export const ToastNotifications: React.FC<ToastNotificationsProps> = ({
 
   return (
     <ToastStack>
-      {toasts.map(({ action, id, message, onClick }) =>
-        action ? (
+      {toasts.map(({ actions, id, message, onClick }) =>
+        actions ? (
           <Toast
             key={id}
             title={message}
-            action={{
+            actions={actions.map((action) => ({
               label: action.label,
               onPress: pressed(id, action.onClick),
-            }}
+            }))}
           />
         ) : onClick ? (
           <Toast key={id} title={message} onPress={pressed(id, onClick)} />

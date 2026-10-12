@@ -1,6 +1,7 @@
 import { Button, EmptyState, IconButton, Row } from "@linky-fit/ui";
 import { useAtomValue } from "@linky-fit/linkstr-react";
 import type { FC } from "react";
+import { useBlockEditedContact } from "../app/hooks/contacts/useContactActions";
 import {
   useContactEditor,
   useContactEditorParams,
@@ -19,6 +20,8 @@ interface Contact {
 }
 
 interface ContactEditPageProps {
+  /** Null when the contact has no npub to block. */
+  blockContact: (() => void) | null;
   contactEditsSavable: boolean;
   editingId: ContactId | null;
   form: ContactFormData;
@@ -34,6 +37,7 @@ interface ContactEditPageProps {
 }
 
 export const ContactEditPage: FC<ContactEditPageProps> = ({
+  blockContact,
   contactEditsSavable,
   editingId,
   form,
@@ -111,6 +115,11 @@ export const ContactEditPage: FC<ContactEditPageProps> = ({
             {t("saveContact")}
           </Button>
         )}
+        {blockContact ? (
+          <Button variant="secondary" icon="Ban" onPress={blockContact}>
+            {t("blockContact")}
+          </Button>
+        ) : null}
       </Row>
     </PageCard>
   );
@@ -121,10 +130,13 @@ export const ContactEditRoute: FC<{ route: Route }> = ({ route }) => {
   const selectedContact = useRoutePeopleContact(route);
   const { groupNames } = useAtomValue(contactGroupsAtom);
   const editor = useContactEditor(useContactEditorParams(route));
+  const { editingId } = editor;
+  const blockContact = useBlockEditedContact(editingId);
   return (
     <ContactEditPage
+      blockContact={blockContact}
       contactEditsSavable={editor.contactEditsSavable}
-      editingId={editor.editingId}
+      editingId={editingId}
       form={editor.form}
       groupNames={groupNames}
       handleSaveContact={editor.handleSaveContact}

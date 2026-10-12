@@ -116,11 +116,13 @@ Two plain replaceable events with empty content: kind 10002 (NIP-65) with one `[
 
 ## Mute list
 
-`MuteList.publishMuteList(pubkeys)` publishes your NIP-51 mute list: a kind 10000 event with one `p` tag per blocked pubkey, replacing the previous list on relays. There is no draft class; pass the complete list every time, since the newest event is the list. Publish whenever the local block list changes so other clients on the same key honour it.
+`MuteList.publishMuteList(pubkeys, { changes, replaces })` publishes your NIP-51 mute list: a kind 10000 event with one `p` tag per blocked pubkey, replacing the previous list on relays. There is no draft class; pass the complete list every time, since the newest event is the list. Publish whenever the local block list changes so other clients on the same key honour it.
 
-`fetchOwnMuteList()` asks every read and write relay for your kind 10000 and returns the newest as a `FetchedMuteList`, or `null` when every relay answered and none holds one. When no answering relay holds a list but some relay did not answer, it fails with `SomeRelaysUnanswered`, since the silent relay may hold the only list. Each relay gets 4 s, so a silent relay delays the result by that much at most. Fetch at startup so a new device learns who you blocked elsewhere, and again right before a publish: a replaceable event has no merge, so a publish built without the newest list drops what another device added to it.
+`changes` are `MuteListChange`s, one per pubkey you blocked or unblocked, with the time of the change. They go into the list's content, NIP-44 encrypted to yourself, so an unblock is not published in the clear. A replaceable event has no merge, so with them each device can merge a list another device published concurrently: per pubkey, the later change wins. `replaces` is the `createdAt` of the newest list you know; the event is dated at least a second after it, because of two lists from the same second a relay keeps the one with the lower id.
 
-In React, call the `publishMuteList` command with the complete pubkey list whenever it changes; it returns the same `PlainEventReceipt`. The `fetchOwnMuteList` command runs `fetchOwnMuteList`.
+`fetchOwnMuteList()` asks every read and write relay for your kind 10000 and returns the newest as a `FetchedMuteList`, or `null` when every relay answered and none holds one. Its `changes` are the timed changes it carries, empty when its content is missing or another client encrypted it. When no answering relay holds a list but some relay did not answer, it fails with `SomeRelaysUnanswered`, since the silent relay may hold the only list. Each relay gets 4 s, so a silent relay delays the result by that much at most. Fetch at startup so a new device learns who you blocked elsewhere, and again right before a publish, so the publish does not drop what another device added.
+
+In React, call the `publishMuteList` command with the complete pubkey list and its options whenever the list changes; it returns the same `PlainEventReceipt`, whose `sentAt` is the published list's `createdAt`. The `fetchOwnMuteList` command runs `fetchOwnMuteList`.
 
 ```ts
 import { Effect } from "effect";
@@ -134,7 +136,7 @@ Publishing does not block anyone by itself, and there is no watch of your own mu
 
 ### Wire format
 
-Kind 10000, plain and replaceable: one `["p", pubkey]` per muted contact, empty content, no encrypted section. Anyone can read the list. Decoding keeps the `p` values that are valid pubkeys, once each, and ignores other tags and any encrypted content another client wrote.
+Kind 10000, plain and replaceable: one `["p", pubkey]` per muted contact, readable by anyone. The content is empty without `changes`; with them it is a NIP-44 payload encrypted to your own key, holding a JSON array of `["muted" | "unmuted", pubkey, at]` entries (`at` in seconds, as a string). Decoding keeps the `p` values that are valid pubkeys, once each, and the content entries it can decrypt and validate, and ignores other tags and content another client wrote.
 
 ### Errors
 

@@ -211,7 +211,7 @@ export const useNpubCash = ({
         setStatus(`${t("cashuAcceptFailed")}: ${detail}`),
       onUnsaved: (token) =>
         pushToast(t("npubCashClaimUnsaved"), {
-          action: { label: t("copy"), onClick: () => void copyText(token) },
+          actions: [{ label: t("copy"), onClick: () => void copyText(token) }],
         }),
     }),
     [
