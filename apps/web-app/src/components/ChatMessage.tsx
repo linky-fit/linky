@@ -61,6 +61,7 @@ import { ContactPill } from "./ContactPill";
 
 import type { I18nKey, Translate } from "../i18n";
 import { LinkPreviewCard } from "./LinkPreviewCard";
+import type { ReactionEmojiGroupId } from "../app/lib/reactionEmojis";
 import { MessageActionsMenu } from "./MessageActionsMenu";
 import { MessageReactions } from "./MessageReactions";
 import { PrivateFileBubble } from "./PrivateFileBubble";
@@ -87,6 +88,7 @@ interface ChatMessageProps {
     copy: string;
     edit: string;
     edited: string;
+    emojiGroups: Record<ReactionEmojiGroupId, string>;
     menu: string;
     moreEmojis: string;
     react: string;

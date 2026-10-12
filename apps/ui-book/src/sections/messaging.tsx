@@ -134,14 +134,59 @@ export const messaging: Section = {
         </UI.Stack>
       );
     },
+    EmojiCatalog: () => {
+      const [emoji, setEmoji] = useState("🎉");
+      return (
+        <UI.Stack>
+          <UI.EmojiCatalog
+            accessibilityLabel="Example emojis"
+            groups={[
+              {
+                key: "smileys",
+                label: "Smileys",
+                icon: "Smile",
+                emojis: ["😀", "😂", "😍", "🤔", "😢", "😡"],
+              },
+              {
+                key: "food",
+                label: "Food",
+                icon: "Pizza",
+                emojis: ["🍕", "🍔", "🍣", "🍩", "☕"],
+              },
+              {
+                key: "flags",
+                label: "Flags",
+                icon: "Flag",
+                emojis: ["🏁", "🇨🇿", "🇩🇪", "🇧🇷"],
+              },
+            ]}
+            onSelect={setEmoji}
+          />
+          <UI.Text variant="caption">Selected: {emoji}</UI.Text>
+        </UI.Stack>
+      );
+    },
     EmojiPicker: () => {
       const [emoji, setEmoji] = useState("👍");
+      const [expanded, setExpanded] = useState(false);
       return (
         <UI.Stack>
           <UI.EmojiPicker
             accessibilityLabel="Example reactions"
-            emojis={["👍", "❤️", "😂", "⚡"]}
+            emojis={
+              expanded
+                ? ["👍", "❤️", "😂", "⚡", "🎉", "🔥", "😮", "😢"]
+                : ["👍", "❤️", "😂", "⚡"]
+            }
             onSelect={setEmoji}
+            {...(expanded
+              ? {}
+              : {
+                  more: {
+                    label: "More emojis",
+                    onPress: () => setExpanded(true),
+                  },
+                })}
           />
           <UI.Text variant="caption">Selected: {emoji}</UI.Text>
         </UI.Stack>

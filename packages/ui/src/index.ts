@@ -139,6 +139,7 @@ export type {
 export {
   AttachmentTray,
   DaySeparator,
+  EmojiCatalog,
   EmojiPicker,
   FileAttachment,
   ImageAttachment,
@@ -151,6 +152,8 @@ export {
 export type {
   AttachmentDraft,
   AttachmentTrayProps,
+  EmojiCatalogGroup,
+  EmojiCatalogProps,
   EmojiPickerProps,
   FileAttachmentProps,
   ImageAttachmentProps,
