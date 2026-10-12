@@ -250,6 +250,8 @@ export default defineConfig({
         type: "module",
       },
       filename: "sw.ts",
+      // main.tsx registers the worker through platform/serviceWorker.ts.
+      injectRegister: false,
       registerType: "prompt",
       srcDir: "src",
       strategies: "injectManifest",
