@@ -12,6 +12,7 @@
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
 		504EC3091FED796500168520 /* LinkyBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3091FED79650016851F /* LinkyBridgeViewController.swift */; };
 		504EC30A1FED796500168520 /* LinkyScannerPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC30A1FED79650016851F /* LinkyScannerPlugin.swift */; };
+		504EC31E1FED796500168520 /* LinkyStatusBarPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC31E1FED79650016851F /* LinkyStatusBarPlugin.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
@@ -31,6 +32,7 @@
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		504EC3091FED79650016851F /* LinkyBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkyBridgeViewController.swift; sourceTree = "<group>"; };
 		504EC30A1FED79650016851F /* LinkyScannerPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkyScannerPlugin.swift; sourceTree = "<group>"; };
+		504EC31E1FED79650016851F /* LinkyStatusBarPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkyStatusBarPlugin.swift; sourceTree = "<group>"; };
 		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -96,6 +98,7 @@
 				504EC3191FED79650016851F /* LinkyNfcPlugin.swift */,
 				504EC30A1FED79650016851F /* LinkyScannerPlugin.swift */,
 				504EC3141FED796500168520 /* LinkySecretStoragePlugin.swift */,
+				504EC31E1FED79650016851F /* LinkyStatusBarPlugin.swift */,
 				504EC31D1FED79650016851F /* SceneDelegate.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
@@ -239,6 +242,7 @@
 				504EC3191FED796500168520 /* LinkyNfcPlugin.swift in Sources */,
 				504EC30A1FED796500168520 /* LinkyScannerPlugin.swift in Sources */,
 				504EC3151FED796500168520 /* LinkySecretStoragePlugin.swift in Sources */,
+				504EC31E1FED796500168520 /* LinkyStatusBarPlugin.swift in Sources */,
 				504EC31D1FED796500168520 /* SceneDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
