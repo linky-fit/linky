@@ -68,10 +68,10 @@ export const useMessageWrites = ({
   const registry = React.useContext(RegistryContext);
 
   const removeNostrMessage = React.useCallback(
-    (message: LocalNostrMessage) => {
+    (message: LocalNostrMessage): Promise<WriteOutcome> => {
       const messageId = parseMessageId(message.id);
-      if (!messageId) return;
-      void write(
+      if (!messageId) return NO_WRITE;
+      return write(
         "message removal",
         isUnknownContactId(message.contactId)
           ? unknownSenders.remove(messageId)
@@ -201,7 +201,7 @@ export const useMessageWrites = ({
       }
       for (const message of registry.get(contactMessagesAtom)) {
         if (trimString(message.contactId) !== normalizedContactId) continue;
-        removeNostrMessage(message);
+        void removeNostrMessage(message);
       }
     },
     [registry, removeNostrMessage, unknownSenders, write],

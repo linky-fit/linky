@@ -397,6 +397,45 @@ describe("useMessagesDomain", () => {
     vi.useRealTimers();
   });
 
+  it("prunes a conversation past its cap once, waiting for the removals", async () => {
+    vi.useFakeTimers();
+    const { store } = makeTestLinkyStore();
+    const contactId = createId<"Contact">();
+    const writer = makeConversationsRepository(store);
+    for (let index = 1; index <= 503; index += 1) {
+      const wrapId = NonEmptyString1000.orThrow(`wrap-${index}`);
+      await Effect.runPromise(
+        writer.messages.insert({
+          id: createId<"Message">(),
+          conversationId: directConversationIdFor(contactId),
+          direction: NonEmptyString100.orThrow("in"),
+          content: NonEmptyString.orThrow(`message ${index}`),
+          wrapId,
+          createdAtSec: PositiveInt.orThrow(1_000 + index),
+          status: NonEmptyString100.orThrow("sent"),
+        }),
+      );
+    }
+    const { conversations, domain, view } = await renderDomain(store, [
+      { id: contactId },
+    ]);
+    const remove = vi.spyOn(conversations.messages, "remove");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+
+    expect(remove).toHaveBeenCalledTimes(3);
+    const contents = domain().nostrMessagesLocal.map((m) => m.content);
+    expect(contents).toHaveLength(500);
+    expect(contents[0]).toBe("message 4");
+    await view.unmount();
+    vi.useRealTimers();
+  });
+
   it("keeps the open conversation and unchanged rows when another conversation gets a message", async () => {
     const { store } = makeTestLinkyStore();
     const open = createId<"Contact">();
