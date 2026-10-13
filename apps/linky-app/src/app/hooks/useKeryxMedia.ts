@@ -3,6 +3,7 @@ import { base64 } from "@scure/base";
 import { Effect, Result } from "effect";
 import React from "react";
 import { saveFile } from "../../platform/fileExport";
+import { bytesToBlob } from "../../platform/files";
 import { keryxMediaFailedRow, reportKeryx } from "../lib/keryxInspector";
 
 export interface KeryxMedia {
@@ -125,9 +126,7 @@ export const openKeryxAttachment = async (
   if (bytes === null) return false;
   const fileName = fileNameOf(attachment);
   await saveFile({
-    blob: new Blob([bytes], {
-      type: attachment.mimeType ?? "application/octet-stream",
-    }),
+    blob: bytesToBlob(bytes, attachment.mimeType ?? "application/octet-stream"),
     fileName,
     title: fileName,
   }).catch(() => undefined);
