@@ -204,6 +204,7 @@ function DetailPane({
       borderLeftWidth={border.hairline}
       borderColor="$borderColor"
       $compact={{ width: "100%", flex: 1 }}
+      nestedScrollEnabled
     >
       <Stack gap="$lg" padding="$lg">
         <Row justifyContent="space-between">
@@ -757,6 +758,8 @@ export function InspectorApp({
             minHeight={0}
             onScroll={handleTimelineScroll}
             scrollEventThrottle={16}
+            // Android scrolls a scroller inside the page's only with this.
+            nestedScrollEnabled
             ref={timelineRef}
           >
             {hiddenRowCount > 0 && (

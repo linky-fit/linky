@@ -188,6 +188,7 @@ export type { VideoEmbedProps } from "./video-embed";
 export type { SandboxedHtmlProps } from "./sandboxed-html";
 export type { CameraPreviewProps } from "./camera-preview";
 export { LogScroll, PageScroll } from "./page-scroll";
+export { usePageScrollHeight } from "./page-scroll-frame";
 export type { LogScrollProps, PageScrollProps } from "./page-scroll";
 export { SafeAreaPad } from "./safe-area";
 export type { SafeAreaPadProps } from "./safe-area";

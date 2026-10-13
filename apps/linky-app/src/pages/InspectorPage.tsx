@@ -1,4 +1,4 @@
-import { Dialog, Stack } from "@linky-fit/ui";
+import { Dialog, Stack, usePageScrollHeight } from "@linky-fit/ui";
 import React from "react";
 
 import { clientInspectorStore } from "../devtools/inspector/clientInspectorStore";
@@ -9,6 +9,7 @@ import { createInMemoryInspectorDataSource } from "../devtools/inspectorPage/ins
 export default function InspectorPage(): React.ReactElement {
   const [isFullscreen, setIsFullscreen] = React.useState(false);
   const isCollecting = useInspectorEnabled();
+  const pageHeight = usePageScrollHeight();
   const dataSource = React.useMemo(
     () => createInMemoryInspectorDataSource(clientInspectorStore),
     [],
@@ -36,7 +37,7 @@ export default function InspectorPage(): React.ReactElement {
     <Stack
       width="100%"
       minHeight={0}
-      height="100%"
+      height={pageHeight ?? "100%"}
       borderRadius="$control"
       overflow="hidden"
     >
