@@ -49,6 +49,8 @@ import type * as webQrCamera from "@linky-fit/linky-app/src/platform/QrCamera";
 import * as nativeQrCamera from "@linky-fit/linky-app/src/platform/QrCamera.native";
 import type * as webTextShare from "@linky-fit/linky-app/src/platform/textShare";
 import * as nativeTextShare from "@linky-fit/linky-app/src/platform/textShare.native";
+import type * as webRecurringReminderNotes from "@linky-fit/linky-app/src/utils/recurringReminderNotes";
+import * as nativeRecurringReminderNotes from "@linky-fit/linky-app/src/utils/recurringReminderNotes.native";
 import type * as webImage from "@linky-fit/linky-app/src/utils/image";
 import * as nativeImage from "@linky-fit/linky-app/src/utils/image.native";
 import type * as webPickFile from "@linky-fit/linky-app/src/utils/pickFile";
@@ -129,3 +131,5 @@ export const videoEmbed: typeof webVideoEmbed = nativeVideoEmbed;
 export const keryxHtml: typeof webKeryxHtml = nativeKeryxHtml;
 export const indexedDbInspectorLogStorage: typeof webIndexedDbInspectorLogStorage =
   nativeIndexedDbInspectorLogStorage;
+export const recurringReminderNotes: typeof webRecurringReminderNotes =
+  nativeRecurringReminderNotes;
