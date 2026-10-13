@@ -15,6 +15,7 @@ import {
   safeSessionStorageClear,
 } from "../utils/storage";
 import { getUnknownErrorMessage } from "../utils/unknown";
+import { clearCapacitorStores } from "./capacitorStores.native";
 import { secureStore } from "./secureStore.native";
 
 const LOGOUT_PENDING_STORAGE_KEY = "linky.logoutPending";
@@ -67,6 +68,10 @@ export const finishPendingLogout = async (): Promise<void> => {
   const removals = await Promise.allSettled(
     SECRET_KEYS.map((key) => secureStore.deleteItemAsync(key)),
   );
+  const capacitorStoresRemoved = await clearCapacitorStores().then(
+    () => true,
+    () => false,
+  );
   reportAppLog({
     tag: "auth.logoutWiped",
     summary: `Logout wiped ${deletedFiles} database files and the secure-store secrets`,
@@ -76,6 +81,7 @@ export const finishPendingLogout = async (): Promise<void> => {
       secretsNotRemoved: SECRET_KEYS.filter(
         (_, index) => removals[index]?.status === "rejected",
       ),
+      capacitorStoresRemoved,
     },
   });
   safeSessionStorageClear();

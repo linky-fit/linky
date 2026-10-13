@@ -283,13 +283,13 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "session.reinstallAwaitingHydration":
     "First launch of an Expo app install that found the account's secrets in the iOS Keychain, which outlives an uninstall. The account waits for its first sync like a restore, so the empty database never writes over the synced data.",
   "secrets.legacyMigrated":
-    "First launch of the Expo app over the Android Capacitor app: the identity secrets from its encrypted preferences were copied into the secure store, only into keys it didn't hold, each read back. copied, alreadyPresent (same value), kept (the secure store's own value won) and failed count keys; failed lists their names. Without failures the old store was deleted (clearFailure says why it couldn't be) and the account waits for its first sync. Values are never logged.",
+    "First launch of the Expo app over the Android Capacitor app. settings counts the device settings, relay lists and cashu state copied from the old WebView's localStorage (copied, kept: the native value won, invalid: its reader would reject it). The identity secrets came from source: the encrypted preferences, or the WebView's plaintext copy when those were missing or unreadable; copied, alreadyPresent, kept and failed count keys, failed lists their names. Without failures the old stores were deleted (clearFailure says why they couldn't be) and the account waits for its first sync. Values are never logged.",
   "secrets.legacyMigrationFailed":
-    "The Expo app found the Android Capacitor app's encrypted preferences but couldn't read them (cause), and the secure store holds no identity. The listed keys read as unreadable, so the app asks the user instead of onboarding; the next launch tries again.",
+    "The Expo app found what the Android Capacitor app left but couldn't read its secrets (cause), and the secure store holds no identity. Settings were still copied. The listed keys read as unreadable, so the app asks the user instead of onboarding; the old stores are kept and the next launch tries again.",
   "secrets.legacyMigrationAbandoned":
-    "The secure store already held an identity the Android Capacitor app's secrets don't match: they were unreadable, held no nsec, or belong to another identity (cause). Nothing was copied and the old store was deleted.",
+    "The secure store already held an identity the Android Capacitor app's secrets don't match (unreadable, no nsec, or another identity). No secret was copied and the old stores were deleted.",
   "auth.logoutWiped":
-    "On the Expo app, the boot after a logout deleted the Linky database files and the secure-store secrets, then cleared device storage. failure is why the database files could not be deleted; secretsNotRemoved lists keys the secure store kept.",
+    "On the Expo app, the boot after a logout deleted the Linky database files, the secure-store secrets and on Android what the Capacitor app left (capacitorStoresRemoved), then cleared device storage. failure is why the database files could not be deleted; secretsNotRemoved lists keys the secure store kept.",
   "evolu.serversChanged":
     "The user changed the Evolu server list. The payload records the saved configured and enabled servers, including an empty selection. A reload applies the new transports.",
   "evolu.linkyRelayMigrated":

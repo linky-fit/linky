@@ -83,7 +83,7 @@ export const NOSTR_SEARCH_RELAYS: ReadonlyArray<RelayUrl> =
 // the cache be recognized as a stale relay response.
 const RELAY_CACHE_KEY_PREFIX = "linky.nostr_relays.v1";
 
-const CachedRelayListsSchema = Schema.Struct({
+export const CachedRelayListsSchema = Schema.Struct({
   relayUrls: Schema.Array(Schema.String),
   relaysUpdatedAt: Schema.NullOr(Schema.Number),
   dmRelaysUpdatedAt: Schema.NullOr(Schema.Number),
