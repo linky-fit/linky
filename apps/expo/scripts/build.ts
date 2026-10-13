@@ -36,6 +36,8 @@ await $`expo export --platform web --clear ${process.argv.slice(2)}`
     EXPO_UNSTABLE_TREE_SHAKING: "1",
     EXPO_UNSTABLE_METRO_OPTIMIZE_GRAPH: "1",
     LINKY_EVOLU_WORKER_URL: evoluWorkerUrl,
+    // expo-constants embeds the app config, and the web app is the production one.
+    LINKY_APP_VARIANT: "production",
   });
 await cp(evoluWorker, join(dist, evoluWorkerUrl));
 await rm(workerDir, { recursive: true });

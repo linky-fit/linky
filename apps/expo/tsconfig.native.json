@@ -1,0 +1,10 @@
+{
+  "extends": "@linky-fit/config/tsconfig/app",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.native.tsbuildinfo",
+    "types": [],
+    "moduleSuffixes": [".native", ""],
+    "customConditions": ["react-native"]
+  },
+  "include": ["index.ts", "src/**/*.native.ts", "src/**/*.native.tsx"]
+}

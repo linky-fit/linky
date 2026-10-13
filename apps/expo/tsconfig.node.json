@@ -5,6 +5,8 @@
     "types": ["bun", "node"]
   },
   "include": [
+    "app.config.ts",
+    "plugins",
     "scripts",
     "server",
     "src/**/*.test.ts",

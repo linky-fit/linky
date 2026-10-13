@@ -16,17 +16,22 @@ process.env.EXPO_PUBLIC_APP_COMMIT_SHA = appCommitSha;
 
 const config = getDefaultConfig(__dirname);
 
-// apps/linky-app modules whose Vite implementation Metro replaces.
+// apps/linky-app modules whose Vite implementation Metro replaces. Targets are
+// resolved without an extension, so a `.native.tsx` sibling wins on native.
 const swappedModules = new Map([
   [
     path.join(webApp, "src/platform/buildEnv.ts"),
-    path.join(__dirname, "src/buildEnv.ts"),
+    path.join(__dirname, "src/buildEnv"),
   ],
   [
     path.join(webApp, "src/platform/navigation.ts"),
-    path.join(__dirname, "src/navigation.tsx"),
+    path.join(__dirname, "src/navigation"),
   ],
 ]);
+
+// hermesc rejects its import(<runtime path>), and Evolu never runs migrations from files.
+const kyselyFileMigrationProvider =
+  /\/kysely\/dist\/\w+\/migration\/file-migration-provider\.js$/;
 
 const emptyModules = new Set([
   // Metro does not emit CSS url() assets; index.html links /fonts/manrope.css.
@@ -51,9 +56,16 @@ const resolveWithJsFallback = (context, moduleName, platform) => {
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (emptyModules.has(moduleName)) return { type: "empty" };
   const resolution = resolveWithJsFallback(context, moduleName, platform);
-  const swapped =
-    resolution.type === "sourceFile" && swappedModules.get(resolution.filePath);
-  return swapped ? { type: "sourceFile", filePath: swapped } : resolution;
+  if (resolution.type !== "sourceFile") return resolution;
+  if (
+    platform !== "web" &&
+    kyselyFileMigrationProvider.test(resolution.filePath)
+  )
+    return { type: "empty" };
+  const swapped = swappedModules.get(resolution.filePath);
+  return swapped
+    ? context.resolveRequest(context, swapped, platform)
+    : resolution;
 };
 
 // Loaded on the first request: `expo export` starts this server too.

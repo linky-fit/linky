@@ -1,2 +1,5 @@
 .expo/
 public/
+/ios
+/android
+/dist-native

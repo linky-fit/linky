@@ -5,5 +5,10 @@
     "types": []
   },
   "include": ["app", "src", "../linky-app/src/vite-env.d.ts"],
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.native.ts",
+    "src/**/*.native.tsx",
+    "src/main.ts"
+  ]
 }

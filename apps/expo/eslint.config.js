@@ -3,7 +3,7 @@ import { defineConfig, globalIgnores } from "eslint/config";
 
 export default defineConfig([
   ...config,
-  globalIgnores([".expo", "public"]),
+  globalIgnores([".expo", "public", "android", "ios", "dist-native"]),
   {
     // Its exports mirror apps/linky-app/src/platform/navigation.ts.
     files: ["src/navigation.tsx"],
