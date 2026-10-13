@@ -1359,4 +1359,7 @@ export const en = {
   keryxMediaUnavailable:
     "The file didn't match what the company signed, so it wasn't opened.",
   keryxNotFound: "Not found",
+  pickSourceTitle: "Attach from",
+  pickSourcePhotos: "Photos",
+  pickSourceFiles: "Files",
 } satisfies Record<keyof typeof cs, string>;

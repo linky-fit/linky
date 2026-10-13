@@ -20,6 +20,7 @@ vi.mock("../app/lib/privateImageMessage", async (importOriginal) => {
 });
 
 vi.mock("../app/lib/pdfPreview", () => ({
+  canRenderPdfPages: true,
   renderPdfPages: vi.fn(async () => [
     { height: 400, url: "blob:page-1", width: 300 },
   ]),

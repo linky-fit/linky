@@ -1,5 +1,6 @@
 import { AttachmentTray } from "@linky-fit/ui";
 import { useEffect, useRef, type FC } from "react";
+import { blobUrl, revokeBlobUrl } from "../platform/files";
 
 interface ChatAttachmentPreviewProps {
   accessibilityLabel: string;
@@ -17,7 +18,7 @@ const previewUrlFor = (file: File): string | null => {
   if (!file.type.startsWith("image/")) return null;
   const cached = previewUrls.get(file);
   if (cached) return cached;
-  const url = URL.createObjectURL(file);
+  const url = blobUrl(file);
   previewUrls.set(file, url);
   return url;
 };
@@ -29,7 +30,7 @@ const useRevokeRemovedPreviews = (files: readonly File[]) => {
     for (const file of previous.current) {
       if (files.includes(file)) continue;
       const url = previewUrls.get(file);
-      if (url) URL.revokeObjectURL(url);
+      if (url) revokeBlobUrl(url);
       previewUrls.delete(file);
     }
     previous.current = files;

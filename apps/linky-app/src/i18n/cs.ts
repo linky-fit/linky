@@ -1366,4 +1366,7 @@ export const cs = {
   keryxMediaUnavailable:
     "Soubor neodpovídá tomu, co firma podepsala, proto nebyl otevřen.",
   keryxNotFound: "Nenalezeno",
+  pickSourceTitle: "Přiložit z",
+  pickSourcePhotos: "Fotky",
+  pickSourceFiles: "Soubory",
 } as const;

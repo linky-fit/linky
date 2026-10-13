@@ -35,6 +35,7 @@ import {
   openSpdPaymentInBank,
   shareSpdPaymentQrJpeg,
 } from "../utils/spdPayment";
+import { blobUrl, revokeBlobUrl } from "../platform/files";
 import {
   getChatAttachmentRejection,
   parsePrivateImageMessage,
@@ -306,7 +307,7 @@ export const BankPaymentOfferDetailPage: React.FC<
   React.useEffect(
     () => () => {
       if (pendingConfirmation?.imageUrl) {
-        URL.revokeObjectURL(pendingConfirmation.imageUrl);
+        revokeBlobUrl(pendingConfirmation.imageUrl);
       }
     },
     [pendingConfirmation],
@@ -611,9 +612,7 @@ export const BankPaymentOfferDetailPage: React.FC<
       setErrorText(null);
       setPendingConfirmation({
         fileName: file.name,
-        imageUrl: file.type.startsWith("image/")
-          ? URL.createObjectURL(file)
-          : null,
+        imageUrl: file.type.startsWith("image/") ? blobUrl(file) : null,
       });
       setIsAttachingConfirmation(true);
       try {

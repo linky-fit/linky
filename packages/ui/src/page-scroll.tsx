@@ -1,6 +1,11 @@
-import { useMemo, useRef, useState } from "react";
-import { Animated, type View } from "react-native";
-import type { GetProps } from "tamagui";
+import { useMemo, useRef, useState, type Ref } from "react";
+import {
+  Animated,
+  type ScrollView as ScrollViewRef,
+  type View,
+} from "react-native";
+import type { GetProps, TamaguiElement } from "tamagui";
+import { ScrollView } from "tamagui";
 import { Stack } from "./layout";
 import { PageScrollFrameContext } from "./page-scroll-frame";
 
@@ -32,5 +37,37 @@ export function PageScroll({ testID, ...props }: PageScrollProps) {
         <Stack ref={content} flexGrow={1} {...props} />
       </PageScrollFrameContext>
     </Animated.ScrollView>
+  );
+}
+
+export type LogScrollProps = PageScrollProps & {
+  ref?: Ref<TamaguiElement> | undefined;
+};
+
+const END_SLACK_PX = 48;
+
+/** A stack that fills its parent and scrolls vertically, following new content at its end while scrolled there, e.g. a chat log. */
+export function LogScroll({ testID, ref, ...props }: LogScrollProps) {
+  const scrollRef = useRef<ScrollViewRef>(null);
+  const atEnd = useRef(true);
+  return (
+    <ScrollView
+      ref={scrollRef}
+      testID={testID}
+      flex={1}
+      keyboardShouldPersistTaps="handled"
+      scrollEventThrottle={64}
+      onScroll={({ nativeEvent }) => {
+        const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
+        atEnd.current =
+          contentOffset.y + layoutMeasurement.height >=
+          contentSize.height - END_SLACK_PX;
+      }}
+      onContentSizeChange={() => {
+        if (atEnd.current) scrollRef.current?.scrollToEnd({ animated: false });
+      }}
+    >
+      <Stack ref={ref} {...props} />
+    </ScrollView>
   );
 }

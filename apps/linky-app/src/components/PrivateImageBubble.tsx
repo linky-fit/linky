@@ -14,6 +14,7 @@ import {
   sharePrivateImageBlob,
 } from "../app/lib/privateImageFile";
 import { isCancelledShareError } from "../platform/fileExport";
+import { blobUrl, revokeBlobUrl } from "../platform/files";
 import {
   decryptPrivateImageMessage,
   type PrivateImageMessagePayload,
@@ -85,7 +86,7 @@ export function PrivateImageBubble({
     void decryptPrivateImageMessage(payload)
       .then((blob) => {
         if (cancelled) return;
-        objectUrl = URL.createObjectURL(blob);
+        objectUrl = blobUrl(blob);
         setImageBlob(blob);
         onBlobChangeRef.current(blob);
         setImageUrl(objectUrl);
@@ -96,7 +97,7 @@ export function PrivateImageBubble({
 
     return () => {
       cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      if (objectUrl) revokeBlobUrl(objectUrl);
     };
   }, [payload, shouldLoad, onBlobChangeRef]);
 
@@ -197,21 +198,27 @@ export function PrivateImageBubble({
           alignItems="center"
           justifyContent="center"
         >
-          <Image
-            src={imageUrl}
-            aria-label={t("chatImageMessage")}
+          {/* The native animation driver animates views, not images. */}
+          <Stack
             width="100%"
             height="100%"
             maxWidth="$contentWidth"
-            objectFit="contain"
-            draggable={false}
-            userSelect="none"
             x={zoom.transform.x}
             y={zoom.transform.y}
             scale={zoom.transform.scale}
             transition={zoom.isGesturing ? null : "fast"}
             onClick={(event: React.MouseEvent) => event.stopPropagation()}
-          />
+          >
+            <Image
+              src={imageUrl}
+              aria-label={t("chatImageMessage")}
+              width="100%"
+              height="100%"
+              objectFit="contain"
+              draggable={false}
+              userSelect="none"
+            />
+          </Stack>
         </Stack>
       </AttachmentViewer>
     </>

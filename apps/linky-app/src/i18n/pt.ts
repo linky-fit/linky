@@ -1379,4 +1379,7 @@ export const pt = {
   keryxMediaUnavailable:
     "O arquivo não corresponde ao que a empresa assinou, por isso não foi aberto.",
   keryxNotFound: "Não encontrado",
+  pickSourceTitle: "Anexar de",
+  pickSourcePhotos: "Fotos",
+  pickSourceFiles: "Arquivos",
 } satisfies Record<keyof typeof cs, string>;

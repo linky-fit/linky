@@ -1,6 +1,8 @@
 // pdf.js needs canvas and a module worker, and hermesc rejects its import(<url>);
 // native shows PDFs through the share sheet until P8.
 
+export const canRenderPdfPages = false;
+
 export interface RenderedPdfPage {
   height: number;
   url: string;

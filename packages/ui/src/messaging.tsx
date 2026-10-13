@@ -318,7 +318,7 @@ export function FileAttachment({
       <View padding="$sm" borderRadius="$sm" backgroundColor="$accentSoft">
         <Icon name={icon} color="$accentText" />
       </View>
-      <Stack flex={1} gap="$xxs">
+      <Stack flexShrink={1} minWidth={0} gap="$xxs">
         <Text variant="label" numberOfLines={1}>
           {name}
         </Text>

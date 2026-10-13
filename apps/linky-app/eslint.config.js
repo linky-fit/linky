@@ -128,7 +128,6 @@ export const platformSeamRatchet = [
   "src/app/lib/messageEditorDom.ts",
   "src/app/lib/pdfPreview.ts",
   "src/app/lib/privateImageFile.ts",
-  "src/app/lib/privateImageMessage.ts",
   "src/app/lib/pwaNotifications.ts",
   "src/components/ChatMessage.tsx",
   "src/components/ChatMessageEditor.tsx",

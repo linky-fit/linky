@@ -44,6 +44,15 @@ export const layout: Section = {
         </UI.PageScroll>
       </UI.Stack>
     ),
+    LogScroll: () => (
+      <UI.Stack height={160}>
+        <UI.LogScroll>
+          {Array.from({ length: 12 }, (_, index) => (
+            <UI.Text key={index}>Log line {index + 1}</UI.Text>
+          ))}
+        </UI.LogScroll>
+      </UI.Stack>
+    ),
     SafeAreaPad: () => (
       <UI.SafeAreaPad edge="top" backgroundColor="$surface">
         <UI.Text>Padded below the top device inset</UI.Text>

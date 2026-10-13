@@ -4,6 +4,9 @@ export interface RenderedPdfPage {
   width: number;
 }
 
+/** Whether this platform rasterizes PDF pages; without it a PDF opens in the share sheet. */
+export const canRenderPdfPages: boolean = true;
+
 const PREVIEW_MAX_PAGES = 30;
 // Page geometry is peer-controlled; a page never rasterizes to more than
 // this many device pixels (≈ 4 MP, 16 MB of RGBA).

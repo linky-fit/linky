@@ -10,6 +10,7 @@ import { useDivRef } from "../hooks/useDivRef";
 import { useLatest } from "../hooks/useLatest";
 import React from "react";
 import {
+  canRenderPdfPages,
   renderPdfPages,
   revokePdfPages,
   type RenderedPdfPage,
@@ -145,7 +146,8 @@ export function PrivateFileBubble({
 
   const openViewer = () => {
     setViewerErrorText(null);
-    setViewerOpen(true);
+    if (canRenderPdfPages) setViewerOpen(true);
+    else void shareFile();
   };
 
   const closeViewer = () => {

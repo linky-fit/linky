@@ -7,6 +7,7 @@ import {
   EmptyState,
   IconButton,
   ListRow,
+  LogScroll,
   MessageComposerFrame,
   NearbyBanner,
   Notice,
@@ -646,13 +647,10 @@ const ChatMessageList = memo(function ChatMessageList({
   ]);
 
   return (
-    <Stack
+    <LogScroll
       ref={messagesNodeRef}
       role="log"
       aria-live="polite"
-      flex={1}
-      minHeight={0}
-      overflowY="auto"
       paddingHorizontal="$xl"
     >
       <Stack
@@ -723,7 +721,7 @@ const ChatMessageList = memo(function ChatMessageList({
           ))
         )}
       </Stack>
-    </Stack>
+    </LogScroll>
   );
 });
 

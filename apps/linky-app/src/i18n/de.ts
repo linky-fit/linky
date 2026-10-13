@@ -1377,4 +1377,7 @@ export const de = {
   keryxMediaUnavailable:
     "Die Datei stimmt nicht mit dem überein, was die Firma signiert hat, und wurde nicht geöffnet.",
   keryxNotFound: "Nicht gefunden",
+  pickSourceTitle: "Anhängen aus",
+  pickSourcePhotos: "Fotos",
+  pickSourceFiles: "Dateien",
 } satisfies Record<keyof typeof cs, string>;
