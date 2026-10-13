@@ -401,6 +401,13 @@ export const pt = {
   evoluSyncedOwners: "Donos sincronizados",
   migratingDataTitle: "Migrando dados",
   migratingDataBody: "Isso leva um momento. Mantenha o aplicativo aberto.",
+  hydrationTitle: "Baixando seus dados",
+  hydrationBody:
+    "Seus contatos, mensagens e carteira estão chegando do relay Evolu. Mantenha o aplicativo aberto.",
+  hydrationSlowBody:
+    "Isso está demorando. O relay Evolu pode estar inacessível; verifique seus relays Evolu.",
+  hydrationProgress: "{synced} de {total} partes sincronizadas",
+  hydrationOpenRelaySettings: "Relays Evolu",
   secretsUnavailableTitle: "Não foi possível ler suas chaves",
   secretsUnavailableBody:
     "O Linky não conseguiu ler suas chaves do armazenamento seguro deste aparelho, então manteve sua conta fechada para proteger seus dados. Tente de novo ou continue e entre com as palavras do seu backup.",

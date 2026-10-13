@@ -402,6 +402,13 @@ export const de = {
   evoluSyncedOwners: "Synchronisierte Eigentümer",
   migratingDataTitle: "Daten werden migriert",
   migratingDataBody: "Das dauert einen Moment. Lass die App geöffnet.",
+  hydrationTitle: "Deine Daten werden geladen",
+  hydrationBody:
+    "Deine Kontakte, Nachrichten und dein Wallet kommen vom Evolu-Relay. Lass die App geöffnet.",
+  hydrationSlowBody:
+    "Das dauert lange. Das Evolu-Relay ist vielleicht nicht erreichbar; prüfe deine Evolu-Relays.",
+  hydrationProgress: "{synced} von {total} Teilen synchronisiert",
+  hydrationOpenRelaySettings: "Evolu-Relays",
   secretsUnavailableTitle: "Schlüssel konnten nicht gelesen werden",
   secretsUnavailableBody:
     "Linky konnte deine Schlüssel nicht aus dem sicheren Speicher dieses Geräts lesen und hat dein Konto deshalb geschlossen gelassen, damit deine Daten sicher bleiben. Versuch es erneut oder fahre fort und melde dich mit deinen Sicherungswörtern an.",

@@ -19,7 +19,12 @@ export const testPlatformPorts = (
   secrets: {
     read: (): Promise<SecretRead> => Promise.resolve({ _tag: "Missing" }),
   },
-  config: { evoluRelayDefaults: [], isE2e: false, isDev: false },
+  config: {
+    evoluRelayDefaults: [],
+    isE2e: false,
+    isDev: false,
+    blockOnFirstHydration: false,
+  },
   lifecycle: {
     reload: () => {},
     deferUpdateWhile: () => {},

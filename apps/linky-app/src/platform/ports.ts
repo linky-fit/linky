@@ -23,6 +23,8 @@ export interface AppConfig {
   readonly isE2e: boolean;
   /** A development build, which may talk to local services over plain http. */
   readonly isDev: boolean;
+  /** A restored account waits on a full-screen hydration screen instead of opening the shell empty. */
+  readonly blockOnFirstHydration: boolean;
 }
 
 export interface LifecyclePort {

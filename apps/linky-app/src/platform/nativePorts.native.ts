@@ -15,6 +15,7 @@ export const makeNativePlatformPorts = (): PlatformPorts => ({
     evoluRelayDefaults: parseEvoluRelayUrls(envEvoluServerUrls),
     isE2e: false,
     isDev: isDevBuild,
+    blockOnFirstHydration: true,
   },
   lifecycle: {
     reload: reloadApp,

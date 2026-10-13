@@ -37,6 +37,7 @@ export const makeWebPlatformPorts = (): PlatformPorts => ({
     evoluRelayDefaults: parseEvoluRelayUrls(envEvoluServerUrls),
     isE2e: isE2eBuild,
     isDev: isDevBuild,
+    blockOnFirstHydration: false,
   },
   lifecycle: {
     reload: reloadApp,

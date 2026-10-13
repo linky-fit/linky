@@ -268,6 +268,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "At boot the native secure storage failed and localStorage holds no identity, so the app asks the user to retry or restore from backup words, without touching the stored account. The payload names the keys that failed.",
   "session.appMnemonicUnreadable":
     "At boot the nsec was read but the app mnemonic was not, and the device's marker says it holds one (present) or never recorded it (unknown). Opening the database without it would open the empty anonymous one, so nothing opens, the wallet stays off, and the app asks the user to retry or restore from backup words. An absent marker (an nsec-only account) signs in instead. The payload names the keys that failed, never the values.",
+  "session.hydrationScreenLeft":
+    "On iOS and Android, a restored account waits on a full-screen hydration screen until its data has arrived from an Evolu relay. After 30 seconds the screen offers the Evolu relay settings; this row means the user took it, and the app opened without the account's data while writes stay held until hydration. The payload counts the owners synced so far.",
   "session.secretsUnavailableDecided":
     "On the screen shown after the keys could not be read, the user chose retry (the page reloads and reads the secure store again) or continue (the restore-from-backup-words step only; creating an account is not offered, since it could overwrite keys still in secure storage).",
   "secrets.nativeWriteRolledBack":

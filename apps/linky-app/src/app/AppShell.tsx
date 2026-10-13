@@ -5,12 +5,14 @@ import { AuthenticatedLayout } from "../components/AuthenticatedLayout";
 import { CashuContactSendBanner } from "../components/CashuContactSendBanner";
 import { InstallPwaBanner } from "../components/InstallPwaBanner";
 import { PwaUpdateBanner } from "../components/PwaUpdateBanner";
+import { HydrationScreen } from "../components/HydrationScreen";
 import { MigratingDataScreen } from "../components/MigratingDataScreen";
 import { SecretsUnavailableScreen } from "../components/SecretsUnavailableScreen";
 import { ToastNotifications } from "../components/ToastNotifications";
 import { UnauthenticatedLayout } from "../components/UnauthenticatedLayout";
 import { reportAppLog } from "../devtools/inspector/appLog";
 import { usePersistentInspectorLogStartup } from "../devtools/inspector/usePersistentInspectorLogStartup";
+import { navigateTo } from "../hooks/useRouting";
 import { useToasts } from "../hooks/useToasts";
 import { useDisplayAmounts, useTranslation } from "./hooks/shell";
 import { useTokenContactSend } from "./hooks/wallet/useWalletTokens";
@@ -18,6 +20,7 @@ import { BeaconController } from "./BeaconController";
 import { useLaneToShardMigration } from "./migrations/useLaneToShardMigration";
 import { AppRouteContent } from "./routes/AppRouteContent";
 import { platformAtom } from "./state/platform";
+import { hydrationAtom } from "./state/session/hydration";
 import { sessionAtom } from "./state/session/session";
 import { useAppShellComposition } from "./useAppShellComposition";
 import { useUnauthenticatedAppShellComposition } from "./useUnauthenticatedAppShellComposition";
@@ -170,6 +173,32 @@ const UnauthenticatedAppShell = ({
   );
 };
 
+/** Holds the shell behind the hydration screen while a restored account's data arrives, or until the user leaves for the relay settings. */
+const FirstHydrationGate = ({ children }: { children: React.ReactNode }) => {
+  const hydration = useAtomValue(hydrationAtom);
+  const [released, setReleased] = React.useState(false);
+  const { t } = useTranslation();
+  if (released || hydration._tag === "Hydrated") return children;
+  return (
+    <AppFrame>
+      <HydrationScreen
+        synced={hydration.synced}
+        total={hydration.total}
+        onOpenRelaySettings={() => {
+          reportAppLog({
+            tag: "session.hydrationScreenLeft",
+            summary: `Left the hydration screen for the Evolu relays with ${hydration.synced} owners synced`,
+            payload: { synced: hydration.synced, total: hydration.total },
+          });
+          setReleased(true);
+          navigateTo({ route: "evoluServers" });
+        }}
+        t={t}
+      />
+    </AppFrame>
+  );
+};
+
 /** Holds the authenticated shell back until the one-time lane migration ran. */
 const MigratedAppShell = (props: AuthenticatedAppShellProps) => {
   const migrating = useLaneToShardMigration();
@@ -210,6 +239,7 @@ const SecretsUnavailableAppShell = ({
 
 const AppShell = () => {
   const session = useAtomValue(sessionAtom);
+  const { config } = useAtomValue(platformAtom);
   const [restoring, setRestoring] = React.useState(false);
   usePersistentInspectorLogStartup();
 
@@ -220,7 +250,13 @@ const AppShell = () => {
       <SecretsUnavailableAppShell onContinue={() => setRestoring(true)} />
     );
   if (session._tag !== "SignedIn") return <UnauthenticatedAppShell />;
-  return <MigratedAppShell currentNsec={session.secrets.nsec} />;
+  const shell = <MigratedAppShell currentNsec={session.secrets.nsec} />;
+  // Outside the shell, which suspends until the store opens, so the screen shows before the shards sync.
+  return config.blockOnFirstHydration ? (
+    <FirstHydrationGate>{shell}</FirstHydrationGate>
+  ) : (
+    shell
+  );
 };
 
 export default AppShell;

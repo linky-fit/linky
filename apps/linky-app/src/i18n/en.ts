@@ -390,6 +390,13 @@ export const en = {
   evoluSyncedOwners: "Synced owners",
   migratingDataTitle: "Migrating data",
   migratingDataBody: "This takes a moment. Keep the app open.",
+  hydrationTitle: "Downloading your data",
+  hydrationBody:
+    "Your contacts, messages and wallet are arriving from the Evolu relay. Keep the app open.",
+  hydrationSlowBody:
+    "This is taking long. The Evolu relay may be unreachable; check your Evolu relays.",
+  hydrationProgress: "{synced} of {total} parts synced",
+  hydrationOpenRelaySettings: "Evolu relays",
   secretsUnavailableTitle: "Couldn't read your keys",
   secretsUnavailableBody:
     "Linky couldn't read your keys from this device's secure storage, so it kept your account closed to keep your data safe. Try again, or continue and log in with your backup words.",
