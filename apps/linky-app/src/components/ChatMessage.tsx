@@ -61,6 +61,7 @@ import type {
   ChatReactionChip,
   LocalNostrMessage,
 } from "../app/types/appTypes";
+import { asDivElement } from "../utils/domNodes";
 import type { MintIcon } from "../utils/mint";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 import { CashuTokenPill } from "./CashuTokenPill";
@@ -614,7 +615,8 @@ function ChatMessageComponent({
     if (isDeleted) return;
     // Close the keyboard while the action sheet is up; remember the field so
     // closeMenu can bring the keyboard back.
-    const active = document.activeElement;
+    const active =
+      typeof document === "undefined" ? null : document.activeElement;
     if (
       active instanceof HTMLElement &&
       (active instanceof HTMLInputElement ||
@@ -747,7 +749,7 @@ function ChatMessageComponent({
   };
 
   const setMessageNode = (node: unknown) => {
-    const element = node instanceof HTMLDivElement ? node : null;
+    const element = asDivElement(node);
     messageDivRef.current = element;
     if (messageElRef && messageId) messageElRef(element, messageId);
   };

@@ -14,9 +14,8 @@ import {
   consumePendingNativeDeepLinkUrl,
   consumePendingNativeNotificationOpenDetail,
   consumePendingNativeNotificationRoute,
-  NATIVE_DEEP_LINK_EVENT,
-  NATIVE_NOTIFICATION_OPEN_EVENT,
-  NATIVE_PUSH_ACTION_EVENT,
+  onNativeDeepLinkUrl,
+  onNativeNotificationOpen,
 } from "../../../platform/nativeBridge";
 import { readClipboardText } from "../../../platform/clipboard";
 import { pickFile } from "../../../utils/pickFile";
@@ -342,22 +341,7 @@ export const useScanNativeComposition = ({
     acceptDeepLinkUrl(consumePendingNativeDeepLinkUrl());
     void consumePendingIosNativeDeepLinkUrl().then(acceptDeepLinkUrl);
 
-    const onDeepLink: EventListener = (event) => {
-      if (!(event instanceof CustomEvent)) {
-        return;
-      }
-
-      const detail = event.detail;
-      if (typeof detail !== "object" || detail === null) {
-        return;
-      }
-
-      const url: unknown = Reflect.get(detail, "url");
-      if (typeof url === "string") acceptDeepLinkUrl(url);
-    };
-
-    window.addEventListener(NATIVE_DEEP_LINK_EVENT, onDeepLink);
-    return () => window.removeEventListener(NATIVE_DEEP_LINK_EVENT, onDeepLink);
+    return onNativeDeepLinkUrl(acceptDeepLinkUrl);
   }, [updatePendingDeepLinkText]);
 
   React.useEffect(() => {
@@ -404,21 +388,8 @@ export const useScanNativeComposition = ({
       }
     }
 
-    const onNotificationOpen: EventListener = (event) => {
-      if (!(event instanceof CustomEvent)) {
-        return;
-      }
-
-      const detail = event.detail;
-      if (typeof detail !== "object" || detail === null) {
-        return;
-      }
-
-      openNotification(detail);
-    };
-
-    window.addEventListener(NATIVE_NOTIFICATION_OPEN_EVENT, onNotificationOpen);
-    window.addEventListener(NATIVE_PUSH_ACTION_EVENT, onNotificationOpen);
+    const unsubscribeNotificationOpens =
+      onNativeNotificationOpen(openNotification);
     const onServiceWorkerMessage = (event: MessageEvent) => {
       const data = event.data;
       if (typeof data !== "object" || data === null) {
@@ -446,12 +417,7 @@ export const useScanNativeComposition = ({
           onServiceWorkerMessage,
         );
       }
-
-      window.removeEventListener(
-        NATIVE_NOTIFICATION_OPEN_EVENT,
-        onNotificationOpen,
-      );
-      window.removeEventListener(NATIVE_PUSH_ACTION_EVENT, onNotificationOpen);
+      unsubscribeNotificationOpens();
     };
   }, [nostrBootstrapReady, openNotificationChat]);
 

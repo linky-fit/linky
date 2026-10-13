@@ -10,12 +10,15 @@ interface IdleRequestOptionsLike {
   timeout?: number;
 }
 
+// React Native's handle is an object, the browser's a number.
+type IdleHandle = unknown;
+
 type RequestIdleCallbackLike = (
   callback: (deadline: IdleDeadlineLike) => void,
   options?: IdleRequestOptionsLike,
-) => number;
+) => IdleHandle;
 
-type CancelIdleCallbackLike = (handle: number) => void;
+type CancelIdleCallbackLike = (handle: IdleHandle) => void;
 
 interface UseDeferredOnlineReadyOptions {
   delayMs?: number;
@@ -26,10 +29,8 @@ const getRequestIdleCallback = (): RequestIdleCallbackLike | null => {
   const candidate = Reflect.get(globalThis, "requestIdleCallback");
   if (typeof candidate !== "function") return null;
 
-  return (callback, options) => {
-    const result = Reflect.apply(candidate, globalThis, [callback, options]);
-    return typeof result === "number" ? result : 0;
-  };
+  return (callback, options): IdleHandle =>
+    Reflect.apply(candidate, globalThis, [callback, options]);
 };
 
 const getCancelIdleCallback = (): CancelIdleCallbackLike | null => {
@@ -53,7 +54,7 @@ export const useDeferredOnlineReady = (
   React.useEffect(() => {
     let cancelled = false;
     let timeoutId: number | null = null;
-    let idleId: number | null = null;
+    let idleId: IdleHandle = null;
 
     const markReady = () => {
       if (cancelled) return;

@@ -1,6 +1,7 @@
 import type { Pubkey } from "@linky-fit/linkstr";
 import type { ContactId } from "@linky-fit/linksync";
 import { reportAppLog } from "../../devtools/inspector/appLog";
+import { onAppResume } from "../../platform/appEvents";
 import {
   getNativeBeaconPermissionState,
   onNativeBeaconIdentities,
@@ -395,8 +396,7 @@ if (typeof window !== "undefined") {
   onNativeBeaconOpenConversation((pubkey) =>
     update({ pendingOpen: { pubkey, atMs: Date.now() } }),
   );
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState !== "visible") return;
+  onAppResume(() => {
     refreshBeaconPermission();
     reconcileNative();
   });

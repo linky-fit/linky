@@ -928,8 +928,11 @@ export const ChatComposer = memo(function ChatComposer({
         if (files.length > 0 && canAttach) addChatAttachments(files);
       });
   };
-  // Keeps the editor focused, and the iOS keyboard open, while tapping composer controls.
-  const keepEditorFocus = (event: React.PointerEvent) => event.preventDefault();
+  // Keeps the editor focused, and the iOS keyboard open, while tapping composer
+  // controls. React Native's pointer events have no preventDefault.
+  const keepEditorFocus = (event: React.PointerEvent) => {
+    if (typeof event.preventDefault === "function") event.preventDefault();
+  };
   const showSend = hasDraftText || chatAttachments.length > 0;
 
   return (

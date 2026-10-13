@@ -584,7 +584,7 @@ const bootstrap = async () => {
       import("./boot/bootSession.ts"),
       import("./platform/ports.web.ts"),
       import("./evolu.ts"),
-      import("./platform/hashLinks.ts"),
+      import("./platform/hashLinks"),
     ]);
     console.log("[linky][boot] app modules loaded");
     captureLaunchHashLink();
@@ -599,7 +599,7 @@ const bootstrap = async () => {
     });
     // The native beacon outlives the page, so a signed-out boot stops whatever an earlier page left running.
     if (session._tag === "SignedOut" && Capacitor.isNativePlatform())
-      await import("./platform/nativeBridge.ts").then(({ stopNativeBeacon }) =>
+      await import("./platform/nativeBridge").then(({ stopNativeBeacon }) =>
         stopNativeBeacon(),
       );
     if (isDevBuild || isE2eBuild) {

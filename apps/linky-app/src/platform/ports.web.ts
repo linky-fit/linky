@@ -2,6 +2,7 @@ import { deferPwaUpdateWhile } from "../utils/pwaUpdate";
 import { localStorageKv, safeLocalStorageGet } from "../utils/storage";
 import { getUnknownErrorMessage } from "../utils/unknown";
 import { asNonEmptyString } from "../utils/validation";
+import { parseEvoluRelayUrls } from "./evoluRelayUrls";
 import type { PlatformPorts, SecretRead } from "./ports";
 import { isNativePlatform } from "./runtime";
 import { readNativeSecret } from "./secretStorage";
@@ -28,12 +29,6 @@ const readSecret = async (key: string): Promise<SecretRead> => {
     };
   }
 };
-
-const parseEvoluRelayUrls = (value: string | undefined): string[] =>
-  (value ?? "")
-    .split(",")
-    .map((url) => url.trim())
-    .filter((url) => url.startsWith("ws://") || url.startsWith("wss://"));
 
 export const makeWebPlatformPorts = (): PlatformPorts => ({
   kv: localStorageKv,

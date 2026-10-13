@@ -48,7 +48,7 @@ import {
   connectionStatus,
   type ConnectionState,
 } from "../utils/connectionStatus";
-import { isDesktopShell, isNightlyOrigin } from "../platform/runtime";
+import { isNightlyOrigin } from "../platform/runtime";
 import { COLOR_MODE_PREFERENCE_LABEL_KEYS } from "../utils/colorMode";
 import { pickFile } from "../utils/pickFile";
 import { RECEIVE_METHOD_LABEL_KEYS } from "../utils/receiveMethod";
@@ -186,16 +186,15 @@ export function AdvancedPage(): React.ReactElement {
           navigateTo({ route: "settingsTutorial" }),
         )}
         {linkRow("MessageCircle", t("feedback"), openFeedbackContact)}
-        {/* Electron has no Web Push service; the running desktop app notifies. */}
-        {isDesktopShell()
-          ? null
-          : toggleRow(
+        {notifications.supported
+          ? toggleRow(
               "Bell",
               t("notifications"),
               notifications.enabled,
               (checked) => void notifications.setEnabled(checked),
               !currentNsec || notifications.isBusy,
-            )}
+            )
+          : null}
         {toggleRow(
           "CheckCheck",
           t("sendReadReceipts"),

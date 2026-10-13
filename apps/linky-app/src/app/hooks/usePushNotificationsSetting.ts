@@ -1,11 +1,13 @@
 import React from "react";
 import { getNativeNotificationPermissionState } from "../../platform/nativeBridge";
-import { isNativePlatform } from "../../platform/runtime";
+import { isDesktopShell, isNativePlatform } from "../../platform/runtime";
 import { useAtomValue } from "@linky-fit/linkstr-react";
 import { currentNsecAtom } from "../state/session/session";
 import { usePushToast, useTranslation } from "./shell";
 
 export interface PushNotificationsSetting {
+  /** False where the app cannot receive push notifications at all. */
+  supported: boolean;
   enabled: boolean;
   isBusy: boolean;
   /** Resolves with the resulting state; toasts explain a failed change. */
@@ -133,5 +135,6 @@ export const usePushNotificationsSetting = (): PushNotificationsSetting => {
     [currentNsec, enabled, pushToast, t],
   );
 
-  return { enabled, isBusy, setEnabled };
+  // Electron has no Web Push service; the running desktop app notifies.
+  return { supported: !isDesktopShell(), enabled, isBusy, setEnabled };
 };
