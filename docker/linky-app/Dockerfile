@@ -12,7 +12,7 @@
 
 ARG WEB_BUNDLER=vite
 
-FROM oven/bun:1.3.9-alpine AS deps
+FROM oven/bun:1.3.14-alpine AS deps
 WORKDIR /app
 
 # Manifests first so editing source does not bust the dependency layer.
