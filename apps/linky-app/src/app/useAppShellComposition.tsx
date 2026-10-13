@@ -18,6 +18,7 @@ import {
   useMainReturnTabWatcher,
 } from "./hooks/layout/useMainMenuState";
 import { useNativeBackHandler } from "./hooks/layout/useNativeBackHandler";
+import { useSecretsWriteFailure } from "./hooks/useSecretsWriteFailure";
 import { useChatMessageEffects } from "./hooks/messages/useChatMessageEffects";
 import { useDisplayCurrencyGuard } from "./hooks/settings/useDeviceSettings";
 import { useEvoluStorageWatchers } from "./hooks/settings/useEvoluStorageWatchers";
@@ -86,6 +87,7 @@ interface UseAppShellCompositionParams {
  * because the last sibling rendered is the one on top.
  */
 const useDismissTopModal = (): (() => void) | null => {
+  const secretsWriteFailure = useSecretsWriteFailure();
   const share = useShareOptions();
   const [profileShareOverlayIsOpen, setProfileShareOverlayIsOpen] = useAtom(
     profileShareOverlayOpenAtom,
@@ -111,6 +113,7 @@ const useDismissTopModal = (): (() => void) | null => {
     pendingCashuPaymentRequestAtom,
   );
 
+  if (secretsWriteFailure.cancel) return secretsWriteFailure.cancel;
   if (share.shareOptionsText) return share.closeShareOptions;
   if (profileShareOverlayIsOpen) {
     return () => setProfileShareOverlayIsOpen(false);

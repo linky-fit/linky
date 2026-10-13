@@ -8,6 +8,7 @@ import { PwaUpdateBanner } from "../components/PwaUpdateBanner";
 import { HydrationScreen } from "../components/HydrationScreen";
 import { MigratingDataScreen } from "../components/MigratingDataScreen";
 import { SecretsUnavailableScreen } from "../components/SecretsUnavailableScreen";
+import { SecretsWriteFailedScreen } from "../components/SecretsWriteFailedScreen";
 import { ToastNotifications } from "../components/ToastNotifications";
 import { UnauthenticatedLayout } from "../components/UnauthenticatedLayout";
 import { reportAppLog } from "../devtools/inspector/appLog";
@@ -15,6 +16,10 @@ import { usePersistentInspectorLogStartup } from "../devtools/inspector/usePersi
 import { navigateTo } from "../hooks/useRouting";
 import { useToasts } from "../hooks/useToasts";
 import { useDisplayAmounts, useTranslation } from "./hooks/shell";
+import {
+  reportSecretsWriteDecision,
+  useSecretsWriteFailure,
+} from "./hooks/useSecretsWriteFailure";
 import { useTokenContactSend } from "./hooks/wallet/useWalletTokens";
 import { BeaconController } from "./BeaconController";
 import { useLaneToShardMigration } from "./migrations/useLaneToShardMigration";
@@ -237,11 +242,28 @@ const SecretsUnavailableAppShell = ({
   );
 };
 
-const AppShell = () => {
+/** Covers either shell while new keys the secure store refused wait in memory; the shells' back handlers cancel it. */
+const SecretsWriteFailureLayer = () => {
+  const { failure, cancel } = useSecretsWriteFailure();
+  const { t } = useTranslation();
+  if (failure === null || cancel === null) return null;
+  return (
+    <SecretsWriteFailedScreen
+      backupWords={failure.backupWords}
+      onRetry={() => {
+        reportSecretsWriteDecision("retry");
+        return failure.retry();
+      }}
+      onCancel={cancel}
+      t={t}
+    />
+  );
+};
+
+const SessionShell = () => {
   const session = useAtomValue(sessionAtom);
   const { config } = useAtomValue(platformAtom);
   const [restoring, setRestoring] = React.useState(false);
-  usePersistentInspectorLogStartup();
 
   if (session._tag === "SecretsUnavailable")
     return restoring ? (
@@ -256,6 +278,16 @@ const AppShell = () => {
     <FirstHydrationGate>{shell}</FirstHydrationGate>
   ) : (
     shell
+  );
+};
+
+const AppShell = () => {
+  usePersistentInspectorLogStartup();
+  return (
+    <>
+      <SessionShell />
+      <SecretsWriteFailureLayer />
+    </>
   );
 };
 

@@ -12,15 +12,12 @@ import {
   setStoredPushNsec,
 } from "../utils/pushNsecStorage";
 import { forgetRecoveredMasterSecret } from "../utils/slip39Nostr";
-import { reportAppLog } from "../devtools/inspector/appLog";
 import { asNonEmptyString } from "../utils/validation";
 import { wipeLinkshuSeedBoundState } from "./linkshu/wipeLinkshuSeedBoundState";
-import { isNativePlatform } from "./runtime";
 import {
-  readNativeSecret,
   readStoredSecret,
-  removeNativeSecret,
   removeStoredSecret,
+  writeSecretSet,
   writeStoredSecret,
 } from "./secretStorage";
 import {
@@ -28,7 +25,11 @@ import {
   safeLocalStorageRemove,
   safeLocalStorageSet,
 } from "../utils/storage";
-import { writeAppMnemonicState } from "./appMnemonicState";
+import {
+  readAppMnemonicState,
+  writeAppMnemonicState,
+} from "./appMnemonicState";
+import { SecretsWriteFailed } from "./secureStoreSecrets";
 
 const PUSH_SECRET_MIRROR_TIMEOUT_MS = 1_500;
 
@@ -66,59 +67,6 @@ const wipeCashuStateIfMnemonicChanged = async (
   )?.trim();
   if (current === next) return; // unchanged
   await wipeLinkshuSeedBoundState(next);
-};
-
-const nativeHolds = async (key: string, value: string): Promise<boolean> => {
-  try {
-    return (await readNativeSecret(key)) === asNonEmptyString(value);
-  } catch {
-    return false;
-  }
-};
-
-const writeLocalSecret = (key: string, value: string): void => {
-  const normalized = asNonEmptyString(value);
-  if (normalized) safeLocalStorageSet(key, normalized);
-  else safeLocalStorageRemove(key);
-};
-
-/**
- * Writes the secrets as one set. Boot reads the native store first, so when
- * it misses any of them the set is removed from it and boot reads the
- * complete localStorage copy instead of a mix of old and new secrets.
- */
-const writeSecretSet = async (
-  secrets: Readonly<Record<string, string>>,
-): Promise<void> => {
-  const entries = Object.entries(secrets);
-  const writes = entries.map(([key, value]) => writeStoredSecret(key, value));
-  if (!isNativePlatform()) {
-    await Promise.all(writes);
-    return;
-  }
-  await Promise.allSettled(writes);
-  const held = await Promise.all(
-    entries.map(([key, value]) => nativeHolds(key, value)),
-  );
-  const missed = entries.filter((_, index) => !held[index]);
-  if (missed.length === 0) return;
-
-  // A native write that throws skips its localStorage write.
-  for (const [key, value] of entries) writeLocalSecret(key, value);
-  const removals = await Promise.allSettled(
-    entries.map(([key]) => removeNativeSecret(key)),
-  );
-  reportAppLog({
-    tag: "secrets.nativeWriteRolledBack",
-    summary: `Native secure storage missed ${missed.length} of ${entries.length} secrets; removed the set from it so boot reads localStorage`,
-    payload: {
-      keys: entries.map(([key]) => key),
-      missed: missed.map(([key]) => key),
-      notRemoved: entries
-        .filter((_, index) => removals[index].status === "rejected")
-        .map(([key]) => key),
-    },
-  });
 };
 
 interface PersistIdentitySecretsParams {
@@ -194,13 +142,21 @@ export const persistIdentitySecrets = async ({
 
   const hasAppMnemonic = asNonEmptyString(appMnemonic) !== null;
   // Raised before the write and lowered after it, so an interrupted write never reads as absent.
+  const previousState = readAppMnemonicState(localStorageKv);
   if (hasAppMnemonic) writeAppMnemonicState(localStorageKv, "present");
-  await writeSecretSet({
-    [NOSTR_NSEC_STORAGE_KEY]: nsec,
-    [NOSTR_SLIP39_SEED_STORAGE_KEY]: slip39Seed,
-    [CASHU_BIP85_MNEMONIC_STORAGE_KEY]: cashuMnemonic,
-    [INITIAL_MNEMONIC_STORAGE_KEY]: appMnemonic,
-  });
+  try {
+    await writeSecretSet({
+      [NOSTR_NSEC_STORAGE_KEY]: nsec,
+      [NOSTR_SLIP39_SEED_STORAGE_KEY]: slip39Seed,
+      [CASHU_BIP85_MNEMONIC_STORAGE_KEY]: cashuMnemonic,
+      [INITIAL_MNEMONIC_STORAGE_KEY]: appMnemonic,
+    });
+  } catch (error) {
+    // A refused set leaves the keys it would have replaced, so their marker stays too.
+    if (error instanceof SecretsWriteFailed)
+      writeAppMnemonicState(localStorageKv, previousState);
+    throw error;
+  }
   if (!hasAppMnemonic) writeAppMnemonicState(localStorageKv, "absent");
 
   persistNostrIdentitySourceMarkers(identitySource, switchedAtSec);

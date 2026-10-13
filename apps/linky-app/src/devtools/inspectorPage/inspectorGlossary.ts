@@ -74,6 +74,10 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "The app told the push service when to remind this identity of upcoming recurring payments (a minute after each due time still ahead), or failed to. It syncs again when a due time passes, which cancels that reminder because this running app sends the payment. The server stores only the times, never notes, amounts or recipients; the notes due at each time stay on the device.",
   "contacts.npubSaved":
     "A Nostr contact was saved after the duplicate check. The contact link identifies the new row; the insert itself runs in the background.",
+  "secrets.secureWriteRefused":
+    "On iOS or Android the secure store (Keychain, Keystore) refused some of a set of identity secrets. Their keys got back the values they held before, nothing was written anywhere else, and the app shows the couldn't-store-your-keys screen with Retry and the backup words. Keys only, never values.",
+  "session.secretsWriteDecided":
+    "The user answered the couldn't-store-your-keys screen: retry stores the keys again and reloads into them, cancel drops them from memory and goes back to where the switch started.",
   "navigation.incomingLink":
     "The iOS or Android app was opened with a link it takes: kind ScanText (a nostr:, cashu: or nostrconnect: link for the scanned-text handler), HashLink (a #add, #linkauth or #wallet?cashu= command link) or Route (a linky:// path). initial: the link launched the app. The link itself is never logged, as it may carry a token.",
   "contacts.sharedProfileOpened":

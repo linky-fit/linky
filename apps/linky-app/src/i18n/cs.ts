@@ -401,9 +401,16 @@ export const cs = {
   hydrationOpenRelaySettings: "Evolu relaye",
   secretsUnavailableTitle: "Klíče se nepodařilo načíst",
   secretsUnavailableBody:
-    "Klíče z bezpečného úložiště tohoto zařízení se nepodařilo načíst, proto váš účet zůstal zavřený, aby byla vaše data v bezpečí. Zkuste to znovu, nebo pokračujte a přihlaste se záložními slovy.",
+    "Klíče z bezpečného úložiště tohoto zařízení se nepodařilo načíst, proto váš účet zůstal zavřený, aby byla vaše data v bezpečí. Zkuste to znovu, nebo účet obnovte záložními slovy.",
   secretsUnavailableRetry: "Zkusit znovu",
-  secretsUnavailableContinue: "Pokračovat",
+  secretsUnavailableContinue: "Obnovit záložními slovy",
+  secretsWriteFailedTitle: "Klíče se nepodařilo bezpečně uložit",
+  secretsWriteFailedBody:
+    "Bezpečné úložiště tohoto zařízení vaše klíče odmítlo. Linky je nikdy neukládá nikam méně bezpečně, takže zatím uložené nejsou. Zkuste to znovu. Pokud to stále selhává, nejdřív si opište záložní slova: obnovíte jimi účet na tomto i jakémkoli jiném zařízení.",
+  secretsWriteFailedWords: "Vaše záložní slova",
+  secretsWriteFailedRetry: "Zkusit znovu",
+  secretsWriteFailedAgain:
+    "Stále se je nepodařilo uložit. Zkuste to za chvíli nebo zařízení restartujte.",
   evoluNoDataYet: "Tady zatím nejsou uložená žádná data.",
   evoluData: "Data",
   evoluStorage: "Úložiště",

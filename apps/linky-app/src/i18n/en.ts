@@ -399,9 +399,16 @@ export const en = {
   hydrationOpenRelaySettings: "Evolu relays",
   secretsUnavailableTitle: "Couldn't read your keys",
   secretsUnavailableBody:
-    "Linky couldn't read your keys from this device's secure storage, so it kept your account closed to keep your data safe. Try again, or continue and log in with your backup words.",
+    "Linky couldn't read your keys from this device's secure storage, so it kept your account closed to keep your data safe. Try again, or restore your account with your backup words.",
   secretsUnavailableRetry: "Try again",
-  secretsUnavailableContinue: "Continue",
+  secretsUnavailableContinue: "Restore with backup words",
+  secretsWriteFailedTitle: "Couldn't store your keys securely",
+  secretsWriteFailedBody:
+    "This device's secure storage refused your keys. Linky never keeps them anywhere less safe, so they aren't saved yet. Try again. If it keeps failing, write down your backup words first: they restore your account on this or any other device.",
+  secretsWriteFailedWords: "Your backup words",
+  secretsWriteFailedRetry: "Try again",
+  secretsWriteFailedAgain:
+    "Still couldn't store them. Try again in a moment or restart the device.",
   evoluNoDataYet: "No data stored here yet.",
   evoluData: "Data",
   evoluStorage: "Storage",

@@ -411,9 +411,16 @@ export const de = {
   hydrationOpenRelaySettings: "Evolu-Relays",
   secretsUnavailableTitle: "Schlüssel konnten nicht gelesen werden",
   secretsUnavailableBody:
-    "Linky konnte deine Schlüssel nicht aus dem sicheren Speicher dieses Geräts lesen und hat dein Konto deshalb geschlossen gelassen, damit deine Daten sicher bleiben. Versuch es erneut oder fahre fort und melde dich mit deinen Sicherungswörtern an.",
+    "Linky konnte deine Schlüssel nicht aus dem sicheren Speicher dieses Geräts lesen und hat dein Konto deshalb geschlossen gelassen, damit deine Daten sicher bleiben. Versuch es erneut oder stelle dein Konto mit deinen Sicherungswörtern wieder her.",
   secretsUnavailableRetry: "Erneut versuchen",
-  secretsUnavailableContinue: "Fortfahren",
+  secretsUnavailableContinue: "Mit Sicherungswörtern wiederherstellen",
+  secretsWriteFailedTitle: "Schlüssel konnten nicht sicher gespeichert werden",
+  secretsWriteFailedBody:
+    "Der sichere Speicher dieses Geräts hat deine Schlüssel abgelehnt. Linky legt sie nie an einem weniger sicheren Ort ab, deshalb sind sie noch nicht gespeichert. Versuch es erneut. Wenn es weiter fehlschlägt, schreib dir zuerst deine Sicherungswörter auf: Mit ihnen stellst du dein Konto auf diesem oder jedem anderen Gerät wieder her.",
+  secretsWriteFailedWords: "Deine Sicherungswörter",
+  secretsWriteFailedRetry: "Erneut versuchen",
+  secretsWriteFailedAgain:
+    "Sie konnten immer noch nicht gespeichert werden. Versuch es gleich noch einmal oder starte das Gerät neu.",
   evoluNoDataYet: "Hier sind noch keine Daten gespeichert.",
   evoluData: "Daten",
   evoluStorage: "Speicher",

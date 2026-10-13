@@ -38,6 +38,7 @@ import {
   SLIP39_WORD_COUNT,
 } from "../utils/slip39Input";
 import { useBackAction } from "../app/hooks/layout/useNativeBackHandler";
+import { useSecretsWriteFailure } from "../app/hooks/useSecretsWriteFailure";
 import { AvatarPhotoInput } from "./AvatarPhotoInput";
 import type { FilePickerHandle } from "../utils/pickFile";
 import { StickyTopBar } from "./StickyTopBar";
@@ -227,18 +228,20 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
     }
     setOnboardingStep(null);
   };
+  const secretsWriteFailure = useSecretsWriteFailure();
   useBackAction(
-    pickerMenuIsOpen
-      ? () => setPickerMenuIsOpen(false)
-      : selfieCaptureIsOpen
-        ? closeSelfieCapture
-        : onboardingIsBusy
-          ? null
-          : onboardingStep?.kind === "returning"
-            ? leaveReturnStep
-            : onboardingStep?.kind === "profile"
-              ? leaveProfileStage
-              : null,
+    secretsWriteFailure.cancel ??
+      (pickerMenuIsOpen
+        ? () => setPickerMenuIsOpen(false)
+        : selfieCaptureIsOpen
+          ? closeSelfieCapture
+          : onboardingIsBusy
+            ? null
+            : onboardingStep?.kind === "returning"
+              ? leaveReturnStep
+              : onboardingStep?.kind === "profile"
+                ? leaveProfileStage
+                : null),
   );
 
   React.useEffect(() => {

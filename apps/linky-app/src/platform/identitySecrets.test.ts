@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   isNativePlatform: vi.fn(() => false),
   reportAppLog: vi.fn(),
+  writeSecretSet: vi.fn(),
 }));
 
 vi.mock("./runtime", async (importOriginal) => ({
@@ -11,6 +12,11 @@ vi.mock("./runtime", async (importOriginal) => ({
   getPlatformTarget: () => (mocks.isNativePlatform() ? "android" : "web"),
   isNativePlatform: mocks.isNativePlatform,
 }));
+vi.mock("./secretStorage", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./secretStorage")>();
+  mocks.writeSecretSet.mockImplementation(actual.writeSecretSet);
+  return { ...actual, writeSecretSet: mocks.writeSecretSet };
+});
 vi.mock("../devtools/inspector/appLog", () => ({
   reportAppLog: mocks.reportAppLog,
 }));
@@ -33,6 +39,7 @@ import {
   persistSyncedActiveNostrIdentity,
 } from "./identitySecrets";
 import { makeWebPlatformPorts } from "./ports.web";
+import { SecretsWriteFailed } from "./secureStoreSecrets";
 import { loadSession } from "./session";
 
 const NSEC = "linky.nostr_nsec";
@@ -215,6 +222,27 @@ describe("the app mnemonic marker", () => {
 
     expect(localStorage.getItem(APP_MNEMONIC_STATE)).toBe("present");
   });
+
+  it.each([["absent"], [null]])(
+    "stays %s when the secure store refuses the identity",
+    async (before) => {
+      if (before === null) localStorage.removeItem(APP_MNEMONIC_STATE);
+      else localStorage.setItem(APP_MNEMONIC_STATE, before);
+      mocks.writeSecretSet.mockRejectedValueOnce(
+        new SecretsWriteFailed([NSEC]),
+      );
+
+      await expect(
+        persistIdentitySecrets({
+          ...identity("a"),
+          identitySource: "derived",
+          switchedAtSec: null,
+        }),
+      ).rejects.toBeInstanceOf(SecretsWriteFailed);
+
+      expect(localStorage.getItem(APP_MNEMONIC_STATE)).toBe(before);
+    },
+  );
 
   it("records the app mnemonic absent once the identity is cleared", async () => {
     await persist("a");

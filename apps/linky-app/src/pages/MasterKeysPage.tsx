@@ -1,10 +1,11 @@
-import { Button, EmptyState, Row, Stack, Text } from "@linky-fit/ui";
+import { Button, EmptyState, Stack } from "@linky-fit/ui";
 import React, { useCallback, useMemo, useState } from "react";
 import {
   useSeedBackup,
   useSeedMnemonic,
 } from "../app/hooks/settings/useIdentitySettings";
 import { usePushToast, useTranslation } from "../app/hooks/shell";
+import { SeedWordGrid } from "../components/SeedWordGrid";
 
 export function MasterKeysPage(): React.ReactElement {
   const { copySeed, saveSeedToPasswordManager } = useSeedBackup();
@@ -47,31 +48,7 @@ export function MasterKeysPage(): React.ReactElement {
   return (
     <Stack gap="$lg">
       {hasSeedMnemonic ? (
-        <Row flexWrap="wrap" gap="$sm" aria-live="polite">
-          {seedWords.map((word, index) => (
-            <Row
-              key={index}
-              flexBasis="40%"
-              flexGrow={1}
-              paddingHorizontal="$md"
-              paddingVertical="$sm"
-              borderRadius="$control"
-              backgroundColor="$neutralSoft"
-              gap="$sm"
-            >
-              <Text variant="caption" color="$colorMuted">
-                {index + 1}
-              </Text>
-              <Text
-                mono
-                variant="label"
-                color={isVisible ? "$colorStrong" : "$colorMuted"}
-              >
-                {isVisible ? word : "****"}
-              </Text>
-            </Row>
-          ))}
-        </Row>
+        <SeedWordGrid words={seedWords} visible={isVisible} />
       ) : (
         <EmptyState title={t("seedMissing")} />
       )}

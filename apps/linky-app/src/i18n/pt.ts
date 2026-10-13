@@ -410,9 +410,16 @@ export const pt = {
   hydrationOpenRelaySettings: "Relays Evolu",
   secretsUnavailableTitle: "Não foi possível ler suas chaves",
   secretsUnavailableBody:
-    "O Linky não conseguiu ler suas chaves do armazenamento seguro deste aparelho, então manteve sua conta fechada para proteger seus dados. Tente de novo ou continue e entre com as palavras do seu backup.",
+    "O Linky não conseguiu ler suas chaves do armazenamento seguro deste aparelho, então manteve sua conta fechada para proteger seus dados. Tente de novo ou restaure sua conta com as palavras do seu backup.",
   secretsUnavailableRetry: "Tentar de novo",
-  secretsUnavailableContinue: "Continuar",
+  secretsUnavailableContinue: "Restaurar com as palavras do backup",
+  secretsWriteFailedTitle: "Não foi possível guardar suas chaves com segurança",
+  secretsWriteFailedBody:
+    "O armazenamento seguro deste aparelho recusou suas chaves. O Linky nunca as guarda em um lugar menos seguro, então elas ainda não foram salvas. Tente de novo. Se continuar falhando, anote antes as palavras do seu backup: com elas você restaura sua conta neste ou em qualquer outro aparelho.",
+  secretsWriteFailedWords: "As palavras do seu backup",
+  secretsWriteFailedRetry: "Tentar de novo",
+  secretsWriteFailedAgain:
+    "Ainda não foi possível guardá-las. Tente de novo daqui a pouco ou reinicie o aparelho.",
   evoluNoDataYet: "Nenhum dado gravado aqui ainda.",
   evoluData: "Dados",
   evoluStorage: "Armazenamento",

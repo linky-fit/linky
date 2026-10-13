@@ -15,7 +15,11 @@ export const readAppMnemonicState = (
   return value === "present" || value === "absent" ? value : null;
 };
 
+/** Records `state`; null forgets it. */
 export const writeAppMnemonicState = (
   kv: KeyValuePort,
-  state: AppMnemonicState,
-): void => kv.setItem(APP_MNEMONIC_STATE_STORAGE_KEY, state);
+  state: AppMnemonicState | null,
+): void => {
+  if (state === null) kv.removeItem(APP_MNEMONIC_STATE_STORAGE_KEY);
+  else kv.setItem(APP_MNEMONIC_STATE_STORAGE_KEY, state);
+};
