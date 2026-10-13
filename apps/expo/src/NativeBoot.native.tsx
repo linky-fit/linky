@@ -30,7 +30,7 @@ import { formatBootError } from "@linky-fit/linky-app/src/utils/bootDiagnostics"
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { useColorScheme } from "react-native";
+import { KeyboardAvoidingView, useColorScheme } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -96,15 +96,17 @@ export const NativeBoot = () => {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <StatusBar style="auto" />
-        {state._tag === "Booted" ? (
-          <AppRoot
-            registry={state.booted.registry}
-            onCommit={hideSplash}
-            onError={hideSplash}
-          />
-        ) : state._tag === "Failed" ? (
-          <BootError error={state.error} />
-        ) : null}
+        <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+          {state._tag === "Booted" ? (
+            <AppRoot
+              registry={state.booted.registry}
+              onCommit={hideSplash}
+              onError={hideSplash}
+            />
+          ) : state._tag === "Failed" ? (
+            <BootError error={state.error} />
+          ) : null}
+        </KeyboardAvoidingView>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

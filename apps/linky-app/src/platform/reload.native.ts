@@ -1,9 +1,5 @@
-import { reloadAppAsync } from "expo";
-import { localStorageKv, safeSessionStorageEntries } from "../utils/storage";
-import { keepSessionStorageForReload } from "./reloadableSessionStorage";
+import { currentRoutePath } from "./navigation";
+import { restartAppAt } from "./restartApp.native";
 
-/** Restarts the JavaScript app from its entry point, keeping sessionStorage as a page reload does. */
-export const reloadApp = (): void => {
-  keepSessionStorageForReload(localStorageKv, safeSessionStorageEntries());
-  void reloadAppAsync();
-};
+/** Restarts the app from its entry point on the route it shows, as a page reload does. */
+export const reloadApp = (): void => restartAppAt(currentRoutePath());

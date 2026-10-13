@@ -1,6 +1,7 @@
 // Metro resolves apps/linky-app/src/platform/navigation.ts to this module on
 // iOS and Android: expo-router keeps the route and navigates.
-import { reloadApp } from "@linky-fit/linky-app/src/platform/reload";
+import { restartAppAt } from "@linky-fit/linky-app/src/platform/restartApp.native";
+import { takeReloadRoute } from "@linky-fit/linky-app/src/platform/reloadRoute";
 import {
   localStorageKv,
   safeSessionStorageGet,
@@ -10,7 +11,6 @@ import { ExpoRoot, router, Slot } from "expo-router";
 import { ctx } from "expo-router/_ctx";
 import { createContext, use, useEffect, type ReactNode } from "react";
 import { Linking } from "react-native";
-import { keepReloadRoute, takeReloadRoute } from "./reloadRoute";
 import { urlPathFor } from "./routeUrl";
 import { useRouterRoutePath } from "./useRouterRoutePath";
 
@@ -44,10 +44,7 @@ export const navigateToRoutePath = (
 ): void => openHref(urlPathFor(path, spdStore), options?.replace ?? false);
 
 /** Reloads the app on a route path, as a restore or an identity switch does once its new session is stored. */
-export const reloadAtRoutePath = (path: string): void => {
-  keepReloadRoute(localStorageKv, path);
-  reloadApp();
-};
+export const reloadAtRoutePath = (path: string): void => restartAppAt(path);
 
 /** Leaves the app for another app or the browser, such as the site a login came from. */
 export const navigateAwayTo = (url: string): void => {
