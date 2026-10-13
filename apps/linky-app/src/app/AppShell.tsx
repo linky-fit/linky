@@ -92,7 +92,11 @@ const AuthenticatedAppShell = ({ currentNsec }: AuthenticatedAppShellProps) => {
   );
 };
 
-const UnauthenticatedAppShell = () => {
+const UnauthenticatedAppShell = ({
+  onLeaveRestore,
+}: {
+  onLeaveRestore?: () => void;
+}) => {
   const {
     confirmPendingOnboardingProfile,
     createNewAccount,
@@ -157,6 +161,7 @@ const UnauthenticatedAppShell = () => {
           setPendingOnboardingName={setPendingOnboardingName}
           submitReturningSlip39={submitReturningSlip39}
           t={t}
+          onLeaveRestore={onLeaveRestore}
         />
       </Stack>
     </AppFrame>
@@ -170,7 +175,7 @@ const MigratedAppShell = (props: AuthenticatedAppShellProps) => {
   return <AuthenticatedAppShell {...props} />;
 };
 
-/** Retry reboots and reads the secure store again; Continue goes on signed out, never into an empty database. */
+/** Retry reboots and reads the secure store again; Continue restores from backup words, never into an empty database. */
 const SecretsUnavailableAppShell = ({
   onContinue,
 }: {
@@ -203,14 +208,14 @@ const SecretsUnavailableAppShell = ({
 
 const AppShell = () => {
   const session = useAtomValue(sessionAtom);
-  const [continuedSignedOut, setContinuedSignedOut] = React.useState(false);
+  const [restoring, setRestoring] = React.useState(false);
   usePersistentInspectorLogStartup();
 
-  if (session._tag === "SecretsUnavailable" && !continuedSignedOut)
-    return (
-      <SecretsUnavailableAppShell
-        onContinue={() => setContinuedSignedOut(true)}
-      />
+  if (session._tag === "SecretsUnavailable")
+    return restoring ? (
+      <UnauthenticatedAppShell onLeaveRestore={() => setRestoring(false)} />
+    ) : (
+      <SecretsUnavailableAppShell onContinue={() => setRestoring(true)} />
     );
   if (session._tag !== "SignedIn") return <UnauthenticatedAppShell />;
   return <MigratedAppShell currentNsec={session.secrets.nsec} />;

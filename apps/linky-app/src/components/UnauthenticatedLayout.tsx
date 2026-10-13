@@ -64,6 +64,8 @@ interface UnauthenticatedLayoutProps {
   setPendingOnboardingName: (value: string) => void;
   submitReturningSlip39: (inputOverride?: string) => Promise<void>;
   t: Translate;
+  /** Shows only the restore step, whose back button calls this; nothing can create an account. */
+  onLeaveRestore?: (() => void) | undefined;
 }
 
 const LANGUAGE_LABEL_KEYS = {
@@ -166,7 +168,9 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
   setPendingOnboardingName,
   submitReturningSlip39,
   t,
+  onLeaveRestore,
 }) => {
+  const restoreOnly = onLeaveRestore !== undefined;
   const [pickerMenuIsOpen, setPickerMenuIsOpen] = React.useState(false);
   const colorModePreference = useColorModePreference();
   const colorModeLabel = `${t("appearance")}: ${t(
@@ -222,6 +226,11 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
     }
     setPickerMenuIsOpen(false);
   }, [onboardingStep]);
+
+  React.useEffect(() => {
+    if (restoreOnly && onboardingStep?.kind !== "returning")
+      openReturningOnboarding();
+  }, [restoreOnly, onboardingStep, openReturningOnboarding]);
 
   const renderPreparingStep = (
     step: Extract<OnboardingStep, { kind: "preparing" }>,
@@ -288,7 +297,8 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
         <StickyTopBar
           leading={backButton(() => {
             setPickerMenuIsOpen(false);
-            setOnboardingStep(null);
+            if (onLeaveRestore) onLeaveRestore();
+            else setOnboardingStep(null);
           })}
           trailing={menuButton()}
         />
@@ -632,11 +642,13 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
 
   return (
     <Stack gap="$md" flexGrow={1}>
-      {onboardingStep?.kind === "profile"
-        ? renderProfilePicker(onboardingStep)
-        : onboardingStep?.kind === "returning"
-          ? renderReturnStep(onboardingStep)
-          : renderWelcome(onboardingStep)}
+      {onboardingStep?.kind === "returning"
+        ? renderReturnStep(onboardingStep)
+        : restoreOnly
+          ? null
+          : onboardingStep?.kind === "profile"
+            ? renderProfilePicker(onboardingStep)
+            : renderWelcome(onboardingStep)}
 
       <Sheet
         open={pickerMenuIsOpen}

@@ -263,11 +263,11 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "session.secretsDegraded":
     "At boot the native secure storage failed (an error or no answer within 5 s) for the listed secrets, and the app runs on their localStorage copies. Keys under unreadable have no copy either, so the app treats them as unknown rather than missing: when the wallet seed would come from one, the wallet stays unconfigured for this launch instead of generating a new seed. The payload names the keys, never the values.",
   "session.secretsUnavailable":
-    "At boot the native secure storage failed and localStorage holds no identity, so the app asks the user to retry or continue signed out, without touching the stored account. The payload names the keys that failed.",
+    "At boot the native secure storage failed and localStorage holds no identity, so the app asks the user to retry or restore from backup words, without touching the stored account. The payload names the keys that failed.",
   "session.appMnemonicUnreadable":
-    "At boot the nsec was read but the app mnemonic was not, and the device's marker says it holds one (present) or never recorded it (unknown). Opening the database without it would open the empty anonymous one, so nothing opens, the wallet stays off, and the app asks the user to retry or continue signed out. An absent marker (an nsec-only account) signs in instead. The payload names the keys that failed, never the values.",
+    "At boot the nsec was read but the app mnemonic was not, and the device's marker says it holds one (present) or never recorded it (unknown). Opening the database without it would open the empty anonymous one, so nothing opens, the wallet stays off, and the app asks the user to retry or restore from backup words. An absent marker (an nsec-only account) signs in instead. The payload names the keys that failed, never the values.",
   "session.secretsUnavailableDecided":
-    "On the screen shown after the keys could not be read, the user chose retry (the page reloads and reads the secure store again) or continue (the signed-out screen, to log in with backup words).",
+    "On the screen shown after the keys could not be read, the user chose retry (the page reloads and reads the secure store again) or continue (the restore-from-backup-words step only; creating an account is not offered, since it could overwrite keys still in secure storage).",
   "secrets.nativeWriteRolledBack":
     "Saving identity secrets (a restore, identity switch or new cashu seed) on a native app: the native secure storage failed or did not read back the new value for the keys under missed. The app removed every key of the set from the native store, so the next boot reads the complete new set from localStorage instead of a mix of old and new secrets; notRemoved lists keys the native store also failed to remove. The payload names the keys, never the values.",
   "evolu.serversChanged":

@@ -1,5 +1,5 @@
 import { act, createRef } from "react";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReturningOnboardingStep } from "../app/hooks/useProfileAuthDomain";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { emptySlip39Words } from "../utils/slip39Input";
@@ -17,7 +17,12 @@ const renderReturning = async (
   overrides: Partial<
     Pick<
       Parameters<typeof UnauthenticatedLayout>[0],
-      "pasteReturningSlip39" | "setReturningSlip39Words"
+      | "onboardingStep"
+      | "onLeaveRestore"
+      | "openReturningOnboarding"
+      | "pasteReturningSlip39"
+      | "setOnboardingStep"
+      | "setReturningSlip39Words"
     >
   > = {},
 ) => {
@@ -127,4 +132,41 @@ it("hands a paste into any slot to the paste handler from that slot", async () =
 
   expect(pasteReturningSlip39).toHaveBeenCalledExactlyOnceWith("acid acne", 5);
   await view.unmount();
+});
+
+describe("restore only", () => {
+  it("opens the restore step and never offers to create an account", async () => {
+    const openReturningOnboarding = vi.fn();
+    const view = await renderReturning(
+      {},
+      {
+        onboardingStep: null,
+        onLeaveRestore: vi.fn(),
+        openReturningOnboarding,
+      },
+    );
+
+    expect(openReturningOnboarding).toHaveBeenCalled();
+    expect(view.container.textContent).not.toContain("onboardingCreate");
+    await view.unmount();
+  });
+
+  it("leaves the restore step through onLeaveRestore instead of the welcome screen", async () => {
+    const onLeaveRestore = vi.fn();
+    const setOnboardingStep = vi.fn();
+    const view = await renderReturning(
+      {},
+      { onLeaveRestore, setOnboardingStep },
+    );
+
+    const back = view.container.querySelector('[aria-label="back"]');
+    if (!back) throw new Error("back missing");
+    await act(async () => {
+      back.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(onLeaveRestore).toHaveBeenCalledTimes(1);
+    expect(setOnboardingStep).not.toHaveBeenCalled();
+    await view.unmount();
+  });
 });
