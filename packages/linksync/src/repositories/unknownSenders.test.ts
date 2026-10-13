@@ -5,6 +5,8 @@ import {
   PositiveInt,
 } from "@evolu/common";
 import { Pubkey, RumorId } from "@linky-fit/linkstr";
+import { Effect } from "effect";
+import { TestClock } from "effect/testing";
 import { messageContentColumns } from "../model/schema";
 import { createLinkyStore } from "../model/store";
 import {
@@ -80,6 +82,39 @@ describe("unknown senders repository", () => {
     expect(runNow(conversations.forContact(contactId))?.kind).toBe("direct");
     expect(messagesFrom(unknownSenders, alice)).toEqual([]);
     expect(messagesFrom(unknownSenders, bob)).toHaveLength(1);
+  });
+
+  it("moves messages of one second in the order they were stored", async () => {
+    const { db, appOwner } = linkyStore();
+    const movedIds: string[] = [];
+    const store = createLinkyStore(
+      {
+        ...db,
+        mutate: (mutations) => {
+          for (const mutation of mutations)
+            if (mutation.table === "message") movedIds.push(mutation.row.id);
+          return db.mutate(mutations);
+        },
+      },
+      appOwner,
+    );
+    const unknownSenders = makeUnknownSendersRepository(store);
+
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        // Read order differs from stored order, as Evolu reads rows by id.
+        for (const n of [3, 1, 2]) {
+          yield* TestClock.setTime(1_000 * n);
+          yield* unknownSenders.insertIfAbsent({
+            ...incoming(alice, n),
+            createdAtSec: PositiveInt.orThrow(100),
+          });
+        }
+        yield* unknownSenders.moveToContact(alice, createId<"Contact">());
+      }).pipe(Effect.provide(TestClock.layer())),
+    );
+
+    expect(movedIds).toEqual([1, 2, 3].map((n) => nostrMessageIdFor(rumor(n))));
   });
 
   it("carries every message content column it holds onto the contact", () => {
