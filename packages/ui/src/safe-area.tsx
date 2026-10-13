@@ -1,5 +1,11 @@
-import { use, useRef, useState, type ReactNode } from "react";
-import { Animated, View } from "react-native";
+import { use, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  Animated,
+  Keyboard,
+  Platform,
+  View,
+  type KeyboardEventName,
+} from "react-native";
 import type { GetProps } from "tamagui";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Stack } from "./layout";
@@ -120,15 +126,34 @@ function Pinned({
   );
 }
 
-/** A stack padded by the device inset (notch, home indicator) of a screen edge. */
+const keyboardEvents: Record<"show" | "hide", KeyboardEventName> =
+  Platform.OS === "ios"
+    ? { show: "keyboardWillShow", hide: "keyboardWillHide" }
+    : { show: "keyboardDidShow", hide: "keyboardDidHide" };
+
+const useKeyboardShown = (watch: boolean): boolean => {
+  const [shown, setShown] = useState(() => watch && Keyboard.isVisible());
+  useEffect(() => {
+    if (!watch) return;
+    const subscriptions = [
+      Keyboard.addListener(keyboardEvents.show, () => setShown(true)),
+      Keyboard.addListener(keyboardEvents.hide, () => setShown(false)),
+    ];
+    return () => subscriptions.forEach((subscription) => subscription.remove());
+  }, [watch]);
+  return watch && shown;
+};
+
+/** A stack padded by the device inset (notch, home indicator) of a screen edge; the keyboard covers the bottom one. */
 export function SafeAreaPad({ edge, position, ...props }: SafeAreaPadProps) {
   const insets = useSafeAreaInsets();
+  const keyboardShown = useKeyboardShown(edge === "bottom");
   const frame = use(PageScrollFrameContext);
   const padding =
     edge === "top"
       ? { paddingTop: insets.top }
       : edge === "bottom"
-        ? { paddingBottom: insets.bottom }
+        ? { paddingBottom: keyboardShown ? 0 : insets.bottom }
         : {};
   if (position === "sticky") {
     const stack = <Stack {...props} {...padding} position="relative" />;

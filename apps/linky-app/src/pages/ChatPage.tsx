@@ -13,6 +13,7 @@ import {
   Notice,
   ReplyPreview,
   Row,
+  SafeAreaPad,
   ScrollView,
   Stack,
 } from "@linky-fit/ui";
@@ -932,7 +933,7 @@ export const ChatComposer = memo(function ChatComposer({
   const showSend = hasDraftText || chatAttachments.length > 0;
 
   return (
-    <Stack testID="chat-compose" data-safe-area="bottom">
+    <SafeAreaPad testID="chat-compose" edge="bottom">
       <MessageComposerFrame
         header={
           replyContext ||
@@ -1094,7 +1095,7 @@ export const ChatComposer = memo(function ChatComposer({
           getNpubMessageContactInfo={getNpubMessageContactInfo}
         />
       </MessageComposerFrame>
-    </Stack>
+    </SafeAreaPad>
   );
 });
 
