@@ -33,6 +33,8 @@ await $`expo export --platform web --clear ${process.argv.slice(2)}`
   .cwd(root)
   .env({
     ...process.env,
+    // The tree-shaken export outgrows Node's default 2 GB heap.
+    NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --max-old-space-size=4096`,
     EXPO_UNSTABLE_TREE_SHAKING: "1",
     EXPO_UNSTABLE_METRO_OPTIMIZE_GRAPH: "1",
     LINKY_EVOLU_WORKER_URL: evoluWorkerUrl,
