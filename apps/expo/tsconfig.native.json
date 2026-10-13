@@ -4,7 +4,20 @@
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.native.tsbuildinfo",
     "types": [],
     "moduleSuffixes": [".native", ""],
-    "customConditions": ["react-native"]
+    "customConditions": ["react-native"],
+    "paths": {
+      "expo": ["./node_modules/expo"],
+      "expo-constants": ["./node_modules/expo-constants"],
+      "expo-file-system": ["./node_modules/expo-file-system"],
+      "expo-network": ["./node_modules/expo-network"],
+      "expo-secure-store": ["./node_modules/expo-secure-store"],
+      "expo-sqlite": ["./node_modules/expo-sqlite"],
+      "expo-status-bar": ["./node_modules/expo-status-bar"],
+      "@evolu/react-native/expo-sqlite": [
+        "./node_modules/@evolu/react-native/dist/exports/expo-sqlite"
+      ],
+      "@formatjs/*": ["./node_modules/@formatjs/*"]
+    }
   },
   "include": [
     "index.ts",

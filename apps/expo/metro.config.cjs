@@ -65,9 +65,25 @@ const resolveWithJsFallback = (context, moduleName, platform) => {
   }
 };
 
+// apps/linky-app's .native siblings import native modules only this package
+// declares: declaring them there too makes Linux bun installs run out of memory.
+const expoEntry = path.join(__dirname, "index.ts");
+const resolveFromExpo = (context, moduleName, platform) => {
+  try {
+    return resolveWithJsFallback(context, moduleName, platform);
+  } catch (error) {
+    if (platform === "web" || moduleName.startsWith(".")) throw error;
+    return context.resolveRequest(
+      { ...context, originModulePath: expoEntry },
+      moduleName,
+      platform,
+    );
+  }
+};
+
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (emptyModules.has(moduleName)) return { type: "empty" };
-  const resolution = resolveWithJsFallback(context, moduleName, platform);
+  const resolution = resolveFromExpo(context, moduleName, platform);
   if (resolution.type !== "sourceFile") return resolution;
   if (
     platform !== "web" &&
