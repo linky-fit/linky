@@ -13,6 +13,7 @@ import {
   Notice,
   ReplyPreview,
   Row,
+  ScrollView,
   Stack,
 } from "@linky-fit/ui";
 import { useDivRef } from "../hooks/useDivRef";
@@ -964,48 +965,53 @@ export const ChatComposer = memo(function ChatComposer({
                 />
               ) : null}
               {mentionSuggestions.length > 0 ? (
-                <Stack
-                  role="list"
+                <ScrollView
                   maxHeight="$qr"
-                  overflowY="auto"
-                  padding="$xs"
+                  flexGrow={0}
                   borderRadius="$control"
                   backgroundColor="$surfaceRaised"
-                  onPointerDown={keepInputFocus}
+                  keyboardShouldPersistTaps="handled"
                 >
-                  {mentionSuggestions.map((suggestion) =>
-                    suggestion.kind === "group" ? (
-                      <ListRow
-                        key={`group-${suggestion.groupName}`}
-                        title={`@${suggestion.groupName}`}
-                        meta={t("chatMentionGroupCount").replace(
-                          "{count}",
-                          String(suggestion.contacts.length),
-                        )}
-                        chevron={false}
-                        onPress={() => selectMentionSuggestion(suggestion)}
-                      />
-                    ) : (
-                      <ListRow
-                        key={`contact-${suggestion.contact.npub}`}
-                        leading={
-                          <Avatar
-                            name={suggestion.contact.name}
-                            uri={
-                              getNpubMessageContactInfo(suggestion.contact.npub)
-                                ?.pictureUrl ?? undefined
-                            }
-                            size="sm"
-                          />
-                        }
-                        title={suggestion.contact.name}
-                        meta={suggestion.contact.groupName ?? undefined}
-                        chevron={false}
-                        onPress={() => selectMentionSuggestion(suggestion)}
-                      />
-                    ),
-                  )}
-                </Stack>
+                  <Stack
+                    role="list"
+                    padding="$xs"
+                    onPointerDown={keepInputFocus}
+                  >
+                    {mentionSuggestions.map((suggestion) =>
+                      suggestion.kind === "group" ? (
+                        <ListRow
+                          key={`group-${suggestion.groupName}`}
+                          title={`@${suggestion.groupName}`}
+                          meta={t("chatMentionGroupCount").replace(
+                            "{count}",
+                            String(suggestion.contacts.length),
+                          )}
+                          chevron={false}
+                          onPress={() => selectMentionSuggestion(suggestion)}
+                        />
+                      ) : (
+                        <ListRow
+                          key={`contact-${suggestion.contact.npub}`}
+                          leading={
+                            <Avatar
+                              name={suggestion.contact.name}
+                              uri={
+                                getNpubMessageContactInfo(
+                                  suggestion.contact.npub,
+                                )?.pictureUrl ?? undefined
+                              }
+                              size="sm"
+                            />
+                          }
+                          title={suggestion.contact.name}
+                          meta={suggestion.contact.groupName ?? undefined}
+                          chevron={false}
+                          onPress={() => selectMentionSuggestion(suggestion)}
+                        />
+                      ),
+                    )}
+                  </Stack>
+                </ScrollView>
               ) : null}
             </>
           ) : null
