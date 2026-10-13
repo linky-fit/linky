@@ -5,9 +5,11 @@ import type { GetProps, Dialog } from "tamagui";
 export type DialogBehaviorHook = (
   open: boolean,
   onOpenChange: (open: boolean) => void,
-) => Pick<
-  GetProps<typeof Dialog.Content>,
-  "tabIndex" | "onOpenAutoFocus" | "onCloseAutoFocus"
+) => Partial<
+  Pick<
+    GetProps<typeof Dialog.Content>,
+    "tabIndex" | "onOpenAutoFocus" | "onCloseAutoFocus"
+  >
 >;
 
 export const useDialogBehavior: DialogBehaviorHook = (open, onOpenChange) => {

@@ -1,7 +1,7 @@
 import { useId, useState } from "react";
 import type { ComponentRef, ReactNode, Ref } from "react";
 import { Input, Label } from "tamagui";
-import type { InputProps } from "tamagui";
+import type { GetProps } from "tamagui";
 import { Row, Stack, Text } from "./layout";
 import { fieldStyle, fieldTrailing, textVariant } from "./styles";
 import { opacity, size } from "./tokens";
@@ -68,7 +68,7 @@ const fieldA11y = (
     borderColor: error || invalid ? "$danger" : "$transparent",
   }) as const;
 
-export interface TextFieldProps extends Omit<InputProps, "size"> {
+export interface TextFieldProps extends Omit<GetProps<typeof Input>, "size"> {
   label: string;
   hideLabel?: boolean | undefined;
   hint?: string | undefined;
