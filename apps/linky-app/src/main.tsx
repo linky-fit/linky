@@ -1,7 +1,6 @@
 import "./platform/browserPolyfills";
-import { Buffer } from "buffer";
+import "./boot/nodeGlobals";
 import { Capacitor } from "@capacitor/core";
-import { StrictMode } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import {
@@ -15,7 +14,6 @@ import {
   zIndex,
 } from "@linky-fit/ui/tokens";
 import type { TextVariant } from "@linky-fit/ui/tokens";
-import { BootCommitSignal } from "./components/BootCommitSignal";
 import "./index.css";
 import {
   enableInMemoryEvoluStorageForSession,
@@ -30,7 +28,6 @@ import {
   isLogoutPending,
   onLogoutInAnotherTab,
 } from "./platform/logoutWipe";
-import { decodeBase64Url, encodeBase64Url } from "./utils/base64";
 import { getColorMode } from "./utils/colorMode";
 import {
   downloadBootDiagnostics,
@@ -56,122 +53,6 @@ import { isDevBuild, isE2eBuild } from "./platform/buildEnv";
 import { registerServiceWorker } from "./platform/serviceWorker";
 import { emitAppEvent } from "./platform/appEvents";
 import { reloadApp } from "./platform/reload";
-
-type BufferFromArgs =
-  | [arrayLike: ArrayLike<number> | ArrayBufferView]
-  | [
-      arrayBuffer: ArrayBuffer | SharedArrayBuffer,
-      byteOffset?: number,
-      length?: number,
-    ]
-  | [value: string, encoding?: string];
-
-interface ProcessLike {
-  emitWarning?: (message: string, type?: string, code?: string) => void;
-  env?: Record<string, string | undefined>;
-}
-
-const isBufferConstructor = (value: unknown): value is typeof Buffer => {
-  return typeof value === "function" && "from" in value && "prototype" in value;
-};
-
-const getGlobalBuffer = (): typeof Buffer | null => {
-  const candidate = Reflect.get(globalThis, "Buffer");
-  return isBufferConstructor(candidate) ? candidate : null;
-};
-
-const getGlobalProcess = (): object | null => {
-  const candidate = Reflect.get(globalThis, "process");
-  if (candidate && typeof candidate === "object") {
-    return candidate;
-  }
-  return null;
-};
-
-// Some dependencies (e.g. Cashu libs) expect Node's global Buffer.
-// Provide a safe browser polyfill.
-if (!getGlobalBuffer()) {
-  try {
-    Object.defineProperty(globalThis, "Buffer", {
-      configurable: true,
-      value: Buffer,
-      writable: true,
-    });
-  } catch {
-    Reflect.set(globalThis, "Buffer", Buffer);
-  }
-}
-
-// Some browserified Node deps still expect a global `process`.
-// Provide a tiny shim before any lazy-loaded app code runs.
-if (!getGlobalProcess()) {
-  const processShim: ProcessLike = {
-    emitWarning: (message: string, type?: string, code?: string) => {
-      if (
-        typeof console !== "undefined" &&
-        typeof console.warn === "function"
-      ) {
-        console.warn(message, type, code);
-      }
-    },
-    env: {},
-  };
-
-  try {
-    Object.defineProperty(globalThis, "process", {
-      configurable: true,
-      value: processShim,
-      writable: true,
-    });
-  } catch {
-    Reflect.set(globalThis, "process", processShim);
-  }
-}
-
-// The `buffer` polyfill doesn't implement Node's newer "base64url" encoding.
-// Some deps (e.g. Evolu) use it for compact URL-safe IDs.
-// Patch in minimal support to avoid boot crashes in the browser.
-(() => {
-  const B = getGlobalBuffer();
-  if (!B) return;
-
-  const patchMarker = "__linkyBase64UrlPatched";
-  if (Reflect.get(B.prototype, patchMarker) === true) return;
-
-  const origToString = B.prototype.toString;
-  Object.defineProperty(B.prototype, "toString", {
-    configurable: true,
-    value: function (
-      this: Buffer,
-      encoding?: string,
-      start?: number,
-      end?: number,
-    ) {
-      if (encoding === "base64url") {
-        return encodeBase64Url(this.subarray(start, end));
-      }
-      return origToString.call(this, encoding, start, end);
-    },
-    writable: true,
-  });
-
-  const origFrom = B.from;
-  Object.defineProperty(B, "from", {
-    configurable: true,
-    value: function (this: typeof Buffer, ...args: BufferFromArgs) {
-      const [value, encodingOrOffset] = args;
-      if (typeof value === "string" && encodingOrOffset === "base64url") {
-        return Reflect.apply(origFrom, this, [
-          decodeBase64Url(value) ?? new Uint8Array(0),
-        ]);
-      }
-      return Reflect.apply(origFrom, this, args);
-    },
-    writable: true,
-  });
-
-  Reflect.set(B.prototype, patchMarker, true);
-})();
 
 const updateSW = registerServiceWorker({
   onOfflineReady() {
@@ -693,51 +574,34 @@ const bootstrap = async () => {
 
     setStage("import-app");
     const [
-      { default: App },
-      { ErrorBoundary },
-      { makeAppRegistry, RegistryContext },
-      { evoluAtom, evoluRelaySettingsAtom },
+      { AppRoot },
+      { bootSession },
       { makeWebPlatformPorts },
-      { loadSession, mirrorPushNsec },
       { probeLocalDatabase },
-      { NavigationRoot },
       { captureLaunchHashLink },
     ] = await Promise.all([
-      import("./App.tsx"),
-      import("./ErrorBoundary.tsx"),
-      import("./app/registry.ts"),
-      import("./app/state/session/evolu.ts"),
+      import("./boot/AppRoot.tsx"),
+      import("./boot/bootSession.ts"),
       import("./platform/ports.web.ts"),
-      import("./platform/session.ts"),
       import("./evolu.ts"),
-      import("./platform/navigation.ts"),
       import("./platform/hashLinks.ts"),
     ]);
     console.log("[linky][boot] app modules loaded");
     captureLaunchHashLink();
 
     setStage("load-session");
-    const ports = makeWebPlatformPorts();
-    const session = await loadSession(ports);
-    mirrorPushNsec(session);
-    console.log("[linky][boot] session loaded", { session: session._tag });
-
-    // Only a signed-in session opens the database.
-    const signedIn = session._tag === "SignedIn";
+    const { registry, session, opened } = await bootSession({
+      ports: makeWebPlatformPorts(),
+      makeEvoluPlatform: async () => {
+        setStage("import-evolu");
+        return (await import("./platform/evolu.web.ts")).makeWebEvoluPlatform();
+      },
+    });
     // The native beacon outlives the page, so a signed-out boot stops whatever an earlier page left running.
     if (session._tag === "SignedOut" && Capacitor.isNativePlatform())
       await import("./platform/nativeBridge.ts").then(({ stopNativeBeacon }) =>
         stopNativeBeacon(),
       );
-    if (signedIn) setStage("import-evolu");
-    const evoluPlatform = signedIn
-      ? (await import("./platform/evolu.web.ts")).makeWebEvoluPlatform()
-      : null;
-    const registry = makeAppRegistry({ ports, session, evoluPlatform });
-    // Built on every boot: building it migrates the stored relay list once.
-    registry.get(evoluRelaySettingsAtom);
-    const opened = registry.get(evoluAtom);
-    console.log("[linky][boot] evolu loaded", { opened: opened !== null });
     if (isDevBuild || isE2eBuild) {
       const { installLinkyE2eHooks } =
         await import("./devtools/e2e/installLinkyE2eHooks.ts");
@@ -763,21 +627,14 @@ const bootstrap = async () => {
     };
     flushSync(() => {
       root.render(
-        <StrictMode>
-          <RegistryContext.Provider value={registry}>
-            <ErrorBoundary
-              onError={() => {
-                window.clearTimeout(stuckTimer);
-                signalBootFailure();
-              }}
-            >
-              <NavigationRoot>
-                <BootCommitSignal onCommit={recordAppCommit} />
-                <App />
-              </NavigationRoot>
-            </ErrorBoundary>
-          </RegistryContext.Provider>
-        </StrictMode>,
+        <AppRoot
+          registry={registry}
+          onCommit={recordAppCommit}
+          onError={() => {
+            window.clearTimeout(stuckTimer);
+            signalBootFailure();
+          }}
+        />,
       );
     });
     console.log("[linky][boot] render scheduled");
