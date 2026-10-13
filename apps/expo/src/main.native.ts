@@ -1,5 +1,5 @@
 import "./polyfills.native";
 import { registerRootComponent } from "expo";
-import { SmokeScreen } from "./SmokeScreen.native";
+import { NativeBoot } from "./NativeBoot.native";
 
-registerRootComponent(SmokeScreen);
+registerRootComponent(NativeBoot);

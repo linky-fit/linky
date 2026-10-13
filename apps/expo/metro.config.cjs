@@ -14,6 +14,18 @@ const { appVersion, appCommitSha } = jiti(
 process.env.EXPO_PUBLIC_APP_VERSION = appVersion;
 process.env.EXPO_PUBLIC_APP_COMMIT_SHA = appCommitSha;
 
+// An iPhone cannot reach this machine's localhost: LINKY_DEV_HOST=<LAN IP>
+// points the local service URLs from .env.development at this machine.
+if (process.env.LINKY_DEV_HOST) {
+  for (const [name, value] of Object.entries(process.env)) {
+    if (name.startsWith("EXPO_PUBLIC_") && value)
+      process.env[name] = value.replaceAll(
+        /\/\/localhost(?=[:/]|$)/g,
+        `//${process.env.LINKY_DEV_HOST}`,
+      );
+  }
+}
+
 const config = getDefaultConfig(__dirname);
 
 // apps/linky-app modules whose Vite implementation Metro replaces. Targets are

@@ -6,5 +6,11 @@
     "moduleSuffixes": [".native", ""],
     "customConditions": ["react-native"]
   },
-  "include": ["index.ts", "src/**/*.native.ts", "src/**/*.native.tsx"]
+  "include": [
+    "index.ts",
+    "src/**/*.native.ts",
+    "src/**/*.native.tsx",
+    "../linky-app/src/*.d.ts",
+    "../linky-app/src/types/browser.ts"
+  ]
 }

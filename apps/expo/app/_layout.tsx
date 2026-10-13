@@ -1,1 +1,1 @@
-export { RootLayout as default } from "../src/navigation.tsx";
+export { RootLayout as default } from "../src/navigation";

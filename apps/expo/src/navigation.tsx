@@ -1,13 +1,7 @@
 // Metro resolves apps/linky-app/src/platform/navigation.ts to this module:
 // routes live in the URL path and expo-router navigates.
 // navigation.contract.ts keeps the exports in step.
-import {
-  ExpoRoot,
-  router,
-  Slot,
-  useGlobalSearchParams,
-  usePathname,
-} from "expo-router";
+import { ExpoRoot, router, Slot } from "expo-router";
 import { ctx } from "expo-router/_ctx";
 import { createContext, use, useEffect, useState, type ReactNode } from "react";
 import { isDevBuild } from "@linky-fit/linky-app/src/platform/buildEnv.ts";
@@ -17,11 +11,11 @@ import {
 } from "@linky-fit/linky-app/src/utils/storage.ts";
 import {
   legacyHashTarget,
-  routePathForRouter,
   routePathForUrl,
   routerStartUrl,
   urlPathFor,
 } from "./routeUrl.ts";
+import { useRouterRoutePath } from "./useRouterRoutePath.ts";
 
 const spdStore = { get: safeSessionStorageGet, set: safeSessionStorageSet };
 
@@ -29,19 +23,7 @@ const spdStore = { get: safeSessionStorageGet, set: safeSessionStorageSet };
 export const currentRoutePath = (): string =>
   routePathForUrl(window.location.pathname, window.location.search, spdStore);
 
-export const useCurrentRoutePath = (): string => {
-  const pathname = usePathname();
-  const params = useGlobalSearchParams();
-  const search = new URLSearchParams(
-    Object.entries(params)
-      // `segments` is the catch-all route's param, not a query param.
-      .filter(([key]) => key !== "segments")
-      .flatMap(([key, value]) =>
-        (Array.isArray(value) ? value : [value]).map((item) => [key, item]),
-      ),
-  );
-  return routePathForRouter(pathname, search, spdStore);
-};
+export const useCurrentRoutePath = (): string => useRouterRoutePath(spdStore);
 
 // Set when NavigationRoot first renders. Before that (the launch fragment
 // at boot) expo-router has not read the URL; after it, router.push queues

@@ -74,6 +74,15 @@ describe("native.contract.ts", () => {
     expect(missing).toEqual([]);
   });
 
+  it("never gives a .ts module a .native.tsx sibling", () => {
+    // Metro tries every platform suffix per extension, so foo.ts wins over foo.native.tsx.
+    const shadowed = nativeFiles
+      .filter((file) => file.endsWith(".native.tsx"))
+      .filter((file) => existsSync(file.replace(/\.native\.tsx$/, ".ts")))
+      .map((file) => path.relative(expoRoot, file));
+    expect(shadowed).toEqual([]);
+  });
+
   it("finds no import naming a seam's web module with its extension", () => {
     // Metro resolves "./foo.ts" to that file on native too, skipping foo.native.ts.
     const explicit = sourceFiles.flatMap((file) =>

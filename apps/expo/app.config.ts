@@ -45,6 +45,7 @@ export default ({ projectRoot }: ConfigContext): ExpoConfig => {
   const variant = variantName(process.env.LINKY_APP_VARIANT);
   const { id, name } = variants[variant];
   const version = readAppVersion(projectRoot);
+  const appleTeamId = process.env.LINKY_IOS_TEAM ?? "W29Z32M73W";
   return withLinkySigning(
     {
       name,
@@ -54,7 +55,10 @@ export default ({ projectRoot }: ConfigContext): ExpoConfig => {
       orientation: "portrait",
       ios: {
         bundleIdentifier: id,
-        appleTeamId: process.env.LINKY_IOS_TEAM ?? "W29Z32M73W",
+        appleTeamId,
+        entitlements: {
+          "keychain-access-groups": [`$(AppIdentifierPrefix)${id}`],
+        },
       },
       android: {
         package: id,
@@ -67,7 +71,25 @@ export default ({ projectRoot }: ConfigContext): ExpoConfig => {
         output: "single",
         name: "Linky",
       },
-      plugins: ["expo-router", "react-native-quick-crypto"],
+      plugins: [
+        "expo-router",
+        "react-native-quick-crypto",
+        "expo-sqlite",
+        "expo-secure-store",
+        "expo-font",
+        [
+          "expo-splash-screen",
+          {
+            backgroundColor: "#ffffff",
+            image: "../linky-app/public/pwa-512x512.png",
+            imageWidth: 120,
+          },
+        ],
+      ],
+      extra: {
+        // The keychain group secureStore.native.ts writes to, the first in the entitlement above.
+        keychainAccessGroup: `${appleTeamId}.${id}`,
+      },
     },
     { requireUploadKey: variant === "production" },
   );

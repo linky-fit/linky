@@ -37,8 +37,12 @@ import type * as webSystemColorScheme from "@linky-fit/linky-app/src/platform/sy
 import * as nativeSystemColorScheme from "@linky-fit/linky-app/src/platform/systemColorScheme.native";
 import type * as webPwaUpdate from "@linky-fit/linky-app/src/utils/pwaUpdate";
 import * as nativePwaUpdate from "@linky-fit/linky-app/src/utils/pwaUpdate.native";
+import type * as webBuildEnv from "./buildEnv";
+import * as nativeBuildEnv from "./buildEnv.native";
 import type * as webMain from "./main";
 import * as nativeMain from "./main.native";
+import type * as webNavigation from "./navigation";
+import * as nativeNavigation from "./navigation.native";
 
 export const usePushNotificationsSetting: typeof webUsePushNotificationsSetting =
   nativeUsePushNotificationsSetting;
@@ -66,4 +70,6 @@ export const storageEvents: typeof webStorageEvents = nativeStorageEvents;
 export const systemColorScheme: typeof webSystemColorScheme =
   nativeSystemColorScheme;
 export const pwaUpdate: typeof webPwaUpdate = nativePwaUpdate;
+export const buildEnv: typeof webBuildEnv = nativeBuildEnv;
 export const main: typeof webMain = nativeMain;
+export const navigation: typeof webNavigation = nativeNavigation;
