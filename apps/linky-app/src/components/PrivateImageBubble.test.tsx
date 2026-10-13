@@ -18,6 +18,10 @@ vi.mock("../app/lib/privateImageMessage", async (importOriginal) => {
   };
 });
 
+vi.mock("../app/hooks/useSavePrivateImage", () => ({
+  useSavePrivateImage: () => vi.fn(),
+}));
+
 const decryptMock = vi.mocked(decryptPrivateImageMessage);
 
 const payload: PrivateImageMessagePayload = {

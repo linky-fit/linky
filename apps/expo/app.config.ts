@@ -46,6 +46,8 @@ const androidVersionCode = (version: string): number => {
 
 const cameraPermission =
   "Linky uses the camera to scan QR codes and to take photos for your profile and chats.";
+const photosPermission =
+  "Linky lets you pick photos for your profile and to send in chats.";
 
 export default ({ projectRoot }: ConfigContext): ExpoConfig => {
   const variant = variantName(process.env.LINKY_APP_VARIANT);
@@ -95,10 +97,19 @@ export default ({ projectRoot }: ConfigContext): ExpoConfig => {
         [
           "expo-image-picker",
           {
-            photosPermission:
-              "Linky lets you pick photos for your profile and to send in chats.",
+            photosPermission,
             cameraPermission,
             microphonePermission: false,
+          },
+        ],
+        [
+          "expo-media-library",
+          {
+            photosPermission,
+            savePhotosPermission:
+              "Linky saves the chat photos you choose to your photo library.",
+            // Saving needs no read access to the library.
+            granularPermissions: [],
           },
         ],
         [

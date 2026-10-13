@@ -583,6 +583,10 @@ export const de = {
   chatImageOpen: "Bild öffnen",
   chatImageBackToChat: "Zurück zum Chat",
   chatImageSave: "In Fotos speichern",
+  chatImageSaved: "In Fotos gespeichert",
+  chatImageSaveDenied:
+    "Linky darf nicht in deine Fotos speichern. Erlaube den Fotozugriff in den Einstellungen.",
+  chatImageSaveFailed: "Speichern in Fotos fehlgeschlagen.",
   chatReplyAction: "Antworten",
   chatReactAction: "Reagieren",
   chatMoreEmojis: "Weitere Emojis",

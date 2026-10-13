@@ -75,6 +75,7 @@ import { MessageActionsMenu } from "./MessageActionsMenu";
 import { MessageReactions } from "./MessageReactions";
 import { PrivateFileBubble } from "./PrivateFileBubble";
 import { PrivateImageBubble } from "./PrivateImageBubble";
+import { useSavePrivateImage } from "../app/hooks/useSavePrivateImage";
 
 export interface NpubMessageContactInfo {
   displayName: string;
@@ -638,6 +639,7 @@ function ChatMessageComponent({
     if (el?.isConnected) el.focus();
   }, []);
 
+  const savePrivateImage = useSavePrivateImage();
   const imageActions = React.useMemo(() => {
     if (!privateImageInfo || !privateImageBlob) return null;
     const exportLinks = rumorId ? { rumor: rumorId } : {};
@@ -648,7 +650,7 @@ function ChatMessageComponent({
     return {
       canShare: canSharePrivateImage(),
       onSave: () => {
-        downloadPrivateImageBlob(privateImageBlob, exportLinks, fileName);
+        void savePrivateImage(privateImageBlob, exportLinks, fileName);
       },
       onShare: () => {
         void sharePrivateImageBlob(
@@ -662,7 +664,7 @@ function ChatMessageComponent({
         });
       },
     };
-  }, [privateImageBlob, privateImageInfo, rumorId, t]);
+  }, [privateImageBlob, privateImageInfo, rumorId, savePrivateImage, t]);
 
   const clearLongPress = React.useCallback(() => {
     if (longPressTimerRef.current == null) return;

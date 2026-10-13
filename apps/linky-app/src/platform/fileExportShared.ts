@@ -5,6 +5,9 @@ export interface FileExport {
   title: string;
 }
 
+/** How saving to the photo library ended; "denied" when the user refused access. */
+export type PhotoLibrarySave = "saved" | "denied";
+
 export const isCancelledShareError = (error: unknown): boolean => {
   if (typeof error !== "object" || error === null) return false;
 

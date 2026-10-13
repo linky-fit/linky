@@ -1,13 +1,18 @@
 import { Directory, File as ExpoFile, Paths } from "expo-file-system";
+import { Asset, requestPermissionsAsync } from "expo-media-library";
 import * as Sharing from "expo-sharing";
-import { type FileExport } from "./fileExportShared";
+import { type FileExport, type PhotoLibrarySave } from "./fileExportShared";
 import {
   DeviceFile,
   readBlobBytes,
   writeDeviceFile,
 } from "./deviceFile.native";
 
-export { type FileExport, isCancelledShareError } from "./fileExportShared";
+export {
+  type FileExport,
+  isCancelledShareError,
+  type PhotoLibrarySave,
+} from "./fileExportShared";
 
 const exportDirectory = new Directory(Paths.cache, "linky-exports");
 
@@ -53,3 +58,14 @@ export const shareFileNatively = async ({
 
 export const saveFile = (file: FileExport): Promise<void> =>
   shareFileNatively(file);
+
+/** Asks for add-only photo access the first time, then saves the image as a new photo. */
+export const saveImageToPhotoLibrary: (
+  file: FileExport,
+) => Promise<PhotoLibrarySave> = async ({ blob, fileName }) => {
+  const permission = await requestPermissionsAsync(true, ["photo"]);
+  if (!permission.granted) return "denied";
+  const file = await writeExportFile(blob, fileName);
+  await Asset.create(file.uri);
+  return "saved";
+};

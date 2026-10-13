@@ -9,10 +9,8 @@ import {
   Text,
 } from "@linky-fit/ui";
 import React from "react";
-import {
-  downloadPrivateImageBlob,
-  sharePrivateImageBlob,
-} from "../app/lib/privateImageFile";
+import { sharePrivateImageBlob } from "../app/lib/privateImageFile";
+import { useSavePrivateImage } from "../app/hooks/useSavePrivateImage";
 import { isCancelledShareError } from "../platform/fileExport";
 import { blobUrl, revokeBlobUrl } from "../platform/files";
 import {
@@ -49,6 +47,7 @@ export function PrivateImageBubble({
   );
 
   const onBlobChangeRef = useLatest(onBlobChange);
+  const savePrivateImage = useSavePrivateImage();
   const viewerStageRef = React.useRef<HTMLDivElement | null>(null);
   const zoom = useImageZoom(viewerStageRef, viewerOpen);
   const placeholderNodeRef = useDivRef(placeholderRef);
@@ -116,7 +115,7 @@ export function PrivateImageBubble({
 
   const saveImage = () => {
     if (!imageBlob) return;
-    downloadPrivateImageBlob(imageBlob, exportLinks);
+    void savePrivateImage(imageBlob, exportLinks);
   };
 
   const shareImage = async () => {

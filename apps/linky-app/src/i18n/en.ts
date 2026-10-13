@@ -566,6 +566,10 @@ export const en = {
   chatImageOpen: "Open image",
   chatImageBackToChat: "Back to chat",
   chatImageSave: "Save to photos",
+  chatImageSaved: "Saved to photos",
+  chatImageSaveDenied:
+    "Linky can't save to your photos. Allow photo access in Settings.",
+  chatImageSaveFailed: "Could not save to photos.",
   chatReplyAction: "Reply",
   chatReactAction: "React",
   chatMoreEmojis: "More emojis",

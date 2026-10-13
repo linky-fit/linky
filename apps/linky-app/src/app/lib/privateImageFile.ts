@@ -2,6 +2,8 @@ import { reportAppLog } from "../../devtools/inspector/appLog";
 import {
   downloadFileInBrowser,
   isCancelledShareError,
+  type PhotoLibrarySave,
+  saveImageToPhotoLibrary,
   shareFileNatively,
 } from "../../platform/fileExport";
 import { isNativePlatform } from "../../platform/runtime";
@@ -62,7 +64,12 @@ const toPrivateFileExport = (
   return { blob, name: safeName ?? `${baseName}.${extension}`, type };
 };
 
-type ExportEvent = "Saved" | "Shared" | "ShareFailed";
+type ExportEvent =
+  | "Saved"
+  | "SavedToPhotos"
+  | "PhotosDenied"
+  | "Shared"
+  | "ShareFailed";
 
 const exportTag = (file: PrivateFileExport, event: ExportEvent): string =>
   `${file.type === PDF_FILE_TYPE ? "ChatFile" : "ChatImage"}${event}`;
@@ -128,6 +135,40 @@ export const downloadPrivateImageBlob = (
   }
   downloadFileInBrowser(file.blob, file.name);
   reportPrivateImageExport("Saved", "Chat file saved as a file", file, links);
+};
+
+/** Saves a chat image to the photo library where the platform has one, else as a file (`"downloaded"`). */
+export const savePrivateImageBlob = async (
+  blob: Blob,
+  links: PrivateImageExportLinks = {},
+  fileName?: string,
+): Promise<PhotoLibrarySave | "downloaded"> => {
+  const file = toPrivateFileExport(blob, fileName);
+  if (saveImageToPhotoLibrary === null || file.type === PDF_FILE_TYPE) {
+    downloadPrivateImageBlob(blob, links, fileName);
+    return "downloaded";
+  }
+  const result = await saveImageToPhotoLibrary({
+    blob: file.blob,
+    fileName: file.name,
+    title: file.name,
+  });
+  if (result === "saved") {
+    reportPrivateImageExport(
+      "SavedToPhotos",
+      "Chat image saved to the photo library",
+      file,
+      links,
+    );
+  } else {
+    reportPrivateImageExport(
+      "PhotosDenied",
+      "Saving a chat image stopped: photo library access was denied",
+      file,
+      links,
+    );
+  }
+  return result;
 };
 
 export const canSharePrivateImage = (): boolean =>
