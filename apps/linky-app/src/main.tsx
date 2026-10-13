@@ -54,6 +54,8 @@ import {
 import { getUnknownErrorMessage, isRecord } from "./utils/unknown";
 import { isDevBuild, isE2eBuild } from "./platform/buildEnv";
 import { registerServiceWorker } from "./platform/serviceWorker";
+import { emitAppEvent } from "./platform/appEvents";
+import { reloadApp } from "./platform/reload";
 
 type BufferFromArgs =
   | [arrayLike: ArrayLike<number> | ArrayBufferView]
@@ -252,7 +254,7 @@ if ("serviceWorker" in navigator) {
     // SW's purged precache. Skipped on first install (no controller at
     // load) and in the tab that initiated the update (it reloads itself).
     if (hadControllerAtLoad && !isApplyingPwaUpdate()) {
-      window.location.reload();
+      reloadApp();
     }
   });
 
@@ -400,7 +402,7 @@ const recoverFromLocalDynamicImportFetch = async (
     await Promise.all(keys.map((key) => caches.delete(key)));
   }
 
-  window.location.reload();
+  reloadApp();
   return true;
 };
 
@@ -477,7 +479,7 @@ const bootCodeStyle = (color: string, background: string): string =>
   `overflow:auto;color:${color};background:${background};padding:${space.md}px;white-space:pre-wrap;border-radius:${radius.sm}px`;
 
 const signalBootFailure = (): void => {
-  window.dispatchEvent(new Event("linky-boot-failed"));
+  emitAppEvent("linky-boot-failed");
 };
 
 const renderBootError = (error: unknown, source: string) => {
@@ -530,7 +532,7 @@ const renderBootError = (error: unknown, source: string) => {
     temporary.addEventListener("click", () => {
       temporary.disabled = true;
       enableInMemoryEvoluStorageForSession();
-      window.location.reload();
+      reloadApp();
     });
     actions.append(temporary);
   }
@@ -549,7 +551,7 @@ const renderBootError = (error: unknown, source: string) => {
   reload.textContent = text.reload;
   reload.addEventListener("click", () => {
     reload.disabled = true;
-    window.dispatchEvent(new Event("linky-clear-cache-and-reload"));
+    emitAppEvent("linky-clear-cache-and-reload");
   });
 
   actions.append(download, reload);
@@ -653,10 +655,10 @@ const bootstrap = async () => {
     if (isLogoutPending()) {
       setStage("logout-wipe");
       await finishPendingLogout();
-      window.location.reload();
+      reloadApp();
       return;
     }
-    onLogoutInAnotherTab(() => window.location.reload());
+    onLogoutInAnotherTab(reloadApp);
 
     if (Capacitor.isNativePlatform()) {
       setStage("secret-backfill");
@@ -676,14 +678,14 @@ const bootstrap = async () => {
         // reload replaces the screen in the meantime.
         storagePromptShown = true;
         window.clearTimeout(stuckTimer);
-        window.dispatchEvent(new Event("linky-boot-decision-pending"));
+        emitAppEvent("linky-boot-decision-pending");
         return showTemporarySessionPrompt(issue);
       },
     });
     if (storagePromptShown) {
       removeTemporarySessionPrompt();
       armStuckTimer();
-      window.dispatchEvent(new Event("linky-boot-decision-resolved"));
+      emitAppEvent("linky-boot-decision-resolved");
     }
     console.log("[linky][boot] storage compatibility checked", {
       inMemory: shouldUseInMemoryEvoluStorage(),
@@ -750,7 +752,7 @@ const bootstrap = async () => {
       setStage("mounted");
       window.clearTimeout(stuckTimer);
       appHasMounted = true;
-      window.dispatchEvent(new Event("linky-app-mounted"));
+      emitAppEvent("linky-app-mounted");
       dynamicImportFetchRetry.clear();
       evoluOpenRetry.clear();
       if (Capacitor.getPlatform() === "android" && !isDevBuild) {
@@ -808,7 +810,7 @@ const bootstrap = async () => {
       console.warn("[linky][boot] local database failed to open, reloading", {
         delayMs,
       });
-      window.setTimeout(() => window.location.reload(), delayMs);
+      window.setTimeout(reloadApp, delayMs);
     });
   } catch (error) {
     window.clearTimeout(stuckTimer);

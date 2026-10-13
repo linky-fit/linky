@@ -20,6 +20,7 @@ import type {
 } from "../../types/appTypes";
 import { resolveNostrChatIdentity } from "./contactIdentity";
 import type { Translate } from "../../../i18n";
+import { isOnline } from "../../../platform/appEvents";
 
 const isPubkey = Schema.is(Pubkey);
 const isRumorId = Schema.is(RumorId);
@@ -94,8 +95,7 @@ export const useSendReaction = <
           return;
         }
         const { contactPubHex, myPubHex } = identity;
-        const isOffline =
-          typeof navigator !== "undefined" && navigator.onLine === false;
+        const isOffline = !isOnline();
 
         // One reaction per user per message: replace mine, or toggle off on
         // the same emoji. UX policy lives here, not in linkstr.

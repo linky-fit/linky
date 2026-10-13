@@ -328,11 +328,11 @@ export const BankPaymentOfferDetailPage: React.FC<
     entry.info.status === "canceled";
   React.useEffect(() => {
     if (offerHasEnded) return;
-    const intervalId = window.setInterval(() => {
+    const intervalId = setInterval(() => {
       setNowMs(Date.now());
     }, 1_000);
 
-    return () => window.clearInterval(intervalId);
+    return () => clearInterval(intervalId);
   }, [offerHasEnded]);
 
   const isCreatedByMe =

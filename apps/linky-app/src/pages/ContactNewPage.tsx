@@ -490,11 +490,11 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
     if (searchResults?.query === searchQuery) return;
     if (lastSearchedQueryRef.current === searchQuery) return;
 
-    const timer = window.setTimeout(() => {
+    const timer = setTimeout(() => {
       void runSearch(searchQuery, { silentEmpty: true });
     }, 900);
 
-    return () => window.clearTimeout(timer);
+    return () => clearTimeout(timer);
   }, [runSearch, searchQuery, searchResults?.query, step]);
 
   const createManualFromSearch = () => {

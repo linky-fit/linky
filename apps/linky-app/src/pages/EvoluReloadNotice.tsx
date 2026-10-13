@@ -6,6 +6,7 @@ import {
   useEvoluReloadRequired,
 } from "../app/hooks/settings/useEvoluSettings";
 import { reportAppLog } from "../devtools/inspector/appLog";
+import { reloadApp } from "../platform/reload";
 
 export function EvoluReloadNotice(): React.ReactElement | null {
   const evoluErrorType = useEvoluErrorType();
@@ -37,7 +38,7 @@ export function EvoluReloadNotice(): React.ReactElement | null {
               settingsChanged: evoluServersReloadRequired,
             },
           });
-          window.location.reload();
+          reloadApp();
         },
       }}
     />

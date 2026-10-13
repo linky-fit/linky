@@ -17,6 +17,7 @@ import type {
 import type { EditChatContext } from "../../state/messages/chat";
 import { resolveNostrChatIdentity } from "./contactIdentity";
 import type { Translate } from "../../../i18n";
+import { isOnline } from "../../../platform/appEvents";
 
 const isPubkey = Schema.is(Pubkey);
 const isRumorId = Schema.is(RumorId);
@@ -136,7 +137,7 @@ export const useEditChatMessage = <
         rumorId: editedFromId,
       });
 
-      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      if (!isOnline()) {
         setStatus(t("chatQueued"));
       }
     } catch (e) {

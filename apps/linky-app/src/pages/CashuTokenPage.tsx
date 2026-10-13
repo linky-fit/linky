@@ -214,12 +214,12 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
       }
     };
     void tick();
-    const intervalId = window.setInterval(() => {
+    const intervalId = setInterval(() => {
       void tick();
     }, 10_000);
     return () => {
       cancelled = true;
-      window.clearInterval(intervalId);
+      clearInterval(intervalId);
     };
   }, [isIssued, routeId, showPaidOverlay, t, checkSingleIssuedRef]);
 
@@ -234,10 +234,10 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
     setShowMissingRecovery(false);
     if (!transferMissing || loadedRouteIdRef.current === routeId) return;
 
-    const timeoutId = window.setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       setShowMissingRecovery(true);
     }, 750);
-    return () => window.clearTimeout(timeoutId);
+    return () => clearTimeout(timeoutId);
   }, [routeId, transferMissing]);
 
   React.useEffect(() => {

@@ -1,6 +1,6 @@
 import { useLatest } from "../../../hooks/useLatest";
 import React from "react";
-import { NATIVE_BACK_BUTTON_EVENT } from "../../../hooks/useRouting";
+import { onBackPress } from "../../../platform/appEvents";
 
 interface NativeBackTargets {
   closeScan: () => void;
@@ -31,9 +31,8 @@ export const resolveNativeBackAction = ({
 /**
  * Routes the Android hardware/gesture back button into in-app navigation.
  *
- * The shell dispatches a cancelable `linky-native-back-button` event and runs
- * its default action — closing the app — unless a listener calls
- * `preventDefault()`. We claim the press whenever something is layered over the
+ * The system runs its default action, closing the app, unless a handler
+ * claims the press. We claim it whenever something is layered over the
  * page to dismiss or there is a parent route to walk up to, and otherwise leave
  * it alone so back exits the app as it does in any other Android app.
  *
@@ -50,19 +49,14 @@ export const useNativeBackHandler = (targets: NativeBackTargets) => {
   // never runs against a stale route or a dismissed overlay.
   const backActionRef = useLatest(backAction);
 
-  React.useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const onNativeBack = (event: Event) => {
-      const action = backActionRef.current;
-      if (!action) return;
-
-      event.preventDefault();
-      action();
-    };
-
-    window.addEventListener(NATIVE_BACK_BUTTON_EVENT, onNativeBack);
-    return () =>
-      window.removeEventListener(NATIVE_BACK_BUTTON_EVENT, onNativeBack);
-  }, [backActionRef]);
+  React.useEffect(
+    () =>
+      onBackPress(() => {
+        const action = backActionRef.current;
+        if (!action) return false;
+        action();
+        return true;
+      }),
+    [backActionRef],
+  );
 };

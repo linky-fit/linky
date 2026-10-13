@@ -114,7 +114,7 @@ const useSerialPasses = <Owner>(
         return;
       }
       running = true;
-      window.clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
       void (async () => {
         let delayMs: number | null = null;
         try {
@@ -126,7 +126,7 @@ const useSerialPasses = <Owner>(
           running = false;
         }
         if (!cancelled && delayMs !== null) {
-          timeoutId = window.setTimeout(kick, delayMs);
+          timeoutId = setTimeout(kick, delayMs);
         }
       })();
     };
@@ -134,7 +134,7 @@ const useSerialPasses = <Owner>(
     kick();
     return () => {
       cancelled = true;
-      window.clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
     };
   }, [owner]);
   return React.useCallback(() => kickRef.current(), []);
@@ -812,7 +812,7 @@ export const useBankPaymentOffers = ({
     const expireDueGroups = () => {
       if (cancelled) return;
       if (expiryInFlightRef.current) {
-        timeoutId = window.setTimeout(expireDueGroups, 100);
+        timeoutId = setTimeout(expireDueGroups, 100);
         return;
       }
       expiryInFlightRef.current = true;
@@ -831,13 +831,13 @@ export const useBankPaymentOffers = ({
         }
       })();
     };
-    timeoutId = window.setTimeout(
+    timeoutId = setTimeout(
       expireDueGroups,
       Math.max(0, nextExpiryAtSec * 1000 - Date.now()),
     );
     return () => {
       cancelled = true;
-      window.clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
     };
   }, [expiryGroups, respondToOffer]);
 

@@ -98,6 +98,7 @@ import {
 } from "../lib/keySwitchProfile";
 import { fetchOwnedLightningAddress } from "../../utils/npubCashInfo";
 import type { I18nKey, Translate } from "../../i18n";
+import { reloadApp } from "../../platform/reload";
 
 export type { NostrIdentitySource };
 
@@ -1260,7 +1261,7 @@ export const useProfileAuthDomain = ({
         // Native secret storage lives outside the site data the wipe deletes.
         await clearIdentitySecrets();
         markLogoutPending();
-        globalThis.location.reload();
+        reloadApp();
       })();
     },
     [logoutArmed, pushToast, t, setLogoutArmed],
@@ -1269,12 +1270,12 @@ export const useProfileAuthDomain = ({
   React.useEffect(() => {
     if (!logoutArmed) return;
 
-    const timeoutId = window.setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       setLogoutArmed(false);
     }, 5000);
 
     return () => {
-      window.clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
     };
   }, [logoutArmed, setLogoutArmed]);
 

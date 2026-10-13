@@ -21,3 +21,5 @@ export const envMainMintUrl = process.env.EXPO_PUBLIC_MAIN_MINT_URL;
 export const envPushServerUrl = process.env.EXPO_PUBLIC_PUSH_SERVER_URL;
 export const envNotificationServerUrl =
   process.env.EXPO_PUBLIC_NOTIFICATION_SERVER_URL;
+/** Origin serving the Linky `/api/*` functions; empty for the page's own origin. */
+export const apiOrigin: string = process.env.EXPO_PUBLIC_API_ORIGIN ?? "";

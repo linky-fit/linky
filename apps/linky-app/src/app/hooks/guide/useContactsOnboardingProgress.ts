@@ -254,13 +254,13 @@ export const useContactsOnboardingProgress = ({
 
     setContactsOnboardingCelebrating(true);
     stopContactsGuide();
-    const timeoutId = window.setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       dismissContactsOnboarding();
       setContactsOnboardingCelebrating(false);
     }, 1400);
 
     return () => {
-      window.clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
     };
   }, [
     contactsOnboardingCelebrating,

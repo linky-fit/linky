@@ -6,6 +6,8 @@ import type { PlatformPorts, SecretRead } from "./ports";
 import { isNativePlatform } from "./runtime";
 import { readNativeSecret } from "./secretStorage";
 import { envEvoluServerUrls, isDevBuild, isE2eBuild } from "./buildEnv";
+import { isOnline } from "./appEvents";
+import { reloadApp } from "./reload";
 
 // Undefined: the shell has no native store, so the localStorage copy is the secret.
 const toSecretRead = (value: string | null | undefined): SecretRead => {
@@ -42,9 +44,8 @@ export const makeWebPlatformPorts = (): PlatformPorts => ({
     isDev: isDevBuild,
   },
   lifecycle: {
-    reload: () => globalThis.location.reload(),
+    reload: reloadApp,
     deferUpdateWhile: deferPwaUpdateWhile,
-    isOnline: () =>
-      typeof navigator === "undefined" || navigator.onLine !== false,
+    isOnline,
   },
 });

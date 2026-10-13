@@ -52,6 +52,7 @@ import { isDesktopShell, isNightlyOrigin } from "../platform/runtime";
 import { COLOR_MODE_PREFERENCE_LABEL_KEYS } from "../utils/colorMode";
 import { pickFile } from "../utils/pickFile";
 import { RECEIVE_METHOD_LABEL_KEYS } from "../utils/receiveMethod";
+import { reloadApp } from "../platform/reload";
 
 export function AdvancedPage(): React.ReactElement {
   const { logoutArmed, requestLogout, seedMnemonic } = useIdentitySettings();
@@ -116,7 +117,7 @@ export function AdvancedPage(): React.ReactElement {
       }
     }
 
-    window.location.reload();
+    reloadApp();
   }, []);
 
   const linkRow = (

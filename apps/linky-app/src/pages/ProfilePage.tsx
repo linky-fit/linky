@@ -231,7 +231,7 @@ export function ProfilePage({
     if (!canCheckInlineClaim || !unregisteredOwnLightningAddress) return;
 
     const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       setInlineClaimIsChecking(true);
       void requestOwnLightningAddressClaimPreview({
         makeNip98AuthHeader,
@@ -267,7 +267,7 @@ export function ProfilePage({
 
     return () => {
       controller.abort();
-      window.clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
     };
   }, [
     canCheckInlineClaim,

@@ -16,7 +16,6 @@ import {
   type Route,
 } from "../types/route";
 
-export const NATIVE_BACK_BUTTON_EVENT = "linky-native-back-button";
 // Holds a route path; values stored before route paths start with `#`.
 const BANK_PAYMENT_OFFER_RETURN_HASH_KEY =
   "linky.bank_payment_offer_return_hash.v1";

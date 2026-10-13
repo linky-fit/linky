@@ -18,3 +18,5 @@ export const envMainMintUrl = import.meta.env.VITE_MAIN_MINT_URL;
 export const envPushServerUrl = import.meta.env.VITE_PUSH_SERVER_URL;
 export const envNotificationServerUrl = import.meta.env
   .VITE_NOTIFICATION_SERVER_URL;
+/** Origin serving the Linky `/api/*` functions; empty for the page's own origin. */
+export const apiOrigin: string = "";

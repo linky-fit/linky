@@ -23,21 +23,21 @@ interface UseDeferredOnlineReadyOptions {
 }
 
 const getRequestIdleCallback = (): RequestIdleCallbackLike | null => {
-  const candidate = Reflect.get(window, "requestIdleCallback");
+  const candidate = Reflect.get(globalThis, "requestIdleCallback");
   if (typeof candidate !== "function") return null;
 
   return (callback, options) => {
-    const result = Reflect.apply(candidate, window, [callback, options]);
+    const result = Reflect.apply(candidate, globalThis, [callback, options]);
     return typeof result === "number" ? result : 0;
   };
 };
 
 const getCancelIdleCallback = (): CancelIdleCallbackLike | null => {
-  const candidate = Reflect.get(window, "cancelIdleCallback");
+  const candidate = Reflect.get(globalThis, "cancelIdleCallback");
   if (typeof candidate !== "function") return null;
 
   return (handle) => {
-    void Reflect.apply(candidate, window, [handle]);
+    void Reflect.apply(candidate, globalThis, [handle]);
   };
 };
 
@@ -75,12 +75,12 @@ export const useDeferredOnlineReady = (
       markReady();
     };
 
-    timeoutId = window.setTimeout(scheduleIdle, delayMs);
+    timeoutId = setTimeout(scheduleIdle, delayMs);
 
     return () => {
       cancelled = true;
       if (timeoutId !== null) {
-        window.clearTimeout(timeoutId);
+        clearTimeout(timeoutId);
       }
       const cancelIdleCallback = getCancelIdleCallback();
       if (idleId !== null && cancelIdleCallback) {

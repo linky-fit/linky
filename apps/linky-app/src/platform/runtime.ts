@@ -6,6 +6,7 @@ import {
   type TelemetryEnvironment,
   type TelemetryEnvironmentFacts,
 } from "@linky-fit/linkstr";
+import { apiOrigin } from "./buildEnv";
 
 export type PlatformTarget = "android" | "ios" | "web";
 
@@ -96,3 +97,24 @@ export const getTelemetryDevicePlatform = (): PaymentTelemetryDevicePlatform =>
 export const isNightlyOrigin = (): boolean =>
   typeof window !== "undefined" &&
   window.location.hostname.startsWith("nightly.");
+
+const HOSTED_APP_ORIGIN = "https://app.linky.fit";
+
+/** URL of a Linky `/api/*` function: same-origin in the browser, the hosted app in the native shells. */
+export const apiUrl = (path: `/api/${string}`): string => {
+  if (apiOrigin !== "") return `${apiOrigin}${path}`;
+  return isNativePlatform() ? `${HOSTED_APP_ORIGIN}${path}` : path;
+};
+
+/** Whether the page comes from a local server, which runs only some `/api/*` functions. */
+export const isLocalOrigin = (): boolean => {
+  if (typeof window === "undefined") return false;
+  const { hostname } = window.location;
+  return (
+    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]"
+  );
+};
+
+/** URL of a Linky `/api/*` function on the hosted app. */
+export const hostedApiUrl = (path: `/api/${string}`): string =>
+  `${HOSTED_APP_ORIGIN}${path}`;
