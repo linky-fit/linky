@@ -12,6 +12,7 @@ import {
 } from "../../testUtils/cashuToken";
 import {
   isShownDeferredReceive,
+  receivedTokenProofs,
   sentTokenClaims,
   takenTokenProofs,
 } from "./cashuTransfers";
@@ -108,6 +109,19 @@ describe("isShownDeferredReceive", () => {
     expect(isShownDeferredReceive(deferral("pending", "sat"))).toBe(true);
     expect(isShownDeferredReceive(deferral("pending", "usd"))).toBe(false);
     expect(isShownDeferredReceive(deferral("done", "sat"))).toBe(false);
+  });
+});
+
+describe("receivedTokenProofs", () => {
+  it("holds only receives that completed", () => {
+    const done = transfer("AQEBAQEBAQEBAQEBAQEBAQ", "receive", "done");
+    const failed = transfer("AgICAgICAgICAgICAgICAg", "receive", "failed");
+    const pending = transfer("AwMDAwMDAwMDAwMDAwMDAw", "receive", "pending");
+    const sent = transfer("BAQEBAQEBAQEBAQEBAQEBA", "send", "done");
+
+    expect([...receivedTokenProofs([done, failed, pending, sent])]).toEqual([
+      tokenProofsKey(done.tokenText),
+    ]);
   });
 });
 

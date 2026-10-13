@@ -1266,6 +1266,7 @@ export const cs = {
   // Locale-specific strings
   paid: "Zaplaceno",
   cashuTokenClaimed: "Token byl využit",
+  cashuTokenReceived: "Token byl přijat",
   cashuTokenClaimedWithAmount: "Tvůj token za {amount} byl využit",
   conversations: "Konverzace",
   proxyPayments: "Proxy platby",

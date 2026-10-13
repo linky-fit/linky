@@ -1274,6 +1274,7 @@ export const de = {
   saveContactPromptSkip: "Nicht jetzt",
   paid: "Bezahlt",
   cashuTokenClaimed: "Token eingelöst",
+  cashuTokenReceived: "Token empfangen",
   cashuTokenClaimedWithAmount: "Dein Token über {amount} wurde eingelöst",
   conversations: "Unterhaltungen",
   proxyPayments: "Proxy-Zahlungen",

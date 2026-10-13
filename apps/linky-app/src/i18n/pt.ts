@@ -1275,6 +1275,7 @@ export const pt = {
   // Locale-specific strings
   paid: "Pago",
   cashuTokenClaimed: "Token resgatado",
+  cashuTokenReceived: "Token recebido",
   cashuTokenClaimedWithAmount: "Seu token de {amount} foi resgatado",
   conversations: "Conversas",
   proxyPayments: "Pagamentos proxy",

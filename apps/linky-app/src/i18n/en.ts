@@ -1258,6 +1258,7 @@ export const en = {
   // Locale-specific strings
   paid: "Paid",
   cashuTokenClaimed: "Token claimed",
+  cashuTokenReceived: "Token received",
   cashuTokenClaimedWithAmount: "Your token of {amount} has been claimed",
   conversations: "Conversations",
   proxyPayments: "Proxy payments",
