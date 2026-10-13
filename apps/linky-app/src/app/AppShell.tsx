@@ -1,5 +1,5 @@
 import { useAtomValue } from "@linky-fit/linkstr-react";
-import { Stack } from "@linky-fit/ui";
+import { Stack, PageScroll, SafeAreaPad } from "@linky-fit/ui";
 import React from "react";
 import { AuthenticatedLayout } from "../components/AuthenticatedLayout";
 import { CashuContactSendBanner } from "../components/CashuContactSendBanner";
@@ -24,14 +24,19 @@ import { useUnauthenticatedAppShellComposition } from "./useUnauthenticatedAppSh
 
 /** Fills the viewport; index.css shrinks it above the keyboard while a chat is open. */
 const AppFrame = ({ children }: { children: React.ReactNode }) => (
-  <Stack data-app-frame gap="$none" backgroundColor="$background">
+  <Stack
+    data-app-frame
+    gap="$none"
+    backgroundColor="$background"
+    $platform-native={{ flex: 1 }}
+  >
     {children}
   </Stack>
 );
 
 /** Pins app-wide banners over the top edge as full-width strips, stacked when several show at once. */
 const TopBanners = ({ children }: { children: React.ReactNode }) => (
-  <Stack
+  <SafeAreaPad
     position="fixed"
     top="$none"
     left="$none"
@@ -39,10 +44,10 @@ const TopBanners = ({ children }: { children: React.ReactNode }) => (
     zIndex="$overlay"
     gap="$none"
     pointerEvents="box-none"
-    data-safe-area="top"
+    edge="top"
   >
     {children}
-  </Stack>
+  </SafeAreaPad>
 );
 
 interface AuthenticatedAppShellProps {
@@ -129,13 +134,10 @@ const UnauthenticatedAppShell = ({
       </TopBanners>
       <ToastNotifications toasts={toasts} dismissToast={dismissToast} />
       <InstallPwaBanner t={t} />
-      <Stack
-        flex={1}
-        minHeight={0}
+      <PageScroll
         width="100%"
         maxWidth="$appWidth"
         alignSelf="center"
-        overflowY="auto"
         paddingHorizontal="$xl"
       >
         <UnauthenticatedLayout
@@ -163,7 +165,7 @@ const UnauthenticatedAppShell = ({
           t={t}
           onLeaveRestore={onLeaveRestore}
         />
-      </Stack>
+      </PageScroll>
     </AppFrame>
   );
 };

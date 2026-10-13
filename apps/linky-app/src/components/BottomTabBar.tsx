@@ -1,4 +1,4 @@
-import { Avatar, Stack, TabBar } from "@linky-fit/ui";
+import { Avatar, TabBar, SafeAreaPad } from "@linky-fit/ui";
 import type { NavItem } from "@linky-fit/ui";
 import React from "react";
 import { useAtomValue } from "@linky-fit/linkstr-react";
@@ -79,13 +79,13 @@ export function BottomTabBar({
   };
 
   return (
-    <Stack backgroundColor="$surface" data-safe-area="bottom">
+    <SafeAreaPad backgroundColor="$surface" edge="bottom">
       <TabBar
         accessibilityLabel={t("list")}
         items={items}
         value={activeTab}
         onValueChange={changeTab}
       />
-    </Stack>
+    </SafeAreaPad>
   );
 }

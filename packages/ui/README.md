@@ -57,7 +57,9 @@ export default defineConfig({ plugins: [linkyUi(), react()] });
 
 On the web, import `@linky-fit/ui/manrope.css` once (from CSS or JS); it registers self-hosted `Manrope` for weights 400, 600 and 700, and the font stack falls back to `system-ui`. Publish `fonts/manrope/OFL.txt` with the app, e.g. at `public/licenses/Manrope-OFL.txt`.
 
-A full-screen `Dialog` marks its top and bottom edges with `data-safe-area="top"` and `data-safe-area="bottom"`. On the web, give those attributes the device insets as `padding-top` and `padding-bottom`, e.g. `env(safe-area-inset-top)`; the dialog adds its own padding inside them.
+`SafeAreaPad` pads a stack by the device inset of one screen edge; a full-screen `Dialog` pads its top and bottom edges with it. On native it reads the insets from `react-native-safe-area-context`, so render the app inside its `SafeAreaProvider`. On the web it marks the stack with `data-safe-area="top"` or `data-safe-area="bottom"`: give those attributes the device insets as `padding-top` and `padding-bottom`, e.g. `env(safe-area-inset-top)`; the dialog adds its own padding inside them.
+
+`PageScroll` fills its parent and scrolls its content vertically: a `ScrollView` on native, an `overflow-y: auto` stack on the web.
 
 ## Tokens and themes
 

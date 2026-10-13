@@ -12,6 +12,7 @@ import {
   size,
   space,
   useMedia,
+  SafeAreaPad,
 } from "@linky-fit/ui";
 import React from "react";
 import { useAtomValue } from "@linky-fit/linkstr-react";
@@ -451,19 +452,19 @@ export function ProfilePage({
   const saveAction = wide ? (
     saveButton
   ) : (
-    <Stack
+    <SafeAreaPad
       position="fixed"
       bottom="$none"
       left="$none"
       right="$none"
       backgroundColor="$background"
       zIndex="$sticky"
-      data-safe-area="bottom"
+      edge="bottom"
     >
       <Stack paddingHorizontal="$xl" paddingVertical="$lg">
         {saveButton}
       </Stack>
-    </Stack>
+    </SafeAreaPad>
   );
 
   return (

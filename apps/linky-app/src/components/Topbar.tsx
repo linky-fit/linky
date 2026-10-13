@@ -2,9 +2,9 @@ import {
   Avatar,
   IconButton,
   Pressable,
-  Stack,
   Text,
   TopBar,
+  SafeAreaPad,
 } from "@linky-fit/ui";
 import React from "react";
 import { useNostrPictureByNpub } from "../app/hooks/contacts/useProfileCache";
@@ -121,8 +121,8 @@ export function Topbar({
   return desktopDetail ? (
     <TopBar {...props} />
   ) : (
-    <Stack data-safe-area="top" backgroundColor="$background">
+    <SafeAreaPad edge="top" backgroundColor="$background">
       <TopBar {...props} />
-    </Stack>
+    </SafeAreaPad>
   );
 }

@@ -15,6 +15,7 @@ import {
   SubmitButton,
   Text,
   TextField,
+  SafeAreaPad,
 } from "@linky-fit/ui";
 import type { IconName } from "@linky-fit/ui";
 import React from "react";
@@ -128,11 +129,11 @@ const StepBody = ({ children }: { children: React.ReactNode }) => (
 
 /** Pins the step's main action to the screen bottom. */
 const StepActions = ({ children }: { children: React.ReactNode }) => (
-  <Stack
+  <SafeAreaPad
     position="sticky"
     bottom="$none"
     backgroundColor="$background"
-    data-safe-area="bottom"
+    edge="bottom"
   >
     <Stack
       gap="$sm"
@@ -144,7 +145,7 @@ const StepActions = ({ children }: { children: React.ReactNode }) => (
     >
       {children}
     </Stack>
-  </Stack>
+  </SafeAreaPad>
 );
 
 export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({

@@ -1,4 +1,4 @@
-import { IconButton, Stack, size, space, useMedia } from "@linky-fit/ui";
+import { IconButton, size, space, useMedia, SafeAreaPad } from "@linky-fit/ui";
 import type { IconName } from "@linky-fit/ui";
 
 /** Bottom padding that keeps a page's last content clear of the button. */
@@ -20,12 +20,12 @@ export function FloatingActionButton({
 }: FloatingActionButtonProps) {
   const { wide } = useMedia();
   return (
-    <Stack
+    <SafeAreaPad
       position="absolute"
       right={wide ? "$xxl" : "$xl"}
       bottom={wide ? "$xxl" : "$xxxl"}
       zIndex="$sticky"
-      data-safe-area={wide ? undefined : "bottom"}
+      edge={wide ? undefined : "bottom"}
     >
       <IconButton
         icon={icon}
@@ -36,6 +36,6 @@ export function FloatingActionButton({
         data-guide={guide}
         tooltip={label}
       />
-    </Stack>
+    </SafeAreaPad>
   );
 }

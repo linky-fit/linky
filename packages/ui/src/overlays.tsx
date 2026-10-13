@@ -4,6 +4,7 @@ import { IconButton } from "./controls";
 import { useDialogBehavior } from "./dialogBehavior";
 import { Row, ScrollList, Stack } from "./layout";
 import { textVariant } from "./styles";
+import { SafeAreaPad } from "./safe-area";
 import { enterScale, shadow, space } from "./tokens";
 
 const fade = { opacity: 0 } as const;
@@ -200,14 +201,14 @@ export function Dialog({
   );
 }
 
-/** Marks the screen edges that the web app pads by the device insets (see README). */
+/** Pads a full-screen dialog by the device insets. */
 function SafeAreaEdges({ children }: { children: ReactNode }) {
   return (
-    <Stack flex={1} minHeight={0} data-safe-area="top">
-      <Stack flex={1} minHeight={0} data-safe-area="bottom">
+    <SafeAreaPad flex={1} minHeight={0} edge="top">
+      <SafeAreaPad flex={1} minHeight={0} edge="bottom">
         {children}
-      </Stack>
-    </Stack>
+      </SafeAreaPad>
+    </SafeAreaPad>
   );
 }
 

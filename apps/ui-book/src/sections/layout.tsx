@@ -35,6 +35,20 @@ export const layout: Section = {
         </UI.Card>
       </UI.Stack>
     ),
+    PageScroll: () => (
+      <UI.Stack height={160}>
+        <UI.PageScroll>
+          {Array.from({ length: 12 }, (_, index) => (
+            <UI.Text key={index}>Scrolling line {index + 1}</UI.Text>
+          ))}
+        </UI.PageScroll>
+      </UI.Stack>
+    ),
+    SafeAreaPad: () => (
+      <UI.SafeAreaPad edge="top" backgroundColor="$surface">
+        <UI.Text>Padded below the top device inset</UI.Text>
+      </UI.SafeAreaPad>
+    ),
     Section: () => (
       <UI.Section title="A section">
         <UI.Text>Related content</UI.Text>
