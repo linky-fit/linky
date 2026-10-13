@@ -1,3 +1,4 @@
+import { NostrSecretKey } from "@linky-fit/linkstr";
 import { HDKey } from "@scure/bip32";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
@@ -11,6 +12,7 @@ import {
   ERROR_TRACKER_OWNER_PATH,
   messagesOwnerPath,
   META_OWNER_PATH,
+  NOSTR_PATH,
   transactionsOwnerPath,
 } from "./derivationPaths";
 import {
@@ -112,5 +114,23 @@ export const deriveCashuMnemonicFromMasterSecret = (
       new IdentityDerivationError({
         cause,
         message: "Failed to derive Cashu mnemonic from master secret",
+      }),
+  });
+
+/** The Nostr signing key alone, skipping the wallet seed and owner keys `IdentityProvider` also derives. */
+export const deriveNostrSecretKeyFromMasterSecret = (
+  masterSecret: MasterSecret,
+): Effect.Effect<NostrSecretKey, IdentityDerivationError> =>
+  Effect.try({
+    try: () => {
+      const { privateKey } =
+        HDKey.fromMasterSeed(masterSecret).derive(NOSTR_PATH);
+      if (!privateKey) throw new Error("The Nostr path has no private key");
+      return NostrSecretKey.make(privateKey);
+    },
+    catch: (cause) =>
+      new IdentityDerivationError({
+        cause,
+        message: "Failed to derive the Nostr key from master secret",
       }),
   });

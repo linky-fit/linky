@@ -1,18 +1,36 @@
-import { Effect } from "effect";
+import { Effect, Layer } from "effect";
 import { describe, expect, it } from "vitest";
 import {
   deriveCashuMnemonicFromMasterSecret,
+  deriveNostrSecretKeyFromMasterSecret,
   deriveOwnerMnemonicsFromMasterSecret,
   parseOwnerLaneIndex,
   type OwnerMnemonicRequest,
 } from "./derive";
 import { MasterSecret } from "./domain";
+import { IdentityProvider } from "./IdentityProvider";
+import { MasterSecretProvider } from "./MasterSecretProvider";
 
 const TEST_SEED = MasterSecret.make(
   new Uint8Array(Array.from({ length: 64 }, (_, i) => (i + 1) % 256)),
 );
 
 describe("identity derivation", () => {
+  it("derives the same Nostr key as IdentityProvider", async () => {
+    const identity = await Effect.runPromise(
+      Effect.provide(
+        IdentityProvider,
+        Layer.provide(
+          IdentityProvider.layer,
+          Layer.succeed(MasterSecretProvider, TEST_SEED),
+        ),
+      ),
+    );
+    expect(
+      await Effect.runPromise(deriveNostrSecretKeyFromMasterSecret(TEST_SEED)),
+    ).toEqual(identity.nostrSigningKey);
+  });
+
   it("parses valid owner lane indexes and rejects invalid ones", async () => {
     const valid = await Effect.runPromise(parseOwnerLaneIndex(7));
     expect(valid).toBe(7);

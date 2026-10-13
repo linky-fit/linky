@@ -1,17 +1,16 @@
 import {
   createSlip39Share,
   deriveCashuMnemonicFromMasterSecret,
+  deriveNostrSecretKeyFromMasterSecret,
   deriveOwnerMnemonicsFromMasterSecret,
-  IdentityProvider,
-  MasterSecretProvider,
   parseOwnerLaneIndex,
   parseSlip39Share,
   recoverMasterSecretFromSlip39Share,
   type MasterSecret,
   type OwnerRole,
 } from "@linky-fit/identity";
-import { encodeNpub, encodeNsec } from "@linky-fit/linkstr";
-import { Effect, Layer } from "effect";
+import { derivePubkey, encodeNpub, encodeNsec } from "@linky-fit/linkstr";
+import { Effect } from "effect";
 
 interface DerivedNostrKeys {
   npub: string;
@@ -34,14 +33,15 @@ const pendingOwnerMnemonicRequests = new Map<
   PendingOwnerMnemonicRequest[]
 >();
 
-// Recovery is deterministic PBKDF2 work and every derivation from one share
-// needs it, so the last share's result is reused.
+// Recovery and the Nostr key are deterministic and asked for several times
+// per sign-in, so the last share's results are reused.
 let lastRecovery: {
   readonly rawText: string;
   readonly masterSecret: Promise<MasterSecret>;
+  nostrKeys?: Promise<DerivedNostrKeys>;
 } | null = null;
 
-const recoverMasterSecret = (rawText: string): Promise<MasterSecret> => {
+const recoveryOf = (rawText: string) => {
   if (lastRecovery?.rawText !== rawText) {
     lastRecovery = {
       rawText,
@@ -52,7 +52,22 @@ const recoverMasterSecret = (rawText: string): Promise<MasterSecret> => {
       ),
     };
   }
-  return lastRecovery.masterSecret;
+  return lastRecovery;
+};
+
+const recoverMasterSecret = (rawText: string): Promise<MasterSecret> =>
+  recoveryOf(rawText).masterSecret;
+
+const nostrKeysOf = async (
+  masterSecret: Promise<MasterSecret>,
+): Promise<DerivedNostrKeys> => {
+  const secretKey = await Effect.runPromise(
+    deriveNostrSecretKeyFromMasterSecret(await masterSecret),
+  );
+  return {
+    npub: encodeNpub(derivePubkey(secretKey)),
+    nsec: encodeNsec(secretKey),
+  };
 };
 
 export const forgetRecoveredMasterSecret = (): void => {
@@ -62,20 +77,10 @@ export const forgetRecoveredMasterSecret = (): void => {
 export const deriveNostrKeysFromSlip39 = async (
   rawText: string,
 ): Promise<DerivedNostrKeys | null> => {
+  const recovery = recoveryOf(rawText);
+  recovery.nostrKeys ??= nostrKeysOf(recovery.masterSecret);
   try {
-    const masterSecret = await recoverMasterSecret(rawText);
-    const identity = await Effect.runPromise(
-      Effect.provide(
-        IdentityProvider,
-        Layer.provide(
-          IdentityProvider.layer,
-          Layer.succeed(MasterSecretProvider, masterSecret),
-        ),
-      ),
-    );
-    const nsec = encodeNsec(identity.nostrSigningKey);
-    const npub = encodeNpub(identity.nostrPublicKey);
-    return { npub, nsec };
+    return await recovery.nostrKeys;
   } catch {
     return null;
   }
