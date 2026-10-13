@@ -61,6 +61,8 @@ export default ({ projectRoot }: ConfigContext): ExpoConfig => {
       version,
       scheme: ["linky", "nostr", "cashu", "nostrconnect"],
       orientation: "portrait",
+      // The app follows the system appearance itself; Expo's default pins iOS to light.
+      userInterfaceStyle: "automatic",
       ios: {
         bundleIdentifier: id,
         appleTeamId,
