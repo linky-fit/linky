@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type Ref } from "react";
+import { useEffect, useMemo, useRef, useState, type Ref } from "react";
 import {
   Animated,
   type ScrollView as ScrollViewRef,
@@ -7,7 +7,10 @@ import {
 import type { GetProps, TamaguiElement } from "tamagui";
 import { ScrollView } from "tamagui";
 import { Stack } from "./layout";
-import { PageScrollFrameContext } from "./page-scroll-frame";
+import {
+  PageScrollFrameContext,
+  registerPageScroll,
+} from "./page-scroll-frame";
 
 export type PageScrollProps = GetProps<typeof Stack>;
 
@@ -15,13 +18,20 @@ export type PageScrollProps = GetProps<typeof Stack>;
 export function PageScroll({ testID, ...props }: PageScrollProps) {
   const [scrollY] = useState(() => new Animated.Value(0));
   const [height, setHeight] = useState(0);
+  const scroll = useRef<ScrollViewRef>(null);
   const content = useRef<View>(null);
+  const visibleHeight = useRef(0);
   const frame = useMemo(
     () => ({ scrollY, height, content }),
     [scrollY, height],
   );
+  useEffect(
+    () => registerPageScroll({ scroll, content, height: visibleHeight }),
+    [],
+  );
   return (
     <Animated.ScrollView
+      ref={scroll}
       testID={testID}
       style={{ flex: 1 }}
       contentContainerStyle={{ flexGrow: 1 }}
@@ -31,7 +41,10 @@ export function PageScroll({ testID, ...props }: PageScrollProps) {
         [{ nativeEvent: { contentOffset: { y: scrollY } } }],
         { useNativeDriver: true },
       )}
-      onLayout={(event) => setHeight(event.nativeEvent.layout.height)}
+      onLayout={(event) => {
+        visibleHeight.current = event.nativeEvent.layout.height;
+        setHeight(event.nativeEvent.layout.height);
+      }}
     >
       <PageScrollFrameContext value={frame}>
         <Stack ref={content} flexGrow={1} {...props} />

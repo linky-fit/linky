@@ -1,3 +1,4 @@
+import { revealInPageScroll } from "@linky-fit/ui";
 import React from "react";
 import { Dimensions } from "react-native";
 import {
@@ -11,6 +12,7 @@ export type { UseGuideHighlightParams } from "../app/lib/guideTargets";
 const PAD = 8;
 // Native has no scroll or resize events for the whole screen, so the target is re-measured.
 const MEASURE_EVERY_MS = 250;
+const REVEAL_ATTEMPTS = 8;
 
 interface WindowRect {
   readonly x: number;
@@ -75,12 +77,33 @@ const sameRect = (
     a.width === b.width &&
     a.height === b.height);
 
-/** Reports where the walkthrough's target is in the window while the step shows. */
+/** Scrolls the walkthrough's target into view and reports where it is in the window while the step shows. */
 export const useGuideHighlight = ({
   target,
+  stepId,
   routeKind,
   onRect,
 }: UseGuideHighlightParams): void => {
+  React.useEffect(() => {
+    if (target === null) return;
+    let cancelled = false;
+    let attempts = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // The target can mount after the step starts, e.g. on the page the step opens.
+    const reveal = async () => {
+      const [node] = guideTargetNodes(target);
+      const revealed = node !== undefined && (await revealInPageScroll(node));
+      attempts += 1;
+      if (cancelled || revealed || attempts >= REVEAL_ATTEMPTS) return;
+      timer = setTimeout(() => void reveal(), MEASURE_EVERY_MS);
+    };
+    void reveal();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [target, stepId]);
+
   React.useEffect(() => {
     if (target === null) {
       onRect(null);
