@@ -32,18 +32,27 @@ const templateReleaseSigning = `            // Caution! In production, you need 
             // see https://reactnative.dev/docs/signed-apk-android.
             signingConfig signingConfigs.debug`;
 
-const linkyReleaseSigning = `            signingConfig linkyHasUploadKey ? signingConfigs.release : signingConfigs.debug`;
+const linkyReleaseSigning = `            signingConfig linkyHasUploadKey ? signingConfigs.release : signingConfigs.debug
+            if (!linkyHasUploadKey) versionNameSuffix '-qa'`;
 
 const uploadKeyCheck = `
 def linkyHasUploadKey = ['LINKY_UPLOAD_STORE_FILE', 'LINKY_UPLOAD_STORE_PASSWORD', 'LINKY_UPLOAD_KEY_ALIAS', 'LINKY_UPLOAD_KEY_PASSWORD'].every { System.getenv(it)?.trim() }
 `;
 
-const requireUploadKeyTask = `
-tasks.configureEach { task ->
-    if ((task.name == 'bundleRelease' || task.name == 'assembleRelease') && !linkyHasUploadKey) {
-        task.doFirst {
-            throw new GradleException('Release signing is not configured. Set the LINKY_UPLOAD_* environment variables.')
-        }
+/** Google Play holds the Capacitor builds' version codes, 200001000 + run number (.github/actions/android-release-setup). */
+const playVersionCodeFloor = 200001000;
+
+const productionReleaseChecks = `
+        if (!linkyHasUploadKey) throw new GradleException('The production variant signs releases only with the upload key. Set the LINKY_UPLOAD_* environment variables.')
+        if (android.defaultConfig.versionCode <= ${playVersionCodeFloor}) throw new GradleException("The production variant needs LINKY_ANDROID_VERSION_CODE above ${playVersionCodeFloor}, or Google Play rejects it as older than the Capacitor builds; got \${android.defaultConfig.versionCode}.")`;
+
+const qaReleaseWarning = `
+        if (!linkyHasUploadKey) logger.warn('LINKY_UPLOAD_* is not set: signing the release with the debug keystore as a local QA build (version name suffix -qa), not for distribution.')`;
+
+// Runs once the task graph is known, so a refused release stops before compiling anything.
+const releaseCheck = (checks: string) => `
+gradle.taskGraph.whenReady { graph ->
+    if (graph.allTasks.any { it.project == project && it.name in ['packageRelease', 'signReleaseBundle'] }) {${checks}
     }
 }
 `;
@@ -59,11 +68,12 @@ const replaceOnce = (source: string, from: string, to: string): string => {
 /**
  * Debug builds sign with LINKY_ANDROID_DEBUG_KEYSTORE (default ~/.android/debug.keystore),
  * release builds with the Capacitor app's LINKY_UPLOAD_* key. Without that key a release
- * build falls back to the debug keystore, unless `requireUploadKey` makes it fail.
+ * build is a local QA build: debug-signed, its version name suffixed `-qa`, and it warns.
+ * A `production` release refuses it, and refuses a version code Google Play would reject.
  */
-export const withLinkySigning: ConfigPlugin<{ requireUploadKey: boolean }> = (
+export const withLinkySigning: ConfigPlugin<{ production: boolean }> = (
   config,
-  { requireUploadKey },
+  { production },
 ) =>
   withAppBuildGradle(config, (gradle) => {
     let contents = replaceOnce(
@@ -81,7 +91,9 @@ export const withLinkySigning: ConfigPlugin<{ requireUploadKey: boolean }> = (
       "\nandroid {",
       `${uploadKeyCheck}\nandroid {`,
     );
-    if (requireUploadKey) contents += requireUploadKeyTask;
+    contents += releaseCheck(
+      production ? productionReleaseChecks : qaReleaseWarning,
+    );
     gradle.modResults.contents = contents;
     return gradle;
   });

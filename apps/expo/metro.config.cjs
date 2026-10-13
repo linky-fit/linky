@@ -14,6 +14,11 @@ const { appVersion, appCommitSha } = jiti(
 process.env.EXPO_PUBLIC_APP_VERSION = appVersion;
 process.env.EXPO_PUBLIC_APP_COMMIT_SHA = appCommitSha;
 
+// Release bundles skip .env.development; LINKY_NATIVE_SERVICES=local builds
+// one against the local stack. Variables already set win.
+if (process.env.LINKY_NATIVE_SERVICES === "local")
+  process.loadEnvFile(path.join(__dirname, ".env.development"));
+
 // An iPhone cannot reach this machine's localhost: LINKY_DEV_HOST=<LAN IP>
 // points the local service URLs from .env.development at this machine.
 if (process.env.LINKY_DEV_HOST) {
