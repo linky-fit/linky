@@ -45,6 +45,7 @@ import { StickyTopBar } from "./StickyTopBar";
 import { SelfieCaptureModal } from "./SelfieCaptureModal";
 
 import type { Translate } from "../i18n";
+import { keepInputFocus } from "../utils/keepInputFocus";
 
 interface UnauthenticatedLayoutProps {
   confirmPendingOnboardingProfile: () => Promise<void>;
@@ -94,8 +95,6 @@ const formatTemplate = (template: string, vars: Record<string, string>) =>
   template.replace(/\{(\w+)\}/g, (_match, key: string) => vars[key] ?? "");
 
 // Keeps the word field focused (and the phone keyboard open) while tapping helpers.
-const keepInputFocus = (event: React.PointerEvent) => event.preventDefault();
-
 const SLIP39_WORD_INDEXES = Array.from(
   { length: SLIP39_WORD_COUNT },
   (_, index) => index,

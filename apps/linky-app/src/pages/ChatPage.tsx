@@ -119,6 +119,7 @@ import {
 import { ChatMessageEditor } from "../components/ChatMessageEditor";
 import { navigateTo } from "../hooks/useRouting";
 import type { Translate } from "../i18n";
+import { keepInputFocus } from "../utils/keepInputFocus";
 import { formatChatDayLabel, normalizeLocale } from "../utils/formatting";
 import type { MintIcon } from "../utils/mint";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
@@ -926,11 +927,6 @@ export const ChatComposer = memo(function ChatComposer({
         if (files.length > 0 && canAttach) addChatAttachments(files);
       });
   };
-  // Keeps the editor focused, and the iOS keyboard open, while tapping composer
-  // controls. React Native's pointer events have no preventDefault.
-  const keepEditorFocus = (event: React.PointerEvent) => {
-    if (typeof event.preventDefault === "function") event.preventDefault();
-  };
   const showSend = hasDraftText || chatAttachments.length > 0;
 
   return (
@@ -975,7 +971,7 @@ export const ChatComposer = memo(function ChatComposer({
                   padding="$xs"
                   borderRadius="$control"
                   backgroundColor="$surfaceRaised"
-                  onPointerDown={keepEditorFocus}
+                  onPointerDown={keepInputFocus}
                 >
                   {mentionSuggestions.map((suggestion) =>
                     suggestion.kind === "group" ? (
@@ -1068,7 +1064,7 @@ export const ChatComposer = memo(function ChatComposer({
                 accessibilityLabel={
                   editContext ? t("chatSaveAction") : t("send")
                 }
-                onPointerDown={keepEditorFocus}
+                onPointerDown={keepInputFocus}
                 onPress={() => void requestSend()}
                 disabled={!canSendChat}
                 data-guide="chat-send"
@@ -1079,7 +1075,7 @@ export const ChatComposer = memo(function ChatComposer({
                 variant="secondary"
                 size="sm"
                 accessibilityLabel={t("chatImageAttach")}
-                onPointerDown={keepEditorFocus}
+                onPointerDown={keepInputFocus}
                 onPress={attachFiles}
                 disabled={!canAttach}
               />

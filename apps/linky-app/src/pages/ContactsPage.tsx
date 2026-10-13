@@ -28,6 +28,7 @@ import { useContactRows } from "../app/hooks/useLinksync";
 import type { ContactRowLike } from "../app/types/appTypes";
 import { navigateTo } from "../hooks/useRouting";
 import type { Translate } from "../i18n";
+import { keepInputFocus } from "../utils/keepInputFocus";
 import { asInputElement } from "../utils/domNodes";
 import { firstName, formatShortNpub } from "../utils/formatting";
 
@@ -171,7 +172,7 @@ export const ContactsPage: FC<ContactsPageProps> = React.memo(
                     size="sm"
                     variant="secondary"
                     accessibilityLabel={t("contactsSearchClear")}
-                    onPointerDown={(event) => event.preventDefault()}
+                    onPointerDown={keepInputFocus}
                     onPress={() => {
                       setContactsSearch("");
                       requestAnimationFrame(() => {

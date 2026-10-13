@@ -35,6 +35,7 @@ import type { ContactNewStep } from "../app/types/appTypes";
 import { isLightningAddress } from "../lnurlPay";
 
 import type { Translate } from "../i18n";
+import { keepInputFocus } from "../utils/keepInputFocus";
 import { readClipboardText } from "../platform/clipboard";
 import { normalizeContactGroups } from "../utils/contactGroups";
 import {
@@ -564,7 +565,7 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
             icon="ClipboardPaste"
             size="sm"
             accessibilityLabel={t("paste")}
-            onPointerDown={(event) => event.preventDefault()}
+            onPointerDown={keepInputFocus}
             onPress={() => void pasteSearch()}
           />
         }
