@@ -118,12 +118,18 @@ export const fields: Section = {
       );
     },
     RichTextInput: () => {
-      const [empty, setEmpty] = useState(true);
+      const [text, setText] = useState("");
       return (
         <UI.RichTextInput
-          placeholder="Write with inline entities"
-          empty={empty}
-          onInput={(event) => setEmpty(!event.currentTarget.textContent)}
+          placeholder="Write with inline @entities"
+          empty={text === ""}
+          onInput={(event) => setText(event.currentTarget.textContent ?? "")}
+          native={{
+            segments: text
+              .split(/(@\w+)/u)
+              .map((part) => ({ text: part, entity: part.startsWith("@") })),
+            onChangeText: setText,
+          }}
         />
       );
     },

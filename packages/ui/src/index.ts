@@ -58,7 +58,11 @@ export type { TextFieldProps } from "./fields";
 export { SelectField } from "./select-field";
 export type { SelectFieldProps, SelectOption } from "./select-field";
 export { RichTextInput } from "./rich-text-input";
-export type { RichTextInputProps } from "./rich-text-input";
+export type {
+  RichTextInputNative,
+  RichTextInputProps,
+  RichTextSegment,
+} from "./rich-text-input";
 export { Form, SubmitButton } from "./form";
 export type { FormProps, SubmitButtonProps } from "./form";
 
