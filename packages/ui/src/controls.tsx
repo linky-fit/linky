@@ -31,6 +31,8 @@ export function Pressable({ disabled, tooltip, ...props }: PressableProps) {
       padding="$none"
       focusVisibleStyle={focusRing}
       disabledStyle={{ opacity: opacity.disabled, cursor: "default" }}
+      // Android fades each child on its own otherwise, so a label washes into its dimmed background.
+      needsOffscreenAlphaCompositing={disabled}
       disabled={disabled}
       // Tamagui's disabled button ignores the pointer, which would hide its tooltip.
       pointerEvents="auto"
