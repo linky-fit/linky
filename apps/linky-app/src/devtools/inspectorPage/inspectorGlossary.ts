@@ -270,6 +270,12 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "On the screen shown after the keys could not be read, the user chose retry (the page reloads and reads the secure store again) or continue (the restore-from-backup-words step only; creating an account is not offered, since it could overwrite keys still in secure storage).",
   "secrets.nativeWriteRolledBack":
     "Saving identity secrets (a restore, identity switch or new cashu seed) on a native app: the native secure storage failed or did not read back the new value for the keys under missed. The app removed every key of the set from the native store, so the next boot reads the complete new set from localStorage instead of a mix of old and new secrets; notRemoved lists keys the native store also failed to remove. The payload names the keys, never the values.",
+  "secrets.secureStoreFailed":
+    "On the Expo app, the secure store (iOS Keychain, Android Keystore) failed to read, write or delete one key. A failed read at boot leaves that secret unknown, never missing; the cause is the store's own error. The payload names the key, never the value.",
+  "session.reinstallAwaitingHydration":
+    "First launch of an Expo app install that found the account's secrets in the iOS Keychain, which outlives an uninstall. The account waits for its first sync like a restore, so the empty database never writes over the synced data.",
+  "auth.logoutWiped":
+    "On the Expo app, the boot after a logout deleted the Linky database files and the secure-store secrets, then cleared device storage. failure is why the database files could not be deleted; secretsNotRemoved lists keys the secure store kept.",
   "evolu.serversChanged":
     "The user changed the Evolu server list. The payload records the saved configured and enabled servers, including an empty selection. A reload applies the new transports.",
   "evolu.linkyRelayMigrated":

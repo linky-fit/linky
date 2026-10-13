@@ -74,7 +74,7 @@ const evoluImportPatterns = [
   {
     group: ["@evolu/*"],
     message:
-      "Take Evolu re-exports from @linky-fit/linksync; only src/evolu.ts, src/evoluDb.worker.ts, src/platform/evolu.web.ts and src/app/migrations import @evolu/* directly.",
+      "Take Evolu re-exports from @linky-fit/linksync; only src/evolu.ts, src/evoluDb.worker.ts, src/platform/evolu.web.ts, src/platform/evolu.native.ts and src/app/migrations import @evolu/* directly.",
   },
 ];
 const wipeImportPatterns = [
@@ -317,6 +317,21 @@ export default defineConfig([
             ...wipeImportPatterns,
             ...pureJsPbkdf2ImportPatterns,
             { group: ["react-dom", "react-dom/*"], message: nativeMessage },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/platform/evolu.native.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            ...testHelperImportPatterns,
+            ...wipeImportPatterns,
+            ...pureJsPbkdf2ImportPatterns,
           ],
         },
       ],
