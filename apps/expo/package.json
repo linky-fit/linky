@@ -47,6 +47,7 @@
     "expo-image-picker": "~57.0.20",
     "expo-intent-launcher": "~57.0.1",
     "expo-linking": "~57.0.12",
+    "expo-media-library": "~57.0.5",
     "expo-network": "~57.0.2",
     "expo-router": "~57.0.26",
     "expo-secure-store": "~57.0.4",
@@ -65,7 +66,8 @@
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
     "react-native-svg": "15.15.4",
-    "react-native-web": "0.21.3"
+    "react-native-web": "0.21.3",
+    "react-native-webview": "13.16.1"
   },
   "devDependencies": {
     "@linky-fit/config": "workspace:*",

@@ -2,7 +2,7 @@
 
 Linky's design system: Tamagui components that render the same on React Native (Expo) and on the web through react-native-web. Components take translated labels, formatted values and callbacks; wallet, Nostr, storage and navigation logic stays in the app.
 
-The package ships TypeScript source. Add `"@linky-fit/ui": "workspace:*"` to the consumer and let Metro or Vite compile it. Peers: `react`, `react-native`, `react-native-svg`, and on the web `react-dom` and `react-native-web`.
+The package ships TypeScript source. Add `"@linky-fit/ui": "workspace:*"` to the consumer and let Metro or Vite compile it. Peers: `react`, `react-native`, `react-native-svg`, on native `react-native-webview` (for `SandboxedHtml` and `VideoEmbed`), and on the web `react-dom` and `react-native-web`.
 
 ## Setup
 
@@ -111,4 +111,4 @@ The config makes style values strict at the type level: color props accept theme
 - Navigation: `TopBar`, `TabBar` (docked icon tabs with an indicator that can follow a swipe), `NavigationRail` (the full-height section column on wide screens, with a header such as the profile avatar and `footerItems` pinned to its bottom)
 - Payments: `Keypad`, `QRCode` (optional centre `badge` icon), `Amount`
 - Messaging: `MessageBubble`, `DaySeparator`, `ReplyPreview`, `MessageComposerFrame` (stacks a header, the app's input with its send action inside, e.g. a `RichTextInput` with `trailing`, and a footer), `MessageLink`, `LinkPreview`, `FileAttachment`, `ImageAttachment`, `AttachmentTray`, `EmojiPicker`
-- Media: `DeviceFrame` (a phone around a screen, e.g. an app screenshot on a marketing page), `MediaFrame`, `CameraPreview` (a live `getUserMedia` stream inside a `MediaFrame` on the web), `ImageCropPreview`, `DocumentPages`, `VideoEmbed` (a third-party player such as YouTube in a 16:9 frame on the web; nothing on native)
+- Media: `DeviceFrame` (a phone around a screen, e.g. an app screenshot on a marketing page), `MediaFrame`, `CameraPreview` (a live `getUserMedia` stream inside a `MediaFrame` on the web), `ImageCropPreview`, `DocumentPages`, `VideoEmbed` (a third-party player such as YouTube in a 16:9 frame; a `react-native-webview` on native)

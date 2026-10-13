@@ -69,6 +69,12 @@ import type * as webNavigation from "./navigation";
 import * as nativeNavigation from "./navigation.native";
 import type * as webUseGuideHighlight from "@linky-fit/linky-app/src/platform/useGuideHighlight";
 import * as nativeUseGuideHighlight from "@linky-fit/linky-app/src/platform/useGuideHighlight.native";
+import type * as webSandboxedHtml from "../../../packages/ui/src/sandboxed-html";
+import * as nativeSandboxedHtml from "../../../packages/ui/src/sandboxed-html.native";
+import type * as webVideoEmbed from "../../../packages/ui/src/video-embed";
+import * as nativeVideoEmbed from "../../../packages/ui/src/video-embed.native";
+import type * as webKeryxHtml from "@linky-fit/linky-app/src/app/lib/keryxHtml";
+import * as nativeKeryxHtml from "@linky-fit/linky-app/src/app/lib/keryxHtml.native";
 
 export const usePushNotificationsSetting: typeof webUsePushNotificationsSetting =
   nativeUsePushNotificationsSetting;
@@ -116,3 +122,6 @@ export const screenOrientation: typeof webScreenOrientation =
   nativeScreenOrientation;
 export const useGuideHighlight: typeof webUseGuideHighlight =
   nativeUseGuideHighlight;
+export const sandboxedHtml: typeof webSandboxedHtml = nativeSandboxedHtml;
+export const videoEmbed: typeof webVideoEmbed = nativeVideoEmbed;
+export const keryxHtml: typeof webKeryxHtml = nativeKeryxHtml;

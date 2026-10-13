@@ -1,9 +1,8 @@
-export interface VideoEmbedProps {
-  /** The player's embed URL, e.g. `https://www.youtube-nocookie.com/embed/<id>`. */
-  src: string;
-  /** Names the player for assistive technology. */
-  title: string;
-}
+import type { ReactElement } from "react";
+import type { VideoEmbedProps } from "./video-embed-props";
 
-/** Embedded players are web pages; native apps link to the video instead. */
-export const VideoEmbed: (props: VideoEmbedProps) => null = () => null;
+export type { VideoEmbedProps } from "./video-embed-props";
+
+/** The props every platform's VideoEmbed takes; `video-embed.web.tsx` and `.native.tsx` render it. */
+export const VideoEmbed: (props: VideoEmbedProps) => ReactElement | null = () =>
+  null;

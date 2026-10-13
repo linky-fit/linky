@@ -54,7 +54,8 @@ export const media: Section = {
           }
         />
         <UI.Text variant="caption" color="$colorMuted">
-          Web only: scripts, same-origin access and remote media stay blocked
+          Scripts, same-origin access and remote media stay blocked; links open
+          outside the app
         </UI.Text>
       </UI.Stack>
     ),
@@ -65,7 +66,8 @@ export const media: Section = {
           src="https://www.youtube-nocookie.com/embed/9zRPQu2SOec"
         />
         <UI.Text variant="caption" color="$colorMuted">
-          Web only: native renders nothing
+          A web view on native, loaded from the hosted app's origin as on the
+          web
         </UI.Text>
       </UI.Stack>
     ),

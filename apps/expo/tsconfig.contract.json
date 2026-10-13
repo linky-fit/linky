@@ -19,6 +19,8 @@
       "expo-secure-store": ["./node_modules/expo-secure-store"],
       "expo-sqlite": ["./node_modules/expo-sqlite"],
       "expo-status-bar": ["./node_modules/expo-status-bar"],
+      "expo-media-library": ["./node_modules/expo-media-library"],
+      "react-native-webview": ["./node_modules/react-native-webview"],
       "@evolu/react-native/expo-sqlite": [
         "./node_modules/@evolu/react-native/dist/exports/expo-sqlite"
       ],

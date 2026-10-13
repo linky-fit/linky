@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { sanitizeAnnouncementHtml } from "./keryxHtml";
+import { sanitizeAnnouncementHtml as sanitizeWeb } from "./keryxHtml";
+import { sanitizeAnnouncementHtml as sanitizeNative } from "./keryxHtml.native";
 
-const parse = (html: string) =>
-  new DOMParser().parseFromString(sanitizeAnnouncementHtml(html), "text/html")
-    .body;
+describe.each([
+  ["web", sanitizeWeb],
+  ["native", sanitizeNative],
+])("sanitizeAnnouncementHtml (%s)", (_, sanitizeAnnouncementHtml) => {
+  const parse = (html: string) =>
+    new DOMParser().parseFromString(sanitizeAnnouncementHtml(html), "text/html")
+      .body;
 
-describe("sanitizeAnnouncementHtml", () => {
   it("drops scripts, event handlers and forms", () => {
     const body = parse(
       '<p onclick="alert(1)">Hi</p><script>alert(1)</script><form><input></form><iframe src="https://x.example"></iframe>',
@@ -43,5 +47,12 @@ describe("sanitizeAnnouncementHtml", () => {
       '<svg><a href="https://evil.example"><text>trezor.io</text></a></svg><math><mi href="https://evil.example">x</mi></math><map><area href="https://evil.example"></map>',
     );
     expect(body.querySelector("[href]")).toBeNull();
+  });
+
+  it("drops elements that navigate on their own and unwraps unknown ones", () => {
+    const body = parse(
+      '<meta http-equiv="refresh" content="0;url=https://evil.example"><base href="https://evil.example/"><!-- note --><x-card><b>Kept</b></x-card>',
+    );
+    expect(body.innerHTML).toBe("<b>Kept</b>");
   });
 });
