@@ -1,0 +1,13 @@
+diff --git a/android/src/main/java/expo/modules/camera/CameraViewModule.kt b/android/src/main/java/expo/modules/camera/CameraViewModule.kt
+index 21382f81b3f42889193c6583a5439690a39f2a64..b53813d3a8e5fc7bbcbfc5bd1bde0afe57d6d438 100644
+--- a/android/src/main/java/expo/modules/camera/CameraViewModule.kt
++++ b/android/src/main/java/expo/modules/camera/CameraViewModule.kt
+@@ -112,7 +112,7 @@ class CameraViewModule : Module() {
+     }
+ 
+     AsyncFunction("scanFromURLAsync") { url: String, barcodeTypes: List<BarcodeType>, promise: Promise ->
+-      if (!CameraUtils.isMLKitAvailable(appContext.reactContext)) {
++      if (!CameraUtils.isMLKitBarcodeScannerAvailable()) {
+         promise.reject(CameraExceptions.MLKitUnavailableException())
+         return@AsyncFunction
+       }

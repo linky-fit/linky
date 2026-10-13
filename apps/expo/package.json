@@ -36,14 +36,22 @@
     "@linky-fit/linky-app": "workspace:*",
     "effect": "^4.0.0",
     "expo": "~57.0.21",
+    "expo-camera": "~57.0.6",
+    "expo-clipboard": "~57.0.2",
     "expo-constants": "~57.0.21",
     "expo-dev-client": "~57.0.20",
+    "expo-document-picker": "~57.0.3",
     "expo-file-system": "~57.0.7",
     "expo-font": "~57.0.4",
+    "expo-image-manipulator": "~57.0.21",
+    "expo-image-picker": "~57.0.20",
+    "expo-intent-launcher": "~57.0.1",
     "expo-linking": "~57.0.12",
     "expo-network": "~57.0.2",
     "expo-router": "~57.0.26",
     "expo-secure-store": "~57.0.4",
+    "expo-sensors": "~57.0.3",
+    "expo-sharing": "~57.0.23",
     "expo-splash-screen": "~57.0.10",
     "expo-sqlite": "~57.0.4",
     "expo-status-bar": "~57.0.1",
@@ -77,6 +85,13 @@
       "exclude": [
         "typescript"
       ]
+    },
+    "autolinking": {
+      "android": {
+        "buildFromSource": [
+          "expo-camera"
+        ]
+      }
     }
   }
 }

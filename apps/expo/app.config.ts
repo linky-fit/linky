@@ -42,6 +42,9 @@ const androidVersionCode = (version: string): number => {
   return major * 10000 + minor * 100 + patch;
 };
 
+const cameraPermission =
+  "Linky uses the camera to scan QR codes and to take photos for your profile and chats.";
+
 export default ({ projectRoot }: ConfigContext): ExpoConfig => {
   const variant = variantName(process.env.LINKY_APP_VARIANT);
   const { id, name } = variants[variant];
@@ -78,6 +81,24 @@ export default ({ projectRoot }: ConfigContext): ExpoConfig => {
         "expo-sqlite",
         "expo-secure-store",
         "expo-font",
+        "expo-sharing",
+        [
+          "expo-camera",
+          {
+            cameraPermission,
+            microphonePermission: false,
+            recordAudioAndroid: false,
+          },
+        ],
+        [
+          "expo-image-picker",
+          {
+            photosPermission:
+              "Linky lets you pick photos for your profile and to send in chats.",
+            cameraPermission,
+            microphonePermission: false,
+          },
+        ],
         [
           "expo-splash-screen",
           {

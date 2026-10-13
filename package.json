@@ -60,6 +60,7 @@
   },
   "patchedDependencies": {
     "bysquare@4.0.0": "patches/bysquare@4.0.0.patch",
-    "@evolu/sqlite-wasm@2.2.4": "patches/@evolu%2Fsqlite-wasm@2.2.4.patch"
+    "@evolu/sqlite-wasm@2.2.4": "patches/@evolu%2Fsqlite-wasm@2.2.4.patch",
+    "expo-camera@57.0.6": "patches/expo-camera@57.0.6.patch"
   }
 }
