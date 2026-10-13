@@ -11,7 +11,7 @@ import {
 } from "./inspectorEnabled";
 import { INSPECTOR_REPORT_PATH } from "./inspectorRows";
 import type { InspectorRow } from "./inspectorRows";
-import { isDevBuild } from "../../platform/buildEnv";
+import { inspectorCollectorOrigin, isDevBuild } from "../../platform/buildEnv";
 
 // App side of the inspector: prepare each row once, then fan it out to every
 // active sink. Production builds have no HTTP reporting path.
@@ -85,7 +85,7 @@ const flushPendingRows = (): void => {
   }
 
   const rows = pendingRows.splice(0);
-  void fetch(INSPECTOR_REPORT_PATH, {
+  void fetch(`${inspectorCollectorOrigin}${INSPECTOR_REPORT_PATH}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ client: getClientId(), rows }),

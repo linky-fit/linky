@@ -1,6 +1,8 @@
 // Metro resolves apps/linky-app/src/platform/buildEnv.ts to this module on iOS
 // and Android; Expo inlines process.env.EXPO_PUBLIC_* at build time.
 
+import Constants from "expo-constants";
+
 declare const __DEV__: boolean;
 
 export const isDevBuild: boolean = __DEV__;
@@ -21,3 +23,8 @@ export const envNotificationServerUrl =
 /** The app has no page origin, so `/api/*` goes to the hosted app unless the build names another. */
 export const apiOrigin: string =
   process.env.EXPO_PUBLIC_API_ORIGIN || "https://app.linky.fit";
+/** Dev builds report inspector rows to the Metro server that served the bundle. */
+export const inspectorCollectorOrigin: string =
+  __DEV__ && Constants.expoConfig?.hostUri
+    ? `http://${Constants.expoConfig.hostUri}`
+    : "";

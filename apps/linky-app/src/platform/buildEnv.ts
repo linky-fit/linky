@@ -20,3 +20,5 @@ export const envNotificationServerUrl = import.meta.env
   .VITE_NOTIFICATION_SERVER_URL;
 /** Origin serving the Linky `/api/*` functions; empty for the page's own origin. */
 export const apiOrigin: string = "";
+/** Origin of the dev server collecting inspector rows; empty for the page's own origin. */
+export const inspectorCollectorOrigin: string = "";
