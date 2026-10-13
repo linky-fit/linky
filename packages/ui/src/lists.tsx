@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
+import type { TamaguiElement } from "tamagui";
 import { Pressable } from "./controls";
 import { Avatar, Pill } from "./display";
 import { Icon } from "./icons";
@@ -27,6 +28,8 @@ export interface ListRowProps {
   disabled?: boolean | undefined;
   accessibilityLabel?: string | undefined;
   testID?: string | undefined;
+  /** The rendered element, e.g. for measuring where it is on screen. */
+  ref?: Ref<TamaguiElement> | undefined;
 }
 
 /**
@@ -49,6 +52,7 @@ export function ListRow({
   disabled = false,
   accessibilityLabel,
   testID,
+  ref,
 }: ListRowProps) {
   const titleColor = destructive
     ? "$dangerText"
@@ -60,6 +64,7 @@ export function ListRow({
   const highlight = onPress && !selected ? "$neutralSoft" : background;
   return (
     <Frame
+      ref={ref}
       testID={testID}
       onPress={onPress}
       disabled={disabled}

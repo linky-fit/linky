@@ -53,6 +53,7 @@ import { COLOR_MODE_PREFERENCE_LABEL_KEYS } from "../utils/colorMode";
 import { pickFile } from "../utils/pickFile";
 import { RECEIVE_METHOD_LABEL_KEYS } from "../utils/receiveMethod";
 import { reloadApp } from "../platform/reload";
+import { guideTargetRef } from "../app/lib/guideTargets";
 
 export function AdvancedPage(): React.ReactElement {
   const { logoutArmed, requestLogout, seedMnemonic } = useIdentitySettings();
@@ -316,6 +317,7 @@ export function AdvancedPage(): React.ReactElement {
           icon="ShieldCheck"
           title={t("masterKeys")}
           testID="open-master-keys"
+          ref={guideTargetRef("open-master-keys")}
           onPress={() => navigateTo({ route: "settingsMasterKeys" })}
           disabled={!hasSeedMnemonic}
         />

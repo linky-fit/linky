@@ -67,6 +67,8 @@ import type * as webMain from "./main";
 import * as nativeMain from "./main.native";
 import type * as webNavigation from "./navigation";
 import * as nativeNavigation from "./navigation.native";
+import type * as webUseGuideHighlight from "@linky-fit/linky-app/src/platform/useGuideHighlight";
+import * as nativeUseGuideHighlight from "@linky-fit/linky-app/src/platform/useGuideHighlight.native";
 
 export const usePushNotificationsSetting: typeof webUsePushNotificationsSetting =
   nativeUsePushNotificationsSetting;
@@ -112,3 +114,5 @@ export const bankPaymentOfferSpdStore: typeof webBankPaymentOfferSpdStore =
   nativeBankPaymentOfferSpdStore;
 export const screenOrientation: typeof webScreenOrientation =
   nativeScreenOrientation;
+export const useGuideHighlight: typeof webUseGuideHighlight =
+  nativeUseGuideHighlight;

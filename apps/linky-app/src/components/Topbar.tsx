@@ -19,6 +19,7 @@ import {
 import type { TopbarButton } from "../app/types/appTypes";
 import { navigateTo } from "../hooks/useRouting";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
+import { guideTarget } from "../app/lib/guideTargets";
 
 interface TopbarProps {
   /** Renders the static header of the desktop detail pane. */
@@ -39,7 +40,7 @@ const TopbarAction = ({
     variant={button.isActive ? "secondary" : "ghost"}
     aria-pressed={button.isActive}
     onPress={button.onClick}
-    data-guide={guide}
+    {...(guide ? guideTarget(guide) : {})}
   />
 );
 

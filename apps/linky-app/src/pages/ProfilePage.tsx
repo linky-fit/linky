@@ -54,6 +54,7 @@ import { PageCard } from "../components/PageCard";
 import { canWriteNfc, useWriteCurrentNpubToNfc } from "../app/hooks/shell/nfc";
 import { useShareText } from "../app/hooks/shell/share";
 import { useWalletCommands } from "../app/hooks/wallet/useWalletCommands";
+import { guideTarget } from "../app/lib/guideTargets";
 
 interface DerivedProfile {
   lnAddress: string;
@@ -366,7 +367,7 @@ export function ProfilePage({
         <Text variant="display" textAlign="center">
           {displayName}
         </Text>
-        <Stack data-guide="profile-qr">
+        <Stack {...guideTarget("profile-qr")}>
           <QRCode
             value={currentNpub}
             accessibilityLabel={t("copy")}
@@ -498,7 +499,7 @@ export function ProfilePage({
         placeholder={t("name")}
       />
 
-      <Stack gap="$xs" data-guide="profile-ln-address">
+      <Stack gap="$xs" {...guideTarget("profile-ln-address")}>
         <Text variant="label" color="$colorSubtle">
           {t("lightningAddress")}
         </Text>

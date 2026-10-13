@@ -7,6 +7,7 @@ import { currentNpubAtom } from "../app/state/session/session";
 import { navigateTo } from "../hooks/useRouting";
 import type { Translate } from "../i18n";
 import { formatShortNpub } from "../utils/formatting";
+import { guideTargetRef } from "../app/lib/guideTargets";
 
 export type BottomTabKey =
   | "profile"
@@ -41,6 +42,7 @@ export function BottomTabBar({
       value: "profile",
       label: t("profile"),
       testID: "profile-qr-button",
+      ref: guideTargetRef("profile-qr-button"),
       leading: (
         <Avatar
           name={
@@ -58,18 +60,21 @@ export function BottomTabBar({
       label: t("wallet"),
       icon: "Wallet",
       testID: "open-wallet",
+      ref: guideTargetRef("open-wallet"),
     },
     {
       value: "proxy",
       label: t("proxyPayments"),
       icon: "HandCoins",
       testID: "open-proxy",
+      ref: guideTargetRef("open-proxy"),
     },
     {
       value: "settings",
       label: t("settings"),
       icon: "Settings",
       testID: "open-menu",
+      ref: guideTargetRef("open-menu"),
     },
   ];
 

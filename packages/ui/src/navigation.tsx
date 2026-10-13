@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
+import type { TamaguiElement } from "tamagui";
 import { Pressable } from "./controls";
 import { Icon } from "./icons";
 import type { IconName } from "./icons";
@@ -59,6 +60,8 @@ export interface NavItem<T extends string = string> {
   leading?: ReactNode;
   disabled?: boolean | undefined;
   testID?: string | undefined;
+  /** The rendered element, e.g. for measuring where it is on screen. */
+  ref?: Ref<TamaguiElement> | undefined;
 }
 
 export interface TabBarProps<T extends string> {
@@ -118,6 +121,7 @@ export function TabBar<T extends string>({
               aria-selected={active}
               aria-label={item.label}
               testID={item.testID}
+              ref={item.ref}
               disabled={item.disabled}
               onPress={() => onValueChange(item.value)}
               flex={1}
@@ -170,6 +174,7 @@ export function NavigationRail<T extends string>({
         aria-label={item.label}
         tooltip={item.label}
         testID={item.testID}
+        ref={item.ref}
         disabled={item.disabled}
         onPress={() => onValueChange(item.value)}
         flexDirection="column"

@@ -6,6 +6,7 @@ import {
 } from "../app/hooks/settings/useIdentitySettings";
 import { usePushToast, useTranslation } from "../app/hooks/shell";
 import { SeedWordGrid } from "../components/SeedWordGrid";
+import { guideTarget } from "../app/lib/guideTargets";
 
 export function MasterKeysPage(): React.ReactElement {
   const { copySeed, saveSeedToPasswordManager } = useSeedBackup();
@@ -57,7 +58,7 @@ export function MasterKeysPage(): React.ReactElement {
           icon="Copy"
           onPress={copySeed}
           disabled={!hasSeedMnemonic}
-          data-guide="copy-seed"
+          {...guideTarget("copy-seed")}
         >
           {t("copy")}
         </Button>

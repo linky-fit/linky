@@ -33,6 +33,7 @@ import {
 } from "../utils/formatting";
 import { resolveVerifiedNip05Identifier } from "../utils/nostrNip05";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
+import { guideTarget } from "../app/lib/guideTargets";
 
 interface Contact {
   id: ContactId;
@@ -189,7 +190,7 @@ export const ContactPage: FC<ContactPageProps> = ({
           onPress={() => openContactPay(contactId)}
           disabled={cashuIsBusy || !canStartPay}
           tooltip={!canStartPay ? t("payInsufficient") : undefined}
-          data-guide="contact-pay"
+          {...guideTarget("contact-pay")}
         >
           {payLabel}
         </Button>
@@ -200,7 +201,7 @@ export const ContactPage: FC<ContactPageProps> = ({
           variant="secondary"
           icon={isFeedbackContact ? "MessageCircle" : "MessageCircleMore"}
           onPress={() => navigateTo({ route: "chat", id: contactId })}
-          data-guide="contact-message"
+          {...guideTarget("contact-message")}
         >
           {messageLabel}
         </Button>

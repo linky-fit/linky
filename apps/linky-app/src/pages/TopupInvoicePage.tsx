@@ -10,6 +10,7 @@ import type { Translate } from "../i18n";
 import { MAIN_MINT_URL, normalizeMintUrl } from "../utils/mint";
 import { optimizeCaseInsensitiveQrPayload } from "../utils/qrPayload";
 import type { ReceiveMethod } from "../utils/receiveMethod";
+import { guideTargetRef } from "../app/lib/guideTargets";
 
 interface TopupInvoicePageProps {
   copyText: (text: string) => Promise<void>;
@@ -81,6 +82,7 @@ export const TopupInvoicePage: FC<TopupInvoicePageProps> = ({
         <Stack gap="$lg">
           <QRCode
             testID="topup-invoice-qr"
+            ref={guideTargetRef("topup-invoice-qr")}
             value={qrValue}
             accessibilityLabel={t("copy")}
             badge="Copy"

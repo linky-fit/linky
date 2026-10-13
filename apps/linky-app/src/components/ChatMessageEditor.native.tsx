@@ -1,5 +1,7 @@
 import { RichTextInput, type RichTextSegment } from "@linky-fit/ui";
 import React from "react";
+import { View } from "react-native";
+import { guideTargetRef } from "../app/lib/guideTargets";
 import { MESSAGE_ENTITY_PATTERN } from "../app/lib/messageEditorEntities";
 import type { CashuTokenMessageInfo } from "../app/lib/tokenMessageInfo";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
@@ -62,12 +64,14 @@ export const ChatMessageEditor = React.forwardRef<
   }, [getCashuTokenMessageInfo, getNpubMessageContactInfo, value]);
 
   return (
-    <RichTextInput
-      placeholder={placeholder}
-      empty={value === ""}
-      disabled={disabled}
-      trailing={trailing}
-      native={{ segments, onChangeText: onChange, onCaretChange }}
-    />
+    <View ref={guideTargetRef("chat-input")}>
+      <RichTextInput
+        placeholder={placeholder}
+        empty={value === ""}
+        disabled={disabled}
+        trailing={trailing}
+        native={{ segments, onChangeText: onChange, onCaretChange }}
+      />
+    </View>
   );
 });

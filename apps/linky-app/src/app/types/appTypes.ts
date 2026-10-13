@@ -211,7 +211,7 @@ export interface ContactsGuideStep {
   bodyKey: I18nKey;
   ensure?: () => void;
   id: string;
-  selector: string;
+  target: string;
   titleKey: I18nKey;
 }
 

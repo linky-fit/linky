@@ -17,6 +17,7 @@ import {
   MessageDirectionIcon,
   MessageEntityPreview,
 } from "./MessageEntityPreview";
+import { guideTarget } from "../app/lib/guideTargets";
 
 interface ContactCardProps {
   avatarUrl: string | null;
@@ -107,7 +108,7 @@ export const ContactCard: React.FC<ContactCardProps> = React.memo(
 
     return (
       <Stack
-        data-guide="contact-card"
+        {...guideTarget("contact-card")}
         data-guide-contact-id={String(contact.id)}
         data-unread={hasAttention || undefined}
       >

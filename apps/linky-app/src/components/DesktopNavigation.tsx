@@ -10,6 +10,7 @@ import {
 } from "../app/routes/desktopRouteSection";
 import { navigateTo, useRouting } from "../hooks/useRouting";
 import { formatShortNpub } from "../utils/formatting";
+import { guideTargetRef } from "../app/lib/guideTargets";
 
 export function DesktopNavigation(): React.ReactElement {
   const route = useRouting();
@@ -26,6 +27,7 @@ export function DesktopNavigation(): React.ReactElement {
           borderRadius="$pill"
           aria-label={t("profile")}
           testID="profile-qr-button"
+          ref={guideTargetRef("profile-qr-button")}
           onPress={() => navigateTo({ route: "profile" })}
         >
           <Avatar
@@ -44,12 +46,14 @@ export function DesktopNavigation(): React.ReactElement {
           label: t("wallet"),
           icon: "Wallet",
           testID: "open-wallet",
+          ref: guideTargetRef("open-wallet"),
         },
         {
           value: "proxy",
           label: t("proxyPayments"),
           icon: "HandCoins",
           testID: "open-proxy",
+          ref: guideTargetRef("open-proxy"),
         },
       ]}
       footerItems={[
@@ -58,6 +62,7 @@ export function DesktopNavigation(): React.ReactElement {
           label: t("settings"),
           icon: "Settings",
           testID: "open-menu",
+          ref: guideTargetRef("open-menu"),
         },
       ]}
       value={getDesktopRouteSection(route)}

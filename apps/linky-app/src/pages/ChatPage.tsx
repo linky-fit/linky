@@ -128,6 +128,7 @@ import { boundedMemo } from "../utils/boundedMemo";
 import { pickFiles } from "../utils/pickFile";
 import { nowSeconds } from "../utils/time";
 import { isDeletedMessage } from "../app/lib/deletedMessage";
+import { guideTarget } from "../app/lib/guideTargets";
 
 interface Contact {
   id: string;
@@ -1028,7 +1029,7 @@ export const ChatComposer = memo(function ChatComposer({
                     openContactPay(selectedContact.id, true, "request")
                   }
                   disabled={cashuIsBusy}
-                  data-guide="chat-request"
+                  {...guideTarget("chat-request")}
                 >
                   {t("requestPayment")}
                 </Button>
@@ -1040,7 +1041,7 @@ export const ChatComposer = memo(function ChatComposer({
                 onPress={() => openContactPay(selectedContact.id, true)}
                 disabled={cashuIsBusy || !canStartPay}
                 tooltip={!canStartPay ? t("payInsufficient") : undefined}
-                data-guide="chat-pay"
+                {...guideTarget("chat-pay")}
               >
                 {isFeedbackContact ? t("donate") : t("pay")}
               </Button>
@@ -1073,7 +1074,7 @@ export const ChatComposer = memo(function ChatComposer({
                 onPointerDown={keepInputFocus}
                 onPress={() => void requestSend()}
                 disabled={!canSendChat}
-                data-guide="chat-send"
+                {...guideTarget("chat-send")}
               />
             ) : (
               <IconButton

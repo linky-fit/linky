@@ -113,7 +113,6 @@ const nativeMessage =
 /** Files that predate the platform seam rule; move their browser access into src/platform and delete the line. */
 export const platformSeamRatchet = [
   "src/app/hooks/composition/useScanNativeComposition.ts",
-  "src/app/hooks/guide/useContactsGuide.ts",
   "src/app/hooks/useAppLanguage.ts",
   "src/app/hooks/useGuideScannerDomain.ts",
   "src/app/hooks/useKeryxMedia.ts",

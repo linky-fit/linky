@@ -43,6 +43,7 @@ import {
   formatShortLightningAddress,
   formatShortNpub,
 } from "../utils/formatting";
+import { guideTarget } from "../app/lib/guideTargets";
 
 export interface ContactFormData {
   name: string;
@@ -144,7 +145,7 @@ export function ContactFields({
         trailing={publicValueAndAction(lightningPublicValue, lightningAction)}
       />
 
-      <Stack gap="$xs" data-guide="contact-group">
+      <Stack gap="$xs" {...guideTarget("contact-group")}>
         <Text variant="label" color="$colorSubtle">
           {t("group")}
         </Text>
@@ -530,7 +531,7 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
         icon="ScanLine"
         onPress={openScan}
         disabled={isSavingContact}
-        data-guide="scan-contact-button"
+        {...guideTarget("scan-contact-button")}
       >
         {t("contactLoadQr")}
       </Button>
@@ -559,7 +560,7 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
         }}
         placeholder={t("contactSearchPlaceholder")}
         autoComplete="off"
-        data-guide="contact-search-input"
+        {...guideTarget("contact-search-input")}
         trailing={
           <IconButton
             icon="ClipboardPaste"
