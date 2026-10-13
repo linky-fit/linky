@@ -113,6 +113,8 @@ export interface LocalNostrMessage {
   rootMessageId?: string | null;
   rumorId: string | null;
   status?: "sent" | "pending";
+  /** When the row was first stored, ISO with milliseconds; orders messages of one second. */
+  storedAt?: string;
   wrapId: string;
 }
 
