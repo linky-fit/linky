@@ -23,6 +23,7 @@ import {
   finishPendingLogout,
   isLogoutPending,
 } from "@linky-fit/linky-app/src/platform/logoutWipe";
+import { adoptLegacySecrets } from "@linky-fit/linky-app/src/platform/legacySecretsMigration.native";
 import { adoptSecretsFromPreviousInstall } from "@linky-fit/linky-app/src/platform/nativeInstall";
 import { makeNativePlatformPorts } from "@linky-fit/linky-app/src/platform/nativePorts.native";
 import { reloadApp } from "@linky-fit/linky-app/src/platform/reload";
@@ -50,7 +51,7 @@ const boot = async (): Promise<BootedSession | null> => {
     reloadApp();
     return null;
   }
-  const ports = makeNativePlatformPorts();
+  const ports = await adoptLegacySecrets(makeNativePlatformPorts());
   await adoptSecretsFromPreviousInstall(ports);
   return bootSession({ ports, makeEvoluPlatform: makeNativeEvoluPlatform });
 };

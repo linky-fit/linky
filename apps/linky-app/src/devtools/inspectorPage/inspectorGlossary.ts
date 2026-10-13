@@ -282,6 +282,12 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "On the Expo app, the secure store (iOS Keychain, Android Keystore) failed to read, write or delete one key. A failed read at boot leaves that secret unknown, never missing; the cause is the store's own error. The payload names the key, never the value.",
   "session.reinstallAwaitingHydration":
     "First launch of an Expo app install that found the account's secrets in the iOS Keychain, which outlives an uninstall. The account waits for its first sync like a restore, so the empty database never writes over the synced data.",
+  "secrets.legacyMigrated":
+    "First launch of the Expo app over the Android Capacitor app: the identity secrets from its encrypted preferences were copied into the secure store, only into keys it didn't hold, each read back. copied, alreadyPresent (same value), kept (the secure store's own value won) and failed count keys; failed lists their names. Without failures the old store was deleted (clearFailure says why it couldn't be) and the account waits for its first sync. Values are never logged.",
+  "secrets.legacyMigrationFailed":
+    "The Expo app found the Android Capacitor app's encrypted preferences but couldn't read them (cause), and the secure store holds no identity. The listed keys read as unreadable, so the app asks the user instead of onboarding; the next launch tries again.",
+  "secrets.legacyMigrationAbandoned":
+    "The secure store already held an identity the Android Capacitor app's secrets don't match: they were unreadable, held no nsec, or belong to another identity (cause). Nothing was copied and the old store was deleted.",
   "auth.logoutWiped":
     "On the Expo app, the boot after a logout deleted the Linky database files and the secure-store secrets, then cleared device storage. failure is why the database files could not be deleted; secretsNotRemoved lists keys the secure store kept.",
   "evolu.serversChanged":
