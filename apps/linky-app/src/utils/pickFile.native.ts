@@ -1,7 +1,7 @@
 import { File as ExpoFile } from "expo-file-system";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
-import { Alert } from "react-native";
+import { ActionSheetIOS, Alert, Platform } from "react-native";
 import { getInitialLang, translations } from "../i18n";
 import { DeviceFile } from "../platform/deviceFile.native";
 
@@ -54,10 +54,24 @@ const pickDocuments = async (
 
 type PickSource = "photos" | "files";
 
-// Like a mobile browser's file input, a picker taking images and documents asks where to pick from.
+// Like a mobile browser's file input, a picker taking images and documents
+// asks where to pick from. iOS presents the picker only once the action sheet
+// has closed, which its callback waits for and Alert's does not.
 const askPickSource = (): Promise<PickSource | null> =>
   new Promise((resolve) => {
     const t = translations[getInitialLang()];
+    const sources: readonly (PickSource | null)[] = ["photos", "files", null];
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title: t.pickSourceTitle,
+          options: [t.pickSourcePhotos, t.pickSourceFiles, t.cancel],
+          cancelButtonIndex: 2,
+        },
+        (index) => resolve(sources[index] ?? null),
+      );
+      return;
+    }
     Alert.alert(
       t.pickSourceTitle,
       undefined,
