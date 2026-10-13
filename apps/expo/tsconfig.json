@@ -9,6 +9,9 @@
     },
     {
       "path": "./tsconfig.native.json"
+    },
+    {
+      "path": "./tsconfig.contract.json"
     }
   ],
   "compilerOptions": {},

@@ -9,6 +9,7 @@
     "src/**/*.test.ts",
     "src/**/*.native.ts",
     "src/**/*.native.tsx",
-    "src/main.ts"
+    "src/main.ts",
+    "src/native.contract.ts"
   ]
 }

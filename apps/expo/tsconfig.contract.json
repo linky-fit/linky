@@ -1,0 +1,8 @@
+{
+  "extends": "@linky-fit/config/tsconfig/app",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.contract.tsbuildinfo",
+    "types": []
+  },
+  "include": ["src/native.contract.ts", "../linky-app/src/*.d.ts"]
+}

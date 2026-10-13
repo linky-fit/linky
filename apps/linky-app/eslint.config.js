@@ -107,6 +107,9 @@ const stateImportPaths = ["react", "react-dom", "@effect/atom-react"].map(
 const platformSeamMessage =
   "Browser APIs go behind the platform seam in src/platform (or a .web.ts sibling), so native builds can supply their own implementation.";
 
+const nativeMessage =
+  "A .native module runs on iOS and Android without a DOM; use React Native or Expo APIs.";
+
 /** Files that predate the platform seam rule; move their browser access into src/platform and delete the line. */
 export const platformSeamRatchet = [
   "src/app/hooks/composition/useScanNativeComposition.ts",
@@ -301,6 +304,25 @@ export default defineConfig([
     ],
     plugins: { "platform-seam": platformSeamPlugin },
     rules: platformSeamRules(platformSeamMessage),
+  },
+  {
+    files: ["src/**/*.native.{ts,tsx}"],
+    plugins: { "platform-seam": platformSeamPlugin },
+    rules: {
+      ...platformSeamRules(nativeMessage),
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            ...testHelperImportPatterns,
+            ...evoluImportPatterns,
+            ...wipeImportPatterns,
+            ...pureJsPbkdf2ImportPatterns,
+            { group: ["react-dom", "react-dom/*"], message: nativeMessage },
+          ],
+        },
+      ],
+    },
   },
   {
     files: ["src/**/*.tsx"],
