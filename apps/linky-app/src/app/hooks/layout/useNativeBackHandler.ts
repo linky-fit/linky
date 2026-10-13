@@ -42,21 +42,26 @@ export const resolveNativeBackAction = ({
  * the user visited instead of moving up the hierarchy, and on a cold start from
  * a deep link or notification there is no in-app entry to return to at all.
  */
-export const useNativeBackHandler = (targets: NativeBackTargets) => {
-  const backAction = resolveNativeBackAction(targets);
+export const useNativeBackHandler = (targets: NativeBackTargets) =>
+  useBackAction(resolveNativeBackAction(targets));
 
+/**
+ * Hands each system back press to `action`; null leaves the press to the
+ * system, which closes the app.
+ */
+export const useBackAction = (action: (() => void) | null) => {
   // Keep the newest action in a ref so the listener registers only once and
   // never runs against a stale route or a dismissed overlay.
-  const backActionRef = useLatest(backAction);
+  const actionRef = useLatest(action);
 
   React.useEffect(
     () =>
       onBackPress(() => {
-        const action = backActionRef.current;
-        if (!action) return false;
-        action();
+        const current = actionRef.current;
+        if (!current) return false;
+        current();
         return true;
       }),
-    [backActionRef],
+    [actionRef],
   );
 };

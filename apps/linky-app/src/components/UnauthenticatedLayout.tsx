@@ -37,6 +37,7 @@ import {
   fillSlip39Words,
   SLIP39_WORD_COUNT,
 } from "../utils/slip39Input";
+import { useBackAction } from "../app/hooks/layout/useNativeBackHandler";
 import { AvatarPhotoInput } from "./AvatarPhotoInput";
 import type { FilePickerHandle } from "../utils/pickFile";
 import { StickyTopBar } from "./StickyTopBar";
@@ -213,6 +214,33 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
     />
   );
 
+  const leaveReturnStep = () => {
+    setPickerMenuIsOpen(false);
+    if (onLeaveRestore) onLeaveRestore();
+    else setOnboardingStep(null);
+  };
+  const leaveProfileStage = () => {
+    setPickerMenuIsOpen(false);
+    if (profileStage === "picture") {
+      setProfileStage("name");
+      return;
+    }
+    setOnboardingStep(null);
+  };
+  useBackAction(
+    pickerMenuIsOpen
+      ? () => setPickerMenuIsOpen(false)
+      : selfieCaptureIsOpen
+        ? closeSelfieCapture
+        : onboardingIsBusy
+          ? null
+          : onboardingStep?.kind === "returning"
+            ? leaveReturnStep
+            : onboardingStep?.kind === "profile"
+              ? leaveProfileStage
+              : null,
+  );
+
   React.useEffect(() => {
     if (onboardingStep?.kind !== "profile") {
       setProfileStage("name");
@@ -296,11 +324,7 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
     return (
       <Stack flexGrow={1}>
         <StickyTopBar
-          leading={backButton(() => {
-            setPickerMenuIsOpen(false);
-            if (onLeaveRestore) onLeaveRestore();
-            else setOnboardingStep(null);
-          })}
+          leading={backButton(leaveReturnStep)}
           trailing={menuButton()}
         />
 
@@ -541,26 +565,18 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
     );
   };
 
-  const renderProfilePicker = (profile: PendingOnboardingProfile) => {
-    const goBack = () => {
-      setPickerMenuIsOpen(false);
-      if (profileStage === "picture") {
-        setProfileStage("name");
-        return;
-      }
-      setOnboardingStep(null);
-    };
+  const renderProfilePicker = (profile: PendingOnboardingProfile) => (
+    <Stack flexGrow={1}>
+      <StickyTopBar
+        leading={backButton(leaveProfileStage)}
+        trailing={menuButton()}
+      />
 
-    return (
-      <Stack flexGrow={1}>
-        <StickyTopBar leading={backButton(goBack)} trailing={menuButton()} />
-
-        {profileStage === "name"
-          ? renderProfileNameStep(profile)
-          : renderProfilePictureStep(profile)}
-      </Stack>
-    );
-  };
+      {profileStage === "name"
+        ? renderProfileNameStep(profile)
+        : renderProfilePictureStep(profile)}
+    </Stack>
+  );
 
   const renderWelcome = (
     step: Extract<OnboardingStep, { kind: "preparing" }> | null,

@@ -33,6 +33,7 @@ import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, useColorScheme } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { BackSwipe } from "./BackSwipe.native";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -98,11 +99,13 @@ export const NativeBoot = () => {
         <StatusBar style="auto" />
         <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
           {state._tag === "Booted" ? (
-            <AppRoot
-              registry={state.booted.registry}
-              onCommit={hideSplash}
-              onError={hideSplash}
-            />
+            <BackSwipe>
+              <AppRoot
+                registry={state.booted.registry}
+                onCommit={hideSplash}
+                onError={hideSplash}
+              />
+            </BackSwipe>
           ) : state._tag === "Failed" ? (
             <BootError error={state.error} />
           ) : null}

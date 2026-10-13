@@ -19,8 +19,7 @@ const spdStore = { get: safeSessionStorageGet, set: safeSessionStorageSet };
 // The route the router last rendered; the wallet until it first renders.
 let routePath = "";
 // A navigation asked for before the router mounted, opened once it has.
-let pendingHref: { readonly href: string; readonly replace: boolean } | null =
-  null;
+let pendingHref: string | null = null;
 let routerMounted = false;
 
 /** The route the router last rendered. */
@@ -28,20 +27,17 @@ export const currentRoutePath = (): string => routePath;
 
 export const useCurrentRoutePath = (): string => useRouterRoutePath(spdStore);
 
-const openHref = (href: string, replace: boolean): void => {
-  if (!routerMounted) {
-    pendingHref = { href, replace };
-    return;
-  }
-  if (replace) router.replace(href);
-  else router.push(href);
+// Back walks up the route hierarchy (useNativeBackHandler), never through
+// history, so the router keeps one entry and its own back handler, which
+// would pop that history, never claims a press.
+const openHref = (href: string): void => {
+  if (routerMounted) router.replace(href);
+  else pendingHref = href;
 };
 
-/** Opens a route path in a new history entry, or in place of the current one with `replace`. */
-export const navigateToRoutePath = (
-  path: string,
-  options?: { replace?: boolean },
-): void => openHref(urlPathFor(path, spdStore), options?.replace ?? false);
+/** Opens a route path in place of the current one. */
+export const navigateToRoutePath = (path: string): void =>
+  openHref(urlPathFor(path, spdStore));
 
 /** Reloads the app on a route path, as a restore or an identity switch does once its new session is stored. */
 export const reloadAtRoutePath = (path: string): void => restartAppAt(path);
@@ -66,11 +62,9 @@ export const RootLayout = (): ReactNode => {
     routerMounted = true;
     const reloadRoute = takeReloadRoute(localStorageKv);
     const start =
-      reloadRoute === null
-        ? pendingHref
-        : { href: urlPathFor(reloadRoute, spdStore), replace: true };
+      reloadRoute === null ? pendingHref : urlPathFor(reloadRoute, spdStore);
     pendingHref = null;
-    if (start !== null) openHref(start.href, start.replace);
+    if (start !== null) openHref(start);
   }, []);
   return (
     <>
