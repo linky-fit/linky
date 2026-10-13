@@ -82,6 +82,8 @@ const evolu = createEvolu({ ...deps, createDbWorker })(schema, config);
 const db = createEvoluShardDb(evolu, ownerSync);
 ```
 
+The worker gives each write its own millisecond, at most a second ahead of the system clock, so rows a device writes in a burst get distinct `createdAt` times in write order; the in-memory adapter and the read overlay stamp the same way. Evolu's clock never runs behind the latest timestamp it has seen, so a peer whose clock runs ahead can still leave rows sharing a millisecond.
+
 Without workers, as on React Native, run the same database worker on the calling thread with `createInProcessOwnerSyncDbWorker` from `@linky-fit/linksync/evolu/worker`, and hand it to `trackOwnerSync` in place of the web worker. Evolu's database work then shares the thread with the UI.
 
 ```ts

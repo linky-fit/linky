@@ -14,6 +14,7 @@ import {
   type DbWorkerOutput,
   type DbWorkerPlatformDeps,
 } from "@evolu/common/local-first";
+import { distinctMillis } from "../core/distinctMillis";
 
 /**
  * Evolu 7 syncs in its database worker and tells the page nothing about it, so
@@ -150,7 +151,9 @@ export interface DbWorkerScope {
 /**
  * Runs Evolu's database worker in `scope` and reports the owners whose sync
  * round with a relay finished, and every protocol error a relay answered; an
- * owner without a relay to sync with counts as synced once used. Pair it with
+ * owner without a relay to sync with counts as synced once used. Each write
+ * gets its own millisecond, so rows it stores in a burst keep distinct
+ * `createdAt` times in the order written. Pair it with
  * `trackOwnerSync` on the page. A separate
  * entry (`@linky-fit/linksync/evolu/worker`) keeps the store out of the worker bundle.
  */
@@ -167,8 +170,11 @@ export const runOwnerSyncDbWorker = (
     synced.add(ownerId);
     report([ownerId]);
   };
+  const writeMillis = distinctMillis();
   const dbWorker = createDbWorkerForPlatform({
     ...deps,
+    // Evolu stamps a written row's createdAt with the millisecond `now` gave its write.
+    time: { ...deps.time, now: () => writeMillis(deps.time.now()) },
     createWebSocket: reportOwnerSync(
       deps.createWebSocket,
       markSynced,

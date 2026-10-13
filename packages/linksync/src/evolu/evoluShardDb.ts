@@ -15,6 +15,7 @@ import type {
   SystemColumns,
 } from "../core";
 import { ShardDbError } from "../core";
+import { distinctMillis } from "../core/distinctMillis";
 import { LinkySchema, type LinkyDbSchema } from "../model/schema";
 import type { OwnerSync } from "./ownerSync";
 
@@ -167,6 +168,7 @@ export const createEvoluShardDb = (
   { onWriteUnconfirmed }: EvoluShardDbOptions = {},
 ): ShardDb<LinkyDbSchema> => {
   const overlay = new Map<string, OverlayEntry>();
+  const writeMillis = distinctMillis();
   // Evolu queries are branded strings that Evolu keys its promise cache by;
   // they are passed back exactly as received.
   const queries = new Map<string, string>();
@@ -306,7 +308,10 @@ export const createEvoluShardDb = (
       ownerId: mutation.ownerId,
       onComplete: () => Deferred.doneUnsafe(completed, Effect.void),
     });
-    const entry = record(mutation, new Date().toISOString());
+    const entry = record(
+      mutation,
+      new Date(writeMillis(Date.now())).toISOString(),
+    );
     return Effect.succeed({
       mutation,
       entry,
