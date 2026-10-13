@@ -15,6 +15,7 @@ import {
 } from "../../state/contacts/contactsList";
 import { profileDraftAtom } from "../../state/contacts/profiles";
 import { hiddenTransactionsShownAtom } from "../../state/shell/topbar";
+import { contactPaymentIntentAtom } from "../../state/wallet/contactPay";
 import {
   useBackFromContactNew,
   useCloseContactDetail,
@@ -48,6 +49,7 @@ export const useTopbar = () => {
   const toggleContactsFilter = useToggleContactsFilter();
   const selectedChatContact = useChatContact(route);
   const selectedContact = useRouteContact(route);
+  const contactPaymentIntent = useAtomValue(contactPaymentIntentAtom);
   const contactsSearch = useAtomValue(contactsSearchAtom);
   const activeGroup = useAtomValue(activeContactGroupAtom);
   const isProfileEditing = useAtomValue(
@@ -104,6 +106,9 @@ export const useTopbar = () => {
     chatTopbarContact,
     topbar,
     topbarRight,
-    topbarTitle: React.useMemo(() => buildTopbarTitle(route, t), [route, t]),
+    topbarTitle: React.useMemo(
+      () => buildTopbarTitle(route, t, contactPaymentIntent),
+      [contactPaymentIntent, route, t],
+    ),
   };
 };

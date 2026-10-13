@@ -755,6 +755,7 @@ export const en = {
   editContact: "Edit contact",
   contactEditTitle: "Edit contact",
   contactPayTitle: "Pay to contact",
+  contactRequestTitle: "Request from contact",
   messagesTitle: "Messages",
   newContact: "Add contact",
   close: "Close",

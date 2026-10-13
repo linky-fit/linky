@@ -757,6 +757,7 @@ export const cs = {
   editContact: "Upravit kontakt",
   contactEditTitle: "Úprava kontaktu",
   contactPayTitle: "Platba na kontakt",
+  contactRequestTitle: "Požádat kontakt o platbu",
   messagesTitle: "Zprávy",
   newContact: "Přidat kontakt",
   close: "Zavřít",

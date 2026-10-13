@@ -771,6 +771,7 @@ export const de = {
   editContact: "Kontakt bearbeiten",
   contactEditTitle: "Kontakt bearbeiten",
   contactPayTitle: "Kontakt bezahlen",
+  contactRequestTitle: "Zahlung von Kontakt anfordern",
   messagesTitle: "Nachrichten",
   newContact: "Kontakt hinzufügen",
   close: "Schließen",
