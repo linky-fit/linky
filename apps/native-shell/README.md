@@ -26,6 +26,12 @@ bun run native:apk:debug
 
 FCM push works in the debug APK only when `android/app/google-services.json` has a client for `fit.linky.app.debug`. Otherwise the build skips the Google Services plugin and push goes through UnifiedPush.
 
+To install the debug build under another application id (without the `.debug` suffix), as the Expo migration QA does:
+
+```bash
+cd android && ./gradlew assembleDebug -PLINKY_ANDROID_APPLICATION_ID=fit.linky.app.migrationqa
+```
+
 ## Android release APK
 
 Uses the signing setup from the AAB section below.
