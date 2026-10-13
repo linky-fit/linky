@@ -207,7 +207,12 @@ const FirstHydrationGate = ({ children }: { children: React.ReactNode }) => {
 /** Holds the authenticated shell back until the one-time lane migration ran. */
 const MigratedAppShell = (props: AuthenticatedAppShellProps) => {
   const migrating = useLaneToShardMigration();
-  if (migrating) return <MigratingDataScreen />;
+  if (migrating)
+    return (
+      <AppFrame>
+        <MigratingDataScreen />
+      </AppFrame>
+    );
   return <AuthenticatedAppShell {...props} />;
 };
 
