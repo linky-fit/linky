@@ -6,7 +6,7 @@ import type { ServerResponse } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Connect, Plugin, ViteDevServer } from "vite";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 import { contentSecurityPolicyMeta } from "./server/contentSecurityPolicy";
 import { appCommitSha, appVersion } from "./server/buildInfo";
@@ -66,6 +66,22 @@ const linkPreviewApi = (): Plugin => ({
   },
 });
 
+// A phone's web peer needs the LAN URLs the phone uses, as in apps/expo/metro.config.cjs.
+const devHostServices = (): Plugin => ({
+  name: "dev-host-services",
+  config(_, { mode }) {
+    const host = process.env.LINKY_DEV_HOST;
+    if (!host) return;
+    for (const [name, value] of Object.entries(
+      loadEnv(mode, __dirname, "VITE_"),
+    ))
+      process.env[name] = value.replaceAll(
+        /\/\/localhost(?=[:/]|$)/g,
+        `//${host}`,
+      );
+  },
+});
+
 export default defineConfig({
   define: {
     global: "globalThis",
@@ -119,6 +135,7 @@ export default defineConfig({
     },
   },
   plugins: [
+    devHostServices(),
     linkyUi(),
     bootDiagnosticRedaction(),
     serveSqliteWasm(),

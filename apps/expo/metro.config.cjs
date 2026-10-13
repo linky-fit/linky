@@ -28,6 +28,14 @@ if (process.env.LINKY_DEV_HOST) {
 
 const config = getDefaultConfig(__dirname);
 
+// Dev bundles read the .env files themselves, over process.env; with the
+// files unwatched they fall back to the rewritten process.env.
+if (process.env.LINKY_DEV_HOST) {
+  config.watcher.additionalExts = config.watcher.additionalExts.filter(
+    (ext) => !["env", "local", "development"].includes(ext),
+  );
+}
+
 // apps/linky-app modules whose Vite implementation Metro replaces. Targets are
 // resolved without an extension, so a `.native.tsx` sibling wins on native.
 const swappedModules = new Map([
