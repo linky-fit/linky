@@ -634,7 +634,7 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
   return (
     <Stack
       gap="$md"
-      minHeight="100%"
+      flexGrow={1}
       onLayout={({ nativeEvent }) => {
         if (nativeEvent.layout.width > 0) setRowWidth(nativeEvent.layout.width);
       }}
