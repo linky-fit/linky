@@ -1,4 +1,11 @@
-import type { HTMLAttributes, ReactNode, Ref } from "react";
+import {
+  useEffect,
+  useRef,
+  type HTMLAttributes,
+  type ReactNode,
+  type Ref,
+} from "react";
+import type { TextInput } from "react-native";
 import { Input, View } from "tamagui";
 import { Text } from "./layout";
 import { fieldStyle, fieldTrailing } from "./styles";
@@ -31,6 +38,8 @@ export interface RichTextInputNative {
   onChangeText: (text: string) => void;
   /** Reports the caret, as a text offset. */
   onCaretChange?: ((caret: number) => void) | undefined;
+  /** Moves the caret to this text offset once per new request object. */
+  caret?: { readonly at: number } | undefined;
 }
 
 /** Native has no contentEditable: a multiline input shows the segments, entities in accent. */
@@ -40,9 +49,20 @@ export function RichTextInput({
   trailing,
   native,
 }: RichTextInputProps) {
+  const input = useRef<TextInput>(null);
+  const caret = native?.caret;
+  useEffect(() => {
+    if (!caret) return;
+    // Android applies the new text after this commit; a selection set before it is lost.
+    const frame = requestAnimationFrame(() =>
+      input.current?.setSelection(caret.at, caret.at),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [caret]);
   return (
     <View position="relative">
       <Input
+        ref={input}
         unstyled
         {...fieldStyle}
         multiline
@@ -61,7 +81,12 @@ export function RichTextInput({
       >
         {native?.segments.map((segment, index) =>
           segment.entity ? (
-            <Text key={index} bold color="$accentText">
+            <Text
+              key={index}
+              bold
+              color="$accentText"
+              backgroundColor="$accentSoft"
+            >
               {segment.text}
             </Text>
           ) : (
