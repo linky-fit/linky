@@ -132,7 +132,6 @@ export const platformSeamRatchet = [
   "src/components/ChatMessage.tsx",
   "src/components/ChatMessageEditor.tsx",
   "src/components/InstallPwaBanner.tsx",
-  "src/components/ProfileShareOverlay.tsx",
   "src/components/ProfileShareSheet.tsx",
   "src/components/SelfieCaptureModal.tsx",
   "src/evolu.ts",
