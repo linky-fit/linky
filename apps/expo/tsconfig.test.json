@@ -4,5 +4,9 @@
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo",
     "types": ["bun"]
   },
-  "include": ["src/**/*.test.ts", "../linky-app/src/vite-env.d.ts"]
+  "include": [
+    "src/**/*.test.ts",
+    "../linky-app/src/vite-env.d.ts",
+    "../linky-app/src/types/browser.ts"
+  ]
 }

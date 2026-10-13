@@ -75,6 +75,8 @@ import type * as webVideoEmbed from "../../../packages/ui/src/video-embed";
 import * as nativeVideoEmbed from "../../../packages/ui/src/video-embed.native";
 import type * as webKeryxHtml from "@linky-fit/linky-app/src/app/lib/keryxHtml";
 import * as nativeKeryxHtml from "@linky-fit/linky-app/src/app/lib/keryxHtml.native";
+import type * as webIndexedDbInspectorLogStorage from "@linky-fit/linky-app/src/devtools/inspector/indexedDbInspectorLogStorage";
+import * as nativeIndexedDbInspectorLogStorage from "@linky-fit/linky-app/src/devtools/inspector/indexedDbInspectorLogStorage.native";
 
 export const usePushNotificationsSetting: typeof webUsePushNotificationsSetting =
   nativeUsePushNotificationsSetting;
@@ -125,3 +127,5 @@ export const useGuideHighlight: typeof webUseGuideHighlight =
 export const sandboxedHtml: typeof webSandboxedHtml = nativeSandboxedHtml;
 export const videoEmbed: typeof webVideoEmbed = nativeVideoEmbed;
 export const keryxHtml: typeof webKeryxHtml = nativeKeryxHtml;
+export const indexedDbInspectorLogStorage: typeof webIndexedDbInspectorLogStorage =
+  nativeIndexedDbInspectorLogStorage;

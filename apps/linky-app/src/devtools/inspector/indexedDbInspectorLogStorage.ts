@@ -2,21 +2,11 @@ import {
   parseCollectedInspectorRow,
   type CollectedInspectorRow,
 } from "./inspectorRows";
+import type { InspectorLogStorage } from "./persistentInspectorLogBuffer";
 
 const DATABASE_NAME = "linky.inspector_logs";
 const DATABASE_VERSION = 1;
 const ROW_STORE_NAME = "rows";
-
-interface InspectorLogStorageMutation {
-  appendedRows: CollectedInspectorRow[];
-  deletedRows: CollectedInspectorRow[];
-}
-
-interface InspectorLogStorage {
-  apply: (mutation: InspectorLogStorageMutation) => Promise<void>;
-  clear: () => Promise<void>;
-  load: () => Promise<CollectedInspectorRow[]>;
-}
 
 const transactionDone = (transaction: IDBTransaction): Promise<void> =>
   new Promise((resolve, reject) => {
