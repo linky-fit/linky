@@ -6,6 +6,7 @@ import { makeSettingsRepository } from "../repositories";
 import { memoryKeyValueStorage } from "../testing/keyValueStorage";
 import {
   createAccountStore,
+  isAwaitingFirstHydration,
   markAwaitingFirstHydration,
 } from "./firstHydration";
 
@@ -51,6 +52,7 @@ describe("createAccountStore", () => {
     const kv = memoryKeyValueStorage();
     markAwaitingFirstHydration(kv, mnemonic);
     expect(kv.getItem(key)).toBe("1");
+    expect(isAwaitingFirstHydration(kv, appOwner.id)).toBe(true);
     const account = openAccount(kv);
     await settle();
     expect(account.written()).toBe(false);
@@ -58,7 +60,7 @@ describe("createAccountStore", () => {
     account.hydrate();
     await settle();
     expect(account.written()).toBe(true);
-    expect(kv.getItem(key)).toBeNull();
+    expect(isAwaitingFirstHydration(kv, appOwner.id)).toBe(false);
   });
 
   it("keeps a restored account unhydrated while no Evolu relay is enabled", async () => {

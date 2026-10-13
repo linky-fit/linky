@@ -226,7 +226,12 @@ export const createLinkyEvolu = ({
   readonly inMemory: boolean;
   readonly enableLogging: boolean;
   readonly onEvent?: (event: LinkyEvoluEvent) => void;
-}): { readonly evolu: LinkyEvolu; readonly ownerSync: OwnerSync } => {
+}): {
+  readonly evolu: LinkyEvolu;
+  readonly ownerSync: OwnerSync;
+  /** The mnemonic's app owner, known before the worker answers; `null` without a mnemonic. */
+  readonly appOwner: Evolu.AppOwner | null;
+} => {
   const tracked = trackOwnerSync(createWorker);
   let startedWorker = false;
   const createDbWorker: CreateDbWorker = (name) => {
@@ -249,7 +254,7 @@ export const createLinkyEvolu = ({
   ownerSync.subscribeFailures((failure) =>
     onEvent?.({ _tag: "OwnerSyncFailed", failure }),
   );
-  return { evolu, ownerSync };
+  return { evolu, ownerSync, appOwner: externalAppOwner };
 };
 
 const syncOwnerIds = (
