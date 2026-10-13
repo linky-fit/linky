@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { ConfigContext, ExpoConfig } from "expo/config";
 import { withLinkySigning } from "./plugins/withLinkySigning.ts";
+import { withSceneLifecycle } from "./plugins/withSceneLifecycle.ts";
 
 const variants = {
   dev: { id: "fit.linky.expo.dev", name: "Linky Expo Dev" },
@@ -47,7 +48,7 @@ export default ({ projectRoot }: ConfigContext): ExpoConfig => {
   const version = readAppVersion(projectRoot);
   const appleTeamId = process.env.LINKY_IOS_TEAM ?? "W29Z32M73W";
   return withLinkySigning(
-    {
+    withSceneLifecycle({
       name,
       slug: "linky",
       version,
@@ -90,7 +91,7 @@ export default ({ projectRoot }: ConfigContext): ExpoConfig => {
         // The keychain group secureStore.native.ts writes to, the first in the entitlement above.
         keychainAccessGroup: `${appleTeamId}.${id}`,
       },
-    },
+    }),
     { requireUploadKey: variant === "production" },
   );
 };

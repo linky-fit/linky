@@ -7,6 +7,8 @@ import type * as webUsePushRegistrationLifecycle from "@linky-fit/linky-app/src/
 import * as nativeUsePushRegistrationLifecycle from "@linky-fit/linky-app/src/app/hooks/usePushRegistrationLifecycle.native";
 import type * as webKeryxCacheStorage from "@linky-fit/linky-app/src/app/lib/keryxCacheStorage";
 import * as nativeKeryxCacheStorage from "@linky-fit/linky-app/src/app/lib/keryxCacheStorage.native";
+import type * as webPdfPreview from "@linky-fit/linky-app/src/app/lib/pdfPreview";
+import * as nativePdfPreview from "@linky-fit/linky-app/src/app/lib/pdfPreview.native";
 import type * as webChatMessageEditor from "@linky-fit/linky-app/src/components/ChatMessageEditor";
 import * as nativeChatMessageEditor from "@linky-fit/linky-app/src/components/ChatMessageEditor.native";
 import type * as webInstallPwaBanner from "@linky-fit/linky-app/src/components/InstallPwaBanner";
@@ -50,6 +52,7 @@ export const usePushRegistrationLifecycle: typeof webUsePushRegistrationLifecycl
   nativeUsePushRegistrationLifecycle;
 export const keryxCacheStorage: typeof webKeryxCacheStorage =
   nativeKeryxCacheStorage;
+export const pdfPreview: typeof webPdfPreview = nativePdfPreview;
 export const ChatMessageEditor: typeof webChatMessageEditor =
   nativeChatMessageEditor;
 export const InstallPwaBanner: typeof webInstallPwaBanner =
