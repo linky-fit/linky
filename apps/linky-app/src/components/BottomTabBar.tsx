@@ -54,7 +54,12 @@ export function BottomTabBar({
         />
       ),
     },
-    { value: "contacts", label: t("contactsTitle"), icon: "Users" },
+    {
+      value: "contacts",
+      label: t("contactsTitle"),
+      icon: "Users",
+      testID: "open-contacts",
+    },
     {
       value: "wallet",
       label: t("wallet"),
