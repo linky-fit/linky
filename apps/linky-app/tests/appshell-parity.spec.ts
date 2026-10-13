@@ -7,7 +7,11 @@ import {
   setRandomIdentityStorage,
   setSeedLoginStorage,
 } from "./helpers/identity";
-import { watchAppErrors } from "./helpers/diagnostics";
+import {
+  expectShellNotRemounted,
+  markShellMount,
+  watchAppErrors,
+} from "./helpers/diagnostics";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
 import { EVOLU_RELAY_URL, NOSTR_RELAY_URL } from "./helpers/stack";
 import { mintUrl } from "../../../packages/linkshu/tests/integration/helpers";
@@ -317,6 +321,9 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
       });
     });
 
+  // Every route change from here on, back and forward included, keeps the shell mounted.
+  await markShellMount(page);
+
   await test.step("open the contact's pay, detail and chat routes", async () => {
     const contactPath = `contact/${encodeURIComponent(contactId)}`;
     await gotoRoute(page, `${contactPath}/pay`);
@@ -470,6 +477,14 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
     await expect(
       banner.getByRole("button", { name: "Bearbeiten", exact: true }),
     ).toBeVisible();
+  });
+
+  await test.step("back and forward keep the shell mounted", async () => {
+    await page.goBack();
+    await expectRoute(page, "profile/edit");
+    await page.goForward();
+    await expectRoute(page, "profile");
+    await expectShellNotRemounted(page);
   });
   errors.assertClean();
 });

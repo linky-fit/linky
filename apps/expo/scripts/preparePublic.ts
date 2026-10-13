@@ -39,7 +39,9 @@ const indexHtml = async (): Promise<string> => {
     .replace("<head>", `<head>\n${await bootDiagnosticRedactionScript()}`)
     .replace(
       "</head>",
-      '<link rel="stylesheet" href="/fonts/manrope.css">\n<link rel="manifest" href="/manifest.webmanifest">\n</head>',
+      // ExpoRoot's outermost View is `flex: 1`; a column flex #root gives it
+      // the full height the shell expects.
+      '<style>#root{display:flex;flex-direction:column}</style>\n<link rel="stylesheet" href="/fonts/manrope.css">\n<link rel="manifest" href="/manifest.webmanifest">\n</head>',
     );
 };
 

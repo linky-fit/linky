@@ -46,6 +46,12 @@ export const navigateToRoutePath = (
   for (const listener of replaceListeners) listener();
 };
 
+/** Reloads the app on a route path, as a restore or an identity switch does once its new session is stored. */
+export const reloadAtRoutePath = (path: string): void => {
+  navigateToRoutePath(path);
+  window.location.reload();
+};
+
 /** Leaves the app for another page, such as the site a login came from. */
 export const navigateAwayTo = (url: string): void => {
   window.location.assign(url);

@@ -29,6 +29,7 @@ import {
   setMessagesRotation,
 } from "../../app/state/session/store";
 import { makeLocalStorageKeyValueStore } from "../../platform/linkshu/localStorageKeyValueStore";
+import { navigateToRoutePath } from "../../platform/navigation";
 
 /**
  * Test-only entry point the Playwright suites reach through
@@ -74,6 +75,8 @@ export interface LinkyE2eHooks {
   ) => Promise<string | null>;
   /** Restarts a recurring payment's schedule at `atSec`, as an edit would, but without the form's no-past rule. */
   readonly makeRecurringDue: (id: string, atSec: number) => Promise<void>;
+  /** Opens a route path the way the app navigates, so the page does not reload. */
+  readonly navigate: (routePath: string) => void;
 }
 
 declare global {
@@ -137,6 +140,7 @@ export const installLinkyE2eHooks = (
   const getLinkyStore = () => readLinkyStore(registry);
   const walletStore = makeLocalStorageKeyValueStore();
   window.__linkyE2E = {
+    navigate: (routePath) => navigateToRoutePath(routePath),
     setMessagesRotation: (enabled) => {
       if (!registry.get(platformAtom).config.isE2e)
         throw new Error("E2E build required");

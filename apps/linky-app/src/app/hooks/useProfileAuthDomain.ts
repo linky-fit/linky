@@ -1,4 +1,5 @@
-import { navigateTo } from "../../hooks/useRouting";
+import { reloadAtRoutePath } from "../../platform/navigation";
+import { routePathFor } from "../../types/route";
 import {
   appOwnerFromMnemonic,
   NonEmptyString100,
@@ -571,13 +572,12 @@ export const useProfileAuthDomain = ({
       setSlip39Seed(normalizedSlip39);
       setCashuSeedMnemonic(derivedCashuMnemonic);
 
-      navigateTo({ route: "contacts" });
       stopBeaconForIdentityChange();
       // The next boot creates the Evolu instance from the app mnemonic saved
       // above. Resetting the currently open instance here is both unnecessary
       // and unsafe: Evolu's restore promise stays pending when its DB reset
       // fails, which would leave onboarding busy forever and skip this reload.
-      globalThis.location.reload();
+      reloadAtRoutePath(routePathFor({ route: "contacts" }));
     },
     [
       currentNsec,
