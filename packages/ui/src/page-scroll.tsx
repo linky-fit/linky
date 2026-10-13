@@ -50,6 +50,9 @@ const END_SLACK_PX = 48;
 export function LogScroll({ testID, ref, ...props }: LogScrollProps) {
   const scrollRef = useRef<ScrollViewRef>(null);
   const atEnd = useRef(true);
+  const keepEndInView = () => {
+    if (atEnd.current) scrollRef.current?.scrollToEnd({ animated: false });
+  };
   return (
     <ScrollView
       ref={scrollRef}
@@ -63,9 +66,9 @@ export function LogScroll({ testID, ref, ...props }: LogScrollProps) {
           contentOffset.y + layoutMeasurement.height >=
           contentSize.height - END_SLACK_PX;
       }}
-      onContentSizeChange={() => {
-        if (atEnd.current) scrollRef.current?.scrollToEnd({ animated: false });
-      }}
+      onContentSizeChange={keepEndInView}
+      // A shrinking viewport, e.g. the keyboard opening, moves the end out of view without a scroll.
+      onLayout={keepEndInView}
     >
       <Stack ref={ref} {...props} />
     </ScrollView>
