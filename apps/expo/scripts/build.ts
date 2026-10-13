@@ -9,6 +9,11 @@ import { checkBundleSize } from "./bundleSize.ts";
 import { addContentSecurityPolicy, preparePublic } from "./preparePublic.ts";
 import { buildServiceWorker } from "./serviceWorker.ts";
 
+// Bun loads .env.<NODE_ENV> at startup, defaulting to .env.development with
+// its local services, and expo export inlines whatever EXPO_PUBLIC_* it sees.
+if (process.env.NODE_ENV !== "production")
+  throw new Error("Run the build with NODE_ENV=production (bun run build).");
+
 const root = join(import.meta.dir, "..");
 const dist = join(root, "dist");
 const workerDir = await mkdtemp(join(tmpdir(), "linky-evolu-worker-"));
