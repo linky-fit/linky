@@ -36,8 +36,10 @@ const readAppVersion = (projectRoot: string): string => {
   throw new Error("apps/linky-app/package.json has no version.");
 };
 
-/** The Capacitor app's formula (apps/native-shell/android/app/build.gradle): 26.10.5 → 261005. */
+/** As the Capacitor app computes it (apps/native-shell/android/app/build.gradle): LINKY_ANDROID_VERSION_CODE, else 26.10.5 → 261005. */
 const androidVersionCode = (version: string): number => {
+  const override = process.env.LINKY_ANDROID_VERSION_CODE?.trim();
+  if (override) return Number.parseInt(override, 10);
   const [major = 0, minor = 0, patch = 0] = version.split(".").map(Number);
   return major * 10000 + minor * 100 + patch;
 };
