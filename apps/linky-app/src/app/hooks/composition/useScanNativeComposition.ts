@@ -18,6 +18,7 @@ import {
   onNativeNotificationOpen,
 } from "../../../platform/nativeBridge";
 import { readClipboardText } from "../../../platform/clipboard";
+import { decodeQrImage } from "../../../utils/image";
 import { pickFile } from "../../../utils/pickFile";
 import { parseNativeDeepLinkUrl } from "../../../utils/deepLinks";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
@@ -447,65 +448,8 @@ export const useScanNativeComposition = ({
 
   const scanImageFile = React.useCallback(
     async (file: File) => {
-      const loadImage = async (imageFile: File): Promise<HTMLImageElement> => {
-        const objectUrl = URL.createObjectURL(imageFile);
-
-        try {
-          return await new Promise<HTMLImageElement>((resolve, reject) => {
-            const image = new Image();
-            image.onload = () => resolve(image);
-            image.onerror = () => reject(new Error("image-load-failed"));
-            image.src = objectUrl;
-          });
-        } finally {
-          URL.revokeObjectURL(objectUrl);
-        }
-      };
-
       try {
-        const image = await loadImage(file);
-        const detectorCtor = window.BarcodeDetector;
-
-        if (detectorCtor) {
-          const detector = new detectorCtor({ formats: ["qr_code"] });
-          const detectorValue = (
-            (await detector.detect(image))?.[0]?.rawValue ?? ""
-          ).trim();
-
-          if (detectorValue) {
-            if (isAnimatedQrFrame(detectorValue)) {
-              pushToast(t("scanAnimatedQrNeedsCamera"));
-              return;
-            }
-            await handleScannedText(detectorValue);
-            return;
-          }
-        }
-
-        const width = image.naturalWidth || image.width;
-        const height = image.naturalHeight || image.height;
-        if (width <= 0 || height <= 0) {
-          pushToast(t("scanImageUnsupported"));
-          return;
-        }
-
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext("2d", { willReadFrequently: true });
-        if (!ctx) {
-          pushToast(t("scanImageUnsupported"));
-          return;
-        }
-
-        ctx.drawImage(image, 0, 0, width, height);
-        const imageData = ctx.getImageData(0, 0, width, height);
-        const jsQr = (await import("jsqr")).default;
-        const qrValue = (
-          jsQr(imageData.data, width, height)?.data ?? ""
-        ).trim();
-
+        const qrValue = await decodeQrImage(file);
         if (!qrValue) {
           pushToast(t("scanImageUnsupported"));
           return;

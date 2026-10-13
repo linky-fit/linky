@@ -6,8 +6,8 @@ import type {
   NativeBeaconStatus,
 } from "./nativeBridgeShared";
 
-// The Capacitor shells' bridges. The Expo app has none of them yet: the
-// scanner, deep links, push, NFC and the beacon answer "unsupported".
+// The Capacitor shells' bridges. The Expo app's scanner is the QrCamera
+// component; deep links, push, NFC and the beacon answer "unsupported".
 
 export {
   BeaconPermissionState,
@@ -97,12 +97,26 @@ export const onNativeNotificationOpen: (
   onDetail: (detail: object) => void,
 ) => () => void = unsubscribed;
 
-export const supportsNativeQrScan = (): boolean => false;
+let nativeScanListener: ((result: NativeScanResult) => void) | null = null;
+
+/** Hands what QrCamera decoded, or why its camera failed, to the running scan. */
+export const reportNativeQrScan = (result: NativeScanResult): void =>
+  nativeScanListener?.(result);
+
+export const supportsNativeQrScan = (): boolean => true;
 export const startNativeQrScan = (): Promise<NativeScanResult> | null => null;
 export const startNativeQrScanStream: (
   onResult: (result: NativeScanResult) => void,
   getViewport?: () => NativeScanViewport | null,
-) => NativeScanStreamHandle | null = () => null;
+) => NativeScanStreamHandle | null = (onResult) => {
+  nativeScanListener = onResult;
+  return {
+    updateViewport: () => {},
+    stop: () => {
+      if (nativeScanListener === onResult) nativeScanListener = null;
+    },
+  };
+};
 
 /** Makes the status bar icons readable on the app background in `mode`. */
 export const setNativeStatusBarColorMode = (mode: ColorMode): void =>

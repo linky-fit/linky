@@ -558,7 +558,9 @@ export const useGuideScannerDomain = ({
 
   React.useEffect(() => {
     const nativeScanHandle = nativeScanHandleRef.current;
-    if (!scanIsOpen || !nativeScanHandle) return;
+    // The Expo app's camera is a view in the layout, with no overlay to keep aligned.
+    if (!scanIsOpen || !nativeScanHandle || typeof document === "undefined")
+      return;
 
     const controls = document.querySelectorAll("[data-scan-region]");
     if (controls.length === 0) return;

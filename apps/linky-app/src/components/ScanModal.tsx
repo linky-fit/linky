@@ -1,6 +1,5 @@
 import {
   Button,
-  CameraPreview,
   Dialog,
   IconButton,
   ListRow,
@@ -20,6 +19,7 @@ import {
 } from "../app/hooks/shell/scan";
 import { useInspectorEmissionEnabled } from "../devtools/inspector/inspectorEnabled";
 import { useDesktopSplitView } from "../hooks/useDesktopSplitView";
+import { QrCamera } from "../platform/QrCamera";
 import { navigateTo } from "../hooks/useRouting";
 
 interface ScanAction {
@@ -124,7 +124,7 @@ export function ScanModal(): React.ReactElement {
     <>
       <Stack flex={1} minHeight={0} data-scan-region="preview">
         <MediaFrame accessibilityLabel={t("scanCameraPreview")} fill>
-          <CameraPreview videoRef={scanVideoRef} />
+          <QrCamera videoRef={scanVideoRef} />
           {scanCanSwitchCamera ? (
             <Stack position="absolute" right="$md" bottom="$md">
               <Button
