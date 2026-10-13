@@ -98,6 +98,24 @@ export const redirectSystemPath = ({
   return href ?? (initial ? "/" : null);
 };
 
+// React Native drops a link the OS hands over while nothing listens, and
+// expo-router listens only once it mounts, after the session boots.
+let linksBeforeRouter: string[] = [];
+const bootLinkListener = Linking.addEventListener("url", ({ url }) => {
+  linksBeforeRouter = [...linksBeforeRouter, url];
+});
+
+/** Hands the links that arrived during boot over as the router would have. */
+const takeLinksBeforeRouter = (): string | null => {
+  bootLinkListener.remove();
+  const links = linksBeforeRouter;
+  linksBeforeRouter = [];
+  return links.reduce<string | null>(
+    (href, path) => redirectSystemPath({ path, initial: false }) ?? href,
+    null,
+  );
+};
+
 const AppShell = createContext<ReactNode>(null);
 
 /**
@@ -112,8 +130,11 @@ export const RootLayout = (): ReactNode => {
   useEffect(() => {
     routerMounted = true;
     const reloadRoute = takeReloadRoute(localStorageKv);
+    const linkHref = takeLinksBeforeRouter();
     const start =
-      reloadRoute === null ? pendingHref : urlPathFor(reloadRoute, spdStore);
+      reloadRoute === null
+        ? (linkHref ?? pendingHref)
+        : urlPathFor(reloadRoute, spdStore);
     pendingHref = null;
     if (start !== null) openHref(start);
   }, []);
