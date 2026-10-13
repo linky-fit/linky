@@ -401,6 +401,11 @@ export const pt = {
   evoluSyncedOwners: "Donos sincronizados",
   migratingDataTitle: "Migrando dados",
   migratingDataBody: "Isso leva um momento. Mantenha o aplicativo aberto.",
+  secretsUnavailableTitle: "Não foi possível ler suas chaves",
+  secretsUnavailableBody:
+    "O Linky não conseguiu ler suas chaves do armazenamento seguro deste aparelho, então manteve sua conta fechada para proteger seus dados. Tente de novo ou continue e entre com as palavras do seu backup.",
+  secretsUnavailableRetry: "Tentar de novo",
+  secretsUnavailableContinue: "Continuar",
   evoluNoDataYet: "Nenhum dado gravado aqui ainda.",
   evoluData: "Dados",
   evoluStorage: "Armazenamento",

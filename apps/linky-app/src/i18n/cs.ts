@@ -392,6 +392,11 @@ export const cs = {
   evoluSyncedOwners: "Synchronizovaní owneři",
   migratingDataTitle: "Převádím data",
   migratingDataBody: "Chvíli to potrvá. Nezavírej aplikaci.",
+  secretsUnavailableTitle: "Klíče se nepodařilo načíst",
+  secretsUnavailableBody:
+    "Klíče z bezpečného úložiště tohoto zařízení se nepodařilo načíst, proto váš účet zůstal zavřený, aby byla vaše data v bezpečí. Zkuste to znovu, nebo pokračujte a přihlaste se záložními slovy.",
+  secretsUnavailableRetry: "Zkusit znovu",
+  secretsUnavailableContinue: "Pokračovat",
   evoluNoDataYet: "Tady zatím nejsou uložená žádná data.",
   evoluData: "Data",
   evoluStorage: "Úložiště",

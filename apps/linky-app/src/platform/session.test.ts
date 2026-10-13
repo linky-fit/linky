@@ -21,12 +21,14 @@ const APP_MNEMONIC = "linky.initialMnemonic";
 const CASHU_MNEMONIC = "linky.cashu_bip85_mnemonic";
 const SLIP39 = "linky.nostr_slip39_seed";
 
-/** Ports whose secure store answers from `secure` and whose localStorage holds `local`. */
+const APP_MNEMONIC_STATE = "linky.app_mnemonic_state.v1";
+
+/** Ports whose secure store answers from `secure` and whose localStorage holds `local`; pass a Map to share it across boots. */
 const ports = (
   secure: Readonly<Record<string, SecretRead | Promise<SecretRead>>>,
-  local: Readonly<Record<string, string>> = {},
+  local: Readonly<Record<string, string>> | Map<string, string> = {},
 ) => {
-  const items = new Map(Object.entries(local));
+  const items = local instanceof Map ? local : new Map(Object.entries(local));
   return testPlatformPorts({
     kv: {
       getItem: (key) => items.get(key) ?? null,
@@ -146,6 +148,112 @@ describe("loadSession", () => {
       degraded: true,
       cause: `${NSEC}: timed out`,
     });
+  });
+});
+
+describe("loadSession without a readable app mnemonic", () => {
+  it("signs an nsec-only account in when its app mnemonic read fails", async () => {
+    const local = new Map<string, string>();
+    await loadSession(ports({ [NSEC]: found("nsec1secure") }, local));
+    expect(local.get(APP_MNEMONIC_STATE)).toBe("absent");
+
+    const session = await loadSession(
+      ports(
+        { [NSEC]: found("nsec1secure"), [APP_MNEMONIC]: unavailable },
+        local,
+      ),
+    );
+    expect(session).toMatchObject({
+      _tag: "SignedIn",
+      degraded: true,
+      secrets: { nsec: "nsec1secure", appMnemonic: null },
+      unreadable: new Set(),
+    });
+  });
+
+  it("asks the user instead of opening the anonymous database after localStorage was evicted", async () => {
+    const session = await loadSession(
+      ports({ [NSEC]: found("nsec1secure"), [APP_MNEMONIC]: unavailable }),
+    );
+    expect(session).toEqual({
+      _tag: "SecretsUnavailable",
+      cause: `${APP_MNEMONIC}: bridge down`,
+    });
+    expect(mocks.reportAppLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tag: "session.appMnemonicUnreadable",
+        payload: { keys: [APP_MNEMONIC], appMnemonicState: "unknown" },
+      }),
+    );
+  });
+
+  it("asks the user after an eviction and an nsec-only re-save", async () => {
+    const local = new Map<string, string>();
+    await loadSession(
+      ports(
+        { [NSEC]: found("nsec1secure"), [APP_MNEMONIC]: found("app words") },
+        local,
+      ),
+    );
+    // persistSyncedActiveNostrIdentity writes the nsec back, not the app mnemonic.
+    local.set(NSEC, "nsec1secure");
+
+    const session = await loadSession(
+      ports(
+        { [NSEC]: found("nsec1secure"), [APP_MNEMONIC]: unavailable },
+        local,
+      ),
+    );
+    expect(session).toMatchObject({ _tag: "SecretsUnavailable" });
+    expect(mocks.reportAppLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tag: "session.appMnemonicUnreadable",
+        payload: { keys: [APP_MNEMONIC], appMnemonicState: "present" },
+      }),
+    );
+  });
+
+  it("runs degraded on the localStorage copy of a failed app mnemonic, and records it present", async () => {
+    const local = new Map([
+      [APP_MNEMONIC, "app words"],
+      [APP_MNEMONIC_STATE, "absent"],
+    ]);
+    const session = await loadSession(
+      ports(
+        { [NSEC]: found("nsec1secure"), [APP_MNEMONIC]: unavailable },
+        local,
+      ),
+    );
+    expect(session).toMatchObject({
+      _tag: "SignedIn",
+      degraded: true,
+      secrets: { appMnemonic: "app words" },
+      unreadable: new Set(),
+    });
+    expect(local.get(APP_MNEMONIC_STATE)).toBe("present");
+  });
+
+  it("keeps a recorded mnemonic present when the secure store reports it missing", async () => {
+    const local = new Map([[APP_MNEMONIC_STATE, "present"]]);
+    const session = await loadSession(
+      ports({ [NSEC]: found("nsec1secure") }, local),
+    );
+    expect(session).toEqual({
+      _tag: "SecretsUnavailable",
+      cause: `${APP_MNEMONIC}: missing`,
+    });
+    expect(local.get(APP_MNEMONIC_STATE)).toBe("present");
+  });
+
+  it("leaves the marker alone while the read fails", async () => {
+    const local = new Map<string, string>();
+    await loadSession(
+      ports(
+        { [NSEC]: found("nsec1secure"), [APP_MNEMONIC]: unavailable },
+        local,
+      ),
+    );
+    expect(local.has(APP_MNEMONIC_STATE)).toBe(false);
   });
 });
 

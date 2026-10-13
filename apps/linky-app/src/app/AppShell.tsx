@@ -6,8 +6,10 @@ import { CashuContactSendBanner } from "../components/CashuContactSendBanner";
 import { InstallPwaBanner } from "../components/InstallPwaBanner";
 import { PwaUpdateBanner } from "../components/PwaUpdateBanner";
 import { MigratingDataScreen } from "../components/MigratingDataScreen";
+import { SecretsUnavailableScreen } from "../components/SecretsUnavailableScreen";
 import { ToastNotifications } from "../components/ToastNotifications";
 import { UnauthenticatedLayout } from "../components/UnauthenticatedLayout";
+import { reportAppLog } from "../devtools/inspector/appLog";
 import { usePersistentInspectorLogStartup } from "../devtools/inspector/usePersistentInspectorLogStartup";
 import { useToasts } from "../hooks/useToasts";
 import { useDisplayAmounts, useTranslation } from "./hooks/shell";
@@ -15,6 +17,7 @@ import { useTokenContactSend } from "./hooks/wallet/useWalletTokens";
 import { BeaconController } from "./BeaconController";
 import { useLaneToShardMigration } from "./migrations/useLaneToShardMigration";
 import { AppRouteContent } from "./routes/AppRouteContent";
+import { platformAtom } from "./state/platform";
 import { sessionAtom } from "./state/session/session";
 import { useAppShellComposition } from "./useAppShellComposition";
 import { useUnauthenticatedAppShellComposition } from "./useUnauthenticatedAppShellComposition";
@@ -167,10 +170,48 @@ const MigratedAppShell = (props: AuthenticatedAppShellProps) => {
   return <AuthenticatedAppShell {...props} />;
 };
 
+/** Retry reboots and reads the secure store again; Continue goes on signed out, never into an empty database. */
+const SecretsUnavailableAppShell = ({
+  onContinue,
+}: {
+  onContinue: () => void;
+}) => {
+  const { t } = useTranslation();
+  const { lifecycle } = useAtomValue(platformAtom);
+  const reportDecision = (decision: "continue" | "retry") =>
+    reportAppLog({
+      tag: "session.secretsUnavailableDecided",
+      summary: `The user chose to ${decision} after the keys could not be read`,
+      payload: { decision },
+    });
+  return (
+    <AppFrame>
+      <SecretsUnavailableScreen
+        onContinue={() => {
+          reportDecision("continue");
+          onContinue();
+        }}
+        onRetry={() => {
+          reportDecision("retry");
+          lifecycle.reload();
+        }}
+        t={t}
+      />
+    </AppFrame>
+  );
+};
+
 const AppShell = () => {
   const session = useAtomValue(sessionAtom);
+  const [continuedSignedOut, setContinuedSignedOut] = React.useState(false);
   usePersistentInspectorLogStartup();
 
+  if (session._tag === "SecretsUnavailable" && !continuedSignedOut)
+    return (
+      <SecretsUnavailableAppShell
+        onContinue={() => setContinuedSignedOut(true)}
+      />
+    );
   if (session._tag !== "SignedIn") return <UnauthenticatedAppShell />;
   return <MigratedAppShell currentNsec={session.secrets.nsec} />;
 };

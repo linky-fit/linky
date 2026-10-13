@@ -390,6 +390,11 @@ export const en = {
   evoluSyncedOwners: "Synced owners",
   migratingDataTitle: "Migrating data",
   migratingDataBody: "This takes a moment. Keep the app open.",
+  secretsUnavailableTitle: "Couldn't read your keys",
+  secretsUnavailableBody:
+    "Linky couldn't read your keys from this device's secure storage, so it kept your account closed to keep your data safe. Try again, or continue and log in with your backup words.",
+  secretsUnavailableRetry: "Try again",
+  secretsUnavailableContinue: "Continue",
   evoluNoDataYet: "No data stored here yet.",
   evoluData: "Data",
   evoluStorage: "Storage",

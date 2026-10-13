@@ -23,7 +23,12 @@ import {
   removeStoredSecret,
   writeStoredSecret,
 } from "./secretStorage";
-import { safeLocalStorageRemove, safeLocalStorageSet } from "../utils/storage";
+import {
+  localStorageKv,
+  safeLocalStorageRemove,
+  safeLocalStorageSet,
+} from "../utils/storage";
+import { writeAppMnemonicState } from "./appMnemonicState";
 
 const PUSH_SECRET_MIRROR_TIMEOUT_MS = 1_500;
 
@@ -187,12 +192,16 @@ export const persistIdentitySecrets = async ({
 }: PersistIdentitySecretsParams): Promise<void> => {
   await wipeCashuStateIfMnemonicChanged(cashuMnemonic);
 
+  const hasAppMnemonic = asNonEmptyString(appMnemonic) !== null;
+  // Raised before the write and lowered after it, so an interrupted write never reads as absent.
+  if (hasAppMnemonic) writeAppMnemonicState(localStorageKv, "present");
   await writeSecretSet({
     [NOSTR_NSEC_STORAGE_KEY]: nsec,
     [NOSTR_SLIP39_SEED_STORAGE_KEY]: slip39Seed,
     [CASHU_BIP85_MNEMONIC_STORAGE_KEY]: cashuMnemonic,
     [INITIAL_MNEMONIC_STORAGE_KEY]: appMnemonic,
   });
+  if (!hasAppMnemonic) writeAppMnemonicState(localStorageKv, "absent");
 
   persistNostrIdentitySourceMarkers(identitySource, switchedAtSec);
 
@@ -234,6 +243,7 @@ export const clearIdentitySecrets = async (): Promise<void> => {
     removeStoredSecret(CASHU_BIP85_MNEMONIC_STORAGE_KEY),
     removeStoredSecret(INITIAL_MNEMONIC_STORAGE_KEY),
   ]);
+  writeAppMnemonicState(localStorageKv, "absent");
 
   safeLocalStorageRemove(NOSTR_IDENTITY_SOURCE_STORAGE_KEY);
   safeLocalStorageRemove(NOSTR_IDENTITY_SWITCHED_AT_SEC_STORAGE_KEY);
