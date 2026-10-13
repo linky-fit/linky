@@ -7,6 +7,7 @@ import {
   type NearbyBadge,
   NearbyRow,
   Row,
+  SafeAreaPad,
   ScrollList,
   ScrollView,
   Section,
@@ -144,7 +145,7 @@ export const ContactsPage: FC<ContactsPageProps> = React.memo(
       <>
         {onboardingContent}
         {filterOpen && (
-          <Stack
+          <SafeAreaPad
             position="sticky"
             top="$none"
             zIndex="$sticky"
@@ -205,7 +206,7 @@ export const ContactsPage: FC<ContactsPageProps> = React.memo(
                 </Row>
               </ScrollView>
             )}
-          </Stack>
+          </SafeAreaPad>
         )}
 
         <ContactList flex={wide ? 1 : undefined}>
