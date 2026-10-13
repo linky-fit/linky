@@ -1,41 +1,11 @@
-import { readNotificationOpenHashLink } from "../app/lib/notificationOpenTarget";
-import { extractCashuTokenFromText } from "../app/lib/tokenText";
-import { readAddContactNpubFromHash } from "../sharedProfileLink";
-import { readSiteLoginHashLink } from "../siteLogin";
+import {
+  readAddContact,
+  readHashLink,
+  readNotificationOpen,
+  readScanHashLink,
+  type HashLinkReader,
+} from "./hashLinkReaders";
 import { navigateToRoutePath } from "./navigation";
-
-/** A link a fragment carries, and the route the address bar keeps once it is taken. */
-interface HashLink<T> {
-  readonly link: T;
-  readonly routePath: string;
-}
-
-type HashLinkReader<T> = (hash: string) => HashLink<T> | null;
-
-const routePathOfHash = (hash: string): string =>
-  hash.slice(1).split("?")[0] ?? "";
-
-const readScanHashLink: HashLinkReader<string> = (hash) => {
-  const siteLogin = readSiteLoginHashLink(hash);
-  if (siteLogin) return { link: siteLogin, routePath: "wallet" };
-  // `#wallet?cashu=…`: the manifest's web+cashu protocol handler.
-  const token = extractCashuTokenFromText(hash);
-  return token
-    ? { link: `cashu:${token}`, routePath: routePathOfHash(hash) }
-    : null;
-};
-
-const readNotificationOpen: HashLinkReader<string> = (hash) => {
-  const taken = readNotificationOpenHashLink(hash);
-  return taken && { link: taken.detail, routePath: taken.routePath };
-};
-
-const readAddContact: HashLinkReader<string> = (hash) => {
-  const npub = readAddContactNpubFromHash(hash);
-  return npub ? { link: npub, routePath: "contacts" } : null;
-};
-
-const readers = [readScanHashLink, readNotificationOpen, readAddContact];
 
 // The fragment the page loaded with, kept for the first subscriber that
 // reads a link from it.
@@ -49,7 +19,7 @@ let launchHash: string | null = null;
  */
 export const captureLaunchHashLink = (): void => {
   const { hash } = window.location;
-  const taken = readers.map((read) => read(hash)).find((link) => link);
+  const taken = readHashLink(hash);
   if (!taken) return;
   launchHash = hash;
   navigateToRoutePath(taken.routePath, { replace: true });
@@ -65,9 +35,9 @@ export const captureLaunchHashLink = (): void => {
  * fragment is cleared right away, and only while it is still the current
  * one, so a later route or link is never wiped.
  */
-const subscribeHashLink = <T>(
-  read: HashLinkReader<T>,
-  onLink: (link: T) => void,
+const subscribeHashLink = (
+  read: HashLinkReader,
+  onLink: (link: string) => void,
 ): (() => void) => {
   const launch = launchHash === null ? null : read(launchHash);
   if (launch) {

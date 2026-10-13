@@ -9,7 +9,6 @@
     "plugins",
     "scripts",
     "server",
-    "src/**/*.test.ts",
     "../linky-app/src/vite-env.d.ts"
   ]
 }

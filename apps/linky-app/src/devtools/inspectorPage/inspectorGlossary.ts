@@ -74,6 +74,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "The app told the push service when to remind this identity of upcoming recurring payments (a minute after each due time still ahead), or failed to. It syncs again when a due time passes, which cancels that reminder because this running app sends the payment. The server stores only the times, never notes, amounts or recipients; the notes due at each time stay on the device.",
   "contacts.npubSaved":
     "A Nostr contact was saved after the duplicate check. The contact link identifies the new row; the insert itself runs in the background.",
+  "navigation.incomingLink":
+    "The iOS or Android app was opened with a link it takes: kind ScanText (a nostr:, cashu: or nostrconnect: link for the scanned-text handler), HashLink (a #add, #linkauth or #wallet?cashu= command link) or Route (a linky:// path). initial: the link launched the app. The link itself is never logged, as it may carry a token.",
   "contacts.sharedProfileOpened":
     "A profile link (`#add/<npub>` from a linky.fit profile page) was opened once the account hydrated. The contact link identifies the saved or already existing contact whose conversation opens next; created tells which.",
   "contacts.deleted":

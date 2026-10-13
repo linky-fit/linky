@@ -83,6 +83,14 @@ export const navigateAwayTo = (url: string): void => {
   window.location.assign(url);
 };
 
+/** app/+native-intent.tsx: expo-router calls it on iOS and Android only. */
+export const redirectSystemPath = ({
+  path,
+}: {
+  readonly path: string;
+  readonly initial: boolean;
+}): string | null => path;
+
 /** Moves a hash-routed URL (`/#chat/abc`) to its path; command links keep their fragment. */
 const redirectLegacyHash = (
   hash: string,

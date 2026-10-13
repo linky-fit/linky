@@ -1,5 +1,10 @@
 // Metro resolves apps/linky-app/src/platform/navigation.ts to this module on
 // iOS and Android: expo-router keeps the route and navigates.
+import { reportAppLog } from "@linky-fit/linky-app/src/devtools/inspector/appLog";
+import {
+  receiveHashLink,
+  receiveScanText,
+} from "@linky-fit/linky-app/src/platform/hashLinks.native";
 import { restartAppAt } from "@linky-fit/linky-app/src/platform/restartApp.native";
 import { takeReloadRoute } from "@linky-fit/linky-app/src/platform/reloadRoute";
 import {
@@ -11,6 +16,7 @@ import { ExpoRoot, router, Slot } from "expo-router";
 import { ctx } from "expo-router/_ctx";
 import { createContext, use, useEffect, type ReactNode } from "react";
 import { Linking } from "react-native";
+import { classifyIncomingUrl, type IncomingUrl } from "./incomingUrl";
 import { urlPathFor } from "./routeUrl";
 import { useRouterRoutePath } from "./useRouterRoutePath";
 
@@ -45,6 +51,51 @@ export const reloadAtRoutePath = (path: string): void => restartAppAt(path);
 /** Leaves the app for another app or the browser, such as the site a login came from. */
 export const navigateAwayTo = (url: string): void => {
   void Linking.openURL(url);
+};
+
+const LAUNCH_URL_KEY = "linky.native.launchUrl";
+
+/** Hands the link over and returns the URL path it opens, or null to stay. */
+const openIncoming = (incoming: IncomingUrl): string | null => {
+  switch (incoming._tag) {
+    case "ScanText":
+      receiveScanText(incoming.text);
+      return null;
+    case "HashLink": {
+      const routePath = receiveHashLink(incoming.hash);
+      return routePath === null ? null : urlPathFor(routePath, spdStore);
+    }
+    case "Route":
+      return incoming.href;
+  }
+};
+
+/**
+ * app/+native-intent.tsx: expo-router passes every URL the OS opens the app
+ * with here, the launch URL with `initial`, and opens the path returned.
+ * Links go to their subscribers in hashLinks.native.ts, which hand each one
+ * over once.
+ */
+export const redirectSystemPath = ({
+  path,
+  initial,
+}: {
+  readonly path: string;
+  readonly initial: boolean;
+}): string | null => {
+  // A reload restarts JavaScript with the same launch URL, whose link the previous run took.
+  if (initial && safeSessionStorageGet(LAUNCH_URL_KEY) === path) return "/";
+  if (initial) safeSessionStorageSet(LAUNCH_URL_KEY, path);
+  const incoming = classifyIncomingUrl(path, spdStore);
+  if (incoming !== null) {
+    reportAppLog({
+      tag: "navigation.incomingLink",
+      summary: `The system opened the app with a ${incoming._tag} link`,
+      payload: { kind: incoming._tag, initial },
+    });
+  }
+  const href = incoming === null ? null : openIncoming(incoming);
+  return href ?? (initial ? "/" : null);
 };
 
 const AppShell = createContext<ReactNode>(null);

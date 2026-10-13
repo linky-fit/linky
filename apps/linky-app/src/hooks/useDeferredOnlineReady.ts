@@ -53,7 +53,7 @@ export const useDeferredOnlineReady = (
 
   React.useEffect(() => {
     let cancelled = false;
-    let timeoutId: number | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
     let idleId: IdleHandle = null;
 
     const markReady = () => {
