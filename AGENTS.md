@@ -2,7 +2,7 @@
 
 Mobile-first PWA for contacts, Nostr messaging and Lightning/Cashu payments, local-first on Evolu. Bun workspace: `bun` only, never npm/yarn/pnpm.
 
-Before you commit or declare a task done, run `bun run check-code` and fix what remains until it passes. Don't run it after every edit.
+Before you commit or declare a task done, run `bun run check-changed` and fix what remains until it passes. It checks only what the branch reaches, with CI's scope: the changed apps and the apps importing them, or every workspace once anything outside `apps/` changed. Don't run it after every edit.
 
 ## Where a rule goes
 

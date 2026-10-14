@@ -17,9 +17,11 @@ Requirements: Bun and Docker (local Nostr relay, Evolu relay and FakeWallet Cash
 
 ```bash
 bun install
-bun run dev          # Docker stack, web app on :5173, push service on :8787
-bun run test         # unit tests in every workspace
-bun run check-code   # typecheck, eslint --fix, prettier --write
+bun run dev           # Docker stack, web app on :5173, push service on :8787
+bun run test          # unit tests in every workspace
+bun run check-code    # typecheck, eslint --fix, prettier --write
+bun run test-changed  # unit tests in the workspaces this branch reaches
+bun run check-changed # check-code in the workspaces this branch reaches
 ```
 
 End-to-end tests (Playwright against a Docker stack owned by the checkout, so worktrees can run them side by side):

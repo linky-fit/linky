@@ -10,15 +10,15 @@ description: Use whenever you run tests, unit or Playwright e2e.
 Keep the loop tight while iterating, from inside the workspace you changed:
 
 - `bunx vitest related <changed files> --run` runs every test that imports those files, directly or transitively. Name the test files instead when you know them.
-- `bun run typecheck` checks that workspace's types; keep `check-code` for the end.
+- `bun run typecheck` checks that workspace's types; keep `check-changed` for the end.
 
-Run the full `bun run test` once before you commit.
+Run `bun run test-changed` once before you commit. It covers the workspaces the branch reaches, the same scope as `check-changed`.
 
 ## E2E tests
 
 Run every Playwright suite through `bun run e2e`. It starts a Docker stack owned by this checkout, on ports derived from its path, so other worktrees can run e2e at the same time. It passes `--build` every run; layer caching turns that into a no-op unless app code changed, and editing specs never triggers a rebuild.
 
-- `bun run e2e tests/<name>.spec.ts` runs the specs your change touches. Start there, then run the full suite (`bun run e2e`) before you commit a change to a flow Playwright covers.
+- `bun run e2e tests/<name>.spec.ts` runs the specs your change touches. Run them before you commit a change to a flow Playwright covers; the full suite runs on CI for every pull request that reaches web-app, site or shared code. Changes confined to other apps need no e2e run.
 - Add `-x` while iterating, so the run stops at the first failure.
 - After a failure, `bun run e2e --last-failed` reruns only the failed tests.
 - `bun run e2e site` runs the site suite against the same stack.

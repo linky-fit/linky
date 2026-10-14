@@ -45,6 +45,8 @@
     "test": "bun run --workspaces --if-present test",
     "e2e": "bash scripts/e2e.sh",
     "check-code": "bun run typecheck && bun run eslint && bun run prettier",
+    "check-changed": "bash scripts/changed.sh typecheck eslint prettier",
+    "test-changed": "bash scripts/changed.sh test",
     "build:npm": "bun run --filter @linky-fit/linkshu --filter @linky-fit/linkstr --filter @linky-fit/linkauth build:npm",
     "check:npm": "bash packages/config/npm/check.sh",
     "ui:dev": "bun run --filter @linky-fit/ui-book dev"

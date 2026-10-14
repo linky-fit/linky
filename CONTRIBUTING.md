@@ -32,7 +32,7 @@ PRs that are just AI slop get closed. That means generated code the author doesn
 ## Before you open a PR
 
 1. Set up the project as described in the [README](./README.md#development).
-2. Run `bun run check-code` and `bun run test` until both pass. If you changed a flow the Playwright tests cover, run those too.
+2. Run `bun run check-changed` and `bun run test-changed` until both pass. They cover the workspaces your branch reaches; `check-code` and `test` cover all of them. If you changed a flow the Playwright tests cover, run those specs too.
 3. Run the app with `bun run dev` and try your change the way a user would. Passing tests aren't enough. Check it at phone width, Linky is mobile-first.
 4. Keep the PR small and to one change. Refactors or formatting of unrelated code go in a separate PR. If you still want to add multiple unrelated changes into one PR, separate them into well scoped commits.
 
