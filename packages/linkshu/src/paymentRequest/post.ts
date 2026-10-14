@@ -33,6 +33,22 @@ export interface PaymentRequestPayload {
   }>;
 }
 
+/**
+ * The payload as the JSON text a transport carries: the `post` body, or the
+ * content of the NIP-17 message a `nostr` transport delivers. An empty `id` or
+ * `memo` is left out.
+ */
+export const encodePaymentRequestPayload = (
+  payload: PaymentRequestPayload,
+): string =>
+  JSON.stringify({
+    mint: payload.mint,
+    unit: payload.unit,
+    proofs: payload.proofs,
+    ...(payload.id ? { id: payload.id } : {}),
+    ...(payload.memo ? { memo: payload.memo } : {}),
+  });
+
 export interface PostPaymentRequestPayloadArgs {
   /** The `post` transport target (`PaymentRequestTransport.target`). */
   readonly url: string;
@@ -67,13 +83,6 @@ export const postPaymentRequestPayload = async ({
   if (!isAllowedPaymentRequestPostUrl(url, { allowHttp })) {
     return { _tag: "InsecureUrl" };
   }
-  const body = {
-    mint: payload.mint,
-    unit: payload.unit,
-    proofs: payload.proofs,
-    ...(payload.id ? { id: payload.id } : {}),
-    ...(payload.memo ? { memo: payload.memo } : {}),
-  };
   try {
     const response = await send(new URL(url).toString(), {
       method: "POST",
@@ -84,7 +93,7 @@ export const postPaymentRequestPayload = async ({
         "Content-Type": "application/json",
       },
       mode: "cors",
-      body: JSON.stringify(body),
+      body: encodePaymentRequestPayload(payload),
     });
     return response.ok
       ? { _tag: "Delivered" }

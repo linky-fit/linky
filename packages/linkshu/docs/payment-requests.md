@@ -39,7 +39,7 @@ The request carries `a` (amount), `u: "sat"`, `s: true` (single use), `m` (mints
 A point-of-sale device that shows such a URI waits for either leg:
 
 1. Lightning: start a [topup](./topup.md) for the amount with a `lockingKey` the device can derive again (NUT-20), and show `handle.quote.invoice` as the `lightning` leg. `handle.result` resolves once the invoice is paid and the proofs are minted into the wallet.
-2. Cashu: the payer sends the token to the nprofile as a NIP-17 direct message, which a Nostr client such as `@linky-fit/linkstr` receives as a chat message. A Linky payer sends a bare `cashuB…` token; other wallets send the NUT-18 payment payload, a JSON `{id, memo, mint, unit, proofs}`. `decodePaymentRequestPayload(text)` reads the payload's `requestId`, `mint`, `unit` and face `amount` so you can match it to the open request; a bare token names no request, so match it by mint and amount. Receive either text unchanged with `Receive.receive(new ReceiveDraft({ text, automatic: true }))`; it accepts both forms.
+2. Cashu: the payer sends the token to the nprofile as a NIP-17 direct message, which a Nostr client such as `@linky-fit/linkstr` receives as a chat message. A payer sends the NUT-18 payment payload, a JSON `{id, memo, mint, unit, proofs}`; Linky does so for a scanned request that carries an `id`, and sends a bare `cashuB…` token for one without. `decodePaymentRequestPayload(text)` reads the payload's `requestId`, `mint`, `unit` and face `amount` so you can match it to the open request; a bare token names no request, so match it by mint and amount. Give every request an `id`: matching by amount is ambiguous while two open requests ask for the same one. Receive either text unchanged with `Receive.receive(new ReceiveDraft({ text, automatic: true }))`; it accepts both forms.
 
 ```ts
 import { Effect } from "effect";
@@ -58,6 +58,10 @@ const receiveForRequest = (messageText: string, paymentId: string) =>
 ```
 
 The receipt's `amount` is what reached the wallet, after the mint's input fee; compare it with what you asked for. Once one leg paid, close the topup's scope. The unpaid quote stays a `pending` topup; the handle a later `Topup.resumePending` returns for it fails with `QuoteExpired` once the mint reports it `UNPAID` past its expiry, and the operation closes `failed`.
+
+## Paying a request over nostr
+
+A request whose transport is `nostr` is paid by sending `encodePaymentRequestPayload({ id, memo, mint, unit, proofs })` as a NIP-17 message to the transport's nprofile, with `id` the request's own and `proofs` taken from `SendReceipt.proofs` as below. Once the message is published the funds are the payee's, so close the send with `Tokens.forget`.
 
 ## Paying a request over POST
 
@@ -107,4 +111,4 @@ const payOverPost = (
   });
 ```
 
-`postPaymentRequestPayload({ url, payload, allowHttp, fetch })` sends `{mint, unit, proofs, id, memo}` as JSON (`id` and `memo` left out when empty) with no credentials, and resolves, never rejects, with `Delivered` for a 2xx answer, `HttpError` with the `status` otherwise, `NetworkError` with a `detail` when the request did not complete, and `InsecureUrl` without sending anything when the URL fails the check above. `fetch` defaults to the global one. Take `proofs` from `SendReceipt.proofs`, not from the token text, whose v4 encoding shortens keyset ids. Any outcome but `Delivered` may still have handed the proofs to the payee, so take the send back with `Tokens.returnToWallet`, which re-receives it and kills the payee's copy at the mint ([tokens.md](./tokens.md#returntowallet)).
+`postPaymentRequestPayload({ url, payload, allowHttp, fetch })` sends `encodePaymentRequestPayload(payload)`, the payload as `{mint, unit, proofs, id, memo}` JSON (`id` and `memo` left out when empty), with no credentials, and resolves, never rejects, with `Delivered` for a 2xx answer, `HttpError` with the `status` otherwise, `NetworkError` with a `detail` when the request did not complete, and `InsecureUrl` without sending anything when the URL fails the check above. `fetch` defaults to the global one. Take `proofs` from `SendReceipt.proofs`, not from the token text, whose v4 encoding shortens keyset ids. Any outcome but `Delivered` may still have handed the proofs to the payee, so take the send back with `Tokens.returnToWallet`, which re-receives it and kills the payee's copy at the mint ([tokens.md](./tokens.md#returntowallet)).

@@ -1,4 +1,6 @@
+import { decodePaymentRequestPayload } from "./nut18";
 import {
+  encodePaymentRequestPayload,
   isAllowedPaymentRequestPostUrl,
   postPaymentRequestPayload,
 } from "./post";
@@ -59,6 +61,35 @@ describe("isAllowedPaymentRequestPostUrl", () => {
         false,
       );
     }
+  });
+});
+
+describe("encodePaymentRequestPayload", () => {
+  it("encodes the payload the payee decodes back to its request", () => {
+    const text = encodePaymentRequestPayload(payload);
+
+    expect(JSON.parse(text)).toEqual({
+      mint: "https://mint.example",
+      unit: "sat",
+      proofs: [proof],
+      id: "req-1",
+      memo: "coffee",
+    });
+    expect(decodePaymentRequestPayload(text)).toEqual({
+      requestId: "req-1",
+      mint: "https://mint.example",
+      unit: "sat",
+      memo: "coffee",
+      amount: 8,
+    });
+  });
+
+  it("leaves out an empty id and memo", () => {
+    expect(
+      JSON.parse(
+        encodePaymentRequestPayload({ ...payload, id: null, memo: "" }),
+      ),
+    ).toEqual({ mint: "https://mint.example", unit: "sat", proofs: [proof] });
   });
 });
 
