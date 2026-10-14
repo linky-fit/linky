@@ -34,7 +34,7 @@ export const copy = {
     titleBefore: "Terminál, který patří ",
     titleAccent: "jen vám",
     subtitle:
-      "Zákazník naskenuje QR kód a zaplatí převodem rovnou na váš účet, nebo bitcoinem přes Lightning či Cashu. Bez smlouvy, bez registrace a bez terminálu, stačí telefon. Tržby, historie i bitcoin zůstávají u vás.",
+      "Zákazník naskenuje QR kód a zaplatí převodem rovnou na váš účet, nebo bitcoinem přes Lightning či Cashu. Bez smlouvy, bez registrace a bez terminálu, stačí telefon. Tržby i historie zůstávají u vás.",
     primaryCta: "Otevřít aplikaci",
     secondaryCta: "Jak to funguje",
     methods: [
@@ -49,12 +49,12 @@ export const copy = {
   benefits: {
     eyebrow: "Proč fazole.fit",
     title: "Vaše peníze, vaše data",
-    body: "Mezi vámi a zákazníkem nestojí žádný prostředník. Kolik prodáváte, víte jen vy.",
+    body: "Bez poskytovatele plateb a bez smlouvy. Převody jdou rovnou na váš účet a historie plateb zůstává u vás.",
     points: [
       {
         icon: "KeyRound",
-        title: "Data máte jen vy",
-        body: "Tržby a historie se ukládají ve vašem zařízení a synchronizují se šifrovaně. Klíč k nim máte jen vy.",
+        title: "Klíč k datům máte jen vy",
+        body: "Tržby a historie se ukládají ve vašem zařízení a mezi zařízeními se synchronizují šifrovaně.",
       },
       {
         icon: "Bitcoin",
@@ -187,8 +187,8 @@ export const copy = {
   },
   wallet: {
     eyebrow: "Peněženka",
-    title: "Bitcoin, který máte opravdu u sebe",
-    body: "Zůstatek v satoshi i v korunách. Vybírejte do Linky, nebo přes Lightning.",
+    title: "Bitcoin v peněžence aplikace, vybíráte kdykoli",
+    body: "Bitcoin držíte jako Cashu od mincovny. Zůstatek vidíte v satoshi i v korunách a vybíráte ho do Linky, nebo přes Lightning.",
     points: [
       {
         icon: "Send",
@@ -210,7 +210,7 @@ export const copy = {
   comparison: {
     eyebrow: "Srovnání",
     title: "Proč ne karetní terminál?",
-    body: "Karetní terminál potřebuje smlouvu, vlastní hardware a o každé vaší platbě ví poskytovatel. fazole.fit nic z toho nepotřebuje.",
+    body: "Karetní terminál potřebuje smlouvu, vlastní hardware a poskytovatel si bere procento z každé platby. fazole.fit nic z toho nepotřebuje.",
     cardTerminal: "Karetní terminál",
     fazole: "fazole.fit",
     rows: [
@@ -265,12 +265,12 @@ export const copy = {
       {
         icon: "KeyRound",
         title: "Záložní fráze",
-        body: "20 slov obnoví obchod, historii i peněženku. Prohlížeč vám ji nabídne uložit do správce hesel.",
+        body: "20 slov obnoví obchod, historii i peněženku. V prohlížečích, které to umí, vám ji nabídne uložit do správce hesel; jinak ji najdete v nastavení.",
       },
       {
         icon: "Smartphone",
         title: "Na dalším zařízení",
-        body: "Zvolíte Mám záložní frázi, správce hesel ji doplní a obchod se otevře i s historií.",
+        body: "Zvolíte Mám záložní frázi, vložíte ji nebo ji doplní správce hesel a obchod se otevře i s historií.",
       },
     ] satisfies Point[],
   },
@@ -331,7 +331,7 @@ export const copy = {
       {
         question: "Proč zrovna fazole?",
         answer:
-          "Fazole se říkalo prvním online penězům na českém internetu. Na ně navazujeme: peníze, které jdou z ruky do ruky bez prostředníka. A s fazolemi se počítá snadno.",
+          "Fazole se říkalo prvním online penězům na českém internetu. Na ně navazujeme: peníze, které jdou z ruky do ruky. A s fazolemi se počítá snadno.",
       },
     ] satisfies FaqItem[],
   },
