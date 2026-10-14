@@ -1,0 +1,42 @@
+import recommendedRelays from "@linky-fit/site/recommended-relays.json";
+import { RelayUrl } from "@linky-fit/linkstr";
+import { Schema } from "effect";
+
+const RecommendedRelays = Schema.Struct({
+  nostr: Schema.Array(Schema.String),
+  evolu: Schema.Array(Schema.String),
+});
+const recommended =
+  Schema.decodeUnknownSync(RecommendedRelays)(recommendedRelays);
+
+const list = (value: string | undefined): readonly string[] =>
+  (value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const env = import.meta.env;
+const envNostrRelays = list(env.VITE_NOSTR_RELAYS);
+
+/** Fresh-origin defaults, Linky's own; `.env.development` points them at the local services. */
+export interface AppConfig {
+  readonly nostrRelays: readonly RelayUrl[];
+  /** Replaces Linky's recommended Evolu relays when non-empty. */
+  readonly evoluRelayDefaults: readonly string[];
+  readonly recommendedEvoluRelays: readonly string[];
+  /** The mint payments are received at. */
+  readonly mintUrl: string;
+  readonly allowInsecureLocalhostRelays: boolean;
+}
+
+export const appConfig: AppConfig = {
+  nostrRelays: (envNostrRelays.length > 0
+    ? envNostrRelays
+    : recommended.nostr
+  ).filter(Schema.is(RelayUrl)),
+  evoluRelayDefaults: list(env.VITE_EVOLU_SERVER_URLS),
+  recommendedEvoluRelays: recommended.evolu,
+  mintUrl: env.VITE_MAIN_MINT_URL?.trim() || "https://cashu.cz",
+  allowInsecureLocalhostRelays:
+    env.VITE_ALLOW_INSECURE_LOCALHOST_RELAYS === "1",
+};
