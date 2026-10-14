@@ -20,7 +20,7 @@ import {
 } from "@linky-fit/linkstr";
 import { FakeRelay, makeIdentity, poolFor } from "@linky-fit/linkstr/testing";
 import { Layer, Result, Schema } from "effect";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WithdrawTarget } from "../domain";
 import type { Ledger } from "../storage/ledger";
 import { createNostr } from "./nostr";
@@ -59,7 +59,7 @@ const tokenOf = (amount: number) =>
     }),
   );
 
-const pendingSend = (id: string, amount: number) =>
+const pendingSend = (id: string, amount: number, createdAt = 1_700_000_000) =>
   Schema.decodeUnknownSync(TokenTransfer)({
     id,
     kind: "send",
@@ -69,7 +69,7 @@ const pendingSend = (id: string, amount: number) =>
     unit: "sat",
     amount,
     error: null,
-    createdAt: 1_700_000_000,
+    createdAt,
   });
 
 const enqueued = (ref: string) =>
@@ -92,7 +92,7 @@ const linkyWithdrawal = async (ledger: Ledger, operationId?: string) => {
   });
   return operationId === undefined
     ? created
-    : ledger.updateWithdrawal(created, { operationId });
+    : ledger.updateWithdrawal(created.id, { operationId });
 };
 
 /** A wallet of `sats` at the local mint in `proofs` proofs, at 100 ppk. */
@@ -154,6 +154,16 @@ describe("quoting a withdrawal to Linky", () => {
     expect(await quote(0, 0)).toEqual(Result.fail("insufficient-funds"));
     expect(await quote(1, 1)).toEqual(Result.fail("amount-too-small"));
   });
+});
+
+/** Moves the clock past the grace period `resume` leaves fresh rows and sends alone for. */
+const afterGracePeriod = () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(Date.now() + 3 * 60_000);
+};
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("Linky withdrawals over the outbox", () => {
@@ -263,6 +273,7 @@ describe("Linky withdrawals over the outbox", () => {
     });
     const resumed = await linkyWithdrawal(ledger, "send-1");
     const cutOff = await linkyWithdrawal(ledger);
+    afterGracePeriod();
     await withdrawals.resume();
     expect(returned).toEqual(["send-2"]);
     expect(queued).toEqual([
@@ -277,6 +288,34 @@ describe("Linky withdrawals over the outbox", () => {
     expect(stored.find(({ id }) => id === cutOff.id)).toMatchObject({
       status: "failed",
       error: "Interrupted",
+    });
+  });
+
+  it("leaves a withdrawal another tab is still linking to its send", async () => {
+    const { ledger, wallet } = setup();
+    const returned: string[] = [];
+    const withdrawals = createWithdrawals({
+      ledger,
+      nostr: fakeNostr().nostr,
+      wallet: {
+        ...wallet,
+        pendingSends: async () => [
+          pendingSend("send-1", 100, Math.floor(Date.now() / 1000)),
+        ],
+        returnSend: async (operationId) => {
+          returned.push(operationId);
+          return true;
+        },
+      },
+    });
+    const linking = await linkyWithdrawal(ledger);
+    await withdrawals.resume();
+    expect(returned).toEqual([]);
+    expect((await ledger.records()).withdrawals[0]?.status).toBe("pending");
+    await ledger.updateWithdrawal(linking.id, { operationId: "send-1" });
+    expect((await ledger.records()).withdrawals[0]).toMatchObject({
+      status: "pending",
+      operationId: "send-1",
     });
   });
 
