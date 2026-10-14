@@ -54,11 +54,14 @@ import {
   createWebSocket,
 } from "@evolu/common";
 import { createWasmSqliteDriver } from "@evolu/web";
-import { runOwnerSyncDbWorker } from "@linky-fit/linksync/evolu/worker";
+import {
+  guardOpfsIdle,
+  runOwnerSyncDbWorker,
+} from "@linky-fit/linksync/evolu/worker";
 
 runOwnerSyncDbWorker(self, {
   console: createConsole(),
-  createSqliteDriver: createWasmSqliteDriver,
+  createSqliteDriver: guardOpfsIdle(createWasmSqliteDriver),
   createWebSocket,
   random: createRandom(),
   randomBytes: createRandomBytes(),
@@ -81,6 +84,8 @@ const { createDbWorker, ownerSync } = trackOwnerSync((name) =>
 const evolu = createEvolu({ ...deps, createDbWorker })(schema, config);
 const db = createEvoluShardDb(evolu, ownerSync);
 ```
+
+`guardOpfsIdle` wraps the driver to read the database every four minutes: in Chrome's Incognito and other ephemeral profiles OPFS lives in memory, and a database file left unread for about ten minutes reads as empty through its open handle, so every query fails with "no such table" until the page reloads.
 
 The worker gives each write its own millisecond, at most a second ahead of the system clock, so rows a device writes in a burst get distinct `createdAt` times in write order; the in-memory adapter and the read overlay stamp the same way. Evolu's clock never runs behind the latest timestamp it has seen, so a peer whose clock runs ahead can still leave rows sharing a millisecond.
 

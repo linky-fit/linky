@@ -16,6 +16,8 @@ import {
 } from "@evolu/common/local-first";
 import { distinctMillis } from "../core/distinctMillis";
 
+export { guardOpfsIdle } from "./opfsIdleGuard";
+
 /**
  * Evolu 7 syncs in its database worker and tells the page nothing about it, so
  * the worker taps its relay sockets instead. Evolu reconciles an owner in
