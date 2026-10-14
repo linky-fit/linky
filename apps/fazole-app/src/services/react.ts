@@ -11,13 +11,17 @@ import {
   useSyncExternalStore,
 } from "react";
 import {
+  historyEntries,
   walletActivity,
+  type DirectTransfer,
+  type HistoryEntry,
   type Payment,
   type ShopProfile,
   type SupportChat,
   type WalletActivity,
   type Withdrawal,
 } from "../domain";
+import { shortNpub } from "../format";
 import type { FazoleRecords } from "../storage/transactions";
 import type { AppServices } from "./appServices";
 import type { Device, Session } from "./device";
@@ -80,17 +84,33 @@ export const usePayerProfile = (pubkey: Pubkey | null): PayerProfile | null => {
   return loaded !== null && loaded.pubkey === pubkey ? loaded.profile : null;
 };
 
+/** What to call the payer: their Nostr name, or their short npub while there is none. */
+export const usePayerName = (pubkey: Pubkey): string =>
+  usePayerProfile(pubkey)?.name ?? shortNpub(pubkey);
+
 /** The chat with Fazole support; `null` until read. */
 export const useSupportChat = (): SupportChat | null =>
   useLiveValue<SupportChat | null>(useAppServices().supportChat.live, null);
 
-/** Payments, receipts and withdrawals, newest first; `null` until read. */
+/** Payments, receipts, direct transfers and withdrawals, newest first; `null` until read. */
 export const useFazoleRecords = (): FazoleRecords | null =>
   useLiveValue<FazoleRecords | null>(useAppServices().live.records, null);
 
-/** Every payment, newest first; empty until read. */
-export const usePayments = (): ReadonlyArray<Payment> =>
-  useFazoleRecords()?.payments ?? [];
+/** Payments and direct transfers, as the history lists them; empty until read. */
+export const useHistory = (): HistoryEntry[] => {
+  const records = useFazoleRecords();
+  return useMemo(
+    () =>
+      records === null
+        ? []
+        : historyEntries(records.payments, records.directTransfers),
+    [records],
+  );
+};
+
+/** Every direct transfer, newest first; empty until read. */
+export const useDirectTransfers = (): ReadonlyArray<DirectTransfer> =>
+  useFazoleRecords()?.directTransfers ?? [];
 
 /** The payment a route names; `undefined` until read, `null` when there is none. */
 export const usePayment = (id: string): Payment | null | undefined => {
@@ -108,15 +128,7 @@ export const useWithdrawals = (): ReadonlyArray<Withdrawal> =>
 export const useWalletActivity = (limit?: number): WalletActivity[] => {
   const records = useFazoleRecords();
   return useMemo(
-    () =>
-      records === null
-        ? []
-        : walletActivity(
-            records.payments,
-            records.receipts,
-            records.withdrawals,
-            limit,
-          ),
+    () => (records === null ? [] : walletActivity(records, limit)),
     [records, limit],
   );
 };

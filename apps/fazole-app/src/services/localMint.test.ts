@@ -226,12 +226,7 @@ describe.runIf(mintAnswers)("the terminal at the local mint", () => {
       expect(await balanceOf(wallet)).toBe(0);
 
       const records = await ledger.records();
-      const activity = walletActivity(
-        records.payments,
-        records.receipts,
-        records.withdrawals,
-        Infinity,
-      );
+      const activity = walletActivity(records, Infinity);
       expect(activity.reduce((sum, item) => sum + balanceChange(item), 0)).toBe(
         0,
       );

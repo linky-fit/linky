@@ -129,6 +129,7 @@ describe("records", () => {
     expect(await ledger.records()).toEqual({
       payments: [],
       receipts: [],
+      directTransfers: [],
       withdrawals: [],
     });
   });
@@ -147,6 +148,44 @@ describe("records", () => {
     expect(await ledger.hasReceipt("receive-1")).toBe(true);
     expect((await ledger.records()).receipts).toMatchObject([
       { operationId: "receive-1", sats: 99 },
+    ]);
+  });
+  it("record a direct transfer once per receive, its note in the row's note column", async () => {
+    const { ledger, repositories } = setup();
+    const payerPubkey = makeIdentity().pubkey;
+    const transfer = {
+      operationId: "receive-1",
+      sats: 300,
+      czkPerBtc: 2_500_000,
+      mintUrl: testMint,
+      payerPubkey,
+      note: "Za kávu",
+    };
+    await ledger.recordDirectTransfer(transfer);
+    await ledger.recordDirectTransfer({ ...transfer, sats: 50 });
+    expect(await ledger.hasReceipt("receive-1")).toBe(true);
+    const [row, ...others] = await Effect.runPromise(
+      repositories.transactions.all,
+    );
+    expect(others).toEqual([]);
+    expect(row).toMatchObject({
+      direction: "in",
+      status: "ok",
+      method: "cashu",
+      amount: 300,
+      mint: testMint,
+      unit: "sat",
+      note: "Za kávu",
+    });
+    expect(JSON.parse(row?.detailsJson ?? "")).toEqual({
+      app: "fazole",
+      kind: "direct",
+      operationId: "receive-1",
+      payerPubkey,
+      czkPerBtc: 2_500_000,
+    });
+    expect((await ledger.records()).directTransfers).toMatchObject([
+      { ...transfer, id: row?.id },
     ]);
   });
 });

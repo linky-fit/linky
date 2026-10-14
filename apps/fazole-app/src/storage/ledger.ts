@@ -13,6 +13,7 @@ import {
   generateVariableSymbol,
   type BitcoinLeg,
   type CzkAmount,
+  type DirectTransfer,
   type Payment,
   type Receipt,
   type Withdrawal,
@@ -20,6 +21,7 @@ import {
 } from "../domain";
 import { nowSeconds } from "../utils/time";
 import {
+  insertDirectTransfer,
   insertPayment,
   insertReceipt,
   insertWithdrawal,
@@ -42,7 +44,7 @@ export type PaidBy =
       readonly payerPubkey?: Pubkey | undefined;
     };
 
-/** Payments, receipts and withdrawals over the transactions repository, as promises. */
+/** Payments, receipts, direct transfers and withdrawals over the transactions repository, as promises. */
 export interface Ledger {
   readonly records: () => Promise<FazoleRecords>;
   readonly payment: (id: string) => Promise<Payment | null>;
@@ -66,11 +68,15 @@ export interface Ledger {
     paidBy: PaidBy,
   ) => Promise<boolean>;
   readonly cancelPayment: (payment: Payment) => Promise<boolean>;
-  /** Whether the receive `operationId` was already recorded, by a payment or a receipt. */
+  /** Whether the receive `operationId` was already recorded, by a payment, a receipt or a direct transfer. */
   readonly hasReceipt: (operationId: string) => Promise<boolean>;
   /** Records sats a payment's own settlement does not account for, once per receive. */
   readonly recordReceipt: (
     receipt: Omit<Receipt, "id" | "receivedAtSec">,
+  ) => Promise<void>;
+  /** Records sats that paid no payment, once per receive. */
+  readonly recordDirectTransfer: (
+    transfer: Omit<DirectTransfer, "id" | "receivedAtSec">,
   ) => Promise<void>;
   readonly createWithdrawal: (withdrawal: {
     readonly kind: WithdrawalKind;
@@ -171,10 +177,11 @@ export const makeLedger = (transactions: TransactionsRepository): Ledger => {
       return true;
     },
     hasReceipt: async (operationId) => {
-      const { payments, receipts } = await records();
+      const { payments, receipts, directTransfers } = await records();
       const id = receiptIdFor(operationId);
       return (
         receipts.some((receipt) => receipt.id === id) ||
+        directTransfers.some((transfer) => transfer.id === id) ||
         payments.some(
           (candidate) => candidate.cashuReceive?.operationId === operationId,
         )
@@ -185,6 +192,15 @@ export const makeLedger = (transactions: TransactionsRepository): Ledger => {
         insertReceipt(transactions, {
           ...receipt,
           id: receiptIdFor(receipt.operationId),
+          receivedAtSec: nowSeconds(),
+        }),
+      );
+    },
+    recordDirectTransfer: async (transfer) => {
+      await run(
+        insertDirectTransfer(transactions, {
+          ...transfer,
+          id: receiptIdFor(transfer.operationId),
           receivedAtSec: nowSeconds(),
         }),
       );

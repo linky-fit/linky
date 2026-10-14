@@ -64,6 +64,25 @@ export interface Receipt {
   readonly paymentId: TransactionId | null;
 }
 
+/**
+ * Sats someone sent the shop without a payment to pay, such as a Linky user
+ * paying the shop from its chat: a token that matched no open request.
+ */
+export interface DirectTransfer {
+  readonly id: TransactionId;
+  /** Net of the mint's input fee. */
+  readonly sats: number;
+  /** The rate when the sats arrived; `null` when it was unavailable, which leaves the transfer without a CZK value. */
+  readonly czkPerBtc: number | null;
+  readonly receivedAtSec: number;
+  readonly operationId: string;
+  /** The mint the token came from; a direct transfer stays there. */
+  readonly mintUrl: string;
+  readonly payerPubkey: Pubkey;
+  /** The sender's note, sanitized to plain text. */
+  readonly note: string | null;
+}
+
 /** Where a withdrawal sends the sats; the transaction `method` it is stored under. */
 export type WithdrawalKind =
   | "lightning_invoice"

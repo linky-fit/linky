@@ -48,6 +48,8 @@ export interface IncomingCashu {
   readonly unit: string | null;
   /** The request id a NUT-18 payload echoes; a bare token carries none. */
   readonly requestId: string | null;
+  /** The sender's note, as Linky sends it in the token memo; unsanitized. */
+  readonly memo: string | null;
 }
 
 /**
@@ -57,8 +59,8 @@ export interface IncomingCashu {
 export const readIncomingCashu = (text: string): IncomingCashu | null => {
   const payload = decodePaymentRequestPayload(text);
   if (payload !== null) {
-    const { mint, amount, unit, requestId } = payload;
-    return { mint, amount, unit, requestId };
+    const { mint, amount, unit, requestId, memo } = payload;
+    return { mint, amount, unit, requestId, memo };
   }
   const token = extractTokenText(text);
   const parsed = token === null ? null : parseTokenText(token);
@@ -68,6 +70,7 @@ export const readIncomingCashu = (text: string): IncomingCashu | null => {
         amount: parsed.amount,
         unit: parsed.unit,
         requestId: null,
+        memo: parsed.memo,
       }
     : null;
 };

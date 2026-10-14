@@ -16,9 +16,12 @@ import { useState } from "react";
 import { copy } from "../copy";
 import {
   CzkAmount,
+  directTransferCzk,
   formatCzk,
   groupByDay,
   relativeDay,
+  type DirectTransfer,
+  type HistoryEntry,
   type Payment,
 } from "../domain";
 import {
@@ -31,7 +34,7 @@ import {
 } from "../format";
 import { navigateTo } from "../platform/hashRoute";
 import { paymentRoute } from "../routing";
-import { usePayerProfile, usePayments } from "../services/react";
+import { useHistory, usePayerName, usePayerProfile } from "../services/react";
 import { nowSeconds } from "../utils/time";
 import { DetailRows, type Detail } from "./DetailRows";
 import { Page } from "./Page";
@@ -47,21 +50,21 @@ const dayTitle = (startSec: number, nowSec: number) => {
 };
 
 export function HistoryScreen() {
-  const payments = usePayments();
+  const entries = useHistory();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [nowSec] = useState(nowSeconds);
-  const selected = payments.find((payment) => payment.id === selectedId);
+  const selected = entries.find((entry) => entry.id === selectedId);
 
   return (
     <Page title={copy.sections.history} testID="history-screen">
-      {payments.length === 0 ? (
+      {entries.length === 0 ? (
         <EmptyState
           icon="History"
           title={copy.history.emptyTitle}
           description={copy.history.emptyDescription}
         />
       ) : (
-        groupByDay(payments).map((day) => (
+        groupByDay(entries).map((day) => (
           <Stack key={day.startSec} gap="$xs">
             <Row justifyContent="space-between" paddingVertical="$sm">
               <Text eyebrow role="heading">
@@ -76,28 +79,21 @@ export function HistoryScreen() {
               </Text>
             </Row>
             <Card paddingVertical="$sm" gap="$none">
-              {day.payments.map((payment) => (
-                <ListRow
-                  key={payment.id}
-                  testID={`payment-row-${payment.id}`}
-                  icon={
-                    payment.method === null
-                      ? "QrCode"
-                      : methodIcons[payment.method]
-                  }
-                  title={formatCzk(payment.amountCzk)}
-                  description={rowDescription(payment)}
-                  trailing={
-                    <Pill
-                      size="sm"
-                      tone={statusTones[payment.status]}
-                      label={copy.statuses[payment.status]}
-                    />
-                  }
-                  chevron={false}
-                  onPress={() => setSelectedId(payment.id)}
-                />
-              ))}
+              {day.entries.map((entry) =>
+                entry.kind === "payment" ? (
+                  <PaymentRow
+                    key={entry.id}
+                    payment={entry.payment}
+                    onPress={() => setSelectedId(entry.id)}
+                  />
+                ) : (
+                  <DirectTransferRow
+                    key={entry.id}
+                    transfer={entry.transfer}
+                    onPress={() => setSelectedId(entry.id)}
+                  />
+                ),
+              )}
             </Card>
           </Stack>
         ))
@@ -109,9 +105,63 @@ export function HistoryScreen() {
         }}
         title={copy.history.detail}
       >
-        {selected ? <PaymentDetail payment={selected} /> : null}
+        {selected ? <EntryDetail entry={selected} /> : null}
       </Sheet>
     </Page>
+  );
+}
+
+function PaymentRow({
+  payment,
+  onPress,
+}: {
+  readonly payment: Payment;
+  readonly onPress: () => void;
+}) {
+  return (
+    <ListRow
+      testID={`payment-row-${payment.id}`}
+      icon={payment.method === null ? "QrCode" : methodIcons[payment.method]}
+      title={formatCzk(payment.amountCzk)}
+      description={rowDescription(payment)}
+      trailing={
+        <Pill
+          size="sm"
+          tone={statusTones[payment.status]}
+          label={copy.statuses[payment.status]}
+        />
+      }
+      chevron={false}
+      onPress={onPress}
+    />
+  );
+}
+
+/** A direct transfer: its CZK value at its rate, or its sats without one. */
+function DirectTransferRow({
+  transfer,
+  onPress,
+}: {
+  readonly transfer: DirectTransfer;
+  readonly onPress: () => void;
+}) {
+  const payer = usePayerName(transfer.payerPubkey);
+  const czk = directTransferCzk(transfer);
+  const sats = copy.satAmount(formatWhole(transfer.sats));
+  return (
+    <ListRow
+      testID={`direct-row-${transfer.id}`}
+      icon="HandCoins"
+      title={czk === null ? sats : formatCzk(czk)}
+      meta={czk === null ? undefined : sats}
+      description={copy.history.row(
+        formatTime(transfer.receivedAtSec),
+        copy.history.direct,
+        payer,
+      )}
+      chevron={false}
+      onPress={onPress}
+    />
   );
 }
 
@@ -162,6 +212,61 @@ const paymentDetails = (payment: Payment): Detail[] => [
       ]),
 ];
 
+function EntryDetail({ entry }: { readonly entry: HistoryEntry }) {
+  return entry.kind === "payment" ? (
+    <PaymentDetail payment={entry.payment} />
+  ) : (
+    <DirectTransferDetail transfer={entry.transfer} />
+  );
+}
+
+const directTransferDetails = (transfer: DirectTransfer): Detail[] => {
+  const czk = directTransferCzk(transfer);
+  return [
+    ...(transfer.note === null
+      ? []
+      : [{ label: copy.history.note, value: transfer.note }]),
+    {
+      label: copy.history.amount,
+      value: copy.history.directAmount(
+        formatWhole(transfer.sats),
+        czk === null ? null : formatCzkValue(czk),
+      ),
+    },
+    {
+      label: copy.history.receivedAt,
+      value: formatDateTime(transfer.receivedAtSec),
+    },
+  ];
+};
+
+function DirectTransferDetail({
+  transfer,
+}: {
+  readonly transfer: DirectTransfer;
+}) {
+  const czk = directTransferCzk(transfer);
+  return (
+    <Stack gap="$lg" paddingTop="$sm" testID="direct-transfer-detail">
+      <Stack alignItems="center" gap="$sm">
+        <Amount
+          value={formatWhole(transfer.sats)}
+          unit={copy.sat}
+          size="md"
+          caption={
+            czk === null ? undefined : copy.approxCzk(formatCzkValue(czk))
+          }
+        />
+        <Row justifyContent="center">
+          <Pill tone="accent" label={copy.history.direct} />
+        </Row>
+      </Stack>
+      <Payer pubkey={transfer.payerPubkey} />
+      <DetailRows details={directTransferDetails(transfer)} />
+    </Stack>
+  );
+}
+
 function PaymentDetail({ payment }: { readonly payment: Payment }) {
   return (
     <Stack gap="$lg" paddingTop="$sm" testID="payment-detail">
@@ -195,7 +300,7 @@ function PaymentDetail({ payment }: { readonly payment: Payment }) {
   );
 }
 
-/** Who paid with a Cashu token, by their Nostr name and photo once a relay answers. */
+/** Who sent the sats, by their Nostr name and photo once a relay answers. */
 function Payer({ pubkey }: { readonly pubkey: Pubkey }) {
   const profile = usePayerProfile(pubkey);
   const name = profile?.name ?? shortNpub(pubkey);

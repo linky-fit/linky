@@ -1,4 +1,4 @@
-import type { Payment, Receipt, Withdrawal } from "./records";
+import type { DirectTransfer, Payment, Receipt, Withdrawal } from "./records";
 
 /** One line of wallet activity: the sats that reached or left the wallet, and the fee among them. */
 export type WalletActivity =
@@ -21,6 +21,14 @@ export type WalletActivity =
       readonly receipt: Receipt;
     }
   | {
+      readonly kind: "direct";
+      readonly id: string;
+      readonly atSec: number;
+      readonly sats: number;
+      readonly feeSats: 0;
+      readonly transfer: DirectTransfer;
+    }
+  | {
       readonly kind: "withdrawal";
       readonly id: string;
       readonly atSec: number;
@@ -40,13 +48,22 @@ const receivedBy = (payment: Payment): number | null => {
 /**
  * What moved through the wallet, newest first: payments paid in Bitcoin
  * (the minted sats or the received token, net of the mint's fee), receipts
- * (a token that matched no payment, or paid one again) and withdrawals with
- * their fees. Bank payments never touch the wallet.
+ * (sats that paid a payment again, or a quote no payment holds), direct
+ * transfers and withdrawals with their fees. Bank payments never touch the
+ * wallet.
  */
 export const walletActivity = (
-  payments: readonly Payment[],
-  receipts: readonly Receipt[],
-  withdrawals: readonly Withdrawal[],
+  {
+    payments,
+    receipts,
+    directTransfers,
+    withdrawals,
+  }: {
+    readonly payments: readonly Payment[];
+    readonly receipts: readonly Receipt[];
+    readonly directTransfers: readonly DirectTransfer[];
+    readonly withdrawals: readonly Withdrawal[];
+  },
   limit = 30,
 ): WalletActivity[] =>
   [
@@ -73,6 +90,16 @@ export const walletActivity = (
         sats: receipt.sats,
         feeSats: 0,
         receipt,
+      }),
+    ),
+    ...directTransfers.map(
+      (transfer): WalletActivity => ({
+        kind: "direct",
+        id: transfer.id,
+        atSec: transfer.receivedAtSec,
+        sats: transfer.sats,
+        feeSats: 0,
+        transfer,
       }),
     ),
     ...withdrawals.map((withdrawal): WalletActivity => {
