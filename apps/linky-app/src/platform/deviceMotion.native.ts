@@ -1,4 +1,4 @@
-import { DeviceMotion } from "expo-sensors";
+import { DeviceMotion, type DeviceMotionMeasurement } from "expo-sensors";
 
 export const STANDARD_GRAVITY = 9.81;
 
@@ -18,9 +18,12 @@ export const onGravityY = (
   listener: (gravityY: number) => void,
 ): (() => void) => {
   DeviceMotion.setUpdateInterval(UPDATE_INTERVAL_MS);
-  const subscription = DeviceMotion.addListener(({ rotation }) => {
-    if (Number.isFinite(rotation.beta))
-      listener(Math.sin(rotation.beta) * STANDARD_GRAVITY);
-  });
+  // On Android, events before the first rotation-vector reading carry no `rotation`.
+  const subscription = DeviceMotion.addListener(
+    ({ rotation }: Partial<DeviceMotionMeasurement>) => {
+      if (rotation && Number.isFinite(rotation.beta))
+        listener(Math.sin(rotation.beta) * STANDARD_GRAVITY);
+    },
+  );
   return () => subscription.remove();
 };
