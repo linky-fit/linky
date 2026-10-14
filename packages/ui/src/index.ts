@@ -119,6 +119,7 @@ export type {
 export { Spinner } from "./spinner";
 export type { SpinnerProps } from "./spinner";
 export { Dialog, Sheet } from "./overlays";
+export { dispatchBackPress, onBackPress } from "./backPress";
 export type { DialogProps, SheetProps } from "./overlays";
 export { GuidedTour } from "./guided-tour";
 export type { GuidedTourProps, TourTarget } from "./guided-tour";

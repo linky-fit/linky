@@ -1,5 +1,5 @@
 import * as Network from "expo-network";
-import { AppState, BackHandler } from "react-native";
+import { AppState } from "react-native";
 import { reloadApp } from "./reload";
 
 type Unsubscribe = () => void;
@@ -55,30 +55,8 @@ export const onAppResume = (callback: () => void): Unsubscribe =>
     if (isAppVisible()) callback();
   });
 
-const backHandlers = new Set<() => boolean>();
-
-/**
- * Offers the iOS edge swipe back to the handlers, newest first, as Android
- * offers its back press. False when none handled it.
- */
-export const dispatchBackPress = (): boolean =>
-  [...backHandlers].reverse().some((handler) => handler());
-
-/**
- * Offers the system back press to `handler`, which returns true when it
- * handled the press. An unhandled press runs the default, closing the app.
- */
-export const onBackPress = (handler: () => boolean): Unsubscribe => {
-  backHandlers.add(handler);
-  const subscription = BackHandler.addEventListener(
-    "hardwareBackPress",
-    handler,
-  );
-  return () => {
-    backHandlers.delete(handler);
-    subscription.remove();
-  };
-};
+// Dialogs in @linky-fit/ui take back presses from the same handlers, so the newest of either wins.
+export { onBackPress } from "@linky-fit/ui";
 
 /** Boot progress the web page shell listens for. */
 export type AppEvent =

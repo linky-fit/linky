@@ -1,4 +1,4 @@
-import { dispatchBackPress } from "@linky-fit/linky-app/src/platform/appEvents.native";
+import { dispatchBackPress } from "@linky-fit/ui";
 import type { ReactNode } from "react";
 import { Platform, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";

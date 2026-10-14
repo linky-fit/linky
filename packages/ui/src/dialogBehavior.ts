@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { BackHandler, TextInput } from "react-native";
+import { TextInput } from "react-native";
 import type { GetProps, Dialog } from "tamagui";
+import { onBackPress } from "./backPress";
 
 export type DialogBehaviorHook = (
   open: boolean,
@@ -29,14 +30,10 @@ export const useDialogBehavior: DialogBehaviorHook = (open, onOpenChange) => {
   }, [open, opener]);
   useEffect(() => {
     if (!open) return;
-    const subscription = BackHandler.addEventListener(
-      "hardwareBackPress",
-      () => {
-        onOpenChange(false);
-        return true;
-      },
-    );
-    return () => subscription.remove();
+    return onBackPress(() => {
+      onOpenChange(false);
+      return true;
+    });
   }, [open, onOpenChange]);
   return {};
 };
