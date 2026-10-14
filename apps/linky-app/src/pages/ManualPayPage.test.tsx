@@ -133,6 +133,47 @@ describe("ManualPayPage", () => {
     expect(onSubmitText).toHaveBeenCalledWith("bob@pay.test");
   });
 
+  it("neither suggests nor pays a deleted contact by name", async () => {
+    const onSubmitText = vi.fn<ManualPayPagePropsSubmit>();
+
+    const { container } = await renderIntoDocument(
+      <ManualPayPage
+        contacts={[
+          { id: createId<"Contact">(), name: "Carol", archivedAtSec: 1 },
+          { id: createId<"Contact">(), name: "Caroline" },
+        ]}
+        nostrPictureByNpub={{}}
+        onSubmitText={onSubmitText}
+        t={translate}
+      />,
+    );
+
+    const input = container.querySelector("input");
+    if (!(input instanceof HTMLInputElement)) {
+      throw new Error("manual pay input missing");
+    }
+    await act(async () => {
+      setInputValue(input, "Carol");
+    });
+    const suggested = Array.from(container.querySelectorAll("button")).map(
+      (candidate) => candidate.textContent,
+    );
+    expect(suggested.some((text) => text?.includes("Caroline"))).toBe(true);
+    expect(
+      suggested.some((text) =>
+        text?.replaceAll("Caroline", "").includes("Carol"),
+      ),
+    ).toBe(false);
+
+    const button = Array.from(container.querySelectorAll("button")).find(
+      (candidate) => candidate.textContent === "Continue",
+    );
+    await act(async () => {
+      button?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(navigateTo).not.toHaveBeenCalled();
+  });
+
   it("submits invoices without linky.fit expansion", async () => {
     const onSubmitText = vi.fn<ManualPayPagePropsSubmit>();
 
