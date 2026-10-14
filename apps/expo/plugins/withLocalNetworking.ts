@@ -1,10 +1,8 @@
-// Node loads this file as native ESM, and expo has no exports map to resolve a bare subpath.
-import {
-  AndroidConfig,
-  withAndroidManifest,
-  withInfoPlist,
-  type ConfigPlugin,
-} from "expo/config-plugins.js";
+// Node loads this file as native ESM: expo has no exports map to resolve a bare subpath,
+// and Node 22 sees only some named exports of this CommonJS module.
+import configPlugins, { type ConfigPlugin } from "expo/config-plugins.js";
+
+const { AndroidConfig, withAndroidManifest, withInfoPlist } = configPlugins;
 
 const localNetworkUsage =
   "Linky connects to development services on your local network.";
