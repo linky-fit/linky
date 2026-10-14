@@ -567,6 +567,7 @@ export const de = {
   chatSeenShort: "gelesen",
   chatImageAttach: "Bild oder PDF hinzufügen",
   chatPdfDecrypting: "PDF wird entschlüsselt…",
+  chatAttachmentRetry: "Erneut versuchen",
   chatPdfLoadFailed: "PDF konnte nicht geladen werden.",
   chatPdfMessage: "PDF",
   chatPdfOpen: "PDF öffnen",

@@ -553,6 +553,7 @@ export const cs = {
   chatSeenShort: "přečteno",
   chatImageAttach: "Přidat obrázek nebo PDF",
   chatPdfDecrypting: "Dešifruji PDF…",
+  chatAttachmentRetry: "Zkusit znovu",
   chatPdfLoadFailed: "PDF se nepodařilo načíst.",
   chatPdfMessage: "PDF",
   chatPdfOpen: "Otevřít PDF",

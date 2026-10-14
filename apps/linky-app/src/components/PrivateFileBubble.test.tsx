@@ -108,4 +108,36 @@ describe("PrivateFileBubble", () => {
     expect(container.querySelector("[aria-label='chatPdfOpen']")).toBeNull();
     expect(container.textContent).toContain("invoice.pdf");
   });
+
+  it("loads a failed file again when the device comes back online", async () => {
+    decryptMock.mockRejectedValueOnce(new Error("offline"));
+    const container = await render();
+    expect(container.textContent).toContain("chatPdfLoadFailed");
+
+    await act(async () => {
+      window.dispatchEvent(new Event("online"));
+    });
+
+    expect(decryptMock).toHaveBeenCalledTimes(2);
+    expect(container.textContent).not.toContain("chatPdfLoadFailed");
+    expect(
+      container.querySelector("[aria-label='chatPdfOpen'] img"),
+    ).not.toBeNull();
+  });
+
+  it("loads a failed file again on Try again", async () => {
+    decryptMock.mockRejectedValueOnce(new Error("offline"));
+    const container = await render();
+
+    await act(async () => {
+      Array.from(
+        container.querySelectorAll<HTMLElement>("button, [role=button]"),
+      )
+        .find((element) => element.textContent?.includes("chatAttachmentRetry"))
+        ?.click();
+    });
+
+    expect(decryptMock).toHaveBeenCalledTimes(2);
+    expect(container.textContent).not.toContain("chatPdfLoadFailed");
+  });
 });
