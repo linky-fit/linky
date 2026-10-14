@@ -1,11 +1,17 @@
 import {
+  Bolt11Invoice,
   DecodedToken,
   encodeToken,
+  Inspector,
+  linkshuServices,
   MintUnreachable,
   MintUrl,
   OperationId,
+  QuoteId,
   ReceiveReceipt,
   TokenAlreadyKnown,
+  Topup,
+  TopupQuote,
 } from "@linky-fit/linkshu";
 import {
   CashuTokenText,
@@ -16,7 +22,7 @@ import {
   UnixSeconds,
 } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
-import { Result, Schema } from "effect";
+import { Effect, Layer, ManagedRuntime, Result, Schema } from "effect";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildCashuRequest, CzkAmount, Sats } from "../domain";
 import type { Ledger } from "../storage/ledger";
@@ -165,6 +171,55 @@ describe("BitcoinPayments.request", () => {
       minimumCzk: 23,
     });
     expect((await ledger.payment(id))?.bitcoin).toBeNull();
+  });
+
+  it("leaves a payment a token paid while its quote was being created paid", async () => {
+    const { account, ledger, wallet } = setup();
+    const { id } = await ledger.createPayment(CzkAmount.make(2_500));
+    const payWithToken = async () => {
+      const pending = await ledger.payment(id);
+      if (!pending) throw new Error("no payment");
+      await ledger.completePayment(pending, {
+        cashuReceive: { operationId: "receive-1", sats: 1_000 },
+      });
+    };
+    const runtime = ManagedRuntime.make(
+      Layer.merge(
+        linkshuServices({ bip39Seed: account.cashuSeed }).pipe(
+          Layer.provideMerge(Inspector.disabled),
+        ),
+        Layer.succeed(Topup, {
+          start: (draft) =>
+            Effect.promise(payWithToken).pipe(
+              Effect.as({
+                quote: new TopupQuote({
+                  quoteId: QuoteId.make("quote-1"),
+                  mint: draft.mint,
+                  amount: draft.amount,
+                  invoice: Bolt11Invoice.make("lnbc1fake"),
+                  expiresAt: null,
+                  locked: true,
+                }),
+                result: Effect.never,
+              }),
+            ),
+          adopt: () => Effect.die("unused"),
+          resumePending: () => Effect.succeed([]),
+        }),
+      ),
+    );
+    const { payments } = paymentsOf(
+      ledger,
+      { ...wallet, runtime },
+      async () => 2_500_000,
+    );
+    expect(await payments.request(id)).toBeNull();
+    expect(await ledger.payment(id)).toMatchObject({
+      status: "paid",
+      bitcoin: null,
+      cashuReceive: { operationId: "receive-1" },
+    });
+    await runtime.dispose();
   });
 
   it("keeps the leg a payment already has", async () => {
