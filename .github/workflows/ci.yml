@@ -1,19 +1,51 @@
 name: CI
 
-# Every check runs here, once per commit. Releases start when this workflow
-# succeeds on main or a hotfix/** branch and ship the commit it tested; the site
-# and the error tracker gate production on its checks through Vercel.
+# Every check runs here. Releases start when this workflow succeeds on main or a
+# hotfix/** branch and ship the commit it tested; the site and the error tracker
+# gate production on its checks through Vercel. Pull requests and merge groups
+# skip the jobs their change cannot affect, and ci-ok is the check the main
+# ruleset requires.
 on:
   push:
     branches:
       - main
       - "hotfix/**"
   pull_request:
+  merge_group:
 
 permissions:
   contents: read
 
 jobs:
+  # Pushes run everything: require-ci and Vercel need every check on the commit
+  # they ship. Anything outside apps/ counts as shared, and web-app imports site.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      shared: ${{ steps.scope.outputs.shared }}
+      linky-e2e: ${{ steps.scope.outputs.linky-e2e }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Scope the change
+        id: scope
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: |
+          set -euo pipefail
+          shared=true linky_e2e=true
+          if [[ -n "$BASE" ]]; then
+            git fetch --quiet --depth 1 origin "$BASE"
+            changed=$(git diff --name-only "$BASE" HEAD)
+            echo "$changed"
+            grep -qv '^apps/' <<< "$changed" || shared=false
+            grep -qE '^apps/(web-app|site)/' <<< "$changed" || linky_e2e=$shared
+          fi
+          echo "shared=$shared" >> "$GITHUB_OUTPUT"
+          echo "linky-e2e=$linky_e2e" >> "$GITHUB_OUTPUT"
+
   lint:
     runs-on: ubuntu-latest
 
@@ -52,6 +84,8 @@ jobs:
         run: bun run test
 
   linkshu-integration:
+    needs: changes
+    if: needs.changes.outputs.shared == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -77,6 +111,8 @@ jobs:
         run: docker compose -f docker-compose.dev.yml logs cashu-mint cashu-mint-target
 
   npm-packages:
+    needs: changes
+    if: needs.changes.outputs.shared == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -124,6 +160,8 @@ jobs:
           if-no-files-found: error
 
   app-e2e:
+    needs: changes
+    if: needs.changes.outputs.linky-e2e == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -219,6 +257,8 @@ jobs:
           retention-days: 7
 
   site-e2e:
+    needs: changes
+    if: needs.changes.outputs.linky-e2e == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -267,3 +307,14 @@ jobs:
           name: site-e2e-test-results
           path: apps/site/test-results/
           retention-days: 7
+
+  # Skipped jobs count as passed, so a path-scoped run can still satisfy the ruleset.
+  ci-ok:
+    if: always()
+    needs: [changes, lint, unit-tests, linkshu-integration, npm-packages, app-e2e, site-e2e]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Fail if a needed job failed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1

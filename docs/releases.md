@@ -15,7 +15,7 @@ The desktop shell loads `app.linky.fit`, so it follows the app release.
 
 ## CI gates every release
 
-`ci.yml` runs every check once per commit, on pull requests and on pushes to `main` and `hotfix/**`. The `main` ruleset requires its six checks: `lint` (typecheck, ESLint and Prettier for the whole repo), `unit-tests` (every workspace), `linkshu-integration`, `npm-packages`, `app-e2e` and `site-e2e`.
+`ci.yml` has six checks: `lint` (typecheck, ESLint and Prettier for the whole repo), `unit-tests` (every workspace), `linkshu-integration`, `npm-packages`, `app-e2e` and `site-e2e`. Pushes to `main` and `hotfix/**` run all six. Pull requests and merge-queue groups skip the jobs their change cannot affect: anything outside `apps/` runs all six, `apps/web-app` or `apps/site` adds the two e2e suites to `lint` and `unit-tests`, and any other app runs only `lint` and `unit-tests`. The `main` ruleset merges through a merge queue and requires `ci-ok`, which fails if any job that ran failed.
 
 Release workflows run no tests. They ship a commit only after `.github/actions/require-ci` confirms that all six checks succeeded on it, so a release always ships code its CI run tested. It waits up to 45 minutes for checks that are still running or not yet started, and fails as soon as one fails.
 
@@ -96,7 +96,7 @@ Like the site, the push server ships ahead of the app and must keep working with
 - Web-app project: production branch `production` with domain `app.linky.fit` and no Deployment Checks, because `release-app.yml` gates it. Custom Environment `nightly` tracks `main` with domain `nightly.app.linky.fit`, the same environment variables as Production and no Deployment Protection on its domain.
 - Site project: Deployment Checks `lint`, `unit-tests` and `site-e2e`.
 - Error tracker project: Deployment Checks `lint` and `unit-tests`.
-- The `main` ruleset requires `lint`, `unit-tests`, `linkshu-integration`, `npm-packages`, `app-e2e` and `site-e2e`.
+- The `main` ruleset requires a merge queue and the status check `ci-ok`, without requiring branches to be up to date.
 - The `production` branch has a ruleset that restricts updates and deletions, with the `Linky releases` GitHub App as the only bypass. `release-app.yml` pushes with that app's token, whose credentials (variable `RELEASE_APP_CLIENT_ID`, secret `RELEASE_APP_PRIVATE_KEY`) live in the `Production` environment, which admits only `main` and `v*` tags (a release started by `CI` runs in `main`'s context, hotfixes included); `GITHUB_TOKEN` can't bypass rulesets, and the organization blocks deploy keys.
 - Tags `v*` and `packages-v*` have a ruleset that restricts updates and deletions. Creation stays open, because the release creates `v<version>` with `GITHUB_TOKEN`.
 - The `zapstore` environment admits `main` and `v*` tags, so a release run started from a tag can publish.
