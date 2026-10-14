@@ -1,3 +1,4 @@
+import { useAtomValue } from "@linky-fit/linkstr-react";
 import { SuccessOverlay } from "@linky-fit/ui";
 import React from "react";
 import { useNostrPictureByNpub } from "../app/hooks/contacts/useProfileCache";
@@ -6,6 +7,7 @@ import type {
   PaidOverlayDetails,
   PaidOverlayPhase,
 } from "../app/lib/paidOverlay";
+import { contactsAtom } from "../app/state/contacts/readModel";
 import { deriveDefaultProfile } from "../derivedProfile";
 import type { Translate } from "../i18n";
 
@@ -25,8 +27,13 @@ export function PaidOverlay({
 }: PaidOverlayProps): React.ReactElement {
   const { formatDisplayedAmountParts } = useDisplayAmounts();
   const nostrPictureByNpub = useNostrPictureByNpub();
+  const contacts = useAtomValue(contactsAtom);
   const contact = details?.contact ?? null;
   const npub = contact?.npub ?? null;
+  // The saved contact's name follows its profile, which can arrive after the payment started.
+  const name =
+    (npub ? contacts.find((saved) => saved.npub === npub)?.name : null) ??
+    contact?.name;
   const pictureUrl = npub
     ? nostrPictureByNpub[npub] || deriveDefaultProfile(npub).pictureUrl
     : null;
@@ -50,9 +57,7 @@ export function PaidOverlay({
       amount={amount ? `${amount.approxPrefix}${amount.amountText}` : undefined}
       unit={amount?.unitLabel}
       avatar={
-        contact
-          ? { name: contact.name ?? "", uri: pictureUrl ?? undefined }
-          : undefined
+        contact ? { name: name ?? "", uri: pictureUrl ?? undefined } : undefined
       }
       direction={direction ?? undefined}
       pending={isSending}
