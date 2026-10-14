@@ -10,7 +10,8 @@ Beta Electron shell for macOS on Apple Silicon. It loads `https://app.linky.fit`
 ## Development
 
 ```bash
-bun run dev                 # web app on http://localhost:5173
+bun run dev:services        # local relay, Evolu relay and mint
+bun run expo:dev            # Expo web app on http://localhost:5180
 bun run desktop:dev         # shell pointed at it (LINKY_DESKTOP_URL overrides)
 ```
 
