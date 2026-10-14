@@ -6,6 +6,7 @@ import { localStorageKeyValueStore } from "./linkshuKeyValueStore";
 import { linkstrStores } from "./linkstrStores";
 import { onOnline } from "./online";
 import { saveRecoverySeedToPasswordManager } from "./passwordManager";
+import { deferUpdateWhile } from "./pwaUpdate";
 import { localStorageKv } from "./storage";
 
 /** The device over the browser: Evolu in OPFS, secrets and queues in localStorage. */
@@ -17,6 +18,7 @@ export const createBrowserDevice = (config: AppConfig): Device =>
       ...linkstrStores(account.pubkey),
       keyValueStore: localStorageKeyValueStore,
       onOnline,
+      deferUpdateWhile,
     }),
     saveRecoverySeed: (account, shopName) =>
       void saveRecoverySeedToPasswordManager(account, shopName),

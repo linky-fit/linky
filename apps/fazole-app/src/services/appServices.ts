@@ -112,6 +112,8 @@ export interface ServicePorts {
     | undefined;
   /** Subscribes to the browser coming back online. */
   readonly onOnline?: ((listener: () => void) => () => void) | undefined;
+  /** Holds a new release's reload back until the wallet operation settles. */
+  readonly deferUpdateWhile?: (<A>(work: Promise<A>) => Promise<A>) | undefined;
 }
 
 export const createAppServices = ({
@@ -147,7 +149,11 @@ export const createAppServices = ({
     relays: config.nostrRelays,
     outboxStore: ports.outboxStore,
   });
-  const wallet = createWallet(linkshu, account.secretKey);
+  const wallet = createWallet(
+    linkshu,
+    account.secretKey,
+    ports.deferUpdateWhile,
+  );
   const rates = createRates(ports.fetchRates);
   const loadShop = () => Effect.runPromise(readShop(repositories.settings));
   const bitcoinPayments = createBitcoinPayments({
