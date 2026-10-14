@@ -20,6 +20,8 @@
     "site:preview": "bun run --filter @linky-fit/site preview",
     "fazole:dev": "bun run --filter @linky-fit/fazole-app dev",
     "fazole:build": "bun run --filter @linky-fit/fazole-app build",
+    "fazole-site:dev": "bun run --filter @linky-fit/fazole-site dev",
+    "fazole-site:build": "bun run --filter @linky-fit/fazole-site build",
     "errors:dev": "bun run --filter @linky-fit/nostr-error-tracker dev",
     "desktop:dev": "bun run --filter @linky-fit/desktop dev",
     "desktop:mac": "bun run --filter @linky-fit/desktop dist:mac",
