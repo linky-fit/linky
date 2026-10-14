@@ -1,4 +1,5 @@
-import { Effect, Result } from "effect";
+import { KeyValueStore, makeInMemoryKeyValueStore } from "@linky-fit/linkshu";
+import { Effect, Layer, Result } from "effect";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRecoverySeed } from "../storage/account";
 import type { Device, DevicePlatform } from "./device";
@@ -19,17 +20,21 @@ const signedIn = (device: Device) => {
 const fakePlatform = (kv = memoryKv()) => {
   const offered: string[] = [];
   let reloads = 0;
+  const linkshuKv = makeInMemoryKeyValueStore();
   const platform: DevicePlatform = {
     kv,
     openStore: async () => testStore(),
-    servicePorts: () => ({ outboxStore: sharedOutboxStore() }),
+    servicePorts: () => ({
+      outboxStore: sharedOutboxStore(),
+      keyValueStore: Layer.succeed(KeyValueStore, linkshuKv),
+    }),
     saveRecoverySeed: (_account, shopName) => void offered.push(shopName),
     reload: () => {
       reloads += 1;
     },
     resetDevice: () => {},
   };
-  return { platform, kv, offered, reloads: () => reloads };
+  return { platform, kv, linkshuKv, offered, reloads: () => reloads };
 };
 
 const opened: Device[] = [];
@@ -102,6 +107,21 @@ describe("a device", () => {
     await device.restoreAccount(seed);
     expect(fake.reloads()).toBe(1);
     expect(signedIn(device).services.account.npub).toBe(npub);
+  });
+
+  it("forgets the replaced seed's wallet counters before reloading into another account", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fake = fakePlatform();
+    const device = open(fake.platform);
+    await device.createAccount({ name: "Kavárna", iban: null });
+    const counter = "linkshu.detCounter.https%3A%2F%2Fmint.example.sat.00ff";
+    const seenMint = "linkshu.seenMints.https%3A%2F%2Fmint.example";
+    await Effect.runPromise(fake.linkshuKv.set(counter, "42"));
+    await Effect.runPromise(fake.linkshuKv.set(seenMint, "42"));
+    await device.restoreAccount(await Effect.runPromise(createRecoverySeed));
+    expect(await Effect.runPromise(fake.linkshuKv.get(counter))).toBeNull();
+    expect(await Effect.runPromise(fake.linkshuKv.get(seenMint))).toBe("42");
+    expect(fake.reloads()).toBe(1);
   });
 
   it("refuses a mistyped recovery seed and stays signed out", async () => {

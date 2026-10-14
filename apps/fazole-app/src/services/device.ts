@@ -1,3 +1,4 @@
+import { Restore, runLinkshu } from "@linky-fit/linkshu";
 import type { LinkyStore } from "@linky-fit/linksync";
 import {
   markAwaitingFirstHydration,
@@ -105,6 +106,16 @@ export const createDevice = (
     return prepared;
   };
 
+  /** linkshu's counters and cursors belong to the replaced seed; reused under another one they collide at the mint. */
+  const wipeSeedBoundState = (account: Account) =>
+    runLinkshu(
+      {
+        bip39Seed: account.cashuSeed,
+        keyValueStore: platform.servicePorts(account).keyValueStore,
+      },
+      Effect.flatMap(Restore, (restore) => restore.wipeSeedBoundState),
+    );
+
   const stored = loadStoredAccount(platform.kv);
   if (stored !== null) void open(stored, false);
 
@@ -131,6 +142,11 @@ export const createDevice = (
       );
       if (Result.isFailure(derived)) return Result.fail(derived.failure);
       const account = derived.success;
+      const replaced = loadStoredAccount(platform.kv);
+      if (replaced !== null && replaced.npub !== account.npub) {
+        if (session._tag === "SignedIn") await session.services.dispose();
+        await wipeSeedBoundState(account);
+      }
       storeAccount(platform.kv, account);
       markAwaitingFirstHydration(platform.kv, account.appMnemonic);
       if (session._tag === "SignedOut") await open(account, true);
