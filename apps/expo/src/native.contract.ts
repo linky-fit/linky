@@ -21,6 +21,8 @@ import type * as webBrowserPolyfills from "@linky-fit/linky-app/src/platform/bro
 import * as nativeBrowserPolyfills from "@linky-fit/linky-app/src/platform/browserPolyfills.native";
 import type * as webDeviceMotion from "@linky-fit/linky-app/src/platform/deviceMotion";
 import * as nativeDeviceMotion from "@linky-fit/linky-app/src/platform/deviceMotion.native";
+import type * as webEvoluDatabaseSize from "@linky-fit/linky-app/src/platform/evoluDatabaseSize";
+import * as nativeEvoluDatabaseSize from "@linky-fit/linky-app/src/platform/evoluDatabaseSize.native";
 import type * as webHashLinks from "@linky-fit/linky-app/src/platform/hashLinks";
 import * as nativeHashLinks from "@linky-fit/linky-app/src/platform/hashLinks.native";
 import type * as webLogoutWipe from "@linky-fit/linky-app/src/platform/logoutWipe";
@@ -97,6 +99,8 @@ export const appEvents: typeof webAppEvents = nativeAppEvents;
 export const browserPolyfills: typeof webBrowserPolyfills =
   nativeBrowserPolyfills;
 export const deviceMotion: typeof webDeviceMotion = nativeDeviceMotion;
+export const evoluDatabaseSize: typeof webEvoluDatabaseSize =
+  nativeEvoluDatabaseSize;
 export const hashLinks: typeof webHashLinks = nativeHashLinks;
 export const logoutWipe: typeof webLogoutWipe = nativeLogoutWipe;
 export const nativeBridge: typeof webNativeBridge = nativeNativeBridge;

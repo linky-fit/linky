@@ -1,5 +1,4 @@
 import { Directory } from "expo-file-system";
-import { defaultDatabaseDirectory } from "expo-sqlite";
 import { reportAppLog } from "../devtools/inspector/appLog";
 import { INITIAL_MNEMONIC_STORAGE_KEY } from "../mnemonic";
 import {
@@ -16,6 +15,7 @@ import {
 } from "../utils/storage";
 import { getUnknownErrorMessage } from "../utils/unknown";
 import { clearCapacitorStores } from "./capacitorStores.native";
+import { databaseDirectoryUri } from "./evoluDatabaseSize.native";
 import { secureStore } from "./secureStore.native";
 
 const LOGOUT_PENDING_STORAGE_KEY = "linky.logoutPending";
@@ -39,12 +39,6 @@ export const markLogoutPending = (): void =>
 
 /** The native app runs in one context. */
 export const onLogoutInAnotherTab: (callback: () => void) => void = () => {};
-
-// expo-sqlite names the directory by a plain path; expo-file-system takes a URI.
-const databaseDirectoryUri = (): string => {
-  const directory = String(defaultDatabaseDirectory);
-  return directory.startsWith("file://") ? directory : `file://${directory}`;
-};
 
 const deleteDatabaseFiles = (): number => {
   const files = new Directory(databaseDirectoryUri())
