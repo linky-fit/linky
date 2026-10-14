@@ -224,7 +224,7 @@ export function SuccessOverlay({
       >
         <View position="relative">
           {avatar ? (
-            <Avatar name={avatar.name} uri={avatar.uri} size="lg" />
+            <Avatar name={avatar.name} uri={avatar.uri} size="lg" raised />
           ) : (
             <View
               width="$hero"

@@ -3,14 +3,17 @@ import { TamaguiProvider } from "tamagui";
 import { config } from "./config";
 import type { ColorMode } from "./tokens";
 
-export interface UIProviderProps {
-  mode: ColorMode;
-  children: ReactNode;
-}
+export type UIProviderProps = { children: ReactNode } & (
+  | { mode: ColorMode; brand?: "linky" | undefined }
+  | { mode: "dark"; brand: "fazole" }
+);
 
-export function UIProvider({ mode, children }: UIProviderProps) {
+export function UIProvider({ mode, brand, children }: UIProviderProps) {
   return (
-    <TamaguiProvider config={config} defaultTheme={mode}>
+    <TamaguiProvider
+      config={config}
+      defaultTheme={brand === "fazole" ? "dark_fazole" : mode}
+    >
       {children}
     </TamaguiProvider>
   );

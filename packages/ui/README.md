@@ -8,6 +8,8 @@ The package ships TypeScript source. Add `"@linky-fit/ui": "workspace:*"` to the
 
 Wrap the app once in `UIProvider` and pass the active color mode. The provider does not pick or store the mode; the app decides between `"light"` and `"dark"`.
 
+fazole.fit wears its gold-on-black palette with `<UIProvider mode="dark" brand="fazole">`. The fazole brand has a dark theme only, so its `mode` must be `"dark"`. It is the Tamagui sub-theme `dark_fazole`, so components and `useTheme()` follow it.
+
 ```tsx
 import { Button, Screen, Text, UIProvider } from "@linky-fit/ui";
 
@@ -81,7 +83,7 @@ All values live in `src/tokens.ts`, exported whole from the package root. `@link
 | Border, opacity and shadow | exported as `border`, `opacity` (`disabled`, `dimmed`) and `shadow` constants for props without token support                                                                                                                                                             |
 | Breakpoint                 | media `compact` below 961 px, `wide` from 961 px                                                                                                                                                                                                                          |
 
-Both themes have the same keys. Surfaces: `$background` (page), `$surface` (cards, sheets, toasts), `$surfaceRaised` (secondary buttons, keys), the translucent `$neutralSoft` (fields, incoming messages, chips) `$scrim` (dims the page behind overlays) and `$bezel` (the body of a `DeviceFrame`). Text: `$colorStrong` (amounts, code), `$color`, `$colorSubtle`, `$colorMuted`. Each tone has a soft fill and a text color for that fill: `$accentSoft`/`$accentText`, `$dangerSoft`/`$dangerText`, `$warningSoft`/`$warningText`, `$infoSoft`/`$infoText`, plus solid `$accent` and `$danger` with `$onAccent` and `$onDanger`. Components take a `tone` of `neutral`, `accent`, `warning`, `danger` or `info`.
+Every theme (`dark`, `light`, `dark_fazole`) has the same keys. Surfaces: `$background` (page), `$surface` (cards, sheets, toasts), `$surfaceRaised` (secondary buttons, keys), the translucent `$neutralSoft` (fields, incoming messages, chips) `$scrim` (dims the page behind overlays) and `$bezel` (the body of a `DeviceFrame`). Text: `$colorStrong` (amounts, code), `$color`, `$colorSubtle`, `$colorMuted`. Each tone has a soft fill and a text color for that fill: `$accentSoft`/`$accentText`, `$dangerSoft`/`$dangerText`, `$warningSoft`/`$warningText`, `$infoSoft`/`$infoText`, plus solid `$accent` and `$danger` with `$onAccent` and `$onDanger`. Components take a `tone` of `neutral`, `accent`, `warning`, `danger` or `info`.
 
 The config makes style values strict at the type level: color props accept theme keys only, space props reject strings that are not tokens, and size props accept tokens and percentages. Tamagui's types always accept raw numbers for space and size, so the types cannot reject them; use the tokens.
 
