@@ -69,11 +69,25 @@ const openIncoming = (incoming: IncomingUrl): string | null => {
   }
 };
 
+/** Logs a URL the OS opened the app with, hands its link over and returns the URL path it opens, or null to stay. */
+const takeIncomingUrl = (path: string, initial: boolean): string | null => {
+  const incoming = classifyIncomingUrl(path, spdStore);
+  if (incoming === null) return null;
+  reportAppLog({
+    tag: "navigation.incomingLink",
+    summary: `The system opened the app with a ${incoming._tag} link`,
+    payload: { kind: incoming._tag, initial },
+  });
+  return openIncoming(incoming);
+};
+
 /**
  * app/+native-intent.tsx: expo-router passes every URL the OS opens the app
- * with here, the launch URL with `initial`, and opens the path returned.
- * Links go to their subscribers in hashLinks.native.ts, which hand each one
- * over once.
+ * with here, the launch URL with `initial`, whose returned path becomes the
+ * first route. A later link replaces the route like any in-app navigation:
+ * a returned path would be pushed, and the router's own back handler would
+ * then pop back to the page the link interrupted. Links go to their
+ * subscribers in hashLinks.native.ts, which hand each one over once.
  */
 export const redirectSystemPath = ({
   path,
@@ -82,20 +96,15 @@ export const redirectSystemPath = ({
   readonly path: string;
   readonly initial: boolean;
 }): string | null => {
-  // A reload restarts JavaScript with the same launch URL, whose link the previous run took.
-  if (initial && safeSessionStorageGet(HANDLED_LAUNCH_URL_KEY) === path)
-    return "/";
-  if (initial) safeSessionStorageSet(HANDLED_LAUNCH_URL_KEY, path);
-  const incoming = classifyIncomingUrl(path, spdStore);
-  if (incoming !== null) {
-    reportAppLog({
-      tag: "navigation.incomingLink",
-      summary: `The system opened the app with a ${incoming._tag} link`,
-      payload: { kind: incoming._tag, initial },
-    });
+  if (initial) {
+    // A reload restarts JavaScript with the same launch URL, whose link the previous run took.
+    if (safeSessionStorageGet(HANDLED_LAUNCH_URL_KEY) === path) return "/";
+    safeSessionStorageSet(HANDLED_LAUNCH_URL_KEY, path);
+    return takeIncomingUrl(path, true) ?? "/";
   }
-  const href = incoming === null ? null : openIncoming(incoming);
-  return href ?? (initial ? "/" : null);
+  const href = takeIncomingUrl(path, false);
+  if (href !== null) openHref(href);
+  return null;
 };
 
 // React Native drops a link the OS hands over while nothing listens, and
@@ -111,7 +120,7 @@ const takeLinksBeforeRouter = (): string | null => {
   const links = linksBeforeRouter;
   linksBeforeRouter = [];
   return links.reduce<string | null>(
-    (href, path) => redirectSystemPath({ path, initial: false }) ?? href,
+    (href, path) => takeIncomingUrl(path, false) ?? href,
     null,
   );
 };
