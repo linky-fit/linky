@@ -1,4 +1,6 @@
 import {
+  Autoswap,
+  AutoswapDraft,
   Mints,
   OperationId,
   P2pkUnlockingKey,
@@ -34,6 +36,10 @@ export interface Wallet {
   readonly receive: (
     text: string,
   ) => Promise<Result.Result<ReceiveReceipt, ReceiveError>>;
+  /** Moves the sats at `from` to `to` over Lightning; the fee it cost, `null` when nothing moved. */
+  readonly moveAll: (from: MintUrl, to: MintUrl) => Promise<number | null>;
+  /** Finishes moves an earlier session left halfway. */
+  readonly resumeMoves: () => Promise<void>;
   /** Whether `operationId` is a receive that finished, so its sats are in the wallet. */
   readonly isReceived: (operationId: string) => Promise<boolean>;
   /** Takes an undelivered send's token back into the balance; `false` when it has to be tried again. */
@@ -84,6 +90,23 @@ export const createWallet = (
           }),
         ),
       ),
+    moveAll: async (from, to) => {
+      const moved = await run(
+        Effect.flatMap(Autoswap, (autoswap) =>
+          autoswap.claim(
+            new AutoswapDraft({ sourceMint: from, targetMint: to }),
+          ),
+        ),
+      );
+      if (Result.isSuccess(moved)) return moved.success.feePaid;
+      console.warn("[fazole] sats not moved", moved.failure._tag);
+      return null;
+    },
+    resumeMoves: async () => {
+      await run(
+        Effect.flatMap(Autoswap, (autoswap) => autoswap.resumePendingClaims),
+      );
+    },
     isReceived: async (operationId) =>
       (await transfers()).some(
         (transfer) =>

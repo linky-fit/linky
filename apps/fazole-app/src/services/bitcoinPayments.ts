@@ -20,6 +20,7 @@ import {
   minimumCzkFor,
   OPEN_REQUEST_SEC,
   readIncomingCashu,
+  requestMintElsewhere,
   uniqueRequestSats,
   type CzkAmount,
   type IncomingCashu,
@@ -63,6 +64,12 @@ export interface BitcoinPayments {
 }
 
 const RESUME_DELAY_MS = 30_000;
+
+/** A receive and the sats it put into the wallet. */
+interface CashuReceive {
+  readonly operationId: string;
+  readonly sats: number;
+}
 
 /** A payment's open Bitcoin request in the shape the matching rules take. */
 interface OpenPayment {
@@ -194,6 +201,7 @@ export const createBitcoinPayments = ({
     serially(async () => {
       await Effect.runPromise(Scope.close(scope, Exit.void));
       scope = Effect.runSync(Scope.make());
+      await wallet.resumeMoves();
       const handles = await runtime.runPromise(
         Scope.provide(
           Effect.flatMap(Topup, (topup) => topup.resumePending({ lockingKey })),
@@ -293,10 +301,7 @@ export const createBitcoinPayments = ({
   const unrecordedReceiveOf = async (
     text: string,
     incoming: IncomingCashu,
-  ): Promise<{
-    readonly operationId: string;
-    readonly sats: number;
-  } | null> => {
+  ): Promise<CashuReceive | null> => {
     const received = await wallet.receive(text);
     if (Result.isSuccess(received)) {
       return {
@@ -317,9 +322,35 @@ export const createBitcoinPayments = ({
   };
 
   /**
+   * Moves the sats of a token from another mint than the request it pays to
+   * that request's mint, so a payment is paid only by sats its own mint
+   * holds. Sats that cannot move stay where they are, paying nothing.
+   */
+  const atRequestMint = async (
+    incoming: IncomingCashu,
+    received: CashuReceive,
+  ): Promise<{ incoming: IncomingCashu; received: CashuReceive }> => {
+    const target = requestMintElsewhere(
+      incoming,
+      openBitcoinPayments((await ledger.records()).payments),
+    );
+    const from = parseMintUrl(incoming.mint);
+    const to = target === null ? null : parseMintUrl(target);
+    if (from === null || to === null) return { incoming, received };
+    const fee = await wallet.moveAll(from, to);
+    return fee === null
+      ? { incoming, received }
+      : {
+          incoming: { ...incoming, mint: to },
+          received: { ...received, sats: Math.max(0, received.sats - fee) },
+        };
+  };
+
+  /**
    * Receives a token and records what it put into the wallet: it pays the
-   * payment it matches, also a cancelled one; a token for a paid payment is
-   * recorded as paying it again, and one that matches none as a receipt.
+   * payment it matches, also a cancelled one, once its sats are at that
+   * payment's mint; a token for a paid payment is recorded as paying it
+   * again, and one that matches none as a receipt.
    */
   const receiveChatToken: InboxHandler = async (event) => {
     if (event._tag !== "ChatMessageReceived" || event.editOf !== null) return;
@@ -332,15 +363,19 @@ export const createBitcoinPayments = ({
     const incoming = text === null ? null : readIncomingCashu(text);
     if (text === null || incoming === null) return;
     await whenHydrated();
-    const received = await unrecordedReceiveOf(text, incoming);
-    if (received === null) return;
+    const unrecorded = await unrecordedReceiveOf(text, incoming);
+    if (unrecorded === null) return;
+    const { incoming: paying, received } = await atRequestMint(
+      incoming,
+      unrecorded,
+    );
     await settling(async () => {
       const { payments } = await ledger.records();
       const paidBefore = payments.find(
         (payment) => payment.cashuReceive?.operationId === received.operationId,
       );
       if (paidBefore) return;
-      const open = matchIncomingCashu(incoming, openBitcoinPayments(payments));
+      const open = matchIncomingCashu(paying, openBitcoinPayments(payments));
       if (
         open &&
         (await ledger.completePayment(open.payment, {
@@ -351,7 +386,7 @@ export const createBitcoinPayments = ({
         return;
       }
       const repeated = matchRepeatedCashu(
-        incoming,
+        paying,
         paidBitcoinPayments(payments),
       );
       await ledger.recordReceipt({

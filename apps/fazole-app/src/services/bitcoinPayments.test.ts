@@ -35,10 +35,13 @@ import {
 } from "./testing/fakes";
 import type { Wallet } from "./wallet";
 
-const tokenOf = (amount: number) =>
+/** A mint other than the shop's, which Linky may pay a request from. */
+const otherMint = "http://localhost:3340";
+
+const tokenOf = (amount: number, tokenMint = mint) =>
   encodeToken(
     Schema.decodeUnknownSync(DecodedToken)({
-      mint,
+      mint: tokenMint,
       unit: "sat",
       memo: null,
       proofs: [
@@ -75,8 +78,11 @@ const chatMessage = (body: ChatMessageReceived["body"]) =>
     sentAt: UnixSeconds.make(1_700_000_000),
   });
 
-const tokenMessage = (amount: number) =>
-  chatMessage(new TokenBody({ token: CashuTokenText.make(tokenOf(amount)) }));
+/** What Linky sends for a request: the bare token as a NIP-17 chat token. */
+const tokenMessage = (amount: number, tokenMint = mint) =>
+  chatMessage(
+    new TokenBody({ token: CashuTokenText.make(tokenOf(amount, tokenMint)) }),
+  );
 
 /** The NUT-18 payload a non-Linky wallet sends for the request `id`. */
 const nut18Payload = (id: string) =>
@@ -263,6 +269,40 @@ describe("tokens sent to the account", () => {
       payerPubkey: payer,
     });
     expect((await ledger.records()).receipts).toEqual([]);
+  });
+
+  it("pays the payment with a token from another mint once its sats moved to the payment's mint", async () => {
+    const moves: string[] = [];
+    const { ledger, handler, id } = await withHandler(
+      () => Result.succeed(receipt(99)),
+      {
+        moveAll: async (from, to) => {
+          moves.push(`${from} -> ${to}`);
+          return 2;
+        },
+      },
+    );
+    await handler(tokenMessage(100, otherMint), "live");
+    expect(moves).toEqual([`${otherMint} -> ${mint}`]);
+    expect(await ledger.payment(id)).toMatchObject({
+      status: "paid",
+      method: "cashu",
+      cashuReceive: { operationId: "receive-1", sats: 97 },
+      payerPubkey: payer,
+    });
+    expect((await ledger.records()).receipts).toEqual([]);
+  });
+
+  it("keeps a token from another mint whose sats did not move as an unassigned receipt", async () => {
+    const { ledger, handler, id } = await withHandler(
+      () => Result.succeed(receipt(99)),
+      { moveAll: async () => null },
+    );
+    await handler(tokenMessage(100, otherMint), "live");
+    expect((await ledger.payment(id))?.status).toBe("pending");
+    expect((await ledger.records()).receipts).toMatchObject([
+      { method: "cashu", sats: 99, paymentId: null },
+    ]);
   });
 
   it("pays a payment the merchant cancelled when its token arrives late", async () => {
