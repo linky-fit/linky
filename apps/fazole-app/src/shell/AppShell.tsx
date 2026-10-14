@@ -17,6 +17,7 @@ import {
   paymentIdOf,
   resolveRoute,
   sections,
+  supportRoute,
   type AccountState,
   type Route,
   type Section,
@@ -27,6 +28,7 @@ import { RestoreScreen } from "../screens/RestoreScreen";
 import { RestoringScreen } from "../screens/RestoringScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { SetupScreen } from "../screens/SetupScreen";
+import { SupportChatScreen } from "../screens/SupportChatScreen";
 import { TerminalScreen } from "../screens/TerminalScreen";
 import { WalletScreen } from "../screens/WalletScreen";
 import { WelcomeScreen } from "../screens/WelcomeScreen";
@@ -111,6 +113,7 @@ function RouteScreen({
   if (shop !== null && paymentId !== null) {
     return <PaymentScreen paymentId={paymentId} shop={shop} />;
   }
+  if (shop !== null && route === supportRoute) return <SupportChatScreen />;
   if (shop !== null && isSection(route)) {
     return <Sections section={route} shop={shop} />;
   }

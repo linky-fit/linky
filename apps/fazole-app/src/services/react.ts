@@ -14,6 +14,7 @@ import {
   walletActivity,
   type Payment,
   type ShopProfile,
+  type SupportChat,
   type WalletActivity,
   type Withdrawal,
 } from "../domain";
@@ -78,6 +79,10 @@ export const usePayerProfile = (pubkey: Pubkey | null): PayerProfile | null => {
   }, [payers, pubkey]);
   return loaded !== null && loaded.pubkey === pubkey ? loaded.profile : null;
 };
+
+/** The chat with Fazole support; `null` until read. */
+export const useSupportChat = (): SupportChat | null =>
+  useLiveValue<SupportChat | null>(useAppServices().supportChat.live, null);
 
 /** Payments, receipts and withdrawals, newest first; `null` until read. */
 export const useFazoleRecords = (): FazoleRecords | null =>

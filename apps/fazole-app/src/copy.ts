@@ -256,6 +256,19 @@ export const copy = {
     resetConfirm: "Resetovat",
     about: "O aplikaci",
     mint: "Mincovna",
+    help: "Pomoc",
+    contactSupport: "Kontaktovat podporu",
+    unreadSupport: "Nová odpověď podpory",
+  },
+  support: {
+    title: "Podpora",
+    emptyTitle: "Jak vám můžeme pomoct?",
+    emptyDescription: "Napište nám, s čím potřebujete pomoct.",
+    placeholder: "Zpráva pro podporu",
+    send: "Odeslat",
+    sending: "Odesílá se",
+    failed: "Neodesláno",
+    sendFailed: "Zprávu se nepodařilo odeslat. Zkuste to znovu.",
   },
 
   shopPicture: {

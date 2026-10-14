@@ -9,7 +9,10 @@ export type Flow = (typeof flows)[number];
 /** A payment shown to the customer. */
 export type PaymentRoute = `pay/${string}`;
 
-export type Route = Section | Flow | PaymentRoute;
+/** The chat with Fazole support, opened from the settings. */
+export const supportRoute = "support";
+
+export type Route = Section | Flow | PaymentRoute | typeof supportRoute;
 
 /** Where this device stands, as far as routing cares. */
 export type AccountState =
@@ -32,7 +35,10 @@ const isPaymentRoute = (value: string): value is PaymentRoute =>
 
 export const parseRoute = (hash: string): Route => {
   const name = hash.replace(/^#\/?/u, "");
-  return isOneOf(sections, name) || isOneOf(flows, name) || isPaymentRoute(name)
+  return isOneOf(sections, name) ||
+    isOneOf(flows, name) ||
+    isPaymentRoute(name) ||
+    name === supportRoute
     ? name
     : "welcome";
 };
@@ -51,8 +57,8 @@ export const isSection = (route: Route): route is Section =>
 /**
  * Where a route lands in this account state: signed out only the welcome
  * flows open, a restore waits on the restoring screen, an account without a
- * shop sets one up, and a shop opens its sections, payments and the restore
- * of another account.
+ * shop sets one up, and a shop opens its sections, payments, the support
+ * chat and the restore of another account.
  */
 export const resolveRoute = (route: Route, state: AccountState): Route => {
   switch (state) {
@@ -66,7 +72,10 @@ export const resolveRoute = (route: Route, state: AccountState): Route => {
     case "noShop":
       return "setup";
     case "ready":
-      return route === "restore" || isPaymentRoute(route) || isSection(route)
+      return route === "restore" ||
+        route === supportRoute ||
+        isPaymentRoute(route) ||
+        isSection(route)
         ? route
         : "terminal";
   }

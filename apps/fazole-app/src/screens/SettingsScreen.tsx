@@ -5,13 +5,19 @@ import {
   Dialog,
   ListRow,
   Section,
+  StatusDot,
   Switch,
 } from "@linky-fit/ui";
 import { useState } from "react";
 import { copy } from "../copy";
 import { formatCzechIban, type ShopProfile } from "../domain";
 import { navigateTo } from "../platform/hashRoute";
-import { useAppServices, useDevice, useOfferTips } from "../services/react";
+import {
+  useAppServices,
+  useDevice,
+  useOfferTips,
+  useSupportChat,
+} from "../services/react";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Page } from "./Page";
 import { RecoverySeed } from "./RecoverySeed";
@@ -33,6 +39,7 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
   const device = useDevice();
   const { config, saveOfferTips } = useAppServices();
   const offerTips = useOfferTips() ?? true;
+  const supportUnread = useSupportChat()?.unread ?? false;
   const [dialog, setDialog] = useState<OpenDialog | null>(null);
   const close = () => setDialog(null);
 
@@ -103,6 +110,24 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
             title={copy.settings.reset}
             destructive
             onPress={() => setDialog("reset")}
+          />
+        </Card>
+      </Section>
+      <Section title={copy.settings.help}>
+        <Card paddingVertical="$sm" gap="$none">
+          <ListRow
+            testID="settings-support"
+            icon="MessageCircle"
+            title={copy.settings.contactSupport}
+            trailing={
+              supportUnread ? (
+                <StatusDot
+                  tone="accent"
+                  accessibilityLabel={copy.settings.unreadSupport}
+                />
+              ) : undefined
+            }
+            onPress={() => navigateTo("support")}
           />
         </Card>
       </Section>

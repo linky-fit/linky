@@ -15,7 +15,7 @@ export interface PaymentDay<P extends DatedPayment> {
   readonly payments: readonly P[];
 }
 
-const startOfDaySec = (sec: number) =>
+export const startOfDaySec = (sec: number) =>
   new Date(sec * 1000).setHours(0, 0, 0, 0) / 1000;
 
 /** Groups payments, newest first, by the local day they were created on. */
