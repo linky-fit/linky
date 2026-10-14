@@ -122,7 +122,6 @@ export const copy = {
       "Přidejte bankovní účet v Nastavení a zákazníci budou moci platit QR platbou z banky.",
     openSettings: "Otevřít nastavení",
     paidTitle: "Zaplaceno",
-    paidDetail: (method: string, time: string) => `${method} · ${time}`,
     paidFrom: (name: string) => `Od: ${name}`,
     notFound: "Platba nenalezena",
     notFoundDescription: "Možná se ještě nesynchronizovala na toto zařízení.",

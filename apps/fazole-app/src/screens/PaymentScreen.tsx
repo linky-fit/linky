@@ -25,7 +25,7 @@ import {
   type Payment,
   type ShopProfile,
 } from "../domain";
-import { formatCzkValue, formatTime, formatWhole, shortNpub } from "../format";
+import { formatCzkValue, formatWhole, shortNpub } from "../format";
 import { copyText } from "../platform/clipboard";
 import { navigateTo } from "../platform/hashRoute";
 import type { BitcoinRequestFailure } from "../services/bitcoinPayments";
@@ -121,10 +121,6 @@ function PaymentBody({
                   uri: payer?.picture ?? undefined,
                 }
           }
-          detail={copy.payment.paidDetail(
-            payment.method === null ? "" : copy.methods[payment.method],
-            formatTime(payment.paidAtSec ?? payment.createdAtSec),
-          )}
           onDismiss={toTerminal}
         />
       </Page>
