@@ -34,11 +34,14 @@ const contrast = (foreground: string, background: string, page: string) => {
 };
 
 describe("themes", () => {
-  it("define the same keys in light and dark", () => {
-    expect(Object.keys(themes.light).sort()).toEqual(
-      Object.keys(themes.dark).sort(),
-    );
-  });
+  it.each(Object.entries(themes))(
+    "%s defines the same keys as dark",
+    (_name, theme) => {
+      expect(Object.keys(theme).sort()).toEqual(
+        Object.keys(themes.dark).sort(),
+      );
+    },
+  );
 
   // A `$key` resolves to the theme before the prop's token group, so a shared name hides the token.
   it.each(Object.entries({ space, size, radius, zIndex }))(

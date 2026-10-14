@@ -5,7 +5,10 @@ export const setup: Section = {
   title: "Setup",
   entries: {
     UIProvider: ({ mode }) => (
-      <UI.Text>Provides the {mode} theme, fonts and animations.</UI.Text>
+      <UI.Text>
+        Provides the {mode} theme, fonts and animations;
+        brand=&quot;fazole&quot; switches to the fazole palette.
+      </UI.Text>
     ),
     Theme: ({ mode }) => (
       <UI.Theme name={mode === "light" ? "dark" : "light"}>

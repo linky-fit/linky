@@ -36,6 +36,24 @@ const palette = {
   sky500: "#0ea5e9",
   sky600: "#0284c7",
   sky800: "#075985",
+  // fazole.fit: warm ink and gold.
+  ink50: "#f6f4ef",
+  ink100: "#ebe7df",
+  ink200: "#d6d0c4",
+  ink300: "#b8b0a1",
+  ink400: "#978e7e",
+  ink500: "#6f685b",
+  ink750: "#2b2721",
+  ink800: "#1f1c18",
+  ink900: "#151310",
+  ink950: "#0a0908",
+  gold200: "#efd88e",
+  gold300: "#e5c45f",
+  gold400: "#d8ae3a",
+  gold500: "#c4922a",
+  orange200: "#fed7aa",
+  orange400: "#fb923c",
+  orange500: "#f97316",
 };
 
 /** Appends an alpha channel to a 6-digit hex color. */
@@ -257,8 +275,52 @@ const light: ThemeColors = {
   bezel: palette.slate950,
 };
 
-export const themes = { dark, light };
+/** fazole.fit's gold-on-black palette, selected by `UIProvider brand="fazole"`. */
+const darkFazole: ThemeColors = {
+  background: palette.ink950,
+  backgroundPress: palette.ink800,
+  surface: palette.ink900,
+  surfaceRaised: palette.ink750,
+  neutral: palette.ink500,
+  neutralSoft: alpha(palette.ink300, 0.12),
+  color: palette.ink100,
+  colorStrong: palette.ink50,
+  colorSubtle: palette.ink200,
+  colorMuted: palette.ink400,
+  placeholderColor: palette.ink500,
+  // fazole draws no borders; surfaces separate by fill alone.
+  borderColor: alpha(palette.ink300, 0),
+  borderColorHover: alpha(palette.ink300, 0),
+  outlineColor: alpha(palette.gold400, 0.6),
+  shadowColor: alpha(palette.black, 0.5),
+  scrim: alpha(palette.ink950, 0.74),
+  accent: palette.gold400,
+  accentHover: palette.gold300,
+  accentPress: palette.gold500,
+  onAccent: palette.ink950,
+  accentSoft: alpha(palette.gold400, 0.16),
+  accentText: palette.gold200,
+  danger: palette.red400,
+  onDanger: palette.red950,
+  dangerSoft: alpha(palette.red500, 0.14),
+  dangerText: palette.red200,
+  warning: palette.orange400,
+  warningSoft: alpha(palette.orange500, 0.14),
+  warningText: palette.orange200,
+  info: palette.sky400,
+  infoSoft: alpha(palette.sky400, 0.14),
+  infoText: palette.sky300,
+  qrBackground: palette.white,
+  qrForeground: palette.black,
+  bezel: palette.ink750,
+};
 
-export type ColorMode = keyof typeof themes;
+// `dark_fazole` is a Tamagui sub-theme: `<Theme name="fazole">` inside dark resolves to it.
+export const themes = { dark, light, dark_fazole: darkFazole };
+
+export type ColorMode = "dark" | "light";
+
+/** The product whose palette the UI wears; fazole has a dark theme only. */
+export type Brand = "linky" | "fazole";
 
 export type Tone = "neutral" | "accent" | "warning" | "danger" | "info";
