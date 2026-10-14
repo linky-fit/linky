@@ -799,6 +799,53 @@ describe("payContact", () => {
     expect(linkshu.sendCashuToken).not.toHaveBeenCalled();
   });
 
+  it("queues an offline payment of a scanned request with its id, memo and reply, and of a chat request without the id", async () => {
+    const chat = chatWrites({
+      appendLocalNostrMessage: vi.fn(() => ({
+        id: "offline-message",
+        written: Promise.resolve({ ok: true as const }),
+      })),
+    });
+    const { commands } = setup({ chat, online: false });
+    const replyContext = {
+      replyToId: "cd".repeat(32),
+      rootMessageId: "ab".repeat(32),
+      replyToContent: "creqA…",
+    };
+
+    await commands.payContact(
+      alicePayment({
+        memo: " coffee ",
+        paymentRequestId: "request-1",
+        replyContext,
+        sendAsPaymentRequestPayload: true,
+      }),
+    );
+    await commands.payContact(alicePayment({ paymentRequestId: "request-2" }));
+
+    expect(chat.appendLocalNostrMessage).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        content: "queued for Alice",
+        replyToId: replyContext.replyToId,
+        rootMessageId: replyContext.rootMessageId,
+        replyToContent: replyContext.replyToContent,
+      }),
+    );
+    expect(chat.enqueuePendingPayment).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        memo: "coffee",
+        paymentRequestId: "request-1",
+        replyContext,
+      }),
+    );
+    expect(chat.enqueuePendingPayment).toHaveBeenNthCalledWith(
+      2,
+      expect.not.objectContaining({ paymentRequestId: expect.anything() }),
+    );
+  });
+
   it.each([false, true])(
     "reports an unstored message without claiming success, offline=%s",
     async (offline) => {

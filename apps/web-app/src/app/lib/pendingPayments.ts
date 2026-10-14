@@ -15,6 +15,11 @@ export const readPendingPayments = (key: string): LocalPendingPayment[] =>
     .map((payment) => {
       const recipientPubkey = parsePubkey(trimString(payment.recipientPubkey));
       const messageId = trimString(payment.messageId);
+      const paymentRequestId = trimString(payment.paymentRequestId);
+      const memo = trimString(payment.memo);
+      const replyToId = trimString(payment.replyToId);
+      const rootMessageId = trimString(payment.rootMessageId);
+      const replyToContent = trimString(payment.replyToContent);
       return {
         id: trimString(payment.id),
         contactId: trimString(payment.contactId),
@@ -25,6 +30,15 @@ export const readPendingPayments = (key: string): LocalPendingPayment[] =>
         ),
         ...(recipientPubkey ? { recipientPubkey } : {}),
         ...(messageId ? { messageId } : {}),
+        ...(paymentRequestId ? { paymentRequestId } : {}),
+        ...(memo ? { memo } : {}),
+        ...(replyToId
+          ? {
+              replyToId,
+              ...(rootMessageId ? { rootMessageId } : {}),
+              ...(replyToContent ? { replyToContent } : {}),
+            }
+          : {}),
       };
     })
     .filter(

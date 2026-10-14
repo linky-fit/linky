@@ -30,6 +30,7 @@ import {
   toUnknownSenderWriteRow,
 } from "../../hooks/messages/messageRows";
 import { buildMessageUpdate } from "../../hooks/messages/messageUpdates";
+import type { ReplyContext } from "./chat";
 import { enqueueStoredPendingPayment } from "../../lib/pendingPayments";
 import { NO_WRITE, runWrite, type WriteOutcome } from "../../lib/storeWrite";
 import type {
@@ -52,6 +53,9 @@ export interface PendingPaymentPayload {
   readonly contactId: ContactId;
   readonly recipientPubkey: Pubkey;
   readonly messageId?: string;
+  readonly paymentRequestId?: string;
+  readonly memo?: string;
+  readonly replyContext?: ReplyContext;
 }
 
 export interface StoredMessage {
@@ -270,6 +274,21 @@ const makeChatWrites = ({
       recipientPubkey: payload.recipientPubkey,
       createdAtSec: nowSeconds(),
       ...(payload.messageId ? { messageId: payload.messageId } : {}),
+      ...(payload.paymentRequestId
+        ? { paymentRequestId: payload.paymentRequestId }
+        : {}),
+      ...(payload.memo ? { memo: payload.memo } : {}),
+      ...(payload.replyContext
+        ? {
+            replyToId: payload.replyContext.replyToId,
+            ...(payload.replyContext.rootMessageId
+              ? { rootMessageId: payload.replyContext.rootMessageId }
+              : {}),
+            ...(payload.replyContext.replyToContent
+              ? { replyToContent: payload.replyContext.replyToContent }
+              : {}),
+          }
+        : {}),
     });
   };
 

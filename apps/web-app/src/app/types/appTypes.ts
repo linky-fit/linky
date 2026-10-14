@@ -134,6 +134,13 @@ export interface LocalPendingPayment {
   createdAtSec: number;
   id: string;
   messageId?: string;
+  /** The id of a scanned NUT-18 request; the replay sends its payment payload. */
+  paymentRequestId?: string;
+  memo?: string;
+  /** The request message the payment answers, so the replay sends it as a reply. */
+  replyToId?: string;
+  rootMessageId?: string;
+  replyToContent?: string;
 }
 
 export type OptionalBooleanTextNumber =

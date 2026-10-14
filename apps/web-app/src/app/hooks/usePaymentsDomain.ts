@@ -15,6 +15,7 @@ import {
   readPendingPayments,
   withPendingPaymentsFlushLock,
 } from "../lib/pendingPayments";
+import type { ReplyContext } from "../state/messages/chat";
 import type { CashuMessagePaymentHookResult } from "./payments/cashuMessagePaymentTypes";
 
 interface UsePaymentsDomainParams<TContact extends ContactIdentityRowLike> {
@@ -29,7 +30,11 @@ interface UsePaymentsDomainParams<TContact extends ContactIdentityRowLike> {
     contact: TContact;
     fromQueue?: boolean;
     isPaymentAuthorized?: () => boolean;
+    memo?: string;
+    paymentRequestId?: string;
     pendingMessageId?: string;
+    replyContext?: ReplyContext;
+    sendAsPaymentRequestPayload?: boolean;
   }) => Promise<CashuMessagePaymentHookResult>;
   pendingPaymentsKey: string | null;
   updateLocalNostrMessage: UpdateLocalNostrMessage;
@@ -110,6 +115,22 @@ export const usePaymentsDomain = <TContact extends ContactIdentityRowLike>({
           isPaymentAuthorized,
           fromQueue: true,
           ...(pending.messageId ? { pendingMessageId: pending.messageId } : {}),
+          ...(pending.paymentRequestId
+            ? {
+                paymentRequestId: pending.paymentRequestId,
+                sendAsPaymentRequestPayload: true,
+              }
+            : {}),
+          ...(pending.memo ? { memo: pending.memo } : {}),
+          ...(pending.replyToId
+            ? {
+                replyContext: {
+                  replyToId: pending.replyToId,
+                  rootMessageId: pending.rootMessageId ?? null,
+                  replyToContent: pending.replyToContent ?? null,
+                },
+              }
+            : {}),
         });
       } catch (error) {
         result = {

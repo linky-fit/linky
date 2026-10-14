@@ -142,6 +142,31 @@ describe("queued payment authorization", () => {
     expect(harness.toast).not.toHaveBeenCalled();
   });
 
+  it("replays a scanned request's payment as its payment payload, with its memo and reply", async () => {
+    const harness = await setup({
+      entry: {
+        ...pending,
+        paymentRequestId: "request-1",
+        memo: "coffee",
+        replyToId: "cd".repeat(32),
+        rootMessageId: "ab".repeat(32),
+      },
+    });
+    await goOnline();
+    expect(harness.pay).toHaveBeenCalledWith(
+      expect.objectContaining({
+        memo: "coffee",
+        paymentRequestId: "request-1",
+        replyContext: {
+          replyToId: "cd".repeat(32),
+          rootMessageId: "ab".repeat(32),
+          replyToContent: null,
+        },
+        sendAsPaymentRequestPayload: true,
+      }),
+    );
+  });
+
   it("cancels a changed identity without attempting payment", async () => {
     const harness = await setup({
       initialContact: { ...contact, npub: encodeNpub(changed.pubkey) },

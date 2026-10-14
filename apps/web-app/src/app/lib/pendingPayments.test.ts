@@ -30,6 +30,19 @@ describe("pending payment persistence", () => {
     expect(readPendingPayments(key)).toEqual([approved]);
   });
 
+  it("round-trips a scanned request's id, memo and the message it answers", () => {
+    const scanned = {
+      ...payment,
+      paymentRequestId: "request-1",
+      memo: "coffee",
+      replyToId: "cd".repeat(32),
+      rootMessageId: "ab".repeat(32),
+      replyToContent: "creqA…",
+    };
+    safeLocalStorageSetJson(key, [scanned]);
+    expect(readPendingPayments(key)).toEqual([scanned]);
+  });
+
   it("keeps legacy and invalid-key entries readable without approving any identity", () => {
     safeLocalStorageSetJson(key, [
       payment,

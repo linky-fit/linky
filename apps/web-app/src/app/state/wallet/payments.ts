@@ -692,6 +692,15 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
     if (!deps.isOnline()) {
       const clientId = makeLocalId();
       const appended = chat.appendLocalNostrMessage({
+        ...(replyContext?.replyToId
+          ? {
+              replyToContent: replyContext.replyToContent,
+              replyToId: replyContext.replyToId,
+              rootMessageId:
+                (replyContext.rootMessageId ?? "").trim() ||
+                replyContext.replyToId,
+            }
+          : {}),
         clientId,
         contactId,
         content: payment.offlineNotice,
@@ -719,6 +728,11 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
         contactId,
         recipientPubkey,
         messageId: appended.id,
+        ...(sendAsPaymentRequestPayload && paymentRequestId
+          ? { paymentRequestId }
+          : {}),
+        ...(note ? { memo: note } : {}),
+        ...(replyContext?.replyToId ? { replyContext } : {}),
       });
       return { _tag: "QueuedOffline", contactId };
     }
