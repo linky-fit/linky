@@ -29,6 +29,7 @@ import {
   type BitcoinRequestFailure,
 } from "./bitcoinPayments";
 import { createNostr, type Nostr, type PayerProfile } from "./nostr";
+import { uploadToBlossom, type ImageFile } from "./blossom";
 import { createRates, type Rates } from "./rates";
 import { makeLinkshuRuntime, makeLinkstrRuntime } from "./runtimes";
 import { createWallet, type Wallet } from "./wallet";
@@ -56,8 +57,10 @@ export interface Payments {
 
 export interface Shop {
   readonly load: () => Promise<ShopProfile | null>;
-  /** Saves the profile and publishes its name as the account's Nostr profile. */
+  /** Saves the profile and publishes its name and picture as the account's Nostr profile. */
   readonly save: (shop: ShopProfile) => Promise<void>;
+  /** Uploads the image as the shop's picture, or removes the picture on `null`; rejects when the upload fails. */
+  readonly setPicture: (image: ImageFile | null) => Promise<void>;
 }
 
 /** Who paid with a Cashu token, as their Nostr profile names them. */
@@ -164,6 +167,11 @@ export const createAppServices = ({
     return payment === null ? false : change(payment);
   };
 
+  const saveShopProfile = async (shop: ShopProfile) => {
+    await Effect.runPromise(saveShop(repositories.settings, shop));
+    void nostr.publishProfile(shop);
+  };
+
   const payerProfiles = new Map<Pubkey, Promise<PayerProfile | null>>();
 
   let started = false;
@@ -180,9 +188,15 @@ export const createAppServices = ({
     rates,
     shop: {
       load: loadShop,
-      save: async (shop) => {
-        await Effect.runPromise(saveShop(repositories.settings, shop));
-        void nostr.publishName(shop.name);
+      save: saveShopProfile,
+      setPicture: async (image) => {
+        const picture =
+          image === null
+            ? null
+            : await uploadToBlossom(image, account.secretKey);
+        const shop = await loadShop();
+        if (shop === null) throw new Error("the account has no shop");
+        await saveShopProfile({ ...shop, picture });
       },
     },
     saveOfferTips: (offer) =>

@@ -90,6 +90,7 @@ export const useShopForm = (initial?: ShopProfile | null) => {
       return {
         name: trimmed,
         iban: accountCheck.kind === "valid" ? accountCheck.iban : null,
+        picture: initial?.picture ?? null,
       };
     },
   };

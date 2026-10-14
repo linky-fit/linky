@@ -258,6 +258,21 @@ export const copy = {
     mint: "Mincovna",
   },
 
+  shopPicture: {
+    title: "Obrázek obchodu",
+    description:
+      "Zákazníci ho uvidí v peněžence, když vám platí. Nahraje se na veřejný server.",
+    none: "Bez obrázku",
+    choose: "Vybrat obrázek",
+    change: "Změnit obrázek",
+    remove: "Odebrat obrázek",
+    cropHelp: "Posunutím obrázku vyberte výřez.",
+    zoom: "Přiblížení",
+    notAnImage: "Tento soubor nejde otevřít jako obrázek.",
+    failed:
+      "Obrázek se nepodařilo uložit. Zkontrolujte připojení a zkuste to znovu.",
+  },
+
   recoverySeed: {
     description:
       "Záložní fráze je jediná záloha obchodu, jeho historie i peněženky. Uložte si ji do správce hesel, nebo ji zkopírujte na bezpečné místo.",

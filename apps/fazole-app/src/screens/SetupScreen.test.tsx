@@ -47,6 +47,7 @@ describe("the setup screen", () => {
     expect(device.createAccount).toHaveBeenCalledWith({
       name: "Kavárna U Lípy",
       iban: "CZ6508000000192000145399",
+      picture: null,
     });
 
     const bitcoinOnly = fakeDevice();
@@ -56,6 +57,7 @@ describe("the setup screen", () => {
     expect(bitcoinOnly.createAccount).toHaveBeenCalledWith({
       name: "Stánek",
       iban: null,
+      picture: null,
     });
   });
 });

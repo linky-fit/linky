@@ -19,7 +19,9 @@ export const makeSettingsRepository = (store: LinkyStore): SettingsRepository =>
 
 const SHOP_KEY = "fazole.shop";
 // Mirrors linksync's `settingIdFor`, whose keys are Linky's own settings only.
-const shopSettingId = createIdFromString<"Setting">(`setting/${SHOP_KEY}`);
+export const shopSettingId = createIdFromString<"Setting">(
+  `setting/${SHOP_KEY}`,
+);
 
 /** What the merchant may name the shop: trimmed, 1 to 100 characters. */
 export const ShopName = Schema.String.pipe(
@@ -30,8 +32,17 @@ export const ShopName = Schema.String.pipe(
   ),
 );
 
+/** An https URL short enough to fit the setting row next to the name and IBAN. */
+export const ShopPicture = Schema.String.pipe(
+  Schema.check(Schema.isPattern(/^https:\/\/\S+$/u), Schema.isMaxLength(500)),
+);
+
 const ShopJson = Schema.fromJsonString(
-  Schema.Struct({ name: ShopName, iban: Schema.optionalKey(CzechIban) }),
+  Schema.Struct({
+    name: ShopName,
+    iban: Schema.optionalKey(CzechIban),
+    picture: Schema.optionalKey(ShopPicture),
+  }),
 );
 
 export const readShop = (
@@ -41,7 +52,11 @@ export const readShop = (
     Option.getOrNull(
       Option.map(
         Schema.decodeUnknownOption(ShopJson)(row?.value),
-        ({ name, iban }) => ({ name, iban: iban ?? null }),
+        ({ name, iban, picture }) => ({
+          name,
+          iban: iban ?? null,
+          picture: picture ?? null,
+        }),
       ),
     ),
   );
@@ -57,6 +72,7 @@ export const saveShop = (
       Schema.encodeSync(ShopJson)({
         name: shop.name,
         ...(shop.iban === null ? {} : { iban: shop.iban }),
+        ...(shop.picture === null ? {} : { picture: shop.picture }),
       }),
     ),
   });

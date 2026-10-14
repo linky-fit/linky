@@ -60,12 +60,13 @@ describe("a device", () => {
     const device = open(platform);
     expect(device.session()._tag).toBe("SignedOut");
     device.prepareAccount();
-    await device.createAccount({ name: "Kavárna", iban: null });
+    await device.createAccount({ name: "Kavárna", iban: null, picture: null });
     const session = signedIn(device);
     expect(session.restored).toBe(false);
     expect(await session.services.shop.load()).toEqual({
       name: "Kavárna",
       iban: null,
+      picture: null,
     });
     expect(offered).toEqual(["Kavárna"]);
     expect(kv.entries.has("linky.fazole.account")).toBe(true);
@@ -75,7 +76,7 @@ describe("a device", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const first = fakePlatform();
     const device = open(first.platform);
-    await device.createAccount({ name: "Kavárna", iban: null });
+    await device.createAccount({ name: "Kavárna", iban: null, picture: null });
     const { npub } = signedIn(device).services.account;
     const restarted = open(fakePlatform(first.kv).platform);
     await vi.waitFor(() =>
@@ -101,7 +102,7 @@ describe("a device", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const fake = fakePlatform();
     const device = open(fake.platform);
-    await device.createAccount({ name: "Kavárna", iban: null });
+    await device.createAccount({ name: "Kavárna", iban: null, picture: null });
     const { npub } = signedIn(device).services.account;
     const seed = await Effect.runPromise(createRecoverySeed);
     await device.restoreAccount(seed);
@@ -113,7 +114,7 @@ describe("a device", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const fake = fakePlatform();
     const device = open(fake.platform);
-    await device.createAccount({ name: "Kavárna", iban: null });
+    await device.createAccount({ name: "Kavárna", iban: null, picture: null });
     const counter = "linkshu.detCounter.https%3A%2F%2Fmint.example.sat.00ff";
     const seenMint = "linkshu.seenMints.https%3A%2F%2Fmint.example";
     await Effect.runPromise(fake.linkshuKv.set(counter, "42"));
