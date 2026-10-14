@@ -17,6 +17,7 @@ export default defineConfig({
           name: "node",
           include: ["src/**/*.test.ts"],
           environment: "node",
+          setupFiles: ["./src/testing/czechDevice.ts"],
         },
       },
       {
@@ -25,7 +26,10 @@ export default defineConfig({
           name: "jsdom",
           include: ["src/**/*.test.tsx"],
           environment: "jsdom",
-          setupFiles: ["./src/testing/jsdomSetup.ts"],
+          setupFiles: [
+            "./src/testing/czechDevice.ts",
+            "./src/testing/jsdomSetup.ts",
+          ],
         },
       },
     ],

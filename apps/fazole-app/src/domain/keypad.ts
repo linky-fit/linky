@@ -53,11 +53,22 @@ export const pressKeypadKey = (
 export const canRequestPayment = (input: KeypadInput): boolean =>
   keypadAmount(input) > 0;
 
-/** Shows the typed amount as typed, a trailing comma included, with Czech digit grouping. */
-export const formatKeypadInput = (input: KeypadInput): string => {
+export interface NumberSeparators {
+  readonly group: string;
+  readonly decimal: string;
+}
+
+/** Shows the typed amount as typed, a trailing decimal mark included, with the locale's separators. */
+export const formatKeypadInput = (
+  input: KeypadInput,
+  separators: NumberSeparators,
+): string => {
   const [whole = "", fraction] = input.split(DECIMAL_COMMA);
-  const grouped = (whole || "0").replace(/\B(?=(\d{3})+(?!\d))/gu, " ");
+  const grouped = (whole || "0").replace(
+    /\B(?=(\d{3})+(?!\d))/gu,
+    separators.group,
+  );
   return fraction === undefined
     ? grouped
-    : `${grouped}${DECIMAL_COMMA}${fraction}`;
+    : `${grouped}${separators.decimal}${fraction}`;
 };
