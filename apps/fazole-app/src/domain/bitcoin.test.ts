@@ -51,6 +51,7 @@ const token = (
   amount,
   unit: "sat",
   requestId: null,
+  memo: null,
   ...overrides,
 });
 
@@ -258,12 +259,12 @@ describe("readIncomingCashu", () => {
     },
   ];
 
-  it("reads a bare token's mint and face value", () => {
+  it("reads a bare token's mint, face value and the note Linky sends as its memo", () => {
     const text = encodeToken(
       Schema.decodeUnknownSync(DecodedToken)({
         mint,
         unit: "sat",
-        memo: null,
+        memo: "Za kávu",
         proofs,
       }),
     );
@@ -272,6 +273,7 @@ describe("readIncomingCashu", () => {
       amount: 100,
       unit: "sat",
       requestId: null,
+      memo: "Za kávu",
     });
     expect(readIncomingCashu(`cashu:${text}`)?.amount).toBe(100);
   });
@@ -283,6 +285,7 @@ describe("readIncomingCashu", () => {
       amount: 100,
       unit: "sat",
       requestId: "p1",
+      memo: null,
     });
   });
 

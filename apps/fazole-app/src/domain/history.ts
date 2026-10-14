@@ -1,44 +1,88 @@
-import { CzkAmount } from "./money";
-import type { PaymentStatus } from "./payment";
+import { CzkAmount, satsToCzk } from "./money";
+import type { DirectTransfer, Payment } from "./records";
 
-interface DatedPayment {
-  readonly createdAtSec: number;
-  readonly status: PaymentStatus;
-  readonly amountCzk: CzkAmount;
-}
+/** One line of the history: a payment the terminal asked for, or a direct transfer. */
+export type HistoryEntry =
+  | {
+      readonly kind: "payment";
+      readonly id: string;
+      readonly atSec: number;
+      readonly receivedCzk: CzkAmount;
+      readonly payment: Payment;
+    }
+  | {
+      readonly kind: "direct";
+      readonly id: string;
+      readonly atSec: number;
+      readonly receivedCzk: CzkAmount;
+      readonly transfer: DirectTransfer;
+    };
 
-export interface PaymentDay<P extends DatedPayment> {
+/** A direct transfer's CZK value at the rate it arrived at; `null` without one. */
+export const directTransferCzk = (
+  transfer: DirectTransfer,
+): CzkAmount | null =>
+  transfer.czkPerBtc === null
+    ? null
+    : satsToCzk(transfer.sats, transfer.czkPerBtc);
+
+/**
+ * Payments at the time they were created and direct transfers at the time
+ * they arrived. What each adds to the day's takings: a paid payment its
+ * amount, a direct transfer its CZK value at its rate, so the day total is
+ * all the money received; a transfer without a rate adds nothing.
+ */
+export const historyEntries = (
+  payments: readonly Payment[],
+  transfers: readonly DirectTransfer[],
+): HistoryEntry[] => [
+  ...payments.map(
+    (payment): HistoryEntry => ({
+      kind: "payment",
+      id: payment.id,
+      atSec: payment.createdAtSec,
+      receivedCzk:
+        payment.status === "paid" ? payment.amountCzk : CzkAmount.make(0),
+      payment,
+    }),
+  ),
+  ...transfers.map(
+    (transfer): HistoryEntry => ({
+      kind: "direct",
+      id: transfer.id,
+      atSec: transfer.receivedAtSec,
+      receivedCzk: directTransferCzk(transfer) ?? CzkAmount.make(0),
+      transfer,
+    }),
+  ),
+];
+
+export interface HistoryDay {
   /** Local midnight that starts the day, in seconds. */
   readonly startSec: number;
-  /** What was actually paid that day; pending and cancelled payments do not count. */
+  /** What was actually received that day. */
   readonly paidTotal: CzkAmount;
-  readonly payments: readonly P[];
+  readonly entries: readonly HistoryEntry[];
 }
 
 export const startOfDaySec = (sec: number) =>
   new Date(sec * 1000).setHours(0, 0, 0, 0) / 1000;
 
-/** Groups payments, newest first, by the local day they were created on. */
-export const groupByDay = <P extends DatedPayment>(
-  payments: readonly P[],
-): PaymentDay<P>[] => {
-  const days = new Map<number, P[]>();
-  for (const payment of payments) {
-    const day = startOfDaySec(payment.createdAtSec);
-    days.set(day, [...(days.get(day) ?? []), payment]);
+/** Groups entries, newest first, by their local day. */
+export const groupByDay = (entries: readonly HistoryEntry[]): HistoryDay[] => {
+  const days = new Map<number, HistoryEntry[]>();
+  for (const entry of entries) {
+    const day = startOfDaySec(entry.atSec);
+    days.set(day, [...(days.get(day) ?? []), entry]);
   }
   return [...days]
     .sort(([a], [b]) => b - a)
-    .map(([startSec, dayPayments]) => ({
+    .map(([startSec, dayEntries]) => ({
       startSec,
       paidTotal: CzkAmount.make(
-        dayPayments
-          .filter((payment) => payment.status === "paid")
-          .reduce((total, payment) => total + payment.amountCzk, 0),
+        dayEntries.reduce((total, entry) => total + entry.receivedCzk, 0),
       ),
-      payments: [...dayPayments].sort(
-        (a, b) => b.createdAtSec - a.createdAtSec,
-      ),
+      entries: [...dayEntries].sort((a, b) => b.atSec - a.atSec),
     }));
 };
 

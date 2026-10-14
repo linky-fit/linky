@@ -19,7 +19,7 @@ bun run fazole:dev                                      # http://localhost:5280
 ## Layout
 
 - `src/domain`: pure rules: Czech accounts and IBAN, SPD, variable symbols, money and keypad, payment status, Bitcoin request matching, withdrawal targets, history and wallet activity.
-- `src/storage`: the account (recovery seed and what derives from it), the Evolu store, the shop profile, payments, receipts and withdrawals as Linky `setting` and `transaction` rows, and the support chat as a Linky conversation.
+- `src/storage`: the account (recovery seed and what derives from it), the Evolu store, the shop profile, payments, receipts, direct transfers and withdrawals as Linky `setting` and `transaction` rows, and the support chat as a Linky conversation.
 - `src/services`: one linkstr and one linkshu runtime per launch behind `AppServices`; `Device` creates, restores and resets the account; `supportChat.ts` is the NIP-17 chat with Fazole support's hardcoded npub; `react.ts` holds the hooks screens use.
 - `src/platform`: browser APIs (localStorage, password manager, device wipe, service worker, clipboard, hash routes, the QR camera scanner, the image picker).
 - `src/routing.ts`: the hash routes and where each lands for the account's state; `src/shell` renders them, the terminal alone and the other sections with bottom tabs (a rail on wide screens).

@@ -1,8 +1,9 @@
 import { createIdFromString } from "@linky-fit/domain";
+import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { describe, expect, it } from "vitest";
 import { balanceChange, parseSats, walletActivity } from "./activity";
 import { CzkAmount, Sats } from "./money";
-import type { Payment, Receipt, Withdrawal } from "./records";
+import type { DirectTransfer, Payment, Receipt, Withdrawal } from "./records";
 import { VariableSymbol } from "./variableSymbol";
 
 const id = (name: string) => createIdFromString<"Transaction">(name);
@@ -60,10 +61,25 @@ const receipt = (name: string, overrides: Partial<Receipt>): Receipt => ({
   ...overrides,
 });
 
+const direct = (
+  name: string,
+  overrides: Partial<DirectTransfer>,
+): DirectTransfer => ({
+  id: id(name),
+  sats: 300,
+  czkPerBtc: null,
+  receivedAtSec: 1_000,
+  operationId: `receive-${name}`,
+  mintUrl: "http://localhost:3338",
+  payerPubkey: makeIdentity().pubkey,
+  note: "Za kávu",
+  ...overrides,
+});
+
 describe("walletActivity", () => {
   it("lists what reached and left the wallet, newest first", () => {
-    const items = walletActivity(
-      [
+    const items = walletActivity({
+      payments: [
         payment("Lightning", { paidAtSec: 3_000 }),
         payment("Cashu", {
           method: "cashu",
@@ -73,22 +89,29 @@ describe("walletActivity", () => {
         payment("Bank", { method: "bank", bitcoin: null }),
         payment("Pending", { status: "pending", method: null }),
       ],
-      [receipt("Stray", { receivedAtSec: 1_500 })],
-      [withdrawal("Out", { createdAtSec: 4_000, feeSats: 2 })],
-    );
+      receipts: [
+        receipt("Again", { receivedAtSec: 1_500, paymentId: id("Cashu") }),
+      ],
+      directTransfers: [direct("Direct", { receivedAtSec: 1_200 })],
+      withdrawals: [withdrawal("Out", { createdAtSec: 4_000, feeSats: 2 })],
+    });
     expect(items.map((item) => [item.kind, item.sats, item.feeSats])).toEqual([
       ["withdrawal", 42, 2],
       ["payment", 100, 0],
       ["payment", 98, 2],
       ["receipt", 99, 0],
+      ["direct", 300, 0],
     ]);
   });
 
   it("adds up to the balance the movements left", () => {
-    const items = walletActivity(
-      [payment("Paid", { bitcoin: { ...leg, sats: Sats.make(500) } })],
-      [receipt("Again", { sats: 249, paymentId: id("Paid") })],
-      [
+    const items = walletActivity({
+      payments: [
+        payment("Paid", { bitcoin: { ...leg, sats: Sats.make(500) } }),
+      ],
+      receipts: [receipt("Again", { sats: 249, paymentId: id("Paid") })],
+      directTransfers: [direct("Direct", { sats: 300 })],
+      withdrawals: [
         withdrawal("Linky", { amountSats: 100, feeSats: 1 }),
         withdrawal("Ln", {
           kind: "lightning_invoice",
@@ -98,9 +121,9 @@ describe("walletActivity", () => {
         }),
         withdrawal("Failed", { amountSats: 50, status: "failed" }),
       ],
-    );
+    });
     expect(items.reduce((sum, item) => sum + balanceChange(item), 0)).toBe(
-      500 + 249 - 101 - 535,
+      500 + 249 + 300 - 101 - 535,
     );
   });
 
@@ -109,7 +132,10 @@ describe("walletActivity", () => {
       payment(`P${n}`, { paidAtSec: n * 1_000 }),
     );
     expect(
-      walletActivity(payments, [], [], 2).map((item) => item.atSec),
+      walletActivity(
+        { payments, receipts: [], directTransfers: [], withdrawals: [] },
+        2,
+      ).map((item) => item.atSec),
     ).toEqual([3_000, 2_000]);
   });
 });

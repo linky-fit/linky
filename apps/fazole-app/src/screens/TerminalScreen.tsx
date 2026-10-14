@@ -8,22 +8,34 @@ import {
   Row,
   Stack,
   Text,
+  Toast,
+  ToastStack,
   TopBar,
 } from "@linky-fit/ui";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { copy } from "../copy";
 import {
   canRequestPayment,
+  directTransferCzk,
+  formatCzk,
   formatKeypadInput,
   keypadAmount,
   pressKeypadKey,
   withTip,
+  type DirectTransfer,
   type ShopProfile,
   type TipChoice,
 } from "../domain";
+import { formatWhole } from "../format";
 import { navigateTo } from "../platform/hashRoute";
 import { paymentRoute } from "../routing";
-import { useAppServices, useOfferTips } from "../services/react";
+import {
+  useAppServices,
+  useDirectTransfers,
+  useOfferTips,
+  usePayerName,
+} from "../services/react";
+import { nowSeconds } from "../utils/time";
 import { TipStep } from "./TipStep";
 
 /** The amount keypad, full screen; the arrow at the top leads to the other sections. */
@@ -122,6 +134,58 @@ export function TerminalScreen({ shop }: { readonly shop: ShopProfile }) {
           {copy.terminal.request}
         </Button>
       </Stack>
+      <DirectTransferNotice />
     </Stack>
+  );
+}
+
+const NOTICE_MS = 6_000;
+
+/** Tells the merchant about a direct transfer that arrives while the terminal is open, for a few seconds. */
+function DirectTransferNotice() {
+  const [openedAtSec] = useState(nowSeconds);
+  const [newest] = useDirectTransfers();
+  const [dismissedId, setDismissedId] = useState<string | null>(null);
+  const fresh =
+    newest !== undefined &&
+    newest.receivedAtSec >= openedAtSec &&
+    newest.id !== dismissedId
+      ? newest
+      : null;
+  const freshId = fresh?.id ?? null;
+  useEffect(() => {
+    if (freshId === null) return;
+    const timer = setTimeout(() => setDismissedId(freshId), NOTICE_MS);
+    return () => clearTimeout(timer);
+  }, [freshId]);
+  return fresh === null ? null : (
+    <ToastStack>
+      <DirectTransferToast
+        transfer={fresh}
+        onPress={() => setDismissedId(fresh.id)}
+      />
+    </ToastStack>
+  );
+}
+
+function DirectTransferToast({
+  transfer,
+  onPress,
+}: {
+  readonly transfer: DirectTransfer;
+  readonly onPress: () => void;
+}) {
+  const payer = usePayerName(transfer.payerPubkey);
+  const czk = directTransferCzk(transfer);
+  return (
+    <Toast
+      title={copy.terminal.directReceived(
+        payer,
+        czk === null
+          ? copy.satAmount(formatWhole(transfer.sats))
+          : formatCzk(czk),
+      )}
+      onPress={onPress}
+    />
   );
 }

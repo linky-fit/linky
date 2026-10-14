@@ -93,6 +93,8 @@ const activityLabel = (item: WalletActivity): string => {
       return item.receipt.paymentId === null
         ? copy.wallet.receiptUnassigned
         : copy.wallet.receiptPaidAgain(copy.methods[item.receipt.method]);
+    case "direct":
+      return copy.history.direct;
     case "withdrawal":
       return item.withdrawal.kind === "cashu_chat"
         ? copy.wallet.withdrawalLinky
@@ -108,6 +110,8 @@ const activityIcon = (item: WalletActivity): IconName => {
         : methodIcons.lightning;
     case "receipt":
       return methodIcons[item.receipt.method];
+    case "direct":
+      return "HandCoins";
     case "withdrawal":
       return item.withdrawal.kind === "cashu_chat" ? "Send" : "ArrowUpRight";
   }

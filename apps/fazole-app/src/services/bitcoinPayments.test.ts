@@ -38,12 +38,16 @@ import type { Wallet } from "./wallet";
 /** A mint other than the shop's, which Linky may pay a request from. */
 const otherMint = "http://localhost:3340";
 
-const tokenOf = (amount: number, tokenMint = mint) =>
+const tokenOf = (
+  amount: number,
+  tokenMint = mint,
+  memo: string | null = null,
+) =>
   encodeToken(
     Schema.decodeUnknownSync(DecodedToken)({
       mint: tokenMint,
       unit: "sat",
-      memo: null,
+      memo,
       proofs: [
         {
           id: "00ad268c4d1f5826",
@@ -82,6 +86,17 @@ const chatMessage = (body: ChatMessageReceived["body"]) =>
 const tokenMessage = (amount: number, tokenMint = mint) =>
   chatMessage(
     new TokenBody({ token: CashuTokenText.make(tokenOf(amount, tokenMint)) }),
+  );
+
+/**
+ * What Linky sends when its user pays a contact from the chat: the bare
+ * token as a NIP-17 chat token, the user's note in the token memo.
+ */
+const directPayment = (amount: number, note: string) =>
+  chatMessage(
+    new TokenBody({
+      token: CashuTokenText.make(tokenOf(amount, mint, note)),
+    }),
   );
 
 /** The NUT-18 payload a non-Linky wallet sends for the request `id`. */
@@ -246,10 +261,11 @@ describe("tokens sent to the account", () => {
   const withHandler = async (
     answer: Parameters<typeof scriptedReceive>[1],
     overrides: Partial<Wallet> = {},
+    czkPerBtc: number | null = 2_500_000,
   ) => {
     const { ledger, wallet } = setup();
     const scripted = scriptedReceive(wallet, answer, overrides);
-    const { fake } = paymentsOf(ledger, scripted.wallet, async () => 2_500_000);
+    const { fake } = paymentsOf(ledger, scripted.wallet, async () => czkPerBtc);
     const [handler] = fake.inbox;
     if (!handler) throw new Error("no inbox handler");
     const id = await pendingBitcoinPayment(ledger);
@@ -293,16 +309,16 @@ describe("tokens sent to the account", () => {
     expect((await ledger.records()).receipts).toEqual([]);
   });
 
-  it("keeps a token from another mint whose sats did not move as an unassigned receipt", async () => {
+  it("keeps a token from another mint whose sats did not move as a direct transfer at that mint", async () => {
     const { ledger, handler, id } = await withHandler(
       () => Result.succeed(receipt(99)),
       { moveAll: async () => null },
     );
     await handler(tokenMessage(100, otherMint), "live");
     expect((await ledger.payment(id))?.status).toBe("pending");
-    expect((await ledger.records()).receipts).toMatchObject([
-      { method: "cashu", sats: 99, paymentId: null },
-    ]);
+    const { receipts, directTransfers } = await ledger.records();
+    expect(receipts).toEqual([]);
+    expect(directTransfers).toMatchObject([{ sats: 99, mintUrl: otherMint }]);
   });
 
   it("pays a payment the merchant cancelled when its token arrives late", async () => {
@@ -320,7 +336,7 @@ describe("tokens sent to the account", () => {
     });
   });
 
-  it("keeps a token two requests could be paid by as an unassigned receipt", async () => {
+  it("keeps a token two requests could be paid by as a direct transfer", async () => {
     const { ledger, handler, id } = await withHandler(() =>
       Result.succeed(receipt(100)),
     );
@@ -328,9 +344,67 @@ describe("tokens sent to the account", () => {
     await handler(tokenMessage(100), "live");
     expect((await ledger.payment(id))?.status).toBe("pending");
     expect((await ledger.payment(twin))?.status).toBe("pending");
-    expect((await ledger.records()).receipts).toMatchObject([
-      { method: "cashu", sats: 100, paymentId: null },
+    expect((await ledger.records()).directTransfers).toMatchObject([
+      { sats: 100, payerPubkey: payer },
     ]);
+  });
+
+  it("records a payment Linky sends from the chat as a direct transfer from its sender, with their note and its CZK rate", async () => {
+    const { ledger, handler, calls, id } = await withHandler(() =>
+      Result.succeed(receipt(299)),
+    );
+    await handler(directPayment(300, "Za kávu\na dort"), "live");
+    expect(calls).toEqual([tokenOf(300, mint, "Za kávu\na dort")]);
+    const { payments, receipts, directTransfers } = await ledger.records();
+    expect(payments.find((payment) => payment.id === id)?.status).toBe(
+      "pending",
+    );
+    expect(receipts).toEqual([]);
+    expect(directTransfers).toEqual([
+      {
+        id: expect.any(String),
+        sats: 299,
+        czkPerBtc: 2_500_000,
+        receivedAtSec: expect.any(Number),
+        operationId: "receive-1",
+        mintUrl: mint,
+        payerPubkey: payer,
+        note: "Za kávu a dort",
+      },
+    ]);
+  });
+
+  it("records a direct transfer once when the inbox replays it", async () => {
+    const { ledger, handler } = await withHandler(
+      () => Result.fail(new TokenAlreadyKnown({ operationId: receiveId })),
+      { isReceived: async (operationId) => operationId === "receive-1" },
+    );
+    await handler(directPayment(300, "Za kávu"), "backfill");
+    await handler(directPayment(300, "Za kávu"), "backfill");
+    expect((await ledger.records()).directTransfers).toMatchObject([
+      { operationId: "receive-1", sats: 300, note: "Za kávu" },
+    ]);
+  });
+
+  it("keeps a direct transfer in sats while the rate is unavailable", async () => {
+    const { ledger, handler } = await withHandler(
+      () => Result.succeed(receipt(300)),
+      {},
+      null,
+    );
+    await handler(directPayment(300, "Za kávu"), "live");
+    expect((await ledger.records()).directTransfers).toMatchObject([
+      { sats: 300, czkPerBtc: null },
+    ]);
+  });
+
+  it("pays the open request a token with a note matches by its amount instead of keeping it as a direct transfer", async () => {
+    const { ledger, handler, id } = await withHandler(() =>
+      Result.succeed(receipt(100)),
+    );
+    await handler(directPayment(100, "Za kávu"), "live");
+    expect((await ledger.payment(id))?.status).toBe("paid");
+    expect((await ledger.records()).directTransfers).toEqual([]);
   });
 
   it("records a token for a paid payment as paying it again", async () => {

@@ -19,6 +19,7 @@ import {
   minimumBitcoinSats,
   minimumCzkFor,
   OPEN_REQUEST_SEC,
+  paymentNote,
   readIncomingCashu,
   requestMintElsewhere,
   uniqueRequestSats,
@@ -45,7 +46,8 @@ export type BitcoinRequestFailure =
 /**
  * Takes Bitcoin payments: a Lightning quote and a Cashu request per payment,
  * settled by whichever the customer pays first. Sats that arrive for a
- * payment already paid, or for none, are recorded as a receipt.
+ * payment already paid are recorded as a receipt, a token that pays no
+ * payment as a direct transfer.
  */
 export interface BitcoinPayments {
   /**
@@ -350,7 +352,8 @@ export const createBitcoinPayments = ({
    * Receives a token and records what it put into the wallet: it pays the
    * payment it matches, also a cancelled one, once its sats are at that
    * payment's mint; a token for a paid payment is recorded as paying it
-   * again, and one that matches none as a receipt.
+   * again, and one that matches none as a direct transfer from its sender,
+   * with the note they wrote, left at the mint it came from.
    */
   const receiveChatToken: InboxHandler = async (event) => {
     if (event._tag !== "ChatMessageReceived" || event.editOf !== null) return;
@@ -389,11 +392,22 @@ export const createBitcoinPayments = ({
         paying,
         paidBitcoinPayments(payments),
       );
-      await ledger.recordReceipt({
+      if (repeated) {
+        await ledger.recordReceipt({
+          operationId: received.operationId,
+          method: "cashu",
+          sats: received.sats,
+          paymentId: repeated.payment.id,
+        });
+        return;
+      }
+      await ledger.recordDirectTransfer({
         operationId: received.operationId,
-        method: "cashu",
         sats: received.sats,
-        paymentId: repeated?.payment.id ?? null,
+        czkPerBtc: await czkPerBtc(),
+        mintUrl: paying.mint,
+        payerPubkey: event.from,
+        note: paymentNote(paying.memo),
       });
     });
   };

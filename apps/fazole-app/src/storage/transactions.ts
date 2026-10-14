@@ -18,6 +18,7 @@ import {
   PaymentMethod,
   Sats,
   VariableSymbol,
+  type DirectTransfer,
   type Payment,
   type PaymentStatus,
   type Receipt,
@@ -27,9 +28,10 @@ import {
 } from "../domain";
 
 /**
- * Payments, receipts and withdrawals are Linky `transaction` rows. The row
- * columns carry what Linky's history shows (direction, status, method, sats,
- * fee, mint); `detailsJson` carries the fazole fields under `app: "fazole"`.
+ * Payments, receipts, direct transfers and withdrawals are Linky
+ * `transaction` rows. The row columns carry what Linky's history shows
+ * (direction, status, method, sats, fee, mint, note); `detailsJson` carries
+ * the fazole fields under `app: "fazole"`.
  */
 
 type TransactionColumns = LinkyDbSchema["transaction"];
@@ -69,6 +71,14 @@ const ReceiptDetails = Schema.Struct({
   paymentId: Schema.optionalKey(TransactionIdString),
 });
 
+const DirectTransferDetails = Schema.Struct({
+  app: Schema.Literal("fazole"),
+  kind: Schema.Literal("direct"),
+  operationId: Schema.String,
+  payerPubkey: Pubkey,
+  czkPerBtc: Schema.optionalKey(Schema.Finite),
+});
+
 const WithdrawalDetails = Schema.Struct({
   app: Schema.Literal("fazole"),
   kind: Schema.Literal("withdrawal"),
@@ -79,7 +89,12 @@ const WithdrawalDetails = Schema.Struct({
 });
 
 const Details = Schema.fromJsonString(
-  Schema.Union([PaymentDetails, ReceiptDetails, WithdrawalDetails]),
+  Schema.Union([
+    PaymentDetails,
+    ReceiptDetails,
+    DirectTransferDetails,
+    WithdrawalDetails,
+  ]),
 );
 const decodeDetails = Schema.decodeUnknownOption(Details);
 const encodeDetails = (details: typeof Details.Type) =>
@@ -123,6 +138,7 @@ export interface FazoleRecords {
   /** Newest first. */
   readonly payments: ReadonlyArray<Payment>;
   readonly receipts: ReadonlyArray<Receipt>;
+  readonly directTransfers: ReadonlyArray<DirectTransfer>;
   readonly withdrawals: ReadonlyArray<Withdrawal>;
 }
 
@@ -131,6 +147,7 @@ export const toFazoleRecords = (
 ): FazoleRecords => {
   const payments: Payment[] = [];
   const receipts: Receipt[] = [];
+  const directTransfers: DirectTransfer[] = [];
   const withdrawals: Withdrawal[] = [];
   for (const row of [...rows].sort((a, b) => b.createdAtSec - a.createdAtSec)) {
     const details = decodeDetails(row.detailsJson);
@@ -167,6 +184,20 @@ export const toFazoleRecords = (
           });
         }
         break;
+      case "direct":
+        if (row.amount !== null && row.mint !== null) {
+          directTransfers.push({
+            id: row.id,
+            sats: row.amount,
+            czkPerBtc: value.czkPerBtc ?? null,
+            receivedAtSec: row.createdAtSec,
+            operationId: value.operationId,
+            mintUrl: row.mint,
+            payerPubkey: value.payerPubkey,
+            note: row.note,
+          });
+        }
+        break;
       case "withdrawal": {
         const kind = withdrawalKindOf(row.method);
         if (kind !== null && row.amount !== null) {
@@ -189,7 +220,7 @@ export const toFazoleRecords = (
       }
     }
   }
-  return { payments, receipts, withdrawals };
+  return { payments, receipts, directTransfers, withdrawals };
 };
 
 export const readFazoleRecords = (
@@ -244,6 +275,25 @@ const receiptColumns = (receipt: Receipt) => ({
   }),
 });
 
+const directTransferColumns = (transfer: DirectTransfer) => ({
+  createdAtSec: PositiveInt.orThrow(transfer.receivedAtSec),
+  direction: NonEmptyString100.orThrow("in"),
+  status: NonEmptyString100.orThrow("ok"),
+  method: NonEmptyString100.orThrow("cashu"),
+  amount: PositiveInt.orThrow(transfer.sats),
+  mint: NonEmptyString1000.orThrow(transfer.mintUrl),
+  unit: NonEmptyString100.orThrow("sat"),
+  note:
+    transfer.note === null ? null : NonEmptyString1000.orThrow(transfer.note),
+  detailsJson: encodeDetails({
+    app: "fazole",
+    kind: "direct",
+    operationId: transfer.operationId,
+    payerPubkey: transfer.payerPubkey,
+    ...(transfer.czkPerBtc === null ? {} : { czkPerBtc: transfer.czkPerBtc }),
+  }),
+});
+
 const withdrawalColumns = (withdrawal: Withdrawal) => ({
   createdAtSec: PositiveInt.orThrow(withdrawal.createdAtSec),
   direction: NonEmptyString100.orThrow("out"),
@@ -280,7 +330,10 @@ const withoutNulls = <C extends Patch<TransactionColumns>>(
 const insertRow = (
   id: TransactionId,
   columns: ReturnType<
-    typeof paymentColumns | typeof receiptColumns | typeof withdrawalColumns
+    | typeof paymentColumns
+    | typeof receiptColumns
+    | typeof directTransferColumns
+    | typeof withdrawalColumns
   >,
 ) => {
   const { createdAtSec, direction, status } = columns;
@@ -311,6 +364,15 @@ export const insertReceipt = (
   receipt: Receipt,
 ) =>
   transactions.insertIfAbsent(insertRow(receipt.id, receiptColumns(receipt)));
+
+/** Records a direct transfer once: like a receipt's, its id derives from the receive. */
+export const insertDirectTransfer = (
+  transactions: TransactionsRepository,
+  transfer: DirectTransfer,
+) =>
+  transactions.insertIfAbsent(
+    insertRow(transfer.id, directTransferColumns(transfer)),
+  );
 
 export const insertWithdrawal = (
   transactions: TransactionsRepository,

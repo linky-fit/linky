@@ -91,6 +91,8 @@ export const copy = {
     keypadDelete: "Smazat",
     request: "Požadovat platbu",
     failed: "Platbu se nepodařilo vytvořit. Zkuste to znovu.",
+    directReceived: (name: string, amount: string) =>
+      `Přímá platba od ${name}: ${amount}`,
   },
 
   tips: {
@@ -161,11 +163,12 @@ export const copy = {
 
   history: {
     emptyTitle: "Zatím žádné platby",
-    emptyDescription: "Platby, které vytvoříte v terminálu, se objeví tady.",
+    emptyDescription:
+      "Platby, které vytvoříte v terminálu, i přímé platby z Linky se objeví tady.",
     today: "Dnes",
     yesterday: "Včera",
     dayTotal: (amount: string) => `Přijato ${amount}`,
-    row: (time: string, method: string) => `${time} · ${method}`,
+    row: (...parts: readonly string[]) => parts.join(" · "),
     tipped: (tip: string) => `z toho spropitné ${tip}`,
     amount: "Částka",
     tip: "Spropitné",
@@ -176,6 +179,11 @@ export const copy = {
     created: "Vytvořeno",
     paidAt: "Zaplaceno",
     showQr: "Zobrazit QR kód",
+    direct: "Přímá platba",
+    note: "Poznámka",
+    directAmount: (sats: string, czk: string | null) =>
+      czk === null ? `${sats} sat` : `${sats} sat · ≈ ${czk} Kč`,
+    receivedAt: "Přijato",
   },
 
   wallet: {
