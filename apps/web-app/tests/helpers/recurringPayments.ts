@@ -1,9 +1,4 @@
-import {
-  expect,
-  test as base,
-  type APIRequestContext,
-  type Page,
-} from "@playwright/test";
+import type { APIRequestContext, Page } from "@playwright/test";
 import { Schema } from "effect";
 import {
   mintUrl,
@@ -24,6 +19,7 @@ import {
   type SeedIdentity,
 } from "./identity";
 import { stubFiatRates, stubThirdPartyAssets } from "./network";
+import { expect, test as base } from "./test";
 import { topUp } from "./wallet";
 
 interface Account {

@@ -77,3 +77,7 @@ export const upsertRow = (
     },
     { table, row, ownerId },
   );
+
+/** The origin's persistent inspector log as ndjson; null before the app installed the hooks. */
+export const inspectorLogs = (page: Page): Promise<string | null> =>
+  page.evaluate(() => window.__linkyE2E?.inspectorLogs() ?? null);

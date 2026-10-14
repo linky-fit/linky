@@ -7,7 +7,9 @@ import { readSetting, writeSetting } from "./settings";
 import { tableRepository } from "./tableRepository";
 
 export interface InboxCursorsRepository {
-  readonly get: (pubkey: Pubkey) => Effect.Effect<UnixSeconds | null>;
+  readonly get: (
+    pubkey: Pubkey,
+  ) => Effect.Effect<UnixSeconds | null, ShardDbError>;
   readonly set: (
     pubkey: Pubkey,
     cursor: UnixSeconds,

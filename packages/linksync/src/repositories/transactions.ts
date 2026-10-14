@@ -12,6 +12,7 @@ import {
   type CashuOperationId,
   type TransactionId,
 } from "../model/ids";
+import type { ShardDbError } from "../core";
 import type { LinkyDbSchema, TransactionRow } from "../model/schema";
 import type { LinkyStore } from "../model/store";
 import { tableRepository, type TableRepository } from "./tableRepository";
@@ -36,7 +37,7 @@ export interface TransactionsRepository extends Omit<
   "all"
 > {
   /** Rows a reader can trust: event time, direction and status valid, category derived. Incomplete synced rows are skipped. */
-  readonly all: Effect.Effect<ReadonlyArray<TransactionRecord>>;
+  readonly all: Effect.Effect<ReadonlyArray<TransactionRecord>, ShardDbError>;
 }
 
 /**

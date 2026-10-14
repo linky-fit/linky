@@ -1,6 +1,7 @@
 // A profile created, or an account already on the device, saves what the user
 // does while no Evolu relay answers.
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./helpers/test";
 import { MOBILE_VIEWPORT, setBaseStorage } from "./helpers/appState";
 import { addContactByNpub } from "./helpers/contacts";
 import { watchAppErrors } from "./helpers/diagnostics";

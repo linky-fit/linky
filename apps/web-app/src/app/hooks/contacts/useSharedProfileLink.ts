@@ -1,4 +1,4 @@
-import type { ContactId } from "@linky-fit/linksync";
+import type { ContactId, ShardDbError } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import React from "react";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
@@ -18,7 +18,10 @@ interface UseSharedProfileLinkParams {
   accountHydrated: boolean;
   contacts: readonly { id: ContactId }[];
   contactsRepository: {
-    all: Effect.Effect<readonly { id: ContactId; npub: string | null }[]>;
+    all: Effect.Effect<
+      readonly { id: ContactId; npub: string | null }[],
+      ShardDbError
+    >;
   };
   currentNpub: string | null;
   saveNpubContact: ReturnType<typeof useSaveNpubContact>;

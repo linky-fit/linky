@@ -17,7 +17,7 @@ const store = createShardStore<Schema, typeof scopes>({ db, appOwner, scopes });
 
 `Schema` maps table name to column types and must include `shardPointer` (`CoreSchema`); pass both type arguments explicitly, they cannot be inferred from the port. `createLinkyStore(db, appOwner, { scopes?, retention?, holdWritesUntilHydrated? })` builds the store over `LinkyDbSchema` with `linkyScopes`; a test passes its own `scopes` for small rotation rules.
 
-Reads and writes are `Effect`s. Errors are `ShardDbError` (the port rejected or never confirmed a write), `RowNotFound` (an id no visible shard holds) and `UnknownScope`. Time comes from Effect's `Clock`, so tests drive the cooldown with a manual clock.
+Reads and writes are `Effect`s. Errors are `ShardDbError` (the port rejected a write, or did not confirm a write or answer a read in time), `RowNotFound` (an id no visible shard holds) and `UnknownScope`. Every read can fail with `ShardDbError`, repository reads included; reading again may succeed. Time comes from Effect's `Clock`, so tests drive the cooldown with a manual clock.
 
 ## Lifecycle
 

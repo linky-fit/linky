@@ -2,7 +2,8 @@
 // counts, rotation of every scope, the pointer on a second device,
 // copy-on-write of an edited old-shard row, sends and top-ups across a
 // rotation, and a fresh device seeing only the newest 4 message shards.
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import type { Browser, Page } from "@playwright/test";
+import { expect, test } from "./helpers/test";
 import type { LinkyE2eHooks } from "../src/devtools/e2e/installLinkyE2eHooks";
 import {
   expectSingleLoad,

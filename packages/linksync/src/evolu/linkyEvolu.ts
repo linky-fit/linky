@@ -14,7 +14,11 @@ import {
   type LinkyStore,
 } from "../model";
 import type { PageMessage, WorkerMessage } from "./dbWorker";
-import { createEvoluShardDb, type UnconfirmedWrite } from "./evoluShardDb";
+import {
+  createEvoluShardDb,
+  type SlowEvoluCall,
+  type UnconfirmedWrite,
+} from "./evoluShardDb";
 import { createAccountStore } from "./firstHydration";
 import { readJson, writeJson, type KeyValueStorage } from "./keyValueStorage";
 import {
@@ -156,6 +160,7 @@ export type LinkyEvoluEvent =
       readonly owners: ReadonlyArray<Evolu.OwnerId>;
     }
   | { readonly _tag: "WriteUnconfirmed"; readonly write: UnconfirmedWrite }
+  | { readonly _tag: "SlowEvoluCall"; readonly call: SlowEvoluCall }
   | {
       readonly _tag: "ShardPointersRepaired";
       readonly repairs: ReadonlyArray<{
@@ -240,12 +245,19 @@ export const createLinkyEvolu = ({
   return { evolu, ownerSync };
 };
 
-const syncOwnerIds = (
+/** Hands the synced owner ids to `report`; a failed read is reported by the read itself. */
+const withSyncOwnerIds = (
   store: LinkyStore,
-): Promise<ReadonlyArray<Evolu.OwnerId>> =>
-  Effect.runPromise(store.syncOwners()).then((owners) =>
-    owners.map((owner) => owner.id),
+  report: (owners: ReadonlyArray<Evolu.OwnerId>) => void,
+): void => {
+  void Effect.runPromise(
+    Effect.ignore(
+      Effect.map(store.syncOwners(), (owners) =>
+        report(owners.map((owner) => owner.id)),
+      ),
+    ),
   );
+};
 
 /**
  * The account's shard store over this database. Resolves once the app owner
@@ -285,6 +297,7 @@ export const openLinkyStore = async (
     createEvoluShardDb(evolu, ownerSync, {
       onWriteUnconfirmed: (write) =>
         onEvent?.({ _tag: "WriteUnconfirmed", write }),
+      onSlowCall: (call) => onEvent?.({ _tag: "SlowEvoluCall", call }),
     }),
     owner,
     {
@@ -301,7 +314,7 @@ export const openLinkyStore = async (
   );
   const reportSubscribed = (reason: "boot" | "rotation") => {
     if (onEvent)
-      void syncOwnerIds(store).then((owners) =>
+      withSyncOwnerIds(store, (owners) =>
         onEvent({ _tag: "ShardsSubscribed", reason, owners }),
       );
   };
@@ -317,7 +330,7 @@ export const openLinkyStore = async (
   });
   store.subscribeHydration(() => {
     if (onEvent)
-      void syncOwnerIds(store).then((owners) =>
+      withSyncOwnerIds(store, (owners) =>
         onEvent({ _tag: "AccountHydrated", owners }),
       );
   });

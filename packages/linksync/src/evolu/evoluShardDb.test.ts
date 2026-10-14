@@ -4,6 +4,7 @@ import { testAppOwner } from "../testing/toy";
 import {
   createEvoluShardDb,
   type EvoluRuntime,
+  type SlowEvoluCall,
   type UnconfirmedWrite,
 } from "./evoluShardDb";
 import type { OwnerSync } from "./ownerSync";
@@ -22,7 +23,8 @@ const fakeEvolu = () => {
   }> = [];
   const queries: string[] = [];
   let rows: ReadonlyArray<Record<string, unknown>> = [];
-  let held: Array<() => void> | null = null;
+  let holding = false;
+  const held: Array<() => void> = [];
   let heldCompletions: Array<() => void> | null = null;
   const mutation =
     (kind: string) =>
@@ -66,10 +68,10 @@ const fakeEvolu = () => {
     loadQuery: (query: string) => {
       queries.push(query);
       const answer = rows;
-      if (held === null) return Promise.resolve(answer);
-      const waiting = held;
-      return new Promise((resolve) => waiting.push(() => resolve(answer)));
+      if (!holding) return Promise.resolve(answer);
+      return new Promise((resolve) => held.push(() => resolve(answer)));
     },
+    getQueryRows: () => rows,
     subscribeQuery: () => () => () => {},
     upsert: mutation("upsert"),
     update: mutation("update"),
@@ -83,11 +85,15 @@ const fakeEvolu = () => {
       rows = next;
     },
     holdQueries: () => {
-      held = [];
+      holding = true;
+    },
+    /** Answers new queries again; the held ones stay unanswered. */
+    stopHolding: () => {
+      holding = false;
     },
     answerQueries: () => {
-      for (const answer of held ?? []) answer();
-      held = null;
+      for (const answer of held.splice(0)) answer();
+      holding = false;
     },
     holdCompletions: () => {
       heldCompletions = [];
@@ -227,6 +233,105 @@ describe("evolu shard db", () => {
         { table: "cashuProof", ownerId: owner.id, id: "p1" },
       ]);
       expect(await Effect.runPromise(db.readTable("cashuProof"))).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reports a write Evolu was slow to confirm, with the subscribed load", async () => {
+    vi.useFakeTimers();
+    try {
+      const fake = fakeEvolu();
+      const slow: SlowEvoluCall[] = [];
+      const db = createEvoluShardDb(
+        fake.runtime,
+        reportedOwnerSync().ownerSync,
+        { onSlowCall: (call) => slow.push(call) },
+      );
+      const owner = testAppOwner();
+      fake.seed([{ id: "m1" }, { id: "m2" }]);
+      db.subscribe("message", () => {});
+      fake.holdCompletions();
+      const write = Effect.runPromise(
+        db.mutate([
+          {
+            kind: "update",
+            table: "message",
+            ownerId: owner.id,
+            row: { id: "m1", content: "edited" },
+          },
+        ]),
+      );
+      await vi.advanceTimersByTimeAsync(1_500);
+      fake.completeMutations();
+      await write;
+      expect(slow).toEqual([
+        {
+          call: "write",
+          tables: ["message"],
+          ids: ["m1"],
+          owners: [owner.id],
+          elapsedMs: 1_500,
+          answered: true,
+          load: {
+            subscribedTables: 1,
+            subscribedRows: 2,
+            pendingWrites: 0,
+            pendingReads: 0,
+          },
+        },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("fails a read Evolu never answers and retries it with a query Evolu has not cached", async () => {
+    vi.useFakeTimers();
+    try {
+      const fake = fakeEvolu();
+      const slow: SlowEvoluCall[] = [];
+      const db = createEvoluShardDb(
+        fake.runtime,
+        reportedOwnerSync().ownerSync,
+        { onSlowCall: (call) => slow.push(call) },
+      );
+      const owner = testAppOwner();
+      const row = {
+        id: "p1",
+        ownerId: owner.id,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: null,
+        isDeleted: null,
+      };
+      fake.seed([row]);
+      fake.holdQueries();
+      const stuck = Effect.runPromise(Effect.flip(db.readTable("cashuProof")));
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(await stuck).toMatchObject({
+        _tag: "ShardDbError",
+        table: "cashuProof",
+        message: "Evolu did not answer the read",
+      });
+      expect(slow).toMatchObject([
+        { call: "readTable", answered: false, elapsedMs: 10_000 },
+      ]);
+
+      fake.stopHolding();
+      const ids = async () =>
+        (await Effect.runPromise(db.readTable("cashuProof"))).map(
+          (read) => read.id,
+        );
+      expect(await ids()).toEqual(["p1"]);
+      const [original, retry] = fake.queries;
+      expect(retry).not.toEqual(original);
+      expect(retry).toContain('["where","id","!=","linksync-retry-1"]');
+
+      fake.answerQueries();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(slow.at(-1)).toMatchObject({ call: "readTable", answered: true });
+      await ids();
+      expect(fake.queries.at(-1)).toEqual(original);
     } finally {
       vi.useRealTimers();
     }

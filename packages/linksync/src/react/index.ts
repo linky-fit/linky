@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { useEffect, useMemo, useState } from "react";
 import type { CoreSchema, ScopeRegistry, Shard, ShardStore } from "../core";
 
@@ -8,7 +8,7 @@ import type { CoreSchema, ScopeRegistry, Shard, ShardStore } from "../core";
  * paired with the matching subscription.
  */
 export interface LiveSource<A> {
-  readonly all: Effect.Effect<A>;
+  readonly all: Effect.Effect<A, unknown>;
   readonly subscribe: (listener: () => void) => () => void;
 }
 
@@ -19,8 +19,9 @@ export const useLiveValue = <A>(source: LiveSource<A>, initial: A): A => {
     let latest = 0;
     const read = () => {
       const sequence = ++latest;
-      void Effect.runPromise(source.all).then((next) => {
-        if (sequence === latest) setValue(next);
+      // A failed read keeps the last value; the next change reads again.
+      void Effect.runPromise(Effect.option(source.all)).then((next) => {
+        if (sequence === latest && Option.isSome(next)) setValue(next.value);
       });
     };
     read();

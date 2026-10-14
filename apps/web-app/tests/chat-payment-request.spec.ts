@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./helpers/test";
 import { readBalanceSat, setBaseStorage } from "./helpers/appState";
 import { addContactByNpub } from "./helpers/contacts";
 import { expectNoBootErrorPanel, watchAppErrors } from "./helpers/diagnostics";

@@ -1,4 +1,5 @@
 import { Effect } from "effect";
+import type { ShardDbError } from "../core";
 import type { KeryxSubscriptionRow, LinkyDbSchema } from "../model/schema";
 import type { LinkyStore } from "../model/store";
 import { tableRepository, type TableRepository } from "./tableRepository";
@@ -23,7 +24,10 @@ export interface KeryxSubscriptionsRepository extends Omit<
   "all"
 > {
   /** Complete subscriptions; a row still arriving column by column is skipped. */
-  readonly all: Effect.Effect<ReadonlyArray<KeryxSubscriptionRecord>>;
+  readonly all: Effect.Effect<
+    ReadonlyArray<KeryxSubscriptionRecord>,
+    ShardDbError
+  >;
 }
 
 const isComplete = (

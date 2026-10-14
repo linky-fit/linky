@@ -87,16 +87,18 @@ export interface ShardStore<
 > {
   readonly appOwner: AppOwner;
   /** The pointer's index, or a locally written rotation not yet observed. */
-  readonly activeIndex: (scope: keyof R & string) => Effect.Effect<number>;
+  readonly activeIndex: (
+    scope: keyof R & string,
+  ) => Effect.Effect<number, ShardDbError>;
   readonly shardOwner: (scope: keyof R & string, index: number) => SyncOwner;
   readonly visibleShards: (
     scope: keyof R & string,
-  ) => Effect.Effect<ReadonlyArray<Shard>>;
+  ) => Effect.Effect<ReadonlyArray<Shard>, ShardDbError>;
   /** Live rows across the visible shards, one per id, the newest shard's copy. */
   readonly rows: <Scope extends keyof R & string, T extends TableOf<R, Scope>>(
     scope: Scope,
     table: T,
-  ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
+  ) => Effect.Effect<ReadonlyArray<Row<S[T]>>, ShardDbError>;
   /**
    * Every copy of every row in the visible shards, tombstones and duplicate
    * ids included, highest shard first: for a repository whose domain has a
@@ -108,7 +110,7 @@ export interface ShardStore<
   >(
     scope: Scope,
     table: T,
-  ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
+  ) => Effect.Effect<ReadonlyArray<Row<S[T]>>, ShardDbError>;
   /** The copies of one row in the visible shards, tombstones included, highest shard first. */
   readonly copiesOf: <
     Scope extends keyof R & string,
@@ -117,7 +119,7 @@ export interface ShardStore<
     scope: Scope,
     table: T,
     id: S[T]["id"],
-  ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
+  ) => Effect.Effect<ReadonlyArray<Row<S[T]>>, ShardDbError>;
   /**
    * Writes the row's columns into the active shard. A tombstone there stays
    * unless `revive` is set, so a row fetched again cannot undo a removal.
@@ -185,7 +187,7 @@ export interface ShardStore<
   readonly foreignRows: <T extends keyof S & string>(
     table: T,
     ownerId: OwnerId,
-  ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
+  ) => Effect.Effect<ReadonlyArray<Row<S[T]>>, ShardDbError>;
   /** Moves the pointer to the next shard unconditionally. */
   readonly rotate: (
     scope: keyof R & string,
@@ -195,15 +197,18 @@ export interface ShardStore<
     scope: keyof R & string,
   ) => Effect.Effect<RotationOutcome, ShardDbError | UnknownScope>;
   /** The app owner plus every visible shard of every scope. */
-  readonly syncOwners: () => Effect.Effect<ReadonlyArray<SyncOwner>>;
+  readonly syncOwners: () => Effect.Effect<
+    ReadonlyArray<SyncOwner>,
+    ShardDbError
+  >;
   /** Uses the owners in `syncOwners` and unuses the rest. */
-  readonly reconcileSync: () => Effect.Effect<void>;
+  readonly reconcileSync: () => Effect.Effect<void, ShardDbError>;
   /**
    * Whether the store is hydrated: the app owner, and after it every shard
    * its pointers make visible, finished a sync round with a relay, so reads
    * show the account's data. Once true it stays true for the store's life.
    */
-  readonly hydrated: Effect.Effect<boolean>;
+  readonly hydrated: Effect.Effect<boolean, ShardDbError>;
   /** Fires once, when the store becomes hydrated. */
   readonly subscribeHydration: (listener: () => void) => () => void;
   /**
@@ -219,7 +224,7 @@ export interface ShardStore<
   /** Shards outside a forgettable scope's window: unsubscribed, deleted when the port can. */
   readonly forget: (
     scope?: keyof R & string,
-  ) => Effect.Effect<ReadonlyArray<ForgottenShard>>;
+  ) => Effect.Effect<ReadonlyArray<ForgottenShard>, ShardDbError>;
   /** Fires after any change to a table of the scope. */
   readonly subscribe: (
     scope: keyof R & string,
@@ -337,7 +342,7 @@ export const createShardStore = <
       ),
     );
 
-  const activeIndex = (scope: string): Effect.Effect<number> =>
+  const activeIndex = (scope: string): Effect.Effect<number, ShardDbError> =>
     Effect.map(readPointer(scope), (pointer) => {
       const observed = pointer?.index ?? 0;
       const pending = pendingIndex.get(scope);
@@ -346,7 +351,9 @@ export const createShardStore = <
       return Math.max(observed, pending ?? 0);
     });
 
-  const visibleShards = (scope: string): Effect.Effect<ReadonlyArray<Shard>> =>
+  const visibleShards = (
+    scope: string,
+  ): Effect.Effect<ReadonlyArray<Shard>, ShardDbError> =>
     Effect.gen(function* () {
       const active = yield* activeIndex(scope);
       const policy = definition(scope);
@@ -438,7 +445,7 @@ export const createShardStore = <
       ([shards, all]) => visibleNewestFirst(shards, all),
     );
 
-  const activeOwner = (scope: string): Effect.Effect<SyncOwner> =>
+  const activeOwner = (scope: string): Effect.Effect<SyncOwner, ShardDbError> =>
     Effect.map(activeIndex(scope), (index) => shardOwner(scope, index));
 
   const upsertInto = (
@@ -452,7 +459,7 @@ export const createShardStore = <
     scope: string,
     table: T,
     id: string,
-  ): Effect.Effect<Row<S[T]>, RowNotFound> =>
+  ): Effect.Effect<Row<S[T]>, ShardDbError | RowNotFound> =>
     Effect.flatMap(copiesOf(scope, table, id), ([newest]) =>
       newest === undefined || !isLive(newest)
         ? Effect.fail(new RowNotFound({ scope, table, id }))
@@ -553,7 +560,10 @@ export const createShardStore = <
       rotatedAtMs: nowMs,
     });
 
-  const syncOwners = (): Effect.Effect<ReadonlyArray<SyncOwner>> =>
+  const syncOwners = (): Effect.Effect<
+    ReadonlyArray<SyncOwner>,
+    ShardDbError
+  > =>
     Effect.map(
       Effect.forEach(Object.keys(scopes), visibleShards),
       (perScope) => {
@@ -564,7 +574,7 @@ export const createShardStore = <
       },
     );
 
-  const reconcileSync = (): Effect.Effect<void> =>
+  const reconcileSync = (): Effect.Effect<void, ShardDbError> =>
     Effect.map(syncOwners(), (wanted) => {
       const wantedIds = new Set(wanted.map((owner) => owner.id));
       for (const owner of wanted)
@@ -582,19 +592,27 @@ export const createShardStore = <
   let watchingHydration = false;
 
   // Retention waits for hydration: before it, a fresh device's windows are provisional.
-  const checkHydration: Effect.Effect<boolean> = Effect.gen(function* () {
-    if (isHydrated) return true;
-    const owners = yield* syncOwners();
-    if (!owners.every((owner) => db.isOwnerSynced(owner.id))) return false;
-    if (isHydrated) return true;
-    isHydrated = true;
-    yield* Effect.forEach(Object.keys(scopes), retainBeforeWrite, {
-      discard: true,
-    });
-    for (const listener of hydrationListeners) listener();
-    hydrationListeners.clear();
-    return true;
-  });
+  const checkHydration: Effect.Effect<boolean, ShardDbError> = Effect.gen(
+    function* () {
+      if (isHydrated) return true;
+      const owners = yield* syncOwners();
+      if (!owners.every((owner) => db.isOwnerSynced(owner.id))) return false;
+      if (isHydrated) return true;
+      isHydrated = true;
+      yield* Effect.forEach(Object.keys(scopes), retainBeforeWrite, {
+        discard: true,
+      });
+      for (const listener of hydrationListeners) listener();
+      hydrationListeners.clear();
+      return true;
+    },
+  );
+
+  // A failed read leaves the store unhydrated until the next owner-sync report.
+  const checkHydrationInBackground = Effect.orElseSucceed(
+    checkHydration,
+    () => false,
+  );
 
   const watchHydration = (): void => {
     if (watchingHydration) return;
@@ -603,7 +621,7 @@ export const createShardStore = <
     let queue = Promise.resolve();
     const stop = db.subscribeOwnerSync(() => {
       queue = queue.then(() =>
-        Effect.runPromise(checkHydration).then((done) => {
+        Effect.runPromise(checkHydrationInBackground).then((done) => {
           if (done) stop();
         }),
       );
@@ -614,13 +632,13 @@ export const createShardStore = <
     if (isHydrated) return () => {};
     hydrationListeners.add(listener);
     watchHydration();
-    void Effect.runPromise(checkHydration);
+    void Effect.runPromise(checkHydrationInBackground);
     return () => {
       hydrationListeners.delete(listener);
     };
   };
 
-  const whenHydrated: Effect.Effect<void> = Effect.flatMap(
+  const whenHydrated: Effect.Effect<void, ShardDbError> = Effect.flatMap(
     checkHydration,
     (done) =>
       done
@@ -631,9 +649,8 @@ export const createShardStore = <
           }),
   );
 
-  const beforeWrite: Effect.Effect<void> = options.holdWritesUntilHydrated
-    ? whenHydrated
-    : Effect.void;
+  const beforeWrite: Effect.Effect<void, ShardDbError> =
+    options.holdWritesUntilHydrated ? whenHydrated : Effect.void;
 
   const scopeNames = Object.keys(scopes).filter(
     (scope): scope is keyof R & string => scope in scopes,
@@ -770,7 +787,7 @@ export const createShardStore = <
 
   const forget = (
     onlyScope?: string,
-  ): Effect.Effect<ReadonlyArray<ForgottenShard>> =>
+  ): Effect.Effect<ReadonlyArray<ForgottenShard>, ShardDbError> =>
     Effect.gen(function* () {
       const forgotten: ForgottenShard[] = [];
       for (const scope of onlyScope === undefined
@@ -830,10 +847,11 @@ export const createShardStore = <
         onRotated({ scope, index });
       }
     });
-    // Checks run one after another so two pointer changes cannot interleave.
+    // Checks run one after another so two pointer changes cannot interleave;
+    // a check whose read failed is repeated by the next pointer change.
     let queue = Promise.resolve();
     const enqueue = () => {
-      queue = queue.then(() => Effect.runPromise(check));
+      queue = queue.then(() => Effect.runPromise(Effect.ignore(check)));
     };
     enqueue();
     return subscribePointers(enqueue);

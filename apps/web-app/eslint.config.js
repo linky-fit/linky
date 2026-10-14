@@ -336,7 +336,24 @@ export default defineConfig([
             "Wait on observable state with expect, expect.poll or toPass; the writing-tests skill covers the exception.",
         },
       ],
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@playwright/test",
+              importNames: ["test"],
+              message:
+                "Import test from tests/helpers/test.ts, which attaches the inspector logs of a failed test.",
+            },
+          ],
+        },
+      ],
     },
+  },
+  {
+    files: ["tests/helpers/test.ts"],
+    rules: { "no-restricted-imports": "off" },
   },
   {
     files: ["src/devtools/e2e/**"],

@@ -1,6 +1,7 @@
 import type { PositiveInt } from "@evolu/common";
 import { Effect } from "effect";
 import type { ContactId } from "@linky-fit/domain";
+import type { ShardDbError } from "../core";
 import type { LinkyDbSchema, RecurringPaymentRow } from "../model/schema";
 import type { LinkyStore } from "../model/store";
 import { tableRepository, type TableRepository } from "./tableRepository";
@@ -36,9 +37,15 @@ export interface RecurringPaymentsRepository extends Omit<
   "all"
 > {
   /** Rows the scheduler can act on; a row still arriving column by column is skipped. */
-  readonly all: Effect.Effect<ReadonlyArray<RecurringPaymentRecord>>;
+  readonly all: Effect.Effect<
+    ReadonlyArray<RecurringPaymentRecord>,
+    ShardDbError
+  >;
   /** Removed payments; their scope is never forgotten, so every tombstone stays readable. */
-  readonly deleted: Effect.Effect<ReadonlyArray<RecurringPaymentRecord>>;
+  readonly deleted: Effect.Effect<
+    ReadonlyArray<RecurringPaymentRecord>,
+    ShardDbError
+  >;
 }
 
 export const normalizeRecurringPayment = (

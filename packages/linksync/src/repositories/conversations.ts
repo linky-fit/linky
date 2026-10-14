@@ -32,21 +32,24 @@ export interface ConversationsRepository extends TableRepository<
   ) => Effect.Effect<ConversationRow, ShardDbError>;
   readonly forContact: (
     contactId: ContactId,
-  ) => Effect.Effect<ConversationRow | null>;
+  ) => Effect.Effect<ConversationRow | null, ShardDbError>;
   readonly messagesIn: (
     conversationId: ConversationId,
-  ) => Effect.Effect<ReadonlyArray<MessageRow>>;
+  ) => Effect.Effect<ReadonlyArray<MessageRow>, ShardDbError>;
   readonly reactionsIn: (
     conversationId: ConversationId,
-  ) => Effect.Effect<ReadonlyArray<ReactionRow>>;
+  ) => Effect.Effect<ReadonlyArray<ReactionRow>, ShardDbError>;
   /**
    * When the oldest messages shard this device reads began (its earliest
    * row), or null when the device reads the scope from its first shard. Read
    * cursors written before it may sit in a forgotten shard.
    */
-  readonly visibleSinceSec: Effect.Effect<number | null>;
+  readonly visibleSinceSec: Effect.Effect<number | null, ShardDbError>;
   /** Tombstoned reaction copies in the visible shards, so a removed reaction's wrap is still known. */
-  readonly removedReactions: Effect.Effect<ReadonlyArray<ReactionRow>>;
+  readonly removedReactions: Effect.Effect<
+    ReadonlyArray<ReactionRow>,
+    ShardDbError
+  >;
   /** Moves the read cursor forward; never backwards. */
   readonly markSeen: (
     conversationId: ConversationId,
@@ -94,8 +97,8 @@ export const makeConversationsRepository = (
 
   // Once hydrated, the oldest visible shard holds every row it will get before this device writes.
   const startedSecByOwner = new Map<OwnerId, number>();
-  const visibleSinceSec: Effect.Effect<number | null> = Effect.gen(
-    function* () {
+  const visibleSinceSec: Effect.Effect<number | null, ShardDbError> =
+    Effect.gen(function* () {
       const [oldest] = yield* store.visibleShards("messages");
       if (oldest === undefined || oldest.index === 0) return null;
       const known = startedSecByOwner.get(oldest.owner.id);
@@ -104,8 +107,7 @@ export const makeConversationsRepository = (
       if (startedSec !== null && (yield* store.hydrated))
         startedSecByOwner.set(oldest.owner.id, startedSec);
       return startedSec;
-    },
-  );
+    });
 
   return {
     ...conversations,

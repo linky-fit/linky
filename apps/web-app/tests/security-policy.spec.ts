@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./helpers/test";
 import vercel from "../vercel.json" with { type: "json" };
 import { setBaseStorage } from "./helpers/appState";
 import { NOSTR_RELAY_URL } from "./helpers/stack";
