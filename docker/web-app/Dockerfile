@@ -15,6 +15,7 @@ COPY package.json bun.lock ./
 COPY patches patches
 COPY apps/desktop/package.json apps/desktop/
 COPY apps/fazole-app/package.json apps/fazole-app/
+COPY apps/fazole-site/package.json apps/fazole-site/
 COPY apps/linkshu-cli/package.json apps/linkshu-cli/
 COPY apps/native-shell/package.json apps/native-shell/
 COPY apps/push/package.json apps/push/
