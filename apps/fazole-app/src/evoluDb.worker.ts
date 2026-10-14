@@ -1,3 +1,5 @@
+// Workers have their own globals, so the page's polyfills cannot protect Evolu.
+import "./platform/browserPolyfills";
 import {
   createConsole,
   createRandom,

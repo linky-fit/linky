@@ -88,8 +88,11 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: (id) =>
-          id.includes("node_modules") ? "vendor" : undefined,
+        manualChunks: (id) => {
+          if (!id.includes("node_modules")) return;
+          // core-js must load before vendor: Evolu calls `Set.prototype.difference` at module init.
+          return id.includes("/node_modules/core-js/") ? "polyfills" : "vendor";
+        },
       },
     },
   },

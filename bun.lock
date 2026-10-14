@@ -33,6 +33,7 @@
         "@linky-fit/site": "workspace:*",
         "@linky-fit/ui": "workspace:*",
         "@noble/hashes": "^2.0.1",
+        "core-js": "^3.50.0",
         "effect": "^4.0.0",
         "jsqr": "^1.4.0",
         "react": "^19.2.3",
