@@ -1,5 +1,4 @@
-/** Every user-facing string; the app is Czech only. */
-export const copy = {
+export const cs = {
   appTagline: "Platební terminál pro QR platby bankou i bitcoinem.",
   loading: "Načítám…",
   back: "Zpět",
@@ -87,7 +86,6 @@ export const copy = {
   terminal: {
     amount: "Částka",
     keypadClear: "Vymazat",
-    keypadDecimal: ",",
     keypadDelete: "Smazat",
     request: "Požadovat platbu",
     failed: "Platbu se nepodařilo vytvořit. Zkuste to znovu.",
@@ -266,6 +264,7 @@ export const copy = {
     resetConfirmDescription:
       "Z tohoto zařízení se smaže obchod, historie i peněženka. Bez záložní fráze je už nepůjde obnovit.",
     resetConfirm: "Resetovat",
+    language: "Jazyk",
     about: "O aplikaci",
     mint: "Mincovna",
     help: "Pomoc",
@@ -313,4 +312,6 @@ export const copy = {
       "Tento prohlížeč neumí uložit frázi do správce hesel. Zkopírujte ji.",
     saveFailed: "Uložení do správce hesel se nepovedlo.",
   },
-} as const;
+};
+
+export type Copy = typeof cs;

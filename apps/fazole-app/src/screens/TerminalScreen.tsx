@@ -17,7 +17,6 @@ import { copy } from "../copy";
 import {
   canRequestPayment,
   directTransferCzk,
-  formatCzk,
   formatKeypadInput,
   keypadAmount,
   pressKeypadKey,
@@ -26,7 +25,7 @@ import {
   type ShopProfile,
   type TipChoice,
 } from "../domain";
-import { formatWhole } from "../format";
+import { formatCzk, formatWhole, numberSeparators } from "../format";
 import { navigateTo } from "../platform/hashRoute";
 import { paymentRoute } from "../routing";
 import {
@@ -106,7 +105,10 @@ export function TerminalScreen({ shop }: { readonly shop: ShopProfile }) {
         gap="$lg"
       >
         <Stack flex={1} justifyContent="center" minHeight="$hero">
-          <Amount value={formatKeypadInput(input)} unit={copy.czk} />
+          <Amount
+            value={formatKeypadInput(input, numberSeparators)}
+            unit={copy.czk}
+          />
         </Stack>
         {failed ? <Notice tone="danger" title={copy.terminal.failed} /> : null}
         <Keypad
@@ -114,7 +116,7 @@ export function TerminalScreen({ shop }: { readonly shop: ShopProfile }) {
           decimal
           labels={{
             clear: copy.terminal.keypadClear,
-            decimal: copy.terminal.keypadDecimal,
+            decimal: numberSeparators.decimal,
             delete: copy.terminal.keypadDelete,
           }}
           onKeyPress={(key) =>

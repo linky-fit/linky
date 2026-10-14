@@ -7,22 +7,6 @@ export type CzkAmount = typeof CzkAmount.Type;
 export const Sats = Schema.Natural.pipe(Schema.brand("Sats"));
 export type Sats = typeof Sats.Type;
 
-const czkFormat = (fractionDigits: number) =>
-  new Intl.NumberFormat("cs-CZ", {
-    style: "currency",
-    currency: "CZK",
-    minimumFractionDigits: fractionDigits,
-    maximumFractionDigits: 2,
-  });
-
-/** `1 234,50 Kč`, or `120 Kč` for whole crowns. */
-export const formatCzk = (amount: CzkAmount): string =>
-  czkFormat(amount % 100 === 0 ? 0 : 2).format(amount / 100);
-
-/** `12 345 sat`. */
-export const formatSats = (sats: number): string =>
-  `${new Intl.NumberFormat("cs-CZ").format(sats)} sat`;
-
 const SATS_PER_BTC = 100_000_000n;
 
 /** Rounds up so the merchant never receives less than the CZK amount. */

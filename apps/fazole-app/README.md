@@ -1,6 +1,6 @@
 # fazole.fit app
 
-A payment terminal PWA for Czech merchants: bank transfers (SPD QR), Lightning and Cashu. It runs on Linky's packages: the account is a Linky recovery seed, data lives in Linky's sharded Evolu database (`@linky-fit/linksync`), Nostr goes through `@linky-fit/linkstr` and the wallet through `@linky-fit/linkshu`. Czech only, dark only.
+A payment terminal PWA for Czech merchants: bank transfers (SPD QR), Lightning and Cashu. It runs on Linky's packages: the account is a Linky recovery seed, data lives in Linky's sharded Evolu database (`@linky-fit/linksync`), Nostr goes through `@linky-fit/linkstr` and the wallet through `@linky-fit/linkshu`. Czech and English, dark only.
 
 ## Develop
 
@@ -23,6 +23,6 @@ bun run fazole:dev                                      # http://localhost:5280
 - `src/services`: one linkstr and one linkshu runtime per launch behind `AppServices`; `Device` creates, restores and resets the account; `supportChat.ts` is the NIP-17 chat with Fazole support's hardcoded npub; `react.ts` holds the hooks screens use.
 - `src/platform`: browser APIs (localStorage, password manager, device wipe, service worker, clipboard, hash routes, the QR camera scanner, the image picker).
 - `src/routing.ts`: the hash routes and where each lands for the account's state; `src/shell` renders them, the terminal alone and the other sections with bottom tabs (a rail on wide screens).
-- `src/screens`: the screens, composed from `@linky-fit/ui` only; their form rules (`shopForm.ts`, `withdrawForm.ts`) are plain modules with unit tests. Strings live in `src/copy.ts`.
+- `src/screens`: the screens, composed from `@linky-fit/ui` only; their form rules (`shopForm.ts`, `withdrawForm.ts`) are plain modules with unit tests. Strings live in `src/copy/`, one file per language; the app starts in the merchant's choice from Settings, otherwise in Czech on a Czech device and English on any other, and switching reloads it.
 
 The PWA icons are generated from `public/logo.webp` (`pwa-assets.config.ts`); the in-app logo is `public/logo-tile.webp`.

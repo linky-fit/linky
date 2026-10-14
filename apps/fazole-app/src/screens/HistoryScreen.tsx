@@ -17,7 +17,6 @@ import { copy } from "../copy";
 import {
   CzkAmount,
   directTransferCzk,
-  formatCzk,
   groupByDay,
   relativeDay,
   type DirectTransfer,
@@ -25,6 +24,7 @@ import {
   type Payment,
 } from "../domain";
 import {
+  formatCzk,
   formatCzkValue,
   formatDateTime,
   formatDay,

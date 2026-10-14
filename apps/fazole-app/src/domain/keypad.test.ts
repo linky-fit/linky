@@ -44,9 +44,17 @@ describe("canRequestPayment", () => {
 });
 
 describe("formatKeypadInput", () => {
+  const czech = { group: " ", decimal: "," };
+
   it("groups thousands and keeps what was typed after the comma", () => {
-    expect(formatKeypadInput("")).toBe("0");
-    expect(formatKeypadInput("1234567,5")).toBe("1 234 567,5");
-    expect(formatKeypadInput("12,")).toBe("12,");
+    expect(formatKeypadInput("", czech)).toBe("0");
+    expect(formatKeypadInput("1234567,5", czech)).toBe("1 234 567,5");
+    expect(formatKeypadInput("12,", czech)).toBe("12,");
+  });
+
+  it("shows the input with the given separators", () => {
+    expect(formatKeypadInput("1234,5", { group: ",", decimal: "." })).toBe(
+      "1,234.5",
+    );
   });
 });

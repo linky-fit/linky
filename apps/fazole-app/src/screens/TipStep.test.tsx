@@ -1,6 +1,7 @@
 import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { CzkAmount, formatCzk, type TipChoice } from "../domain";
+import { CzkAmount, type TipChoice } from "../domain";
+import { formatCzk } from "../format";
 import { fakeDevice } from "../testing/fakeDevice";
 import { byTestId, render } from "../testing/render";
 import { TipStep } from "./TipStep";

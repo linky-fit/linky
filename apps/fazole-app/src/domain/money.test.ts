@@ -1,29 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  CzkAmount,
-  czkToSats,
-  formatCzk,
-  formatSats,
-  minimumCzkFor,
-  satsToCzk,
-} from "./money";
-
-// Intl separates digit groups and the currency with no-break spaces.
-const plain = (text: string) => text.replace(/\s/gu, " ");
-
-describe("formatCzk", () => {
-  it.each<[number, string]>([
-    [123450, "1 234,50 Kč"],
-    [12000, "120 Kč"],
-    [5, "0,05 Kč"],
-  ])("formats %d", (amount, expected) => {
-    expect(plain(formatCzk(CzkAmount.make(amount)))).toBe(expected);
-  });
-
-  it("formats sats with Czech grouping", () => {
-    expect(plain(formatSats(12345))).toBe("12 345 sat");
-  });
-});
+import { CzkAmount, czkToSats, minimumCzkFor, satsToCzk } from "./money";
 
 describe("czkToSats", () => {
   it("converts exactly when the amount divides evenly", () => {

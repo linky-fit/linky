@@ -13,7 +13,6 @@ import { useState } from "react";
 import { copy } from "../copy";
 import {
   canRequestPayment,
-  formatCzk,
   formatKeypadInput,
   keypadAmount,
   pressKeypadKey,
@@ -22,6 +21,7 @@ import {
   type CzkAmount,
   type TipChoice,
 } from "../domain";
+import { formatCzk, numberSeparators } from "../format";
 import { Page, WithTopBar } from "./Page";
 
 const presetLabel = (choice: TipChoice): string => {
@@ -94,7 +94,7 @@ export function TipStep({
         >
           <Stack flex={1} justifyContent="center" minHeight="$hero">
             <Amount
-              value={formatKeypadInput(custom)}
+              value={formatKeypadInput(custom, numberSeparators)}
               unit={copy.czk}
               caption={copy.tips.customTotal(
                 total({ kind: "fixed", tipCzk: tip }),
@@ -106,7 +106,7 @@ export function TipStep({
             decimal
             labels={{
               clear: copy.terminal.keypadClear,
-              decimal: copy.terminal.keypadDecimal,
+              decimal: numberSeparators.decimal,
               delete: copy.terminal.keypadDelete,
             }}
             onKeyPress={(key) =>

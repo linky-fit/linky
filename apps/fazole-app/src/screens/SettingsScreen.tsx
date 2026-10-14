@@ -13,6 +13,12 @@ import { copy } from "../copy";
 import { formatCzechIban, type ShopProfile } from "../domain";
 import { navigateTo } from "../platform/hashRoute";
 import {
+  language,
+  LANGUAGE_NAMES,
+  LANGUAGES,
+  switchLanguage,
+} from "../platform/language";
+import {
   useAppServices,
   useDevice,
   useOfferTips,
@@ -25,7 +31,13 @@ import { ShopFields } from "./ShopFields";
 import { ShopPictureDialog } from "./ShopPictureDialog";
 import { useShopForm } from "./shopForm";
 
-type OpenDialog = "shop" | "picture" | "seed" | "restore" | "reset";
+type OpenDialog =
+  | "shop"
+  | "picture"
+  | "seed"
+  | "restore"
+  | "reset"
+  | "language";
 
 const hostOf = (url: string) => {
   try {
@@ -134,6 +146,13 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
       <Section title={copy.settings.about}>
         <Card paddingVertical="$sm" gap="$none">
           <ListRow
+            testID="settings-language"
+            icon="Languages"
+            title={copy.settings.language}
+            value={LANGUAGE_NAMES[language]}
+            onPress={() => setDialog("language")}
+          />
+          <ListRow
             icon="Bitcoin"
             title={copy.settings.mint}
             value={hostOf(config.mintUrl)}
@@ -155,6 +174,26 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
         testID="seed-dialog"
       >
         <RecoverySeed shopName={shop.name} />
+      </Dialog>
+      <Dialog
+        open={dialog === "language"}
+        onOpenChange={(open) => (open ? undefined : close())}
+        title={copy.settings.language}
+        closeLabel={copy.close}
+        testID="language-dialog"
+      >
+        {LANGUAGES.map((option) => (
+          <ListRow
+            key={option}
+            testID={`language-${option}`}
+            title={LANGUAGE_NAMES[option]}
+            selected={option === language}
+            chevron={false}
+            onPress={() =>
+              option === language ? close() : void switchLanguage(option)
+            }
+          />
+        ))}
       </Dialog>
       <ConfirmDialog
         open={dialog === "restore"}
