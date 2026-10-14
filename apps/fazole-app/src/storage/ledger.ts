@@ -81,8 +81,9 @@ export interface Ledger {
     readonly quoteId?: string | undefined;
     readonly invoice?: string | undefined;
   }) => Promise<Withdrawal>;
+  /** Patches the stored row, which another tab may have changed since it was read. */
   readonly updateWithdrawal: (
-    withdrawal: Withdrawal,
+    id: TransactionId,
     patch: Partial<Pick<Withdrawal, "operationId" | "feeSats" | "amountSats">>,
   ) => Promise<Withdrawal>;
   /** Closes a pending withdrawal; one that already ended is left alone. */
@@ -207,8 +208,11 @@ export const makeLedger = (transactions: TransactionsRepository): Ledger => {
       await run(insertWithdrawal(transactions, created));
       return created;
     },
-    updateWithdrawal: (current, patch) =>
-      saveWithdrawal({ ...current, ...patch }),
+    updateWithdrawal: async (id, patch) => {
+      const current = await withdrawal(id);
+      if (current === null) throw new Error(`no withdrawal ${id}`);
+      return saveWithdrawal({ ...current, ...patch });
+    },
     finishWithdrawal: async (id, outcome) => {
       const current = await withdrawal(id);
       if (current?.status !== "pending") return;

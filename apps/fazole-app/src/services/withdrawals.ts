@@ -16,6 +16,7 @@ import { decodeNpub, type Pubkey } from "@linky-fit/linkstr";
 import { Effect, Result } from "effect";
 import type { Withdrawal, WithdrawTarget } from "../domain";
 import type { Ledger } from "../storage/ledger";
+import { nowSeconds } from "../utils/time";
 import type { Nostr } from "./nostr";
 import { serialQueue } from "./serial";
 import type { Wallet } from "./wallet";
@@ -105,6 +106,8 @@ const MAX_SIZING_ROUNDS = 6;
 const SEND_STEP_DOWNS = 3;
 
 const WITHDRAWAL_REF = "fazole.withdrawal:";
+// Long enough for another tab or device to link a send it just made to its row.
+const RESUME_GRACE_SEC = 120;
 
 export const createWithdrawals = ({
   ledger,
@@ -325,7 +328,7 @@ export const createWithdrawals = ({
           return Result.fail(failureOf(sent.failure));
         }
         const { operationId, tokenText, feePaid, amount } = sent.success;
-        const withdrawal = await ledger.updateWithdrawal(created, {
+        const withdrawal = await ledger.updateWithdrawal(created.id, {
           operationId,
           amountSats: amount,
           feeSats: feePaid,
@@ -371,9 +374,11 @@ export const createWithdrawals = ({
    * Settles Linky withdrawals a reload interrupted: a token that never
    * reached the outbox is queued now, one cut off before its send was linked
    * fails, and a send no live withdrawal holds goes back to the balance.
+   * Rows and sends younger than the grace period are left to their maker.
    */
   const resumeSends = () =>
     serially(async () => {
+      const graceStartSec = nowSeconds() - RESUME_GRACE_SEC;
       const { withdrawals } = await ledger.records();
       const sends = await wallet.pendingSends();
       const queued = await nostr.queuedRefs();
@@ -381,10 +386,12 @@ export const createWithdrawals = ({
         if (withdrawal.kind !== "cashu_chat" || withdrawal.status !== "pending")
           continue;
         if (withdrawal.operationId === null) {
-          await ledger.finishWithdrawal(withdrawal.id, {
-            status: "failed",
-            error: "Interrupted",
-          });
+          if (withdrawal.createdAtSec <= graceStartSec) {
+            await ledger.finishWithdrawal(withdrawal.id, {
+              status: "failed",
+              error: "Interrupted",
+            });
+          }
           continue;
         }
         const send = sends.find(({ id }) => id === withdrawal.operationId);
@@ -399,7 +406,8 @@ export const createWithdrawals = ({
         ),
       );
       for (const send of sends) {
-        if (!live.has(send.id)) await wallet.returnSend(send.id);
+        if (!live.has(send.id) && send.createdAt <= graceStartSec)
+          await wallet.returnSend(send.id);
       }
     });
 
