@@ -1238,6 +1238,8 @@ export const en = {
   payNetworkError: "Unable to send due to a network error.",
   payApprovalChanged:
     "Payment approval is no longer valid. Review the recipient and pay again.",
+  payWalletBusy:
+    "The wallet is busy with another payment, try again in a moment.",
   payFailed: "Payment failed",
   payPending:
     "Payment is waiting for the mint to confirm it. It finishes on its own once the mint answers.",

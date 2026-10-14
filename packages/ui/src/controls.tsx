@@ -1,5 +1,5 @@
 import type { ReactNode, Ref } from "react";
-import { Slider, Button as TamaguiButton, View } from "tamagui";
+import { isWeb, Slider, Button as TamaguiButton, View } from "tamagui";
 import type { ColorTokens, GetProps, TamaguiElement } from "tamagui";
 import { Icon } from "./icons";
 import type { IconName, IconSize } from "./icons";
@@ -34,6 +34,8 @@ export function Pressable({ disabled, tooltip, ...props }: PressableProps) {
       // Android fades each child on its own otherwise, so a label washes into its dimmed background.
       needsOffscreenAlphaCompositing={disabled}
       disabled={disabled}
+      // Android keeps a view disabled until its accessibility state says otherwise, and Tamagui only ever sets `aria-disabled` true.
+      {...(isWeb ? {} : { "aria-disabled": Boolean(disabled) })}
       // Tamagui's disabled button ignores the pointer, which would hide its tooltip.
       pointerEvents="auto"
       {...tooltipProps(tooltip)}

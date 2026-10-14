@@ -1258,6 +1258,8 @@ export const de = {
   payNetworkError: "Senden wegen eines Netzwerkfehlers nicht möglich.",
   payApprovalChanged:
     "Die Zahlungsfreigabe ist nicht mehr gültig. Prüfe den Empfänger und bezahle erneut.",
+  payWalletBusy:
+    "Die Wallet ist gerade mit einer anderen Zahlung beschäftigt, versuche es gleich noch einmal.",
   payFailed: "Zahlung fehlgeschlagen",
   payPending:
     "Die Zahlung wartet auf die Bestätigung der Mint. Sie wird abgeschlossen, sobald die Mint antwortet.",

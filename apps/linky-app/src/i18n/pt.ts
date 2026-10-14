@@ -1255,6 +1255,8 @@ export const pt = {
   payNetworkError: "Não foi possível enviar devido a um erro de rede.",
   payApprovalChanged:
     "A aprovação do pagamento não é mais válida. Revise o destinatário e pague de novo.",
+  payWalletBusy:
+    "A carteira está ocupada com outro pagamento, tente novamente em instantes.",
   payFailed: "O pagamento falhou",
   payPending:
     "O pagamento está aguardando a confirmação do mint. Ele termina sozinho quando o mint responder.",

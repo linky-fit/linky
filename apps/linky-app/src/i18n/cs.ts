@@ -1245,6 +1245,8 @@ export const cs = {
   payNetworkError: "Platbu nelze odeslat kvůli chybě sítě.",
   payApprovalChanged:
     "Schválení platby již není platné. Zkontrolujte příjemce a zaplaťte znovu.",
+  payWalletBusy:
+    "Peněženka právě vyřizuje jinou platbu, zkus to za chvíli znovu.",
   payFailed: "Platba se nepovedla",
   payPending:
     "Platba čeká na potvrzení mintem. Dokončí se sama, jakmile mint odpoví.",
