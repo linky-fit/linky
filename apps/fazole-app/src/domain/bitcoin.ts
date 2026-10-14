@@ -127,6 +127,27 @@ export const matchIncomingCashu = <P extends OpenBitcoinPayment>(
     payments.filter((payment) => payment.status !== "paid"),
   );
 
+/**
+ * The mint of the request a token from another mint would pay once its sats
+ * reached that mint; `null` when it pays one where it is, or none. Linky
+ * spends from whichever mint covers the amount, not the one requested.
+ */
+export const requestMintElsewhere = (
+  incoming: IncomingCashu,
+  payments: readonly OpenBitcoinPayment[],
+): string | null => {
+  if (matchIncomingCashu(incoming, payments) !== null) return null;
+  const elsewhere = payments.filter(
+    (payment) => !sameMint(payment.mintUrl, incoming.mint),
+  );
+  return (
+    elsewhere.find(
+      ({ mintUrl }) =>
+        matchIncomingCashu({ ...incoming, mint: mintUrl }, elsewhere) !== null,
+    )?.mintUrl ?? null
+  );
+};
+
 /** The paid payment a further token pays again, matched the same way: the customer paid it twice. */
 export const matchRepeatedCashu = <P extends OpenBitcoinPayment>(
   incoming: IncomingCashu,

@@ -19,6 +19,7 @@ import {
   OPEN_REQUEST_SEC,
   type OpenBitcoinPayment,
   readIncomingCashu,
+  requestMintElsewhere,
   uniqueRequestSats,
 } from "./bitcoin";
 import { CzkAmount, czkToSats, minimumCzkFor, Sats } from "./money";
@@ -135,6 +136,30 @@ describe("matchIncomingCashu", () => {
     expect(
       matchIncomingCashu(token(587, { requestId: "first" }), payments)?.id,
     ).toBe("first");
+  });
+
+  it("names the mint of the request a token from another mint would pay there", () => {
+    const linkyMint = "https://mint.minibits.cash/Bitcoin";
+    const payments = [
+      payment("p1", 100),
+      payment("cancelled", 120, { status: "cancelled" }),
+    ];
+    expect(
+      requestMintElsewhere(token(100, { mint: linkyMint }), payments),
+    ).toBe(mint);
+    expect(
+      requestMintElsewhere(
+        token(100, { mint: linkyMint, requestId: "cancelled" }),
+        payments,
+      ),
+    ).toBeNull();
+    expect(
+      requestMintElsewhere(token(120, { mint: linkyMint }), payments),
+    ).toBe(mint);
+    expect(
+      requestMintElsewhere(token(60, { mint: linkyMint }), payments),
+    ).toBeNull();
+    expect(requestMintElsewhere(token(100), payments)).toBeNull();
   });
 
   it("compares mints without a trailing slash or case", () => {
