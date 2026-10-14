@@ -6,6 +6,7 @@ import {
 import {
   buildPaymentAmountAttempts,
   buildPaymentFailureAmountAttempts,
+  encodePaymentRequestPayload,
   getLightningInvoicePreview,
   isAllowedPaymentRequestPostUrl,
   isRetryablePaymentAmountFailure,
@@ -118,6 +119,12 @@ export interface ContactPayment {
   readonly paymentNoticeContext?: PaymentNoticeContext;
   readonly paymentNoticeOfferId?: string;
   readonly paymentRequestId?: string | null;
+  /**
+   * Pays a scanned NUT-18 request: the message carries its payment payload
+   * with `paymentRequestId`, which the payee matches to the request. A chat
+   * request stays a bare token, which every Linky release reads.
+   */
+  readonly sendAsPaymentRequestPayload?: boolean;
   /** Checked before the token is made and again before it is sent. */
   readonly isPaymentAuthorized?: () => boolean;
   readonly pendingMessageId?: string;
@@ -648,6 +655,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
       paymentNoticeContext,
       paymentNoticeOfferId,
       paymentRequestId,
+      sendAsPaymentRequestPayload = false,
       isPaymentAuthorized,
       pendingMessageId,
       replyContext,
@@ -805,6 +813,17 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
             mint: receipt.mint,
             token: receipt.tokenText,
             unit: receipt.unit,
+            ...(sendAsPaymentRequestPayload && paymentRequestId
+              ? {
+                  wireContent: encodePaymentRequestPayload({
+                    id: paymentRequestId,
+                    memo: note,
+                    mint: receipt.mint,
+                    unit: receipt.unit,
+                    proofs: receipt.proofs,
+                  }),
+                }
+              : {}),
           },
         ],
         contactId,

@@ -7,6 +7,8 @@ export interface CashuMessagePaymentSendBatch {
   mint: string;
   token: string;
   unit: string | null;
+  /** What the message carries in place of the token, e.g. a NUT-18 payment payload. */
+  wireContent?: string;
 }
 
 interface CashuMessagePaymentPublishError {

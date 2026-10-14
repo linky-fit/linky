@@ -2,13 +2,16 @@ import { createIdFromString } from "@linky-fit/linksync";
 import {
   Amount,
   CurrencyUnit,
+  decodePaymentRequestPayload,
   InsufficientFunds,
+  KeysetId,
   MeltReceipt,
   MintRejected,
   MintUrl,
   NonNegativeAmount,
   OperationId,
   PaymentPending,
+  Proof,
   QuoteId,
   ReceiveReceipt,
   SendReceipt,
@@ -641,6 +644,46 @@ describe("payContact", () => {
     expect(logPaymentEvent).toHaveBeenLastCalledWith(
       expect.objectContaining({ paymentType: "request", status: "ok" }),
     );
+  });
+
+  it("sends a scanned request's payment payload with its id, and a chat request's token bare", async () => {
+    const proof = new Proof({
+      id: KeysetId.make("009a1f293253e41e"),
+      amount: Amount.make(600),
+      secret: "secret",
+      C: "02" + "ab".repeat(32),
+    });
+    const { commands, linkstr } = setup({
+      sendCashuToken: async () =>
+        Result.succeed(new SendReceipt({ ...sendReceipt, proofs: [proof] })),
+    });
+
+    await commands.payContact(
+      alicePayment({
+        memo: "coffee",
+        paymentRequestId: "request-1",
+        sendAsPaymentRequestPayload: true,
+      }),
+    );
+    const scanned = linkstr.enqueueOutbox.mock.calls[0]?.[0].op;
+    expect(scanned?._tag).toBe("chat.text");
+    const content = scanned?._tag === "chat.text" ? scanned.draft.content : "";
+    expect(decodePaymentRequestPayload(content)).toEqual({
+      requestId: "request-1",
+      mint: MINT_URL,
+      unit: "sat",
+      memo: "coffee",
+      amount: 600,
+    });
+    expect(JSON.parse(content).proofs).toEqual([
+      { id: "009a1f293253e41e", amount: 600, secret: "secret", C: proof.C },
+    ]);
+
+    await commands.payContact(alicePayment({ paymentRequestId: "request-2" }));
+    expect(linkstr.enqueueOutbox.mock.calls[1]?.[0].op).toMatchObject({
+      _tag: "chat.token",
+      draft: { token: sendReceipt.tokenText },
+    });
   });
 
   it("keeps the pending row and reports queued on an enqueue failure", async () => {

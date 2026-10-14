@@ -249,6 +249,7 @@ export const useCashuPaymentRequests = ({
           amountSat: request.amount,
           memo: request.description,
           paymentRequestId: request.requestId,
+          sendAsPaymentRequestPayload: true,
           ...(previousRumorId
             ? {
                 replyContext: {

@@ -9,6 +9,7 @@ import {
   PaymentNoticeReceipt,
   RelayUrl,
   RumorId,
+  TextMessageDraft,
   TokenMessageDraft,
   UnixSeconds,
   WrapDelivery,
@@ -266,6 +267,36 @@ describe("publishCashuMessagePayment", () => {
       publishErrors: [],
       publishedTokenTexts: [tokenText],
       unpublishedTokenTexts: [],
+    });
+  });
+
+  it("sends the wire content in place of the token and keeps the token on the local row", async () => {
+    const args = createArgs();
+    const payload =
+      '{"mint":"https://mint.example","unit":"sat","proofs":[],"id":"req-1"}';
+    const [batch] = args.batches;
+    if (batch === undefined) throw new Error("missing batch");
+
+    const result = await publishCashuMessagePayment({
+      ...args,
+      batches: [{ ...batch, wireContent: payload }],
+    });
+
+    expect(args.appendLocalNostrMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ content: tokenText }),
+    );
+    const input = args.enqueueOutbox.mock.calls[0]?.[0];
+    expect(input).toMatchObject({ op: { _tag: "chat.text" } });
+    const draft = input?.op._tag === "chat.text" ? input.op.draft : undefined;
+    expect(draft).toBeInstanceOf(TextMessageDraft);
+    expect(draft).toMatchObject({
+      to: contactPublicKey,
+      content: payload,
+      clientId: "token-client",
+    });
+    expect(result).toMatchObject({
+      hasPendingMessages: false,
+      publishedTokenTexts: [tokenText],
     });
   });
 

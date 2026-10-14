@@ -2,10 +2,12 @@ import {
   CashuTokenText,
   ClientId,
   decodeNpub,
+  MessageText,
   OutboxRef,
   PaymentNoticeDraft,
   Pubkey,
   RumorId,
+  TextMessageDraft,
   TokenMessageDraft,
 } from "@linky-fit/linkstr";
 import type {
@@ -66,6 +68,7 @@ interface PublishCashuMessagePaymentArgs {
 
 const isRumorId = Schema.is(RumorId);
 const decodeCashuTokenText = Schema.decodeUnknownResult(CashuTokenText);
+const decodeMessageText = Schema.decodeUnknownResult(MessageText);
 
 const decodeRequiredNpub = (npub: string): Pubkey => {
   const pubkey = decodeNpub(npub);
@@ -140,8 +143,14 @@ export const publishCashuMessagePayment = async ({
     let messageId: RumorId | null = null;
     let sendError: string | null = null;
     const token = decodeCashuTokenText(messageText);
+    const wireContent =
+      batch.wireContent === undefined
+        ? null
+        : decodeMessageText(batch.wireContent);
     if (Result.isFailure(token)) {
       sendError = "invalid cashu token";
+    } else if (wireContent !== null && Result.isFailure(wireContent)) {
+      sendError = "invalid message content";
     } else {
       if (canReusePendingMessage && !reusedPendingMessage) {
         localMessageId = pendingMessageId ?? "";
@@ -183,15 +192,30 @@ export const publishCashuMessagePayment = async ({
       if (!localMessageId) throw new Error("failed to persist message");
 
       try {
-        const draft = new TokenMessageDraft({
+        const thread = {
           to: contactPublicKey,
-          token: token.success,
           clientId,
           ...(replyTo === undefined ? {} : { replyTo }),
           ...(root === undefined ? {} : { root }),
-        });
+        };
+        // The local row keeps the token, so this chat still shows it as one.
         const exit = await enqueueOutbox({
-          op: { _tag: "chat.token", draft },
+          op:
+            wireContent === null
+              ? {
+                  _tag: "chat.token",
+                  draft: new TokenMessageDraft({
+                    ...thread,
+                    token: token.success,
+                  }),
+                }
+              : {
+                  _tag: "chat.text",
+                  draft: new TextMessageDraft({
+                    ...thread,
+                    content: wireContent.success,
+                  }),
+                },
           ref: OutboxRef.make(`message:${localMessageId}`),
         });
         if (Exit.isSuccess(exit)) {
