@@ -164,13 +164,14 @@ export const createBitcoinPayments = ({
       return;
     }
     switch (outcome.failure._tag) {
-      case "QuoteExpired": {
-        const payment = await paymentWithQuote(quote.quoteId);
-        if (payment?.status === "pending") {
-          await ledger.clearLightningQuote(payment);
-        }
+      case "QuoteExpired":
+        await settling(async () => {
+          const payment = await paymentWithQuote(quote.quoteId);
+          if (payment?.status === "pending") {
+            await ledger.clearLightningQuote(payment);
+          }
+        });
         return;
-      }
       case "MintUnreachable":
       case "CounterLockTimeout":
         scheduleResume();
@@ -257,18 +258,23 @@ export const createBitcoinPayments = ({
       );
       if (Result.isFailure(topup)) return topup;
       const { quote } = topup.success;
-      await ledger.attachBitcoinLeg(payment, {
-        sats,
-        czkPerBtc: rate,
-        mintUrl: mint,
-        quoteId: quote.quoteId,
-        invoice: quote.invoice,
-        paymentRequest: buildCashuRequest({
+      await settling(async () => {
+        // A token may have paid it while the quote was being created.
+        const current = await ledger.payment(payment.id);
+        if (current === null || current.status === "paid") return;
+        await ledger.attachBitcoinLeg(current, {
           sats,
+          czkPerBtc: rate,
           mintUrl: mint,
-          deviceNprofile: nostr.nprofile,
-          paymentId: payment.id,
-        }),
+          quoteId: quote.quoteId,
+          invoice: quote.invoice,
+          paymentRequest: buildCashuRequest({
+            sats,
+            mintUrl: mint,
+            deviceNprofile: nostr.nprofile,
+            paymentId: payment.id,
+          }),
+        });
       });
       return topup;
     });
