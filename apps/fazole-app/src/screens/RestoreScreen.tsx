@@ -1,0 +1,114 @@
+import {
+  Form,
+  IconButton,
+  Notice,
+  Stack,
+  SubmitButton,
+  Text,
+  TextField,
+  TopBar,
+} from "@linky-fit/ui";
+import { Result } from "effect";
+import { useState } from "react";
+import { copy } from "../copy";
+import { pasteText } from "../platform/clipboard";
+import { navigateTo } from "../platform/hashRoute";
+import { useDevice, useSession } from "../services/react";
+import { looksLikeRecoverySeed } from "../storage/account";
+import { Page, WithTopBar } from "./Page";
+
+/** One password-manager-fillable field; a pasted or autofilled seed restores at once. */
+export function RestoreScreen() {
+  const device = useDevice();
+  const replacing = useSession()._tag === "SignedIn";
+  const [seed, setSeed] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [restoring, setRestoring] = useState(false);
+
+  const restore = async (text: string) => {
+    if (restoring) return;
+    setRestoring(true);
+    setError(null);
+    const restored = await device.restoreAccount(text);
+    if (Result.isFailure(restored)) {
+      setError(copy.restore.invalid);
+      setRestoring(false);
+      return;
+    }
+    // Waits on the restoring screen until the shop syncs; replacing an account reloads instead.
+    navigateTo("terminal");
+  };
+  /** Restores right away when a whole seed arrives at once, e.g. a paste or an autofill. */
+  const change = (text: string) => {
+    const arrivedWhole = text.length - seed.length > 1;
+    setSeed(text);
+    setError(null);
+    if (arrivedWhole && looksLikeRecoverySeed(text)) void restore(text);
+  };
+  const paste = async () => {
+    const text = await pasteText();
+    if (text === null) setError(copy.restore.pasteFailed);
+    else change(text);
+  };
+
+  return (
+    <WithTopBar
+      topBar={
+        <TopBar
+          leading={
+            <IconButton
+              icon="ArrowLeft"
+              accessibilityLabel={copy.back}
+              onPress={() => navigateTo(replacing ? "settings" : "welcome")}
+            />
+          }
+        />
+      }
+    >
+      <Page testID="restore-screen">
+        <Stack gap="$sm">
+          <Text variant="heading" role="heading">
+            {copy.restore.title}
+          </Text>
+          <Text color="$colorMuted">{copy.restore.description}</Text>
+        </Stack>
+        {replacing ? (
+          <Notice tone="danger" title={copy.restore.replaceWarning} />
+        ) : null}
+        <Form onSubmit={() => void restore(seed)} gap="$xl">
+          <TextField
+            testID="restore-seed"
+            label={copy.restore.field}
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            autoCapitalize="none"
+            autoCorrect={false}
+            spellCheck={false}
+            autoFocus
+            value={seed}
+            onChangeText={change}
+            error={error ?? undefined}
+            trailing={
+              <IconButton
+                testID="restore-paste"
+                icon="ClipboardPaste"
+                size="sm"
+                accessibilityLabel={copy.restore.paste}
+                onPress={() => void paste()}
+              />
+            }
+          />
+          <SubmitButton
+            testID="restore-submit"
+            icon="RefreshCcw"
+            loading={restoring}
+            disabled={!looksLikeRecoverySeed(seed)}
+          >
+            {copy.restore.submit}
+          </SubmitButton>
+        </Form>
+      </Page>
+    </WithTopBar>
+  );
+}

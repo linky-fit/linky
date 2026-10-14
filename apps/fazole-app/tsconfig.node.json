@@ -1,0 +1,7 @@
+{
+  "extends": "@linky-fit/config/tsconfig/node",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo"
+  },
+  "include": ["vite.config.ts", "vitest.config.ts", "pwa-assets.config.ts"]
+}
