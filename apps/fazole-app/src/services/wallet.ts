@@ -69,9 +69,10 @@ export const isTransientReceiveError = (error: ReceiveError): boolean =>
 export const createWallet = (
   runtime: LinkshuRuntime,
   secretKey: NostrSecretKey,
+  deferUpdateWhile: <A>(work: Promise<A>) => Promise<A> = (work) => work,
 ): Wallet => {
   const run: Wallet["run"] = (effect) =>
-    runtime.runPromise(Effect.result(effect));
+    deferUpdateWhile(runtime.runPromise(Effect.result(effect)));
   const keyHex = bytesToHex(secretKey);
   const unlockingKey = P2pkUnlockingKey.make(keyHex);
   const transfers = () =>

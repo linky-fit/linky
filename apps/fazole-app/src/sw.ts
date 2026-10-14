@@ -12,8 +12,15 @@ cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
 registerRoute(new NavigationRoute(createHandlerBoundToURL("index.html")));
 
+const isSkipWaiting = (data: unknown) =>
+  typeof data === "object" &&
+  data !== null &&
+  "type" in data &&
+  data.type === "SKIP_WAITING";
+
+// The update banner's workbox-window posts this when the merchant accepts a new release.
 self.addEventListener("message", (event) => {
-  if (event.data === "SKIP_WAITING") void self.skipWaiting();
+  if (isSkipWaiting(event.data)) void self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {

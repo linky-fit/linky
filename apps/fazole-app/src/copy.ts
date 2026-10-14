@@ -71,6 +71,11 @@ export const copy = {
     startOver: "Začít znovu",
   },
 
+  update: {
+    available: "Je k dispozici nová verze fazole.fit",
+    apply: "Aktualizovat",
+  },
+
   navigation: "Hlavní sekce",
   sections: {
     terminal: "Terminál",
