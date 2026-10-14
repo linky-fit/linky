@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { memoryKvPorts } from "../testUtils/appRegistry";
 import {
+  clearSessionForLogout,
+  HANDLED_LAUNCH_URL_KEY,
   keepSessionStorageForReload,
   makeReloadableSessionStorage,
 } from "./reloadableSessionStorage";
@@ -34,5 +36,34 @@ describe("makeReloadableSessionStorage", () => {
       "linky.native.sessionStorage": "{broken",
     });
     expect(makeReloadableSessionStorage(ports.kv).length).toBe(0);
+  });
+});
+
+describe("clearSessionForLogout", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const stubSession = () => {
+    const storage = makeReloadableSessionStorage(memoryKvPorts().ports.kv);
+    vi.stubGlobal("sessionStorage", storage);
+    storage.setItem("spd-1", "SPD*1.0");
+    return storage;
+  };
+
+  it("keeps only the launch URL the run handled", () => {
+    const storage = stubSession();
+    storage.setItem(HANDLED_LAUNCH_URL_KEY, "nostrconnect://abc");
+
+    clearSessionForLogout();
+
+    expect(storage.length).toBe(1);
+    expect(storage.getItem(HANDLED_LAUNCH_URL_KEY)).toBe("nostrconnect://abc");
+  });
+
+  it("empties a session that handled no launch URL", () => {
+    const storage = stubSession();
+
+    clearSessionForLogout();
+
+    expect(storage.length).toBe(0);
   });
 });

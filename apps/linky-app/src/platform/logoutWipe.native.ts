@@ -11,11 +11,11 @@ import {
   safeLocalStorageClear,
   safeLocalStorageGet,
   safeLocalStorageSet,
-  safeSessionStorageClear,
 } from "../utils/storage";
 import { getUnknownErrorMessage } from "../utils/unknown";
 import { clearCapacitorStores } from "./capacitorStores.native";
 import { databaseDirectoryUri } from "./evoluDatabaseSize.native";
+import { clearSessionForLogout } from "./reloadableSessionStorage";
 import { secureStore } from "./secureStore.native";
 
 const LOGOUT_PENDING_STORAGE_KEY = "linky.logoutPending";
@@ -78,7 +78,7 @@ export const finishPendingLogout = async (): Promise<void> => {
       capacitorStoresRemoved,
     },
   });
-  safeSessionStorageClear();
+  clearSessionForLogout();
   // Last, so a wipe cut short still finds the pending logout on the next boot.
   safeLocalStorageClear();
 };

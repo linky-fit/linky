@@ -5,6 +5,7 @@ import {
   receiveHashLink,
   receiveScanText,
 } from "@linky-fit/linky-app/src/platform/hashLinks.native";
+import { HANDLED_LAUNCH_URL_KEY } from "@linky-fit/linky-app/src/platform/reloadableSessionStorage";
 import { restartAppAt } from "@linky-fit/linky-app/src/platform/restartApp.native";
 import { takeReloadRoute } from "@linky-fit/linky-app/src/platform/reloadRoute";
 import {
@@ -53,8 +54,6 @@ export const navigateAwayTo = (url: string): void => {
   void Linking.openURL(url);
 };
 
-const LAUNCH_URL_KEY = "linky.native.launchUrl";
-
 /** Hands the link over and returns the URL path it opens, or null to stay. */
 const openIncoming = (incoming: IncomingUrl): string | null => {
   switch (incoming._tag) {
@@ -84,8 +83,9 @@ export const redirectSystemPath = ({
   readonly initial: boolean;
 }): string | null => {
   // A reload restarts JavaScript with the same launch URL, whose link the previous run took.
-  if (initial && safeSessionStorageGet(LAUNCH_URL_KEY) === path) return "/";
-  if (initial) safeSessionStorageSet(LAUNCH_URL_KEY, path);
+  if (initial && safeSessionStorageGet(HANDLED_LAUNCH_URL_KEY) === path)
+    return "/";
+  if (initial) safeSessionStorageSet(HANDLED_LAUNCH_URL_KEY, path);
   const incoming = classifyIncomingUrl(path, spdStore);
   if (incoming !== null) {
     reportAppLog({
