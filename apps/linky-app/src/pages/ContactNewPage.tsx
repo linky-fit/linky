@@ -83,7 +83,10 @@ export function ContactFields({
   const [groupInput, setGroupInput] = React.useState("");
   const allGroups = normalizeContactGroups([...form.groups, ...groupNames]);
   const addGroup = (value: string) => {
-    const groups = normalizeContactGroups([...form.groups, value]);
+    const groups = normalizeContactGroups([
+      ...form.groups,
+      ...value.split(","),
+    ]);
     if (groups.length === form.groups.length) return;
     setForm({ ...form, groups });
     setGroupInput("");
@@ -172,13 +175,13 @@ export function ContactFields({
           label={t("group")}
           hideLabel
           value={groupInput}
-          onChange={(event) => setGroupInput(event.target.value)}
-          onBlur={() => addGroup(groupInput)}
-          onKeyDown={(event) => {
-            if (event.key !== "Enter" && event.key !== ",") return;
-            event.preventDefault();
-            addGroup(groupInput);
+          onChange={(event) => {
+            const value = event.target.value;
+            if (value.includes(",")) addGroup(value);
+            else setGroupInput(value);
           }}
+          onBlur={() => addGroup(groupInput)}
+          onSubmitEditing={() => addGroup(groupInput)}
           placeholder={t("groupPlaceholder")}
         />
       </Stack>
@@ -545,11 +548,7 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
           clearSearchFeedback();
           setForm({ ...form, npub: event.target.value });
         }}
-        onKeyDown={(event) => {
-          if (event.key !== "Enter") return;
-          event.preventDefault();
-          void runSearch();
-        }}
+        onSubmitEditing={() => void runSearch()}
         onPaste={(event) => {
           const queryText = event.clipboardData.getData("text").trim();
           if (!queryText) return;
