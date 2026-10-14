@@ -66,8 +66,11 @@ export interface Nostr {
   readonly sendPaymentNotice: (to: Pubkey) => Promise<void>;
   /** The refs of outbox jobs still stored, delivered or not. */
   readonly queuedRefs: () => Promise<ReadonlySet<string>>;
-  /** Publishes the account's kind-0 name, so wallets show the shop instead of a stranger. */
-  readonly publishName: (name: string) => Promise<void>;
+  /** Publishes the shop as the account's kind-0 profile, so wallets show it instead of a stranger. */
+  readonly publishProfile: (shop: {
+    readonly name: string;
+    readonly picture: string | null;
+  }) => Promise<void>;
   /** Someone's kind-0 name and picture; `null` when they have none or no relay answered in time. */
   readonly fetchProfile: (pubkey: Pubkey) => Promise<PayerProfile | null>;
   readonly onInboxEvent: (handler: InboxHandler) => () => void;
@@ -219,12 +222,16 @@ export const createNostr = ({
           },
           () => null,
         ),
-    publishName: (name) =>
+    publishProfile: ({ name, picture }) =>
       runtime
         .runPromise(
           Effect.flatMap(Profiles, (profiles) =>
             profiles.publishProfile(
-              new ProfileMetadata({ name, displayName: name }),
+              new ProfileMetadata({
+                name,
+                displayName: name,
+                ...(picture === null ? {} : { picture }),
+              }),
             ),
           ),
         )

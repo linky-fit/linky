@@ -97,7 +97,7 @@ export const fakeNostr = (overrides: Partial<Nostr> = {}) => {
     sendToken: () => Promise.reject(new Error("fake nostr")),
     sendPaymentNotice: () => Promise.resolve(),
     queuedRefs: () => Promise.resolve(new Set()),
-    publishName: () => Promise.resolve(),
+    publishProfile: () => Promise.resolve(),
     fetchProfile: () => Promise.resolve(null),
     onInboxEvent: (handler) => {
       inbox.push(handler);

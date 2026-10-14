@@ -1,4 +1,12 @@
-import { Button, Card, Dialog, ListRow, Section, Switch } from "@linky-fit/ui";
+import {
+  Avatar,
+  Button,
+  Card,
+  Dialog,
+  ListRow,
+  Section,
+  Switch,
+} from "@linky-fit/ui";
 import { useState } from "react";
 import { copy } from "../copy";
 import { formatCzechIban, type ShopProfile } from "../domain";
@@ -8,9 +16,10 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { Page } from "./Page";
 import { RecoverySeed } from "./RecoverySeed";
 import { ShopFields } from "./ShopFields";
+import { ShopPictureDialog } from "./ShopPictureDialog";
 import { useShopForm } from "./shopForm";
 
-type OpenDialog = "shop" | "seed" | "restore" | "reset";
+type OpenDialog = "shop" | "picture" | "seed" | "restore" | "reset";
 
 const hostOf = (url: string) => {
   try {
@@ -33,7 +42,14 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
         <Card paddingVertical="$sm" gap="$none">
           <ListRow
             testID="settings-shop"
-            icon="Store"
+            leading={
+              <Avatar
+                name={shop.name}
+                uri={shop.picture ?? undefined}
+                icon="Store"
+                size="sm"
+              />
+            }
             title={shop.name}
             description={
               shop.iban === null
@@ -41,6 +57,15 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
                 : formatCzechIban(shop.iban)
             }
             onPress={() => setDialog("shop")}
+          />
+          <ListRow
+            testID="settings-picture"
+            icon="ImageUp"
+            title={copy.shopPicture.title}
+            description={
+              shop.picture === null ? copy.shopPicture.none : undefined
+            }
+            onPress={() => setDialog("picture")}
           />
           <ListRow
             testID="settings-tips"
@@ -93,6 +118,9 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
 
       {dialog === "shop" ? (
         <EditShopDialog shop={shop} onClose={close} />
+      ) : null}
+      {dialog === "picture" ? (
+        <ShopPictureDialog shop={shop} onClose={close} />
       ) : null}
       <Dialog
         open={dialog === "seed"}

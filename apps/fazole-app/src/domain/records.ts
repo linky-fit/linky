@@ -10,6 +10,8 @@ export interface ShopProfile {
   readonly name: string;
   /** Without one the terminal offers Bitcoin only. */
   readonly iban: CzechIban | null;
+  /** An https image URL; wallets show it as the shop's Nostr profile picture. */
+  readonly picture: string | null;
 }
 
 /** A payment's Bitcoin leg: its price in sats, the Lightning quote and the Cashu request. */

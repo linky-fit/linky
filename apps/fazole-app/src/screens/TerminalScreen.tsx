@@ -1,9 +1,11 @@
 import {
   Amount,
+  Avatar,
   Button,
   IconButton,
   Keypad,
   Notice,
+  Row,
   Stack,
   Text,
   TopBar,
@@ -64,9 +66,14 @@ export function TerminalScreen({ shop }: { readonly shop: ShopProfile }) {
     <Stack flex={1} gap="$none" testID="terminal-screen">
       <TopBar
         content={
-          <Text eyebrow textAlign="center" numberOfLines={1}>
-            {shop.name}
-          </Text>
+          <Row gap="$sm" alignItems="center" justifyContent="center">
+            {shop.picture === null ? null : (
+              <Avatar name={shop.name} uri={shop.picture} size="xs" />
+            )}
+            <Text eyebrow numberOfLines={1} flexShrink={1}>
+              {shop.name}
+            </Text>
+          </Row>
         }
         trailing={
           <IconButton
