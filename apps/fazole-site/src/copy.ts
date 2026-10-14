@@ -393,7 +393,6 @@ export const copy = {
       markPaid: "Zaplaceno",
       cancel: "Zrušit platbu",
       paidTitle: "Zaplaceno",
-      paidDetail: (method: string, time: string) => `${method} · ${time}`,
       paidFrom: (name: string) => `Od: ${name}`,
       qrKind: "Druh QR kódu",
       qrCombined: "Lightning i Cashu",

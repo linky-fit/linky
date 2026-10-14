@@ -21,7 +21,6 @@ import { czk } from "../labels";
 import {
   DEMO_CZK_PER_BTC,
   formatCrowns,
-  formatTime,
   formatWhole,
   halereToSats,
 } from "../money";
@@ -228,10 +227,6 @@ export function PaymentMock({
             unit={t.czk}
             direction="in"
             avatar={payment.payer ?? undefined}
-            detail={t.payment.paidDetail(
-              payment.method === null ? "" : t.methods[payment.method],
-              formatTime(payment.paidAt ?? payment.createdAt),
-            )}
             onDismiss={onDone}
           />
         ) : null

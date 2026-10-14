@@ -71,7 +71,7 @@ describe("the live terminal", () => {
     expect(terminal.textContent).toContain("123456789/0000");
     await press(terminal, "Zaplaceno");
     expect(terminal.querySelector('[role="status"]')?.textContent).toContain(
-      "Banka · ",
+      "Zaplaceno",
     );
     expect(history.textContent).toContain("Banka · z toho spropitné 12 Kč");
   });
@@ -87,6 +87,5 @@ describe("the live terminal", () => {
     await act(async () => vi.advanceTimersByTime(BITCOIN_ARRIVES_AFTER_MS));
     const overlay = terminal.querySelector('[role="status"]')?.textContent;
     expect(overlay).toContain(livePayer.name);
-    expect(overlay).toContain("Cashu · ");
   });
 });
