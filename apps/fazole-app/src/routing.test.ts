@@ -6,6 +6,7 @@ describe("routing", () => {
     expect(parseRoute("#history")).toBe("history");
     expect(parseRoute("#/setup")).toBe("setup");
     expect(parseRoute("#pay/abc-1_2")).toBe("pay/abc-1_2");
+    expect(parseRoute("#support")).toBe("support");
     expect(paymentIdOf(parseRoute("#pay/abc"))).toBe("abc");
     expect(parseRoute("#employees")).toBe("welcome");
     expect(parseRoute("#pay/")).toBe("welcome");
@@ -17,6 +18,7 @@ describe("routing", () => {
     expect(resolveRoute("restore", "signedOut")).toBe("restore");
     expect(resolveRoute("terminal", "signedOut")).toBe("welcome");
     expect(resolveRoute("pay/abc", "signedOut")).toBe("welcome");
+    expect(resolveRoute("support", "signedOut")).toBe("welcome");
     expect(resolveRoute("restoring", "signedOut")).toBe("welcome");
   });
 
@@ -27,8 +29,9 @@ describe("routing", () => {
     expect(resolveRoute("terminal", "noShop")).toBe("setup");
   });
 
-  it("opens sections, payments and another restore once the shop is there", () => {
+  it("opens sections, payments, the support chat and another restore once the shop is there", () => {
     expect(resolveRoute("wallet", "ready")).toBe("wallet");
+    expect(resolveRoute("support", "ready")).toBe("support");
     expect(resolveRoute("pay/abc", "ready")).toBe("pay/abc");
     expect(resolveRoute("restore", "ready")).toBe("restore");
     expect(resolveRoute("welcome", "ready")).toBe("terminal");

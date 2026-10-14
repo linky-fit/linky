@@ -31,6 +31,7 @@ import {
 import { createNostr, type Nostr, type PayerProfile } from "./nostr";
 import { uploadToBlossom, type ImageFile } from "./blossom";
 import { createRates, type Rates } from "./rates";
+import { createSupportChat, type SupportChat } from "./supportChat";
 import { makeLinkshuRuntime, makeLinkstrRuntime } from "./runtimes";
 import { createWallet, type Wallet } from "./wallet";
 import { createWithdrawals, type Withdrawals } from "./withdrawals";
@@ -93,6 +94,7 @@ export interface AppServices {
   readonly payments: Payments;
   readonly payers: Payers;
   readonly withdrawals: Withdrawals;
+  readonly supportChat: SupportChat;
   readonly live: LiveSources;
   /** Opens the inbox and, once the store is hydrated, resumes interrupted payments and withdrawals; once. */
   readonly start: () => void;
@@ -158,6 +160,11 @@ export const createAppServices = ({
     whenHydrated: hydrated,
   });
   const withdrawals = createWithdrawals({ ledger, nostr, wallet });
+  const supportChat = createSupportChat({
+    conversations: repositories.conversations,
+    nostr,
+    whenHydrated: hydrated,
+  });
 
   const settle = async (
     paymentId: string,
@@ -222,6 +229,7 @@ export const createAppServices = ({
       },
     },
     withdrawals,
+    supportChat,
     live: {
       shop: {
         all: readShop(repositories.settings),

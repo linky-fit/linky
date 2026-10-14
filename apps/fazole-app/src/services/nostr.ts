@@ -8,13 +8,16 @@ import {
   PaymentNotices,
   ProfileMetadata,
   Profiles,
+  TextMessageDraft,
   TokenMessageDraft,
   UnixSeconds,
   WrapInbox,
 } from "@linky-fit/linkstr";
 import type {
+  ClientId,
   EnqueueReceipt,
   InboxDelivery,
+  MessageText,
   OutboxResult,
   Pubkey,
   RelayUrl,
@@ -60,6 +63,13 @@ export interface Nostr {
   readonly sendToken: (
     to: Pubkey,
     token: string,
+    ref: string,
+  ) => Promise<EnqueueReceipt>;
+  /** Queues a NIP-17 text message, the way Linky sends chat text. */
+  readonly sendText: (
+    to: Pubkey,
+    text: MessageText,
+    clientId: ClientId,
     ref: string,
   ) => Promise<EnqueueReceipt>;
   /** Wakes the recipient's Linky after a token reached a relay; best effort. */
@@ -179,6 +189,18 @@ export const createNostr = ({
                 to,
                 token: CashuTokenText.make(token),
               }),
+            },
+            OutboxRef.make(ref),
+          ),
+        ),
+      ),
+    sendText: (to, text, clientId, ref) =>
+      runtime.runPromise(
+        Effect.flatMap(Outbox, (outbox) =>
+          outbox.enqueue(
+            {
+              _tag: "chat.text",
+              draft: new TextMessageDraft({ to, content: text, clientId }),
             },
             OutboxRef.make(ref),
           ),

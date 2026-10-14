@@ -8,6 +8,7 @@ export * from "./money";
 export * from "./payment";
 export type * from "./records";
 export * from "./spd";
+export * from "./supportChat";
 export * from "./tip";
 export * from "./variableSymbol";
 export * from "./withdrawTarget";

@@ -95,6 +95,7 @@ export const fakeNostr = (overrides: Partial<Nostr> = {}) => {
     pubkey,
     nprofile: "nprofile1test",
     sendToken: () => Promise.reject(new Error("fake nostr")),
+    sendText: () => Promise.reject(new Error("fake nostr")),
     sendPaymentNotice: () => Promise.resolve(),
     queuedRefs: () => Promise.resolve(new Set()),
     publishProfile: () => Promise.resolve(),
