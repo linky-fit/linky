@@ -1,3 +1,9 @@
+import {
+  MAX_PAGE_ASPECT,
+  MAX_PAGE_PIXELS,
+  PREVIEW_MAX_PAGES,
+} from "./pdfPageLimits";
+
 export interface RenderedPdfPage {
   height: number;
   url: string;
@@ -6,12 +12,6 @@ export interface RenderedPdfPage {
 
 /** Whether this platform rasterizes PDF pages; without it a PDF opens in the share sheet. */
 export const canRenderPdfPages: boolean = true;
-
-const PREVIEW_MAX_PAGES = 30;
-// Page geometry is peer-controlled; a page never rasterizes to more than
-// this many device pixels (≈ 4 MP, 16 MB of RGBA).
-const MAX_PAGE_PIXELS = 4_000_000;
-const MAX_PAGE_ASPECT = 8;
 
 const fitScaleToPixelBudget = (
   requestedScale: number,

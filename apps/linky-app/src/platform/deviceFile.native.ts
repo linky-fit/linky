@@ -49,8 +49,8 @@ const EXTENSION_BY_TYPE: Record<string, string> = {
 
 let filesDirectory: Directory | null = null;
 
-// Decrypted chat files live only until the next app start.
-const openFilesDirectory = (): Directory => {
+/** The directory of decrypted chat files, which live only until the next app start. */
+export const openFilesDirectory = (): Directory => {
   if (filesDirectory) return filesDirectory;
   const directory = new Directory(Paths.cache, "linky-files");
   if (directory.exists) directory.delete();

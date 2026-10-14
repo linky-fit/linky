@@ -1,6 +1,7 @@
 import { Button, Dialog, IconButton, Row, Stack, Text } from "@linky-fit/ui";
 import type { IconName } from "@linky-fit/ui";
 import type { ReactNode } from "react";
+import { Platform } from "react-native";
 
 interface ViewerAction {
   icon: IconName;
@@ -19,7 +20,7 @@ interface AttachmentViewerProps {
   children: ReactNode;
 }
 
-/** The full-screen viewer of a private image or PDF; tapping around the content closes it. */
+/** The full-screen viewer of a private image or PDF; on the web, tapping around the content closes it. */
 export function AttachmentViewer({
   open,
   onClose,
@@ -81,7 +82,8 @@ export function AttachmentViewer({
           alignItems="center"
           justifyContent="center"
           overflow="hidden"
-          onPress={onClose}
+          // On iOS a pressing ancestor stops a PDF's pages from scrolling; native closes through back instead.
+          {...(Platform.OS === "web" ? { onPress: onClose } : {})}
         >
           {children}
         </Stack>
