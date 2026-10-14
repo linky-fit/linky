@@ -166,6 +166,7 @@ describe("openLinkyStore", () => {
       createQuery: () => "query",
       loadQuery: () => Promise.resolve([]),
       subscribeQuery: () => () => () => {},
+      subscribeError: () => () => {},
     };
     const { evolu, ownerSync, deliver } = open(mnemonic);
     const kv = memoryKeyValueStorage();

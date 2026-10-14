@@ -23,6 +23,8 @@ const fakeEvolu = () => {
   const queries: string[] = [];
   let rows: ReadonlyArray<Record<string, unknown>> = [];
   let held: Array<() => void> | null = null;
+  let dropping = false;
+  const errorListeners = new Set<() => void>();
   let heldCompletions: Array<() => void> | null = null;
   const mutation =
     (kind: string) =>
@@ -65,12 +67,17 @@ const fakeEvolu = () => {
     },
     loadQuery: (query: string) => {
       queries.push(query);
+      if (dropping) return new Promise(() => {});
       const answer = rows;
       if (held === null) return Promise.resolve(answer);
       const waiting = held;
       return new Promise((resolve) => waiting.push(() => resolve(answer)));
     },
     subscribeQuery: () => () => () => {},
+    subscribeError: (listener: () => void) => {
+      errorListeners.add(listener);
+      return () => errorListeners.delete(listener);
+    },
     upsert: mutation("upsert"),
     update: mutation("update"),
   };
@@ -88,6 +95,16 @@ const fakeEvolu = () => {
     answerQueries: () => {
       for (const answer of held ?? []) answer();
       held = null;
+    },
+    /** Loads never settle, as when Evolu's worker failed their query batch. */
+    dropQueries: () => {
+      dropping = true;
+    },
+    answerDroppedLater: () => {
+      dropping = false;
+    },
+    reportError: () => {
+      for (const listener of errorListeners) listener();
     },
     holdCompletions: () => {
       heldCompletions = [];
@@ -323,6 +340,53 @@ describe("evolu shard db", () => {
       `"=","bytes:${ownerIdToOwnerIdBytes(owner.id).length}"`,
     );
     expect(fake.queries[0]).not.toContain(owner.id);
+  });
+
+  it("asks again under a fresh key for a read whose query batch Evolu dropped", async () => {
+    const fake = fakeEvolu();
+    const db = createEvoluShardDb(fake.runtime, reportedOwnerSync().ownerSync);
+    const owner = testAppOwner();
+    fake.seed([{ mutations: 3, bytes: 40 }]);
+    fake.dropQueries();
+    const usage = Effect.runPromise(db.ownerUsage(owner.id));
+    await settle();
+    fake.answerDroppedLater();
+    fake.reportError();
+
+    expect(await usage).toEqual({ mutations: 3, bytes: 40 });
+    expect(fake.queries[1]).not.toBe(fake.queries[0]);
+    expect(fake.queries[1]).toContain('["where","id","!=","linksync-fresh-1"]');
+  });
+
+  it("asks for a dropped query under a fresh key on later reads too", async () => {
+    const fake = fakeEvolu();
+    const db = createEvoluShardDb(fake.runtime, reportedOwnerSync().ownerSync);
+    const owner = testAppOwner();
+    fake.seed([{ mutations: 3, bytes: 40 }]);
+    fake.dropQueries();
+    const first = Effect.runPromise(db.ownerUsage(owner.id));
+    await settle();
+    fake.answerDroppedLater();
+    fake.reportError();
+    await first;
+
+    expect(await Effect.runPromise(db.ownerUsage(owner.id))).toEqual({
+      mutations: 3,
+      bytes: 40,
+    });
+    expect(fake.queries.at(-1)).toContain("linksync-fresh-2");
+  });
+
+  it("stops asking again once a database fails every query", async () => {
+    const fake = fakeEvolu();
+    const db = createEvoluShardDb(fake.runtime, reportedOwnerSync().ownerSync);
+    const owner = testAppOwner();
+    fake.dropQueries();
+    void Effect.runPromise(db.ownerUsage(owner.id));
+    await settle();
+    for (let error = 0; error < 5; error += 1) fake.reportError();
+
+    expect(fake.queries).toHaveLength(4);
   });
 
   it("counts a reported owner synced once a fresh query has answered", async () => {
