@@ -1,10 +1,11 @@
 import { Option, Schema } from "effect";
 import { getPublicKey, nip19 } from "nostr-tools";
 import { getConversationKey } from "nostr-tools/nip44";
-import { NostrSecretKey, Pubkey } from "../domain/primitives";
+import { NostrSecretKey, Pubkey, RelayUrl } from "../domain/primitives";
 
 const decodeSecretKey = Schema.decodeUnknownOption(NostrSecretKey);
 const decodePubkey = Schema.decodeUnknownOption(Pubkey);
+const isRelayUrl = Schema.is(RelayUrl);
 
 export const decodeNsec = (value: string): NostrSecretKey | null => {
   try {
@@ -54,15 +55,24 @@ export const identityFromNsec = (
   return { secretKey, pubkey: derivePubkey(secretKey) };
 };
 
-export const decodeNprofilePubkey = (value: string): Pubkey | null => {
+/** An nprofile's key and relay hints; hints that are not relay urls are dropped. */
+export const decodeNprofile = (
+  value: string,
+): { pubkey: Pubkey; relays: ReadonlyArray<RelayUrl> } | null => {
   try {
-    const decoded = nip19.decode(value);
+    const decoded = nip19.decode(value.trim());
     if (decoded.type !== "nprofile") return null;
-    return Option.getOrNull(decodePubkey(decoded.data.pubkey));
+    const pubkey = Option.getOrNull(decodePubkey(decoded.data.pubkey));
+    if (pubkey === null) return null;
+    const relays = (decoded.data.relays ?? []).map((relay) => relay.trim());
+    return { pubkey, relays: [...new Set(relays.filter(isRelayUrl))] };
   } catch {
     return null;
   }
 };
+
+export const decodeNprofilePubkey = (value: string): Pubkey | null =>
+  decodeNprofile(value)?.pubkey ?? null;
 
 export const encodeNprofile = (
   pubkey: Pubkey,

@@ -1,6 +1,12 @@
-import { Schema } from "effect";
+import { Option, Schema } from "effect";
 import { WrapDelivery } from "../domain/delivery";
-import { ClientId, Pubkey, RumorId, UnixSeconds } from "../domain/primitives";
+import {
+  ClientId,
+  Pubkey,
+  RelayUrl,
+  RumorId,
+  UnixSeconds,
+} from "../domain/primitives";
 import { parseCashuToken } from "./cashuToken";
 
 /** Kind of the message a deletion refers to; the codec maps this to the ["k"] tag. */
@@ -22,6 +28,27 @@ export const CashuTokenText = Schema.Trimmed.check(
   }),
 ).pipe(Schema.brand("CashuTokenText"));
 export type CashuTokenText = typeof CashuTokenText.Type;
+
+const PaymentRequestPayloadJson = Schema.fromJsonString(
+  Schema.Struct({
+    mint: Schema.String,
+    unit: Schema.String,
+    proofs: Schema.NonEmptyArray(Schema.Unknown),
+  }),
+);
+const decodePaymentRequestPayloadJson = Schema.decodeUnknownOption(
+  PaymentRequestPayloadJson,
+);
+
+/** A NUT-18 payment payload, the `{id, memo, mint, unit, proofs}` JSON a payer sends. */
+export const PaymentRequestPayloadText = Schema.Trimmed.check(
+  Schema.isNonEmpty(),
+  Schema.makeFilter(
+    (value) => Option.isSome(decodePaymentRequestPayloadJson(value)),
+    { expected: "a NUT-18 payment payload" },
+  ),
+).pipe(Schema.brand("PaymentRequestPayloadText"));
+export type PaymentRequestPayloadText = typeof PaymentRequestPayloadText.Type;
 
 const PrivateImageFields = {
   url: Schema.Trimmed.check(Schema.isNonEmpty()),
@@ -64,7 +91,9 @@ export class TokenMessageDraft extends Schema.Class<TokenMessageDraft>(
   "TokenMessageDraft",
 )({
   to: Pubkey,
-  token: CashuTokenText,
+  token: Schema.Union([CashuTokenText, PaymentRequestPayloadText]),
+  /** Also gets the recipient copy, e.g. a NUT-18 request's nprofile relays. */
+  recipientRelays: Schema.optional(Schema.Array(RelayUrl)),
   replyTo: Schema.optional(RumorId),
   root: Schema.optional(RumorId),
   clientId: Schema.optional(ClientId),

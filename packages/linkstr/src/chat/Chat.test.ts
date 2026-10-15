@@ -18,6 +18,7 @@ import {
   EditMessageDraft,
   ImageMessageDraft,
   MessageText,
+  PaymentRequestPayloadText,
   PrivateImage,
   TextMessageDraft,
   TokenMessageDraft,
@@ -210,6 +211,58 @@ describe("Chat sends", () => {
       expect(rumor.kind).toBe(14);
       expect(rumor.content).toBe(cashuToken);
     }
+  });
+
+  it("sends a NUT-18 payload as one recipient wrap on the write relays and the request's relays", async () => {
+    const published: Array<SignedWrapEvent> = [];
+    const nprofileRelay = RelayUrl.make("wss://payee-inbox.test");
+    const payload = PaymentRequestPayloadText.make(
+      JSON.stringify({
+        id: "pay-1",
+        mint: "https://mint.test",
+        unit: "sat",
+        proofs: [{ id: "00ad268c4d1f5826", amount: 8, secret: "s", C: "02ab" }],
+      }),
+    );
+    const exit = await runWith(
+      stubWrapTransport(published),
+      Effect.gen(function* () {
+        const chat = yield* Chat;
+        return yield* chat.sendToken(
+          new TokenMessageDraft({
+            to: bob.pubkey,
+            token: payload,
+            recipientRelays: [nprofileRelay, relayA],
+            clientId,
+          }),
+        );
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.recipientCopy.acceptedBy).toEqual([
+      relayA,
+      relayB,
+      nprofileRelay,
+    ]);
+    expect(exit.value.selfCopy.acceptedBy).toEqual([relayA, relayB]);
+    const recipientWraps = published.filter(
+      (wrap) => recipientOf(wrap) === bob.pubkey,
+    );
+    expect(new Set(recipientWraps.map((wrap) => wrap.id)).size).toBe(1);
+    const rumor = Result.getOrThrow(
+      unwrapToRumor(recipientWraps[0]!, bob.secretKey),
+    );
+    expect(rumor.kind).toBe(14);
+    expect(rumor.content).toBe(payload);
+  });
+
+  it("rejects payload text without proofs", () => {
+    expect(() =>
+      PaymentRequestPayloadText.make(
+        JSON.stringify({ mint: "https://mint.test", unit: "sat", proofs: [] }),
+      ),
+    ).toThrow();
   });
 
   it("honors the draft sentAt override", async () => {

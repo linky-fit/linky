@@ -7,6 +7,7 @@ import type {
   ClientId,
   NostrSecretKey,
   Pubkey,
+  RelayUrl,
   UnixSeconds,
 } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
@@ -46,6 +47,8 @@ export interface PeerDraft {
   readonly clientId?: ClientId | undefined;
   /** Now when omitted. */
   readonly sentAt?: UnixSeconds | undefined;
+  /** Get the recipient copy too, on top of the write relays. */
+  readonly recipientRelays?: ReadonlyArray<RelayUrl> | undefined;
 }
 
 export type RumorEncoder<Draft> = (
@@ -98,6 +101,7 @@ export const sendToPeer = <Draft extends PeerDraft, Receipt>(
       sentAt,
       pushMarkRecipientCopy: spec.pushMarkRecipientCopy ?? false,
       order: spec.order ?? "parallel",
+      recipientRelays: draft.recipientRelays,
     });
     const sent: PeerSent = {
       outcome: { rumorId: RumorId.make(rumor.id), clientId, sentAt, ...copies },
