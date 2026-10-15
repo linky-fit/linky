@@ -11,25 +11,16 @@ import {
 import { Effect, Exit, Result, Scope } from "effect";
 import {
   buildCashuRequest,
-  cashuRequestMint,
   czkToSats,
-  isOpenBitcoinRequest,
-  matchIncomingCashu,
-  matchRepeatedCashu,
   minimumBitcoinSats,
   minimumCzkFor,
-  OPEN_REQUEST_SEC,
+  paymentNamedBy,
   paymentNote,
   readIncomingCashu,
-  requestMintElsewhere,
-  uniqueRequestSats,
   type CzkAmount,
   type IncomingCashu,
-  type Payment,
-  type Sats,
 } from "../domain";
 import type { Ledger } from "../storage/ledger";
-import { nowSeconds } from "../utils/time";
 import type { InboxHandler, Nostr } from "./nostr";
 import { exclusive, serialQueue } from "./serial";
 import type { Wallet } from "./wallet";
@@ -52,9 +43,8 @@ export type BitcoinRequestFailure =
 export interface BitcoinPayments {
   /**
    * Gives a payment its Bitcoin leg unless it has one: the CZK amount in
-   * sats at the current rate, made unique among the open requests, a NUT-20
-   * locked mint quote and a NUT-18 request to this account, stored on the
-   * payment. A leg whose quote expired gets a fresh one.
+   * sats at the current rate, a NUT-20 locked mint quote and a NUT-18
+   * request to this account, stored on the payment. A leg whose quote expired gets a fresh one.
    */
   readonly request: (
     paymentId: string,
@@ -72,49 +62,6 @@ interface CashuReceive {
   readonly operationId: string;
   readonly sats: number;
 }
-
-/** A payment's open Bitcoin request in the shape the matching rules take. */
-interface OpenPayment {
-  readonly id: string;
-  readonly status: Payment["status"];
-  readonly sats: Sats;
-  readonly mintUrl: string;
-  readonly createdAtSec: number;
-  readonly payment: Payment;
-}
-
-const bitcoinRequestsWhere = (
-  payments: readonly Payment[],
-  isCandidate: (payment: Payment) => boolean,
-): OpenPayment[] =>
-  payments.flatMap((payment) => {
-    const leg = payment.bitcoin;
-    const mintUrl = leg === null ? null : cashuRequestMint(leg.paymentRequest);
-    return leg === null || mintUrl === null || !isCandidate(payment)
-      ? []
-      : [{ ...payment, sats: leg.sats, mintUrl, payment }];
-  });
-
-/** Recent unpaid Bitcoin requests, also cancelled ones: a token can still pay each. */
-export const openBitcoinPayments = (
-  payments: readonly Payment[],
-  nowSec = nowSeconds(),
-) =>
-  bitcoinRequestsWhere(payments, (payment) =>
-    isOpenBitcoinRequest(payment, nowSec),
-  );
-
-/** Recent paid Bitcoin requests, which a customer may pay a second time. */
-export const paidBitcoinPayments = (
-  payments: readonly Payment[],
-  nowSec = nowSeconds(),
-) =>
-  bitcoinRequestsWhere(
-    payments,
-    (payment) =>
-      payment.status === "paid" &&
-      nowSec - payment.createdAtSec < OPEN_REQUEST_SEC,
-  );
 
 export const createBitcoinPayments = ({
   ledger,
@@ -203,7 +150,6 @@ export const createBitcoinPayments = ({
     serially(async () => {
       await Effect.runPromise(Scope.close(scope, Exit.void));
       scope = Effect.runSync(Scope.make());
-      await wallet.resumeMoves();
       const handles = await runtime.runPromise(
         Scope.provide(
           Effect.flatMap(Topup, (topup) => topup.resumePending({ lockingKey })),
@@ -232,23 +178,17 @@ export const createBitcoinPayments = ({
     if (rate === null) return { reason: "rate-unavailable" };
     const mint = parseMintUrl(mintUrl);
     if (mint === null) return { reason: "mint-unreachable" };
-    const priced = czkToSats(payment.amountCzk, rate);
+    const sats = czkToSats(payment.amountCzk, rate);
     const minimum = minimumBitcoinSats(await wallet.inputFeePpk(mint));
-    if (priced < minimum) {
+    if (sats < minimum) {
       return {
         reason: "below-minimum",
         minimumCzk: minimumCzkFor(minimum, rate),
       };
     }
     const description = await shopName();
-    // Serial, so two requests created at once never pick the same amount.
+    // Serial with `resume`, which replaces the scope the topup runs in.
     const started = await serially(async () => {
-      const sats = uniqueRequestSats(
-        priced,
-        openBitcoinPayments((await ledger.records()).payments).filter(
-          ({ id }) => id !== payment.id,
-        ),
-      );
       const topup = await runtime.runPromise(
         Effect.result(
           Scope.provide(
@@ -324,36 +264,12 @@ export const createBitcoinPayments = ({
   };
 
   /**
-   * Moves the sats of a token from another mint than the request it pays to
-   * that request's mint, so a payment is paid only by sats its own mint
-   * holds. Sats that cannot move stay where they are, paying nothing.
-   */
-  const atRequestMint = async (
-    incoming: IncomingCashu,
-    received: CashuReceive,
-  ): Promise<{ incoming: IncomingCashu; received: CashuReceive }> => {
-    const target = requestMintElsewhere(
-      incoming,
-      openBitcoinPayments((await ledger.records()).payments),
-    );
-    const from = parseMintUrl(incoming.mint);
-    const to = target === null ? null : parseMintUrl(target);
-    if (from === null || to === null) return { incoming, received };
-    const fee = await wallet.moveAll(from, to);
-    return fee === null
-      ? { incoming, received }
-      : {
-          incoming: { ...incoming, mint: to },
-          received: { ...received, sats: Math.max(0, received.sats - fee) },
-        };
-  };
-
-  /**
-   * Receives a token and records what it put into the wallet: it pays the
-   * payment it matches, also a cancelled one, once its sats are at that
-   * payment's mint; a token for a paid payment is recorded as paying it
-   * again, and one that matches none as a direct transfer from its sender,
-   * with the note they wrote, left at the mint it came from.
+   * Receives a token and records what it put into the wallet: a NUT-18
+   * payload pays the payment its request id names, also a cancelled one,
+   * once the sats it brought in cover what that request asks, and is
+   * recorded as paying it again when it is already paid. Anything else,
+   * such as a bare token from a Linky chat, is a direct transfer from its
+   * sender, with the note they wrote.
    */
   const receiveChatToken: InboxHandler = async (event) => {
     if (event._tag !== "ChatMessageReceived" || event.editOf !== null) return;
@@ -366,38 +282,31 @@ export const createBitcoinPayments = ({
     const incoming = text === null ? null : readIncomingCashu(text);
     if (text === null || incoming === null) return;
     await whenHydrated();
-    const unrecorded = await unrecordedReceiveOf(text, incoming);
-    if (unrecorded === null) return;
-    const { incoming: paying, received } = await atRequestMint(
-      incoming,
-      unrecorded,
-    );
+    const received = await unrecordedReceiveOf(text, incoming);
+    if (received === null) return;
     await settling(async () => {
       const { payments } = await ledger.records();
       const paidBefore = payments.find(
         (payment) => payment.cashuReceive?.operationId === received.operationId,
       );
       if (paidBefore) return;
-      const open = matchIncomingCashu(paying, openBitcoinPayments(payments));
+      const named = paymentNamedBy(incoming, payments);
       if (
-        open &&
-        (await ledger.completePayment(open.payment, {
+        named?.bitcoin &&
+        received.sats >= named.bitcoin.sats &&
+        (await ledger.completePayment(named, {
           cashuReceive: received,
           payerPubkey: event.from,
         }))
       ) {
         return;
       }
-      const repeated = matchRepeatedCashu(
-        paying,
-        paidBitcoinPayments(payments),
-      );
-      if (repeated) {
+      if (named?.status === "paid") {
         await ledger.recordReceipt({
           operationId: received.operationId,
           method: "cashu",
           sats: received.sats,
-          paymentId: repeated.payment.id,
+          paymentId: named.id,
         });
         return;
       }
@@ -405,9 +314,9 @@ export const createBitcoinPayments = ({
         operationId: received.operationId,
         sats: received.sats,
         czkPerBtc: await czkPerBtc(),
-        mintUrl: paying.mint,
+        mintUrl: incoming.mint,
         payerPubkey: event.from,
-        note: paymentNote(paying.memo),
+        note: paymentNote(incoming.memo),
       });
     });
   };
