@@ -1,7 +1,7 @@
 {
   "name": "@linky-fit/fazole-app",
   "private": true,
-  "version": "0.1.0",
+  "version": "26.10.1",
   "license": "0BSD",
   "type": "module",
   "scripts": {

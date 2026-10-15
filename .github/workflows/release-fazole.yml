@@ -1,0 +1,111 @@
+name: Release · fazole
+
+# Starts when CI succeeds on a push to main or a hotfix/** branch, and ships the
+# commit CI tested once the version in apps/fazole-app/package.json has no
+# fazole-v tag yet: `publish` creates the tag and GitHub release, and
+# `web-production` moves the `fazole-production` branch, which Vercel deploys.
+# A manual run started from a fazole-v tag republishes that tag.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches:
+      - main
+      - "hotfix/**"
+  workflow_dispatch:
+
+jobs:
+  resolve:
+    # Pushes only: a pull request from a fork can name its branch hotfix/**.
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: read
+    outputs:
+      release_tag: ${{ steps.release.outputs.release-tag }}
+      publish: ${{ steps.release.outputs.publish }}
+      sha: ${{ steps.release.outputs.sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Resolve the release
+        id: release
+        uses: ./.github/actions/resolve-release
+        with:
+          manifest: apps/fazole-app/package.json
+          tag-prefix: fazole-v
+
+  publish:
+    needs: resolve
+    if: needs.resolve.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-fazole
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}
+      RELEASE_SHA: ${{ needs.resolve.outputs.sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+
+      - name: Prepare release notes
+        env:
+          CHANGELOG: apps/fazole-app/CHANGELOG.md
+        run: apps/native-shell/scripts/extract-release-notes.sh "$RELEASE_TAG" "$RUNNER_TEMP/release-notes.md"
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.md"
+          else
+            # Linky's release stays the repository's latest.
+            gh release create "$RELEASE_TAG" \
+              --title "Fazole $RELEASE_TAG" \
+              --notes-file "$RUNNER_TEMP/release-notes.md" \
+              --target "$RELEASE_SHA" \
+              --latest=false
+          fi
+
+  web-production:
+    name: Ship the fazole app to production
+    needs: [resolve, publish]
+    runs-on: ubuntu-latest
+    # Holds the release app's credentials and admits only main and fazole-v* tags.
+    environment: Fazole production
+    concurrency:
+      group: fazole-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+
+    steps:
+      # The fazole-production ruleset lets only this app push; GITHUB_TOKEN can't bypass rulesets.
+      - name: Create release app token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+
+      - name: Checkout release tag
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.resolve.outputs.release_tag }}
+          token: ${{ steps.app-token.outputs.token }}
+
+      # Forced, because a hotfix tag cut outside main is not an ancestor of the
+      # next release.
+      - name: Move the fazole-production branch to the release
+        run: git push --force origin HEAD:refs/heads/fazole-production

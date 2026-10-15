@@ -25,6 +25,7 @@ Read `GLOSSARY.md` before discussing domain concepts. When the user uses a term 
 - Local Evolu data is cleared only by the user; quota errors are recovered by adding relay capacity, and degraded storage asks the user instead of falling back silently
 - Env vars set only fresh-origin defaults; relay and Evolu server lists are user settings
 - Nightly (`main`) shares accounts and services with the last release, so whatever it writes to Evolu, Nostr or a mint stays readable by that release
+- Linky and Fazole release separately and share accounts, so whatever either writes to Evolu, Nostr or a mint stays readable by the other's last release
 
 ## Conventions
 
@@ -43,7 +44,7 @@ Read `GLOSSARY.md` before discussing domain concepts. When the user uses a term 
 
 ## Versions
 
-App releases use CalVer `YY.M.MICRO` (the counter resets monthly). Leave `version` fields alone; `@linky-fit/linkshu`, `@linky-fit/linkstr` and `@linky-fit/linkauth` releases follow `docs/npm-releases.md`.
+Linky and Fazole each have their own CalVer `YY.M.MICRO` version (the counter resets monthly) and changelog (`CHANGELOG.md`, `apps/fazole-app/CHANGELOG.md`); `docs/releases.md` covers both releases. Leave `version` fields alone; `@linky-fit/linkshu`, `@linky-fit/linkstr` and `@linky-fit/linkauth` releases follow `docs/npm-releases.md`.
 
 ## Debugging the dev app
 

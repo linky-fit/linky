@@ -24,9 +24,9 @@ jobs:
       contents: read
       checks: read
     outputs:
-      release_tag: ${{ steps.metadata.outputs.release_tag }}
-      publish: ${{ steps.metadata.outputs.publish }}
-      sha: ${{ steps.metadata.outputs.sha }}
+      release_tag: ${{ steps.release.outputs.release-tag }}
+      publish: ${{ steps.release.outputs.publish }}
+      sha: ${{ steps.release.outputs.sha }}
 
     steps:
       # The workflow's own commit, which carries require-ci even when an older
@@ -34,39 +34,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Resolve release tag
-        id: metadata
-        env:
-          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
-        run: |
-          publish=true
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$GITHUB_REF_TYPE" == "tag" ]]; then
-            release_tag="$GITHUB_REF_NAME"
-          else
-            git fetch --quiet --depth 1 origin "$SHA"
-            release_tag="v$(git show "$SHA:package.json" | jq -r .version)"
-            if git ls-remote --exit-code --tags origin "refs/tags/$release_tag" >/dev/null; then
-              echo "Tag $release_tag already exists; run the workflow from that tag to republish it."
-              publish=false
-            fi
-          fi
-
-          if [[ -z "$release_tag" || "$release_tag" == "v" ]]; then
-            echo "Missing release tag" >&2
-            exit 1
-          fi
-
-          {
-            echo "release_tag=$release_tag"
-            echo "publish=$publish"
-            echo "sha=$SHA"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Require passing CI on the release commit
-        if: steps.metadata.outputs.publish == 'true'
-        uses: ./.github/actions/require-ci
+      - name: Resolve the release
+        id: release
+        uses: ./.github/actions/resolve-release
         with:
-          sha: ${{ steps.metadata.outputs.sha }}
+          manifest: package.json
+          tag-prefix: v
 
   publish:
     needs: resolve
