@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
-const rootManifest = new URL("../../package.json", import.meta.url);
-const { version } = JSON.parse(readFileSync(rootManifest, "utf8"));
+const appManifest = new URL("../linky-app/package.json", import.meta.url);
+const { version } = JSON.parse(readFileSync(appManifest, "utf8"));
 
 /** @type {import("electron-builder").Configuration} */
 export default {

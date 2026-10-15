@@ -2,30 +2,30 @@ import groovy.json.JsonSlurper
 
 apply plugin: 'com.android.application'
 
-def workspacePackageJsonFile = file('../../../../package.json')
-if (!workspacePackageJsonFile.exists()) {
-    throw new GradleException("Workspace package.json not found at ${workspacePackageJsonFile.path}")
+def appPackageJsonFile = file('../../../linky-app/package.json')
+if (!appPackageJsonFile.exists()) {
+    throw new GradleException("Linky app package.json not found at ${appPackageJsonFile.path}")
 }
 
-def workspacePackageJson = new JsonSlurper().parseText(workspacePackageJsonFile.text)
-def workspaceVersionValue = workspacePackageJson.version
-def workspaceVersionName = workspaceVersionValue instanceof String && !workspaceVersionValue.trim().isEmpty()
-    ? workspaceVersionValue.trim()
+def appPackageJson = new JsonSlurper().parseText(appPackageJsonFile.text)
+def appVersionValue = appPackageJson.version
+def appVersionName = appVersionValue instanceof String && !appVersionValue.trim().isEmpty()
+    ? appVersionValue.trim()
     : '1.0.0'
 
-def semverMatcher = (workspaceVersionName =~ /^(\d+)\.(\d+)\.(\d+)/)
-def derivedWorkspaceVersionCode = 1
+def semverMatcher = (appVersionName =~ /^(\d+)\.(\d+)\.(\d+)/)
+def derivedAppVersionCode = 1
 if (semverMatcher.find()) {
     def majorVersion = Integer.parseInt(semverMatcher.group(1))
     def minorVersion = Integer.parseInt(semverMatcher.group(2))
     def patchVersion = Integer.parseInt(semverMatcher.group(3))
-    derivedWorkspaceVersionCode = (majorVersion * 10000) + (minorVersion * 100) + patchVersion
+    derivedAppVersionCode = (majorVersion * 10000) + (minorVersion * 100) + patchVersion
 }
 
 def androidVersionNameOverride = (project.findProperty('LINKY_ANDROID_VERSION_NAME') ?: System.getenv('LINKY_ANDROID_VERSION_NAME'))?.toString()?.trim()
 def androidVersionCodeOverride = (project.findProperty('LINKY_ANDROID_VERSION_CODE') ?: System.getenv('LINKY_ANDROID_VERSION_CODE'))?.toString()?.trim()
-def androidVersionName = androidVersionNameOverride ?: workspaceVersionName
-def androidVersionCode = androidVersionCodeOverride ? Integer.parseInt(androidVersionCodeOverride) : derivedWorkspaceVersionCode
+def androidVersionName = androidVersionNameOverride ?: appVersionName
+def androidVersionCode = androidVersionCodeOverride ? Integer.parseInt(androidVersionCodeOverride) : derivedAppVersionCode
 def requestedTaskNames = gradle.startParameter.taskNames.collect { it.toLowerCase(Locale.ROOT) }
 def isDebugOnlyBuild = !requestedTaskNames.isEmpty() && requestedTaskNames.every { taskName ->
     taskName.contains('debug') || taskName.contains('test')

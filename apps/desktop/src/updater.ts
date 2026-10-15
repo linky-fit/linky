@@ -31,7 +31,7 @@ export const fetchAvailableUpdate =
     const release = Schema.decodeUnknownSync(LatestRelease)(
       await response.json(),
     );
-    const version = release.tag_name.replace(/^v/, "");
+    const version = release.tag_name.replace(/^linky-v/, "");
     const dmg = release.assets.find(({ name }) => name === DMG_NAME);
     return dmg && isNewer(version, app.getVersion())
       ? { version, downloadUrl: dmg.browser_download_url }

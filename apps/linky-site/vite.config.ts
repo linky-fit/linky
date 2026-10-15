@@ -29,13 +29,13 @@ const __dirname = path.dirname(__filename);
 
 type NextFunction = () => void;
 
-const readRootPackageVersion = (): string => {
-  const rootPackage = parseJsonObject(
-    readFileSync(path.resolve(__dirname, "../../package.json"), "utf8"),
+const readLinkyAppVersion = (): string => {
+  const appPackage = parseJsonObject(
+    readFileSync(path.resolve(__dirname, "../linky-app/package.json"), "utf8"),
   );
-  const version = rootPackage?.version;
+  const version = appPackage?.version;
   if (typeof version !== "string") {
-    throw new Error("Root package.json has no version");
+    throw new Error("apps/linky-app/package.json has no version");
   }
   return version;
 };
@@ -217,7 +217,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     define: {
-      __APP_VERSION__: JSON.stringify(readRootPackageVersion()),
+      __APP_VERSION__: JSON.stringify(readLinkyAppVersion()),
     },
     plugins: [
       linkyUi(),

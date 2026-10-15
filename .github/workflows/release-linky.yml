@@ -1,11 +1,12 @@
-name: Release · app
+name: Release · linky
 
 # Starts when CI succeeds on a push to main or a hotfix/** branch, and ships the
-# commit CI tested once its version has no tag yet: `publish` creates the
-# v<version> tag and GitHub release, and the web app ships by moving the
-# `production` branch, which Vercel deploys to app.linky.fit. A manual run
-# started from a tag republishes that tag. workflow_run jobs run in main's
-# context, so every checkout names the release commit explicitly.
+# commit CI tested once the version in apps/linky-app/package.json has no
+# linky-v tag yet: `publish` creates the tag and GitHub release, and the app
+# ships by moving the `linky-production` branch, which Vercel deploys to
+# app.linky.fit. A manual run started from a linky-v tag republishes that tag.
+# workflow_run jobs run in main's context, so every checkout names the release
+# commit explicitly.
 on:
   workflow_run:
     workflows: [CI]
@@ -38,8 +39,8 @@ jobs:
         id: release
         uses: ./.github/actions/resolve-release
         with:
-          manifest: package.json
-          tag-prefix: v
+          manifest: apps/linky-app/package.json
+          tag-prefix: linky-v
 
   publish:
     needs: resolve
@@ -48,7 +49,7 @@ jobs:
     # Every push to main starts this workflow, so only real releases queue here
     # and a no-op run can't replace a pending one.
     concurrency:
-      group: release-app
+      group: release-linky
       cancel-in-progress: false
     permissions:
       contents: write
@@ -135,27 +136,29 @@ jobs:
             gh release edit "$RELEASE_TAG" --notes-file "$RELEASE_NOTES_PATH"
             gh release upload "$RELEASE_TAG" "$APK_UPLOAD_PATH" "$LIVE_UPDATE_DIR"/* --clobber
           else
+            # Installed shells and the desktop app update from the latest release.
             gh release create "$RELEASE_TAG" "$APK_UPLOAD_PATH" "$LIVE_UPDATE_DIR"/* \
-              --title "Linky $RELEASE_TAG" \
+              --title "Linky ${RELEASE_TAG#linky-}" \
               --notes-file "$RELEASE_NOTES_PATH" \
-              --target "$RELEASE_SHA"
+              --target "$RELEASE_SHA" \
+              --latest
           fi
 
   web-production:
-    name: Ship the web app to production
+    name: Ship the linky app to production
     needs: [resolve, publish]
     runs-on: ubuntu-latest
-    # Holds the release app's credentials and admits only main and v* tags.
+    # Holds the release app's credentials and admits only main and linky-v* tags.
     environment: Production
     # Releases publish one at a time, so production moves in release order.
     concurrency:
-      group: web-production
+      group: linky-production
       cancel-in-progress: false
     permissions:
       contents: read
 
     steps:
-      # The production ruleset lets only this app push; GITHUB_TOKEN can't bypass rulesets.
+      # The linky-production ruleset lets only this app push; GITHUB_TOKEN can't bypass rulesets.
       - name: Create release app token
         id: app-token
         uses: actions/create-github-app-token@v3
@@ -172,8 +175,8 @@ jobs:
 
       # Forced, because a hotfix tag cut outside main is not an ancestor of the
       # next release.
-      - name: Move the production branch to the release
-        run: git push --force origin HEAD:refs/heads/production
+      - name: Move the linky-production branch to the release
+        run: git push --force origin HEAD:refs/heads/linky-production
 
   google-play:
     name: Publish to Google Play open testing

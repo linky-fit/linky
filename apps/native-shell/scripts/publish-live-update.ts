@@ -35,7 +35,7 @@ const { runtime } = Schema.decodeUnknownSync(
 )(readFileSync(path.join(distDir, "native-runtime.json"), "utf8"));
 const { version } = Schema.decodeUnknownSync(
   Schema.fromJsonString(Schema.Struct({ version: Schema.NonEmptyString })),
-)(readFileSync(path.join(repoDir, "package.json"), "utf8"));
+)(readFileSync(path.join(repoDir, "apps/linky-app/package.json"), "utf8"));
 
 const files = readdirSync(distDir, { recursive: true, withFileTypes: true })
   .filter((entry) => entry.isFile())
