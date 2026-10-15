@@ -109,6 +109,57 @@ describe("paymentRequestMessage", () => {
     });
   });
 
+  it("pays a nostr transport only when it accepts NIP-17 or names no NIPs", () => {
+    const nprofile = nip19.nprofileEncode({
+      pubkey:
+        "1b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f",
+      relays: ["wss://relay.example"],
+    });
+    const parse = (...transports: Record<string, unknown>[]) =>
+      parseCashuPaymentRequestMessage(
+        `creqA${encodeBase64Url(encode({ a: 21, u: "sat", t: transports }))}`,
+      );
+    const post = { t: "post", a: "https://pay.example/1" };
+
+    expect(
+      parse({ t: "nostr", a: nprofile, g: [["n", "04"]] }, post),
+    ).toMatchObject({
+      preferredTransport: "post",
+      transportNprofile: null,
+      transportPostUrl: "https://pay.example/1",
+    });
+    expect(parse({ t: "nostr", a: nprofile, g: [["n", "04"]] })).toMatchObject({
+      preferredTransport: null,
+      transportNprofile: null,
+    });
+    expect(
+      parse(
+        {
+          t: "nostr",
+          a: nprofile,
+          g: [
+            ["n", "04"],
+            ["n", "17"],
+          ],
+        },
+        post,
+      ),
+    ).toMatchObject({
+      preferredTransport: "nostr",
+      transportNprofile: nprofile,
+    });
+    expect(parse({ t: "nostr", a: nprofile }, post)).toMatchObject({
+      preferredTransport: "nostr",
+      transportNprofile: nprofile,
+    });
+    expect(
+      parse({ t: "nostr", a: nprofile, g: [["x", "other"]] }, post),
+    ).toMatchObject({
+      preferredTransport: "nostr",
+      transportNprofile: nprofile,
+    });
+  });
+
   it("parses a payment request decline marker", () => {
     const message = buildLinkyPaymentRequestDeclineMessage("rumor-123");
 
