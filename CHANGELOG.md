@@ -12,6 +12,26 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ## [Unreleased]
 
+## [26.10.6] - 2026-10-15
+
+### en-US
+
+- Pay and get paid by other Cashu wallets through NUT-18 payment requests.
+- A payment request you made counts as paid only once its full amount arrives.
+- Offline, a payment fails right away instead of waiting in a queue.
+- Recent dates read "2h ago" instead of full timestamps.
+- The paid screen shows the payee's profile name.
+- Sent messages reliably show as seen; profiles load reliably from busy relays.
+
+### cs-CZ
+
+- Placení a přijímání plateb s jinými Cashu peněženkami přes žádosti o platbu NUT-18.
+- Vaše žádost o platbu je zaplacená, až když dorazí celá částka.
+- Bez připojení platba hned selže, místo aby čekala ve frontě.
+- Nedávné časy ukazují „před 2 h“ místo celého data.
+- Obrazovka zaplacení ukazuje jméno z profilu příjemce.
+- Odeslané zprávy se spolehlivě ukážou jako přečtené; profily se spolehlivě načtou i z vytížených relayů.
+
 ## [26.10.5] - 2026-10-12
 
 ### en-US
