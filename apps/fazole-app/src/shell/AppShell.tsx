@@ -133,7 +133,7 @@ function SectionScreen({
     case "history":
       return <HistoryScreen />;
     case "wallet":
-      return <WalletScreen />;
+      return <WalletScreen shop={shop} />;
     case "settings":
       return <SettingsScreen shop={shop} />;
   }
