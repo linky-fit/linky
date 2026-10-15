@@ -4,6 +4,7 @@ import {
   Card,
   EmptyState,
   ListRow,
+  Notice,
   Pill,
   Pressable,
   Section,
@@ -13,7 +14,12 @@ import {
 } from "@linky-fit/ui";
 import { useState } from "react";
 import { copy } from "../copy";
-import { satsToCzk, type WalletActivity } from "../domain";
+import {
+  cashRequestMessage,
+  satsToCzk,
+  type ShopProfile,
+  type WalletActivity,
+} from "../domain";
 import {
   formatCzk,
   formatCzkValue,
@@ -21,6 +27,7 @@ import {
   formatWhole,
 } from "../format";
 import {
+  useAppServices,
   useCzkRate,
   useWalletActivity,
   useWalletBalance,
@@ -29,7 +36,7 @@ import { Page } from "./Page";
 import { methodIcons } from "./paymentLabels";
 import { WithdrawSheet } from "./WithdrawSheet";
 
-export function WalletScreen() {
+export function WalletScreen({ shop }: { readonly shop: ShopProfile }) {
   const balances = useWalletBalance();
   const rate = useCzkRate();
   const activity = useWalletActivity();
@@ -85,6 +92,7 @@ export function WalletScreen() {
       >
         {copy.wallet.withdraw}
       </Button>
+      <CashRequest shopName={shop.name} sats={total} />
       <Section title={copy.wallet.activity}>
         {activity.length === 0 ? (
           <EmptyState
@@ -107,6 +115,49 @@ export function WalletScreen() {
         czkPerBtc={czkPerBtc}
       />
     </Page>
+  );
+}
+
+function CashRequest({
+  shopName,
+  sats,
+}: {
+  readonly shopName: string;
+  readonly sats: number;
+}) {
+  const { supportChat } = useAppServices();
+  const [state, setState] = useState<"idle" | "sending" | "sent" | "failed">(
+    "idle",
+  );
+  const request = async () => {
+    setState("sending");
+    try {
+      await supportChat.send(cashRequestMessage(shopName, sats));
+      setState("sent");
+    } catch (error) {
+      console.warn("[fazole] cash request not sent", error);
+      setState("failed");
+    }
+  };
+  return (
+    <>
+      <Button
+        testID="wallet-request-cash"
+        variant="secondary"
+        icon="Banknote"
+        minHeight="$controlLg"
+        loading={state === "sending"}
+        disabled={sats === 0}
+        onPress={() => void request()}
+      >
+        {copy.wallet.requestCash}
+      </Button>
+      {state === "sent" ? (
+        <Notice tone="accent" title={copy.wallet.cashRequested} />
+      ) : state === "failed" ? (
+        <Notice tone="danger" title={copy.wallet.cashRequestFailed} />
+      ) : null}
+    </>
   );
 }
 

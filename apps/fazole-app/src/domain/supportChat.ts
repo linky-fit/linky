@@ -40,3 +40,7 @@ export const supportChatDays = (
         ]
       : [...days, { startSec, messages: [message] }];
   }, []);
+
+/** Fixed Czech text for support, whatever the app's language. */
+export const cashRequestMessage = (shopName: string, sats: number): string =>
+  `${shopName} vyžaduje hotovost. Má ${sats} sats`;
