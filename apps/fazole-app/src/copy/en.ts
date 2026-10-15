@@ -90,7 +90,7 @@ export const en: Copy = {
     amount: "Amount",
     keypadClear: "Clear",
     keypadDelete: "Delete",
-    request: "Request payment",
+    request: "Confirm",
     failed: "The payment could not be created. Try again.",
     directReceived: (name: string, amount: string) =>
       `Direct payment from ${name}: ${amount}`,

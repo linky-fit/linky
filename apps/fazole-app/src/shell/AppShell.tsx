@@ -129,7 +129,7 @@ function SectionScreen({
 }) {
   switch (section) {
     case "terminal":
-      return <TerminalScreen shop={shop} />;
+      return <TerminalScreen />;
     case "history":
       return <HistoryScreen />;
     case "wallet":

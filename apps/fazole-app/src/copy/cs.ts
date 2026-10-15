@@ -87,7 +87,7 @@ export const cs = {
     amount: "Částka",
     keypadClear: "Vymazat",
     keypadDelete: "Smazat",
-    request: "Požadovat platbu",
+    request: "Potvrdit",
     failed: "Platbu se nepodařilo vytvořit. Zkuste to znovu.",
     directReceived: (name: string, amount: string) =>
       `Přímá platba od ${name}: ${amount}`,

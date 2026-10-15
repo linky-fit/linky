@@ -7,6 +7,7 @@ export const payments: Section = {
   entries: {
     Amount: () => (
       <UI.Stack>
+        <UI.Amount value="1 250" unit="Kč" size="xl" caption="Terminal" />
         <UI.Amount value="2,400" unit="sats" caption="Balance" />
         <UI.Amount value="120" unit="sats" size="md" caption="Small amount" />
       </UI.Stack>

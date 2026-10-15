@@ -1,13 +1,10 @@
 import {
   Amount,
-  Avatar,
   Button,
   IconButton,
   Keypad,
   Notice,
-  Row,
   Stack,
-  Text,
   Toast,
   ToastStack,
   TopBar,
@@ -22,7 +19,6 @@ import {
   pressKeypadKey,
   withTip,
   type DirectTransfer,
-  type ShopProfile,
   type TipChoice,
 } from "../domain";
 import { formatCzk, formatWhole, numberSeparators } from "../format";
@@ -37,8 +33,8 @@ import {
 import { nowSeconds } from "../utils/time";
 import { TipStep } from "./TipStep";
 
-/** The amount keypad, full screen; the arrow at the top leads to the other sections. */
-export function TerminalScreen({ shop }: { readonly shop: ShopProfile }) {
+/** The amount keypad, full screen; the menu at the top leads to the other sections. */
+export function TerminalScreen() {
   const { payments } = useAppServices();
   // Tips are offered until the merchant turns them off, also before the setting is read.
   const offerTips = useOfferTips() !== false;
@@ -76,20 +72,10 @@ export function TerminalScreen({ shop }: { readonly shop: ShopProfile }) {
   return (
     <Stack flex={1} gap="$none" testID="terminal-screen">
       <TopBar
-        content={
-          <Row gap="$sm" alignItems="center" justifyContent="center">
-            {shop.picture === null ? null : (
-              <Avatar name={shop.name} uri={shop.picture} size="xs" />
-            )}
-            <Text eyebrow numberOfLines={1} flexShrink={1}>
-              {shop.name}
-            </Text>
-          </Row>
-        }
         trailing={
           <IconButton
             testID="terminal-sections"
-            icon="ArrowRight"
+            icon="Menu"
             accessibilityLabel={copy.sections.history}
             onPress={() => navigateTo("history")}
           />
@@ -108,6 +94,7 @@ export function TerminalScreen({ shop }: { readonly shop: ShopProfile }) {
           <Amount
             value={formatKeypadInput(input, numberSeparators)}
             unit={copy.czk}
+            size="xl"
           />
         </Stack>
         {failed ? <Notice tone="danger" title={copy.terminal.failed} /> : null}
