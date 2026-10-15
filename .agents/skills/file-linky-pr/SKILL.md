@@ -8,6 +8,7 @@ Understand the scope. The change should be targeted to one thing. It's ok to inc
 
 ## Test before pushing
 Run `bun run check-changed` and `bun run test-changed`.
+As the last step before you call the PR done, run the full e2e suites the `running-tests` skill names for the branch's scope.
 If the change affects what a user sees or does, run the app against local dev and try the affected flow at phone width. Use that run to gather screenshots (see below). Changes with no visible effect (packages, config, docs) don't need a local-dev run.
 
 ## Add screenshot for UI changes
