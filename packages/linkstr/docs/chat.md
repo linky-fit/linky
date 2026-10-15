@@ -69,6 +69,8 @@ Linkstr neither encrypts nor uploads. Before building an `ImageMessageDraft`, en
 
 A token message is a plain kind 14 whose content is the token; the receiver classifies it as `TokenBody`. `parseCashuToken` and `extractWholeCashuToken` (which strips a `cashu:` / `web+cashu://` prefix) validate user input before you build the draft.
 
+`token` also takes a `PaymentRequestPayloadText`, the NUT-18 payment payload JSON a payer sends to a payment request's `nostr` transport; the receiver gets it as a `TextBody`. Set `recipientRelays` to the relays of the request's nprofile: the recipient copy then goes to them as well as to your write relays, as one gift wrap, so the payee sees one message wherever it reads. The self copy stays on your write relays.
+
 ## Wire format
 
 Every send is a NIP-17 rumor delivered as two gift wraps, self and peer, published in parallel, except a token: its recipient copy goes first ([wire conventions](./concepts.md#wire-conventions)).

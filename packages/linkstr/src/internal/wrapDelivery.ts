@@ -5,6 +5,7 @@ import type {
   ClientId,
   NostrSecretKey,
   Pubkey,
+  RelayUrl,
   UnixSeconds,
 } from "../domain/primitives";
 import { RumorId } from "../domain/primitives";
@@ -87,11 +88,16 @@ export const deliverRumorToPeer = (
     readonly sentAt: UnixSeconds;
     readonly pushMarkRecipientCopy?: boolean;
     readonly order?: WrapDeliveryOrder;
+    /** Get the recipient copy too, on top of the write relays. */
+    readonly recipientRelays?: ReadonlyArray<RelayUrl> | undefined;
   },
 ): Effect.Effect<DeliveredCopies, RecipientNotReached | NoRelayReachable> =>
   Effect.gen(function* () {
     const { clientId, peer, pushMarkRecipientCopy, rumor, sentAt } = params;
     const relays = relayPolicy.writeRelays;
+    const recipientRelays = [
+      ...new Set([...relays, ...(params.recipientRelays ?? [])]),
+    ];
     const [selfWrap, recipientWrap] = yield* Effect.all([
       Effect.sync(() =>
         wrapRumorFor(rumor, identity.secretKey, identity.pubkey),
@@ -119,8 +125,12 @@ export const deliverRumorToPeer = (
     };
 
     const publishCopy = (wrap: SignedWrapEvent) =>
-      Effect.map(transport.publish(relays, wrap), (results) =>
-        toWrapDelivery(wrap.id, results),
+      Effect.map(
+        transport.publish(
+          wrap === recipientWrap ? recipientRelays : relays,
+          wrap,
+        ),
+        (results) => toWrapDelivery(wrap.id, results),
       );
     const unattempted = (wrap: SignedWrapEvent) =>
       new WrapDelivery({ wrapId: wrap.id, acceptedBy: [], rejectedBy: [] });

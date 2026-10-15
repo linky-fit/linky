@@ -4,7 +4,7 @@ How strings become keys and how keys become the `LinkstrIdentity` service. You n
 
 ## Codecs
 
-The decoders (`decodeNsec`, `decodeNpub`, `decodeNprofilePubkey`, `parsePubkey`, `identityFromNsec`) return `null` on any bad input; nothing throws. `parsePubkey` accepts `npub1…` or 64-hex in any case, so use it for user input. The encoders (`encodeNsec`, `encodeNpub`, `encodeNprofile`) and `derivePubkey` take already-branded values and cannot fail. Consumers never import `nostr-tools`: these codecs cover every key operation, the verticals cover every event, and `SignedPlainEvent` is exported for the HTTP-auth payloads that must be serialized.
+The decoders (`decodeNsec`, `decodeNpub`, `decodeNprofile`, `decodeNprofilePubkey`, `parsePubkey`, `identityFromNsec`) return `null` on any bad input; nothing throws. `decodeNprofile` returns the key with the nprofile's relay hints, keeping only valid relay urls, each once. `parsePubkey` accepts `npub1…` or 64-hex in any case, so use it for user input. The encoders (`encodeNsec`, `encodeNpub`, `encodeNprofile`) and `derivePubkey` take already-branded values and cannot fail. Consumers never import `nostr-tools`: these codecs cover every key operation, the verticals cover every event, and `SignedPlainEvent` is exported for the HTTP-auth payloads that must be serialized.
 
 ```ts
 import { encodeNpub, identityFromNsec, parsePubkey } from "@linky-fit/linkstr";

@@ -1,6 +1,8 @@
 import { getPublicKey, nip19 } from "nostr-tools";
 import { NostrSecretKey, Pubkey } from "../domain/primitives";
 import {
+  decodeNprofile,
+  decodeNprofilePubkey,
   decodeNpub,
   decodeNsec,
   deriveConversationKey,
@@ -20,6 +22,24 @@ describe("identity codec", () => {
 
     expect(encodeNsec(secretKey)).toBe(nsec);
     expect(decodeNsec(nsec)).toEqual(secretKey);
+  });
+
+  it("reads an nprofile's key and its usable relay hints", () => {
+    const nprofile = nip19.nprofileEncode({
+      pubkey,
+      relays: [
+        "wss://relay.example",
+        "https://not-a-relay",
+        "wss://relay.example",
+      ],
+    });
+
+    expect(decodeNprofile(` ${nprofile} `)).toEqual({
+      pubkey,
+      relays: ["wss://relay.example"],
+    });
+    expect(decodeNprofilePubkey(nprofile)).toBe(pubkey);
+    expect(decodeNprofile(nip19.npubEncode(pubkey))).toBeNull();
   });
 
   it("round-trips npub values against nostr-tools", () => {
