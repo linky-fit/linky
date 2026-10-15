@@ -255,8 +255,16 @@ export interface AmountProps {
   value: string;
   unit?: string | undefined;
   caption?: string | undefined;
-  size?: "md" | "lg" | undefined;
+  size?: "md" | "lg" | "xl" | undefined;
 }
+
+// Past this many characters the headline-sized value overflows a phone, so "xl" falls back to "lg".
+const XL_MAX_LENGTH = 7;
+
+const amountVariant = (value: string, size: AmountProps["size"]) => {
+  if (size === "md") return "display";
+  return size === "xl" && value.length <= XL_MAX_LENGTH ? "headline" : "amount";
+};
 
 export function Amount({ value, unit, caption, size = "lg" }: AmountProps) {
   return (
@@ -268,7 +276,7 @@ export function Amount({ value, unit, caption, size = "lg" }: AmountProps) {
         flexWrap="wrap"
       >
         <Text
-          variant={size === "lg" ? "amount" : "display"}
+          variant={amountVariant(value, size)}
           color="$colorStrong"
           textAlign="center"
           fontVariant={["tabular-nums"]}
