@@ -9,11 +9,7 @@ import {
   TopupQuote,
   TopupReceipt,
 } from "@linky-fit/linkshu";
-import {
-  AtomRegistry,
-  RegistryContext,
-  useAtomSet,
-} from "@linky-fit/linkstr-react";
+import { AtomRegistry, RegistryContext } from "@linky-fit/linkstr-react";
 import { PaymentRequestId } from "@linky-fit/linkshu/payment-request";
 import { Result } from "effect";
 import { nip19 } from "nostr-tools";
@@ -34,7 +30,7 @@ vi.mock("../../../hooks/useRouting", () => ({
 }));
 
 import { parseCashuPaymentRequestMessage } from "../../lib/paymentRequestMessage";
-import { receivedPaymentRequestIdsAtom } from "../../state/wallet/tokenActivity";
+import type { ReceivedSatByRequestId } from "../../lib/paymentRequestStatus";
 import { useTopupFlow, useTopupInvoice } from "./useTopupFlow";
 
 const MINT_URL = "https://mint.example";
@@ -110,13 +106,15 @@ const setup = async ({
     current: (kind: Route["kind"]) => void;
   } = { current: () => {} };
   const receivePaymentRef: {
-    current: (requestId: PaymentRequestId) => void;
+    current: (requestId: PaymentRequestId, sat: number) => void;
   } = { current: () => {} };
   const logPaymentEvent = vi.fn();
   const showPaidOverlay = vi.fn();
 
   const Harness = () => {
     const [currentRouteKind, setCurrentRouteKind] = React.useState(routeKind);
+    const [receivedSatByRequestId, setReceivedSatByRequestId] =
+      React.useState<ReceivedSatByRequestId>(new Map());
     const flow = useTopupFlow({
       defaultMintUrl: MINT_URL,
       formatDisplayedAmountParts: (amountSat) => ({
@@ -125,6 +123,7 @@ const setup = async ({
         unitLabel: "sat",
       }),
       logPaymentEvent,
+      receivedSatByRequestId,
       requestMintUrls: [OTHER_MINT_URL, MINT_URL],
       resumePendingCashuTopups: resumePendingCashuTopups ?? null,
       routeKind: currentRouteKind,
@@ -134,15 +133,18 @@ const setup = async ({
       topupRecipientNprofile,
     });
     const invoice = useTopupInvoice();
-    const setReceivedPaymentRequestIds = useAtomSet(
-      receivedPaymentRequestIdsAtom,
-    );
     React.useEffect(() => {
       flowRef.current = { ...flow, ...invoice };
       setRouteKindRef.current = setCurrentRouteKind;
-      receivePaymentRef.current = (requestId) =>
-        setReceivedPaymentRequestIds((ids) => new Set([...ids, requestId]));
-    }, [flow, invoice, setReceivedPaymentRequestIds]);
+      receivePaymentRef.current = (requestId, sat) =>
+        setReceivedSatByRequestId(
+          (received) =>
+            new Map([
+              ...received,
+              [requestId, (received.get(requestId) ?? 0) + sat],
+            ]),
+        );
+    }, [flow, invoice]);
     return null;
   };
 
@@ -158,9 +160,9 @@ const setup = async ({
   return {
     flow,
     logPaymentEvent,
-    receivePayment: async (requestId: PaymentRequestId) => {
+    receivePayment: async (requestId: PaymentRequestId, sat: number) => {
       await act(async () => {
-        receivePaymentRef.current(requestId);
+        receivePaymentRef.current(requestId, sat);
       });
     },
     setRouteKind: async (kind: Route["kind"]) => {
@@ -274,15 +276,18 @@ describe("useTopupFlow", () => {
     await harness.unmount();
   });
 
-  it("closes the topup once a payment naming its request id was received", async () => {
+  it("closes the topup once payments naming its request id brought in its amount", async () => {
     const quote = topupQuote();
     const { harness, requestId } = await startWithCashuRequest(quote);
     vi.useFakeTimers();
 
-    await harness.receivePayment(PaymentRequestId.make("someone-else"));
+    await harness.receivePayment(PaymentRequestId.make("someone-else"), 21);
     expect(harness.flow().topupInvoice).toBe(INVOICE);
 
-    await harness.receivePayment(requestId);
+    await harness.receivePayment(requestId, 20);
+    expect(harness.flow().topupInvoice).toBe(INVOICE);
+
+    await harness.receivePayment(requestId, 1);
     expect(harness.flow().topupInvoice).toBeNull();
     expect(harness.flow().topupAmount).toBe("");
     // The receive already logged and celebrated the payment.

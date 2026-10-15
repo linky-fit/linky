@@ -35,7 +35,10 @@ import {
   topupInvoiceQrPayloadAtom,
   topupNoteAtom,
 } from "../../state/wallet/topup";
-import { receivedPaymentRequestIdsAtom } from "../../state/wallet/tokenActivity";
+import {
+  isRequestPaidInFull,
+  type ReceivedSatByRequestId,
+} from "../../lib/paymentRequestStatus";
 
 const describeTopupError = (error: TopupError): string =>
   describeTaggedCashuError(error) ?? error._tag;
@@ -44,6 +47,7 @@ interface UseTopupFlowParams {
   defaultMintUrl: string | null;
   formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
   logPaymentEvent: (event: LoggedPaymentEventParams) => void;
+  receivedSatByRequestId: ReceivedSatByRequestId;
   /** The user's mints the QR's cashu request offers after the topup's own. */
   requestMintUrls: readonly string[];
   /** Null until the linkshu runtime is composed (seed + owners resolved). */
@@ -68,6 +72,7 @@ export const useTopupFlow = ({
   defaultMintUrl,
   formatDisplayedAmountParts,
   logPaymentEvent,
+  receivedSatByRequestId,
   requestMintUrls,
   resumePendingCashuTopups,
   routeKind,
@@ -387,13 +392,20 @@ export const useTopupFlow = ({
     setTopupNote,
   ]);
 
-  // The QR's cashu request is paid by a payload naming its request id; the
-  // receive already celebrated it, and the unpaid quote is retired later by
-  // linkshu on the mint's own answer.
-  const receivedPaymentRequestIds = useAtomValue(receivedPaymentRequestIdsAtom);
+  // The QR's cashu request is paid once payloads naming its request id
+  // brought in its amount; the receive already celebrated it, and the unpaid
+  // quote is retired later by linkshu on the mint's own answer.
   React.useEffect(() => {
     if (activeTopup === null) return;
-    if (!receivedPaymentRequestIds.has(activeTopup.requestId)) return;
+    if (
+      !isRequestPaidInFull(
+        receivedSatByRequestId,
+        activeTopup.requestId,
+        activeTopup.amountSat,
+      )
+    ) {
+      return;
+    }
     reportAppLog({
       tag: "topup.paidByCashuRequest",
       summary: "A cashu payment of the topup QR's request arrived",
@@ -404,7 +416,7 @@ export const useTopupFlow = ({
       payload: null,
     });
     closeActiveTopup(activeTopup.quote);
-  }, [activeTopup, closeActiveTopup, receivedPaymentRequestIds]);
+  }, [activeTopup, closeActiveTopup, receivedSatByRequestId]);
 
   /**
    * Starts a topup that never touches the invoice-page state — for flows

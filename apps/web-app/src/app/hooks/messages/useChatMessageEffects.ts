@@ -7,13 +7,12 @@ import {
   markCashuAutoAcceptResolved,
 } from "../../lib/autoAcceptedCashuMessages";
 import { decodeBankPaymentOffer } from "@linky-fit/proxy-payment";
-import { useAtomSet, useAtomValue } from "@linky-fit/linkstr-react";
+import { useAtomValue } from "@linky-fit/linkstr-react";
 import type { PaymentRequestId } from "@linky-fit/linkshu/payment-request";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
 import { paymentRequestIdOfPayment } from "../../lib/paymentRequestMessage";
 import { requestIdFulfilledBy } from "../../lib/paymentRequestStatus";
 import { messagesByContactAtom } from "../../state/messages/readModel";
-import { receivedPaymentRequestIdsAtom } from "../../state/wallet/tokenActivity";
 import { parsePrivateImageMessage } from "../../lib/privateImageMessage";
 import type { ContactRowLike, LocalNostrMessage } from "../../types/appTypes";
 import type { SaveCashuFromTextOptions } from "../cashu/useSaveCashuFromText";
@@ -89,9 +88,6 @@ export const useChatMessageEffects = <TContact extends ContactRowLike>({
   selectedContact,
 }: UseChatMessageEffectsParams<TContact>) => {
   const { messagesByContactId } = useAtomValue(messagesByContactAtom);
-  const setReceivedPaymentRequestIds = useAtomSet(
-    receivedPaymentRequestIdsAtom,
-  );
 
   const autoAcceptCashuTokenFromMessages = React.useCallback(
     (messages: readonly LocalNostrMessage[], newestFirst: boolean): void => {
@@ -119,13 +115,15 @@ export const useChatMessageEffects = <TContact extends ContactRowLike>({
         if (isCashuTokenStored(info.tokenRaw)) continue;
 
         const contactId = message.contactId.trim();
-        const paidRequestId = paymentRequestIdOfPayment(content);
-        const requestId = requestIdFulfilledBy(
-          message,
-          messagesByContactId.get(contactId) ?? [],
-        );
-        if (paidRequestId) {
-          reportPaymentRequestLink(message, paidRequestId, requestId !== null);
+        // Recorded even when unlinked: the topup QR's request is no chat message.
+        const requestId = paymentRequestIdOfPayment(content);
+        if (requestId) {
+          const conversation = messagesByContactId.get(contactId) ?? [];
+          reportPaymentRequestLink(
+            message,
+            requestId,
+            requestIdFulfilledBy(message, conversation) !== null,
+          );
         }
         void saveCashuFromText(info.tokenRaw, {
           automatic: true,
@@ -134,14 +132,6 @@ export const useChatMessageEffects = <TContact extends ContactRowLike>({
           onResolved: (resolution) => {
             if (resolution === "terminal") markCashuAutoAcceptResolved(message);
           },
-          ...(paidRequestId
-            ? {
-                onReceived: () =>
-                  setReceivedPaymentRequestIds(
-                    (ids) => new Set([...ids, paidRequestId]),
-                  ),
-              }
-            : {}),
         });
         return;
       }
@@ -153,7 +143,6 @@ export const useChatMessageEffects = <TContact extends ContactRowLike>({
       isCashuTokenStored,
       messagesByContactId,
       saveCashuFromText,
-      setReceivedPaymentRequestIds,
     ],
   );
 

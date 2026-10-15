@@ -13,7 +13,9 @@ import {
 } from "./paymentRequestMessage";
 import {
   paymentRequestAnswersByRumorId,
+  receivedSatByRequestId,
   requestIdFulfilledBy,
+  type ReceivedSatByRequestId,
 } from "./paymentRequestStatus";
 
 const REQUEST_ID = PaymentRequestId.make("request-1");
@@ -23,11 +25,21 @@ const NPROFILE = nip19.nprofileEncode({
   relays: [],
 });
 
-const request = (requestId: PaymentRequestId | null): string =>
-  requestId === null
-    ? `creqA${encodeBase64Url(encode({ a: 21, u: "sat", m: [] }))}`
+const request = (
+  requestId: PaymentRequestId | null,
+  amount: number | null = 21,
+): string =>
+  requestId === null || amount === null
+    ? `creqA${encodeBase64Url(
+        encode({
+          ...(amount === null ? {} : { a: amount }),
+          ...(requestId === null ? {} : { i: requestId }),
+          u: "sat",
+          m: [],
+        }),
+      )}`
     : buildCashuPaymentRequestMessage({
-        amount: 21,
+        amount,
         mintUrls: [],
         recipientNprofile: NPROFILE,
         requestId,
@@ -70,8 +82,10 @@ const row = (
   replyToId: string | null = null,
 ): Row => ({ content, createdAtSec, direction, replyToId, rumorId });
 
-const statusOf = (rows: Row[]) =>
-  paymentRequestAnswersByRumorId(rows).get("req") ?? "requested";
+const receivedInFull: ReceivedSatByRequestId = new Map([[REQUEST_ID, 21]]);
+
+const statusOf = (rows: Row[], received = receivedInFull) =>
+  paymentRequestAnswersByRumorId(rows, received).get("req") ?? "requested";
 
 describe("paymentRequestAnswersByRumorId", () => {
   it.each([
@@ -90,6 +104,46 @@ describe("paymentRequestAnswersByRumorId", () => {
       ).toBe(status);
     },
   );
+
+  describe("a request I sent, answered by a payload naming its id", () => {
+    const answeredWith = (
+      received: ReceivedSatByRequestId,
+      amount: number | null = 21,
+    ) =>
+      statusOf(
+        [
+          row("req", "out", request(REQUEST_ID, amount), 1),
+          row("pay", "in", payload(REQUEST_ID), 2),
+        ],
+        received,
+      );
+
+    it.each([
+      ["nothing reached the wallet", new Map(), "requested"],
+      [
+        "less than asked reached the wallet",
+        new Map([[REQUEST_ID, 20]]),
+        "requested",
+      ],
+      [
+        "the asked amount reached the wallet",
+        new Map([[REQUEST_ID, 21]]),
+        "paid",
+      ],
+      [
+        "only another request's payment reached the wallet",
+        new Map([[PaymentRequestId.make("other"), 21]]),
+        "requested",
+      ],
+    ] as const)("when %s it is %s", (_, received, status) => {
+      expect(answeredWith(received)).toBe(status);
+    });
+
+    it("without an amount is paid by any amount that reached the wallet", () => {
+      expect(answeredWith(new Map(), null)).toBe("requested");
+      expect(answeredWith(new Map([[REQUEST_ID, 1]]), null)).toBe("paid");
+    });
+  });
 
   it("ignores an incoming payload naming another request id, even as a reply", () => {
     expect(
@@ -201,5 +255,52 @@ describe("requestIdFulfilledBy", () => {
         { content: request(PaymentRequestId.make("other")), direction: "out" },
       ]),
     ).toBeNull();
+  });
+});
+
+type ReceiveRecord = Parameters<typeof receivedSatByRequestId>[0][number];
+
+describe("receivedSatByRequestId", () => {
+  const detailsJson = (requestId: string | null) =>
+    requestId === null ? null : JSON.stringify({ requestId });
+  const receive = (
+    requestId: string | null,
+    amount: number | null,
+    overrides: Partial<ReceiveRecord> = {},
+  ): ReceiveRecord => ({
+    amount,
+    detailsJson: detailsJson(requestId),
+    direction: "in",
+    method: "cashu_receive",
+    status: "ok",
+    unit: "sat",
+    ...overrides,
+  });
+
+  it("sums the sats received for each request id", () => {
+    expect(
+      receivedSatByRequestId([
+        receive("request-1", 10),
+        receive("request-1", 11),
+        receive("request-2", 5),
+        receive(null, 50),
+      ]),
+    ).toEqual(
+      new Map([
+        [REQUEST_ID, 21],
+        [PaymentRequestId.make("request-2"), 5],
+      ]),
+    );
+  });
+
+  it.each([
+    ["a failed receive", { status: "error" as const }],
+    ["my own payment of the request", { direction: "out" as const }],
+    ["the row recording the request itself", { method: "cashu_chat" }],
+    ["a receive in another unit", { unit: "usd" }],
+  ])("leaves out %s", (_, overrides) => {
+    expect(
+      receivedSatByRequestId([receive("request-1", 21, overrides)]),
+    ).toEqual(new Map());
   });
 });
