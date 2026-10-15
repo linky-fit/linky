@@ -163,27 +163,32 @@ describe("useSaveCashuFromText", () => {
     );
   });
 
-  it("reports onReceived only when this attempt put proofs into the wallet", async () => {
+  it("records the request id a payload named with the amount that reached the wallet", async () => {
     const transfer = receiveTransfer("pending");
-    const { save } = await setup(async () =>
+    const { save, logPaymentEvent } = await setup(async () =>
       Result.succeed(
         new ReceiveReceipt({
           operationId: transfer.id,
           tokenText: transfer.tokenText,
           mint: transfer.mint,
           unit: transfer.unit,
-          amount: transfer.amount,
+          amount: Amount.make(20),
         }),
       ),
     );
-    const onReceived = vi.fn();
-    await save(transfer.tokenText, { onReceived });
-    expect(onReceived).toHaveBeenCalledOnce();
 
-    const spent = await setup(alreadySpent);
-    const notReceived = vi.fn();
-    await spent.save("cashuBspenttoken", { onReceived: notReceived });
-    expect(notReceived).not.toHaveBeenCalled();
+    await save(transfer.tokenText, { requestId: "request-1" });
+
+    expect(logPaymentEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 20,
+        details: expect.objectContaining({ requestId: "request-1" }),
+        direction: "in",
+        method: "cashu_receive",
+        status: "ok",
+        unit: transfer.unit,
+      }),
+    );
   });
 
   it("reports a finished receive as already saved without receiving again", async () => {

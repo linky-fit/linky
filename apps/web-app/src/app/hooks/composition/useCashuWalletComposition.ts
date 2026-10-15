@@ -26,6 +26,7 @@ import { receiveTokenDraftAtom } from "../../state/wallet/tokenActivity";
 import { useDefaultMint } from "../wallet/useDefaultMint";
 import { useNpubCash } from "../wallet/useNpubCash";
 import { useLnurlWithdraw } from "../wallet/useLnurlWithdraw";
+import { useReceivedSatByRequestId } from "../wallet/useReceivedSatByRequestId";
 import { useRecurringPayments } from "../wallet/useRecurringPayments";
 import { useTransferCleanup } from "../wallet/useTransferCleanup";
 import { useWalletOps } from "../wallet/useWalletOps";
@@ -218,6 +219,7 @@ export const useCashuWalletComposition = ({
 
   const { cashuBalance } = useWalletBalance();
   const requestMintUrls = useRequestMintUrls();
+  const receivedSatByRequestId = useReceivedSatByRequestId();
 
   const { meltToDefaultMint } = useMoveMintFunds();
 
@@ -225,6 +227,7 @@ export const useCashuWalletComposition = ({
     defaultMintUrl,
     formatDisplayedAmountParts,
     logPaymentEvent,
+    receivedSatByRequestId,
     requestMintUrls,
     resumePendingCashuTopups,
     routeKind: route.kind,

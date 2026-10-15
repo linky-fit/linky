@@ -1,4 +1,5 @@
 import { useMintIcons } from "../app/hooks/mint/useMintInfo";
+import { useReceivedSatByRequestId } from "../app/hooks/wallet/useReceivedSatByRequestId";
 import { useWalletCommands } from "../app/hooks/wallet/useWalletCommands";
 import {
   Avatar,
@@ -94,6 +95,7 @@ import {
 import {
   paymentRequestAnswersByRumorId,
   type PaymentRequestStatus,
+  type ReceivedSatByRequestId,
 } from "../app/lib/paymentRequestStatus";
 import { parsePrivateImageMessage } from "../app/lib/privateImageMessage";
 import {
@@ -179,6 +181,7 @@ interface ChatPageProps {
   ) => void;
   payWithCashuEnabled: boolean;
   reactionsByMessageId: ReadonlyMap<string, LocalNostrReaction[]>;
+  receivedSatByRequestId: ReceivedSatByRequestId;
   replyContext: ReplyContext | null;
   selectedContact: Contact | null;
   sendChatImage: (
@@ -393,6 +396,7 @@ interface ChatMessageListProps {
   peerSeenSinceSec: number;
   peerSeenUpToSec: number;
   reactionsByMessageId: ReadonlyMap<string, LocalNostrReaction[]>;
+  receivedSatByRequestId: ReceivedSatByRequestId;
   selectedContactId: string;
   t: Translate;
 }
@@ -466,6 +470,7 @@ const ChatMessageList = memo(function ChatMessageList({
   peerSeenSinceSec,
   peerSeenUpToSec,
   reactionsByMessageId,
+  receivedSatByRequestId,
   selectedContactId,
   t,
 }: ChatMessageListProps) {
@@ -527,7 +532,10 @@ const ChatMessageList = memo(function ChatMessageList({
       if (rumorId) byRumorId.set(rumorId, message);
     }
 
-    const requestAnswerByRumorId = paymentRequestAnswersByRumorId(chatMessages);
+    const requestAnswerByRumorId = paymentRequestAnswersByRumorId(
+      chatMessages,
+      receivedSatByRequestId,
+    );
 
     const offersById = buildBankPaymentOfferIndex(bankPaymentOfferMessages);
 
@@ -632,6 +640,7 @@ const ChatMessageList = memo(function ChatMessageList({
     peerSeenSinceSec,
     peerSeenUpToSec,
     reactionsByMessageId,
+    receivedSatByRequestId,
     selectedContactId,
     t,
   ]);
@@ -1318,6 +1327,7 @@ export const ChatPage: FC<ChatPageProps> = ({
   openContactPay,
   payWithCashuEnabled,
   reactionsByMessageId,
+  receivedSatByRequestId,
   replyContext,
   selectedContact,
   sendChatImage,
@@ -1450,6 +1460,7 @@ export const ChatPage: FC<ChatPageProps> = ({
         peerSeenSinceSec={selectedContact.chatPeerSeenSinceSec ?? 0}
         peerSeenUpToSec={selectedContact.chatPeerSeenAtSec ?? 0}
         reactionsByMessageId={reactionsByMessageId}
+        receivedSatByRequestId={receivedSatByRequestId}
         selectedContactId={selectedContact.id}
         t={t}
       />
@@ -1516,6 +1527,7 @@ export const ChatRoute: FC<{ route: Route }> = ({ route }) => {
   const mentionContacts = useMentionContacts();
   const onOpenNpubContact = useOpenNpubMessageContact();
   const openContactPay = useOpenContactPay();
+  const receivedSatByRequestId = useReceivedSatByRequestId();
   return (
     <ChatPage
       addChatAttachments={composer.addChatAttachments}
@@ -1556,6 +1568,7 @@ export const ChatRoute: FC<{ route: Route }> = ({ route }) => {
       openContactPay={openContactPay}
       payWithCashuEnabled={payWithCashuEnabled}
       reactionsByMessageId={reactionsByMessageId}
+      receivedSatByRequestId={receivedSatByRequestId}
       removeChatAttachment={composer.removeChatAttachment}
       replyContext={composer.replyContext}
       selectedContact={selectedContact}

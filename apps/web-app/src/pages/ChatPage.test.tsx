@@ -279,6 +279,7 @@ describe("ChatPage message rows", () => {
     openContactPay: vi.fn(),
     payWithCashuEnabled: false,
     reactionsByMessageId,
+    receivedSatByRequestId: new Map(),
     removeChatAttachment: vi.fn(),
     replyContext: null,
     selectedContact: { id: "contact", unknownPubkeyHex: "a".repeat(64) },
@@ -363,38 +364,49 @@ describe("ChatPage message rows", () => {
     await unmount();
   });
 
-  it("marks a request paid by a payload naming its request id", async () => {
-    vi.stubGlobal("matchMedia", () => ({ matches: false }));
-    const requestId = PaymentRequestId.make("request-1");
-    const request = {
-      ...message("request", 100),
-      direction: "out" as const,
-      content: buildCashuPaymentRequestMessage({
-        amount: 21,
-        mintUrls: [],
-        recipientNprofile: encodeNprofile(
-          derivePubkey(NostrSecretKey.make(new Uint8Array(32).fill(1))),
-          [],
-        ),
-        requestId,
-      }),
-    };
-    const payment = {
-      ...message("payment", 200),
-      content: encodePaymentRequestPayload({
-        id: requestId,
-        mint: "https://mint.example",
-        unit: "sat",
-        proofs: [{ id: "009a1f293253e41e", amount: 21, secret: "s", C: "02" }],
-      }),
-    };
-    const { unmount } = await renderIntoDocument(
-      <ChatPage {...pageProps([request, payment], new Map(), false)} />,
-    );
+  it.each([
+    [21, "paid"],
+    [20, "requested"],
+  ])(
+    "with %i sats received for a payload naming its request id marks a 21 sat request %s",
+    async (receivedSat, status) => {
+      vi.stubGlobal("matchMedia", () => ({ matches: false }));
+      const requestId = PaymentRequestId.make("request-1");
+      const request = {
+        ...message("request", 100),
+        direction: "out" as const,
+        content: buildCashuPaymentRequestMessage({
+          amount: 21,
+          mintUrls: [],
+          recipientNprofile: encodeNprofile(
+            derivePubkey(NostrSecretKey.make(new Uint8Array(32).fill(1))),
+            [],
+          ),
+          requestId,
+        }),
+      };
+      const payment = {
+        ...message("payment", 200),
+        content: encodePaymentRequestPayload({
+          id: requestId,
+          mint: "https://mint.example",
+          unit: "sat",
+          proofs: [
+            { id: "009a1f293253e41e", amount: 21, secret: "s", C: "02" },
+          ],
+        }),
+      };
+      const { unmount } = await renderIntoDocument(
+        <ChatPage
+          {...pageProps([request, payment], new Map(), false)}
+          receivedSatByRequestId={new Map([[requestId, receivedSat]])}
+        />,
+      );
 
-    expect(rows.requestStatus.get("request")).toBe("paid");
-    await unmount();
-  });
+      expect(rows.requestStatus.get("request")).toBe(status);
+      await unmount();
+    },
+  );
 
   it.each([
     [100, false],
