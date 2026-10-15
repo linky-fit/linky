@@ -21,7 +21,10 @@ import {
 } from "../internal/spend";
 import { nowSeconds } from "../internal/time";
 import { sat } from "../internal/units";
-import { inputFeeForAmount } from "../mint/internal/keysetFees";
+import {
+  feeInclusiveTotal,
+  inputFeeForAmount,
+} from "../mint/internal/keysetFees";
 import {
   boundKeysetId,
   WalletInstances,
@@ -61,7 +64,10 @@ export class Send extends Context.Service<Send>()("linkshu/Send", {
         // Whoever redeems the token pays the mint's input fee on its proofs;
         // an amount that fee consumes would issue a token nobody can redeem.
         const recipientFee = inputFeeForAmount(wallet, draft.amount);
-        if (draft.amount <= recipientFee) {
+        if (
+          draft.includeRecipientFee !== true &&
+          draft.amount <= recipientFee
+        ) {
           return yield* new AmountConsumedByFee({
             mint: draft.mint,
             amount: draft.amount,
@@ -79,10 +85,14 @@ export class Send extends Context.Service<Send>()("linkshu/Send", {
 
         const { spendable, available } =
           yield* selectSpendableProofs(spendContext);
-        if (available < draft.amount) {
+        const required =
+          draft.includeRecipientFee === true
+            ? feeInclusiveTotal(wallet, draft.amount)
+            : draft.amount;
+        if (available < required) {
           return yield* new InsufficientFunds({
             mint: draft.mint,
-            required: draft.amount,
+            required: Amount.make(required),
             available: NonNegativeAmount.make(available),
           });
         }
@@ -94,6 +104,9 @@ export class Send extends Context.Service<Send>()("linkshu/Send", {
             proofs: spendable.map(toDomainProof),
             available,
             ...(draft.lockTo === undefined ? {} : { lockSendTo: draft.lockTo }),
+            ...(draft.includeRecipientFee === true
+              ? { includeFees: true }
+              : {}),
           },
         );
         const sendEncoded = encodeCashuProofs({

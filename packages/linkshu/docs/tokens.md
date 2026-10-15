@@ -69,7 +69,7 @@ On a send, a transient failure (`MintUnreachable`, `CounterLockTimeout`) leaves 
 
 ## Token codec
 
-`extractTokenText`, `normalizeTokenText`, `parseTokenText`, `decodeTokenText`, and `encodeToken` are pure and total: malformed input yields `null`, never a throw. Supported formats are v3 (`cashuA`, base64url JSON), v4 (`cashuB`, base64url CBOR), and legacy cashu.me plain-JSON proof bundles; `encodeToken` always produces v4. `parseTokenText` gives the summary for a preview without exposing proofs; `decodeTokenText` needs the mint's keyset ids only to expand short v2 ids in v4 tokens.
+`extractTokenText`, `normalizeTokenText`, `parseTokenText`, `decodeTokenText`, `tokenProofSecrets`, and `encodeToken` are pure and total: malformed input yields `null`, never a throw. `tokenProofSecrets` gives the secrets of a token's proofs without keysets, so two texts carrying the same proofs in different encodings (v4 text and the NUT-18 payload sent for it) compare equal. Supported formats are v3 (`cashuA`, base64url JSON), v4 (`cashuB`, base64url CBOR), and legacy cashu.me plain-JSON proof bundles; `encodeToken` always produces v4. `parseTokenText` gives the summary for a preview without exposing proofs; `decodeTokenText` needs the mint's keyset ids only to expand short v2 ids in v4 tokens.
 
 ## Errors
 

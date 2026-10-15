@@ -1,3 +1,8 @@
+import {
+  encodePaymentRequestPayload,
+  type PaymentRequestPayload,
+} from "./nut18";
+
 /**
  * A NUT-18 `post` transport target must use https: the payload carries
  * bearer proofs, and any observer of a plain-http request can redeem them.
@@ -16,22 +21,6 @@ export const isAllowedPaymentRequestPostUrl = (
   if (parsed.protocol === "https:") return true;
   return parsed.protocol === "http:" && options.allowHttp;
 };
-
-/** The NUT-18 payment payload a payer sends to a request's transport. */
-export interface PaymentRequestPayload {
-  /** The `id` of the request it pays. */
-  readonly id?: string | null | undefined;
-  readonly memo?: string | null | undefined;
-  readonly mint: string;
-  readonly unit: string;
-  /** `SendReceipt.proofs`; they keep full keyset ids, which the payee needs. */
-  readonly proofs: ReadonlyArray<{
-    readonly id: string;
-    readonly amount: number;
-    readonly secret: string;
-    readonly C: string;
-  }>;
-}
 
 export interface PostPaymentRequestPayloadArgs {
   /** The `post` transport target (`PaymentRequestTransport.target`). */
@@ -67,13 +56,6 @@ export const postPaymentRequestPayload = async ({
   if (!isAllowedPaymentRequestPostUrl(url, { allowHttp })) {
     return { _tag: "InsecureUrl" };
   }
-  const body = {
-    mint: payload.mint,
-    unit: payload.unit,
-    proofs: payload.proofs,
-    ...(payload.id ? { id: payload.id } : {}),
-    ...(payload.memo ? { memo: payload.memo } : {}),
-  };
   try {
     const response = await send(new URL(url).toString(), {
       method: "POST",
@@ -84,7 +66,7 @@ export const postPaymentRequestPayload = async ({
         "Content-Type": "application/json",
       },
       mode: "cors",
-      body: JSON.stringify(body),
+      body: encodePaymentRequestPayload(payload),
     });
     return response.ok
       ? { _tag: "Delivered" }

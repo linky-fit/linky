@@ -4,6 +4,8 @@ import {
   getEncodedToken,
   getTokenMetadata,
 } from "@cashu/cashu-ts";
+import { base64urlnopad } from "@scure/base";
+import { decode as decodeCbor } from "cbor-x";
 import { Schema } from "effect";
 import {
   Amount,
@@ -28,6 +30,15 @@ import {
  */
 
 const V3_PREFIX = "cashuA";
+const V4_PREFIX = "cashuB";
+
+const isV4Proofs = Schema.is(
+  Schema.Struct({
+    t: Schema.Array(
+      Schema.Struct({ p: Schema.Array(Schema.Struct({ s: Schema.String })) }),
+    ),
+  }),
+);
 
 /** Normalizes any supported encoding (including legacy JSON) to token text. */
 export const normalizeTokenText = (raw: string): TokenText | null => {
@@ -110,6 +121,31 @@ export const decodeTokenText = (
     return decodeV3Payload(text.slice(V3_PREFIX.length));
   }
   return decodeViaCashuTs(text, keysetIds);
+};
+
+/**
+ * The secrets of a token's proofs, which name them whatever the encoding:
+ * the same proofs as v3, v4 or a NUT-18 payment payload give the same set.
+ * Needs no keysets; `null` for anything that is not a token.
+ */
+export const tokenProofSecrets = (raw: string): ReadonlySet<string> | null => {
+  const text = normalizeTokenText(raw);
+  if (text === null) return null;
+  if (text.startsWith(V3_PREFIX)) {
+    const token = decodeV3Payload(text.slice(V3_PREFIX.length));
+    return token && new Set(token.proofs.map((proof) => proof.secret));
+  }
+  if (!text.startsWith(V4_PREFIX)) return null;
+  try {
+    const decoded: unknown = decodeCbor(
+      base64urlnopad.decode(text.slice(V4_PREFIX.length).replace(/=+$/, "")),
+    );
+    if (!isV4Proofs(decoded)) return null;
+    const secrets = decoded.t.flatMap((entry) => entry.p.map((p) => p.s));
+    return secrets.length === 0 ? null : new Set(secrets);
+  } catch {
+    return null;
+  }
 };
 
 /** Canonical v4 encoding; roundtrips with `decodeTokenText` by construction. */

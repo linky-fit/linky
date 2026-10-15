@@ -136,6 +136,22 @@ describe("pickBip321PayableLeg", () => {
     });
   });
 
+  it("prefers BOLT11 over a Cashu request the wallet cannot pay from its mints", () => {
+    const parsed = parseBip321Uri(
+      "bitcoin:?lightning=lnbc1abc&creq=creqAabc123",
+    );
+    expect(
+      pickBip321PayableLeg(parsed!, { canPayCashuRequest: () => false }),
+    ).toEqual({ kind: "lightning", value: "lnbc1abc" });
+  });
+
+  it("falls back to a Cashu request it cannot pay from its mints when no other leg is payable", () => {
+    const parsed = parseBip321Uri("bitcoin:bc1qabc?creq=creqAabc123");
+    expect(
+      pickBip321PayableLeg(parsed!, { canPayCashuRequest: () => false }),
+    ).toEqual({ kind: "cashu-request", value: "creqAabc123" });
+  });
+
   it("prefers BOLT11 over LNURL", () => {
     const parsed = parseBip321Uri(
       "bitcoin:bc1qabc?lightning=lnbc1abc&lnurl=LNURL1xyz",

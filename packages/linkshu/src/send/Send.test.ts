@@ -90,6 +90,7 @@ interface SendCall {
   readonly secrets: ReadonlyArray<string>;
   readonly sendCounter: number;
   readonly keepCounter: number;
+  readonly includeFees?: true;
 }
 
 const makeWallet = (args: FakeWalletArgs) => {
@@ -108,7 +109,7 @@ const makeWallet = (args: FakeWalletArgs) => {
               witness: null,
             })),
           ),
-    send: (amount, proofs, _config, outputConfig) => {
+    send: (amount, proofs, config, outputConfig) => {
       const call: SendCall = {
         amount: typeof amount === "number" ? amount : -1,
         secrets: proofs.map((entry) => entry.secret),
@@ -120,6 +121,7 @@ const makeWallet = (args: FakeWalletArgs) => {
           outputConfig?.keep?.type === "deterministic"
             ? outputConfig.keep.counter
             : -1,
+        ...(config?.includeFees === true ? { includeFees: true } : {}),
       };
       sendCalls.push(call);
       return args.send
@@ -534,6 +536,53 @@ describe("Send.send", () => {
       _tag: "AmountConsumedByFee",
       amount: 3,
       fee: 3,
+    });
+    expect(sendCalls).toEqual([]);
+  });
+
+  it("adds the recipient's redemption fee when asked, so the recipient nets the amount", async () => {
+    // At 100 ppk a 1-sat token costs its recipient 1 sat; the swap pays it on top.
+    const { wallet, sendCalls } = makeWallet({
+      keysets: [feeKeyset(100)],
+      send: () => Promise.reject(new Error("mint down")),
+    });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(
+      sendAndInspect(
+        new SendDraft({
+          mint,
+          amount: SendAmount.make(1),
+          produceAs: "pending",
+          includeRecipientFee: true,
+        }),
+      ),
+    );
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure._tag).toBe("MintRejected");
+    expect(sendCalls).toMatchObject([{ amount: 1, includeFees: true }]);
+  });
+
+  it("refuses a fee-inclusive send the balance cannot cover, before any mint call", async () => {
+    const { wallet, sendCalls } = makeWallet({ keysets: [feeKeyset(1000)] });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(
+      sendAndInspect(
+        new SendDraft({
+          mint,
+          amount: SendAmount.make(14),
+          produceAs: "pending",
+          includeRecipientFee: true,
+        }),
+      ),
+    );
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure).toMatchObject({
+      _tag: "InsufficientFunds",
+      available: 14,
     });
     expect(sendCalls).toEqual([]);
   });
