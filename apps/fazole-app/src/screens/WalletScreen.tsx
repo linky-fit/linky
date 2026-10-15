@@ -5,6 +5,7 @@ import {
   EmptyState,
   ListRow,
   Pill,
+  Pressable,
   Section,
   Spinner,
   Text,
@@ -13,7 +14,12 @@ import {
 import { useState } from "react";
 import { copy } from "../copy";
 import { satsToCzk, type WalletActivity } from "../domain";
-import { formatCzkValue, formatDateTime, formatWhole } from "../format";
+import {
+  formatCzk,
+  formatCzkValue,
+  formatDateTime,
+  formatWhole,
+} from "../format";
 import {
   useCzkRate,
   useWalletActivity,
@@ -30,6 +36,26 @@ export function WalletScreen() {
   const [withdrawing, setWithdrawing] = useState(false);
   const total = balances?.total ?? 0;
   const czkPerBtc = rate.status === "ready" ? rate.czkPerBtc : null;
+  // Starts in CZK on every visit, so a merchant never lands on sats unexpectedly.
+  const [showSats, setShowSats] = useState(false);
+  const czk = showSats ? null : czkPerBtc;
+  const formatSats = (sats: number) =>
+    czk === null
+      ? copy.satAmount(formatWhole(sats))
+      : formatCzk(satsToCzk(sats, czk));
+  const balance = (
+    <Amount
+      value={
+        czk === null
+          ? formatWhole(total)
+          : formatCzkValue(satsToCzk(total, czk))
+      }
+      unit={czk === null ? copy.sat : copy.czk}
+      caption={
+        rate.status === "failed" ? copy.wallet.rateUnavailable : undefined
+      }
+    />
+  );
 
   return (
     <Page title={copy.sections.wallet} testID="wallet-screen">
@@ -37,17 +63,18 @@ export function WalletScreen() {
         <Text variant="label" color="$colorMuted">
           {copy.wallet.balance}
         </Text>
-        <Amount
-          value={formatWhole(total)}
-          unit={copy.sat}
-          caption={
-            czkPerBtc !== null
-              ? copy.approxCzk(formatCzkValue(satsToCzk(total, czkPerBtc)))
-              : rate.status === "failed"
-                ? copy.wallet.rateUnavailable
-                : undefined
-          }
-        />
+        {czkPerBtc === null ? (
+          balance
+        ) : (
+          <Pressable
+            testID="wallet-balance"
+            tooltip={copy.wallet.switchUnit}
+            alignSelf="center"
+            onPress={() => setShowSats((current) => !current)}
+          >
+            {balance}
+          </Pressable>
+        )}
       </Card>
       <Button
         testID="wallet-withdraw"
@@ -68,7 +95,7 @@ export function WalletScreen() {
         ) : (
           <Card paddingVertical="$sm" gap="$none">
             {activity.map((item) => (
-              <ActivityRow key={item.id} item={item} />
+              <ActivityRow key={item.id} item={item} formatSats={formatSats} />
             ))}
           </Card>
         )}
@@ -117,10 +144,16 @@ const activityIcon = (item: WalletActivity): IconName => {
   }
 };
 
-function ActivityRow({ item }: { readonly item: WalletActivity }) {
+function ActivityRow({
+  item,
+  formatSats,
+}: {
+  readonly item: WalletActivity;
+  readonly formatSats: (sats: number) => string;
+}) {
   const row = copy.wallet.row(formatDateTime(item.atSec), activityLabel(item));
   const status = item.kind === "withdrawal" ? item.withdrawal.status : "done";
-  const sats = formatWhole(
+  const amount = formatSats(
     item.kind === "withdrawal" && status === "failed"
       ? item.withdrawal.amountSats
       : item.sats,
@@ -131,12 +164,12 @@ function ActivityRow({ item }: { readonly item: WalletActivity }) {
       icon={activityIcon(item)}
       title={
         item.kind === "withdrawal"
-          ? copy.wallet.out(sats)
-          : copy.wallet.in(sats)
+          ? copy.wallet.out(amount)
+          : copy.wallet.in(amount)
       }
       description={
         item.feeSats > 0
-          ? copy.wallet.rowFee(row, formatWhole(item.feeSats))
+          ? copy.wallet.rowFee(row, formatSats(item.feeSats))
           : row
       }
       trailing={
