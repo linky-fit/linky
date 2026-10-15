@@ -72,7 +72,6 @@ interface UseCashuWalletCompositionParams {
     | "nostrMessagesLocal"
     | "nostrMessagesRecent"
     | "nostrPictureByNpub"
-    | "pendingPaymentsKey"
     | "respondToBankPaymentOfferWithGroupState"
     | "selectedChatContact"
     | "selectedContact"
@@ -264,7 +263,6 @@ export const useCashuWalletComposition = ({
     cashuBalance,
     contactsMessaging,
     currentNpub,
-    currentNsec,
     dismissPaymentSending,
     formatDisplayedAmountParts,
     lightningInvoiceAutoPayLimit,

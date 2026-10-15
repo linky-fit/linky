@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 import { createId, type ContactId } from "@linky-fit/linksync";
-import { Pubkey } from "@linky-fit/linkstr";
 import { Effect, Exit } from "effect";
 import { AtomRegistry } from "effect/reactivity";
 import { describe, expect, it, vi } from "vitest";
@@ -9,14 +8,13 @@ import {
   signedInSession,
 } from "../../../testUtils/appRegistry";
 import { makeTestLinkyStore } from "../../../testUtils/linkyStore";
-import { readPendingPayments } from "../../lib/pendingPayments";
 import type { NewLocalNostrMessage } from "../../types/appTypes";
 import {
   appOwnerIdAtom,
   conversationsRepositoryAtom,
   SessionSignedOut,
 } from "../session/store";
-import { chatWritesAtom, pendingPaymentsKeyFor } from "./chatWrites";
+import { chatWritesAtom } from "./chatWrites";
 
 vi.mock("@evolu/common", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@evolu/common")>()),
@@ -27,8 +25,6 @@ vi.mock("@linky-fit/linksync/evolu", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@linky-fit/linksync/evolu")>()),
   openLinkyStore,
 }));
-
-const PEER = Pubkey.make("a1".repeat(32));
 
 const result = <A, E>(
   registry: AtomRegistry.AtomRegistry,
@@ -96,28 +92,5 @@ describe("chatWritesAtom", () => {
     expect(updated).toEqual({ ok: true });
     const [row] = await Effect.runPromise(conversations.messages.all);
     expect(row?.status).toBe("sent");
-  });
-
-  it("queues an offline payment under the owner's key", async () => {
-    const { appOwnerId, writes } = await boot();
-    const contactId = createId<"Contact">();
-
-    writes.enqueuePendingPayment({
-      amountSat: 21.7,
-      contactId,
-      recipientPubkey: PEER,
-      messageId: "message-1",
-    });
-
-    const key = pendingPaymentsKeyFor(appOwnerId);
-    expect(key).not.toBeNull();
-    expect(readPendingPayments(key ?? "")).toEqual([
-      expect.objectContaining({
-        amountSat: 21,
-        contactId,
-        messageId: "message-1",
-        recipientPubkey: PEER,
-      }),
-    ]);
   });
 });

@@ -134,6 +134,7 @@ describe("useLightningPayments", () => {
   it.each<[PayInvoiceOutcome, string | null, boolean]>([
     [{ _tag: "Pending", pending }, "payPending", true],
     [{ _tag: "Failed", detail: "boom" }, "payFailed: boom", false],
+    [{ _tag: "NetworkError" }, "payNetworkError", false],
     [{ _tag: "Busy" }, null, false],
   ])("maps %o to its status", async (invoice, status, paid) => {
     commandsAnswering({ invoice });

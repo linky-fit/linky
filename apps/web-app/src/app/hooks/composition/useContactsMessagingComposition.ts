@@ -22,6 +22,7 @@ import { useDeferredOnlineReady } from "../../../hooks/useDeferredOnlineReady";
 import { useDocumentVisible } from "../../../hooks/useDocumentVisible";
 import { useLatest } from "../../../hooks/useLatest";
 import { useOnline } from "../../../hooks/useOnline";
+import { useOfflinePaymentQueueDrain } from "../../migrations/useOfflinePaymentQueueDrain";
 import { navigateTo, useRouting } from "../../../hooks/useRouting";
 import {
   isStatusFilterValue,
@@ -280,7 +281,6 @@ export const useContactsMessagingComposition = ({
     knownReactionKeysRef,
     markLocalNostrMessageDeleted,
     nostrReactionsLocal,
-    pendingPaymentsKey,
     softDeleteLocalNostrReactionsByWrapIds,
     storeRetractedReaction,
     updateLocalNostrMessage,
@@ -293,6 +293,13 @@ export const useContactsMessagingComposition = ({
     hydrated: accountHydrated,
     route,
     unknownSenders: unknownSendersRepository,
+  });
+  // removal gate in app/migrations/AGENTS.md
+  useOfflinePaymentQueueDrain({
+    appOwnerId,
+    failedNotice: `${t("payFailed")}: ${t("payNetworkError")}`,
+    hydrated: accountHydrated,
+    updateLocalNostrMessage,
   });
 
   // Passive Nostr work waits for hydration, with no timeout, and for the
@@ -728,7 +735,6 @@ export const useContactsMessagingComposition = ({
     nostrPictureByNpub,
     nostrStatusByNpub,
     openNewContactPage,
-    pendingPaymentsKey,
     respondToBankPaymentOfferWithGroupState,
     saveNpubContact,
     selectedChatContact,

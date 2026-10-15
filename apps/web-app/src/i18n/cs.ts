@@ -1214,7 +1214,7 @@ export const cs = {
   payInvalidAmount: "Neplatná částka",
   payInsufficient: "Nemáte dostatek Cashu tokenů.",
   lightningInvoiceConfirmUnknownAmount: "Neznámá částka",
-  payQueuedMessage: "Platba čeká: {amount} {unit} → {name}.",
+  payNetworkError: "Platbu nelze odeslat kvůli chybě sítě.",
   payApprovalChanged:
     "Schválení platby již není platné. Zkontrolujte příjemce a zaplaťte znovu.",
   payFailed: "Platba se nepovedla",

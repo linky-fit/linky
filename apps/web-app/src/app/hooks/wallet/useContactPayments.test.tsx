@@ -11,7 +11,6 @@ import {
 import { act, useEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
-import { NO_WRITE } from "../../lib/storeWrite";
 import type {
   PayContactOutcome,
   PaymentsCommands,
@@ -27,7 +26,6 @@ vi.mock("./paymentUi", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./paymentUi")>()),
   usePaymentsCommands: () => commandsRef.current,
 }));
-vi.mock("../usePaymentsDomain", () => ({ usePaymentsDomain: () => {} }));
 
 const CONTACT_ID = createIdFromString<"Contact">("contact");
 const contact = { id: CONTACT_ID, name: "Alice", npub: "npub1alice" };
@@ -81,8 +79,6 @@ const render = async () => {
       cashuBalance: 1_000,
       contactPayMethod: "cashu",
       contacts: [contact],
-      currentNpub: "npub1me",
-      currentNsec: "nsec1me",
       formatDisplayedAmountParts: (amount) => ({
         approxPrefix: "",
         amountText: String(amount),
@@ -91,13 +87,11 @@ const render = async () => {
       getBankPaymentOfferForSettlement: () => null,
       isBankPaymentOfferCanceled: () => false,
       payAmount: "600",
-      pendingPaymentsKey: null,
       respondToBankPaymentOfferWithGroupState: async () => true,
       route: { kind: "wallet" },
       selectedContact: null,
       setLnAddressPay: () => {},
       t: (key) => key,
-      updateLocalNostrMessage: () => NO_WRITE,
       walletOpRunning: false,
     });
     useEffect(() => {
@@ -106,13 +100,9 @@ const render = async () => {
     return null;
   };
   const view = await renderIntoDocument(<Probe />);
-  const pay = (args: { fromQueue?: boolean } = {}) =>
+  const pay = () =>
     act(() =>
-      hook.current?.payContactWithCashuMessage({
-        amountSat: 600,
-        contact,
-        ...args,
-      }),
+      hook.current?.payContactWithCashuMessage({ amountSat: 600, contact }),
     );
   return { ...ui, pay, view };
 };
@@ -133,10 +123,8 @@ describe("useContactPayments", () => {
     });
     const ui = await render();
 
-    expect(await ui.pay()).toEqual({ ok: true, queued: false });
-    expect(payContact.mock.calls[0]?.[0].offlineNotice).toBe(
-      "payQueuedMessage",
-    );
+    expect(await ui.pay()).toBe(true);
+    expect(payContact).toHaveBeenCalledOnce();
     expect(ui.showPaymentSending).toHaveBeenCalledWith(
       expect.objectContaining({ amountSat: 600, direction: "out" }),
     );
@@ -159,7 +147,7 @@ describe("useContactPayments", () => {
     });
     const ui = await render();
 
-    expect(await ui.pay()).toEqual({ ok: true, queued: true });
+    expect(await ui.pay()).toBe(true);
     expect(ui.pushToast).toHaveBeenCalledWith(
       "payFailed: LinkstrNotConfigured",
     );
@@ -180,7 +168,7 @@ describe("useContactPayments", () => {
       { _tag: "Failed", detail: "mint down", insufficient: false },
       "payFailed: mint down",
     ],
-    [{ _tag: "NotStored", detail: "storage full" }, "payFailed: storage full"],
+    [{ _tag: "NetworkError" }, "payNetworkError"],
     [{ _tag: "MissingIdentity" }, "profileMissingNpub"],
     [{ _tag: "MissingContactNpub" }, "chatMissingContactNpub"],
     [{ _tag: "AuthorizationChanged" }, "payApprovalChanged"],
@@ -188,7 +176,7 @@ describe("useContactPayments", () => {
     commandsPaying(outcome);
     const ui = await render();
 
-    await ui.pay();
+    expect(await ui.pay()).toBe(false);
 
     expect(ui.setStatus).toHaveBeenCalledWith(status);
     expect(ui.showPaidOverlay).not.toHaveBeenCalled();
@@ -196,22 +184,10 @@ describe("useContactPayments", () => {
     await ui.view.unmount();
   });
 
-  it("shows nothing for a retry from the offline queue", async () => {
-    commandsPaying({ _tag: "Insufficient" });
+  it("refuses a payment while the wallet is not ready", async () => {
     const ui = await render();
 
-    expect(await ui.pay({ fromQueue: true })).toMatchObject({
-      retryable: true,
-    });
-    expect(ui.setStatus).not.toHaveBeenCalled();
-    expect(ui.showPaymentSending).not.toHaveBeenCalled();
-    await ui.view.unmount();
-  });
-
-  it("keeps a payment retryable while the wallet is not ready", async () => {
-    const ui = await render();
-
-    expect(await ui.pay()).toMatchObject({ ok: false, retryable: true });
+    expect(await ui.pay()).toBe(false);
     expect(ui.setStatus).toHaveBeenCalledWith(
       "errorPrefix: Cashu storage is not ready",
     );

@@ -33,16 +33,13 @@ interface UseWalletPaymentsParams {
     | "nostrMessagesLocal"
     | "nostrMessagesRecent"
     | "nostrPictureByNpub"
-    | "pendingPaymentsKey"
     | "respondToBankPaymentOfferWithGroupState"
     | "saveNpubContact"
     | "selectedChatContact"
     | "selectedContact"
     | "sendChatMessage"
-    | "updateLocalNostrMessage"
   >;
   currentNpub: string | null;
-  currentNsec: string | null;
   dismissPaymentSending: () => void;
   formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
   lightningInvoiceAutoPayLimit: number;
@@ -67,7 +64,6 @@ export const useWalletPayments = ({
   cashuBalance,
   contactsMessaging,
   currentNpub,
-  currentNsec,
   dismissPaymentSending,
   formatDisplayedAmountParts,
   lightningInvoiceAutoPayLimit,
@@ -132,8 +128,6 @@ export const useWalletPayments = ({
     ...contactsMessaging,
     cashuBalance,
     contactPayMethod,
-    currentNpub,
-    currentNsec,
     payAmount,
     pushToast,
     route,

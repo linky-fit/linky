@@ -94,6 +94,9 @@ export const useLightningPayments = ({
         case "Failed":
           setStatus(`${t("payFailed")}: ${outcome.detail}`);
           return false;
+        case "NetworkError":
+          setStatus(t("payNetworkError"));
+          return false;
         case "Busy":
         case "Invalid":
           return false;
@@ -190,6 +193,9 @@ export const useLightningPayments = ({
           return;
         case "Failed":
           setStatus(`${t("payFailed")}: ${outcome.detail}`);
+          return;
+        case "NetworkError":
+          setStatus(t("payNetworkError"));
           return;
         case "Busy":
         case "Invalid":

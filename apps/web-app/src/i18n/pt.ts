@@ -1223,7 +1223,7 @@ export const pt = {
   payInvalidAmount: "Valor inválido",
   payInsufficient: "Tokens Cashu insuficientes.",
   lightningInvoiceConfirmUnknownAmount: "Valor desconhecido",
-  payQueuedMessage: "Pagamento na fila {amount} {unit} → {name}.",
+  payNetworkError: "Não foi possível enviar devido a um erro de rede.",
   payApprovalChanged:
     "A aprovação do pagamento não é mais válida. Revise o destinatário e pague de novo.",
   payFailed: "O pagamento falhou",

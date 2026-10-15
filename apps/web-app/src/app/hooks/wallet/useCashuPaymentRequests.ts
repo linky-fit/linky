@@ -237,6 +237,9 @@ export const useCashuPaymentRequests = ({
         case "Failed":
           setStatus(`${t("payFailed")}: ${outcome.detail}`);
           return;
+        case "NetworkError":
+          setStatus(t("payNetworkError"));
+          return;
       }
     },
     [reportShortfall, setStatus, t],
@@ -346,6 +349,9 @@ export const useCashuPaymentRequests = ({
                 ? t("payInsufficient")
                 : `${t("payFailed")}: ${outcome.detail}`,
           );
+          return;
+        case "NetworkError":
+          setStatus(t("payNetworkError"));
           return;
         case "AuthorizationChanged":
           setStatus(t("payApprovalChanged"));

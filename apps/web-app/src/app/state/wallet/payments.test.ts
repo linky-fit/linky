@@ -9,6 +9,7 @@ import {
   MeltReceipt,
   MintInfo,
   MintRejected,
+  MintUnreachable,
   MintUrl,
   NonNegativeAmount,
   OperationId,
@@ -43,12 +44,11 @@ import { makeLightningInvoice } from "../../../testUtils/lightningInvoice";
 import { createSecretKey } from "../../../testUtils/nostrKeys";
 import { walletBalancesOf } from "../../../testUtils/walletFakes";
 import type { CashuPaymentRequestMessageInfo } from "../../lib/paymentRequestMessage";
-import { NO_WRITE, type WriteOutcome } from "../../lib/storeWrite";
+import { NO_WRITE } from "../../lib/storeWrite";
 import type { CashuTransferLifecycle } from "../linkshu/commands";
 import { makeWalletOps } from "./opQueue";
 import {
   makePaymentsCommands,
-  paymentResultOf,
   type ContactPayment,
   type PaymentRequestQuote,
   type PaymentsDeps,
@@ -97,6 +97,23 @@ const pending = (amount: number) =>
     operationId: OperationId.make("op-1"),
     amount: Amount.make(amount),
   });
+
+const unreachable = (mint = MINT_URL) =>
+  new MintUnreachable({ mint: MintUrl.make(mint), detail: "fetch failed" });
+
+const rejected = (mint = MINT_URL) =>
+  new MintRejected({ mint: MintUrl.make(mint), code: null, detail: "down" });
+
+/** The device drops offline while `step` runs, which then fails. */
+const goingOffline = () => {
+  let connected = true;
+  return {
+    isOnline: () => connected,
+    drop: () => {
+      connected = false;
+    },
+  };
+};
 
 const insufficientFunds = (required: number, available: number) =>
   new InsufficientFunds({
@@ -205,7 +222,6 @@ const chatWrites = (
   })),
   updateLocalNostrMessage: vi.fn(() => NO_WRITE),
   latestMessages: () => [],
-  enqueuePendingPayment: vi.fn(),
   ...overrides,
 });
 
@@ -213,12 +229,14 @@ const setup = ({
   balances = { [MINT_URL]: 1_000 },
   chat = chatWrites(),
   online = true,
+  isOnline = () => online,
   lifecycle = transferLifecycle(),
   ...overrides
 }: {
   balances?: Record<string, number>;
   chat?: PaymentsDeps["chat"];
   online?: boolean;
+  isOnline?: () => boolean;
   lifecycle?: CashuTransferLifecycle;
 } & Partial<
   Pick<
@@ -288,7 +306,7 @@ const setup = ({
     defaultMint: MINT_URL,
     currentNpub,
     currentNsec: "nsec-test",
-    isOnline: () => online,
+    isOnline,
     linkshu,
     linkstr,
     logPaymentEvent,
@@ -304,7 +322,6 @@ const alicePayment = (
 ): ContactPayment => ({
   amountSat: 600,
   contact: { id: CONTACT_ID, name: "Alice", npub: contactNpub },
-  offlineNotice: "queued for Alice",
   ...overrides,
 });
 
@@ -397,6 +414,24 @@ describe("payLightningInvoice", () => {
     );
   });
 
+  it("fails offline before melting, and on a mint it cannot reach", async () => {
+    const offline = setup({ online: false });
+    expect(await offline.commands.payLightningInvoice("lnbc-mock")).toEqual({
+      _tag: "NetworkError",
+    });
+    expect(offline.linkshu.meltCashuInvoice).not.toHaveBeenCalled();
+
+    const { commands, logPaymentEvent } = setup({
+      meltCashuInvoice: async () => Result.fail(unreachable()),
+    });
+    expect(await commands.payLightningInvoice("lnbc-mock")).toEqual({
+      _tag: "NetworkError",
+    });
+    expect(logPaymentEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ phase: "melt", status: "error" }),
+    );
+  });
+
   it("records an unsettled melt as a pending payment keyed by its quote", async () => {
     const { commands, logPaymentEvent } = setup({
       meltCashuInvoice: async () => Result.fail(pending(40)),
@@ -468,6 +503,56 @@ describe("payLightningAddress", () => {
     pr: `lnbc-mock-${amountSat}`,
     successAction: null,
   });
+
+  it("fails offline before fetching an invoice", async () => {
+    const { commands } = setup({ online: false });
+
+    expect(
+      await commands.payLightningAddress({
+        lnAddress: "alice@example.com",
+        amountSat: 40,
+        contact: null,
+      }),
+    ).toEqual({ _tag: "NetworkError" });
+    expect(fetchLnurlInvoiceForTarget).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "the invoice fetch",
+      () => {
+        const network = goingOffline();
+        fetchLnurlInvoiceForTarget.mockImplementation(async () => {
+          network.drop();
+          throw new TypeError("Failed to fetch");
+        });
+        return setup({ isOnline: network.isOnline });
+      },
+    ],
+    [
+      "the melt",
+      () => {
+        fetchLnurlInvoiceForTarget.mockResolvedValue(invoiceFor(40));
+        return setup({
+          meltCashuInvoice: async () => Result.fail(unreachable()),
+        });
+      },
+    ],
+  ])(
+    "reports a network error from %s without trying a lower amount",
+    async (_step, start) => {
+      const { commands } = start();
+
+      expect(
+        await commands.payLightningAddress({
+          lnAddress: "alice@example.com",
+          amountSat: 40,
+          contact: null,
+        }),
+      ).toEqual({ _tag: "NetworkError" });
+      expect(fetchLnurlInvoiceForTarget).toHaveBeenCalledOnce();
+    },
+  );
 
   it("stops the amount ladder on an unsettled melt and records it pending", async () => {
     fetchLnurlInvoiceForTarget.mockImplementation(async (_target, amount) =>
@@ -676,7 +761,6 @@ describe("payContact", () => {
       queued: false,
       publishErrors: [],
     });
-    expect(paymentResultOf(outcome)).toEqual({ ok: true, queued: false });
     expect(operations).toEqual([
       `send:${MINT_URL}:600:pending`,
       "enqueue",
@@ -736,11 +820,6 @@ describe("payContact", () => {
     );
 
     expect(outcome).toEqual({ _tag: "AuthorizationChanged" });
-    expect(paymentResultOf(outcome)).toEqual({
-      error: "payment authorization changed",
-      ok: false,
-      queued: false,
-    });
     expect(linkshu.sendCashuToken).not.toHaveBeenCalled();
   });
 
@@ -792,64 +871,38 @@ describe("payContact", () => {
     );
   });
 
-  it("queues an offline payment behind its stored placeholder without swapping", async () => {
-    let store: (outcome: WriteOutcome) => void = () => {};
-    const stored = new Promise<WriteOutcome>((resolve) => (store = resolve));
-    const chat = chatWrites({
-      appendLocalNostrMessage: vi.fn(() => ({
-        id: "offline-message",
-        written: stored,
-      })),
-    });
+  it("fails offline before any token is made", async () => {
+    const chat = chatWrites();
     const { commands, linkshu } = setup({ chat, online: false });
 
-    const paying = commands.payContact(alicePayment());
-    await Promise.resolve();
-    expect(chat.enqueuePendingPayment).not.toHaveBeenCalled();
-    store({ ok: true });
-
-    expect(await paying).toEqual({
-      _tag: "QueuedOffline",
-      contactId: CONTACT_ID,
-    });
-    expect(chat.appendLocalNostrMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ content: "queued for Alice", localOnly: true }),
-    );
-    expect(chat.enqueuePendingPayment).toHaveBeenCalledWith({
-      amountSat: 600,
-      contactId: CONTACT_ID,
-      recipientPubkey: contactPubkey,
-      messageId: "offline-message",
+    expect(await commands.payContact(alicePayment())).toEqual({
+      _tag: "NetworkError",
     });
     expect(linkshu.sendCashuToken).not.toHaveBeenCalled();
+    expect(chat.appendLocalNostrMessage).not.toHaveBeenCalled();
   });
 
-  it.each([false, true])(
-    "reports an unstored message without claiming success, offline=%s",
-    async (offline) => {
-      const chat = chatWrites({
-        appendLocalNostrMessage: () => ({
-          id: "message",
-          written: Promise.resolve({ ok: false, error: "storage unavailable" }),
-        }),
-      });
-      const { commands, linkshu, linkstr } = setup({
-        chat,
-        online: !offline,
-      });
+  it("reports a network error when the mint is unreachable or the device drops offline mid-send", async () => {
+    const unreachableMint = setup({
+      sendCashuToken: async () => Result.fail(unreachable()),
+    });
+    expect(await unreachableMint.commands.payContact(alicePayment())).toEqual({
+      _tag: "NetworkError",
+    });
 
-      const outcome = await commands.payContact(alicePayment());
-
-      expect(paymentResultOf(outcome)).toMatchObject({
-        ok: false,
-        queued: false,
-        error: "storage unavailable",
-      });
-      expect(linkstr.enqueueOutbox).not.toHaveBeenCalled();
-      expect(chat.enqueuePendingPayment).not.toHaveBeenCalled();
-      expect(linkshu.cashuTransferLifecycle.forget).not.toHaveBeenCalled();
-    },
-  );
+    const network = goingOffline();
+    const droppedOffline = setup({
+      isOnline: network.isOnline,
+      sendCashuToken: async () => {
+        network.drop();
+        return Result.fail(rejected());
+      },
+    });
+    expect(await droppedOffline.commands.payContact(alicePayment())).toEqual({
+      _tag: "NetworkError",
+    });
+    expect(droppedOffline.linkstr.enqueueOutbox).not.toHaveBeenCalled();
+  });
 
   it("reports insufficient funds from the send without publishing", async () => {
     const { commands, linkstr } = setup({
@@ -863,27 +916,20 @@ describe("payContact", () => {
       detail: "Insufficient funds (need 600, have 10)",
       insufficient: true,
     });
-    expect(paymentResultOf(outcome)).toEqual({
-      error: "Insufficient funds (need 600, have 10)",
-      ok: false,
-      queued: false,
-    });
     expect(linkstr.enqueueOutbox).not.toHaveBeenCalled();
   });
 
-  it("keeps a payment no mint covers, a missing identity or a busy wallet retryable", async () => {
+  it("refuses a payment no mint covers, and one while the wallet is busy", async () => {
     const short = setup({ balances: { [MINT_URL]: 100 } });
-    const insufficient = await short.commands.payContact(alicePayment());
-    expect(insufficient).toEqual({ _tag: "Insufficient" });
+    expect(await short.commands.payContact(alicePayment())).toEqual({
+      _tag: "Insufficient",
+    });
 
     const busy = setup();
     const release = holdWallet(busy.ops);
     const dropped = await busy.commands.payContact(alicePayment());
     await release();
     expect(dropped).toEqual({ _tag: "Busy" });
-
-    for (const outcome of [insufficient, dropped])
-      expect(paymentResultOf(outcome).retryable).toBe(true);
   });
 
   it("refuses a contact without an npub or a valid id", async () => {
@@ -1032,6 +1078,23 @@ describe("payment requests", () => {
       expect(linkshu.estimateAutoswapCashu).not.toHaveBeenCalled();
     });
 
+    it("fails offline, and when the Lightning target cannot be reached", async () => {
+      const offline = setup({ online: false });
+      expect(
+        await offline.commands.quotePaymentRequest(request(), 600),
+      ).toEqual({ _tag: "NetworkError" });
+
+      const { commands } = setup({
+        fetchMintInfo: async () => Result.fail(unreachable(TARGET)),
+      });
+      expect(
+        await commands.quotePaymentRequest(
+          request({ mintUrls: [TARGET] }),
+          600,
+        ),
+      ).toEqual({ _tag: "NetworkError" });
+    });
+
     it("passes on the mint move a short default mint needs, and an unreachable target", async () => {
       const short = setup({ balances: { [MINT_URL]: 50, [FOREIGN]: 80 } });
       expect(
@@ -1176,6 +1239,59 @@ describe("payment requests", () => {
       expect(linkstr.enqueueOutbox).not.toHaveBeenCalled();
     });
 
+    it("fails offline before anything moves", async () => {
+      const { commands, linkshu } = setup({ online: false });
+
+      expect(
+        await commands.payPaymentRequest({
+          request: request({ mintUrls: [TARGET] }),
+          quote: overLightning,
+          recipient: alice,
+        }),
+      ).toEqual({ _tag: "NetworkError" });
+      expect(linkshu.autoswapCashu).not.toHaveBeenCalled();
+      expect(linkshu.sendCashuToken).not.toHaveBeenCalled();
+    });
+
+    it("reports a network error when the move or the send cannot reach the mint", async () => {
+      const move = setup({
+        autoswapCashu: async () => Result.fail(unreachable(FOREIGN)),
+      });
+      expect(
+        await move.commands.payPaymentRequest({
+          request: request({ mintUrls: [TARGET] }),
+          quote: overLightning,
+          recipient: alice,
+        }),
+      ).toEqual({ _tag: "NetworkError" });
+      expect(move.linkshu.sendCashuToken).not.toHaveBeenCalled();
+
+      const send = setup({
+        sendCashuToken: async () => Result.fail(unreachable()),
+      });
+      expect(
+        await send.commands.payPaymentRequest({
+          request: request(),
+          quote: direct,
+          recipient: alice,
+        }),
+      ).toEqual({ _tag: "NetworkError" });
+    });
+
+    it("says where the moved sats are when the send after the move cannot reach the mint", async () => {
+      const { commands } = setup({
+        sendCashuToken: async () => Result.fail(unreachable(TARGET)),
+      });
+
+      expect(
+        await commands.payPaymentRequest({
+          request: request({ mintUrls: [TARGET] }),
+          quote: overLightning,
+          recipient: alice,
+        }),
+      ).toMatchObject({ _tag: "Failed", movedTo: TARGET });
+    });
+
     it("sends nothing when the Lightning move fails", async () => {
       const { commands, linkshu } = setup({
         autoswapCashu: async () => Result.fail(insufficientFunds(612, 600)),
@@ -1263,6 +1379,28 @@ describe("payment requests", () => {
         insufficient: false,
         movedTo: null,
       });
+      expect(
+        linkshu.cashuTransferLifecycle.returnToWallet,
+      ).toHaveBeenCalledWith(sendReceipt.operationId);
+      vi.unstubAllGlobals();
+    });
+
+    it("reports a network error when the POST cannot reach its target", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          throw new TypeError("Failed to fetch");
+        }),
+      );
+      const { commands, linkshu } = setup();
+
+      expect(
+        await commands.payPaymentRequest({
+          request: postRequest,
+          quote: direct,
+          recipient: null,
+        }),
+      ).toEqual({ _tag: "NetworkError" });
       expect(
         linkshu.cashuTransferLifecycle.returnToWallet,
       ).toHaveBeenCalledWith(sendReceipt.operationId);
