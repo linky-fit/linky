@@ -2,7 +2,7 @@ import { parseTokenText } from "@linky-fit/linkshu";
 import { decodeBankPaymentOffer } from "@linky-fit/proxy-payment";
 import type { I18nKey } from "../../i18n";
 import { parsePrivateImageMessage } from "./privateImageMessage";
-import { extractCashuTokenFromText } from "./tokenText";
+import { extractCashuTokenFromText, tokenProofsKey } from "./tokenText";
 import { boundedMemo } from "../../utils/boundedMemo";
 import { isHiddenTestMint } from "../../utils/mint";
 
@@ -54,16 +54,17 @@ const tokenInMessage = boundedMemo((text: string) => {
 
 export const getCashuTokenMessageInfo = (
   text: string,
-  /** Token texts the wallet's transfers carry (sent or received). */
-  knownTokenTexts: ReadonlySet<string> = new Set(),
+  /** `tokenProofsKey`s of the tokens the wallet's transfers carry (sent or received). */
+  takenTokenProofs: ReadonlySet<string> = new Set(),
   allowTestMints = true,
-  /** The wallet's own sends by token text, true once claimed. */
+  /** The wallet's own sends by `tokenProofsKey`, true once claimed. */
   sentTokenClaims: ReadonlyMap<string, boolean> = new Map(),
 ): CashuTokenMessageInfo | null => {
   const token = tokenInMessage(text);
   if (!token) return null;
   const { parsed, tokenRaw } = token;
-  const claimed = sentTokenClaims.get(tokenRaw);
+  const proofsKey = tokenProofsKey(tokenRaw) ?? "";
+  const claimed = sentTokenClaims.get(proofsKey);
 
   return {
     tokenRaw,
@@ -73,9 +74,9 @@ export const getCashuTokenMessageInfo = (
     amount: parsed.amount,
     unit: parsed.unit,
     isHiddenTestMint: isHiddenTestMint(parsed.mint, allowTestMints),
-    // Best-effort: "valid" means no transfer carries this text yet; a token
+    // Best-effort: "valid" means no transfer carries these proofs yet; a token
     // whose proofs the wallet holds is caught by linkshu's receive dedup.
-    isValid: !knownTokenTexts.has(tokenRaw),
+    isValid: !takenTokenProofs.has(proofsKey),
     sent: claimed === undefined ? null : claimed ? "claimed" : "unclaimed",
   };
 };

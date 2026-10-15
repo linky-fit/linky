@@ -10,7 +10,7 @@ import {
 import {
   isShownDeferredReceive,
   sentTokenClaims,
-  takenTokenTexts,
+  takenTokenProofs,
 } from "../../lib/cashuTransfers";
 import { getCashuTokenMessageInfo } from "../../lib/tokenMessageInfo";
 import {
@@ -107,8 +107,8 @@ export const useWalletBalance = () => {
 export const useCashuTokenMessageInfo = () => {
   const allowTestMints = useAtomValue(allowTestMintsAtom);
   const { allProofs, operations, transfers } = useWalletInventory();
-  const knownTransferTexts = React.useMemo(
-    () => takenTokenTexts(transfers, operations),
+  const takenProofs = React.useMemo(
+    () => takenTokenProofs(transfers, operations),
     [operations, transfers],
   );
   const sentClaims = React.useMemo(
@@ -117,12 +117,7 @@ export const useCashuTokenMessageInfo = () => {
   );
   return React.useCallback(
     (text: string) =>
-      getCashuTokenMessageInfo(
-        text,
-        knownTransferTexts,
-        allowTestMints,
-        sentClaims,
-      ),
-    [allowTestMints, knownTransferTexts, sentClaims],
+      getCashuTokenMessageInfo(text, takenProofs, allowTestMints, sentClaims),
+    [allowTestMints, takenProofs, sentClaims],
   );
 };

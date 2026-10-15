@@ -9,6 +9,7 @@ import {
   getCashuTokenMessageInfo,
   readCashuTokenMemo,
 } from "./tokenMessageInfo";
+import { tokenProofsKey } from "./tokenText";
 
 describe("getCashuTokenMessageInfo", () => {
   it("renders cashu.me legacy proof bundles as claimable tokens", () => {
@@ -75,10 +76,9 @@ describe("getCashuTokenMessageInfo", () => {
 
   it("treats a token a wallet transfer carries as already known", () => {
     const token = buildCashuToken();
+    const taken = new Set([tokenProofsKey(token) ?? ""]);
 
-    expect(getCashuTokenMessageInfo(token, new Set([token]))?.isValid).toBe(
-      false,
-    );
+    expect(getCashuTokenMessageInfo(token, taken)?.isValid).toBe(false);
     expect(getCashuTokenMessageInfo(token, new Set())?.isValid).toBe(true);
   });
 
@@ -109,6 +109,7 @@ describe("getCashuTokenMessageInfo", () => {
 
 describe("cashuTokenStateKey", () => {
   const token = buildCashuToken();
+  const key = tokenProofsKey(token) ?? "";
   const stateOf = (
     taken: boolean,
     sentClaims: ReadonlyMap<string, boolean> = new Map(),
@@ -116,7 +117,7 @@ describe("cashuTokenStateKey", () => {
   ) => {
     const info = getCashuTokenMessageInfo(
       token,
-      new Set(taken ? [token] : []),
+      new Set(taken ? [key] : []),
       true,
       sentClaims,
     );
@@ -124,11 +125,11 @@ describe("cashuTokenStateKey", () => {
   };
 
   it("announces an own send the recipient claimed as claimed, not as an error", () => {
-    expect(stateOf(true, new Map([[token, true]]))).toBe("cashuTokenClaimed");
+    expect(stateOf(true, new Map([[key, true]]))).toBe("cashuTokenClaimed");
   });
 
   it("announces nothing for an own send that is still out", () => {
-    expect(stateOf(true, new Map([[token, false]]))).toBeNull();
+    expect(stateOf(true, new Map([[key, false]]))).toBeNull();
   });
 
   it("keeps the error for a token the wallet took that it did not send", () => {
@@ -137,9 +138,7 @@ describe("cashuTokenStateKey", () => {
   });
 
   it("keeps the error for an own send a peer sent back, claimed or not", () => {
-    expect(stateOf(true, new Map([[token, true]]), false)).toBe("cashuInvalid");
-    expect(stateOf(true, new Map([[token, false]]), false)).toBe(
-      "cashuInvalid",
-    );
+    expect(stateOf(true, new Map([[key, true]]), false)).toBe("cashuInvalid");
+    expect(stateOf(true, new Map([[key, false]]), false)).toBe("cashuInvalid");
   });
 });

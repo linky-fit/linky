@@ -1,6 +1,7 @@
-import { tokenProofSecrets, type TokenTransfer } from "@linky-fit/linkshu";
+import type { TokenTransfer } from "@linky-fit/linkshu";
 import React from "react";
 import { isOpenTransfer } from "../../lib/cashuTransfers";
+import { tokenProofsKey } from "../../lib/tokenText";
 import type { CashuTransferLifecycle } from "../../state/linkshu/commands";
 import type { ContactRowLike, LocalNostrMessage } from "../../types/appTypes";
 import { decodeNpubOnce } from "../messages/contactIdentity";
@@ -14,12 +15,6 @@ interface UseTransferCleanupParams {
   nostrMessagesRecent: readonly LocalNostrMessage[];
   walletTransfers: readonly TokenTransfer[];
 }
-
-/** Keys a token by its proofs, so a send and the NUT-18 payload carrying it match. */
-const proofsKey = (text: string): string | null => {
-  const secrets = tokenProofSecrets(text);
-  return secrets === null ? null : [...secrets].sort().join(" ");
-};
 
 /** Closes sends whose message reached the recipient and takes back tokens paid to ourselves. */
 export const useTransferCleanup = ({
@@ -42,12 +37,12 @@ export const useTransferCleanup = ({
     const sentProofs = new Set(
       nostrMessagesLocal.flatMap((message) =>
         message.direction === "out" && (message.status ?? "sent") !== "pending"
-          ? (proofsKey(message.content) ?? [])
+          ? (tokenProofsKey(message.content) ?? [])
           : [],
       ),
     );
     for (const transfer of pendingSends) {
-      const key = proofsKey(transfer.tokenText);
+      const key = tokenProofsKey(transfer.tokenText);
       if (key !== null && sentProofs.has(key))
         void lifecycle.forget(transfer.id);
     }
@@ -92,10 +87,10 @@ export const useTransferCleanup = ({
           const contactId = (message.contactId ?? "").toString().trim();
           return contactId.length > 0 && selfContactIds.has(contactId);
         })
-        .flatMap((message) => proofsKey(message.content) ?? []),
+        .flatMap((message) => tokenProofsKey(message.content) ?? []),
     );
     for (const transfer of openSends) {
-      const key = proofsKey(transfer.tokenText);
+      const key = tokenProofsKey(transfer.tokenText);
       if (key === null || !selfDirectedProofs.has(key)) continue;
       reclaimAttemptedRef.current.add(String(transfer.id));
       void lifecycle.returnToWallet(transfer.id);

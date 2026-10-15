@@ -1,7 +1,7 @@
 import type { StoredProof, TokenTransfer } from "@linky-fit/linkshu";
 import type { LocalNostrMessage } from "../types/appTypes";
 import { isOpenTransfer } from "./cashuTransfers";
-import { extractCashuTokenFromText } from "./tokenText";
+import { extractCashuTokenFromText, tokenProofsKey } from "./tokenText";
 
 export const pendingTokenTransfers = (
   transfers: readonly TokenTransfer[],
@@ -25,14 +25,16 @@ export const pendingTokenTransfers = (
     .sort((a, b) => b.createdAt - a.createdAt);
 };
 
+/** Looks up the chat messages carrying a token, in whichever encoding they carry it. */
 export const tokenChatMessages = (messages: readonly LocalNostrMessage[]) => {
   const byToken = new Map<string, LocalNostrMessage[]>();
   for (const message of messages) {
-    const token =
+    const tokenText =
       extractCashuTokenFromText(message.content) ??
       extractCashuTokenFromText(message.originalContent ?? "");
-    if (token === null) continue;
-    const matches = byToken.get(token) ?? [];
+    const key = tokenText === null ? null : tokenProofsKey(tokenText);
+    if (key === null) continue;
+    const matches = byToken.get(key) ?? [];
     if (
       !matches.some(
         (match) =>
@@ -42,7 +44,8 @@ export const tokenChatMessages = (messages: readonly LocalNostrMessage[]) => {
     ) {
       matches.push(message);
     }
-    byToken.set(token, matches);
+    byToken.set(key, matches);
   }
-  return byToken;
+  return (tokenText: string): readonly LocalNostrMessage[] =>
+    byToken.get(tokenProofsKey(tokenText) ?? "") ?? [];
 };
