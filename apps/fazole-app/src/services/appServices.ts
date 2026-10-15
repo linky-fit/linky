@@ -25,8 +25,9 @@ import {
 import { readShop, saveShop } from "../storage/shop";
 import { readOfferTips, saveOfferTips } from "../storage/tipSetting";
 import {
-  readLightningOnlyQr,
-  saveLightningOnlyQr,
+  readBitcoinQrMode,
+  saveBitcoinQrMode,
+  type BitcoinQrMode,
 } from "../storage/bitcoinQrSetting";
 import { readFazoleRecords, type FazoleRecords } from "../storage/transactions";
 import {
@@ -86,8 +87,7 @@ export interface LiveSources {
   readonly shop: LiveSource<ShopProfile | null>;
   /** Whether the terminal offers a tip before the payment. */
   readonly offerTips: LiveSource<boolean>;
-  /** Whether the Bitcoin QR carries the Lightning invoice alone, without Cashu. */
-  readonly lightningOnlyQr: LiveSource<boolean>;
+  readonly bitcoinQrMode: LiveSource<BitcoinQrMode>;
   readonly records: LiveSource<FazoleRecords>;
   readonly balances: LiveSource<WalletBalances>;
 }
@@ -104,7 +104,7 @@ export interface AppServices {
   readonly rates: Rates;
   readonly shop: Shop;
   readonly saveOfferTips: (offer: boolean) => Promise<void>;
-  readonly saveLightningOnlyQr: (lightningOnly: boolean) => Promise<void>;
+  readonly saveBitcoinQrMode: (mode: BitcoinQrMode) => Promise<void>;
   readonly payments: Payments;
   readonly history: History;
   readonly payers: Payers;
@@ -229,10 +229,8 @@ export const createAppServices = ({
     },
     saveOfferTips: (offer) =>
       Effect.runPromise(saveOfferTips(repositories.settings, offer)),
-    saveLightningOnlyQr: (lightningOnly) =>
-      Effect.runPromise(
-        saveLightningOnlyQr(repositories.settings, lightningOnly),
-      ),
+    saveBitcoinQrMode: (mode) =>
+      Effect.runPromise(saveBitcoinQrMode(repositories.settings, mode)),
     payments: {
       create: ledger.createPayment,
       requestBitcoin: bitcoinPayments.request,
@@ -265,8 +263,8 @@ export const createAppServices = ({
         all: readOfferTips(repositories.settings),
         subscribe: repositories.settings.subscribe,
       },
-      lightningOnlyQr: {
-        all: readLightningOnlyQr(repositories.settings),
+      bitcoinQrMode: {
+        all: readBitcoinQrMode(repositories.settings),
         subscribe: repositories.settings.subscribe,
       },
       records: {

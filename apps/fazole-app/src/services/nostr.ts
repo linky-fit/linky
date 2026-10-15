@@ -78,7 +78,7 @@ export interface Nostr {
   readonly queuedRefs: () => Promise<ReadonlySet<string>>;
   /** Publishes the shop as the account's kind-0 profile, so wallets show it instead of a stranger. */
   readonly publishProfile: (shop: {
-    readonly name: string;
+    readonly name: string | null;
     readonly picture: string | null;
   }) => Promise<void>;
   /** Someone's kind-0 name and picture; `null` when they have none or no relay answered in time. */
@@ -250,8 +250,7 @@ export const createNostr = ({
           Effect.flatMap(Profiles, (profiles) =>
             profiles.publishProfile(
               new ProfileMetadata({
-                name,
-                displayName: name,
+                ...(name === null ? {} : { name, displayName: name }),
                 ...(picture === null ? {} : { picture }),
               }),
             ),

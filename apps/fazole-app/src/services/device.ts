@@ -60,7 +60,10 @@ export interface DevicePlatform {
   readonly kv: KeyValueStorage;
   readonly openStore: (account: Account) => Promise<LinkyStore>;
   readonly servicePorts: (account: Account) => ServicePorts;
-  readonly saveRecoverySeed: (account: Account, shopName: string) => void;
+  readonly saveRecoverySeed: (
+    account: Account,
+    shopName: string | null,
+  ) => void;
   readonly reload: () => void;
   readonly resetDevice: () => void;
 }

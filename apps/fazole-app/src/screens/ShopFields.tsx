@@ -2,7 +2,7 @@ import { Stack, TextField } from "@linky-fit/ui";
 import { copy } from "../copy";
 import type { ShopForm } from "./shopForm";
 
-/** The shop name and optional bank account, shared by setup and settings. */
+/** The shop name and bank account, both optional, shared by setup and settings. */
 export function ShopFields({ form }: { readonly form: ShopForm }) {
   const { accountCheck } = form;
   return (
@@ -23,9 +23,7 @@ export function ShopFields({ form }: { readonly form: ShopForm }) {
         label={copy.shopFields.account}
         placeholder={copy.shopFields.accountPlaceholder}
         hint={
-          accountCheck.kind === "valid"
-            ? accountCheck.description
-            : copy.shopFields.accountHint
+          accountCheck.kind === "valid" ? accountCheck.description : undefined
         }
         error={form.accountError}
         value={form.account}

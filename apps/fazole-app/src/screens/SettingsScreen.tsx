@@ -5,6 +5,8 @@ import {
   Dialog,
   ListRow,
   Section,
+  size,
+  Stack,
   StatusDot,
   Switch,
   Text,
@@ -13,37 +15,42 @@ import { useState } from "react";
 import { copy } from "../copy";
 import { formatCzechIban, type ShopProfile } from "../domain";
 import { navigateTo } from "../platform/hashRoute";
-import {
-  language,
-  LANGUAGE_NAMES,
-  LANGUAGES,
-  switchLanguage,
-} from "../platform/language";
+import { language, LANGUAGE_NAMES } from "../platform/language";
 import {
   useAppServices,
+  useBitcoinQrMode,
   useDevice,
-  useLightningOnlyQr,
   useOfferTips,
   useSupportChat,
 } from "../services/react";
+import { BITCOIN_QR_MODES } from "../storage/bitcoinQrSetting";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { LanguageDialog } from "./LanguageDialog";
 import { Page } from "./Page";
 import { RecoverySeed } from "./RecoverySeed";
 import { ShopFields } from "./ShopFields";
 import { ShopPictureDialog } from "./ShopPictureDialog";
 import { useShopForm } from "./shopForm";
 
-type OpenDialog =
-  | "shop"
-  | "picture"
-  | "seed"
-  | "restore"
-  | "reset"
-  | "language";
+type OpenDialog = "shop" | "bitcoinQr" | "seed" | "reset" | "language";
 
 const versionLabel = __APP_COMMIT_SHA__
   ? `${__APP_VERSION__} (${__APP_COMMIT_SHA__})`
   : __APP_VERSION__;
+
+/** The shop's picture or store icon, centered on a row's icon slot so the title lines up with the other rows. */
+function ShopAvatar({ shop }: { readonly shop: ShopProfile }) {
+  return (
+    <Stack width={size.iconSm} alignItems="center">
+      <Avatar
+        name={shop.name ?? ""}
+        uri={shop.picture ?? undefined}
+        icon="Store"
+        size="sm"
+      />
+    </Stack>
+  );
+}
 
 const hostOf = (url: string) => {
   try {
@@ -55,9 +62,9 @@ const hostOf = (url: string) => {
 
 export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
   const device = useDevice();
-  const { config, saveOfferTips, saveLightningOnlyQr } = useAppServices();
+  const { config, saveOfferTips, saveBitcoinQrMode } = useAppServices();
   const offerTips = useOfferTips() ?? true;
-  const lightningOnlyQr = useLightningOnlyQr() ?? false;
+  const bitcoinQrMode = useBitcoinQrMode() ?? "universal";
   const supportUnread = useSupportChat()?.unread ?? false;
   const [dialog, setDialog] = useState<OpenDialog | null>(null);
   const close = () => setDialog(null);
@@ -68,36 +75,17 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
         <Card paddingVertical="$sm" gap="$none">
           <ListRow
             testID="settings-shop"
-            leading={
-              <Avatar
-                name={shop.name}
-                uri={shop.picture ?? undefined}
-                icon="Store"
-                size="sm"
-              />
-            }
-            title={shop.name}
+            leading={<ShopAvatar shop={shop} />}
+            title={shop.name ?? copy.settings.shopUnnamed}
             description={
-              shop.iban === null
-                ? copy.settings.noAccount
-                : formatCzechIban(shop.iban)
+              shop.iban === null ? undefined : formatCzechIban(shop.iban)
             }
             onPress={() => setDialog("shop")}
-          />
-          <ListRow
-            testID="settings-picture"
-            icon="ImageUp"
-            title={copy.shopPicture.title}
-            description={
-              shop.picture === null ? copy.shopPicture.none : undefined
-            }
-            onPress={() => setDialog("picture")}
           />
           <ListRow
             testID="settings-tips"
             icon="HandCoins"
             title={copy.settings.offerTips}
-            description={copy.settings.offerTipsDescription}
             chevron={false}
             trailing={
               <Switch
@@ -108,41 +96,11 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
             }
           />
           <ListRow
-            testID="settings-lightning-only-qr"
-            icon="Zap"
-            title={copy.settings.lightningOnlyQr}
-            description={copy.settings.lightningOnlyQrDescription}
-            chevron={false}
-            trailing={
-              <Switch
-                accessibilityLabel={copy.settings.lightningOnlyQr}
-                value={lightningOnlyQr}
-                onValueChange={(only) => void saveLightningOnlyQr(only)}
-              />
-            }
-          />
-        </Card>
-      </Section>
-      <Section title={copy.settings.security}>
-        <Card paddingVertical="$sm" gap="$none">
-          <ListRow
-            testID="settings-seed"
-            icon="KeyRound"
-            title={copy.settings.recoverySeed}
-            onPress={() => setDialog("seed")}
-          />
-          <ListRow
-            testID="settings-restore"
-            icon="RefreshCcw"
-            title={copy.settings.restore}
-            onPress={() => setDialog("restore")}
-          />
-          <ListRow
-            testID="settings-reset"
-            icon="Trash2"
-            title={copy.settings.reset}
-            destructive
-            onPress={() => setDialog("reset")}
+            testID="settings-bitcoin-qr"
+            icon="QrCode"
+            title={copy.settings.bitcoinQr}
+            value={copy.settings.bitcoinQrModes[bitcoinQrMode]}
+            onPress={() => setDialog("bitcoinQr")}
           />
         </Card>
       </Section>
@@ -180,6 +138,23 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
           />
         </Card>
       </Section>
+      <Section title={copy.settings.security}>
+        <Card paddingVertical="$sm" gap="$none">
+          <ListRow
+            testID="settings-seed"
+            icon="KeyRound"
+            title={copy.settings.recoverySeed}
+            onPress={() => setDialog("seed")}
+          />
+          <ListRow
+            testID="settings-reset"
+            icon="Trash2"
+            title={copy.settings.reset}
+            destructive
+            onPress={() => setDialog("reset")}
+          />
+        </Card>
+      </Section>
       <Text
         testID="settings-version"
         variant="caption"
@@ -192,9 +167,27 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
       {dialog === "shop" ? (
         <EditShopDialog shop={shop} onClose={close} />
       ) : null}
-      {dialog === "picture" ? (
-        <ShopPictureDialog shop={shop} onClose={close} />
-      ) : null}
+      <Dialog
+        open={dialog === "bitcoinQr"}
+        onOpenChange={(open) => (open ? undefined : close())}
+        title={copy.settings.bitcoinQr}
+        closeLabel={copy.close}
+        testID="bitcoin-qr-dialog"
+      >
+        {BITCOIN_QR_MODES.map((mode) => (
+          <ListRow
+            key={mode}
+            testID={`bitcoin-qr-${mode}`}
+            title={copy.settings.bitcoinQrModes[mode]}
+            selected={mode === bitcoinQrMode}
+            chevron={false}
+            onPress={() => {
+              void saveBitcoinQrMode(mode);
+              close();
+            }}
+          />
+        ))}
+      </Dialog>
       <Dialog
         open={dialog === "seed"}
         onOpenChange={(open) => (open ? undefined : close())}
@@ -204,35 +197,7 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
       >
         <RecoverySeed shopName={shop.name} />
       </Dialog>
-      <Dialog
-        open={dialog === "language"}
-        onOpenChange={(open) => (open ? undefined : close())}
-        title={copy.settings.language}
-        closeLabel={copy.close}
-        testID="language-dialog"
-      >
-        {LANGUAGES.map((option) => (
-          <ListRow
-            key={option}
-            testID={`language-${option}`}
-            title={LANGUAGE_NAMES[option]}
-            selected={option === language}
-            chevron={false}
-            onPress={() =>
-              option === language ? close() : void switchLanguage(option)
-            }
-          />
-        ))}
-      </Dialog>
-      <ConfirmDialog
-        open={dialog === "restore"}
-        onClose={close}
-        title={copy.settings.restoreConfirmTitle}
-        description={copy.settings.restoreConfirmDescription}
-        confirm={copy.continue}
-        destructive
-        onConfirm={() => navigateTo("restore")}
-      />
+      <LanguageDialog open={dialog === "language"} onClose={close} />
       <ConfirmDialog
         open={dialog === "reset"}
         onClose={close}
@@ -246,6 +211,7 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
   );
 }
 
+/** The shop's details, with its picture managed one step deeper; the form survives that step. */
 function EditShopDialog({
   shop,
   onClose,
@@ -256,6 +222,7 @@ function EditShopDialog({
   const services = useAppServices();
   const form = useShopForm(shop);
   const [saving, setSaving] = useState(false);
+  const [editingPicture, setEditingPicture] = useState(false);
   const save = async () => {
     const edited = form.submit();
     if (edited === null) return;
@@ -268,6 +235,11 @@ function EditShopDialog({
       setSaving(false);
     }
   };
+  if (editingPicture) {
+    return (
+      <ShopPictureDialog shop={shop} onClose={() => setEditingPicture(false)} />
+    );
+  }
   return (
     <Dialog
       open
@@ -281,6 +253,12 @@ function EditShopDialog({
         </Button>
       }
     >
+      <ListRow
+        testID="settings-picture"
+        leading={<ShopAvatar shop={shop} />}
+        title={copy.shopPicture.title}
+        onPress={() => setEditingPicture(true)}
+      />
       <ShopFields form={form} />
     </Dialog>
   );

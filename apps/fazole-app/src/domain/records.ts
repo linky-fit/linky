@@ -7,7 +7,8 @@ import type { VariableSymbol } from "./variableSymbol";
 
 /** The shop this account takes payments for. */
 export interface ShopProfile {
-  readonly name: string;
+  /** `null` until the merchant names the shop; payments then carry no recipient name. */
+  readonly name: string | null;
   /** Without one the terminal offers Bitcoin only. */
   readonly iban: CzechIban | null;
   /** An https image URL; wallets show it as the shop's Nostr profile picture. */

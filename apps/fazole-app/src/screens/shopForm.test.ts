@@ -7,12 +7,15 @@ describe("the shop form's bank account", () => {
     expect(checkAccount("  ")).toEqual({ kind: "empty" });
   });
 
-  it("shows the bank and the grouped IBAN of a valid account", () => {
-    expect(checkAccount("19-2000145399/0800")).toEqual({
+  it("shows the bank and the grouped IBAN of a valid account, typed as an account or an IBAN", () => {
+    const valid = {
       kind: "valid",
       iban: "CZ6508000000192000145399",
       description: "Česká spořitelna, a.s. · CZ65 0800 0000 1920 0014 5399",
-    });
+    };
+    expect(checkAccount("19-2000145399/0800")).toEqual(valid);
+    expect(checkAccount("19 - 2000145399 / 0800")).toEqual(valid);
+    expect(checkAccount(" cz65 0800 0000 1920 0014 5399 ")).toEqual(valid);
   });
 
   it("explains a malformed account, a typo and an unknown bank", () => {

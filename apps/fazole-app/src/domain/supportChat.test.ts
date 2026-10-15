@@ -38,5 +38,8 @@ describe("cashRequestMessage", () => {
     expect(cashRequestMessage("Kavárna", 1234)).toBe(
       "Kavárna vyžaduje hotovost. Má 1234 sats",
     );
+    expect(cashRequestMessage(null, 5)).toBe(
+      "Podnik bez názvu vyžaduje hotovost. Má 5 sats",
+    );
   });
 });

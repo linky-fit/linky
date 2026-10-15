@@ -1,7 +1,6 @@
 import {
   Form,
   IconButton,
-  Notice,
   Stack,
   SubmitButton,
   Text,
@@ -13,14 +12,13 @@ import { useState } from "react";
 import { copy } from "../copy";
 import { pasteText } from "../platform/clipboard";
 import { navigateTo } from "../platform/hashRoute";
-import { useDevice, useSession } from "../services/react";
+import { useDevice } from "../services/react";
 import { looksLikeRecoverySeed } from "../storage/account";
 import { Page, WithTopBar } from "./Page";
 
 /** One password-manager-fillable field; a pasted or autofilled seed restores at once. */
 export function RestoreScreen() {
   const device = useDevice();
-  const replacing = useSession()._tag === "SignedIn";
   const [seed, setSeed] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
@@ -35,7 +33,7 @@ export function RestoreScreen() {
       setRestoring(false);
       return;
     }
-    // Waits on the restoring screen until the shop syncs; replacing an account reloads instead.
+    // Waits on the restoring screen until the shop syncs.
     navigateTo("terminal");
   };
   /** Restores right away when a whole seed arrives at once, e.g. a paste or an autofill. */
@@ -59,7 +57,7 @@ export function RestoreScreen() {
             <IconButton
               icon="ArrowLeft"
               accessibilityLabel={copy.back}
-              onPress={() => navigateTo(replacing ? "settings" : "welcome")}
+              onPress={() => navigateTo("welcome")}
             />
           }
         />
@@ -72,9 +70,6 @@ export function RestoreScreen() {
           </Text>
           <Text color="$colorMuted">{copy.restore.description}</Text>
         </Stack>
-        {replacing ? (
-          <Notice tone="danger" title={copy.restore.replaceWarning} />
-        ) : null}
         <Form onSubmit={() => void restore(seed)} gap="$xl">
           <TextField
             testID="restore-seed"

@@ -12,16 +12,15 @@ import {
 } from "react";
 import {
   historyEntries,
-  walletActivity,
   type DirectTransfer,
   type HistoryEntry,
   type Payment,
   type ShopProfile,
   type SupportChat,
-  type WalletActivity,
   type Withdrawal,
 } from "../domain";
 import { shortNpub } from "../format";
+import type { BitcoinQrMode } from "../storage/bitcoinQrSetting";
 import type { FazoleRecords } from "../storage/transactions";
 import type { AppServices } from "./appServices";
 import type { Device, Session } from "./device";
@@ -64,10 +63,10 @@ export const useShopProfile = (): ShopProfile | null | undefined =>
 export const useOfferTips = (): boolean | undefined =>
   useLiveValue<boolean | undefined>(useAppServices().live.offerTips, undefined);
 
-/** Whether the Bitcoin QR carries the Lightning invoice alone; `undefined` until read. */
-export const useLightningOnlyQr = (): boolean | undefined =>
-  useLiveValue<boolean | undefined>(
-    useAppServices().live.lightningOnlyQr,
+/** What the Bitcoin QR carries; `undefined` until read. */
+export const useBitcoinQrMode = (): BitcoinQrMode | undefined =>
+  useLiveValue<BitcoinQrMode | undefined>(
+    useAppServices().live.bitcoinQrMode,
     undefined,
   );
 
@@ -130,15 +129,6 @@ export const usePayment = (id: string): Payment | null | undefined => {
 /** Every withdrawal, newest first; empty until read. */
 export const useWithdrawals = (): ReadonlyArray<Withdrawal> =>
   useFazoleRecords()?.withdrawals ?? [];
-
-/** What moved through the wallet, newest first; empty until read. */
-export const useWalletActivity = (limit?: number): WalletActivity[] => {
-  const records = useFazoleRecords();
-  return useMemo(
-    () => (records === null ? [] : walletActivity(records, limit)),
-    [records, limit],
-  );
-};
 
 /** The wallet balance in sats, total and per mint; `null` until read. */
 export const useWalletBalance = (): WalletBalances | null =>

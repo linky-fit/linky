@@ -75,7 +75,7 @@ export function SetupScreen() {
           <ShopFields form={form} />
           {failed ? <Notice tone="danger" title={copy.setup.failed} /> : null}
           <SubmitButton testID="setup-submit" loading={saving}>
-            {copy.setup.submit}
+            {form.empty ? copy.setup.later : copy.setup.submit}
           </SubmitButton>
         </Form>
         {noShop ? (

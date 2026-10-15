@@ -57,8 +57,8 @@ export const isSection = (route: Route): route is Section =>
 /**
  * Where a route lands in this account state: signed out only the welcome
  * flows open, a restore waits on the restoring screen, an account without a
- * shop sets one up, and a shop opens its sections, payments, the support
- * chat and the restore of another account.
+ * shop sets one up, and a shop opens its sections, payments and the support
+ * chat; another account is restored only after the device is reset.
  */
 export const resolveRoute = (route: Route, state: AccountState): Route => {
   switch (state) {
@@ -72,10 +72,7 @@ export const resolveRoute = (route: Route, state: AccountState): Route => {
     case "noShop":
       return "setup";
     case "ready":
-      return route === "restore" ||
-        route === supportRoute ||
-        isPaymentRoute(route) ||
-        isSection(route)
+      return route === supportRoute || isPaymentRoute(route) || isSection(route)
         ? route
         : "terminal";
   }

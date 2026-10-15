@@ -132,7 +132,7 @@ export function ShopPictureDialog({
       {picked === null ? (
         <Stack alignItems="center">
           <Avatar
-            name={shop.name}
+            name={shop.name ?? ""}
             uri={shop.picture ?? undefined}
             icon="Store"
             size="lg"
