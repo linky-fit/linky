@@ -25,7 +25,7 @@ import {
   type Payment,
   type ShopProfile,
 } from "../domain";
-import { formatCzkValue, formatWhole, shortNpub } from "../format";
+import { formatCzkValue, shortNpub } from "../format";
 import { copyText } from "../platform/clipboard";
 import { navigateTo } from "../platform/hashRoute";
 import type { BitcoinRequestFailure } from "../services/bitcoinPayments";
@@ -325,7 +325,6 @@ function BitcoinLeg({ payment }: { readonly payment: Payment }) {
   }
   const { invoice } = leg;
   const uri = buildBitcoinPaymentUri(invoice, leg.paymentRequest);
-  const sats = copy.satAmount(formatWhole(leg.sats));
   const copyLink = async () => {
     if (await copyText(lightningOnly ? invoice : uri)) setCopied(true);
   };
@@ -338,7 +337,7 @@ function BitcoinLeg({ payment }: { readonly payment: Payment }) {
         value={lightningOnly ? invoice.toUpperCase() : uri}
       />
       <Stack alignItems="center" gap="$md">
-        <Amount value={amount} unit={copy.czk} caption={sats} size="md" />
+        <Amount value={amount} unit={copy.czk} size="md" />
         <Row justifyContent="center" flexWrap="wrap" gap="$sm">
           {copied ? (
             <Pill
