@@ -1,17 +1,41 @@
 import { linkyUi } from "@linky-fit/ui/vite";
 import react from "@vitejs/plugin-react-swc";
+import { execSync } from "node:child_process";
 import fs from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import type { Plugin } from "vite";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
+import packageJson from "./package.json" with { type: "json" };
 
 const require = createRequire(import.meta.url);
 const sqliteWasmPath = path.join(
   path.dirname(require.resolve("@evolu/sqlite-wasm/package.json")),
   "sqlite-wasm/jswasm/sqlite3.wasm",
 );
+
+const shortCommitSha = (value: string | undefined) => {
+  const sha = (value ?? "").trim();
+  return /^[0-9a-f]{7,40}$/i.test(sha) ? sha.slice(0, 7) : "";
+};
+
+const commitSha = (() => {
+  const fromEnv = shortCommitSha(
+    process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT_SHA,
+  );
+  if (fromEnv) return fromEnv;
+  try {
+    return shortCommitSha(
+      execSync("git rev-parse --short=7 HEAD", {
+        cwd: import.meta.dirname,
+        stdio: ["ignore", "pipe", "ignore"],
+      }).toString(),
+    );
+  } catch {
+    return "";
+  }
+})();
 
 // Evolu's worker fetches sqlite3.wasm next to its module; the dev server must answer with the wasm MIME type.
 const serveSqliteWasm = (): Plugin => ({
@@ -36,7 +60,11 @@ const serveSqliteWasm = (): Plugin => ({
 });
 
 export default defineConfig({
-  define: { global: "globalThis" },
+  define: {
+    global: "globalThis",
+    __APP_VERSION__: JSON.stringify(packageJson.version),
+    __APP_COMMIT_SHA__: JSON.stringify(commitSha),
+  },
   plugins: [
     linkyUi(),
     serveSqliteWasm(),

@@ -7,6 +7,7 @@ import {
   Section,
   StatusDot,
   Switch,
+  Text,
 } from "@linky-fit/ui";
 import { useState } from "react";
 import { copy } from "../copy";
@@ -39,6 +40,10 @@ type OpenDialog =
   | "restore"
   | "reset"
   | "language";
+
+const versionLabel = __APP_COMMIT_SHA__
+  ? `${__APP_VERSION__} (${__APP_COMMIT_SHA__})`
+  : __APP_VERSION__;
 
 const hostOf = (url: string) => {
   try {
@@ -175,6 +180,14 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
           />
         </Card>
       </Section>
+      <Text
+        testID="settings-version"
+        variant="caption"
+        color="$colorMuted"
+        textAlign="center"
+      >
+        {versionLabel}
+      </Text>
 
       {dialog === "shop" ? (
         <EditShopDialog shop={shop} onClose={close} />
