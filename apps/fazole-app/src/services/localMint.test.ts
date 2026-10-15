@@ -7,21 +7,22 @@
 import {
   Amount,
   Bolt11Invoice,
+  encodePaymentRequestPayload,
   MintUrl,
+  PaymentRequestId,
   Send,
   SendDraft,
   Topup,
   TopupDraft,
 } from "@linky-fit/linkshu";
 import {
-  CashuTokenText,
   ChatMessageReceived,
   ClientId,
   EnqueueReceipt,
   OutboxJobId,
   OutboxRef,
   RumorId,
-  TokenBody,
+  TextBody,
   UnixSeconds,
 } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
@@ -82,8 +83,9 @@ const customerWallet = async (sats: number) => {
       ),
     ),
   );
-  const token = async (amount: number) =>
-    succeed(
+  /** The NUT-18 payload paying the request `requestId`. */
+  const payload = async (requestId: string, amount: number) => {
+    const receipt = succeed(
       await wallet.run(
         Effect.flatMap(Send, (send) =>
           send.send(
@@ -91,22 +93,30 @@ const customerWallet = async (sats: number) => {
               mint,
               amount: Amount.make(amount),
               produceAs: "issued",
+              includeRecipientFee: true,
             }),
           ),
         ),
       ),
-    ).tokenText;
+    );
+    return encodePaymentRequestPayload({
+      id: PaymentRequestId.make(requestId),
+      mint: receipt.mint,
+      unit: receipt.unit,
+      proofs: receipt.proofs,
+    });
+  };
   return {
-    token,
+    payload,
     invoiceFor: async (amount: number) => succeed(await invoiceFor(amount)),
   };
 };
 
-const tokenMessage = (token: string) =>
+const payloadMessage = (text: string) =>
   new ChatMessageReceived({
     messageId: RumorId.make("ab".repeat(32)),
     from: makeIdentity().pubkey,
-    body: new TokenBody({ token: CashuTokenText.make(token) }),
+    body: new TextBody({ text }),
     replyTo: null,
     root: null,
     editOf: null,
@@ -162,7 +172,7 @@ describe.runIf(mintAnswers)("the terminal at the local mint", () => {
         .toBe("paid");
       expect((await ledger.payment(lightning.id))?.method).toBe("lightning");
 
-      // Cashu: a token pays the request asking its sats; here the request has no invoice to race it.
+      // Cashu: a payload pays the request its id names; here the request has no invoice to race it.
       const cashu = await ledger.createPayment(CzkAmount.make(1_000));
       await ledger.attachBitcoinLeg(cashu, {
         sats: Sats.make(400),
@@ -177,17 +187,22 @@ describe.runIf(mintAnswers)("the terminal at the local mint", () => {
           paymentId: cashu.id,
         }),
       });
-      await deliverChat(tokenMessage(await customer.token(400)), "live");
+      await deliverChat(
+        payloadMessage(await customer.payload(cashu.id, 400)),
+        "live",
+      );
       expect(await ledger.payment(cashu.id)).toMatchObject({
         status: "paid",
         method: "cashu",
         cashuReceive: { sats: expect.any(Number) },
       });
 
-      // A further token for the Lightning payment's sats pays it again, kept as a receipt.
+      // A further payload for the Lightning payment pays it again, kept as a receipt.
       const lightningSats = (await ledger.payment(lightning.id))?.bitcoin?.sats;
       await deliverChat(
-        tokenMessage(await customer.token(lightningSats ?? 0)),
+        payloadMessage(
+          await customer.payload(lightning.id, lightningSats ?? 0),
+        ),
         "live",
       );
       expect((await ledger.records()).receipts).toMatchObject([
