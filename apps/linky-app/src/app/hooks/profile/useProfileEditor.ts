@@ -27,7 +27,6 @@ import {
   type OwnLightningAddressInputCandidate,
 } from "../../../utils/npubCashUsernameClaim";
 import { isHttpUrl } from "../../../utils/validation";
-import { applyLightningAddressToProfileMetadata } from "../../lib/profileMetadata";
 import { prepareProfilePicture } from "../../lib/profilePicture";
 import {
   effectiveProfileAtom,
@@ -155,12 +154,8 @@ export const useProfileEditor = () => {
   const currentNsec = useAtomValue(currentNsecAtom);
   const myProfileMetadata = useAtomValue(myProfileMetadataAtom);
   const myProfileStatus = useAtomValue(myProfileAtom, (my) => my.status);
-  const {
-    defaultLightningAddress,
-    effectiveMyLightningAddress,
-    effectiveProfileName,
-    effectiveProfilePicture,
-  } = useAtomValue(effectiveProfileAtom);
+  const { defaultLightningAddress, effectiveMyLightningAddress } =
+    useAtomValue(effectiveProfileAtom);
   const owned = useAtomValue(ownedLightningAddressesAtom);
   const { isProfileEditing, setIsProfileEditing, toggleProfileEditing } =
     useProfileEditing();
@@ -395,71 +390,17 @@ export const useProfileEditor = () => {
     unregisteredOwnLightningAddress,
   ]);
 
+  // A bought address is saved with the rest of the form at once; nothing is left to confirm.
   const saveClaimedLightningAddress = React.useCallback(
-    async (lightningAddress: string): Promise<boolean> => {
-      try {
-        if (!currentNpub || !currentNsec) {
-          setStatus(t("profileMissingNpub"));
-          return false;
-        }
-
-        const prev =
-          myProfileMetadata ??
-          loadCachedProfile(currentNpub)?.metadata ??
-          new ProfileMetadata({});
-        const next = applyLightningAddressToProfileMetadata(
-          prev,
-          lightningAddress,
-        );
-
-        const publishExit = await publishProfile(next.metadata);
-        if (Exit.isFailure(publishExit)) throw new Error("publish failed");
-
-        const bestName = getBestNostrName(next.metadata);
-        const picture = (
-          next.metadata.picture ??
-          effectiveProfilePicture ??
-          ""
-        ).trim();
-        const statusText =
-          parseProfileGeneralStatus(myProfileStatus).text ?? "";
-
-        saveCachedProfile(currentNpub, next.metadata, nowSeconds());
-        setMyProfileMetadata(next.metadata);
-        updateMyProfile({
-          lnAddress: next.lightningAddress || null,
-          name: bestName ?? effectiveProfileName,
-          picture: picture || effectiveProfilePicture,
-        });
-
-        const saved = {
-          lnAddress: next.lightningAddress,
-          name: bestName ?? effectiveProfileName ?? "",
-          picture,
-          status: statusText,
-        };
-        updateDraft({ ...saved, initial: saved });
-
-        return true;
-      } catch (error) {
-        setStatus(`${t("errorPrefix")}: ${String(error ?? "unknown")}`);
-        return false;
-      }
-    },
-    [
-      currentNpub,
-      currentNsec,
-      effectiveProfileName,
-      effectiveProfilePicture,
-      myProfileMetadata,
-      myProfileStatus,
-      publishProfile,
-      setMyProfileMetadata,
-      setStatus,
-      t,
-      updateDraft,
-      updateMyProfile,
-    ],
+    (lightningAddress: string): Promise<boolean> =>
+      persistProfileValues({
+        lightningAddress,
+        name: draft.name,
+        navigateToProfile: true,
+        picture: draft.picture,
+        status: draft.status,
+      }),
+    [draft.name, draft.picture, draft.status, persistProfileValues],
   );
 
   const onPickProfilePhoto = React.useCallback(async () => {

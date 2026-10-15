@@ -5,7 +5,7 @@ import { getUnknownErrorMessage } from "./unknown";
 import { asNonEmptyString, asRecord } from "./validation";
 import { nowSeconds, sleep } from "./time";
 
-const OWN_LIGHTNING_ADDRESS_DOMAIN = "linky.fit";
+export const OWN_LIGHTNING_ADDRESS_DOMAIN = "linky.fit";
 const OWN_LIGHTNING_USERNAME_MIN_LENGTH = 3;
 
 const OWN_LIGHTNING_USERNAME_RE = /^(?!npub1)[a-z0-9]+$/i;
