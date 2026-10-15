@@ -10,6 +10,8 @@ Každá vydaná verze musí obsahovat nejprve `en-US` a potom `cs-CZ`.
 
 ## [Unreleased]
 
+## [26.10.2] - 2026-10-15
+
 ### en-US
 
 - Welcome screen with a language switch and two plain choices: a new business or restoring an existing one.
