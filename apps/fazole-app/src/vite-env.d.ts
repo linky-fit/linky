@@ -1,6 +1,10 @@
 /// <reference types="vite-plugin-pwa/client" />
 /// <reference types="vite/client" />
 
+declare const __APP_VERSION__: string;
+/** Short commit sha of the build; empty when unknown. */
+declare const __APP_COMMIT_SHA__: string;
+
 interface ImportMetaEnv {
   /** Comma-separated Nostr relay URLs; replaces Linky's recommended relays. */
   readonly VITE_NOSTR_RELAYS?: string;
