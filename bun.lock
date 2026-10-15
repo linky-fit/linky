@@ -21,7 +21,7 @@
     },
     "apps/fazole-app": {
       "name": "@linky-fit/fazole-app",
-      "version": "26.10.1",
+      "version": "26.10.2",
       "dependencies": {
         "@evolu/common": "7.4.1",
         "@evolu/web": "2.4.0",
