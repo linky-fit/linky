@@ -10,14 +10,27 @@ const Transport = Schema.Struct({
   g: Schema.optional(Schema.Array(Schema.Array(Schema.String))),
 });
 
+const Nut10 = Schema.Struct({
+  k: Schema.String,
+  d: Schema.String,
+  t: Schema.optional(Schema.Array(Schema.Array(Schema.String))),
+});
+
 const Payload = Schema.Struct({
   a: Schema.optional(Schema.Number),
   d: Schema.optional(Schema.String),
   i: Schema.optional(Schema.String),
   m: Schema.optional(Schema.Array(Schema.String)),
+  mp: Schema.optional(Schema.Boolean),
+  sm: Schema.optional(
+    Schema.Array(
+      Schema.Struct({ mn: Schema.String, mf: Schema.optional(Schema.Number) }),
+    ),
+  ),
   s: Schema.optional(Schema.Boolean),
   t: Schema.optional(Schema.Array(Transport)),
   u: Schema.optional(Schema.String),
+  nut10: Schema.optional(Nut10),
 });
 type Payload = typeof Payload.Type;
 
@@ -46,13 +59,32 @@ const decodeBase64Url = (value: string): Uint8Array | null => {
   }
 };
 
+/**
+ * The `i` of a NUT-18 request, which the payer echoes as the payload's `id`.
+ * The requester picks it; it is not a Nostr event id.
+ */
+export const PaymentRequestId = Schema.Trimmed.check(Schema.isNonEmpty()).pipe(
+  Schema.brand("PaymentRequestId"),
+);
+export type PaymentRequestId = typeof PaymentRequestId.Type;
+
+const isPaymentRequestId = Schema.is(PaymentRequestId);
+
+const paymentRequestIdOrNull = (
+  value: string | null | undefined,
+): PaymentRequestId | null => {
+  const trimmed = trimmedOrNull(value);
+  return trimmed !== null && isPaymentRequestId(trimmed) ? trimmed : null;
+};
+
 export interface NostrPaymentRequestArgs {
   /** Sats requested. */
   readonly amount: number;
   readonly mintUrls: ReadonlyArray<string>;
   /** Where the payer sends the token, as a NIP-17 message. */
   readonly recipientNprofile: string;
-  readonly requestId?: string | null | undefined;
+  /** Lets the payee match the payment to this request. */
+  readonly requestId: PaymentRequestId;
   readonly description?: string | null | undefined;
 }
 
@@ -65,15 +97,14 @@ export interface NostrPaymentRequestArgs {
 export const encodeNostrPaymentRequest = (
   args: NostrPaymentRequestArgs,
 ): string => {
-  const requestId = trimmedOrNull(args.requestId);
   const description = trimmedOrNull(args.description);
   const payload: Payload = {
     a: args.amount,
     u: "sat",
     s: true,
-    m: args.mintUrls.flatMap((mint) => trimmedOrNull(mint) ?? []),
+    m: [...new Set(args.mintUrls.flatMap((mint) => trimmedOrNull(mint) ?? []))],
     t: [{ t: "nostr", a: args.recipientNprofile, g: [["n", "17"]] }],
-    ...(requestId === null ? {} : { i: requestId }),
+    i: args.requestId,
     ...(description === null ? {} : { d: description }),
   };
   return `${PAYMENT_REQUEST_PREFIX}${encodeBase64Url(encode(payload))}`;
@@ -87,6 +118,23 @@ export interface PaymentRequestTransport {
   readonly tags: ReadonlyArray<ReadonlyArray<string>>;
 }
 
+/** NUT-10 spending condition the payer has to lock the proofs with. */
+export interface PaymentRequestLock {
+  /** `P2PK` or `HTLC` in NUT-10; as sent. */
+  readonly kind: string;
+  /** The condition's data, a public key for `P2PK`. */
+  readonly data: string;
+  readonly tags: ReadonlyArray<ReadonlyArray<string>>;
+}
+
+/** A way the payee can melt the ecash out (`sm`), with what that costs it. */
+export interface PaymentRequestMethod {
+  /** `bolt11`, `bolt12` or `onchain` in NUT-18; as sent, lowercased. */
+  readonly method: string;
+  /** Sats the payer adds when paying from a mint outside `mints` (`mf`). */
+  readonly fee: number;
+}
+
 export interface DecodedPaymentRequest {
   /** The trimmed `creqA…` text. */
   readonly encoded: string;
@@ -95,9 +143,14 @@ export interface DecodedPaymentRequest {
   readonly unit: string | null;
   readonly singleUse: boolean | null;
   readonly mints: ReadonlyArray<string>;
+  /** `mp`: the payee also accepts other mints, preferring `mints`; false without `mints`. */
+  readonly mintsAdvisory: boolean;
+  readonly methods: ReadonlyArray<PaymentRequestMethod>;
   readonly description: string | null;
-  readonly id: string | null;
+  readonly id: PaymentRequestId | null;
   readonly transports: ReadonlyArray<PaymentRequestTransport>;
+  /** Null for bearer proofs. */
+  readonly lock: PaymentRequestLock | null;
 }
 
 /** A `creqA…` NUT-18 request; null for anything else. Nothing is validated beyond its shape. */
@@ -115,20 +168,68 @@ export const decodePaymentRequest = (
     return null;
   }
   if (!isPayload(decoded)) return null;
+  const mints = (decoded.m ?? []).flatMap((mint) => trimmedOrNull(mint) ?? []);
   return {
     encoded,
     amount: decoded.a ?? null,
     unit: trimmedOrNull(decoded.u)?.toLowerCase() ?? null,
     singleUse: decoded.s ?? null,
-    mints: (decoded.m ?? []).flatMap((mint) => trimmedOrNull(mint) ?? []),
+    mints,
+    mintsAdvisory: decoded.mp === true && mints.length > 0,
+    methods: (decoded.sm ?? []).map((method) => ({
+      method: method.mn.trim().toLowerCase(),
+      fee: Math.max(0, method.mf ?? 0),
+    })),
     description: trimmedOrNull(decoded.d),
-    id: trimmedOrNull(decoded.i),
+    id: paymentRequestIdOrNull(decoded.i),
     transports: (decoded.t ?? []).map((transport) => ({
       type: transport.t.trim(),
       target: transport.a.trim(),
       tags: transport.g ?? [],
     })),
+    lock:
+      decoded.nut10 === undefined
+        ? null
+        : {
+            kind: decoded.nut10.k.trim(),
+            data: decoded.nut10.d.trim(),
+            tags: decoded.nut10.t ?? [],
+          },
   };
+};
+
+/** The NUT-18 payment payload a payer sends to a request's transport. */
+export interface PaymentRequestPayload {
+  /** The `id` of the request it pays. */
+  readonly id?: PaymentRequestId | null | undefined;
+  readonly memo?: string | null | undefined;
+  readonly mint: string;
+  readonly unit: string;
+  /** `SendReceipt.proofs`; they keep full keyset ids, which the payee needs. */
+  readonly proofs: ReadonlyArray<{
+    readonly id: string;
+    readonly amount: number;
+    readonly secret: string;
+    readonly C: string;
+  }>;
+}
+
+/**
+ * The payload as the JSON text every transport carries: the body of a
+ * `post`, the content of a `nostr` message. `id` and `memo` are left out
+ * when empty.
+ */
+export const encodePaymentRequestPayload = (
+  payload: PaymentRequestPayload,
+): string => {
+  const memo = trimmedOrNull(payload.memo);
+  return JSON.stringify({
+    ...(payload.id ? { id: payload.id } : {}),
+    ...(memo === null ? {} : { memo }),
+    mint: payload.mint,
+    unit: payload.unit,
+    proofs: payload.proofs,
+  });
 };
 
 const PaymentPayload = Schema.fromJsonString(
@@ -146,7 +247,7 @@ const decodePaymentPayload = Schema.decodeUnknownOption(PaymentPayload);
 
 export interface PaymentRequestPayloadSummary {
   /** The `id` of the request it pays, when the payer echoed it. */
-  readonly requestId: string | null;
+  readonly requestId: PaymentRequestId | null;
   readonly mint: string;
   readonly unit: string;
   readonly memo: string | null;
@@ -156,7 +257,8 @@ export interface PaymentRequestPayloadSummary {
 
 /**
  * The NUT-18 payment payload a payer sends over a transport
- * (`{id, memo, mint, unit, proofs}` JSON), for matching it to the request.
+ * (`{id, memo, mint, unit, proofs}` JSON), for matching it to the request
+ * by `requestId`.
  * Receive the text itself with `Receive.receive`, which accepts the same
  * JSON. Null for anything else, a bare `cashuA`/`cashuB` token included.
  */
@@ -166,7 +268,7 @@ export const decodePaymentRequestPayload = (
   Option.match(decodePaymentPayload(text.trim()), {
     onNone: () => null,
     onSome: (payload) => ({
-      requestId: trimmedOrNull(payload.id),
+      requestId: paymentRequestIdOrNull(payload.id),
       mint: payload.mint.trim(),
       unit: payload.unit.trim().toLowerCase(),
       memo: trimmedOrNull(payload.memo),

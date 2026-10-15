@@ -6,6 +6,7 @@ import {
   extractTokenText,
   normalizeTokenText,
   parseTokenText,
+  tokenProofSecrets,
 } from "./codec";
 import { DecodedToken, ParsedToken, Proof } from "./domain";
 
@@ -265,6 +266,36 @@ describe("decodeTokenText", () => {
         ],
       }),
     );
+  });
+});
+
+describe("tokenProofSecrets", () => {
+  it("names the same proofs as v4 text with a short keyset id, v3 text and a NUT-18 payload", () => {
+    const payload = JSON.stringify({
+      id: "pay-1",
+      mint: "https://mint.example",
+      unit: "sat",
+      proofs: [
+        { id: V2_KEYSET_ID, amount: 21, secret: "test-secret", C: HEX_C },
+      ],
+    });
+    const v3 = buildV3Token({
+      mint: "https://mint.example",
+      proofs: [
+        { id: V1_KEYSET_ID, amount: 21, secret: "test-secret", C: HEX_C },
+      ],
+    });
+
+    expect(tokenProofSecrets(buildV4Token(V2_KEYSET_ID))).toEqual(
+      new Set(["test-secret"]),
+    );
+    expect(tokenProofSecrets(v3)).toEqual(new Set(["test-secret"]));
+    expect(tokenProofSecrets(payload)).toEqual(new Set(["test-secret"]));
+  });
+
+  it("returns null for text that is not a token", () => {
+    expect(tokenProofSecrets("hello")).toBeNull();
+    expect(tokenProofSecrets("cashuBnotcbor")).toBeNull();
   });
 });
 

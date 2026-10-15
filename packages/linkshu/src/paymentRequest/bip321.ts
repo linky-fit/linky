@@ -157,25 +157,37 @@ export interface Bip321PayableLeg {
   value: string;
 }
 
+export interface PickBip321PayableLegOptions {
+  /**
+   * Whether the wallet can pay the `creq` leg from a mint it holds. When it
+   * cannot, a Lightning leg goes first and `creq` is the last resort.
+   * Defaults to true.
+   */
+  readonly canPayCashuRequest?: (creq: string) => boolean;
+}
+
 /**
  * Pick the best payment leg from a BIP 321 URI that Linky can actually
- * settle. Order matches what most senders intend when they include
- * multiple rails:
+ * settle:
  *
- *   1. `creq=` (Cashu request) — native Cashu transfer over Nostr.
+ *   1. `creq=` (Cashu request), when `canPayCashuRequest` accepts it.
  *   2. `lightning=` (BOLT11) — exact invoice with locked amount.
  *   3. `lnurl=` — LNURL-pay; user picks amount within mint/max.
  *   4. Lightning address in the address part of the URI.
+ *   5. `creq=` the wallet cannot pay from a mint it holds.
  *
  * Returns `null` when the URI has only onchain content (Linky doesn't
  * settle onchain) or an unsupported rail (BOLT12, Ark, silent payments).
  */
 export const pickBip321PayableLeg = (
   parsed: Bip321Parsed,
+  { canPayCashuRequest = () => true }: PickBip321PayableLegOptions = {},
 ): Bip321PayableLeg | null => {
-  if (parsed.creq && /^creqA/i.test(parsed.creq)) {
-    return { kind: "cashu-request", value: parsed.creq };
-  }
+  const creq =
+    parsed.creq && /^creqA/i.test(parsed.creq)
+      ? ({ kind: "cashu-request", value: parsed.creq } as const)
+      : null;
+  if (creq && canPayCashuRequest(creq.value)) return creq;
   if (parsed.lightning && /^(lnbc|lntb|lnbcrt)/i.test(parsed.lightning)) {
     return { kind: "lightning", value: parsed.lightning };
   }
@@ -185,5 +197,5 @@ export const pickBip321PayableLeg = (
   if (parsed.lnAddress) {
     return { kind: "ln-address", value: parsed.lnAddress };
   }
-  return null;
+  return creq;
 };

@@ -63,7 +63,7 @@ The mint must list NUT-11 in its info (`Mints.info(mint).supportsP2pk`); otherwi
 
 ### Fees
 
-Sends are exact-amount: the recipient receives `amount`. The mint's input fee comes out of the change, so `feePaid = offered - amount - changeAmount`. If the offered proofs cannot cover `amount` plus the fee, the mint's rejection is reported as `InsufficientFunds`. There is no amount step-down in the package; the caller decides whether to retry lower.
+Sends are exact-amount: the recipient receives `amount`. The mint's input fee comes out of the change, so `feePaid = offered - amount - changeAmount`. With `includeRecipientFee: true` the send also carries the input fee its recipient pays to redeem the proofs, so the recipient nets `amount`; the receipt's `amount` is then the larger face value. A NUT-18 payment needs it, because request amounts are net of that fee. If the offered proofs cannot cover `amount` plus the fee, the mint's rejection is reported as `InsufficientFunds`. There is no amount step-down in the package; the caller decides whether to retry lower.
 
 ## Errors
 

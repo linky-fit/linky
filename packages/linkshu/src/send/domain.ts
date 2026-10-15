@@ -33,6 +33,11 @@ export class SendDraft extends Schema.Class<SendDraft>("SendDraft")({
    * holder can receive the token. Build it with `parseP2pkPubkey`.
    */
   lockTo: Schema.optional(P2pkPubkey),
+  /**
+   * Adds the input fee the recipient pays to redeem the sent proofs, so it
+   * nets `amount`; NUT-18 request amounts are net of that fee.
+   */
+  includeRecipientFee: Schema.optional(Schema.Boolean),
 }) {}
 
 export class SendReceipt extends Schema.Class<SendReceipt>("SendReceipt")({

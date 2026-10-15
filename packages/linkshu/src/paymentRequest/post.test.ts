@@ -1,3 +1,4 @@
+import { PaymentRequestId } from "./nut18";
 import {
   isAllowedPaymentRequestPostUrl,
   postPaymentRequestPayload,
@@ -10,7 +11,7 @@ const proof = {
   C: "02" + "ab".repeat(32),
 };
 const payload = {
-  id: "req-1",
+  id: PaymentRequestId.make("req-1"),
   memo: "coffee",
   mint: "https://mint.example",
   unit: "sat",
