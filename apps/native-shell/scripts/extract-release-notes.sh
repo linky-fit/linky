@@ -2,15 +2,15 @@
 set -euo pipefail
 
 if [[ $# -lt 2 || $# -gt 3 ]]; then
-  echo "Usage: $0 <version-or-tag> <output-path> [locale]" >&2
+  echo "Usage: [CHANGELOG=<path>] $0 <version-or-tag> <output-path> [locale]" >&2
   exit 1
 fi
 
-version="${1#v}"
+version="${1#*v}"
 output_path="$2"
 locale="${3:-}"
 root_dir="$(cd "$(dirname "$0")/../../.." && pwd)"
-changelog_path="$root_dir/CHANGELOG.md"
+changelog_path="${CHANGELOG:-$root_dir/CHANGELOG.md}"
 
 if [[ ! -f "$changelog_path" ]]; then
   echo "Missing changelog: $changelog_path" >&2

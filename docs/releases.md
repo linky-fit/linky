@@ -1,12 +1,14 @@
 # Releases
 
-How each Linky target ships, what you do for it, and how to recover when a run fails.
+How each Linky and Fazole target ships, what you do for it, and how to recover when a run fails.
 
 | Target                                                                | Ships                                  | You do                              |
 | --------------------------------------------------------------------- | -------------------------------------- | ----------------------------------- |
 | Nightly `nightly.app.linky.fit`                                       | every push to `main`                   | nothing                             |
+| Fazole nightly                                                        | every push to `main`                   | nothing                             |
 | App: `app.linky.fit`, Google Play, macOS DMG, Zapstore                | a new version merged to `main`         | [release PR](#app)                  |
-| Site `linky.fit`                                                      | every push to `main`, after its checks | nothing                             |
+| Fazole app                                                            | a new version merged to `main`         | [release PR](#fazole)               |
+| Site `linky.fit`, site `fazole.fit`                                   | every push to `main`, after its checks | nothing                             |
 | Error tracker                                                         | every push to `main`, after its checks | nothing                             |
 | Push server `push.linky.fit`                                          | a manual run                           | [run Release · push](#push-server)  |
 | npm `@linky-fit/linkshu`, `@linky-fit/linkstr`, `@linky-fit/linkauth` | a `packages-v*` tag                    | [version PR and tag](#npm-packages) |
@@ -56,15 +58,27 @@ Don't open a PR from a hotfix branch; the push already runs `CI`, and a PR would
 
 Use Instant Rollback in the Vercel web-app project. It lasts until the next release moves `production`. Google Play and Zapstore have no rollback; ship a hotfix instead.
 
+## Fazole
+
+The fazole app releases on its own, the same way as the [app](#app): its version is in `apps/fazole-app/package.json` and its notes in `apps/fazole-app/CHANGELOG.md`, and both stay apart from Linky's.
+
+1. On a branch from `main`, move the `[Unreleased]` entries of `apps/fazole-app/CHANGELOG.md` under `## [<version>] - <date>`, `en-US` first, then `cs-CZ`, and leave an empty `## [Unreleased]` above.
+2. Set `version` in `apps/fazole-app/package.json` and in the `apps/fazole-app` entry of `bun.lock`.
+3. Open a PR and merge it once its checks pass.
+
+When `CI` succeeds on the merged commit, `release-fazole.yml` confirms the six checks and, because `fazole-v<version>` has no tag yet, creates that tag and its GitHub release, then moves `fazole-production` to it and Vercel deploys it. A PR that bumps both apps releases both. Failures, hotfixes and republishing work as for the app, with `fazole-v<version>` tags and `Release · fazole`. Rollback is Instant Rollback in the Vercel fazole-app project.
+
+Every push to `main` deploys the fazole app's nightly, like Linky's.
+
 ## Nightly
 
 Every push to `main` deploys to `nightly.app.linky.fit` right away, against production relays, Evolu servers, mints and the push server. Settings > Advanced shows `<last release> nightly (<sha>)`.
 
 A nightly device writes to the same Evolu owner, Nostr relays and mints as prod devices for a whole release cycle, so whatever nightly writes must stay readable by the last release. Nightly is a separate origin with its own local storage: restore from the seed, and it joins the account as one more device.
 
-## Site and error tracker
+## Sites and error tracker
 
-Every push to `main` builds both on Vercel, and each goes live once its Deployment Checks pass on that commit: `lint`, `unit-tests` and `site-e2e` for the site, `lint` and `unit-tests` for the error tracker. A failing check keeps the previous deployment live; the next passing push replaces it.
+Every push to `main` builds them on Vercel, and each goes live once its Deployment Checks pass on that commit: `lint`, `unit-tests` and `site-e2e` for the Linky site, `lint` and `unit-tests` for the Fazole site and the error tracker. A failing check keeps the previous deployment live; the next passing push replaces it.
 
 They ship ahead of the app, so their APIs must keep working with the last app release as well as with nightly.
 
@@ -95,10 +109,13 @@ Like the site, the push server ships ahead of the app and must keep working with
 
 - Web-app project: production branch `production` with domain `app.linky.fit` and no Deployment Checks, because `release-app.yml` gates it. Custom Environment `nightly` tracks `main` with domain `nightly.app.linky.fit`, the same environment variables as Production and no Deployment Protection on its domain.
 - Site project: Deployment Checks `lint`, `unit-tests` and `site-e2e`.
+- Fazole app project: production branch `fazole-production` and no Deployment Checks, because `release-fazole.yml` gates it. Custom Environment `nightly` tracks `main`, like the web-app's.
+- Fazole site project: Deployment Checks `lint` and `unit-tests`.
 - Error tracker project: Deployment Checks `lint` and `unit-tests`.
 - The `main` ruleset requires a merge queue and the status check `ci-ok`, without requiring branches to be up to date.
 - The `production` branch has a ruleset that restricts updates and deletions, with the `Linky releases` GitHub App as the only bypass. `release-app.yml` pushes with that app's token, whose credentials (variable `RELEASE_APP_CLIENT_ID`, secret `RELEASE_APP_PRIVATE_KEY`) live in the `Production` environment, which admits only `main` and `v*` tags (a release started by `CI` runs in `main`'s context, hotfixes included); `GITHUB_TOKEN` can't bypass rulesets, and the organization blocks deploy keys.
-- Tags `v*` and `packages-v*` have a ruleset that restricts updates and deletions. Creation stays open, because the release creates `v<version>` with `GITHUB_TOKEN`.
+- The `fazole-production` branch has the same ruleset as `production`. The `Fazole production` environment holds the same release app credentials and admits only `main` and `fazole-v*` tags.
+- Tags `v*`, `fazole-v*` and `packages-v*` have a ruleset that restricts updates and deletions. Creation stays open, because the releases create their tags with `GITHUB_TOKEN`.
 - The `zapstore` environment admits `main` and `v*` tags, so a release run started from a tag can publish.
 - npm: the trusted publisher of both packages names `release-npm.yml`, with no environment or the `npm` environment.
 - The README badges read GitHub deployments: `Production` (app release), `Production – linky-website` (Vercel), `push` (`release-push.yml`) and `npm` (`release-npm.yml`). A job using an environment records a deployment, and GitHub creates the `push` and `npm` environments on their first run.

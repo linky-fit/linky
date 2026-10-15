@@ -1,0 +1,66 @@
+name: Resolve release
+description: Name the commit and tag an app release ships, and require passing CI when that tag is new
+
+inputs:
+  manifest:
+    description: package.json whose version names the release
+    required: true
+  tag-prefix:
+    description: Prefix of the release tag, followed by the version
+    required: true
+
+outputs:
+  release-tag:
+    description: Tag the release ships as
+    value: ${{ steps.metadata.outputs.release_tag }}
+  publish:
+    description: Whether the release still has to be published
+    value: ${{ steps.metadata.outputs.publish }}
+  sha:
+    description: Commit the release ships
+    value: ${{ steps.metadata.outputs.sha }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve release tag
+      id: metadata
+      shell: bash
+      env:
+        SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        MANIFEST: ${{ inputs.manifest }}
+        PREFIX: ${{ inputs.tag-prefix }}
+      run: |
+        set -euo pipefail
+        publish=true
+        if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$GITHUB_REF_TYPE" == "tag" ]]; then
+          if [[ "$GITHUB_REF_NAME" != "$PREFIX"* ]]; then
+            echo "$GITHUB_REF_NAME is not a $PREFIX* tag" >&2
+            exit 1
+          fi
+          release_tag="$GITHUB_REF_NAME"
+        else
+          git fetch --quiet --depth 1 origin "$SHA"
+          release_tag="$PREFIX$(git show "$SHA:$MANIFEST" | jq -r .version)"
+          if git ls-remote --exit-code --tags origin "refs/tags/$release_tag" >/dev/null; then
+            echo "Tag $release_tag already exists; run the workflow from that tag to republish it."
+            publish=false
+          fi
+        fi
+
+        if [[ "$release_tag" == "$PREFIX" || "$release_tag" == "${PREFIX}null" ]]; then
+          echo "Missing release version in $MANIFEST" >&2
+          exit 1
+        fi
+
+        {
+          echo "release_tag=$release_tag"
+          echo "publish=$publish"
+          echo "sha=$SHA"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Require passing CI on the release commit
+      if: steps.metadata.outputs.publish == 'true'
+      uses: ./.github/actions/require-ci
+      with:
+        sha: ${{ steps.metadata.outputs.sha }}
