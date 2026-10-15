@@ -178,7 +178,7 @@ export const en: Copy = {
     directAmount: (sats: string, czk: string | null) =>
       czk === null ? `${sats} sat` : `${sats} sat · ≈ ${czk} CZK`,
     receivedAt: "Received",
-    hide: "Hide from history",
+    hide: "Delete",
     hideConfirmDescription:
       "It disappears from the history and the day total. The money stays in the wallet.",
   },

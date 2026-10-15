@@ -260,7 +260,7 @@ function EntryDetail({
         <Button
           testID="history-hide"
           variant="ghost"
-          icon="EyeOff"
+          icon="Trash2"
           onPress={onHide}
         >
           {copy.history.hide}
