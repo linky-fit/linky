@@ -22,7 +22,7 @@ Shells that run inside Electron (T3 Code) export `ELECTRON_RUN_AS_NODE=1`; unset
 bun run desktop:mac         # apps/desktop/release/linky-mac-arm64.dmg
 ```
 
-The version comes from the root `package.json`. The build is ad-hoc signed and not notarized, so on first launch macOS refuses to open it until the user allows it in System Settings > Privacy & Security > "Open Anyway", and again after each downloaded update.
+The version comes from `apps/linky-app/package.json`. The build is ad-hoc signed and not notarized, so on first launch macOS refuses to open it until the user allows it in System Settings > Privacy & Security > "Open Anyway", and again after each downloaded update.
 
 Developer ID signing and notarization would allow in-place updates (electron-updater) and a clean first launch. They need a "Developer ID Application" certificate and an App Store Connect API key from Apple team `2K8ST4234F`.
 

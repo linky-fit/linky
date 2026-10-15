@@ -1,6 +1,6 @@
 # Linky
 
-[![Release](https://img.shields.io/github/v/release/linky-fit/linky?label=release)](https://github.com/linky-fit/linky/releases/latest)
+[![Release](https://img.shields.io/github/v/release/linky-fit/linky?label=release&display_name=release)](https://github.com/linky-fit/linky/releases/latest)
 [![app.linky.fit](https://img.shields.io/github/deployments/linky-fit/linky/Production?label=app.linky.fit)](https://github.com/linky-fit/linky/deployments/Production)
 [![linky.fit](https://img.shields.io/github/deployments/linky-fit/linky/Production%20%E2%80%93%20linky-website?label=linky.fit)](https://github.com/linky-fit/linky/deployments/Production%20%E2%80%93%20linky-website)
 [![push.linky.fit](https://img.shields.io/github/deployments/linky-fit/linky/push?label=push.linky.fit)](https://github.com/linky-fit/linky/deployments/push)

@@ -20,12 +20,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const sqliteWasmPath = path.join(__dirname, "public/sqlite-wasm/sqlite3.wasm");
-const workspacePackageJsonPath = path.join(
-  __dirname,
-  "..",
-  "..",
-  "package.json",
-);
+const packageJsonPath = path.join(__dirname, "package.json");
 
 const isUnknownRecord = (value: unknown): value is Record<string, unknown> => {
   return value !== null && typeof value === "object";
@@ -33,7 +28,7 @@ const isUnknownRecord = (value: unknown): value is Record<string, unknown> => {
 
 const appVersion = (() => {
   try {
-    const raw = readFileSync(workspacePackageJsonPath, "utf8");
+    const raw = readFileSync(packageJsonPath, "utf8");
     const pkg = JSON.parse(raw);
     if (!isUnknownRecord(pkg)) return "0.0.0";
     const version = pkg.version;
