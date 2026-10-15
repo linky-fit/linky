@@ -37,6 +37,14 @@ const LINKY_PAYMENT_REQUEST_DECLINE_PREFIX = "linky:req-decline:v1";
 
 export const buildCashuPaymentRequestMessage = encodeNostrPaymentRequest;
 
+/** A transport naming no NIPs is taken to speak NIP-17, like Linky's own requests. */
+const acceptsNip17 = (tags: ReadonlyArray<ReadonlyArray<string>>) => {
+  const nips = tags
+    .filter(([key]) => key === "n")
+    .flatMap(([, ...values]) => values);
+  return nips.length === 0 || nips.includes("17");
+};
+
 /**
  * A NUT-18 request Linky can pay: sat, a positive amount or none, and at most
  * a plain P2PK lock (`lockTo` takes one key and no extra conditions).
@@ -66,7 +74,9 @@ export const parseCashuPaymentRequestMessage = (
   const nostrTransport =
     decoded.transports.find(
       (transport) =>
-        transport.type === "nostr" && decodeNprofile(transport.target) !== null,
+        transport.type === "nostr" &&
+        acceptsNip17(transport.tags) &&
+        decodeNprofile(transport.target) !== null,
     ) ?? null;
   const nostrTarget = nostrTransport?.target ?? "";
   const nprofile = nostrTarget ? decodeNprofile(nostrTarget) : null;
