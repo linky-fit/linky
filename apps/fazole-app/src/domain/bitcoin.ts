@@ -1,13 +1,13 @@
 import {
   buildBip321PaymentUri,
-  decodePaymentRequest,
   decodePaymentRequestPayload,
   encodeNostrPaymentRequest,
   extractTokenText,
   parseTokenText,
+  PaymentRequestId,
 } from "@linky-fit/linkshu";
 import { Sats } from "./money";
-import type { PaymentStatus } from "./payment";
+import type { Payment } from "./records";
 
 /**
  * The NUT-18 request a customer's Cashu wallet pays: `sats` at the shop mint,
@@ -24,7 +24,7 @@ export const buildCashuRequest = (request: {
     amount: request.sats,
     mintUrls: [request.mintUrl],
     recipientNprofile: request.deviceNprofile,
-    requestId: request.paymentId,
+    requestId: PaymentRequestId.make(request.paymentId),
   });
 
 /** `bitcoin:?lightning=<bolt11>&creq=<creqA…>`: a wallet pays whichever leg it understands. */
@@ -34,10 +34,6 @@ export const buildBitcoinPaymentUri = (
 ): string =>
   buildBip321PaymentUri({ lightning: invoice, creq: cashuRequest }) ??
   `bitcoin:?lightning=${invoice}`;
-
-/** The mint a stored Cashu request is payable at. */
-export const cashuRequestMint = (cashuRequest: string): string | null =>
-  decodePaymentRequest(cashuRequest)?.mints[0] ?? null;
 
 /** What an incoming Cashu token or NUT-18 payload offers, read before receiving it. */
 export interface IncomingCashu {
@@ -53,8 +49,9 @@ export interface IncomingCashu {
 }
 
 /**
- * Reads a chat message's text: Linky sends a bare `cashuB…` token, other
- * wallets the NUT-18 payload JSON. `null` when it carries no token.
+ * Reads a chat message's text: a wallet paying a request sends the NUT-18
+ * payload JSON, a Linky user paying from the chat a bare `cashuB…` token.
+ * `null` when it carries no token.
  */
 export const readIncomingCashu = (text: string): IncomingCashu | null => {
   const payload = decodePaymentRequestPayload(text);
@@ -75,111 +72,27 @@ export const readIncomingCashu = (text: string): IncomingCashu | null => {
     : null;
 };
 
-/** A payment whose Bitcoin request a token can still pay. */
-export interface OpenBitcoinPayment {
-  readonly id: string;
-  readonly status: PaymentStatus;
-  readonly sats: Sats;
-  readonly mintUrl: string;
-  readonly createdAtSec: number;
-}
-
-/** How long an unpaid request keeps its amount, so a token that pays it late still finds it. */
-export const OPEN_REQUEST_SEC = 24 * 60 * 60;
-
-/** An unpaid request, also a cancelled one, from the last `OPEN_REQUEST_SEC`. */
-export const isOpenBitcoinRequest = (
-  payment: { readonly status: PaymentStatus; readonly createdAtSec: number },
-  nowSec: number,
-): boolean =>
-  payment.status !== "paid" && nowSec - payment.createdAtSec < OPEN_REQUEST_SEC;
-
-/**
- * The sats a new request asks: `sats`, raised a sat at a time past every
- * amount an open request asks, because a bare token names no request and is
- * matched by its amount alone.
- */
-export const uniqueRequestSats = (
-  sats: Sats,
-  open: ReadonlyArray<{ readonly sats: number }>,
-): Sats => {
-  const taken = new Set(open.map((payment) => payment.sats));
-  let unique: number = sats;
-  while (taken.has(unique)) unique += 1;
-  return Sats.make(unique);
-};
-
 const normalizeMint = (mint: string) =>
   mint.trim().replace(/\/+$/u, "").toLowerCase();
 
-export const sameMint = (a: string, b: string): boolean =>
-  normalizeMint(a) === normalizeMint(b);
-
 /**
- * The payment an incoming token pays, if any; a cancelled one still counts.
- * A payload naming its request pays that request. A bare token names none,
- * so it pays the one open request at its mint asking exactly its amount, and
- * nothing when no request or several do.
+ * The payment whose request a received NUT-18 payload names, when the payload
+ * pays at that request's mint in sat. A bare token names no request.
  */
-export const matchIncomingCashu = <P extends OpenBitcoinPayment>(
+export const paymentNamedBy = (
   incoming: IncomingCashu,
-  payments: readonly P[],
-): P | null =>
-  matchAmong(
-    incoming,
-    payments.filter((payment) => payment.status !== "paid"),
-  );
-
-/**
- * The mint of the request a token from another mint would pay once its sats
- * reached that mint; `null` when it pays one where it is, or none. Linky
- * spends from whichever mint covers the amount, not the one requested.
- */
-export const requestMintElsewhere = (
-  incoming: IncomingCashu,
-  payments: readonly OpenBitcoinPayment[],
-): string | null => {
-  if (matchIncomingCashu(incoming, payments) !== null) return null;
-  const elsewhere = payments.filter(
-    (payment) => !sameMint(payment.mintUrl, incoming.mint),
-  );
-  return (
-    elsewhere.find(
-      ({ mintUrl }) =>
-        matchIncomingCashu({ ...incoming, mint: mintUrl }, elsewhere) !== null,
-    )?.mintUrl ?? null
-  );
-};
-
-/** The paid payment a further token pays again, matched the same way: the customer paid it twice. */
-export const matchRepeatedCashu = <P extends OpenBitcoinPayment>(
-  incoming: IncomingCashu,
-  payments: readonly P[],
-): P | null =>
-  matchAmong(
-    incoming,
-    payments.filter((payment) => payment.status === "paid"),
-  );
-
-const matchAmong = <P extends OpenBitcoinPayment>(
-  incoming: IncomingCashu,
-  payments: readonly P[],
-): P | null => {
-  if (incoming.unit !== null && incoming.unit !== "sat") return null;
-  const atMint = payments.filter((payment) =>
-    sameMint(payment.mintUrl, incoming.mint),
-  );
-  if (incoming.requestId !== null) {
-    return (
-      atMint.find(
+  payments: readonly Payment[],
+): Payment | null =>
+  incoming.requestId === null ||
+  (incoming.unit !== null && incoming.unit !== "sat")
+    ? null
+    : (payments.find(
         (payment) =>
-          payment.id === incoming.requestId && incoming.amount >= payment.sats,
-      ) ?? null
-    );
-  }
-  const asked = atMint.filter((payment) => payment.sats === incoming.amount);
-  return asked.length === 1 ? (asked[0] ?? null) : null;
-};
+          payment.id === incoming.requestId &&
+          payment.bitcoin !== null &&
+          normalizeMint(payment.bitcoin.mintUrl) ===
+            normalizeMint(incoming.mint),
+      ) ?? null);
 
 /** Below it, the mint's input fee takes too large a share of a Cashu payment. */
 const MIN_BITCOIN_SATS = 10;

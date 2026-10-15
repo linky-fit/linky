@@ -7,22 +7,18 @@ import {
 import { encodeNprofile, Pubkey } from "@linky-fit/linkstr";
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
+import { createIdFromString } from "@linky-fit/domain";
 import {
   buildBitcoinPaymentUri,
   buildCashuRequest,
-  cashuRequestMint,
   type IncomingCashu,
-  isOpenBitcoinRequest,
-  matchIncomingCashu,
-  matchRepeatedCashu,
   minimumBitcoinSats,
-  OPEN_REQUEST_SEC,
-  type OpenBitcoinPayment,
+  paymentNamedBy,
   readIncomingCashu,
-  requestMintElsewhere,
-  uniqueRequestSats,
 } from "./bitcoin";
 import { CzkAmount, czkToSats, minimumCzkFor, Sats } from "./money";
+import type { Payment } from "./records";
+import { VariableSymbol } from "./variableSymbol";
 
 const mint = "http://localhost:3338";
 const nprofile = encodeNprofile(Pubkey.make("a".repeat(64)), [
@@ -30,17 +26,34 @@ const nprofile = encodeNprofile(Pubkey.make("a".repeat(64)), [
 ]);
 const invoice = "lnbc100n1fakeinvoice";
 
+const id = (name: string) => createIdFromString<"Transaction">(name);
+
 const payment = (
-  id: string,
-  sats: number,
-  overrides: Partial<OpenBitcoinPayment> = {},
-): OpenBitcoinPayment => ({
-  id,
+  name: string,
+  overrides: { readonly mintUrl?: string; readonly bitcoin?: null } = {},
+): Payment => ({
+  id: id(name),
+  amountCzk: CzkAmount.make(100),
+  tipCzk: null,
+  vs: VariableSymbol.make("1234567890"),
   status: "pending",
-  sats: Sats.make(sats),
-  mintUrl: mint,
+  method: null,
   createdAtSec: 1_000,
-  ...overrides,
+  paidAtSec: null,
+  bitcoin:
+    overrides.bitcoin === null
+      ? null
+      : {
+          sats: Sats.make(100),
+          czkPerBtc: 2_000_000,
+          mintUrl: overrides.mintUrl ?? mint,
+          paymentRequest: "creqA",
+          quoteId: null,
+          invoice: null,
+        },
+  cashuReceive: null,
+  payerPubkey: null,
+  hiddenAtSec: null,
 });
 
 const token = (
@@ -71,7 +84,6 @@ describe("buildCashuRequest", () => {
       id: "payment-1",
       transports: [{ type: "nostr", target: nprofile, tags: [["n", "17"]] }],
     });
-    expect(cashuRequestMint(request)).toBe(mint);
   });
 
   it("puts both legs into one BIP-321 URI", () => {
@@ -85,144 +97,52 @@ describe("buildCashuRequest", () => {
     expect(uri.startsWith("bitcoin:?")).toBe(true);
     expect(parseBip321Uri(uri)).toMatchObject({ lightning: invoice, creq });
   });
-
-  it("reads no mint from text that is not a request", () => {
-    expect(cashuRequestMint("cashuBnope")).toBeNull();
-  });
 });
 
-describe("matchIncomingCashu", () => {
-  it("matches a payload by its request id, even after a cancel", () => {
-    const cancelled = payment("p1", 100, { status: "cancelled" });
-    expect(
-      matchIncomingCashu(token(100, { requestId: "p1" }), [
-        cancelled,
-        payment("p2", 100, { createdAtSec: 2_000 }),
-      ]),
-    ).toBe(cancelled);
+describe("paymentNamedBy", () => {
+  const payments = [
+    payment("p1"),
+    payment("other-mint", { mintUrl: "https://cashu.cz" }),
+    payment("bank-only", { bitcoin: null }),
+  ];
+
+  it("finds the payment a payload names by its request id, whatever its amount", () => {
+    expect(paymentNamedBy(token(1, { requestId: id("p1") }), payments)).toBe(
+      payments[0],
+    );
   });
 
-  it("refuses a payload whose request is paid, at another mint or short", () => {
-    const payments = [
-      payment("paid", 100, { status: "paid" }),
-      payment("other-mint", 100, { mintUrl: "https://cashu.cz" }),
-      payment("short", 100),
-    ];
-    for (const requestId of ["paid", "other-mint", "missing"]) {
+  it("finds none for a bare token, even one of the requested amount", () => {
+    expect(paymentNamedBy(token(100), payments)).toBeNull();
+  });
+
+  it("finds none for a payload from another mint than its request's, or naming no Bitcoin request", () => {
+    for (const name of ["other-mint", "bank-only", "missing"]) {
       expect(
-        matchIncomingCashu(token(100, { requestId }), payments),
+        paymentNamedBy(token(100, { requestId: id(name) }), payments),
       ).toBeNull();
     }
-    expect(
-      matchIncomingCashu(token(99, { requestId: "short" }), payments),
-    ).toBeNull();
-  });
-
-  it("matches a bare token to the one request asking exactly its amount, even a cancelled one", () => {
-    const payments = [
-      payment("small", 50),
-      payment("cancelled", 100, { status: "cancelled" }),
-      payment("paid", 120, { status: "paid" }),
-      payment("other-mint", 120, { mintUrl: "https://cashu.cz" }),
-    ];
-    expect(matchIncomingCashu(token(100), payments)?.id).toBe("cancelled");
-    expect(matchIncomingCashu(token(50), payments)?.id).toBe("small");
-    expect(matchIncomingCashu(token(60), payments)).toBeNull();
-    expect(matchIncomingCashu(token(120), payments)).toBeNull();
-  });
-
-  it("assigns a bare token to no request when two ask its amount", () => {
-    const payments = [payment("first", 587), payment("second", 587)];
-    expect(matchIncomingCashu(token(587), payments)).toBeNull();
-    expect(
-      matchIncomingCashu(token(587, { requestId: "first" }), payments)?.id,
-    ).toBe("first");
-  });
-
-  it("names the mint of the request a token from another mint would pay there", () => {
-    const linkyMint = "https://mint.minibits.cash/Bitcoin";
-    const payments = [
-      payment("p1", 100),
-      payment("cancelled", 120, { status: "cancelled" }),
-    ];
-    expect(
-      requestMintElsewhere(token(100, { mint: linkyMint }), payments),
-    ).toBe(mint);
-    expect(
-      requestMintElsewhere(
-        token(100, { mint: linkyMint, requestId: "cancelled" }),
-        payments,
-      ),
-    ).toBeNull();
-    expect(
-      requestMintElsewhere(token(120, { mint: linkyMint }), payments),
-    ).toBe(mint);
-    expect(
-      requestMintElsewhere(token(60, { mint: linkyMint }), payments),
-    ).toBeNull();
-    expect(requestMintElsewhere(token(100), payments)).toBeNull();
   });
 
   it("compares mints without a trailing slash or case", () => {
     expect(
-      matchIncomingCashu(token(100, { mint: "HTTP://localhost:3338/" }), [
-        payment("p1", 100),
-      ])?.id,
-    ).toBe("p1");
+      paymentNamedBy(
+        token(100, { mint: "HTTP://localhost:3338/", requestId: id("p1") }),
+        payments,
+      ),
+    ).toBe(payments[0]);
   });
 
-  it("ignores tokens in another unit and treats a missing unit as sat", () => {
-    const payments = [payment("p1", 100)];
+  it("ignores payloads in another unit and treats a missing unit as sat", () => {
     expect(
-      matchIncomingCashu(token(100, { unit: "usd" }), payments),
+      paymentNamedBy(
+        token(100, { unit: "usd", requestId: id("p1") }),
+        payments,
+      ),
     ).toBeNull();
-    expect(matchIncomingCashu(token(100, { unit: null }), payments)?.id).toBe(
-      "p1",
-    );
-  });
-});
-
-describe("matchRepeatedCashu", () => {
-  it("matches a further token only to a paid request", () => {
-    const payments = [
-      payment("paid", 100, { status: "paid" }),
-      payment("open", 120),
-    ];
-    expect(matchRepeatedCashu(token(100), payments)?.id).toBe("paid");
     expect(
-      matchRepeatedCashu(token(100, { requestId: "paid" }), payments)?.id,
-    ).toBe("paid");
-    expect(matchRepeatedCashu(token(120), payments)).toBeNull();
-  });
-});
-
-describe("uniqueRequestSats", () => {
-  it("raises the amount a sat at a time past every amount an open request asks", () => {
-    const open = [payment("a", 587), payment("b", 588), payment("c", 600)];
-    expect(uniqueRequestSats(Sats.make(587), open)).toBe(589);
-    expect(uniqueRequestSats(Sats.make(590), open)).toBe(590);
-  });
-
-  it("keeps two same-CZK requests apart, so paying the older one settles it", () => {
-    const sats = czkToSats(CzkAmount.make(1_100), 1_875_000);
-    const older = payment("older", uniqueRequestSats(sats, []));
-    const newer = payment("newer", uniqueRequestSats(sats, [older]));
-    expect(newer.sats).toBe(older.sats + 1);
-    expect(matchIncomingCashu(token(older.sats), [older, newer])?.id).toBe(
-      "older",
-    );
-  });
-});
-
-describe("isOpenBitcoinRequest", () => {
-  it("keeps unpaid requests, also cancelled ones, for a day", () => {
-    const now = 10 * OPEN_REQUEST_SEC;
-    const at = (status: "pending" | "cancelled" | "paid", ageSec: number) =>
-      isOpenBitcoinRequest({ status, createdAtSec: now - ageSec }, now);
-    expect(at("pending", 1)).toBe(true);
-    expect(at("cancelled", OPEN_REQUEST_SEC - 1)).toBe(true);
-    expect(at("paid", 1)).toBe(false);
-    expect(at("pending", OPEN_REQUEST_SEC)).toBe(false);
+      paymentNamedBy(token(100, { unit: null, requestId: id("p1") }), payments),
+    ).toBe(payments[0]);
   });
 });
 
