@@ -33,13 +33,13 @@ export const saveToPasswordManager = async (
   }
 };
 
-/** Offers the recovery seed under the shop's name, keyed by the identity so a re-save updates it. */
+/** Offers the recovery seed under the shop's name, or the app's for a nameless shop, keyed by the identity so a re-save updates it. */
 export const saveRecoverySeedToPasswordManager = (
   account: { readonly recoverySeed: string; readonly npub: string },
-  shopName: string,
+  shopName: string | null,
 ): Promise<PasswordManagerSaveResult> =>
   saveToPasswordManager({
     id: `fazole.fit:${account.npub}`,
-    name: shopName,
+    name: shopName ?? "fazole.fit",
     password: account.recoverySeed,
   });

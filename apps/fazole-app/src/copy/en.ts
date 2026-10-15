@@ -9,7 +9,6 @@ export const en: Copy = {
   save: "Save",
   retry: "Try again",
   done: "Done",
-  continue: "Continue",
   czk: "CZK",
   sat: "sat",
   czkAmount: (amount: string) => `${amount} CZK`,
@@ -17,19 +16,17 @@ export const en: Copy = {
   approxCzk: (amount: string) => `≈ ${amount} CZK`,
 
   welcome: {
-    setupShop: "Set up a shop",
-    setupShopDescription: "I want to accept payments in my shop.",
-    restore: "I have a recovery seed",
-    restoreDescription: "Restore my shop on this device.",
+    setupShop: "New business",
+    restore: "Restore existing",
   },
 
   setup: {
     title: "Set up a shop",
-    description:
-      "A bank account is optional. Without one you accept bitcoin only. You can change these details later in Settings.",
+    description: "You can change these details later in Settings.",
     noShopDescription:
       "No shop belongs to this recovery seed yet. Set one up and start accepting payments.",
     submit: "Continue",
+    later: "Set up later",
     failed: "The shop could not be set up. Try again.",
   },
 
@@ -37,10 +34,9 @@ export const en: Copy = {
     name: "Shop name",
     namePlaceholder: "Linden Tree Café",
     nameHint: "Customers see it in the message for the recipient.",
-    nameRequired: "Enter the shop name.",
-    account: "Account number (optional)",
+    nameTooLong: "The name can have at most 100 characters.",
+    account: "Account number",
     accountPlaceholder: "2000145399/0800",
-    accountHint: "In the form [prefix-]number/bank code.",
     accountValid: (bank: string, iban: string) => `${bank} · ${iban}`,
     accountInvalidFormat:
       "Enter the account as number/bank code, e.g. 2000145399/0800.",
@@ -58,8 +54,6 @@ export const en: Copy = {
     pasteFailed:
       "The clipboard could not be read. Paste the seed into the field.",
     invalid: "This is not a valid recovery seed. Check every word.",
-    replaceWarning:
-      "Restoring replaces the shop on this device. Without its recovery seed it cannot be brought back.",
     submit: "Restore",
   },
 
@@ -184,26 +178,12 @@ export const en: Copy = {
   },
 
   wallet: {
-    balance: "Balance",
     rateUnavailable: "Rate unavailable",
     switchUnit: "Switch between CZK and sat",
     requestCash: "Request a cash payout",
     cashRequested: "Cash request sent to support.",
     cashRequestFailed: "The request could not be sent. Try again.",
     withdraw: "Withdraw",
-    activity: "Activity",
-    activityEmptyTitle: "No activity yet",
-    activityEmptyDescription: "Bitcoin payments and withdrawals show up here.",
-    in: (amount: string) => `+${amount}`,
-    out: (amount: string) => `−${amount}`,
-    row: (date: string, label: string) => `${date} · ${label}`,
-    rowFee: (row: string, fee: string) => `${row} · fee ${fee}`,
-    receiptUnassigned: "Unassigned payment",
-    receiptPaidAgain: (method: string) => `Paid twice (${method})`,
-    withdrawalLightning: "Lightning withdrawal",
-    withdrawalLinky: "Sent to Linky",
-    pending: "Processing",
-    failed: "Failed",
   },
 
   withdraw: {
@@ -243,7 +223,7 @@ export const en: Copy = {
       `${sats} sat will arrive in the Linky chat.`,
     pendingTitle: "The payment is processing",
     pendingDetail:
-      "The mint has not settled it yet. You will see the result in Activity.",
+      "The mint has not settled it yet. The balance updates once it does.",
     failures: {
       "lnurl-failed": "The Lightning address did not respond. Check it.",
       "insufficient-funds":
@@ -257,18 +237,16 @@ export const en: Copy = {
   settings: {
     shop: "Shop",
     shopEdit: "Edit shop details",
+    shopUnnamed: "Unnamed business",
     offerTips: "Offer tips",
-    offerTipsDescription: "Customers can add a tip before paying.",
-    lightningOnlyQr: "Lightning-only QR code",
-    lightningOnlyQrDescription:
-      "The bitcoin QR code leaves out Cashu, for wallets that can't read the combined code.",
-    noAccount: "No bank account, bitcoin only",
+    bitcoinQr: "Bitcoin QR code",
+    bitcoinQrModes: {
+      universal: "Universal",
+      cashu: "Cashu",
+      lightning: "Lightning",
+    },
     security: "Security",
     recoverySeed: "Recovery seed",
-    restore: "Restore from backup",
-    restoreConfirmTitle: "Restore another shop?",
-    restoreConfirmDescription:
-      "Restoring replaces the shop on this device. Make sure you have its recovery seed before you continue.",
     reset: "Reset this device",
     resetConfirmTitle: "Reset this device?",
     resetConfirmDescription:

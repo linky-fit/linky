@@ -18,7 +18,7 @@ const signedIn = (device: Device) => {
 };
 
 const fakePlatform = (kv = memoryKv()) => {
-  const offered: string[] = [];
+  const offered: (string | null)[] = [];
   let reloads = 0;
   const linkshuKv = makeInMemoryKeyValueStore();
   const platform: DevicePlatform = {

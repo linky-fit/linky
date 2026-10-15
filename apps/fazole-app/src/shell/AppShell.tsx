@@ -1,4 +1,5 @@
 import {
+  Avatar,
   Image,
   LoadingState,
   NavigationRail,
@@ -8,7 +9,7 @@ import {
   useMedia,
   type NavItem,
 } from "@linky-fit/ui";
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { copy } from "../copy";
 import type { ShopProfile } from "../domain";
 import { navigateTo, replaceRoute, useRoute } from "../platform/hashRoute";
@@ -41,7 +42,7 @@ import {
 const sectionIcons: Record<Section, NavItem<Section>["icon"]> = {
   terminal: "QrCode",
   history: "History",
-  wallet: "Wallet",
+  wallet: "Bitcoin",
   settings: "Settings",
 };
 
@@ -53,6 +54,16 @@ const navItems = sections.map(
     testID: `nav-${value}`,
   }),
 );
+
+/** The section a route belongs to, for the navigation; `null` outside the signed-in app. */
+const sectionOf = (route: Route): Section | null =>
+  isSection(route)
+    ? route
+    : paymentIdOf(route) !== null
+      ? "terminal"
+      : route === supportRoute
+        ? "settings"
+        : null;
 
 /** Routes by where the device stands with its account. */
 export function AppShell() {
@@ -109,25 +120,33 @@ function RouteScreen({
   if (route === "setup") return <SetupScreen />;
   if (route === "restore") return <RestoreScreen />;
   if (state === "opening") return <LoadingState label={copy.loading} />;
-  const paymentId = paymentIdOf(route);
-  if (shop !== null && paymentId !== null) {
-    return <PaymentScreen paymentId={paymentId} shop={shop} />;
-  }
-  if (shop !== null && route === supportRoute) return <SupportChatScreen />;
-  if (shop !== null && isSection(route)) {
-    return <Sections section={route} shop={shop} />;
+  const section = shop === null ? null : sectionOf(route);
+  if (shop !== null && section !== null) {
+    return (
+      <Navigated
+        section={section}
+        shop={shop}
+        tabs={isSection(route) && route !== "terminal"}
+      >
+        <SignedInScreen route={route} shop={shop} />
+      </Navigated>
+    );
   }
   return route === "restoring" ? <RestoringScreen /> : <WelcomeScreen />;
 }
 
-function SectionScreen({
-  section,
+function SignedInScreen({
+  route,
   shop,
 }: {
-  readonly section: Section;
+  readonly route: Route;
   readonly shop: ShopProfile;
 }) {
-  switch (section) {
+  const paymentId = paymentIdOf(route);
+  if (paymentId !== null) {
+    return <PaymentScreen paymentId={paymentId} shop={shop} />;
+  }
+  switch (route) {
     case "terminal":
       return <TerminalScreen />;
     case "history":
@@ -136,33 +155,45 @@ function SectionScreen({
       return <WalletScreen shop={shop} />;
     case "settings":
       return <SettingsScreen shop={shop} />;
+    default:
+      return <SupportChatScreen />;
   }
 }
 
-/** The terminal stands alone; the other sections get bottom tabs on phones and a rail on wide screens. */
-function Sections({
+/**
+ * Wide screens always show the rail, with `section` lit. Phones show bottom
+ * tabs only where `tabs` asks for them: the terminal, a payment and the
+ * support chat stand alone there.
+ */
+function Navigated({
   section,
   shop,
+  tabs,
+  children: body,
 }: {
   readonly section: Section;
   readonly shop: ShopProfile;
+  readonly tabs: boolean;
+  readonly children: ReactNode;
 }) {
   const { wide } = useMedia();
-  const body = <SectionScreen section={section} shop={shop} />;
-  if (section === "terminal") return body;
   if (wide) {
     return (
       <Row flex={1} gap="$none" alignItems="stretch">
         <NavigationRail
           accessibilityLabel={copy.navigation}
           header={
-            <Image
-              src="/logo-tile.webp"
-              width={44}
-              height={44}
-              borderRadius={12}
-              aria-hidden
-            />
+            shop.picture === null ? (
+              <Image
+                src="/logo-tile.webp"
+                width={44}
+                height={44}
+                borderRadius={12}
+                aria-hidden
+              />
+            ) : (
+              <Avatar name={shop.name ?? ""} uri={shop.picture} icon="Store" />
+            )
           }
           items={navItems.filter((item) => item.value !== "settings")}
           footerItems={navItems.filter((item) => item.value === "settings")}
@@ -175,6 +206,7 @@ function Sections({
       </Row>
     );
   }
+  if (!tabs) return body;
   return (
     <Stack flex={1} gap="$none" minHeight={0}>
       <Stack flex={1} gap="$none" minHeight={0}>

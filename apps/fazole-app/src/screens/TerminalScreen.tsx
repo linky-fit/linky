@@ -8,6 +8,7 @@ import {
   Toast,
   ToastStack,
   TopBar,
+  useMedia,
 } from "@linky-fit/ui";
 import { useEffect, useState } from "react";
 import { copy } from "../copy";
@@ -33,9 +34,10 @@ import {
 import { nowSeconds } from "../utils/time";
 import { TipStep } from "./TipStep";
 
-/** The amount keypad, full screen; the menu at the top leads to the other sections. */
+/** The amount keypad, full screen; on phones the menu at the top leads to the other sections, wide screens show the rail. */
 export function TerminalScreen() {
   const { payments } = useAppServices();
+  const { wide } = useMedia();
   // Tips are offered until the merchant turns them off, also before the setting is read.
   const offerTips = useOfferTips() !== false;
   const [input, setInput] = useState("");
@@ -73,12 +75,14 @@ export function TerminalScreen() {
     <Stack flex={1} gap="$none" testID="terminal-screen">
       <TopBar
         trailing={
-          <IconButton
-            testID="terminal-sections"
-            icon="Menu"
-            accessibilityLabel={copy.sections.history}
-            onPress={() => navigateTo("history")}
-          />
+          wide ? undefined : (
+            <IconButton
+              testID="terminal-sections"
+              icon="Menu"
+              accessibilityLabel={copy.sections.history}
+              onPress={() => navigateTo("history")}
+            />
+          )
         }
       />
       <Stack

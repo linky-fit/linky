@@ -7,7 +7,6 @@ export const cs = {
   save: "Uložit",
   retry: "Zkusit znovu",
   done: "Hotovo",
-  continue: "Pokračovat",
   czk: "Kč",
   sat: "sat",
   czkAmount: (amount: string) => `${amount} Kč`,
@@ -15,19 +14,17 @@ export const cs = {
   approxCzk: (amount: string) => `≈ ${amount} Kč`,
 
   welcome: {
-    setupShop: "Založit obchod",
-    setupShopDescription: "Chci přijímat platby ve svém obchodě.",
-    restore: "Mám záložní frázi",
-    restoreDescription: "Obnovím obchod na tomto zařízení.",
+    setupShop: "Nový podnik",
+    restore: "Obnovit existující",
   },
 
   setup: {
     title: "Založit obchod",
-    description:
-      "Bankovní účet je nepovinný. Bez něj přijímáte jen bitcoin. Údaje můžete později změnit v nastavení.",
+    description: "Údaje můžete později změnit v nastavení.",
     noShopDescription:
       "K této záložní frázi zatím nepatří žádný obchod. Založte ho a začněte přijímat platby.",
     submit: "Pokračovat",
+    later: "Nastavím později",
     failed: "Obchod se nepodařilo založit. Zkuste to znovu.",
   },
 
@@ -35,10 +32,9 @@ export const cs = {
     name: "Název obchodu",
     namePlaceholder: "Kavárna U Lípy",
     nameHint: "Zákazník ho uvidí ve zprávě pro příjemce.",
-    nameRequired: "Zadejte název obchodu.",
-    account: "Číslo účtu (nepovinné)",
+    nameTooLong: "Název může mít nejvýš 100 znaků.",
+    account: "Číslo účtu",
     accountPlaceholder: "2000145399/0800",
-    accountHint: "Ve tvaru [předčíslí-]číslo/kód banky.",
     accountValid: (bank: string, iban: string) => `${bank} · ${iban}`,
     accountInvalidFormat:
       "Zadejte účet ve tvaru číslo/kód banky, např. 2000145399/0800.",
@@ -55,8 +51,6 @@ export const cs = {
     paste: "Vložit ze schránky",
     pasteFailed: "Schránku se nepodařilo přečíst. Vložte frázi do pole.",
     invalid: "Tohle není platná záložní fráze. Zkontrolujte každé slovo.",
-    replaceWarning:
-      "Obnovou nahradíte obchod na tomto zařízení. Bez jeho záložní fráze ho už nepůjde vrátit.",
     submit: "Obnovit",
   },
 
@@ -181,26 +175,12 @@ export const cs = {
   },
 
   wallet: {
-    balance: "Zůstatek",
     rateUnavailable: "Kurz není dostupný",
     switchUnit: "Přepnout mezi Kč a sat",
     requestCash: "Vyžádat platbu v hotovosti",
     cashRequested: "Žádost o hotovost odeslána podpoře.",
     cashRequestFailed: "Žádost se nepodařilo odeslat. Zkuste to znovu.",
     withdraw: "Vybrat",
-    activity: "Pohyby",
-    activityEmptyTitle: "Zatím žádné pohyby",
-    activityEmptyDescription: "Platby bitcoinem a výběry se objeví tady.",
-    in: (amount: string) => `+${amount}`,
-    out: (amount: string) => `−${amount}`,
-    row: (date: string, label: string) => `${date} · ${label}`,
-    rowFee: (row: string, fee: string) => `${row} · poplatek ${fee}`,
-    receiptUnassigned: "Nepřiřazená platba",
-    receiptPaidAgain: (method: string) => `Zaplaceno podruhé (${method})`,
-    withdrawalLightning: "Výběr přes Lightning",
-    withdrawalLinky: "Posláno do Linky",
-    pending: "Zpracovává se",
-    failed: "Nepovedlo se",
   },
 
   withdraw: {
@@ -237,7 +217,8 @@ export const cs = {
     sentDetail: (sats: string) => `${sats} sat odešlo z peněženky.`,
     linkySentDetail: (sats: string) => `${sats} sat dorazí do chatu v Linky.`,
     pendingTitle: "Platba se zpracovává",
-    pendingDetail: "Mincovna ji ještě nevyřídila. Výsledek uvidíte v pohybech.",
+    pendingDetail:
+      "Mincovna ji ještě nevyřídila. Zůstatek se upraví, až ji vyřídí.",
     failures: {
       "lnurl-failed": "Lightning adresa neodpověděla. Zkontrolujte ji.",
       "insufficient-funds": "V peněžence na to není dost peněz i s poplatkem.",
@@ -250,18 +231,16 @@ export const cs = {
   settings: {
     shop: "Obchod",
     shopEdit: "Upravit údaje obchodu",
+    shopUnnamed: "Podnik bez názvu",
     offerTips: "Nabízet spropitné",
-    offerTipsDescription: "Před platbou si zákazník může přidat spropitné.",
-    lightningOnlyQr: "Jen Lightning QR kód",
-    lightningOnlyQrDescription:
-      "Bitcoinový QR kód bez Cashu, pro peněženky, které kombinovaný kód nepřečtou.",
-    noAccount: "Bez bankovního účtu, jen bitcoin",
+    bitcoinQr: "Bitcoinový QR kód",
+    bitcoinQrModes: {
+      universal: "Univerzální",
+      cashu: "Cashu",
+      lightning: "Lightning",
+    },
     security: "Zabezpečení",
     recoverySeed: "Záložní fráze",
-    restore: "Obnovit ze zálohy",
-    restoreConfirmTitle: "Obnovit jiný obchod?",
-    restoreConfirmDescription:
-      "Obnova nahradí obchod na tomto zařízení. Než budete pokračovat, ujistěte se, že máte jeho záložní frázi.",
     reset: "Resetovat toto zařízení",
     resetConfirmTitle: "Resetovat toto zařízení?",
     resetConfirmDescription:

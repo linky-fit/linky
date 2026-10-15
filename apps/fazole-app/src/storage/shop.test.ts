@@ -28,6 +28,17 @@ describe("the shop profile", () => {
     });
   });
 
+  it("saves and reads a shop without a name", async () => {
+    const settings = makeSettingsRepository(testStore());
+    const shop = {
+      name: null,
+      iban: CzechIban.make("CZ6508000000192000145399"),
+      picture: null,
+    };
+    await Effect.runPromise(saveShop(settings, shop));
+    expect(await Effect.runPromise(readShop(settings))).toEqual(shop);
+  });
+
   it("keeps a picture and drops it again", async () => {
     const settings = makeSettingsRepository(testStore());
     const shop = {

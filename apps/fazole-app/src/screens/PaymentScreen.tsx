@@ -31,7 +31,7 @@ import { navigateTo } from "../platform/hashRoute";
 import type { BitcoinRequestFailure } from "../services/bitcoinPayments";
 import {
   useAppServices,
-  useLightningOnlyQr,
+  useBitcoinQrMode,
   usePayerProfile,
   usePayment,
 } from "../services/react";
@@ -229,7 +229,7 @@ function BankLeg({
             iban: shop.iban,
             amount: payment.amountCzk,
             variableSymbol: payment.vs,
-            message: shop.name,
+            ...(shop.name === null ? {} : { message: shop.name }),
           })}
         />
         <Amount value={amount} unit={copy.czk} size="md" />
@@ -239,7 +239,9 @@ function BankLeg({
           details={[
             { label: copy.payment.vs, value: payment.vs },
             { label: copy.payment.account, value: formatCzechIban(shop.iban) },
-            { label: copy.payment.recipient, value: shop.name },
+            ...(shop.name === null
+              ? []
+              : [{ label: copy.payment.recipient, value: shop.name }]),
           ]}
         />
       </Card>
@@ -279,7 +281,7 @@ const useBitcoinRequest = (payment: Payment) => {
 
 function BitcoinLeg({ payment }: { readonly payment: Payment }) {
   const { failure, retry } = useBitcoinRequest(payment);
-  const lightningOnly = useLightningOnlyQr() === true;
+  const mode = useBitcoinQrMode() ?? "universal";
   const [copied, setCopied] = useState(false);
   useEffect(() => {
     if (!copied) return;
@@ -324,17 +326,22 @@ function BitcoinLeg({ payment }: { readonly payment: Payment }) {
     );
   }
   const { invoice } = leg;
-  const uri = buildBitcoinPaymentUri(invoice, leg.paymentRequest);
+  const payload =
+    mode === "lightning"
+      ? invoice
+      : mode === "cashu"
+        ? leg.paymentRequest
+        : buildBitcoinPaymentUri(invoice, leg.paymentRequest);
   const copyLink = async () => {
-    if (await copyText(lightningOnly ? invoice : uri)) setCopied(true);
+    if (await copyText(payload)) setCopied(true);
   };
   return (
     <>
       <QRCode
         testID="payment-bitcoin-qr"
         accessibilityLabel={copy.payment.bitcoinQr(copy.czkAmount(amount))}
-        // Uppercase fits QR's alphanumeric mode, a coarser code for weak cameras.
-        value={lightningOnly ? invoice.toUpperCase() : uri}
+        // An uppercase invoice fits QR's alphanumeric mode, a coarser code for weak cameras.
+        value={mode === "lightning" ? payload.toUpperCase() : payload}
       />
       <Stack alignItems="center" gap="$md">
         <Amount value={amount} unit={copy.czk} size="md" />

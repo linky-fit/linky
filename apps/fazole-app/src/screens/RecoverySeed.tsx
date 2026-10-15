@@ -18,7 +18,11 @@ const feedbackNotices: Record<Feedback, { title: string; tone: Tone }> = {
 const MASK = "•••••";
 
 /** The recovery seed, masked until revealed, to save to a password manager or copy. */
-export function RecoverySeed({ shopName }: { readonly shopName: string }) {
+export function RecoverySeed({
+  shopName,
+}: {
+  readonly shopName: string | null;
+}) {
   const { account } = useAppServices();
   const [visible, setVisible] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);

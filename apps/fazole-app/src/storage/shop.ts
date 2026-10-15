@@ -39,7 +39,7 @@ export const ShopPicture = Schema.String.pipe(
 
 const ShopJson = Schema.fromJsonString(
   Schema.Struct({
-    name: ShopName,
+    name: Schema.optionalKey(ShopName),
     iban: Schema.optionalKey(CzechIban),
     picture: Schema.optionalKey(ShopPicture),
   }),
@@ -53,7 +53,7 @@ export const readShop = (
       Option.map(
         Schema.decodeUnknownOption(ShopJson)(row?.value),
         ({ name, iban, picture }) => ({
-          name,
+          name: name ?? null,
           iban: iban ?? null,
           picture: picture ?? null,
         }),
@@ -70,7 +70,7 @@ export const saveShop = (
     key: NonEmptyString100.orThrow(SHOP_KEY),
     value: NonEmptyString1000.orThrow(
       Schema.encodeSync(ShopJson)({
-        name: shop.name,
+        ...(shop.name === null ? {} : { name: shop.name }),
         ...(shop.iban === null ? {} : { iban: shop.iban }),
         ...(shop.picture === null ? {} : { picture: shop.picture }),
       }),

@@ -29,11 +29,11 @@ describe("routing", () => {
     expect(resolveRoute("terminal", "noShop")).toBe("setup");
   });
 
-  it("opens sections, payments, the support chat and another restore once the shop is there", () => {
+  it("opens sections, payments and the support chat once the shop is there, but no other restore", () => {
     expect(resolveRoute("wallet", "ready")).toBe("wallet");
     expect(resolveRoute("support", "ready")).toBe("support");
     expect(resolveRoute("pay/abc", "ready")).toBe("pay/abc");
-    expect(resolveRoute("restore", "ready")).toBe("restore");
+    expect(resolveRoute("restore", "ready")).toBe("terminal");
     expect(resolveRoute("welcome", "ready")).toBe("terminal");
     expect(resolveRoute("setup", "ready")).toBe("terminal");
     expect(resolveRoute("restoring", "ready")).toBe("terminal");

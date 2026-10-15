@@ -5,6 +5,7 @@ import {
   czechAccountToIban,
   czechBankName,
   formatCzechIban,
+  ibanToCzechAccount,
   parseCzechAccount,
   type CzechAccountErrorReason,
   type CzechIban,
@@ -32,10 +33,12 @@ export type AccountCheck =
 export const formatIban = (iban: string): string =>
   iban.replace(/(.{4})(?=.)/gu, "$1 ");
 
-/** Checks the optional bank account as typed: empty, valid with its bank and IBAN, or why not. */
+/** Checks the optional bank account as typed, `[prefix-]number/bank code` or a Czech IBAN: empty, valid with its bank and IBAN, or why not. */
 export const checkAccount = (input: string): AccountCheck => {
   if (input.trim() === "") return { kind: "empty" };
-  const parsed = parseCzechAccount(input);
+  const parsed = /^\s*cz/iu.test(input)
+    ? ibanToCzechAccount(input)
+    : parseCzechAccount(input);
   if (Result.isFailure(parsed)) {
     return { kind: "invalid", error: accountErrors[parsed.failure.reason] };
   }
@@ -56,7 +59,7 @@ export const looksComplete = (input: string): boolean =>
 
 const isShopName = Schema.is(ShopName);
 
-/** The shop name and optional bank account with live validation; `initial` prefills an edit. */
+/** The optional shop name and bank account with live validation; `initial` prefills an edit. */
 export const useShopForm = (initial?: ShopProfile | null) => {
   const [name, setName] = useState(initial?.name ?? "");
   const [account, setAccount] = useState(
@@ -67,6 +70,8 @@ export const useShopForm = (initial?: ShopProfile | null) => {
   const accountCheck = checkAccount(account);
   const showAccountError =
     submitted || accountTouched || looksComplete(account);
+  const trimmedName = name.trim();
+  const nameValid = trimmedName === "" || isShopName(trimmedName);
   return {
     name,
     setName,
@@ -74,10 +79,10 @@ export const useShopForm = (initial?: ShopProfile | null) => {
     setAccount,
     touchAccount: () => setAccountTouched(true),
     accountCheck,
+    /** Nothing filled in yet: the shop can be set up later. */
+    empty: trimmedName === "" && account.trim() === "",
     nameError:
-      submitted && !isShopName(name.trim())
-        ? copy.shopFields.nameRequired
-        : undefined,
+      submitted && !nameValid ? copy.shopFields.nameTooLong : undefined,
     accountError:
       accountCheck.kind === "invalid" && showAccountError
         ? accountCheck.error
@@ -85,10 +90,9 @@ export const useShopForm = (initial?: ShopProfile | null) => {
     /** The profile to save, or `null` after revealing what is wrong. */
     submit: (): ShopProfile | null => {
       setSubmitted(true);
-      const trimmed = name.trim();
-      if (!isShopName(trimmed) || accountCheck.kind === "invalid") return null;
+      if (!nameValid || accountCheck.kind === "invalid") return null;
       return {
-        name: trimmed,
+        name: trimmedName === "" ? null : trimmedName,
         iban: accountCheck.kind === "valid" ? accountCheck.iban : null,
         picture: initial?.picture ?? null,
       };

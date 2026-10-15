@@ -10,6 +10,22 @@ Každá vydaná verze musí obsahovat nejprve `en-US` a potom `cs-CZ`.
 
 ## [Unreleased]
 
+### en-US
+
+- Welcome screen with a language switch and two plain choices: a new business or restoring an existing one.
+- The shop name and the bank account are both optional; with neither filled in, the setup continues with "Set up later". The account field also takes a Czech IBAN.
+- The wallet shows the balance alone; its activity list is gone.
+- Settings without explanations under the rows; the shop picture is managed inside the shop details, the Bitcoin QR code picks between universal, Cashu and Lightning, and security moved to the bottom. Restoring another shop needs a device reset first.
+- Wide screens keep the section rail on the terminal and the payment screen, so the terminal has no menu button there.
+
+### cs-CZ
+
+- Úvodní obrazovka s přepínáním jazyka a dvěma prostými volbami: nový podnik, nebo obnovení existujícího.
+- Název podniku i bankovní účet jsou nepovinné; bez obojího pokračuje založení tlačítkem „Nastavím později“. Do pole účtu jde zadat i český IBAN.
+- Peněženka ukazuje jen zůstatek; seznam pohybů zmizel.
+- Nastavení bez vysvětlivek pod položkami; obrázek podniku se spravuje v údajích podniku, bitcoinový QR kód vybírá mezi univerzálním, Cashu a Lightning a zabezpečení se přesunulo dolů. Obnova jiného podniku vyžaduje nejdřív reset zařízení.
+- Na širokých obrazovkách zůstává lišta sekcí i na terminálu a na platbě, takže terminál tam nemá tlačítko menu.
+
 ## [26.10.1] - 2026-10-15
 
 ### en-US

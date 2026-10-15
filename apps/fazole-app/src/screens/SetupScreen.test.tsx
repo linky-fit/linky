@@ -29,12 +29,20 @@ describe("the setup screen", () => {
     expect(device.createAccount).not.toHaveBeenCalled();
   });
 
-  it("asks for a name before creating the account", async () => {
+  it("creates a nameless account without a bank account, to be set up later", async () => {
     const device = fakeDevice();
     const container = await render(<SetupScreen />, device);
+    const button = byTestId(container, "setup-submit");
+    expect(button.textContent).toBe(copy.setup.later);
+    await typeInto(byTestId(container, "shop-name"), "K");
+    expect(button.textContent).toBe(copy.setup.submit);
+    await typeInto(byTestId(container, "shop-name"), "  ");
     await submit(container);
-    expect(container.textContent).toContain(copy.shopFields.nameRequired);
-    expect(device.createAccount).not.toHaveBeenCalled();
+    expect(device.createAccount).toHaveBeenCalledWith({
+      name: null,
+      iban: null,
+      picture: null,
+    });
   });
 
   it("creates the account with the shop and its IBAN, or without a bank account", async () => {
