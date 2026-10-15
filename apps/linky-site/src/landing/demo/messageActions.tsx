@@ -30,7 +30,7 @@ const actionCues = {
   deleted: 7700,
 };
 
-// The web app's quick reactions and the start of its first catalog tab (apps/web-app/src/app/lib/reactionEmojis.ts).
+// The web app's quick reactions and the start of its first catalog tab (apps/linky-app/src/app/lib/reactionEmojis.ts).
 const quickReactions = ["❤️", "👍", "👎", "😂", "😮", "😢"];
 const smileys = Array.from(
   "😀😃😄😁😆😅🤣😂🙂🙃🫠😉😊😇🥰😍🤩😘😗😚😙🥲😋😛😜🤪😝🤑🤗🤭🫢🫣🤫🤔🫡🤐🤨😐😑😶🫥😏😒🙄😬🤥😌😔😪",

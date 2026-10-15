@@ -12,9 +12,9 @@ Test each behavior at the lowest layer that goes red when it breaks. Each layer 
 | Layer                | Lives in                                                                    | Catches                                                                                                                                                       |
 | -------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Package unit         | `packages/*/src/**/*.test.ts`                                               | Everything a package owns: domain rules, state transitions, wire shapes, sync and shard logic. Use the package's fakes from `src/testing/`.                   |
-| App unit / component | `apps/web-app/src/**/*.test.ts(x)` (`src/testUtils/renderIntoDocument.tsx`) | Hooks, scheduling, what a screen shows and allows for given props: validation, confirmations, prefills, error branches. Time-based behavior uses fake timers. |
+| App unit / component | `apps/linky-app/src/**/*.test.ts(x)` (`src/testUtils/renderIntoDocument.tsx`) | Hooks, scheduling, what a screen shows and allows for given props: validation, confirmations, prefills, error branches. Time-based behavior uses fake timers. |
 | Mint integration     | `packages/linkshu/tests/integration`                                        | Cashu operations against a real mint: fees, collisions, restarts, envelopes.                                                                                  |
-| E2E                  | `apps/web-app/tests`, `apps/site/tests` (Playwright on the Docker stack)    | The wiring between real pieces, listed below.                                                                                                                 |
+| E2E                  | `apps/linky-app/tests`, `apps/linky-site/tests` (Playwright on the Docker stack)    | The wiring between real pieces, listed below.                                                                                                                 |
 
 Web-app `.test.tsx` files run in jsdom and `.test.ts` files in node; a `.test.ts` that reads `window`, `document`, storage or other browser globals starts with `// @vitest-environment jsdom`.
 
@@ -36,6 +36,6 @@ Done when every branch of the change is asserted at some layer and any e2e addit
 ## E2E shape
 
 - **Observable waits.** Wait on state the app exposes, using `expect`, `expect.poll` or `toPass`. Lint rejects `waitForTimeout`; the one exception is asserting that nothing happens, which keeps an `eslint-disable-next-line` with its reason.
-- **No real-time waits.** Make due dates and deadlines arrive through data, using the `VITE_E2E` hooks in `apps/web-app/src/devtools/e2e/`. Keep the browser clock real, because relays reject future Nostr events and Evolu bounds clock drift.
+- **No real-time waits.** Make due dates and deadlines arrive through data, using the `VITE_E2E` hooks in `apps/linky-app/src/devtools/e2e/`. Keep the browser clock real, because relays reject future Nostr events and Evolu bounds clock drift.
 - **Fewest accounts.** Boot only the accounts the flow needs, each with a fresh `createSeedIdentity()`. That keeps tests independent, so the suite runs `fullyParallel`.
 - **One variant per code path.** Parametrize over cases that take different branches; a matrix of combinations belongs in a unit test.

@@ -13,7 +13,7 @@ playwright-report
 local.properties
 *.local
 packages/identity/src/**/*.js
-apps/web-app/.inspector/
+apps/linky-app/.inspector/
 
 # Editor directories and files
 .vscode/*

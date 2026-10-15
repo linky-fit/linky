@@ -1,10 +1,10 @@
 # @linky-fit/native-shell
 
-Capacitor shell that bundles `apps/web-app/dist` and ships it as:
+Capacitor shell that bundles `apps/linky-app/dist` and ships it as:
 
 - Android debug APK (`fit.linky.app.debug`, "Linky Dev", installs next to the production app)
 - Android release APK, published as `linky.apk` on GitHub Releases
-- Android AAB, uploaded to Google Play internal and open testing by `.github/workflows/release-app.yml` (see [Play setup](../../docs/android-play-console.md))
+- Android AAB, uploaded to Google Play internal and open testing by `.github/workflows/release-linky.yml` (see [Play setup](../../docs/android-play-console.md))
 - iOS project (no App Store release pipeline yet)
 
 Android builds need JDK 17. The `native:*` scripts select it through `scripts/with-java17.sh` and run `scripts/patch-android-java.sh`, which rewrites the Java 21 compile options Capacitor 7 generates back to 17.
@@ -72,7 +72,7 @@ An Android shell keeps its web app current without a store update, the way the b
 - A newer bundle with a valid signature and SHA-256 is unpacked into app storage and offered like a web update: applied right away on a fresh untouched launch, otherwise from the update banner, never in the middle of wallet work.
 - The switch is not persisted until the new bundle mounts, so a bundle that fails to boot is dropped on the next launch and not offered again. Installing a new APK goes back to the bundle inside it.
 
-Release CI signs with the `LIVE_UPDATE_SIGNING_KEY` secret, the hex Ed25519 key matching `LIVE_UPDATE_PUBLIC_KEY` in `apps/web-app/src/platform/liveUpdateManifest.ts`; the script refuses a key that doesn't match. Rotating it means changing both in one release; installed shells reject that release's manifest and pick it up from the store, as with a native change.
+Release CI signs with the `LIVE_UPDATE_SIGNING_KEY` secret, the hex Ed25519 key matching `LIVE_UPDATE_PUBLIC_KEY` in `apps/linky-app/src/platform/liveUpdateManifest.ts`; the script refuses a key that doesn't match. Rotating it means changing both in one release; installed shells reject that release's manifest and pick it up from the store, as with a native change.
 
 iOS doesn't expose its runtime yet, so it gets no live updates.
 
@@ -106,6 +106,6 @@ Android:
 - `nostr://`, `cashu://` and `nostrconnect://` URLs are forwarded to the web app: `nostr://npub...` opens or creates the contact, `cashu://cashu...` imports the token, `nostrconnect://...` is handed over whole as a Nostr Connect login request.
 - NFC: reads NDEF URI and `text/plain` records with those schemes; writes `cashu://cashu...` from token detail and `nostr://npub...` from the profile.
 - File export (data backup, chat images and PDFs) writes to the app cache and opens the share sheet.
-- Beacon (experimental, Android 12+): `BeaconService` is a `connectedDevice` foreground service that advertises Bluetooth LE beacons for mutual contacts and scans for theirs; `LinkyNativeBeaconBridge` exposes it as `window.LinkyNativeBeacon`. The wire format lives in `BeaconCodec`, checked against `apps/web-app/src/app/lib/beaconVectors.json` by `cd android && bash ../scripts/with-java17.sh ./gradlew :app:testDebugUnitTest`.
+- Beacon (experimental, Android 12+): `BeaconService` is a `connectedDevice` foreground service that advertises Bluetooth LE beacons for mutual contacts and scans for theirs; `LinkyNativeBeaconBridge` exposes it as `window.LinkyNativeBeacon`. The wire format lives in `BeaconCodec`, checked against `apps/linky-app/src/app/lib/beaconVectors.json` by `cd android && bash ../scripts/with-java17.sh ./gradlew :app:testDebugUnitTest`.
 
 iOS: Keychain-backed secret storage, native QR scanning and CoreNFC NDEF writing for the same payloads. Notifications and deep links are not wired on iOS yet.

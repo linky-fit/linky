@@ -9,7 +9,7 @@
 [![@linky-fit/linkauth](https://img.shields.io/npm/v/@linky-fit/linkauth?label=%40linky-fit%2Flinkauth)](https://www.npmjs.com/package/@linky-fit/linkauth)
 [![npm release](https://img.shields.io/github/deployments/linky-fit/linky/npm?label=npm%20release)](https://github.com/linky-fit/linky/deployments/npm)
 
-Linky is a mobile-first PWA for contacts, private Nostr messaging and Lightning/Cashu payments. Data lives in Evolu (SQLite) on the device and syncs between devices through an Evolu relay. The app runs at `app.linky.fit` and as an Android app; `nightly.app.linky.fit` runs `main` ahead of the last release (see [`docs/releases.md`](./docs/releases.md)). `apps/site/` is the public website `linky.fit`, with the `/cashu/` token redemption page.
+Linky is a mobile-first PWA for contacts, private Nostr messaging and Lightning/Cashu payments. Data lives in Evolu (SQLite) on the device and syncs between devices through an Evolu relay. The app runs at `app.linky.fit` and as an Android app; `nightly.app.linky.fit` runs `main` ahead of the last release (see [`docs/releases.md`](./docs/releases.md)). `apps/linky-site/` is the public website `linky.fit`, with the `/cashu/` token redemption page.
 
 ## Development
 
@@ -27,14 +27,14 @@ bun run check-changed # check-code in the workspaces this branch reaches
 End-to-end tests (Playwright against a Docker stack owned by the checkout, so worktrees can run them side by side):
 
 ```bash
-bun run e2e          # web-app suite; extra args go to Playwright
-bun run e2e site     # site suite
+bun run e2e          # linky-app suite; extra args go to Playwright
+bun run e2e site     # linky-site suite
 bun run e2e down     # stop the stack and drop its data
 ```
 
 ## Workspaces
 
-Apps: `apps/web-app` (the product), `apps/site`, `apps/push` (Web Push and FCM service), `apps/native-shell` (Capacitor Android and iOS shells), `apps/linkshu-cli` (terminal cashu wallet), `tools/nostr-error-tracker`.
+Apps: `apps/linky-app` (the product), `apps/linky-site`, `apps/push` (Web Push and FCM service), `apps/native-shell` (Capacitor Android and iOS shells), `apps/linkshu-cli` (terminal cashu wallet), `tools/nostr-error-tracker`.
 
 Packages:
 

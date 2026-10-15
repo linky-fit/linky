@@ -33,6 +33,6 @@ bun run build:npm
 bun run check:npm
 ```
 
-`check:npm` needs Node 24, npm, Bun and Playwright Chromium (`cd apps/web-app && bunx playwright install chromium`). It takes about a minute because linkstr must send two real keepalives over one WebSocket. It checks declarations under TypeScript's NodeNext resolution, runs the `linkstr/testing` subpath under Vitest, and imports the browser bundles in Chromium. Temporary installs are removed; the verified tarballs stay under `dist/npm/`.
+`check:npm` needs Node 24, npm, Bun and Playwright Chromium (`cd apps/linky-app && bunx playwright install chromium`). It takes about a minute because linkstr must send two real keepalives over one WebSocket. It checks declarations under TypeScript's NodeNext resolution, runs the `linkstr/testing` subpath under Vitest, and imports the browser bundles in Chromium. Temporary installs are removed; the verified tarballs stay under `dist/npm/`.
 
 Workspace manifests remain private and point at TypeScript source; only the generated `dist/package.json` is public and points at JavaScript and declarations. A `workspace:` dependency on another published package (linkstr on linkauth) becomes that package's exact shared version in `dist/package.json`, and any other `workspace:` dependency fails the build. Publish the tested `.tgz`, never a workspace directory.

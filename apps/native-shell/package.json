@@ -5,7 +5,7 @@
   "license": "0BSD",
   "type": "module",
   "scripts": {
-    "build:web": "bun run --filter @linky-fit/web-app build",
+    "build:web": "bun run --filter @linky-fit/linky-app build",
     "android:icons": "bash ./scripts/generate-android-icons.sh",
     "android:release:check": "bash ./scripts/check-android-release-prereqs.sh",
     "android:add": "bash ./scripts/with-java17.sh cap add android && bash ./scripts/patch-android-java.sh",

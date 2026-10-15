@@ -12,4 +12,4 @@ xcrun swiftc -parse-as-library -O \
   "$SCRIPT_DIR/check-ios-beacon-codec.swift" \
   -o "$OUT_DIR/check-ios-beacon-codec"
 
-"$OUT_DIR/check-ios-beacon-codec" "$REPO_ROOT/apps/web-app/src/app/lib/beaconVectors.json"
+"$OUT_DIR/check-ios-beacon-codec" "$REPO_ROOT/apps/linky-app/src/app/lib/beaconVectors.json"

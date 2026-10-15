@@ -30,7 +30,7 @@
         "@linky-fit/linkshu": "workspace:*",
         "@linky-fit/linkstr": "workspace:*",
         "@linky-fit/linksync": "workspace:*",
-        "@linky-fit/site": "workspace:*",
+        "@linky-fit/linky-site": "workspace:*",
         "@linky-fit/ui": "workspace:*",
         "@noble/hashes": "^2.0.1",
         "core-js": "^3.50.0",
@@ -148,8 +148,8 @@
         "typescript": "~5.9.3",
       },
     },
-    "apps/site": {
-      "name": "@linky-fit/site",
+    "apps/linky-site": {
+      "name": "@linky-fit/linky-site",
       "version": "0.1.0",
       "dependencies": {
         "@linky-fit/linkauth": "workspace:*",
@@ -209,8 +209,8 @@
         "vitest": "^4.0.18",
       },
     },
-    "apps/web-app": {
-      "name": "@linky-fit/web-app",
+    "apps/linky-app": {
+      "name": "@linky-fit/linky-app",
       "version": "26.10.6",
       "dependencies": {
         "@capacitor/clipboard": "^7.0.0",
@@ -231,7 +231,7 @@
         "@linky-fit/linksync": "workspace:*",
         "@linky-fit/proxy-payment": "workspace:*",
         "@linky-fit/recurring-payment": "workspace:*",
-        "@linky-fit/site": "workspace:*",
+        "@linky-fit/linky-site": "workspace:*",
         "@linky-fit/ui": "workspace:*",
         "@noble/curves": "^1.9.7",
         "@noble/hashes": "^1.5.0",
@@ -1206,13 +1206,13 @@
 
     "@linky-fit/recurring-payment": ["@linky-fit/recurring-payment@workspace:packages/recurring-payment"],
 
-    "@linky-fit/site": ["@linky-fit/site@workspace:apps/site"],
+    "@linky-fit/linky-site": ["@linky-fit/linky-site@workspace:apps/linky-site"],
 
     "@linky-fit/ui": ["@linky-fit/ui@workspace:packages/ui"],
 
     "@linky-fit/ui-book": ["@linky-fit/ui-book@workspace:apps/ui-book"],
 
-    "@linky-fit/web-app": ["@linky-fit/web-app@workspace:apps/web-app"],
+    "@linky-fit/linky-app": ["@linky-fit/linky-app@workspace:apps/linky-app"],
 
     "@malept/cross-spawn-promise": ["@malept/cross-spawn-promise@2.0.0", "", { "dependencies": { "cross-spawn": "^7.0.1" } }, "sha512-1DpKU0Z5ThltBwjNySMC14g0CkbyhCaz9FkhxqNsZI6uAPJXFS8cMXlBKo26FJ8ZuW6S9GCMcR9IO5k2X5/9Fg=="],
 
@@ -3592,15 +3592,15 @@
 
     "@ionic/utils-fs/fs-extra": ["fs-extra@9.1.0", "", { "dependencies": { "at-least-node": "^1.0.0", "graceful-fs": "^4.2.0", "jsonfile": "^6.0.1", "universalify": "^2.0.0" } }, "sha512-hcg3ZmepS30/7BSFqRvoo3DOMQu7IjqxO5nCDt+zM9XWjb33Wg7ziNT+Qvqbuc3+gWpzO02JubVyk2G4Zvo1OQ=="],
 
-    "@linky-fit/site/undici": ["undici@7.30.0", "", {}, "sha512-dkrQXeHSaoamnItlYbmzG0wFYrM0ZwDxCIg0A7aKjTyyhh9svRzCNFEzV+Vm05/yehjCzjDZ31KXfGEjYSztDQ=="],
+    "@linky-fit/linky-site/undici": ["undici@7.30.0", "", {}, "sha512-dkrQXeHSaoamnItlYbmzG0wFYrM0ZwDxCIg0A7aKjTyyhh9svRzCNFEzV+Vm05/yehjCzjDZ31KXfGEjYSztDQ=="],
 
     "@linky-fit/ui-book/react": ["react@19.2.3", "", {}, "sha512-Ku/hhYbVjOQnXDZFv2+RibmLFGwFdeeKHFcOTlrt7xplBnya5OGn/hIRDsqDiSUcfORsDC7MPxwork8jBwsIWA=="],
 
     "@linky-fit/ui-book/react-dom": ["react-dom@19.2.3", "", { "dependencies": { "scheduler": "^0.27.0" }, "peerDependencies": { "react": "^19.2.3" } }, "sha512-yELu4WmLPw5Mr/lmeEpox5rw3RETacE++JgHqQzd2dg+YbJuat3jH4ingc+WPZhxaoFzdv9y33G+F7Nl5O0GBg=="],
 
-    "@linky-fit/web-app/@noble/hashes": ["@noble/hashes@1.8.0", "", {}, "sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A=="],
+    "@linky-fit/linky-app/@noble/hashes": ["@noble/hashes@1.8.0", "", {}, "sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A=="],
 
-    "@linky-fit/web-app/undici": ["undici@7.30.0", "", {}, "sha512-dkrQXeHSaoamnItlYbmzG0wFYrM0ZwDxCIg0A7aKjTyyhh9svRzCNFEzV+Vm05/yehjCzjDZ31KXfGEjYSztDQ=="],
+    "@linky-fit/linky-app/undici": ["undici@7.30.0", "", {}, "sha512-dkrQXeHSaoamnItlYbmzG0wFYrM0ZwDxCIg0A7aKjTyyhh9svRzCNFEzV+Vm05/yehjCzjDZ31KXfGEjYSztDQ=="],
 
     "@malept/flatpak-bundler/fs-extra": ["fs-extra@9.1.0", "", { "dependencies": { "at-least-node": "^1.0.0", "graceful-fs": "^4.2.0", "jsonfile": "^6.0.1", "universalify": "^2.0.0" } }, "sha512-hcg3ZmepS30/7BSFqRvoo3DOMQu7IjqxO5nCDt+zM9XWjb33Wg7ziNT+Qvqbuc3+gWpzO02JubVyk2G4Zvo1OQ=="],
 

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import siteHandler from "./lnurlp.js";
-import appHandler from "../../web-app/api/lnurlp.js";
+import appHandler from "../../linky-app/api/lnurlp.js";
 
 const { lookup, undiciFetch } = vi.hoisted(() => ({
   lookup: vi.fn<() => Promise<{ address: string; family: number }[]>>(),

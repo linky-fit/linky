@@ -1,4 +1,4 @@
-# Local dev services for `bun run dev` (see apps/web-app/.env.development).
+# Local dev services for `bun run dev` (see apps/linky-app/.env.development).
 # Run attached in a separate terminal with `bun run dev:services`.
 services:
   nostr-relay:
@@ -119,13 +119,13 @@ services:
   # not used by `bun run dev`. Endpoints are build args because Vite inlines
   # import.meta.env; the browser runs on the host, so these are host-published
   # ports.
-  web-app:
+  linky-app:
     profiles: ["e2e"]
     # scripts/e2e.sh tags it per checkout so worktrees never run each other's build.
-    image: ${LINKY_E2E_WEB_IMAGE:-linky-web-app}
+    image: ${LINKY_E2E_WEB_IMAGE:-linky-app}
     build:
       context: .
-      dockerfile: docker/web-app/Dockerfile
+      dockerfile: docker/linky-app/Dockerfile
       args:
         VITE_ALLOW_INSECURE_LOCALHOST_RELAYS: "1"
         VITE_NOSTR_RELAYS: ws://localhost:${LINKY_E2E_NOSTR_PORT:-7777}

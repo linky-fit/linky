@@ -10,7 +10,7 @@ version="${1#*v}"
 output_path="$2"
 locale="${3:-}"
 root_dir="$(cd "$(dirname "$0")/../../.." && pwd)"
-changelog_path="${CHANGELOG:-$root_dir/CHANGELOG.md}"
+changelog_path="${CHANGELOG:-$root_dir/apps/linky-app/CHANGELOG.md}"
 
 if [[ ! -f "$changelog_path" ]]; then
   echo "Missing changelog: $changelog_path" >&2

@@ -21,7 +21,7 @@ import org.json.JSONObject;
 import org.junit.Test;
 
 public class BeaconCodecTest {
-	private static final String VECTORS_PATH = "apps/web-app/src/app/lib/beaconVectors.json";
+	private static final String VECTORS_PATH = "apps/linky-app/src/app/lib/beaconVectors.json";
 	private static final long SLOT = 2958123L;
 
 	@Test

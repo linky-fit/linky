@@ -1,6 +1,6 @@
 # Android Play Console CI
 
-Versioned Android releases (a new version in the root `package.json` on `main` or a `hotfix/**` branch once `CI` passes, or a manual run of the `Release · app` workflow from a `v*` tag) upload the signed AAB to Google Play on the `internal` and `beta` (Open testing) tracks and the APK to GitHub Releases. An ordinary push to `main` does not publish a Play build. The workflow lives in [.github/workflows/release-app.yml](../.github/workflows/release-app.yml); CI sets `versionCode = 200000100 + github.run_number` in [android-release-setup](../.github/actions/android-release-setup/action.yml). Renaming the workflow file restarts `run_number`, so a rename must raise the offset past the last version code.
+Versioned Android releases (a new version in the root `package.json` on `main` or a `hotfix/**` branch once `CI` passes, or a manual run of the `Release · app` workflow from a `v*` tag) upload the signed AAB to Google Play on the `internal` and `beta` (Open testing) tracks and the APK to GitHub Releases. An ordinary push to `main` does not publish a Play build. The workflow lives in [.github/workflows/release-linky.yml](../.github/workflows/release-linky.yml); CI sets `versionCode = 200000100 + github.run_number` in [android-release-setup](../.github/actions/android-release-setup/action.yml). Renaming the workflow file restarts `run_number`, so a rename must raise the offset past the last version code.
 
 ## Prepare Google Play Console
 
@@ -43,7 +43,7 @@ base64 -i apps/native-shell/android/app/google-services.json | pbcopy
 
 ## Verify the first run
 
-1. release a new version by changing `package.json` and extending `CHANGELOG.md`
+1. release a new version by changing `package.json` and extending `apps/linky-app/CHANGELOG.md`
 2. in GitHub Actions wait for the `Publish to Google Play open testing` job
 3. in the Play Console check `Open testing` and `Publishing overview`
 

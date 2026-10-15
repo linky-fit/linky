@@ -12,7 +12,7 @@ import {
   liveUpdatePublicKey,
   NativeRuntimeFile,
   signLiveUpdateManifest,
-} from "../../web-app/src/platform/liveUpdateManifest.ts";
+} from "../../linky-app/src/platform/liveUpdateManifest.ts";
 
 const [releaseTag, outputDir] = process.argv.slice(2);
 const signingKey = process.env.LIVE_UPDATE_SIGNING_KEY?.trim();
@@ -29,7 +29,7 @@ if (liveUpdatePublicKey(signingKey) !== LIVE_UPDATE_PUBLIC_KEY) {
 }
 
 const repoDir = path.resolve(import.meta.dirname, "../../..");
-const distDir = path.join(repoDir, "apps/web-app/dist");
+const distDir = path.join(repoDir, "apps/linky-app/dist");
 const { runtime } = Schema.decodeUnknownSync(
   Schema.fromJsonString(NativeRuntimeFile),
 )(readFileSync(path.join(distDir, "native-runtime.json"), "utf8"));
