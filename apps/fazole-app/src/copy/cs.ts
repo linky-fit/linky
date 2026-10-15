@@ -175,7 +175,7 @@ export const cs = {
     directAmount: (sats: string, czk: string | null) =>
       czk === null ? `${sats} sat` : `${sats} sat · ≈ ${czk} Kč`,
     receivedAt: "Přijato",
-    hide: "Skrýt z historie",
+    hide: "Smazat",
     hideConfirmDescription:
       "Zmizí z historie i z denního součtu. Peníze zůstanou v peněžence.",
   },
