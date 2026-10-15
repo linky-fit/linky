@@ -318,6 +318,7 @@ function DirectTransferDetail({
 }
 
 function PaymentDetail({ payment }: { readonly payment: Payment }) {
+  const { payments } = useAppServices();
   return (
     <Stack gap="$lg" paddingTop="$sm" testID="payment-detail">
       <Stack alignItems="center" gap="$sm">
@@ -338,13 +339,23 @@ function PaymentDetail({ payment }: { readonly payment: Payment }) {
       )}
       <DetailRows details={paymentDetails(payment)} />
       {payment.status === "pending" ? (
-        <Button
-          testID="history-show-qr"
-          icon="QrCode"
-          onPress={() => navigateTo(paymentRoute(payment.id))}
-        >
-          {copy.history.showQr}
-        </Button>
+        <Stack gap="$sm">
+          <Button
+            testID="history-show-qr"
+            icon="QrCode"
+            onPress={() => navigateTo(paymentRoute(payment.id))}
+          >
+            {copy.history.showQr}
+          </Button>
+          <Button
+            testID="history-cancel"
+            variant="ghost"
+            icon="X"
+            onPress={() => void payments.cancel(payment.id)}
+          >
+            {copy.payment.cancel}
+          </Button>
+        </Stack>
       ) : null}
     </Stack>
   );
