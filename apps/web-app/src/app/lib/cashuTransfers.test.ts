@@ -7,10 +7,19 @@ import {
   createTransferFixture,
 } from "../../testUtils/cashuInventory";
 import {
+  buildCashuToken,
+  reencodeCashuToken,
+} from "../../testUtils/cashuToken";
+import {
   isShownDeferredReceive,
   sentTokenClaims,
-  takenTokenTexts,
+  takenTokenProofs,
 } from "./cashuTransfers";
+import { getCashuTokenMessageInfo } from "./tokenMessageInfo";
+import { tokenProofsKey } from "./tokenText";
+
+const tokenOf = (name: string) => buildCashuToken({ secretPrefix: name });
+const keyOf = (name: string) => tokenProofsKey(tokenOf(name));
 
 const transfer = (
   id: string,
@@ -18,12 +27,12 @@ const transfer = (
   status: TokenTransfer["status"],
 ) =>
   Schema.decodeUnknownSync(TokenTransfer)(
-    createTransferFixture({ id, kind, status, tokenText: `cashuB${id}` }),
+    createTransferFixture({ id, kind, status, tokenText: tokenOf(id) }),
   );
 
-describe("takenTokenTexts", () => {
+describe("takenTokenProofs", () => {
   it("counts a deferred token as taken, discarded or not, and leaves an interrupted receive to resume", () => {
-    const taken = takenTokenTexts(
+    const taken = takenTokenProofs(
       [
         transfer("AQEBAQEBAQEBAQEBAQEBAQ", "send", "issued"),
         transfer("AgICAgICAgICAgICAgICAg", "receive", "done"),
@@ -34,29 +43,29 @@ describe("takenTokenTexts", () => {
           id: "BAQEBAQEBAQEBAQEBAQEBA",
           kind: "deferredReceive",
           status: "pending",
-          tokenText: "cashuBdeferred",
+          tokenText: tokenOf("deferred"),
         }),
         createTransferFixture({
           id: "BQUFBQUFBQUFBQUFBQUFBQ",
           kind: "deferredReceive",
           status: "done",
-          tokenText: "cashuBdiscarded",
+          tokenText: tokenOf("discarded"),
         }),
       ],
     );
 
     expect([...taken].sort()).toEqual(
       [
-        "cashuBAQEBAQEBAQEBAQEBAQEBAQ",
-        "cashuBAgICAgICAgICAgICAgICAg",
-        "cashuBdeferred",
-        "cashuBdiscarded",
+        keyOf("AQEBAQEBAQEBAQEBAQEBAQ"),
+        keyOf("AgICAgICAgICAgICAgICAg"),
+        keyOf("deferred"),
+        keyOf("discarded"),
       ].sort(),
     );
   });
 
-  it("leaves a text open whose deferral a retry handed over to a receive that failed transiently", () => {
-    const tokenText = "cashuBhandedover";
+  it("leaves a token open whose deferral a retry handed over to a receive that failed transiently", () => {
+    const tokenText = tokenOf("handedover");
     const handedOver = createTransferFixture({
       id: "BAQEBAQEBAQEBAQEBAQEBA",
       kind: "deferredReceive",
@@ -79,10 +88,9 @@ describe("takenTokenTexts", () => {
     );
     const spent = receive(JSON.stringify({ _tag: "TokenAlreadySpent" }));
 
-    expect(takenTokenTexts([unreachable], [handedOver]).has(tokenText)).toBe(
-      false,
-    );
-    expect(takenTokenTexts([spent], [handedOver]).has(tokenText)).toBe(true);
+    const key = keyOf("handedover") ?? "";
+    expect(takenTokenProofs([unreachable], [handedOver]).has(key)).toBe(false);
+    expect(takenTokenProofs([spent], [handedOver]).has(key)).toBe(true);
   });
 });
 
@@ -92,7 +100,7 @@ describe("isShownDeferredReceive", () => {
       id: "BAQEBAQEBAQEBAQEBAQEBA",
       kind: "deferredReceive",
       status,
-      tokenText: "cashuBdeferred",
+      tokenText: tokenOf("deferred"),
       unit,
     });
 
@@ -130,9 +138,9 @@ describe("sentTokenClaims", () => {
     );
 
     expect([...claims]).toEqual([
-      [claimed.tokenText, true],
-      [partial.tokenText, false],
-      [returned.tokenText, false],
+      [tokenProofsKey(claimed.tokenText), true],
+      [tokenProofsKey(partial.tokenText), false],
+      [tokenProofsKey(returned.tokenText), false],
     ]);
   });
 
@@ -144,6 +152,31 @@ describe("sentTokenClaims", () => {
       [proof("BQUFBQUFBQUFBQUFBQUFBQ", send.id, "spent", 20)],
     );
 
-    expect(claims.get(send.tokenText)).toBe(false);
+    expect(claims.get(tokenProofsKey(send.tokenText) ?? "")).toBe(false);
+  });
+
+  it("finds a send by its proofs whether the message carries it as v4 text or a NUT-18 payload", () => {
+    const token = tokenOf("paid");
+    const { payload, v4 } = reencodeCashuToken(token);
+    const send = Schema.decodeUnknownSync(TokenTransfer)(
+      createTransferFixture({
+        id: "AQEBAQEBAQEBAQEBAQEBAQ",
+        kind: "send",
+        status: "done",
+        tokenText: v4,
+      }),
+    );
+
+    const claims = sentTokenClaims(
+      [send],
+      [proof("BQUFBQUFBQUFBQUFBQUFBQ", send.id, "spent", send.amount)],
+    );
+
+    expect(
+      getCashuTokenMessageInfo(payload, new Set(), true, claims)?.sent,
+    ).toBe("claimed");
+    expect(
+      getCashuTokenMessageInfo(payload, takenTokenProofs([send], []))?.isValid,
+    ).toBe(false);
   });
 });

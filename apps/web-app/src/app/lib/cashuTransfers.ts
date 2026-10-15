@@ -4,6 +4,7 @@ import type {
   TokenTransfer,
 } from "@linky-fit/linkshu";
 import { isStoredCashuErrorTransient } from "./cashuStoredError";
+import { tokenProofsKey } from "./tokenText";
 
 /** A transfer the user is still waiting on: something can still happen to it. */
 export const isOpenTransfer = (transfer: TokenTransfer): boolean =>
@@ -39,18 +40,18 @@ export const isInterruptedReceive = (transfer: TokenTransfer): boolean =>
       isStoredCashuErrorTransient(transfer.error)));
 
 /**
- * Token texts a chat message shows as taken, which auto-accept skips: those
- * of transfers and of deferred receives, pending or closed, unless a receive
- * of the text is still to be resumed.
+ * Tokens, by `tokenProofsKey`, a chat message shows as taken, which
+ * auto-accept skips: those of transfers and of deferred receives, pending or
+ * closed, unless a receive of the token is still to be resumed.
  */
-export const takenTokenTexts = (
+export const takenTokenProofs = (
   transfers: ReadonlyArray<TokenTransfer>,
   operations: ReadonlyArray<StoredOperation>,
 ): ReadonlySet<string> => {
   const resumable = new Set(
     transfers
       .filter(isInterruptedReceive)
-      .map((transfer) => transfer.tokenText),
+      .map((transfer) => tokenProofsKey(transfer.tokenText)),
   );
   return new Set(
     [
@@ -60,12 +61,15 @@ export const takenTokenTexts = (
         .flatMap((operation) =>
           operation.tokenText === null ? [] : [operation.tokenText],
         ),
-    ].filter((text) => !resumable.has(text)),
+    ].flatMap((text) => {
+      const key = tokenProofsKey(text);
+      return key === null || resumable.has(key) ? [] : [key];
+    }),
   );
 };
 
 /**
- * The wallet's own sends by token text: true once the recipient claimed it,
+ * The wallet's own sends by `tokenProofsKey`: true once the recipient claimed it,
  * i.e. the mint reported spent proofs covering the whole amount, so a send
  * whose proofs have not all synced yet stays unclaimed. A returned send's
  * proofs were spent by the wallet itself.
@@ -83,18 +87,19 @@ export const sentTokenClaims = (
       all: (spent?.all ?? true) && proof.state === "spent",
     });
   }
-  return new Map(
-    transfers
-      .filter((transfer) => transfer.kind === "send")
-      .map((transfer) => {
-        const spent = spentByOperation.get(transfer.id);
-        return [
-          transfer.tokenText,
-          transfer.status !== "returned" &&
-            spent !== undefined &&
-            spent.all &&
-            spent.amount === transfer.amount,
-        ];
-      }),
-  );
+  const claims = new Map<string, boolean>();
+  for (const transfer of transfers) {
+    if (transfer.kind !== "send") continue;
+    const key = tokenProofsKey(transfer.tokenText);
+    if (key === null) continue;
+    const spent = spentByOperation.get(transfer.id);
+    claims.set(
+      key,
+      transfer.status !== "returned" &&
+        spent !== undefined &&
+        spent.all &&
+        spent.amount === transfer.amount,
+    );
+  }
+  return claims;
 };

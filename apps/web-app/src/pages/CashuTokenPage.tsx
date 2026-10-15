@@ -126,11 +126,11 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
     (candidate) => String(candidate.id) === routeId,
   );
   const tokenText = transfer?.tokenText ?? "";
-  const chatsByToken = React.useMemo(
+  const chatsForToken = React.useMemo(
     () => tokenChatMessages(messages),
     [messages],
   );
-  const chats = (chatsByToken.get(tokenText) ?? []).filter(
+  const chats = chatsForToken(tokenText).filter(
     (message) =>
       message.direction === (transfer?.kind === "send" ? "out" : "in"),
   );

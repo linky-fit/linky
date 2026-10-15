@@ -92,7 +92,7 @@ export const CashuTokensPage = ({
     () => pendingTokenTransfers(cashuTransfers, cashuProofs),
     [cashuTransfers, cashuProofs],
   );
-  const chatsByToken = useMemo(() => tokenChatMessages(messages), [messages]);
+  const chatsForToken = useMemo(() => tokenChatMessages(messages), [messages]);
   const hasHandedOut = cashuProofs.some(
     (proof) => proof.state === "handedOut" || proof.state === "externalized",
   );
@@ -245,9 +245,9 @@ export const CashuTokensPage = ({
               gap="$md"
             >
               {transfers.map((transfer) => {
-                const chats = (
-                  chatsByToken.get(transfer.tokenText) ?? []
-                ).filter((message) => message.direction === "out");
+                const chats = chatsForToken(transfer.tokenText).filter(
+                  (message) => message.direction === "out",
+                );
                 const partiallyClaimed = cashuProofs.some(
                   (proof) =>
                     proof.operationId === transfer.id &&
