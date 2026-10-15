@@ -7,41 +7,26 @@ import {
   paidOverlayContact,
   type PaidOverlayDetails,
 } from "../../lib/paidOverlay";
-import {
-  paymentResultOf,
-  type ContactPayment,
-} from "../../state/wallet/payments";
-import type {
-  ContactRowLike,
-  LocalNostrMessage,
-  UpdateLocalNostrMessage,
-} from "../../types/appTypes";
-import type { CashuMessagePaymentHookResult } from "../payments/cashuMessagePaymentTypes";
+import type { ContactPayment } from "../../state/wallet/payments";
+import type { ContactRowLike, LocalNostrMessage } from "../../types/appTypes";
 import type { useContactsMessagingComposition } from "../composition/useContactsMessagingComposition";
 import type { useBankPaymentOffers } from "../useBankPaymentOffers";
-import { usePaymentsDomain } from "../usePaymentsDomain";
 
 type BankPaymentOffers = ReturnType<typeof useBankPaymentOffers>;
 import { paymentCopy, usePaymentsCommands, type Shortfall } from "./paymentUi";
 
-export type PayContactArgs = Omit<ContactPayment, "offlineNotice">;
-
-export type PayContactWithCashuMessage = (
-  args: PayContactArgs,
-) => Promise<CashuMessagePaymentHookResult>;
+/** Resolves true once the token is made and handed to the outbox. */
+type PayContactWithCashuMessage = (args: ContactPayment) => Promise<boolean>;
 
 interface UseContactPaymentsParams {
   cashuBalance: number;
   contactPayMethod: "cashu" | "lightning" | null;
   contacts: readonly ContactRowLike[];
-  currentNpub: string | null;
-  currentNsec: string | null;
   dismissPaymentSending: () => void;
   formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
   getBankPaymentOfferForSettlement: BankPaymentOffers["getBankPaymentOfferForSettlement"];
   isBankPaymentOfferCanceled: BankPaymentOffers["isBankPaymentOfferCanceled"];
   payAmount: string;
-  pendingPaymentsKey: string | null;
   pushToast: (message: string) => void;
   rememberFirstPayment: () => void;
   reportShortfall: (shortfall: Shortfall) => void;
@@ -59,34 +44,22 @@ interface UseContactPaymentsParams {
   showPaidOverlay: (title?: string, details?: PaidOverlayDetails) => void;
   showPaymentSending: (details: PaidOverlayDetails) => void;
   t: Translate;
-  updateLocalNostrMessage: UpdateLocalNostrMessage;
   walletOpRunning: boolean;
 }
 
-const NOT_READY: CashuMessagePaymentHookResult = {
-  error: "cashu storage not ready",
-  ok: false,
-  queued: false,
-  retryable: true,
-};
-
 /**
  * Contact payments over messages (linkshu Send, the token as a chat
- * message) mapped to statuses, overlays and navigation; a payment retried
- * from the offline queue shows nothing but a changed approval.
+ * message) mapped to statuses, overlays and navigation.
  */
 export const useContactPayments = ({
   cashuBalance,
   contactPayMethod,
   contacts,
-  currentNpub,
-  currentNsec,
   dismissPaymentSending,
   formatDisplayedAmountParts,
   getBankPaymentOfferForSettlement,
   isBankPaymentOfferCanceled,
   payAmount,
-  pendingPaymentsKey,
   pushToast,
   rememberFirstPayment,
   reportShortfall,
@@ -98,7 +71,6 @@ export const useContactPayments = ({
   showPaidOverlay,
   showPaymentSending,
   t,
-  updateLocalNostrMessage,
   walletOpRunning,
 }: UseContactPaymentsParams) => {
   const commands = usePaymentsCommands();
@@ -106,11 +78,9 @@ export const useContactPayments = ({
   const payContactWithCashuMessage =
     React.useCallback<PayContactWithCashuMessage>(
       async (args) => {
-        const notify = !args.fromQueue;
         if (commands === null) {
-          if (notify)
-            setStatus(`${t("errorPrefix")}: Cashu storage is not ready`);
-          return NOT_READY;
+          setStatus(`${t("errorPrefix")}: Cashu storage is not ready`);
+          return false;
         }
         const { amountSat, contact } = args;
         const displayName =
@@ -118,88 +88,62 @@ export const useContactPayments = ({
           (contact.lnAddress ?? "").trim() ||
           t("appTitle");
         const overlayContact = paidOverlayContact(contact);
-        const outcome = await commands.payContact(
-          {
-            ...args,
-            offlineNotice: paymentCopy(
-              t("payQueuedMessage"),
-              formatDisplayedAmountParts(amountSat),
-              displayName,
-            ),
-          },
-          notify
-            ? {
-                onSending: () =>
-                  showPaymentSending({
-                    direction: "out",
-                    amountSat,
-                    contact: overlayContact,
-                  }),
-              }
-            : {},
-        );
-        if (notify) dismissPaymentSending();
-        const showPaid = (template: string, paidAmount: number) => {
-          showPaidOverlay(
-            paymentCopy(
-              template,
-              formatDisplayedAmountParts(paidAmount),
-              displayName,
-            ),
-            {
+        const outcome = await commands.payContact(args, {
+          onSending: () =>
+            showPaymentSending({
               direction: "out",
-              amountSat: paidAmount,
+              amountSat,
               contact: overlayContact,
-            },
-          );
-          rememberFirstPayment();
-        };
+            }),
+        });
+        dismissPaymentSending();
         switch (outcome._tag) {
-          case "AuthorizationChanged":
-            setStatus(t("payApprovalChanged"));
-            break;
           case "Sent":
-            if (!notify) break;
             for (const error of outcome.publishErrors)
               pushToast(`${t("payFailed")}: ${error}`);
-            showPaid(
-              outcome.queued ? t("paidQueuedTo") : t("paidSentTo"),
-              outcome.receipt.amount,
+            showPaidOverlay(
+              paymentCopy(
+                outcome.queued ? t("paidQueuedTo") : t("paidSentTo"),
+                formatDisplayedAmountParts(outcome.receipt.amount),
+                displayName,
+              ),
+              {
+                direction: "out",
+                amountSat: outcome.receipt.amount,
+                contact: overlayContact,
+              },
             );
+            rememberFirstPayment();
             navigateTo({ id: outcome.contactId, route: "chat" });
-            break;
-          case "QueuedOffline":
-            if (!notify) break;
-            showPaid(t("paidQueuedTo"), amountSat);
-            navigateTo({ id: outcome.contactId, route: "chat" });
-            break;
+            return true;
+          case "AuthorizationChanged":
+            setStatus(t("payApprovalChanged"));
+            return false;
           case "MissingIdentity":
-            if (notify) setStatus(t("profileMissingNpub"));
-            break;
+            setStatus(t("profileMissingNpub"));
+            return false;
           case "MissingContactNpub":
-            if (notify) setStatus(t("chatMissingContactNpub"));
-            break;
+            setStatus(t("chatMissingContactNpub"));
+            return false;
           case "InvalidContact":
-            if (notify) setStatus(t("payFailed"));
-            break;
+            setStatus(t("payFailed"));
+            return false;
           case "Insufficient":
-            if (notify) setStatus(t("payInsufficient"));
-            break;
-          case "NotStored":
-            if (notify) setStatus(`${t("payFailed")}: ${outcome.detail}`);
-            break;
+            setStatus(t("payInsufficient"));
+            return false;
+          case "NetworkError":
+            setStatus(t("payNetworkError"));
+            return false;
           case "Failed":
-            if (notify)
-              setStatus(
-                outcome.insufficient
-                  ? t("payInsufficient")
-                  : `${t("payFailed")}: ${outcome.detail}`,
-              );
-            break;
+            setStatus(
+              outcome.insufficient
+                ? t("payInsufficient")
+                : `${t("payFailed")}: ${outcome.detail}`,
+            );
+            return false;
           case "Busy":
-            break;
+            return false;
         }
-        return paymentResultOf(outcome);
       },
       [
         commands,
@@ -303,14 +247,14 @@ export const useContactPayments = ({
         return;
       }
 
-      const result = await payContactWithCashuMessage({
+      const sent = await payContactWithCashuMessage({
         contact,
         amountSat: offer.amountSat,
         logCompletedOnly: true,
         paymentNoticeContext: "bank_payment_offer",
         paymentNoticeOfferId: offer.offerId,
       });
-      if (result.ok)
+      if (sent)
         await respondToBankPaymentOfferWithGroupState(message, "settled");
     },
     [
@@ -324,20 +268,6 @@ export const useContactPayments = ({
       walletOpRunning,
     ],
   );
-
-  usePaymentsDomain({
-    cashuBalance,
-    cashuIsBusy: walletOpRunning,
-    cashuReady: commands !== null,
-    contacts,
-    currentNpub,
-    currentNsec,
-    payContactWithCashuMessage,
-    pendingPaymentsKey,
-    updateLocalNostrMessage,
-    pushToast,
-    t,
-  });
 
   return {
     payContactWithCashuMessage,

@@ -1226,7 +1226,7 @@ export const de = {
   payInvalidAmount: "Ungültiger Betrag",
   payInsufficient: "Nicht genügend Cashu-Token.",
   lightningInvoiceConfirmUnknownAmount: "Unbekannter Betrag",
-  payQueuedMessage: "Zahlung {amount} {unit} → {name} vorgemerkt.",
+  payNetworkError: "Senden wegen eines Netzwerkfehlers nicht möglich.",
   payApprovalChanged:
     "Die Zahlungsfreigabe ist nicht mehr gültig. Prüfe den Empfänger und bezahle erneut.",
   payFailed: "Zahlung fehlgeschlagen",

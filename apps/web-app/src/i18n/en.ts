@@ -1206,7 +1206,7 @@ export const en = {
   payInvalidAmount: "Invalid amount",
   payInsufficient: "Not enough Cashu tokens.",
   lightningInvoiceConfirmUnknownAmount: "Unknown amount",
-  payQueuedMessage: "Queued payment {amount} {unit} → {name}.",
+  payNetworkError: "Unable to send due to a network error.",
   payApprovalChanged:
     "Payment approval is no longer valid. Review the recipient and pay again.",
   payFailed: "Payment failed",

@@ -114,7 +114,7 @@ describe("wallet payment commands", () => {
     await view.unmount();
     mints.release();
 
-    await expect(paying).resolves.toMatchObject({ _tag: "Failed" });
+    await expect(paying).resolves.toEqual({ _tag: "NetworkError" });
   });
 
   it("does not re-run a finished payment when the linkshu runtime rebuilds", async () => {

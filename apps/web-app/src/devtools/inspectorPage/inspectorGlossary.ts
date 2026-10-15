@@ -162,10 +162,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "The user asked to offer a bank QR that already has a live proxy payment offer from this device, so that offer was opened instead of sending a second one that would pin the bank details to another payer.",
   "bankOffer.staggerExtended":
     "A staggered proxy payment offer reached its next queued recipient: the configured delay elapsed without a winner, so the offer was extended while keeping the original expiry.",
-  "payment.queuedApprovalRejected":
-    "An offline payment had no pinned recipient identity or that identity changed. Its unfunded approval was canceled and its chat placeholder asks for a new approval.",
-  "payment.queuedFailed":
-    "An offline payment was sent after reconnecting and failed after it may have created a token. It is not retried, so it can never be paid twice; its chat placeholder shows the error.",
+  "payment.offlineQueueDropped":
+    "After hydration, payments an older release queued while offline were dropped, since payments now fail offline instead of waiting. None had a token yet, so no funds moved; each chat placeholder now says the payment failed. Message links identify the placeholders.",
   "paymentRequest.authorizationLost":
     "The reviewed request or approved recipient changed during token creation. Delivery was stopped and the app attempted to return the pending transfer to the wallet; a failed return leaves it recoverable.",
   "paymentRequest.planned":
@@ -283,7 +281,7 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "relayList.linkyRelayMigrated":
     "The one-time upgrade published both Nostr relay lists with the Linky relay added. Event links identify the signed list publications; failed attempts remain pending for retry.",
   "pay.step":
-    "One step of paying a contact with a cashu token sent as a chat message (start, mint-selected, swap-ok, plan-send-token, publish-pending, publish-ok, publish-failed, payment-notice-publish, message-ack, queued-offline). The client and message links tie the steps to the gift wraps they produced.",
+    "One step of paying a contact with a cashu token sent as a chat message (start, mint-selected, swap-ok, plan-send-token, publish-pending, publish-ok, publish-failed, payment-notice-publish, message-ack). The client and message links tie the steps to the gift wraps they produced.",
   "contacts.addToGroup":
     "User assigned the contacts just saved from a chat message to a group; the payload lists the contact ids and the group name.",
   ChatImageShareFailed:

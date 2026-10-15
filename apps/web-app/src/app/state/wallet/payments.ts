@@ -26,7 +26,7 @@ import {
   type PaymentNoticeContext,
   type RelayUrl,
 } from "@linky-fit/linkstr";
-import { Option, Result } from "effect";
+import { Option, Predicate, Result } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
 import { getMintFeePpk } from "../../hooks/mint/mintInfoHelpers";
@@ -38,11 +38,8 @@ import {
 } from "../../../lnurlPay";
 import { normalizeMintUrl } from "../../../utils/mint";
 import { getUnknownErrorMessage } from "../../../utils/unknown";
-import { makeLocalId } from "../../../utils/validation";
-import { nowSeconds } from "../../../utils/time";
 import type { ReplyContext } from "../../hooks/messages/useSendChatMessage";
 import { publishCashuMessagePayment } from "../../hooks/payments/publishCashuMessagePayment";
-import type { CashuMessagePaymentHookResult } from "../../hooks/payments/cashuMessagePaymentTypes";
 import { reportCashuSendForgotten } from "../../lib/cashuSendInspector";
 import { describeTaggedCashuError } from "../../lib/cashuStoredError";
 import { isSpellingOf } from "../../lib/mintSpelling";
@@ -101,6 +98,10 @@ interface Failed {
 interface Invalid {
   readonly _tag: "Invalid";
 }
+/** The device is offline or the mint could not be reached. */
+interface NetworkFailure {
+  readonly _tag: "NetworkError";
+}
 
 export type PayInvoiceOutcome =
   | { readonly _tag: "Paid"; readonly receipt: MeltReceipt }
@@ -109,7 +110,8 @@ export type PayInvoiceOutcome =
   | Shortfall
   | Busy
   | Failed
-  | Invalid;
+  | Invalid
+  | NetworkFailure;
 
 export type PayLightningAddressOutcome =
   | {
@@ -123,13 +125,12 @@ export type PayLightningAddressOutcome =
   | Shortfall
   | Busy
   | Failed
-  | Invalid;
+  | Invalid
+  | NetworkFailure;
 
 export interface ContactPayment {
   readonly amountSat: number;
   readonly contact: ContactRowLike;
-  /** A retry of a payment queued offline; only logged differently. */
-  readonly fromQueue?: boolean;
   /** Records only the completed payment, not failed steps. */
   readonly logCompletedOnly?: boolean;
   /** Travels as the token's memo and is kept as the transaction note. */
@@ -138,10 +139,7 @@ export interface ContactPayment {
   readonly paymentNoticeOfferId?: string;
   /** Checked before the token is made and again before it is sent. */
   readonly isPaymentAuthorized?: () => boolean;
-  readonly pendingMessageId?: string;
   readonly replyContext?: ReplyContext | null;
-  /** The localized chat placeholder an offline payment leaves until it is sent. */
-  readonly offlineNotice: string;
 }
 
 export type PayContactOutcome =
@@ -153,19 +151,17 @@ export type PayContactOutcome =
       readonly queued: boolean;
       readonly publishErrors: ReadonlyArray<string>;
     }
-  | { readonly _tag: "QueuedOffline"; readonly contactId: ContactId }
   | { readonly _tag: "AuthorizationChanged" }
   | { readonly _tag: "MissingIdentity" }
   | { readonly _tag: "MissingContactNpub" }
   | { readonly _tag: "InvalidContact" }
   | { readonly _tag: "Insufficient" }
-  /** The offline placeholder could not be stored; nothing was queued. */
-  | { readonly _tag: "NotStored"; readonly detail: string }
   | {
       readonly _tag: "Failed";
       readonly detail: string;
       readonly insufficient: boolean;
     }
+  | NetworkFailure
   | Busy;
 
 /** A priced way to pay a NUT-18 request; `amount + fee` leaves the wallet. */
@@ -195,7 +191,8 @@ export type QuotePaymentRequestOutcome =
   | Shortfall
   /** The Lightning target cannot lock proofs to the request's key (NUT-11). */
   | { readonly _tag: "LockingUnsupported" }
-  | Failed;
+  | Failed
+  | NetworkFailure;
 
 export interface PaymentRequestPayment {
   readonly request: CashuPaymentRequestMessageInfo;
@@ -229,6 +226,8 @@ export type PayPaymentRequestOutcome =
       /** The Lightning move already put the sats at this mint, where they stay. */
       readonly movedTo: string | null;
     }
+  /** Nothing left the wallet; a failure after a Lightning move is `Failed` with `movedTo`. */
+  | NetworkFailure
   | Busy;
 
 interface SendingOptions {
@@ -236,6 +235,7 @@ interface SendingOptions {
   readonly onSending?: () => void;
 }
 
+/** A payment runs while the user waits: offline it fails with `NetworkError`, it is never queued for later. */
 export interface PaymentsCommands {
   readonly fundsFor: (amountSat: number) => Promise<FundsCheck>;
   readonly payLightningInvoice: (
@@ -273,10 +273,7 @@ export interface PaymentsDeps {
   readonly allowTestMints: boolean;
   readonly chat: Pick<
     ChatWrites,
-    | "appendLocalNostrMessage"
-    | "enqueuePendingPayment"
-    | "latestMessages"
-    | "updateLocalNostrMessage"
+    "appendLocalNostrMessage" | "latestMessages" | "updateLocalNostrMessage"
   >;
   readonly defaultMint: string | null;
   readonly currentNpub: string | null;
@@ -305,6 +302,7 @@ export interface PaymentsDeps {
 }
 
 const BUSY: Busy = { _tag: "Busy" };
+const NETWORK_FAILURE: NetworkFailure = { _tag: "NetworkError" };
 
 const describeError = (error: unknown): string =>
   describeTaggedCashuError(error) ?? getUnknownErrorMessage(error, "unknown");
@@ -319,58 +317,6 @@ const describePostFailure = (
       return outcome.detail;
     case "InsecureUrl":
       return "Payment request POST url is not https";
-  }
-};
-
-/** The hook result the offline payment queue retries or drops on. */
-export const paymentResultOf = (
-  outcome: PayContactOutcome,
-): CashuMessagePaymentHookResult => {
-  switch (outcome._tag) {
-    case "Sent":
-      return { ok: true, queued: outcome.queued };
-    case "QueuedOffline":
-      return { ok: true, queued: true };
-    case "AuthorizationChanged":
-      return {
-        error: "payment authorization changed",
-        ok: false,
-        queued: false,
-      };
-    case "MissingIdentity":
-      return {
-        error: "missing nsec",
-        ok: false,
-        queued: false,
-        retryable: true,
-      };
-    case "MissingContactNpub":
-      return { error: "missing contact npub", ok: false, queued: false };
-    case "InvalidContact":
-      return { error: "invalid contact id", ok: false, queued: false };
-    case "Insufficient":
-      return {
-        error: "insufficient",
-        ok: false,
-        queued: false,
-        retryable: true,
-      };
-    case "NotStored":
-      return {
-        error: outcome.detail,
-        ok: false,
-        queued: false,
-        retryable: true,
-      };
-    case "Busy":
-      return {
-        error: "wallet busy",
-        ok: false,
-        queued: false,
-        retryable: true,
-      };
-    case "Failed":
-      return { error: outcome.detail, ok: false, queued: false };
   }
 };
 
@@ -391,6 +337,10 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
       : { _tag: "Insufficient" };
   };
 
+  /** Checked once a step failed, since the device can go offline mid-payment. */
+  const isNetworkFailure = (error: unknown): boolean =>
+    !deps.isOnline() || Predicate.isTagged(error, "MintUnreachable");
+
   const sendMint = (current: WalletBalances, amountSat: number) =>
     planSendMint({
       balances: current.perMint,
@@ -404,7 +354,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
   ): Promise<
     Result.Result<
       MeltReceipt,
-      { detail: string; pending: PaymentPending | null }
+      { detail: string; pending: PaymentPending | null; network: boolean }
     >
   > => {
     try {
@@ -414,9 +364,14 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
         detail: describeError(outcome.failure),
         pending:
           outcome.failure._tag === "PaymentPending" ? outcome.failure : null,
+        network: isNetworkFailure(outcome.failure),
       });
     } catch (error) {
-      return Result.fail({ detail: describeError(error), pending: null });
+      return Result.fail({
+        detail: describeError(error),
+        pending: null,
+        network: isNetworkFailure(error),
+      });
     }
   };
 
@@ -457,6 +412,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
   ) => {
     const normalized = invoice.trim();
     if (!normalized) return { _tag: "Invalid" };
+    if (!deps.isOnline()) return NETWORK_FAILURE;
     const preview = getLightningInvoicePreview(normalized);
     const amountSat = preview?.amountSat ?? null;
     const current = await balances();
@@ -475,7 +431,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
         const note = preview?.description ?? null;
         const outcome = await melt(normalized, mint);
         if (Result.isFailure(outcome)) {
-          const { detail, pending } = outcome.failure;
+          const { detail, pending, network } = outcome.failure;
           if (pending !== null) {
             logPendingMelt(
               pending,
@@ -501,7 +457,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
             paymentType: "lightning",
             phase: "melt",
           });
-          return { _tag: "Failed", detail };
+          return network ? NETWORK_FAILURE : { _tag: "Failed", detail };
         }
         const receipt = outcome.success;
         logPaymentEvent({
@@ -547,6 +503,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
     if (!Number.isFinite(amountSat) || amountSat <= 0)
       return { _tag: "InvalidAmount" };
     if (current.spendable <= 0) return { _tag: "Invalid" };
+    if (!deps.isOnline()) return NETWORK_FAILURE;
 
     const paid = await ops.runExclusiveTask(
       async (): Promise<PayLightningAddressOutcome> => {
@@ -564,6 +521,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
         const seenAttempts = new Set(attempts);
         let finalError: string | null = null;
         let finalErrorMint: string | null = null;
+        let networkFailed = false;
         let lastInvoice: string | null = null;
 
         for (let index = 0; index < attempts.length; index += 1) {
@@ -596,7 +554,8 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
             lastInvoice = invoice;
           } catch (error) {
             const errorMessage = getUnknownErrorMessage(error, "unknown");
-            if (canRetryLower(errorMessage)) continue;
+            networkFailed = !deps.isOnline();
+            if (!networkFailed && canRetryLower(errorMessage)) continue;
             finalError = errorMessage;
             finalErrorMint = null;
             break;
@@ -608,7 +567,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
 
           const outcome = await melt(invoice, mint);
           if (Result.isFailure(outcome)) {
-            const { detail, pending } = outcome.failure;
+            const { detail, pending, network } = outcome.failure;
             if (pending !== null) {
               logPendingMelt(
                 pending,
@@ -623,7 +582,8 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
               );
               return { _tag: "Pending", pending };
             }
-            if (canRetryLower(detail)) continue;
+            networkFailed = network;
+            if (!network && canRetryLower(detail)) continue;
             finalError = detail;
             finalErrorMint = mint;
             break;
@@ -692,7 +652,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
           paymentType,
           phase: finalErrorMint ? "melt" : "invoice_fetch",
         });
-        return { _tag: "Failed", detail };
+        return networkFailed ? NETWORK_FAILURE : { _tag: "Failed", detail };
       },
     );
     return Option.getOrElse(paid, () => BUSY);
@@ -722,7 +682,6 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
     readonly currentNpub: string;
     readonly paymentNoticeContext?: PaymentNoticeContext | undefined;
     readonly paymentNoticeOfferId?: string | undefined;
-    readonly pendingMessageId?: string | undefined;
     readonly recipientRelays?: ReadonlyArray<RelayUrl>;
     readonly replyContext?: ReplyContext | null | undefined;
   }) => {
@@ -750,7 +709,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
       ...(args.paymentNoticeOfferId
         ? { paymentNoticeOfferId: args.paymentNoticeOfferId }
         : {}),
-      pendingMessageId: args.pendingMessageId?.trim() || null,
+      pendingMessageId: null,
       ...(args.recipientRelays
         ? { recipientRelays: args.recipientRelays }
         : {}),
@@ -773,17 +732,14 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
     payment: ContactPayment,
     options: SendingOptions | undefined,
   ): Promise<PayContactOutcome> => {
-    const { chat } = deps;
     const {
       amountSat,
       contact,
-      fromQueue,
       logCompletedOnly = false,
       memo,
       paymentNoticeContext,
       paymentNoticeOfferId,
       isPaymentAuthorized,
-      pendingMessageId,
       replyContext,
     } = payment;
     const note = (memo ?? "").trim() || null;
@@ -796,53 +752,18 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
     if (!currentNsec || !currentNpub) return { _tag: "MissingIdentity" };
 
     const contactNpub = (contact.npub ?? "").trim();
-    const recipientPubkey = decodeNpub(contactNpub);
-    if (!recipientPubkey) return { _tag: "MissingContactNpub" };
+    if (!decodeNpub(contactNpub)) return { _tag: "MissingContactNpub" };
     const parsedContactId = ContactId.fromUnknown(contact.id);
     if (!parsedContactId.ok) return { _tag: "InvalidContact" };
     const contactId = parsedContactId.value;
+    if (!deps.isOnline()) return NETWORK_FAILURE;
 
     const current = await balances();
     logPayStep("start", {
       amountSat,
       cashuBalance: current.spendable,
       contactId,
-      fromQueue: Boolean(fromQueue),
     });
-
-    if (!deps.isOnline()) {
-      const clientId = makeLocalId();
-      const appended = chat.appendLocalNostrMessage({
-        clientId,
-        contactId,
-        content: payment.offlineNotice,
-        createdAtSec: nowSeconds(),
-        direction: "out",
-        localOnly: true,
-        pubkey: "",
-        rumorId: null,
-        status: "pending",
-        wrapId: `pending:pay:${clientId}`,
-      });
-      const written = await appended.written;
-      if (!appended.id || !written.ok)
-        return {
-          _tag: "NotStored",
-          detail: written.ok ? "failed to persist message" : written.error,
-        };
-      logPayStep("queued-offline", {
-        amountSat,
-        contactId,
-        messageId: appended.id,
-      });
-      chat.enqueuePendingPayment({
-        amountSat,
-        contactId,
-        recipientPubkey,
-        messageId: appended.id,
-      });
-      return { _tag: "QueuedOffline", contactId };
-    }
 
     const mint = sendMint(current, amountSat);
     if (mint === null) return { _tag: "Insufficient" };
@@ -881,6 +802,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
       if (Result.isFailure(sent)) {
         const detail = describeError(sent.failure);
         logFailure(detail, mint, "swap");
+        if (isNetworkFailure(sent.failure)) return NETWORK_FAILURE;
         return {
           _tag: "Failed",
           detail,
@@ -891,6 +813,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
     } catch (error) {
       const detail = getUnknownErrorMessage(error, "unknown");
       logFailure(detail, mint, "swap");
+      if (isNetworkFailure(error)) return NETWORK_FAILURE;
       return { _tag: "Failed", detail, insufficient: false };
     }
 
@@ -923,7 +846,6 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
         currentNpub,
         paymentNoticeContext,
         paymentNoticeOfferId,
-        pendingMessageId,
         replyContext,
       });
     } catch (error) {
@@ -977,20 +899,23 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
     request: CashuPaymentRequestMessageInfo,
     amountSat: number,
   ): Promise<QuotePaymentRequestOutcome> => {
+    const quoteFailed = (error: unknown): QuotePaymentRequestOutcome =>
+      isNetworkFailure(error)
+        ? NETWORK_FAILURE
+        : { _tag: "Failed", detail: describeError(error) };
     let info;
     try {
       const fetched = await linkshu.fetchMintInfo(plan.targetMint);
-      if (Result.isFailure(fetched))
-        return { _tag: "Failed", detail: describeError(fetched.failure) };
+      if (Result.isFailure(fetched)) return quoteFailed(fetched.failure);
       info = fetched.success;
     } catch (error) {
-      return { _tag: "Failed", detail: describeError(error) };
+      return quoteFailed(error);
     }
     if (request.lockTo !== null && !info.supportsP2pk)
       return { _tag: "LockingUnsupported" };
     const moveAmount =
       amountSat + sendFeeAllowance(info.inputFeePpk, amountSat);
-    let lastError: string | null = null;
+    let lastError: unknown = null;
     for (const source of plan.sources) {
       try {
         const estimated = await linkshu.estimateAutoswapCashu({
@@ -1000,7 +925,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
         });
         if (Result.isFailure(estimated)) {
           if (estimated.failure._tag !== "InsufficientFunds")
-            lastError = describeError(estimated.failure);
+            lastError = estimated.failure;
           continue;
         }
         const { totalFromSource } = estimated.success;
@@ -1015,18 +940,19 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
           moveAmount,
         };
       } catch (error) {
-        lastError = describeError(error);
+        lastError = error;
       }
     }
     return lastError === null
       ? { _tag: "Insufficient" }
-      : { _tag: "Failed", detail: lastError };
+      : quoteFailed(lastError);
   };
 
   const quotePaymentRequest: PaymentsCommands["quotePaymentRequest"] = async (
     request,
     amountSat,
   ) => {
+    if (!deps.isOnline()) return NETWORK_FAILURE;
     const plan = planPaymentRequestMint({
       amount: amountSat,
       acceptedMints: request.mintUrls,
@@ -1121,7 +1047,9 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
   const moveForRequest = async (
     quote: Extract<PaymentRequestQuote, { _tag: "Lightning" }>,
     request: CashuPaymentRequestMessageInfo,
-  ): Promise<Result.Result<AutoswapReceipt, string>> => {
+  ): Promise<
+    Result.Result<AutoswapReceipt, { detail: string; network: boolean }>
+  > => {
     const report = (
       outcome: "moved" | "failed",
       receipt: AutoswapReceipt | null,
@@ -1146,14 +1074,17 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
       if (Result.isFailure(moved)) {
         const detail = describeError(moved.failure);
         report("failed", null, detail);
-        return Result.fail(detail);
+        return Result.fail({
+          detail,
+          network: isNetworkFailure(moved.failure),
+        });
       }
       report("moved", moved.success, null);
       return Result.succeed(moved.success);
     } catch (error) {
       const detail = describeError(error);
       report("failed", null, detail);
-      return Result.fail(detail);
+      return Result.fail({ detail, network: isNetworkFailure(error) });
     }
   };
 
@@ -1166,6 +1097,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
     if (transport._tag !== "Nostr" && transport._tag !== "Post")
       return transport;
     if (!isAuthorized()) return { _tag: "AuthorizationChanged" };
+    if (!deps.isOnline()) return NETWORK_FAILURE;
     const contactId = transport._tag === "Nostr" ? transport.contactId : null;
     const amountSat = quote.amount;
 
@@ -1195,9 +1127,10 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
           detail: string,
           mint: string | null,
           phase: "publish" | "swap",
-          insufficient = false,
+          { insufficient = false, network = false } = {},
         ): PayPaymentRequestOutcome => {
           logFailure(detail, mint, phase);
+          if (network && movedTo === null) return NETWORK_FAILURE;
           return { _tag: "Failed", detail, insufficient, movedTo };
         };
 
@@ -1206,7 +1139,9 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
         if (quote._tag === "Lightning") {
           const moved = await moveForRequest(quote, request);
           if (Result.isFailure(moved))
-            return failed(moved.failure, quote.sourceMint, "swap");
+            return failed(moved.failure.detail, quote.sourceMint, "swap", {
+              network: moved.failure.network,
+            });
           mint = moved.success.targetMint;
           moveFee = moved.success.feePaid;
           movedTo = mint;
@@ -1226,16 +1161,16 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
           if (Result.isFailure(sent)) {
             if (sent.failure._tag === "LockingUnsupported" && movedTo === null)
               return { _tag: "LockingUnsupported" };
-            return failed(
-              describeError(sent.failure),
-              mint,
-              "swap",
-              sent.failure._tag === "InsufficientFunds",
-            );
+            return failed(describeError(sent.failure), mint, "swap", {
+              insufficient: sent.failure._tag === "InsufficientFunds",
+              network: isNetworkFailure(sent.failure),
+            });
           }
           receipt = sent.success;
         } catch (error) {
-          return failed(describeError(error), mint, "swap");
+          return failed(describeError(error), mint, "swap", {
+            network: isNetworkFailure(error),
+          });
         }
 
         if (!isAuthorized()) {
@@ -1315,7 +1250,9 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
             const notReturned = await returnSend(receipt.operationId);
             if (notReturned !== null)
               logFailure(notReturned, receipt.mint, "swap");
-            return failed(detail, receipt.mint, "publish");
+            return failed(detail, receipt.mint, "publish", {
+              network: delivery._tag === "NetworkError" || !deps.isOnline(),
+            });
           }
           await linkshu.cashuTransferLifecycle.forget(receipt.operationId);
           reportCashuSendForgotten({

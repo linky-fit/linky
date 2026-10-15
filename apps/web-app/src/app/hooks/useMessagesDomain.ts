@@ -22,10 +22,7 @@ import {
 } from "../../utils/storage";
 import { trimString } from "../../utils/validation";
 import { allWrites, type WriteOutcome } from "../lib/storeWrite";
-import {
-  chatWritesAtom,
-  pendingPaymentsKeyFor,
-} from "../state/messages/chatWrites";
+import { chatWritesAtom } from "../state/messages/chatWrites";
 import {
   chatMessagesAtom,
   localMessagesAtom,
@@ -256,8 +253,6 @@ export const useMessagesDomain = ({
     [conversations, write],
   );
 
-  const pendingPaymentsKey = pendingPaymentsKeyFor(appOwnerId);
-
   const { lastMessageByContactId, recentMessages: nostrMessagesRecent } =
     useAtomValue(messagesByContactAtom);
   const reactionsByMessageId = useAtomValue(reactionsByMessageIdAtom);
@@ -267,7 +262,6 @@ export const useMessagesDomain = ({
     appendLocalNostrMessage: chatWrites.appendLocalNostrMessage,
     appendLocalNostrReaction,
     chatMessages,
-    enqueuePendingPayment: chatWrites.enqueuePendingPayment,
     lastMessageByContactId,
     latestMessages: chatWrites.latestMessages,
     nostrMessagesLocal,
@@ -275,7 +269,6 @@ export const useMessagesDomain = ({
     knownReactionKeysRef,
     markLocalNostrMessageDeleted,
     nostrReactionsLocal,
-    pendingPaymentsKey,
     reactionsByMessageId,
     removeLocalNostrMessagesByContactId,
     softDeleteLocalNostrReaction,

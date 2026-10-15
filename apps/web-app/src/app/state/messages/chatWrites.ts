@@ -1,4 +1,4 @@
-import { isRumorId, type Pubkey } from "@linky-fit/linkstr";
+import { isRumorId } from "@linky-fit/linkstr";
 import {
   ContactId,
   createId,
@@ -12,8 +12,6 @@ import {
 import { Effect } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
-import { LOCAL_PENDING_PAYMENTS_STORAGE_KEY_PREFIX } from "../../../utils/constants";
-import { nowSeconds } from "../../../utils/time";
 import { makeLocalId, trimString } from "../../../utils/validation";
 import {
   isUnknownContactId,
@@ -30,7 +28,6 @@ import {
   toUnknownSenderWriteRow,
 } from "../../hooks/messages/messageRows";
 import { buildMessageUpdate } from "../../hooks/messages/messageUpdates";
-import { enqueueStoredPendingPayment } from "../../lib/pendingPayments";
 import { NO_WRITE, runWrite, type WriteOutcome } from "../../lib/storeWrite";
 import type {
   AppendedRow,
@@ -41,18 +38,10 @@ import type {
 } from "../../types/appTypes";
 import { sessionAtom, sessionSecrets } from "../session/session";
 import {
-  appOwnerIdAtom,
   conversationsRepositoryAtom,
   SessionSignedOut,
   unknownSendersRepositoryAtom,
 } from "../session/store";
-
-export interface PendingPaymentPayload {
-  readonly amountSat: number;
-  readonly contactId: ContactId;
-  readonly recipientPubkey: Pubkey;
-  readonly messageId?: string;
-}
 
 export interface StoredMessage {
   readonly message: LocalNostrMessage;
@@ -64,8 +53,6 @@ export interface ChatWrites {
   /** Stores a message unless the latest messages already hold it. */
   readonly appendLocalNostrMessage: AppendLocalNostrMessage;
   readonly updateLocalNostrMessage: UpdateLocalNostrMessage;
-  /** Queues a payment made offline; the offline queue sends it once online. */
-  readonly enqueuePendingPayment: (payload: PendingPaymentPayload) => void;
   /** Stores a message as it is, without checking for a stored copy; null when it is not storable. */
   readonly storeMessage: (
     message: NewLocalNostrMessage,
@@ -106,17 +93,10 @@ const nostrMessageIdOf = (message: NewLocalNostrMessage): MessageId | null => {
   return isRumorId(rumorId) ? nostrMessageIdFor(rumorId) : null;
 };
 
-export const pendingPaymentsKeyFor = (appOwnerId: string | null) =>
-  appOwnerId
-    ? `${LOCAL_PENDING_PAYMENTS_STORAGE_KEY_PREFIX}.${appOwnerId}`
-    : null;
-
 const makeChatWrites = ({
-  appOwnerId,
   conversations,
   unknownSenders,
 }: {
-  readonly appOwnerId: string;
   readonly conversations: ConversationsRepository;
   readonly unknownSenders: UnknownSendersRepository;
 }): ChatWrites => {
@@ -253,29 +233,8 @@ const makeChatWrites = ({
     );
   };
 
-  const pendingPaymentsKey = pendingPaymentsKeyFor(appOwnerId);
-  const enqueuePendingPayment: ChatWrites["enqueuePendingPayment"] = (
-    payload,
-  ) => {
-    const amountSat =
-      Number.isFinite(payload.amountSat) && payload.amountSat > 0
-        ? Math.trunc(payload.amountSat)
-        : 0;
-    if (!pendingPaymentsKey || amountSat <= 0) return;
-
-    void enqueueStoredPendingPayment(pendingPaymentsKey, {
-      id: makeLocalId(),
-      contactId: toText(payload.contactId),
-      amountSat,
-      recipientPubkey: payload.recipientPubkey,
-      createdAtSec: nowSeconds(),
-      ...(payload.messageId ? { messageId: payload.messageId } : {}),
-    });
-  };
-
   return {
     appendLocalNostrMessage,
-    enqueuePendingPayment,
     latestMessages: () => latest,
     onMessageAppended: (listener) => {
       appendedListeners.add(listener);
@@ -303,7 +262,6 @@ export const chatWritesAtom = Atom.keepAlive(
       ? AsyncResult.fail(new SessionSignedOut())
       : AsyncResult.map(
           AsyncResult.all({
-            appOwnerId: get(appOwnerIdAtom),
             conversations: get(conversationsRepositoryAtom),
             unknownSenders: get(unknownSendersRepositoryAtom),
           }),

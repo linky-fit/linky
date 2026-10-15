@@ -68,6 +68,7 @@ export const LOCAL_PAYMENT_EVENTS_STORAGE_KEY_PREFIX =
 export const LOCAL_NOSTR_MESSAGES_STORAGE_KEY_PREFIX =
   "linky.local.nostrMessages.v1";
 export const LOCAL_MINT_INFO_STORAGE_KEY_PREFIX = "linky.local.mintInfo.v1";
+// removal gate in app/migrations/AGENTS.md
 export const LOCAL_PENDING_PAYMENTS_STORAGE_KEY_PREFIX =
   "linky.local.pendingPayments.v1";
 export const LOCAL_PENDING_PAYMENTS_LOCK = "linky.local.pendingPaymentsLock.v1";
