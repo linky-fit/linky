@@ -97,6 +97,7 @@ interface QueuedNotificationOpenDetail {
 
 interface UseScanNativeCompositionParams {
   addNewContactFromIdentifier: ContactsMessagingCompositionResult["addNewContactFromIdentifier"];
+  canPayCashuRequest: CashuWalletCompositionResult["canPayCashuRequest"];
   cashuBalance: CashuWalletCompositionResult["cashuBalance"];
   contacts: ContactsMessagingCompositionResult["contacts"];
   contactsLatestRef: ContactsMessagingCompositionResult["contactsLatestRef"];
@@ -126,6 +127,7 @@ interface UseScanNativeCompositionParams {
 
 export const useScanNativeComposition = ({
   addNewContactFromIdentifier,
+  canPayCashuRequest,
   cashuBalance,
   contacts,
   contactsLatestRef,
@@ -216,6 +218,7 @@ export const useScanNativeComposition = ({
   const { experimentalFeatures } = useExperimentalFeatures();
   const openSavedContact = useSetNavIntent("openSavedContactNpub");
   const handleScannedText = useScannedTextHandler<(typeof contacts)[number]>({
+    canPayCashuRequest,
     closeScan,
     contacts,
     contactsRepository,

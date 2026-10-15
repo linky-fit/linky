@@ -6,12 +6,14 @@ import {
 import {
   buildPaymentAmountAttempts,
   buildPaymentFailureAmountAttempts,
+  encodePaymentRequestPayload,
   getLightningInvoicePreview,
   isAllowedPaymentRequestPostUrl,
   isRetryablePaymentAmountFailure,
   mintMoveCovers,
   planSendMint,
   postPaymentRequestPayload,
+  type AutoswapReceipt,
   type MeltReceipt,
   type MintUrl,
   type PaymentPending,
@@ -19,10 +21,16 @@ import {
   type SendReceipt,
   type WalletBalances,
 } from "@linky-fit/linkshu";
-import { decodeNpub, type PaymentNoticeContext } from "@linky-fit/linkstr";
+import {
+  decodeNpub,
+  type PaymentNoticeContext,
+  type RelayUrl,
+} from "@linky-fit/linkstr";
 import { Option, Result } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
+import { getMintFeePpk } from "../../hooks/mint/mintInfoHelpers";
+import { requestMintUrls } from "../../hooks/mint/useRequestMintUrls";
 import {
   fetchLnurlInvoiceForTarget,
   inferLightningAddressFromLnurlTarget,
@@ -38,6 +46,11 @@ import type { CashuMessagePaymentHookResult } from "../../hooks/payments/cashuMe
 import { reportCashuSendForgotten } from "../../lib/cashuSendInspector";
 import { describeTaggedCashuError } from "../../lib/cashuStoredError";
 import { isSpellingOf } from "../../lib/mintSpelling";
+import {
+  reportPaymentRequestDelivery,
+  reportPaymentRequestLightningMove,
+  reportPaymentRequestPlanned,
+} from "../../lib/paymentRequestInspector";
 import type { CashuPaymentRequestMessageInfo } from "../../lib/paymentRequestMessage";
 import { visibleWalletBalances } from "../../lib/testMintGate";
 import type {
@@ -56,7 +69,13 @@ import { platformAtom } from "../platform";
 import { allowTestMintsAtom } from "../session/settings";
 import { currentNpubAtom, currentNsecAtom } from "../session/session";
 import { defaultMintAtom } from "./defaultMint";
+import { mintInfoByUrlAtom, mintInfoDedupedAtom } from "./mintInfo";
 import { planDefaultMintMove } from "./moveFunds";
+import {
+  planPaymentRequestMint,
+  sendFeeAllowance,
+  type PaymentRequestMintPlan,
+} from "./paymentRequestPlan";
 import { walletOpsAtom, type WalletOps } from "./opQueue";
 import { logPayStep, paymentLogAtom, type PaymentLog } from "./paymentLog";
 
@@ -117,7 +136,6 @@ export interface ContactPayment {
   readonly memo?: string | null;
   readonly paymentNoticeContext?: PaymentNoticeContext;
   readonly paymentNoticeOfferId?: string;
-  readonly paymentRequestId?: string | null;
   /** Checked before the token is made and again before it is sent. */
   readonly isPaymentAuthorized?: () => boolean;
   readonly pendingMessageId?: string;
@@ -150,20 +168,66 @@ export type PayContactOutcome =
     }
   | Busy;
 
-export type PayRequestByPostOutcome =
-  | { readonly _tag: "NoPostTransport" }
-  | { readonly _tag: "InvalidUrl" }
-  | { readonly _tag: "InsecureTransport" }
-  | { readonly _tag: "Insufficient" }
+/** A priced way to pay a NUT-18 request; `amount + fee` leaves the wallet. */
+export type PaymentRequestQuote =
+  | {
+      readonly _tag: "Direct";
+      readonly amount: number;
+      readonly fee: number;
+      readonly mint: MintUrl;
+      /** The request's `mf`, sent on top of `amount`; part of `fee`. */
+      readonly methodFee: number;
+    }
+  | {
+      readonly _tag: "Lightning";
+      readonly amount: number;
+      readonly fee: number;
+      readonly sourceMint: MintUrl;
+      readonly targetMint: string;
+      /** The target joins the user's mint list once they agree. */
+      readonly addsMint: boolean;
+      /** What the move issues at the target: the amount plus the send's fee allowance. */
+      readonly moveAmount: number;
+    };
+
+export type QuotePaymentRequestOutcome =
+  | PaymentRequestQuote
+  | Shortfall
+  /** The Lightning target cannot lock proofs to the request's key (NUT-11). */
+  | { readonly _tag: "LockingUnsupported" }
+  | Failed;
+
+export interface PaymentRequestPayment {
+  readonly request: CashuPaymentRequestMessageInfo;
+  readonly quote: PaymentRequestQuote;
+  /** The contact of the request's nostr transport; null pays its POST target. */
+  readonly recipient: ContactRowLike | null;
+  readonly replyContext?: ReplyContext | null;
+  /** Checked before anything moves and again before the payload is sent. */
+  readonly isPaymentAuthorized?: () => boolean;
+}
+
+export type PayPaymentRequestOutcome =
   | {
       readonly _tag: "Paid";
       readonly receipt: SendReceipt;
-      readonly postUrl: URL;
+      /** The recipient's conversation; null for a POST target. */
+      readonly contactId: ContactId | null;
+      /** The payload message is stored but no relay took it yet. */
+      readonly queued: boolean;
     }
+  | { readonly _tag: "AuthorizationChanged" }
+  | { readonly _tag: "MissingIdentity" }
+  | { readonly _tag: "InvalidContact" }
+  | { readonly _tag: "NoTransport" }
+  | { readonly _tag: "InsecureTransport" }
+  | { readonly _tag: "LockingUnsupported" }
   | {
       readonly _tag: "Failed";
       readonly detail: string;
       readonly insufficient: boolean;
+      /** The Lightning move already put the sats at this mint, where they stay. */
+      readonly movedTo: string | null;
     }
   | Busy;
 
@@ -173,10 +237,7 @@ interface SendingOptions {
 }
 
 export interface PaymentsCommands {
-  readonly fundsFor: (
-    amountSat: number,
-    options?: { readonly acceptedMints?: ReadonlyArray<string> },
-  ) => Promise<FundsCheck>;
+  readonly fundsFor: (amountSat: number) => Promise<FundsCheck>;
   readonly payLightningInvoice: (
     invoice: string,
     options?: SendingOptions,
@@ -194,10 +255,16 @@ export interface PaymentsCommands {
     payment: ContactPayment,
     options?: SendingOptions,
   ) => Promise<PayContactOutcome>;
-  /** NUT-18 POST transport; plain http only in development builds. */
-  readonly payCashuPaymentRequestByPost: (
+  /** Picks and prices the mint a NUT-18 request of `amountSat` is paid from. */
+  readonly quotePaymentRequest: (
     request: CashuPaymentRequestMessageInfo,
-  ) => Promise<PayRequestByPostOutcome>;
+    amountSat: number,
+  ) => Promise<QuotePaymentRequestOutcome>;
+  /** Pays a quoted request over its transport; plain-http POST only in development builds. */
+  readonly payPaymentRequest: (
+    payment: PaymentRequestPayment,
+    options?: SendingOptions,
+  ) => Promise<PayPaymentRequestOutcome>;
 }
 
 export interface PaymentsDeps {
@@ -217,7 +284,10 @@ export interface PaymentsDeps {
   readonly isOnline: () => boolean;
   readonly linkshu: Pick<
     LinkshuCommands,
+    | "autoswapCashu"
     | "cashuTransferLifecycle"
+    | "estimateAutoswapCashu"
+    | "fetchMintInfo"
     | "meltCashuInvoice"
     | "readWalletBalances"
     | "sendCashuToken"
@@ -227,7 +297,11 @@ export interface PaymentsDeps {
     "enqueueOutbox" | "sendPaymentNotice"
   >;
   readonly logPaymentEvent: PaymentLog["logPaymentEvent"];
+  /** The stored NUT-02 input fee of a mint in the user's list; null when unknown. */
+  readonly mintFeePpk: (mint: string) => number | null;
   readonly ops: Pick<WalletOps, "runExclusiveTask">;
+  /** The user's mint list, default mint first, without hidden test mints. */
+  readonly userMints: () => ReadonlyArray<string>;
 }
 
 const BUSY: Busy = { _tag: "Busy" };
@@ -371,20 +445,10 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
       phase: "melt",
     });
 
-  const fundsFor: PaymentsCommands["fundsFor"] = async (amountSat, options) => {
+  const fundsFor: PaymentsCommands["fundsFor"] = async (amountSat) => {
     const current = await balances();
     if (amountSat <= current.spendable) return { _tag: "Covered" };
-    const accepted = (options?.acceptedMints ?? []).flatMap((mint) => {
-      const normalized = normalizeMintUrl(mint);
-      return normalized ? [normalized] : [];
-    });
-    const check = shortfall(current, amountSat);
-    // A request naming its mints only accepts the move when the default mint is one of them.
-    return check._tag === "NeedsMintMove" &&
-      accepted.length > 0 &&
-      !accepted.includes(check.toMint)
-      ? { _tag: "Insufficient" }
-      : check;
+    return shortfall(current, amountSat);
   };
 
   const payLightningInvoice: PaymentsCommands["payLightningInvoice"] = async (
@@ -634,6 +698,77 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
     return Option.getOrElse(paid, () => BUSY);
   };
 
+  /** Takes a pending send back into the balance; the error when that failed. */
+  const returnSend = async (operationId: string): Promise<string | null> => {
+    try {
+      const restored =
+        await linkshu.cashuTransferLifecycle.returnToWallet(operationId);
+      return Result.isFailure(restored) ? restored.failure._tag : null;
+    } catch (error) {
+      return getUnknownErrorMessage(error, "return-to-wallet failed");
+    }
+  };
+
+  /**
+   * Publishes a send's message to its contact and closes the pending send
+   * once a relay took it; an unpublished one stays pending, guarded by the
+   * pending-row cleanup and return-to-wallet.
+   */
+  const publishSend = async (args: {
+    readonly receipt: SendReceipt;
+    readonly content: string;
+    readonly contactId: ContactId;
+    readonly contactNpub: string;
+    readonly currentNpub: string;
+    readonly paymentNoticeContext?: PaymentNoticeContext | undefined;
+    readonly paymentNoticeOfferId?: string | undefined;
+    readonly pendingMessageId?: string | undefined;
+    readonly recipientRelays?: ReadonlyArray<RelayUrl>;
+    readonly replyContext?: ReplyContext | null | undefined;
+  }) => {
+    const { chat } = deps;
+    const { receipt } = args;
+    const publishing = await publishCashuMessagePayment({
+      appendLocalNostrMessage: chat.appendLocalNostrMessage,
+      batches: [
+        {
+          amount: receipt.amount,
+          mint: receipt.mint,
+          token: args.content,
+          unit: receipt.unit,
+        },
+      ],
+      contactId: args.contactId,
+      contactNpub: args.contactNpub,
+      currentNpub: args.currentNpub,
+      enqueueOutbox: deps.linkstr.enqueueOutbox,
+      logPayStep,
+      nostrMessagesLocal: chat.latestMessages(),
+      ...(args.paymentNoticeContext
+        ? { paymentNoticeContext: args.paymentNoticeContext }
+        : {}),
+      ...(args.paymentNoticeOfferId
+        ? { paymentNoticeOfferId: args.paymentNoticeOfferId }
+        : {}),
+      pendingMessageId: args.pendingMessageId?.trim() || null,
+      ...(args.recipientRelays
+        ? { recipientRelays: args.recipientRelays }
+        : {}),
+      ...(args.replyContext ? { replyContext: args.replyContext } : {}),
+      sendPaymentNotice: deps.linkstr.sendPaymentNotice,
+      updateLocalNostrMessage: chat.updateLocalNostrMessage,
+    });
+    if (!publishing.hasPendingMessages) {
+      await linkshu.cashuTransferLifecycle.forget(receipt.operationId);
+      reportCashuSendForgotten({
+        mint: receipt.mint,
+        reason: "message-published",
+        operationId: receipt.operationId,
+      });
+    }
+    return publishing;
+  };
+
   const payContactNow = async (
     payment: ContactPayment,
     options: SendingOptions | undefined,
@@ -647,20 +782,14 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
       memo,
       paymentNoticeContext,
       paymentNoticeOfferId,
-      paymentRequestId,
       isPaymentAuthorized,
       pendingMessageId,
       replyContext,
     } = payment;
     const note = (memo ?? "").trim() || null;
-    // Settling a bank offer is the sats leg of a proxy payment; a request
-    // id means the contact asked for this payment.
+    // Settling a bank offer is the sats leg of a proxy payment.
     const paymentType: PaymentTelemetryPaymentType =
-      paymentNoticeContext === "bank_payment_offer"
-        ? "proxy"
-        : paymentRequestId
-          ? "request"
-          : "contact";
+      paymentNoticeContext === "bank_payment_offer" ? "proxy" : "contact";
     if (isPaymentAuthorized && !isPaymentAuthorized())
       return { _tag: "AuthorizationChanged" };
     const { currentNpub, currentNsec } = deps;
@@ -773,19 +902,8 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
         links: { operation: receipt.operationId },
         payload: null,
       });
-      try {
-        const restored = await linkshu.cashuTransferLifecycle.returnToWallet(
-          receipt.operationId,
-        );
-        if (Result.isFailure(restored))
-          logFailure(restored.failure._tag, receipt.mint, "swap");
-      } catch (error) {
-        logFailure(
-          getUnknownErrorMessage(error, "return-to-wallet failed"),
-          receipt.mint,
-          "swap",
-        );
-      }
+      const notReturned = await returnSend(receipt.operationId);
+      if (notReturned !== null) logFailure(notReturned, receipt.mint, "swap");
       return { _tag: "AuthorizationChanged" };
     }
     logPayStep("swap-ok", {
@@ -797,28 +915,16 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
 
     let publishing;
     try {
-      publishing = await publishCashuMessagePayment({
-        appendLocalNostrMessage: chat.appendLocalNostrMessage,
-        batches: [
-          {
-            amount: receipt.amount,
-            mint: receipt.mint,
-            token: receipt.tokenText,
-            unit: receipt.unit,
-          },
-        ],
+      publishing = await publishSend({
+        receipt,
+        content: receipt.tokenText,
         contactId,
         contactNpub,
         currentNpub,
-        enqueueOutbox: deps.linkstr.enqueueOutbox,
-        logPayStep,
-        nostrMessagesLocal: chat.latestMessages(),
-        ...(paymentNoticeContext ? { paymentNoticeContext } : {}),
-        ...(paymentNoticeOfferId ? { paymentNoticeOfferId } : {}),
-        pendingMessageId: pendingMessageId?.trim() || null,
-        ...(replyContext ? { replyContext } : {}),
-        sendPaymentNotice: deps.linkstr.sendPaymentNotice,
-        updateLocalNostrMessage: chat.updateLocalNostrMessage,
+        paymentNoticeContext,
+        paymentNoticeOfferId,
+        pendingMessageId,
+        replyContext,
       });
     } catch (error) {
       // The send row stays `pending`: the outbox may still deliver the
@@ -829,24 +935,11 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
       return { _tag: "Failed", detail, insufficient: false };
     }
 
-    if (!publishing.hasPendingMessages) {
-      // The message carrying the token is published; the funds are the
-      // contact's now, so the pending row has nothing left to guard.
-      await linkshu.cashuTransferLifecycle.forget(receipt.operationId);
-      reportCashuSendForgotten({
-        mint: receipt.mint,
-        reason: "message-published",
-        operationId: receipt.operationId,
-      });
-    }
     if (!logCompletedOnly || !publishing.hasPendingMessages) {
       logPaymentEvent({
         amount: receipt.amount,
         contactId,
-        details: {
-          issuedToken: receipt.tokenText,
-          ...(paymentRequestId ? { requestId: paymentRequestId } : {}),
-        },
+        details: { issuedToken: receipt.tokenText },
         direction: "out",
         error: null,
         fee: null,
@@ -879,158 +972,393 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
     return Option.getOrElse(paid, () => BUSY);
   };
 
-  const payCashuPaymentRequestByPost: PaymentsCommands["payCashuPaymentRequestByPost"] =
-    async (request) => {
-      const allowHttp = deps.allowHttpPost;
-      const postUrlRaw = (request.transportPostUrl ?? "").trim();
-      if (!postUrlRaw) return { _tag: "NoPostTransport" };
-      let postUrl: URL;
+  const quoteLightning = async (
+    plan: Extract<PaymentRequestMintPlan, { _tag: "Lightning" }>,
+    request: CashuPaymentRequestMessageInfo,
+    amountSat: number,
+  ): Promise<QuotePaymentRequestOutcome> => {
+    let info;
+    try {
+      const fetched = await linkshu.fetchMintInfo(plan.targetMint);
+      if (Result.isFailure(fetched))
+        return { _tag: "Failed", detail: describeError(fetched.failure) };
+      info = fetched.success;
+    } catch (error) {
+      return { _tag: "Failed", detail: describeError(error) };
+    }
+    if (request.lockTo !== null && !info.supportsP2pk)
+      return { _tag: "LockingUnsupported" };
+    const moveAmount =
+      amountSat + sendFeeAllowance(info.inputFeePpk, amountSat);
+    let lastError: string | null = null;
+    for (const source of plan.sources) {
       try {
-        postUrl = new URL(postUrlRaw);
-      } catch {
-        return { _tag: "InvalidUrl" };
+        const estimated = await linkshu.estimateAutoswapCashu({
+          sourceMint: source.mint,
+          targetMint: plan.targetMint,
+          amountSat: moveAmount,
+        });
+        if (Result.isFailure(estimated)) {
+          if (estimated.failure._tag !== "InsufficientFunds")
+            lastError = describeError(estimated.failure);
+          continue;
+        }
+        const { totalFromSource } = estimated.success;
+        if (totalFromSource > source.amount) continue;
+        return {
+          _tag: "Lightning",
+          amount: amountSat,
+          fee: totalFromSource - amountSat,
+          sourceMint: source.mint,
+          targetMint: plan.targetMint,
+          addsMint: plan.addsMint,
+          moveAmount,
+        };
+      } catch (error) {
+        lastError = describeError(error);
       }
-      // An `http:` POST target exposes the bearer proofs to anyone on the
-      // network path, so it is only accepted in development builds.
-      if (!isAllowedPaymentRequestPostUrl(postUrlRaw, { allowHttp }))
-        return { _tag: "InsecureTransport" };
-      const current = await balances();
-      if (current.spendable < request.amount) return { _tag: "Insufficient" };
+    }
+    return lastError === null
+      ? { _tag: "Insufficient" }
+      : { _tag: "Failed", detail: lastError };
+  };
 
-      const paid = await ops.runExclusiveTask(
-        async (): Promise<PayRequestByPostOutcome> => {
-          let sentMint: string | null = null;
-          const logFailure = (
-            error: string,
-            mint: string | null,
-            phase: "publish" | "swap",
-          ): void =>
-            logPaymentEvent({
-              direction: "out",
-              status: "error",
-              amount: request.amount,
-              fee: null,
-              mint,
-              unit: "sat",
-              error,
-              contactId: null,
-              method: "cashu_chat",
-              paymentType: "request",
-              phase,
-            });
-          try {
-            const requestedMints = new Set(
-              request.mintUrls.flatMap((mint) => {
-                const normalized = normalizeMintUrl(mint);
-                return normalized ? [normalized] : [];
-              }),
-            );
-            const eligible =
-              requestedMints.size > 0
-                ? current.perMint.filter((entry) =>
-                    requestedMints.has(normalizeMintUrl(entry.mint)),
-                  )
-                : current.perMint;
-            const preferredMint =
-              request.mintUrls
-                .map((mint) => normalizeMintUrl(mint))
-                .find(Boolean) ?? normalizeMintUrl(deps.defaultMint ?? "");
-            const mint = planSendMint({
-              balances: eligible,
-              isPreferredMint: isSpellingOf(preferredMint),
-              amount: request.amount,
-            });
-            if (mint === null) return { _tag: "Insufficient" };
-
-            const sent = await linkshu.sendCashuToken({
-              amountSat: request.amount,
-              memo: request.description,
-              mint,
-              produceAs: "pending",
-            });
-            if (Result.isFailure(sent)) {
-              const detail = describeError(sent.failure);
-              logFailure(detail, mint, "swap");
-              return {
-                _tag: "Failed",
-                detail,
-                insufficient: sent.failure._tag === "InsufficientFunds",
-              };
-            }
-            const receipt = sent.success;
-            sentMint = receipt.mint;
-
-            const delivery = await postPaymentRequestPayload({
-              url: postUrl.toString(),
-              payload: {
-                id: request.requestId,
-                memo: request.description,
-                mint: receipt.mint,
-                unit: receipt.unit,
-                proofs: receipt.proofs,
-              },
-              allowHttp,
-            });
-            if (delivery._tag !== "Delivered") {
-              // The POST recipient may hold the proofs now; re-receiving kills
-              // that encoding at the mint before the funds return to balance.
-              const restored =
-                await linkshu.cashuTransferLifecycle.returnToWallet(
-                  receipt.operationId,
-                );
-              if (Result.isFailure(restored))
-                console.warn(
-                  "[linky][payment-request] return-to-wallet failed",
-                  {
-                    error: restored.failure._tag,
-                  },
-                );
-              throw new Error(describePostFailure(delivery));
-            }
-
-            await linkshu.cashuTransferLifecycle.forget(receipt.operationId);
-            reportCashuSendForgotten({
-              mint: receipt.mint,
-              reason: "payment-request-posted",
-              operationId: receipt.operationId,
-            });
-            logPaymentEvent({
-              direction: "out",
-              status: "ok",
-              transactionId: transactionIdForOperation(receipt.operationId),
-              amount: receipt.amount,
-              details: {
-                issuedToken: receipt.tokenText,
-                ...(request.requestId ? { requestId: request.requestId } : {}),
-                postUrl: postUrl.toString(),
-              },
-              fee: null,
-              mint: receipt.mint,
-              note: request.description,
-              unit: receipt.unit,
-              error: null,
-              contactId: null,
-              method: "cashu_chat",
-              paymentType: "request",
-              phase: "complete",
-            });
-            return { _tag: "Paid", receipt, postUrl };
-          } catch (error) {
-            const detail = getUnknownErrorMessage(error, "unknown");
-            logFailure(detail, sentMint, "publish");
-            return { _tag: "Failed", detail, insufficient: false };
+  const quotePaymentRequest: PaymentsCommands["quotePaymentRequest"] = async (
+    request,
+    amountSat,
+  ) => {
+    const plan = planPaymentRequestMint({
+      amount: amountSat,
+      acceptedMints: request.mintUrls,
+      mintsAdvisory: request.mintsAdvisory,
+      outsideMintFee: request.outsideMintFee,
+      allowTestMints: deps.allowTestMints,
+      balances: await balances(),
+      defaultMint: deps.defaultMint,
+      userMints: deps.userMints(),
+      sendFee: (mint, amount) =>
+        sendFeeAllowance(deps.mintFeePpk(mint), amount),
+    });
+    const quote: QuotePaymentRequestOutcome =
+      plan._tag === "Direct"
+        ? {
+            _tag: "Direct",
+            amount: amountSat,
+            fee:
+              sendFeeAllowance(deps.mintFeePpk(plan.mint), amountSat) +
+              plan.methodFee,
+            mint: plan.mint,
+            methodFee: plan.methodFee,
           }
-        },
-      );
-      return Option.getOrElse(paid, () => BUSY);
-    };
+        : plan._tag === "Lightning"
+          ? await quoteLightning(plan, request, amountSat)
+          : plan;
+    reportPaymentRequestPlanned({
+      requestId: request.requestId,
+      amount: amountSat,
+      plan: quote._tag,
+      fee: "fee" in quote ? quote.fee : null,
+      mint:
+        quote._tag === "Direct"
+          ? quote.mint
+          : quote._tag === "Lightning"
+            ? quote.targetMint
+            : null,
+      sourceMint: quote._tag === "Lightning" ? quote.sourceMint : null,
+      addsMint: quote._tag === "Lightning" && quote.addsMint,
+      acceptedMints: request.mintUrls,
+    });
+    return quote;
+  };
+
+  /** Where the payload goes: the recipient's conversation or the POST url. */
+  const requestTransport = (
+    request: CashuPaymentRequestMessageInfo,
+    recipient: ContactRowLike | null,
+  ):
+    | {
+        readonly _tag: "Nostr";
+        readonly contactId: ContactId;
+        readonly contactNpub: string;
+        readonly currentNpub: string;
+      }
+    | { readonly _tag: "Post"; readonly url: string }
+    | Extract<
+        PayPaymentRequestOutcome,
+        {
+          readonly _tag:
+            | "InsecureTransport"
+            | "InvalidContact"
+            | "MissingIdentity"
+            | "NoTransport";
+        }
+      > => {
+    if (recipient !== null) {
+      const { currentNpub, currentNsec } = deps;
+      if (!currentNsec || !currentNpub) return { _tag: "MissingIdentity" };
+      const contactNpub = (recipient.npub ?? "").trim();
+      const parsedContactId = ContactId.fromUnknown(recipient.id);
+      if (!decodeNpub(contactNpub) || !parsedContactId.ok)
+        return { _tag: "InvalidContact" };
+      return {
+        _tag: "Nostr",
+        contactId: parsedContactId.value,
+        contactNpub,
+        currentNpub,
+      };
+    }
+    const url = (request.transportPostUrl ?? "").trim();
+    if (!url) return { _tag: "NoTransport" };
+    // An `http:` POST target exposes the bearer proofs to anyone on the
+    // network path, so it is only accepted in development builds.
+    return isAllowedPaymentRequestPostUrl(url, {
+      allowHttp: deps.allowHttpPost,
+    })
+      ? { _tag: "Post", url }
+      : { _tag: "InsecureTransport" };
+  };
+
+  const moveForRequest = async (
+    quote: Extract<PaymentRequestQuote, { _tag: "Lightning" }>,
+    request: CashuPaymentRequestMessageInfo,
+  ): Promise<Result.Result<AutoswapReceipt, string>> => {
+    const report = (
+      outcome: "moved" | "failed",
+      receipt: AutoswapReceipt | null,
+      detail: string | null,
+    ) =>
+      reportPaymentRequestLightningMove({
+        requestId: request.requestId,
+        sourceMint: quote.sourceMint,
+        targetMint: quote.targetMint,
+        moveAmount: quote.moveAmount,
+        outcome,
+        operationId: receipt?.operationId ?? null,
+        feePaid: receipt?.feePaid ?? null,
+        detail,
+      });
+    try {
+      const moved = await linkshu.autoswapCashu({
+        sourceMint: quote.sourceMint,
+        targetMint: quote.targetMint,
+        amountSat: quote.moveAmount,
+      });
+      if (Result.isFailure(moved)) {
+        const detail = describeError(moved.failure);
+        report("failed", null, detail);
+        return Result.fail(detail);
+      }
+      report("moved", moved.success, null);
+      return Result.succeed(moved.success);
+    } catch (error) {
+      const detail = describeError(error);
+      report("failed", null, detail);
+      return Result.fail(detail);
+    }
+  };
+
+  const payPaymentRequest: PaymentsCommands["payPaymentRequest"] = async (
+    { request, quote, recipient, replyContext, isPaymentAuthorized },
+    options,
+  ) => {
+    const isAuthorized = () => !isPaymentAuthorized || isPaymentAuthorized();
+    const transport = requestTransport(request, recipient);
+    if (transport._tag !== "Nostr" && transport._tag !== "Post")
+      return transport;
+    if (!isAuthorized()) return { _tag: "AuthorizationChanged" };
+    const contactId = transport._tag === "Nostr" ? transport.contactId : null;
+    const amountSat = quote.amount;
+
+    const paid = await ops.runExclusiveTask(
+      async (): Promise<PayPaymentRequestOutcome> => {
+        options?.onSending?.();
+        let movedTo: string | null = null;
+        const logFailure = (
+          detail: string,
+          mint: string | null,
+          phase: "publish" | "swap",
+        ) =>
+          logPaymentEvent({
+            amount: amountSat,
+            contactId,
+            direction: "out",
+            error: detail,
+            fee: null,
+            method: "cashu_chat",
+            mint,
+            paymentType: "request",
+            phase,
+            status: "error",
+            unit: "sat",
+          });
+        const failed = (
+          detail: string,
+          mint: string | null,
+          phase: "publish" | "swap",
+          insufficient = false,
+        ): PayPaymentRequestOutcome => {
+          logFailure(detail, mint, phase);
+          return { _tag: "Failed", detail, insufficient, movedTo };
+        };
+
+        let mint: string;
+        let moveFee = 0;
+        if (quote._tag === "Lightning") {
+          const moved = await moveForRequest(quote, request);
+          if (Result.isFailure(moved))
+            return failed(moved.failure, quote.sourceMint, "swap");
+          mint = moved.success.targetMint;
+          moveFee = moved.success.feePaid;
+          movedTo = mint;
+        } else mint = quote.mint;
+
+        let receipt: SendReceipt;
+        try {
+          const sent = await linkshu.sendCashuToken({
+            amountSat:
+              quote._tag === "Direct" ? amountSat + quote.methodFee : amountSat,
+            memo: request.description,
+            mint,
+            produceAs: "pending",
+            lockTo: request.lockTo,
+            includeRecipientFee: true,
+          });
+          if (Result.isFailure(sent)) {
+            if (sent.failure._tag === "LockingUnsupported" && movedTo === null)
+              return { _tag: "LockingUnsupported" };
+            return failed(
+              describeError(sent.failure),
+              mint,
+              "swap",
+              sent.failure._tag === "InsufficientFunds",
+            );
+          }
+          receipt = sent.success;
+        } catch (error) {
+          return failed(describeError(error), mint, "swap");
+        }
+
+        if (!isAuthorized()) {
+          reportAppLog({
+            tag: "paymentRequest.authorizationLost",
+            summary:
+              "Payment authorization changed before token delivery; returning funds",
+            links: { operation: receipt.operationId },
+            payload: null,
+          });
+          const notReturned = await returnSend(receipt.operationId);
+          if (notReturned !== null)
+            logFailure(notReturned, receipt.mint, "swap");
+          // The sats already moved over Lightning; the user has to learn where they are.
+          if (movedTo !== null)
+            return failed("authorization changed", receipt.mint, "swap");
+          return { _tag: "AuthorizationChanged" };
+        }
+
+        const reportDelivery = (
+          outcome: "delivered" | "queued" | "failed",
+          detail: string | null,
+        ) =>
+          reportPaymentRequestDelivery({
+            requestId: request.requestId,
+            transport: transport._tag === "Nostr" ? "nostr" : "post",
+            outcome,
+            operationId: receipt.operationId,
+            amount: receipt.amount,
+            mint: receipt.mint,
+            detail,
+          });
+        const payload = encodePaymentRequestPayload({
+          id: request.requestId,
+          memo: request.description,
+          mint: receipt.mint,
+          unit: receipt.unit,
+          proofs: receipt.proofs,
+        });
+
+        let queued = false;
+        if (transport._tag === "Nostr") {
+          try {
+            const publishing = await publishSend({
+              receipt,
+              content: payload,
+              contactId: transport.contactId,
+              contactNpub: transport.contactNpub,
+              currentNpub: transport.currentNpub,
+              recipientRelays: request.transportRelays,
+              replyContext,
+            });
+            queued = publishing.hasPendingMessages;
+          } catch (error) {
+            // The send stays pending; return-to-wallet takes it back.
+            const detail = getUnknownErrorMessage(error, "unknown");
+            reportDelivery("failed", detail);
+            return failed(detail, receipt.mint, "publish");
+          }
+        } else {
+          const delivery = await postPaymentRequestPayload({
+            url: transport.url,
+            payload: {
+              id: request.requestId,
+              memo: request.description,
+              mint: receipt.mint,
+              unit: receipt.unit,
+              proofs: receipt.proofs,
+            },
+            allowHttp: deps.allowHttpPost,
+          });
+          if (delivery._tag !== "Delivered") {
+            const detail = describePostFailure(delivery);
+            reportDelivery("failed", detail);
+            // The POST recipient may hold the proofs now; re-receiving kills
+            // that copy at the mint before the funds return to balance.
+            const notReturned = await returnSend(receipt.operationId);
+            if (notReturned !== null)
+              logFailure(notReturned, receipt.mint, "swap");
+            return failed(detail, receipt.mint, "publish");
+          }
+          await linkshu.cashuTransferLifecycle.forget(receipt.operationId);
+          reportCashuSendForgotten({
+            mint: receipt.mint,
+            reason: "payment-request-posted",
+            operationId: receipt.operationId,
+          });
+        }
+        reportDelivery(queued ? "queued" : "delivered", null);
+
+        logPaymentEvent({
+          amount: receipt.amount,
+          contactId,
+          details: {
+            issuedToken: receipt.tokenText,
+            ...(request.requestId ? { requestId: request.requestId } : {}),
+            ...(transport._tag === "Post" ? { postUrl: transport.url } : {}),
+          },
+          direction: "out",
+          error: null,
+          fee: moveFee + receipt.feePaid,
+          method: "cashu_chat",
+          mint: receipt.mint,
+          note: request.description,
+          paymentType: "request",
+          phase: queued ? "publish" : "complete",
+          status: "ok",
+          transactionId: transactionIdForOperation(receipt.operationId),
+          unit: "sat",
+        });
+        return { _tag: "Paid", receipt, contactId, queued };
+      },
+    );
+    return Option.getOrElse(paid, () => BUSY);
+  };
 
   return {
     fundsFor,
-    payCashuPaymentRequestByPost,
     payContact,
     payLightningAddress,
     payLightningInvoice,
+    payPaymentRequest,
+    quotePaymentRequest,
   };
 };
 
@@ -1057,7 +1385,21 @@ export const paymentsCommandsAtom = Atom.readable((get) =>
         linkshu,
         linkstr: linkstrCommands(get.registry),
         logPaymentEvent: paymentLog.logPaymentEvent,
+        mintFeePpk: (mint) =>
+          getMintFeePpk(
+            get.registry.get(mintInfoByUrlAtom).get(normalizeMintUrl(mint))
+              ?.feesJson,
+          ),
         ops: get(walletOpsAtom),
+        // Read when a request is planned, so mint list changes do not rebuild the commands.
+        userMints: () =>
+          requestMintUrls({
+            allowTestMints: get(allowTestMintsAtom),
+            defaultMintUrl: get(defaultMintAtom),
+            mintUrls: get.registry
+              .get(mintInfoDedupedAtom)
+              .map((row) => row.canonicalUrl),
+          }),
       }),
   ),
 );

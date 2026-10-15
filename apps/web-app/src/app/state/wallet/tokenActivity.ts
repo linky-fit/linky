@@ -1,4 +1,5 @@
 import type { RestoreProgress } from "@linky-fit/linkshu";
+import type { PaymentRequestId } from "@linky-fit/linkshu/payment-request";
 import { Atom } from "effect/reactivity";
 import type { CashuOperationId } from "../../../evolu";
 
@@ -25,6 +26,11 @@ export const issueTokenAmountAtom = Atom.keepAlive(Atom.make(""));
 
 /** The token text typed on the receive-token screen; a failed receive puts it back. */
 export const receiveTokenDraftAtom = Atom.keepAlive(Atom.make(""));
+
+/** The request ids of the payment payloads this device received this session. */
+export const receivedPaymentRequestIdsAtom = Atom.keepAlive(
+  Atom.make<ReadonlySet<PaymentRequestId>>(new Set<PaymentRequestId>()),
+);
 
 /** Marks one kind of token work as running, so a second tap meanwhile is dropped rather than queued. */
 export interface RunGuard {

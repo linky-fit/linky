@@ -7,7 +7,12 @@ import React from "react";
 import { useLatest } from "../../../hooks/useLatest";
 import { navigateTo } from "../../../hooks/useRouting";
 import type { Route } from "../../../types/route";
-import { buildBip321PaymentUri } from "@linky-fit/linkshu/payment-request";
+import {
+  buildBip321PaymentUri,
+  PaymentRequestId,
+} from "@linky-fit/linkshu/payment-request";
+import { reportAppLog } from "../../../devtools/inspector/appLog";
+import { makeLocalId } from "../../../utils/validation";
 import type { DisplayAmountParts } from "../../../utils/displayAmounts";
 import { getLightningInvoicePreview } from "@linky-fit/linkshu";
 import { MAIN_MINT_URL, normalizeMintUrl } from "../../../utils/mint";
@@ -30,15 +35,17 @@ import {
   topupInvoiceQrPayloadAtom,
   topupNoteAtom,
 } from "../../state/wallet/topup";
+import { receivedPaymentRequestIdsAtom } from "../../state/wallet/tokenActivity";
 
 const describeTopupError = (error: TopupError): string =>
   describeTaggedCashuError(error) ?? error._tag;
 
 interface UseTopupFlowParams {
-  cashuTotalBalance: number;
   defaultMintUrl: string | null;
   formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
   logPaymentEvent: (event: LoggedPaymentEventParams) => void;
+  /** The user's mints the QR's cashu request offers after the topup's own. */
+  requestMintUrls: readonly string[];
   /** Null until the linkshu runtime is composed (seed + owners resolved). */
   resumePendingCashuTopups: ResumePendingCashuTopups | null;
   routeKind: Route["kind"];
@@ -58,10 +65,10 @@ interface UseTopupFlowParams {
  * back online. Pending quotes are retired only by the mint's own answer.
  */
 export const useTopupFlow = ({
-  cashuTotalBalance,
   defaultMintUrl,
   formatDisplayedAmountParts,
   logPaymentEvent,
+  requestMintUrls,
   resumePendingCashuTopups,
   routeKind,
   showPaidOverlay,
@@ -100,7 +107,36 @@ export const useTopupFlow = ({
   const startedKeyRef = React.useRef<string | null>(null);
   /** The note typed for each quote; a resumed quote has only its invoice. */
   const noteByQuoteIdRef = React.useRef<Map<string, string>>(new Map());
-  const startBalanceRef = React.useRef<number | null>(null);
+
+  /** Takes the invoice screen down once its topup got paid either way. */
+  const closeActiveTopup = React.useCallback(
+    (quote: TopupQuote) => {
+      const active = activeTopupRef.current;
+      if (active === null || active.quote.quoteId !== quote.quoteId) return;
+      setActiveTopup(null);
+      setTopupAmount("");
+      setTopupNote("");
+      startedKeyRef.current = null;
+      if (routeKindRef.current !== "topupInvoice") return;
+      if (topupPaidNavTimerRef.current !== null) {
+        window.clearTimeout(topupPaidNavTimerRef.current);
+      }
+      topupPaidNavTimerRef.current = window.setTimeout(() => {
+        topupPaidNavTimerRef.current = null;
+        // The user may have navigated elsewhere during the celebration delay;
+        // yanking them to the wallet then would stomp their navigation.
+        if (routeKindRef.current !== "topupInvoice") return;
+        navigateTo({ route: "wallet" });
+      }, 1400);
+    },
+    [
+      activeTopupRef,
+      routeKindRef,
+      setActiveTopup,
+      setTopupAmount,
+      setTopupNote,
+    ],
+  );
 
   const completeTopup = React.useCallback(
     (quote: TopupQuote, gainedToken: string | null) => {
@@ -140,34 +176,12 @@ export const useTopupFlow = ({
           .replace("{unit}", displayAmount.unitLabel),
         { direction: "in", amountSat: quote.amount },
       );
-
-      const active = activeTopupRef.current;
-      if (active === null || active.quote.quoteId !== quote.quoteId) return;
-      setActiveTopup(null);
-      setTopupAmount("");
-      setTopupNote("");
-      startedKeyRef.current = null;
-      startBalanceRef.current = null;
-      if (routeKindRef.current !== "topupInvoice") return;
-      if (topupPaidNavTimerRef.current !== null) {
-        window.clearTimeout(topupPaidNavTimerRef.current);
-      }
-      topupPaidNavTimerRef.current = window.setTimeout(() => {
-        topupPaidNavTimerRef.current = null;
-        // The user may have navigated elsewhere during the celebration delay;
-        // yanking them to the wallet then would stomp their navigation.
-        if (routeKindRef.current !== "topupInvoice") return;
-        navigateTo({ route: "wallet" });
-      }, 1400);
+      closeActiveTopup(quote);
     },
     [
-      activeTopupRef,
+      closeActiveTopup,
       formatDisplayedAmountParts,
       logPaymentEvent,
-      routeKindRef,
-      setActiveTopup,
-      setTopupAmount,
-      setTopupNote,
       showPaidOverlay,
       t,
     ],
@@ -288,12 +302,12 @@ export const useTopupFlow = ({
         // A newer request supersedes this one; the quote stays watched.
         if (startedKeyRef.current !== requestKey) return;
         if (Result.isSuccess(outcome)) {
-          startBalanceRef.current = null;
           setActiveTopup({
             amountSat,
             mint,
             note,
             quote: outcome.success.quote,
+            requestId: PaymentRequestId.make(makeLocalId()),
           });
         } else {
           setTopupInvoiceError(
@@ -335,8 +349,9 @@ export const useTopupFlow = ({
       ? buildCashuPaymentRequestMessage({
           amount: activeTopup.amountSat,
           description: activeTopup.note,
-          mintUrls: [activeTopup.mint],
+          mintUrls: [activeTopup.mint, ...requestMintUrls],
           recipientNprofile: topupRecipientNprofile,
+          requestId: activeTopup.requestId,
         })
       : null;
     const payload = cashuRequest
@@ -347,6 +362,7 @@ export const useTopupFlow = ({
     setTopupInvoiceQrPayload(payload);
   }, [
     activeTopup,
+    requestMintUrls,
     routeKind,
     setTopupInvoiceCashuRequest,
     setTopupInvoiceQrPayload,
@@ -356,7 +372,6 @@ export const useTopupFlow = ({
   React.useEffect(() => {
     if (routeKind === "topupInvoice") return;
     startedKeyRef.current = null;
-    startBalanceRef.current = null;
     setTopupInvoiceError(null);
     setTopupInvoiceIsBusy(false);
     if (routeKind !== "topup" && activeTopupRef.current === null) {
@@ -372,20 +387,24 @@ export const useTopupFlow = ({
     setTopupNote,
   ]);
 
-  // The QR also carries a cashu payment request, so the sats can arrive as a
-  // token instead of an invoice payment: a balance jump by the requested
-  // amount finalizes the topup UI even though the mint quote stays unpaid
-  // (linkshu retires it later on the mint's own answer).
+  // The QR's cashu request is paid by a payload naming its request id; the
+  // receive already celebrated it, and the unpaid quote is retired later by
+  // linkshu on the mint's own answer.
+  const receivedPaymentRequestIds = useAtomValue(receivedPaymentRequestIdsAtom);
   React.useEffect(() => {
-    if (routeKind !== "topupInvoice" || activeTopup === null) return;
-    if (startBalanceRef.current === null) {
-      startBalanceRef.current = cashuTotalBalance;
-      return;
-    }
-    if (cashuTotalBalance >= startBalanceRef.current + activeTopup.amountSat) {
-      completeTopupRef.current(activeTopup.quote, null);
-    }
-  }, [activeTopup, cashuTotalBalance, completeTopupRef, routeKind]);
+    if (activeTopup === null) return;
+    if (!receivedPaymentRequestIds.has(activeTopup.requestId)) return;
+    reportAppLog({
+      tag: "topup.paidByCashuRequest",
+      summary: "A cashu payment of the topup QR's request arrived",
+      links: {
+        paymentRequest: activeTopup.requestId,
+        quote: activeTopup.quote.quoteId,
+      },
+      payload: null,
+    });
+    closeActiveTopup(activeTopup.quote);
+  }, [activeTopup, closeActiveTopup, receivedPaymentRequestIds]);
 
   /**
    * Starts a topup that never touches the invoice-page state — for flows

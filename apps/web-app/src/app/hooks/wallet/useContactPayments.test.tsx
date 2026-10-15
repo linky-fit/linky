@@ -53,10 +53,11 @@ const commandsPaying = (outcome: PayContactOutcome) => {
   );
   commandsRef.current = {
     fundsFor: vi.fn(async () => ({ _tag: "Covered" }) as const),
-    payCashuPaymentRequestByPost: vi.fn(),
     payContact,
     payLightningAddress: vi.fn(),
     payLightningInvoice: vi.fn(),
+    payPaymentRequest: vi.fn(),
+    quotePaymentRequest: vi.fn(),
   };
   return payContact;
 };

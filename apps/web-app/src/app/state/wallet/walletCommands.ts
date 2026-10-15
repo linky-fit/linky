@@ -35,6 +35,8 @@ export interface WalletCommands {
   readonly confirmLightningInvoicePayment: () => Promise<void>;
   readonly closeLightningInvoiceConfirmation: () => void;
   readonly confirmCashuPaymentRequest: () => Promise<void>;
+  /** Prices the amount the user entered for an amountless payment request. */
+  readonly enterCashuPaymentRequestAmount: (amountSat: number) => Promise<void>;
   readonly closeCashuPaymentRequestConfirmation: () => void;
   readonly confirmPaymentMintMelt: () => Promise<void>;
   readonly closePaymentMintMeltConfirmation: () => void;

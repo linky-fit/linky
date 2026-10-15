@@ -1107,6 +1107,9 @@ export const cs = {
   paymentNotePlaceholder: "Přidat popisek",
   paymentRequestPreviewIncoming: "Žádost o {amount}",
   paymentRequestPreviewOutgoing: "Žádáte o {amount}",
+  paymentRequestPreviewIncomingAnyAmount: "Žádost o platbu",
+  paymentRequestPreviewOutgoingAnyAmount: "Žádáte o platbu",
+  paymentRequestAnyAmount: "Libovolná částka",
   paymentRequestDeclinedPreviewIncoming: "Žádost o platbu odmítnuta",
   paymentRequestDeclinedPreviewOutgoing: "Odmítli jste žádost o platbu",
   paymentRequestChanged:
@@ -1129,6 +1132,18 @@ export const cs = {
     "Platební požadavek používá nezabezpečený přenos (http). Odmítnuto.",
   paymentRequestInsecureTransportWarning:
     "Pozor: tento požadavek posílá tokeny přes nezabezpečené spojení (http).",
+  paymentRequestAddMint:
+    "Zaplatit přes {mint}? Mincovna se přidá mezi tvoje mincovny.",
+  paymentRequestFees: "Včetně poplatků {amount} {unit}",
+  paymentRequestOtherRecipient:
+    "Tato platba půjde na {recipient}, ne osobě z tohoto chatu.",
+  paymentRequestEnterAmount: "Zadej částku",
+  paymentRequestNoTransport:
+    "Tento požadavek zatím Linky zaplatit neumí: neuvádí, kam platbu poslat.",
+  paymentRequestMovedNotPaid:
+    "Platba selhala. {amount} {unit} zůstalo v tvé peněžence v mincovně {name}.",
+  paymentRequestLockUnsupported:
+    "Mincovna neumí platbu uzamknout na klíč příjemce.",
   payCancel: "Zrušit",
   lnurlAuthConfirm: "Přihlásit",
   lnurlAuthDoneLogin: "Přihlášeno",

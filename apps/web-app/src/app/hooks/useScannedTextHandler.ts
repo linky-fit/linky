@@ -42,6 +42,8 @@ import type { Translate } from "../../i18n";
 import type { SiteLoginRequest } from "../../siteLogin";
 
 interface UseScannedTextHandlerParams<TContact extends ContactRowLike> {
+  /** Whether a mint the wallet holds pays the request; otherwise a BIP-321 Lightning leg goes first. */
+  canPayCashuRequest: (request: CashuPaymentRequestMessageInfo) => boolean;
   closeScan: () => void;
   contacts: readonly TContact[];
   currentNpub: string | null;
@@ -79,6 +81,7 @@ interface UseScannedTextHandlerParams<TContact extends ContactRowLike> {
 }
 
 export const useScannedTextHandler = <TContact extends ContactRowLike>({
+  canPayCashuRequest,
   closeScan,
   contacts,
   currentNpub,
@@ -133,13 +136,19 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
 
       // BIP 321 / BIP 21 — unified `bitcoin:` URI. The address part is
       // onchain (Linky doesn't settle onchain) so we promote the best
-      // available off-chain leg (Cashu request > BOLT11 > LNURL > lightning
-      // address) into `scanText` and let the rest of the handler dispatch it
-      // through the existing flows. Unrecognized extension params (Ark,
-      // silent payments, BOLT12 `lno`) are ignored per spec.
+      // available off-chain leg (a Cashu request a held mint pays > BOLT11 >
+      // LNURL > lightning address > any Cashu request) into `scanText` and
+      // let the rest of the handler dispatch it through the existing flows.
+      // Unrecognized extension params (Ark, silent payments, BOLT12 `lno`)
+      // are ignored per spec.
       const bip321 = parseBip321Uri(scanText);
       if (bip321) {
-        const leg = pickBip321PayableLeg(bip321);
+        const leg = pickBip321PayableLeg(bip321, {
+          canPayCashuRequest: (creq) => {
+            const request = parseCashuPaymentRequestMessage(creq);
+            return request !== null && canPayCashuRequest(request);
+          },
+        });
         if (!leg) {
           setStatus(t("scanUnsupportedBitcoinUri"));
           closeScan();
@@ -354,6 +363,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
       closeScan();
     },
     [
+      canPayCashuRequest,
       closeScan,
       contacts,
       currentNpub,

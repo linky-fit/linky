@@ -1,4 +1,4 @@
-import type { TokenTransfer } from "@linky-fit/linkshu";
+import { tokenProofSecrets, type TokenTransfer } from "@linky-fit/linkshu";
 import React from "react";
 import { isOpenTransfer } from "../../lib/cashuTransfers";
 import type { CashuTransferLifecycle } from "../../state/linkshu/commands";
@@ -15,6 +15,12 @@ interface UseTransferCleanupParams {
   walletTransfers: readonly TokenTransfer[];
 }
 
+/** Keys a token by its proofs, so a send and the NUT-18 payload carrying it match. */
+const proofsKey = (text: string): string | null => {
+  const secrets = tokenProofSecrets(text);
+  return secrets === null ? null : [...secrets].sort().join(" ");
+};
+
 /** Closes sends whose message reached the recipient and takes back tokens paid to ourselves. */
 export const useTransferCleanup = ({
   chatMessages,
@@ -29,15 +35,21 @@ export const useTransferCleanup = ({
   // recipient; the pending transfer has nothing left to guard.
   React.useEffect(() => {
     if (lifecycle === null) return;
-    for (const transfer of walletTransfers) {
-      if (transfer.kind !== "send" || transfer.status !== "pending") continue;
-      const hasMessage = nostrMessagesLocal.some(
-        (message) =>
-          message.direction === "out" &&
-          message.content.trim() === transfer.tokenText &&
-          (message.status ?? "sent") !== "pending",
-      );
-      if (hasMessage) void lifecycle.forget(transfer.id);
+    const pendingSends = walletTransfers.filter(
+      (transfer) => transfer.kind === "send" && transfer.status === "pending",
+    );
+    if (pendingSends.length === 0) return;
+    const sentProofs = new Set(
+      nostrMessagesLocal.flatMap((message) =>
+        message.direction === "out" && (message.status ?? "sent") !== "pending"
+          ? (proofsKey(message.content) ?? [])
+          : [],
+      ),
+    );
+    for (const transfer of pendingSends) {
+      const key = proofsKey(transfer.tokenText);
+      if (key !== null && sentProofs.has(key))
+        void lifecycle.forget(transfer.id);
     }
   }, [lifecycle, nostrMessagesLocal, walletTransfers]);
 
@@ -73,17 +85,18 @@ export const useTransferCleanup = ({
     // A token that reached our own inbox (direction "in") or that we sent into
     // a self-chat is a self-payment; a token sent to anyone else never matches
     // one of our own open transfers here, so this cannot reclaim a real send.
-    const selfDirectedTokenTexts = new Set(
+    const selfDirectedProofs = new Set(
       [...chatMessages, ...nostrMessagesRecent, ...nostrMessagesLocal]
         .filter((message) => {
           if (message.direction === "in") return true;
           const contactId = (message.contactId ?? "").toString().trim();
           return contactId.length > 0 && selfContactIds.has(contactId);
         })
-        .map((message) => message.content.trim()),
+        .flatMap((message) => proofsKey(message.content) ?? []),
     );
     for (const transfer of openSends) {
-      if (!selfDirectedTokenTexts.has(transfer.tokenText.trim())) continue;
+      const key = proofsKey(transfer.tokenText);
+      if (key === null || !selfDirectedProofs.has(key)) continue;
       reclaimAttemptedRef.current.add(String(transfer.id));
       void lifecycle.returnToWallet(transfer.id);
     }

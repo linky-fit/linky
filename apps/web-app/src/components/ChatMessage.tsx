@@ -829,8 +829,15 @@ function ChatMessageComponent({
             ? t("paymentRequestStatusDeclined")
             : t("paymentRequestStatusRequested")
       }
-      amount={paymentCardAmount(paymentRequestInfo.amount)}
+      amount={
+        paymentRequestInfo.amount === null
+          ? null
+          : paymentCardAmount(paymentRequestInfo.amount)
+      }
     >
+      {paymentRequestInfo.amount === null ? (
+        <CardNote>{t("paymentRequestAnyAmount")}</CardNote>
+      ) : null}
       {paymentRequestInfo.description ? (
         <CardNote>{paymentRequestInfo.description}</CardNote>
       ) : null}

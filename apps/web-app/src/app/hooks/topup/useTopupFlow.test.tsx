@@ -9,7 +9,12 @@ import {
   TopupQuote,
   TopupReceipt,
 } from "@linky-fit/linkshu";
-import { AtomRegistry, RegistryContext } from "@linky-fit/linkstr-react";
+import {
+  AtomRegistry,
+  RegistryContext,
+  useAtomSet,
+} from "@linky-fit/linkstr-react";
+import { PaymentRequestId } from "@linky-fit/linkshu/payment-request";
 import { Result } from "effect";
 import { nip19 } from "nostr-tools";
 import React, { act } from "react";
@@ -29,9 +34,11 @@ vi.mock("../../../hooks/useRouting", () => ({
 }));
 
 import { parseCashuPaymentRequestMessage } from "../../lib/paymentRequestMessage";
+import { receivedPaymentRequestIdsAtom } from "../../state/wallet/tokenActivity";
 import { useTopupFlow, useTopupInvoice } from "./useTopupFlow";
 
 const MINT_URL = "https://mint.example";
+const OTHER_MINT_URL = "https://other-mint.example";
 const INVOICE = "lnbc2100n1pfakeinvoice";
 // parseCashuPaymentRequestMessage checks the pubkey is on-curve, so this is
 // getPublicKey of the all-ones secret key.
@@ -102,13 +109,15 @@ const setup = async ({
   const setRouteKindRef: {
     current: (kind: Route["kind"]) => void;
   } = { current: () => {} };
+  const receivePaymentRef: {
+    current: (requestId: PaymentRequestId) => void;
+  } = { current: () => {} };
   const logPaymentEvent = vi.fn();
   const showPaidOverlay = vi.fn();
 
   const Harness = () => {
     const [currentRouteKind, setCurrentRouteKind] = React.useState(routeKind);
     const flow = useTopupFlow({
-      cashuTotalBalance: 0,
       defaultMintUrl: MINT_URL,
       formatDisplayedAmountParts: (amountSat) => ({
         approxPrefix: "",
@@ -116,6 +125,7 @@ const setup = async ({
         unitLabel: "sat",
       }),
       logPaymentEvent,
+      requestMintUrls: [OTHER_MINT_URL, MINT_URL],
       resumePendingCashuTopups: resumePendingCashuTopups ?? null,
       routeKind: currentRouteKind,
       showPaidOverlay,
@@ -124,10 +134,15 @@ const setup = async ({
       topupRecipientNprofile,
     });
     const invoice = useTopupInvoice();
+    const setReceivedPaymentRequestIds = useAtomSet(
+      receivedPaymentRequestIdsAtom,
+    );
     React.useEffect(() => {
       flowRef.current = { ...flow, ...invoice };
       setRouteKindRef.current = setCurrentRouteKind;
-    }, [flow, invoice]);
+      receivePaymentRef.current = (requestId) =>
+        setReceivedPaymentRequestIds((ids) => new Set([...ids, requestId]));
+    }, [flow, invoice, setReceivedPaymentRequestIds]);
     return null;
   };
 
@@ -143,6 +158,11 @@ const setup = async ({
   return {
     flow,
     logPaymentEvent,
+    receivePayment: async (requestId: PaymentRequestId) => {
+      await act(async () => {
+        receivePaymentRef.current(requestId);
+      });
+    },
     setRouteKind: async (kind: Route["kind"]) => {
       await act(async () => {
         setRouteKindRef.current(kind);
@@ -219,28 +239,59 @@ describe("useTopupFlow", () => {
     await harness.unmount();
   });
 
-  it("keeps the quote id out of the cashu request in the QR", async () => {
-    // An unlocked quote is mintable by its id alone (NUT-04), so the QR and
-    // copied payload must not carry it.
-    const quote = topupQuote();
+  const startWithCashuRequest = async (quote: TopupQuote) => {
     const harness = await setup({
       startCashuTopup: vi.fn<StartCashuTopup>(async () =>
         Result.succeed(deferredHandle(quote).handle),
       ),
       topupRecipientNprofile: RECIPIENT_NPROFILE,
     });
-
     await act(async () => {
       harness.flow().setTopupAmount("21");
     });
-
     await waitFor(() => {
       expect(harness.flow().topupInvoiceCashuRequest).not.toBeNull();
     });
-    const request = harness.flow().topupInvoiceCashuRequest ?? "";
-    expect(parseCashuPaymentRequestMessage(request)?.requestId).toBeNull();
-    expect(request).not.toContain(quote.quoteId);
+    const request = parseCashuPaymentRequestMessage(
+      harness.flow().topupInvoiceCashuRequest ?? "",
+    );
+    if (request?.requestId == null) throw new Error("no request id in the QR");
+    return { harness, request, requestId: request.requestId };
+  };
+
+  it("puts a request id, never the quote id, and the user's mints into the QR", async () => {
+    // An unlocked quote is mintable by its id alone (NUT-04), so the QR and
+    // copied payload must not carry it.
+    const quote = topupQuote();
+    const { harness, request, requestId } = await startWithCashuRequest(quote);
+
+    expect(requestId).not.toBe(quote.quoteId);
+    expect(request.mintUrls).toEqual([MINT_URL, OTHER_MINT_URL]);
+    expect(harness.flow().topupInvoiceCashuRequest).not.toContain(
+      quote.quoteId,
+    );
     expect(harness.flow().topupInvoiceQrPayload).not.toContain(quote.quoteId);
+    await harness.unmount();
+  });
+
+  it("closes the topup once a payment naming its request id was received", async () => {
+    const quote = topupQuote();
+    const { harness, requestId } = await startWithCashuRequest(quote);
+    vi.useFakeTimers();
+
+    await harness.receivePayment(PaymentRequestId.make("someone-else"));
+    expect(harness.flow().topupInvoice).toBe(INVOICE);
+
+    await harness.receivePayment(requestId);
+    expect(harness.flow().topupInvoice).toBeNull();
+    expect(harness.flow().topupAmount).toBe("");
+    // The receive already logged and celebrated the payment.
+    expect(harness.logPaymentEvent).not.toHaveBeenCalled();
+    expect(harness.showPaidOverlay).not.toHaveBeenCalled();
+    await act(async () => {
+      vi.advanceTimersByTime(1400);
+    });
+    expect(navigateToMock).toHaveBeenCalledWith({ route: "wallet" });
     await harness.unmount();
   });
 

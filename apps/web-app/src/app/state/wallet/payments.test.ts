@@ -1,19 +1,26 @@
 import { createIdFromString } from "@linky-fit/linksync";
 import {
   Amount,
+  AutoswapEstimate,
+  AutoswapReceipt,
   CurrencyUnit,
+  LockingUnsupported,
   InsufficientFunds,
   MeltReceipt,
+  MintInfo,
   MintRejected,
   MintUrl,
   NonNegativeAmount,
   OperationId,
+  parseP2pkPubkey,
   PaymentPending,
+  Proof,
   QuoteId,
   ReceiveReceipt,
   SendReceipt,
   TokenText,
 } from "@linky-fit/linkshu";
+import { PaymentRequestId } from "@linky-fit/linkshu/payment-request";
 import {
   ClientId,
   EnqueueReceipt,
@@ -27,9 +34,9 @@ import {
   WrapId,
 } from "@linky-fit/linkstr";
 import { LinkstrNotConfigured } from "@linky-fit/linkstr-react";
-import { Exit, Result } from "effect";
+import { Exit, Result, Schema } from "effect";
 import { getPublicKey, nip19 } from "nostr-tools";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import type { LnurlPayInvoiceResult } from "../../../lnurlPay";
 import { buildCashuToken } from "../../../testUtils/cashuToken";
 import { makeLightningInvoice } from "../../../testUtils/lightningInvoice";
@@ -43,6 +50,7 @@ import {
   makePaymentsCommands,
   paymentResultOf,
   type ContactPayment,
+  type PaymentRequestQuote,
   type PaymentsDeps,
 } from "./payments";
 
@@ -64,6 +72,7 @@ vi.mock("../../../lnurlPay", () => ({
 
 const MINT_URL = "https://mint.example";
 const FOREIGN = "https://foreign.example";
+const TARGET = "https://target.example";
 const CONTACT_ID = createIdFromString<"Contact">("contact");
 const currentNpub = nip19.npubEncode(getPublicKey(createSecretKey(1)));
 const contactPubkey = Pubkey.make(getPublicKey(createSecretKey(2)));
@@ -96,12 +105,19 @@ const insufficientFunds = (required: number, available: number) =>
     available: NonNegativeAmount.make(available),
   });
 
+const proof = Schema.decodeUnknownSync(Proof)({
+  id: "00ad268c4d1f5826",
+  amount: 600,
+  secret: "proof-secret",
+  C: `02${"ab".repeat(32)}`,
+});
+
 const sendReceipt = new SendReceipt({
   operationId: OperationId.make("send-op"),
   tokenText: TokenText.make(
     buildCashuToken({ amounts: [600], mint: MINT_URL, unit: "sat" }),
   ),
-  proofs: [],
+  proofs: [proof],
   mint: MintUrl.make(MINT_URL),
   unit: CurrencyUnit.make("sat"),
   amount: Amount.make(600),
@@ -109,6 +125,44 @@ const sendReceipt = new SendReceipt({
   changeAmount: NonNegativeAmount.make(400),
   feePaid: NonNegativeAmount.make(0),
 });
+
+const mintInfo = (overrides: Partial<MintInfo> = {}) =>
+  new MintInfo({
+    url: MintUrl.make(TARGET),
+    name: null,
+    inputFeePpk: 100,
+    supportsMpp: false,
+    supportsP2pk: true,
+    isFakeLightning: false,
+    iconUrl: null,
+    ...overrides,
+  });
+
+const autoswapEstimate = (
+  move: { sourceMint: string; targetMint: string; amountSat?: number },
+  fees: number,
+) =>
+  new AutoswapEstimate({
+    sourceMint: MintUrl.make(move.sourceMint),
+    targetMint: MintUrl.make(move.targetMint),
+    amount: Amount.make(move.amountSat ?? 1),
+    lightningFeeReserve: NonNegativeAmount.make(fees),
+    inputFee: NonNegativeAmount.make(0),
+    totalFromSource: Amount.make((move.amountSat ?? 1) + fees),
+  });
+
+const autoswapReceipt = (move: {
+  sourceMint: string;
+  targetMint: string;
+  amountSat?: number;
+}) =>
+  new AutoswapReceipt({
+    sourceMint: MintUrl.make(move.sourceMint),
+    targetMint: MintUrl.make(move.targetMint),
+    movedAmount: Amount.make(move.amountSat ?? 1),
+    feePaid: NonNegativeAmount.make(4),
+    operationId: OperationId.make("move-op"),
+  });
 
 const transferLifecycle = (
   overrides: Partial<CashuTransferLifecycle> = {},
@@ -167,11 +221,31 @@ const setup = ({
   online?: boolean;
   lifecycle?: CashuTransferLifecycle;
 } & Partial<
-  Pick<PaymentsDeps["linkshu"], "meltCashuInvoice" | "sendCashuToken">
+  Pick<
+    PaymentsDeps["linkshu"],
+    | "autoswapCashu"
+    | "estimateAutoswapCashu"
+    | "fetchMintInfo"
+    | "meltCashuInvoice"
+    | "sendCashuToken"
+  >
 > = {}) => {
   const ops = makeWalletOps(() => {});
   const linkshu = {
+    autoswapCashu: vi.fn<PaymentsDeps["linkshu"]["autoswapCashu"]>(
+      overrides.autoswapCashu ??
+        (async (move) => Result.succeed(autoswapReceipt(move))),
+    ),
     cashuTransferLifecycle: lifecycle,
+    estimateAutoswapCashu: vi.fn<
+      PaymentsDeps["linkshu"]["estimateAutoswapCashu"]
+    >(
+      overrides.estimateAutoswapCashu ??
+        (async (move) => Result.succeed(autoswapEstimate(move, 10))),
+    ),
+    fetchMintInfo: vi.fn<PaymentsDeps["linkshu"]["fetchMintInfo"]>(
+      overrides.fetchMintInfo ?? (async () => Result.succeed(mintInfo())),
+    ),
     meltCashuInvoice: vi.fn<PaymentsDeps["linkshu"]["meltCashuInvoice"]>(
       overrides.meltCashuInvoice ??
         (async () => Result.succeed(meltReceipt(40))),
@@ -218,7 +292,9 @@ const setup = ({
     linkshu,
     linkstr,
     logPaymentEvent,
+    mintFeePpk: () => 100,
     ops,
+    userMints: () => [MINT_URL, FOREIGN],
   });
   return { commands, linkshu, linkstr, logPaymentEvent, ops };
 };
@@ -262,12 +338,9 @@ describe("fundsFor", () => {
     });
   });
 
-  it("is insufficient when no move covers it or the request refuses the default mint", async () => {
+  it("is insufficient when no move covers it", async () => {
     const { commands } = setup({ balances: { [MINT_URL]: 50, [FOREIGN]: 80 } });
     expect(await commands.fundsFor(200)).toEqual({ _tag: "Insufficient" });
-    expect(await commands.fundsFor(100, { acceptedMints: [FOREIGN] })).toEqual({
-      _tag: "Insufficient",
-    });
   });
 });
 
@@ -624,7 +697,7 @@ describe("payContact", () => {
     expect(onSending).toHaveBeenCalledOnce();
   });
 
-  it("types a send as proxy for a bank offer and request for a payment request", async () => {
+  it("types a send for a bank offer as proxy", async () => {
     const { commands, logPaymentEvent } = setup();
 
     await commands.payContact(
@@ -635,11 +708,6 @@ describe("payContact", () => {
     );
     expect(logPaymentEvent).toHaveBeenLastCalledWith(
       expect.objectContaining({ paymentType: "proxy", status: "ok" }),
-    );
-
-    await commands.payContact(alicePayment({ paymentRequestId: "request-1" }));
-    expect(logPaymentEvent).toHaveBeenLastCalledWith(
-      expect.objectContaining({ paymentType: "request", status: "ok" }),
     );
   });
 
@@ -833,65 +901,433 @@ describe("payContact", () => {
   });
 });
 
-describe("payCashuPaymentRequestByPost", () => {
-  const request: CashuPaymentRequestMessageInfo = {
+describe("payment requests", () => {
+  const requestId = PaymentRequestId.make("request-1");
+  const payeeRelay = RelayUrl.make("wss://payee.example");
+  const alice = { id: CONTACT_ID, name: "Alice", npub: contactNpub };
+  const request = (
+    overrides: Partial<CashuPaymentRequestMessageInfo> = {},
+  ): CashuPaymentRequestMessageInfo => ({
     amount: 600,
     description: "coffee",
     encodedRequest: "creqA",
+    lockTo: null,
     mintUrls: [MINT_URL],
-    requestId: "request-1",
+    mintsAdvisory: false,
+    outsideMintFee: 0,
+    preferredTransport: "nostr",
+    requestId,
+    transportNprofile: "nprofile",
+    transportPostUrl: null,
+    transportPubkeyHex: contactPubkey,
+    transportRelays: [payeeRelay],
+    unit: "sat",
+    ...overrides,
+  });
+  const direct = {
+    _tag: "Direct",
+    amount: 600,
+    fee: 1,
+    mint: MintUrl.make(MINT_URL),
+    methodFee: 0,
+  } satisfies PaymentRequestQuote;
+  const overLightning = {
+    _tag: "Lightning",
+    amount: 600,
+    fee: 10,
+    sourceMint: MintUrl.make(FOREIGN),
+    targetMint: TARGET,
+    addsMint: true,
+    moveAmount: 602,
+  } satisfies PaymentRequestQuote;
+  const postRequest = request({
+    transportPubkeyHex: null,
     transportNprofile: null,
     transportPostUrl: "https://shop.example/pay",
-    transportPubkeyHex: null,
-    unit: "sat",
-  };
-
-  it("posts the token, forgets the transfer and records the payment", async () => {
-    const post = vi.fn(async () => new Response(null, { status: 200 }));
-    vi.stubGlobal("fetch", post);
-    const { commands, linkshu, logPaymentEvent } = setup();
-
-    const outcome = await commands.payCashuPaymentRequestByPost(request);
-
-    expect(outcome).toMatchObject({ _tag: "Paid", receipt: sendReceipt });
-    expect(post).toHaveBeenCalledOnce();
-    expect(linkshu.cashuTransferLifecycle.forget).toHaveBeenCalledWith(
-      sendReceipt.operationId,
-    );
-    expect(logPaymentEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ paymentType: "request", phase: "complete" }),
-    );
-    vi.unstubAllGlobals();
+    transportRelays: [],
   });
 
-  it("takes the token back when the POST fails", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => new Response(null, { status: 500 })),
-    );
-    const { commands, linkshu } = setup();
-
-    expect(await commands.payCashuPaymentRequestByPost(request)).toEqual({
-      _tag: "Failed",
-      detail: "Payment request POST 500",
-      insufficient: false,
+  describe("quotePaymentRequest", () => {
+    it("adds the request's melt fee when paying from outside its mint list", async () => {
+      const { commands, linkshu } = setup();
+      const advisory = request({
+        mintUrls: [TARGET],
+        mintsAdvisory: true,
+        outsideMintFee: 3,
+      });
+      const quote = await commands.quotePaymentRequest(advisory, 600);
+      expect(quote).toEqual({
+        _tag: "Direct",
+        amount: 600,
+        fee: 7,
+        mint: MINT_URL,
+        methodFee: 3,
+      });
+      assert(quote._tag === "Direct");
+      await commands.payPaymentRequest({
+        request: advisory,
+        quote,
+        recipient: alice,
+      });
+      expect(linkshu.sendCashuToken).toHaveBeenCalledWith(
+        expect.objectContaining({ amountSat: 603, includeRecipientFee: true }),
+      );
     });
-    expect(linkshu.cashuTransferLifecycle.returnToWallet).toHaveBeenCalledWith(
-      sendReceipt.operationId,
-    );
-    vi.unstubAllGlobals();
+
+    it("prices a direct payment with the mint's send fee allowance", async () => {
+      const { commands } = setup();
+      expect(await commands.quotePaymentRequest(request(), 600)).toEqual({
+        _tag: "Direct",
+        amount: 600,
+        // 600 is 10 bits, plus the fee's own proof, at 100 ppk, for both swaps.
+        fee: 4,
+        mint: MINT_URL,
+        methodFee: 0,
+      });
+    });
+
+    it("moves over Lightning from the smallest balance that covers the move", async () => {
+      const { commands, linkshu } = setup({
+        balances: { [MINT_URL]: 1_000, [FOREIGN]: 650 },
+        estimateAutoswapCashu: async (move) =>
+          Result.succeed(
+            autoswapEstimate(move, move.sourceMint === FOREIGN ? 60 : 10),
+          ),
+      });
+
+      expect(
+        await commands.quotePaymentRequest(
+          request({ mintUrls: [TARGET] }),
+          600,
+        ),
+      ).toEqual({
+        _tag: "Lightning",
+        amount: 600,
+        fee: 14,
+        sourceMint: MINT_URL,
+        targetMint: TARGET,
+        addsMint: true,
+        moveAmount: 604,
+      });
+      expect(
+        linkshu.estimateAutoswapCashu.mock.calls.map(([move]) => move),
+      ).toEqual([
+        { sourceMint: FOREIGN, targetMint: TARGET, amountSat: 604 },
+        { sourceMint: MINT_URL, targetMint: TARGET, amountSat: 604 },
+      ]);
+    });
+
+    it("refuses a locked request when the Lightning target lacks NUT-11", async () => {
+      const { commands, linkshu } = setup({
+        fetchMintInfo: async () =>
+          Result.succeed(mintInfo({ supportsP2pk: false })),
+      });
+
+      expect(
+        await commands.quotePaymentRequest(
+          request({ mintUrls: [TARGET], lockTo: parseP2pkPubkey(contactNpub) }),
+          600,
+        ),
+      ).toEqual({ _tag: "LockingUnsupported" });
+      expect(linkshu.estimateAutoswapCashu).not.toHaveBeenCalled();
+    });
+
+    it("passes on the mint move a short default mint needs, and an unreachable target", async () => {
+      const short = setup({ balances: { [MINT_URL]: 50, [FOREIGN]: 80 } });
+      expect(
+        await short.commands.quotePaymentRequest(
+          request({ mintUrls: [] }),
+          100,
+        ),
+      ).toEqual({ _tag: "NeedsMintMove", fromMint: FOREIGN, toMint: MINT_URL });
+
+      const unreachable = setup({
+        estimateAutoswapCashu: async () =>
+          Result.fail(
+            new MintRejected({
+              mint: MintUrl.make(TARGET),
+              code: null,
+              detail: "down",
+            }),
+          ),
+      });
+      expect(
+        await unreachable.commands.quotePaymentRequest(
+          request({ mintUrls: [TARGET] }),
+          600,
+        ),
+      ).toEqual({ _tag: "Failed", detail: "Mint rejected the token: down" });
+    });
   });
 
-  it("refuses requests without a usable https POST target", async () => {
-    const { commands, linkshu } = setup();
-    const pay = (transportPostUrl: string | null) =>
-      commands.payCashuPaymentRequestByPost({ ...request, transportPostUrl });
+  describe("payPaymentRequest", () => {
+    it("sends the NUT-18 payload to the request's key and relays as a reply", async () => {
+      const { commands, linkshu, linkstr, logPaymentEvent } = setup();
+      const replyToId = "ab".repeat(32);
 
-    expect(await pay(null)).toEqual({ _tag: "NoPostTransport" });
-    expect(await pay("not a url")).toEqual({ _tag: "InvalidUrl" });
-    expect(await pay("http://shop.example/pay")).toEqual({
-      _tag: "InsecureTransport",
+      const outcome = await commands.payPaymentRequest({
+        request: request(),
+        quote: direct,
+        recipient: alice,
+        replyContext: {
+          replyToId,
+          rootMessageId: replyToId,
+          replyToContent: "creqA",
+        },
+      });
+
+      expect(outcome).toEqual({
+        _tag: "Paid",
+        receipt: sendReceipt,
+        contactId: CONTACT_ID,
+        queued: false,
+      });
+      expect(linkshu.sendCashuToken).toHaveBeenCalledWith({
+        amountSat: 600,
+        memo: "coffee",
+        mint: MINT_URL,
+        produceAs: "pending",
+        lockTo: null,
+        includeRecipientFee: true,
+      });
+      const [input] = linkstr.enqueueOutbox.mock.calls[0];
+      assert(input.op._tag === "chat.token");
+      const { draft } = input.op;
+      expect(draft.to).toBe(contactPubkey);
+      expect(draft.recipientRelays).toEqual([payeeRelay]);
+      expect(draft.replyTo).toBe(replyToId);
+      expect(JSON.parse(draft.token)).toEqual({
+        id: "request-1",
+        memo: "coffee",
+        mint: MINT_URL,
+        unit: "sat",
+        proofs: [
+          {
+            id: proof.id,
+            amount: 600,
+            secret: proof.secret,
+            C: proof.C,
+          },
+        ],
+      });
+      expect(linkshu.cashuTransferLifecycle.forget).toHaveBeenCalledWith(
+        sendReceipt.operationId,
+      );
+      expect(linkstr.sendPaymentNotice).toHaveBeenCalledOnce();
+      expect(logPaymentEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contactId: CONTACT_ID,
+          details: { issuedToken: sendReceipt.tokenText, requestId },
+          paymentType: "request",
+          phase: "complete",
+          status: "ok",
+        }),
+      );
     });
-    expect(linkshu.sendCashuToken).not.toHaveBeenCalled();
+
+    it("moves over Lightning, then sends at the target mint", async () => {
+      const operations: string[] = [];
+      const { commands, logPaymentEvent } = setup({
+        autoswapCashu: async (move) => {
+          operations.push(
+            `move:${move.sourceMint}>${move.targetMint}:${move.amountSat}`,
+          );
+          return Result.succeed(autoswapReceipt(move));
+        },
+        sendCashuToken: async (args) => {
+          operations.push(`send:${args.mint}:${args.amountSat}`);
+          return Result.succeed(sendReceipt);
+        },
+      });
+
+      expect(
+        await commands.payPaymentRequest({
+          request: request({ mintUrls: [TARGET] }),
+          quote: overLightning,
+          recipient: alice,
+        }),
+      ).toMatchObject({ _tag: "Paid" });
+      expect(operations).toEqual([
+        `move:${FOREIGN}>${TARGET}:602`,
+        `send:${TARGET}:600`,
+      ]);
+      expect(logPaymentEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ fee: 4, status: "ok" }),
+      );
+    });
+
+    it("leaves the moved sats at the target when the send after the move fails", async () => {
+      const { commands, linkstr } = setup({
+        sendCashuToken: async () => Result.fail(insufficientFunds(600, 10)),
+      });
+
+      expect(
+        await commands.payPaymentRequest({
+          request: request({ mintUrls: [TARGET] }),
+          quote: overLightning,
+          recipient: alice,
+        }),
+      ).toEqual({
+        _tag: "Failed",
+        detail: "Insufficient funds (need 600, have 10)",
+        insufficient: true,
+        movedTo: TARGET,
+      });
+      expect(linkstr.enqueueOutbox).not.toHaveBeenCalled();
+    });
+
+    it("sends nothing when the Lightning move fails", async () => {
+      const { commands, linkshu } = setup({
+        autoswapCashu: async () => Result.fail(insufficientFunds(612, 600)),
+      });
+
+      expect(
+        await commands.payPaymentRequest({
+          request: request({ mintUrls: [TARGET] }),
+          quote: overLightning,
+          recipient: alice,
+        }),
+      ).toMatchObject({ _tag: "Failed", movedTo: null });
+      expect(linkshu.sendCashuToken).not.toHaveBeenCalled();
+    });
+
+    it("locks the proofs to the request's key and reports a mint without NUT-11", async () => {
+      const lockTo = parseP2pkPubkey(contactNpub);
+      const { commands, linkshu } = setup({
+        sendCashuToken: async () =>
+          Result.fail(new LockingUnsupported({ mint: MintUrl.make(MINT_URL) })),
+      });
+
+      expect(
+        await commands.payPaymentRequest({
+          request: request({ lockTo }),
+          quote: direct,
+          recipient: alice,
+        }),
+      ).toEqual({ _tag: "LockingUnsupported" });
+      expect(linkshu.sendCashuToken).toHaveBeenCalledWith(
+        expect.objectContaining({ lockTo }),
+      );
+    });
+
+    it("posts the payload to a request without a nostr transport", async () => {
+      const post = vi.fn<typeof fetch>(
+        async () => new Response(null, { status: 200 }),
+      );
+      vi.stubGlobal("fetch", post);
+      const { commands, linkshu, logPaymentEvent } = setup();
+
+      expect(
+        await commands.payPaymentRequest({
+          request: postRequest,
+          quote: direct,
+          recipient: null,
+        }),
+      ).toEqual({
+        _tag: "Paid",
+        receipt: sendReceipt,
+        contactId: null,
+        queued: false,
+      });
+      const [url, init] = post.mock.calls[0];
+      expect(url).toBe("https://shop.example/pay");
+      expect(JSON.parse(String(init?.body))).toMatchObject({
+        id: "request-1",
+        mint: MINT_URL,
+      });
+      expect(linkshu.cashuTransferLifecycle.forget).toHaveBeenCalledWith(
+        sendReceipt.operationId,
+      );
+      expect(logPaymentEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ paymentType: "request", phase: "complete" }),
+      );
+      vi.unstubAllGlobals();
+    });
+
+    it("takes the token back when the POST fails", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(null, { status: 500 })),
+      );
+      const { commands, linkshu } = setup();
+
+      expect(
+        await commands.payPaymentRequest({
+          request: postRequest,
+          quote: direct,
+          recipient: null,
+        }),
+      ).toEqual({
+        _tag: "Failed",
+        detail: "Payment request POST 500",
+        insufficient: false,
+        movedTo: null,
+      });
+      expect(
+        linkshu.cashuTransferLifecycle.returnToWallet,
+      ).toHaveBeenCalledWith(sendReceipt.operationId);
+      vi.unstubAllGlobals();
+    });
+
+    it("refuses a request without a usable transport before any send", async () => {
+      const { commands, linkshu } = setup();
+      const pay = (transportPostUrl: string | null) =>
+        commands.payPaymentRequest({
+          request: { ...postRequest, transportPostUrl },
+          quote: direct,
+          recipient: null,
+        });
+
+      expect(await pay(null)).toEqual({ _tag: "NoTransport" });
+      expect(await pay("http://shop.example/pay")).toEqual({
+        _tag: "InsecureTransport",
+      });
+      expect(linkshu.sendCashuToken).not.toHaveBeenCalled();
+    });
+
+    it("says where the moved sats are when the chat request changed after a Lightning move", async () => {
+      let approved = true;
+      const { commands, linkshu } = setup({
+        autoswapCashu: async (move) => {
+          approved = false;
+          return Result.succeed(autoswapReceipt(move));
+        },
+      });
+
+      expect(
+        await commands.payPaymentRequest({
+          request: request({ mintUrls: [TARGET] }),
+          quote: overLightning,
+          recipient: alice,
+          isPaymentAuthorized: () => approved,
+        }),
+      ).toMatchObject({ _tag: "Failed", movedTo: TARGET });
+      expect(
+        linkshu.cashuTransferLifecycle.returnToWallet,
+      ).toHaveBeenCalledWith(sendReceipt.operationId);
+    });
+
+    it("returns the token when the chat request changed during the send", async () => {
+      let approved = true;
+      const { commands, linkshu, linkstr } = setup({
+        sendCashuToken: async () => {
+          approved = false;
+          return Result.succeed(sendReceipt);
+        },
+      });
+
+      expect(
+        await commands.payPaymentRequest({
+          request: request(),
+          quote: direct,
+          recipient: alice,
+          isPaymentAuthorized: () => approved,
+        }),
+      ).toEqual({ _tag: "AuthorizationChanged" });
+      expect(
+        linkshu.cashuTransferLifecycle.returnToWallet,
+      ).toHaveBeenCalledWith(sendReceipt.operationId);
+      expect(linkstr.enqueueOutbox).not.toHaveBeenCalled();
+    });
   });
 });

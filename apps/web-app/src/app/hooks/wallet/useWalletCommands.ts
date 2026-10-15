@@ -19,6 +19,8 @@ export const useWalletCommands = () => {
         commands?.read().closePaymentMintMeltConfirmation(),
       confirmCashuPaymentRequest: async () =>
         commands?.read().confirmCashuPaymentRequest(),
+      enterCashuPaymentRequestAmount: async (amountSat: number) =>
+        commands?.read().enterCashuPaymentRequestAmount(amountSat),
       confirmLightningInvoicePayment: async () =>
         commands?.read().confirmLightningInvoicePayment(),
       confirmLnurlWithdraw: async () => commands?.read().confirmLnurlWithdraw(),

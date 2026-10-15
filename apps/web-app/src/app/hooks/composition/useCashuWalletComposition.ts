@@ -1,10 +1,8 @@
 import { useAtom, useAtomValue } from "@linky-fit/linkstr-react";
 import type { PushToastOptions } from "../../../hooks/useToasts";
 import { paidOverlayContact } from "../../lib/paidOverlay";
-import { decodeNpub, encodeNprofile } from "@linky-fit/linkstr";
 import React, { useMemo } from "react";
 import { useRouting } from "../../../hooks/useRouting";
-import { recommendedNostrRelays } from "../../../utils/nostrRelays";
 import {
   formatDisplayAmountParts,
   type FiatRates,
@@ -14,10 +12,12 @@ import { useSaveCashuFromText } from "../cashu/useSaveCashuFromText";
 import { useDeferredReceiveRetry } from "../cashu/useDeferredReceiveRetry";
 import { useTopupFlow } from "../topup/useTopupFlow";
 import { useAnonymousPaymentTelemetry } from "../useAnonymousPaymentTelemetry";
+import { useOwnNprofile } from "../useOwnNprofile";
 import { useCashuDomain } from "../useCashuDomain";
 import { useMintInfo, useMintInfoWatchers } from "../mint/useMintInfo";
 import { useAllowTestMints } from "../useAllowTestMints";
 import { useMoveMintFunds } from "../mint/useMoveMintFunds";
+import { useRequestMintUrls } from "../mint/useRequestMintUrls";
 import {
   lightningInvoiceAutoPayLimitAtom,
   payWithCashuEnabledAtom,
@@ -162,10 +162,7 @@ export const useCashuWalletComposition = ({
     migrateLegacyPaymentEvents();
   }, [migrateLegacyPaymentEvents]);
 
-  const topupRecipientNprofile = React.useMemo(() => {
-    const pubkey = decodeNpub(currentNpub ?? "");
-    return pubkey ? encodeNprofile(pubkey, recommendedNostrRelays()) : null;
-  }, [currentNpub]);
+  const topupRecipientNprofile = useOwnNprofile(currentNpub);
 
   const {
     cashuEnvelopes,
@@ -219,15 +216,16 @@ export const useCashuWalletComposition = ({
     transactions,
   });
 
-  const { cashuBalance, cashuTotalBalance } = useWalletBalance();
+  const { cashuBalance } = useWalletBalance();
+  const requestMintUrls = useRequestMintUrls();
 
   const { meltToDefaultMint } = useMoveMintFunds();
 
   const { startBackgroundTopup } = useTopupFlow({
-    cashuTotalBalance,
     defaultMintUrl,
     formatDisplayedAmountParts,
     logPaymentEvent,
+    requestMintUrls,
     resumePendingCashuTopups,
     routeKind: route.kind,
     showPaidOverlay,
@@ -264,7 +262,6 @@ export const useCashuWalletComposition = ({
     contactsMessaging,
     currentNpub,
     currentNsec,
-    defaultMintUrl,
     dismissPaymentSending,
     formatDisplayedAmountParts,
     lightningInvoiceAutoPayLimit,
@@ -394,6 +391,8 @@ export const useCashuWalletComposition = ({
     closePaymentMintMeltConfirmation:
       walletPayments.closePaymentMintMeltConfirmation,
     confirmCashuPaymentRequest: walletPayments.confirmCashuPaymentRequest,
+    enterCashuPaymentRequestAmount:
+      walletPayments.enterCashuPaymentRequestAmount,
     confirmLightningInvoicePayment:
       walletPayments.confirmLightningInvoicePayment,
     confirmLnurlWithdraw: lnurlWithdraw.confirmLnurlWithdraw,
@@ -411,6 +410,7 @@ export const useCashuWalletComposition = ({
   });
 
   return {
+    canPayCashuRequest: walletPayments.canPayCashuRequest,
     cashuBalance,
     cashuIsBusy,
     cashuTokensHydratedRef,

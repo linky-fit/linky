@@ -1,7 +1,9 @@
+import { encode } from "cbor-x";
 import { getPublicKey } from "nostr-tools";
 import { describe, expect, it } from "vitest";
 import { createLinkyBankPaymentOfferEvent } from "../../testUtils/bankPaymentOfferEvent";
 import { createSecretKey } from "../../testUtils/nostrKeys";
+import { encodeBase64Url } from "../../utils/base64";
 import { formatChatMessagePreviewText } from "./chatMessageDisplay";
 
 const translatePreview = (key: string): string => {
@@ -32,6 +34,28 @@ const createOfferContent = (
   }).content;
 
 describe("formatChatMessagePreviewText", () => {
+  it.each([
+    [21, "in", "paymentRequestPreviewIncoming 21 sat"],
+    [21, "out", "paymentRequestPreviewOutgoing 21 sat"],
+    [null, "in", "paymentRequestPreviewIncomingAnyAmount {amount}"],
+    [null, "out", "paymentRequestPreviewOutgoingAnyAmount {amount}"],
+  ] as const)(
+    "previews a request for %s sat sent %s as %s",
+    (amount, direction, preview) => {
+      const content = `creqA${encodeBase64Url(
+        encode({ ...(amount === null ? {} : { a: amount }), u: "sat" }),
+      )}`;
+      expect(
+        formatChatMessagePreviewText({
+          content,
+          direction,
+          formatDisplayedAmountText: (sat) => `${sat} sat`,
+          t: (key) => `${key} {amount}`,
+        }),
+      ).toBe(preview);
+    },
+  );
+
   it("shows an incoming proxy offer as a readable conversation preview", () => {
     expect(
       formatChatMessagePreviewText({

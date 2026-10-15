@@ -73,6 +73,11 @@ export const formatChatMessagePreviewText = ({
 
   const paymentRequest = parseCashuPaymentRequestMessage(content);
   if (paymentRequest) {
+    if (paymentRequest.amount === null) {
+      return direction === "out"
+        ? t("paymentRequestPreviewOutgoingAnyAmount")
+        : t("paymentRequestPreviewIncomingAnyAmount");
+    }
     const amountText = formatDisplayedAmountText(paymentRequest.amount);
     return direction === "out"
       ? t("paymentRequestPreviewOutgoing").replace("{amount}", amountText)

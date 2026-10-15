@@ -163,6 +163,29 @@ describe("useSaveCashuFromText", () => {
     );
   });
 
+  it("reports onReceived only when this attempt put proofs into the wallet", async () => {
+    const transfer = receiveTransfer("pending");
+    const { save } = await setup(async () =>
+      Result.succeed(
+        new ReceiveReceipt({
+          operationId: transfer.id,
+          tokenText: transfer.tokenText,
+          mint: transfer.mint,
+          unit: transfer.unit,
+          amount: transfer.amount,
+        }),
+      ),
+    );
+    const onReceived = vi.fn();
+    await save(transfer.tokenText, { onReceived });
+    expect(onReceived).toHaveBeenCalledOnce();
+
+    const spent = await setup(alreadySpent);
+    const notReceived = vi.fn();
+    await spent.save("cashuBspenttoken", { onReceived: notReceived });
+    expect(notReceived).not.toHaveBeenCalled();
+  });
+
   it("reports a finished receive as already saved without receiving again", async () => {
     const transfer = receiveTransfer("done");
     const receive = vi.fn<ReceiveCashuToken>();

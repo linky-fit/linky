@@ -1,5 +1,5 @@
 import { AtomRegistry, RegistryContext } from "@linky-fit/linkstr-react";
-import { encodeNprofile, encodeNpub } from "@linky-fit/linkstr";
+import { encodeNpub } from "@linky-fit/linkstr";
 import { createId } from "@linky-fit/linksync";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { encode } from "cbor-x";
@@ -12,11 +12,7 @@ import type { LnurlAuthPreview } from "../../lnurlAuth";
 import type { Translate } from "../../i18n";
 import type { SiteLoginRequest } from "../../siteLogin";
 import { useScannedTextHandler } from "./useScannedTextHandler";
-import { useCashuPaymentRequestConfirmation } from "./payments/useCashuPaymentRequestConfirmation";
-import {
-  buildCashuPaymentRequestMessage,
-  type CashuPaymentRequestMessageInfo,
-} from "../lib/paymentRequestMessage";
+import type { CashuPaymentRequestMessageInfo } from "../lib/paymentRequestMessage";
 import { encodeBase64Url } from "../../utils/base64";
 import { optimizeCaseInsensitiveQrPayload } from "../../utils/qrPayload";
 import {
@@ -48,15 +44,15 @@ type ScanParams = Parameters<typeof useScannedTextHandler>[0];
 
 const setup = async ({
   autoPayLimit = 0,
+  canPayFromHeldMint = true,
   contacts = [],
   currentNpub = null,
-  cashuIsBusy = false,
   keryxEnabled = true,
 }: {
   autoPayLimit?: number;
+  canPayFromHeldMint?: boolean;
   contacts?: ScanParams["contacts"];
   currentNpub?: string | null;
-  cashuIsBusy?: boolean;
   keryxEnabled?: boolean;
 } = {}) => {
   const requestLnurlAuthConfirmation = vi.fn<(p: LnurlAuthPreview) => void>();
@@ -67,9 +63,12 @@ const setup = async ({
   const requestLinkauthLogin = vi
     .fn<(link: string) => Promise<void>>()
     .mockResolvedValue(undefined);
-  const runCashuPaymentRequest = vi
+  const payCashuPaymentRequest = vi
     .fn<(request: CashuPaymentRequestMessageInfo) => Promise<void>>()
     .mockResolvedValue(undefined);
+  const canPayCashuRequest = vi
+    .fn<(request: CashuPaymentRequestMessageInfo) => boolean>()
+    .mockReturnValue(canPayFromHeldMint);
   const payLightningInvoiceWithCashu = vi
     .fn<(invoice: string) => Promise<boolean>>()
     .mockResolvedValue(true);
@@ -79,18 +78,10 @@ const setup = async ({
   );
   const setStatus = vi.fn<ScanParams["setStatus"]>();
   const handlerRef: { current: ScannedTextHandler | null } = { current: null };
-  const confirmationRef: {
-    current: ReturnType<typeof useCashuPaymentRequestConfirmation> | null;
-  } = { current: null };
 
   const Probe = (): null => {
-    const confirmation = useCashuPaymentRequestConfirmation({
-      autoPayLimit,
-      currentNpub,
-      cashuIsBusy,
-      runCashuPaymentRequest,
-    });
     const handle = useScannedTextHandler({
+      canPayCashuRequest,
       closeScan: () => undefined,
       contacts,
       contactsRepository: { insert: insertContact },
@@ -100,7 +91,7 @@ const setup = async ({
       lightningInvoiceAutoPayLimit: autoPayLimit,
       onContactIdentifierScanned: null,
       openSavedContact: () => {},
-      payCashuPaymentRequest: confirmation.payCashuPaymentRequest,
+      payCashuPaymentRequest,
       payLightningInvoiceWithCashu,
       requestLightningInvoiceConfirmation,
       requestLnurlAuthConfirmation,
@@ -116,7 +107,6 @@ const setup = async ({
 
     React.useEffect(() => {
       handlerRef.current = handle;
-      confirmationRef.current = confirmation;
     });
     return null;
   };
@@ -134,14 +124,10 @@ const setup = async ({
       if (!handle) throw new Error("scan handler did not mount");
       await act(async () => handle(text));
     },
-    get confirmation() {
-      const confirmation = confirmationRef.current;
-      if (!confirmation) throw new Error("confirmation hook did not mount");
-      return confirmation;
-    },
     insertContact,
     setStatus,
-    runCashuPaymentRequest,
+    canPayCashuRequest,
+    payCashuPaymentRequest,
     payLightningInvoiceWithCashu,
     requestLightningInvoiceConfirmation,
     requestLnurlAuthConfirmation,
@@ -331,115 +317,52 @@ describe("scanned lightning addresses", () => {
   });
 });
 
-describe("scanned Cashu auto-pay", () => {
-  it.each([999, 1000])(
-    "auto-pays %i sats with a 1000-sat limit",
-    async (amount) => {
-      const scan = await setup({ autoPayLimit: 1000 });
-      await scan.handle(cashuRequest(amount));
-
-      expect(scan.runCashuPaymentRequest).toHaveBeenCalledExactlyOnceWith(
-        expect.objectContaining({ amount }),
-      );
-      expect(
-        scan.confirmation.pendingCashuPaymentRequestConfirmation,
-      ).toBeNull();
-    },
-  );
-
-  it("requires confirmation above the limit and cancel never pays", async () => {
-    const scan = await setup({ autoPayLimit: 1000 });
-    await scan.handle(cashuRequest(1001));
-
-    expect(
-      scan.confirmation.pendingCashuPaymentRequestConfirmation?.amount,
-    ).toBe(1001);
-    expect(scan.runCashuPaymentRequest).not.toHaveBeenCalled();
-    await act(async () =>
-      scan.confirmation.closeCashuPaymentRequestConfirmation(),
-    );
-    expect(scan.confirmation.pendingCashuPaymentRequestConfirmation).toBeNull();
-    await act(async () => scan.confirmation.confirmCashuPaymentRequest());
-    expect(scan.runCashuPaymentRequest).not.toHaveBeenCalled();
-  });
-
-  it("pays the approved request once and clears the confirmation", async () => {
-    const scan = await setup({ autoPayLimit: 1000 });
-    await scan.handle(cashuRequest(1001));
-    const pending = scan.confirmation.pendingCashuPaymentRequestConfirmation;
-
-    await act(async () => scan.confirmation.confirmCashuPaymentRequest());
-    expect(scan.runCashuPaymentRequest).toHaveBeenCalledExactlyOnceWith(
-      pending,
-    );
-    expect(scan.confirmation.pendingCashuPaymentRequestConfirmation).toBeNull();
-    await act(async () => scan.confirmation.confirmCashuPaymentRequest());
-    expect(scan.runCashuPaymentRequest).toHaveBeenCalledTimes(1);
-  });
-
-  it("requires confirmation for positive amounts when the limit is zero", async () => {
+describe("scanned Cashu requests", () => {
+  it("hands a scanned request to the payment flow", async () => {
     const scan = await setup();
-    await scan.handle(cashuRequest(1));
+    await scan.handle(cashuRequest(1001));
 
-    expect(
-      scan.confirmation.pendingCashuPaymentRequestConfirmation?.amount,
-    ).toBe(1);
-    expect(scan.runCashuPaymentRequest).not.toHaveBeenCalled();
+    expect(scan.payCashuPaymentRequest).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ amount: 1001 }),
+    );
   });
 
-  it.each([500, 1500])(
-    "uses the %i-sat Cashu amount in a combined QR",
-    async (amount) => {
-      const scan = await setup({ autoPayLimit: 1000 });
-      await scan.handle(
-        `bitcoin:?amount=0.000001&lightning=${lightningInvoice(100)}&creq=${cashuRequest(amount)}`,
-      );
-
-      if (amount <= 1000) {
-        expect(scan.runCashuPaymentRequest).toHaveBeenCalledExactlyOnceWith(
-          expect.objectContaining({ amount }),
-        );
-        expect(
-          scan.confirmation.pendingCashuPaymentRequestConfirmation,
-        ).toBeNull();
-      } else {
-        expect(scan.runCashuPaymentRequest).not.toHaveBeenCalled();
-        expect(
-          scan.confirmation.pendingCashuPaymentRequestConfirmation?.amount,
-        ).toBe(amount);
-      }
-      expect(scan.payLightningInvoiceWithCashu).not.toHaveBeenCalled();
-      expect(scan.requestLightningInvoiceConfirmation).not.toHaveBeenCalled();
-    },
-  );
-
-  it("keeps self-payments outside the limit because no funds leave", async () => {
-    const identity = makeIdentity();
-    const scan = await setup({ currentNpub: encodeNpub(identity.pubkey) });
+  it("pays a combined QR's Cashu leg when a held mint covers it", async () => {
+    const scan = await setup({ autoPayLimit: 1000 });
     await scan.handle(
-      buildCashuPaymentRequestMessage({
-        amount: 2000,
-        mintUrls: [],
-        recipientNprofile: encodeNprofile(identity.pubkey, []),
-      }),
+      `bitcoin:?amount=0.000001&lightning=${lightningInvoice(100)}&creq=${cashuRequest(500)}`,
     );
 
-    expect(scan.runCashuPaymentRequest).toHaveBeenCalledOnce();
-    expect(scan.confirmation.pendingCashuPaymentRequestConfirmation).toBeNull();
+    expect(scan.canPayCashuRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 500 }),
+    );
+    expect(scan.payCashuPaymentRequest).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ amount: 500 }),
+    );
+    expect(scan.payLightningInvoiceWithCashu).not.toHaveBeenCalled();
   });
 
-  it.each([500, 1500])(
-    "ignores a %i-sat scan while the wallet is busy",
-    async (amount) => {
-      const scan = await setup({ autoPayLimit: 1000, cashuIsBusy: true });
-      await scan.handle(cashuRequest(amount));
+  it("pays a combined QR's invoice when no held mint covers the Cashu leg", async () => {
+    const scan = await setup({ autoPayLimit: 1000, canPayFromHeldMint: false });
+    const invoice = lightningInvoice(100);
+    await scan.handle(
+      `bitcoin:?amount=0.000001&lightning=${invoice}&creq=${cashuRequest(500)}`,
+    );
 
-      expect(scan.runCashuPaymentRequest).not.toHaveBeenCalled();
-      expect(
-        scan.confirmation.pendingCashuPaymentRequestConfirmation,
-      ).toBeNull();
-    },
-  );
+    expect(scan.payLightningInvoiceWithCashu).toHaveBeenCalledExactlyOnceWith(
+      invoice,
+    );
+    expect(scan.payCashuPaymentRequest).not.toHaveBeenCalled();
+  });
+
+  it("falls back to a Cashu leg no held mint covers when it is the only one", async () => {
+    const scan = await setup({ canPayFromHeldMint: false });
+    await scan.handle(`bitcoin:?creq=${cashuRequest(500)}`);
+
+    expect(scan.payCashuPaymentRequest).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ amount: 500 }),
+    );
+  });
 });
 
 describe("scanned Lightning auto-pay", () => {
@@ -463,7 +386,7 @@ describe("scanned Lightning auto-pay", () => {
           expect.objectContaining({ invoice, amountSat: amount }),
         );
       }
-      expect(scan.runCashuPaymentRequest).not.toHaveBeenCalled();
+      expect(scan.payCashuPaymentRequest).not.toHaveBeenCalled();
     },
   );
 });

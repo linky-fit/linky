@@ -1,3 +1,4 @@
+import { PaymentRequestId } from "@linky-fit/linkshu/payment-request";
 import {
   derivePubkey,
   encodeNprofile,
@@ -112,7 +113,7 @@ describe("dedupeNostrMessagesByPriority", () => {
         derivePubkey(NostrSecretKey.make(new Uint8Array(32).fill(1))),
         [],
       ),
-      requestId: "request-1",
+      requestId: PaymentRequestId.make("request-1"),
     });
     const placeholder = (id: string, rumorId: string) =>
       makeMessage(id, {

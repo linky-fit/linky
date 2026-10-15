@@ -64,9 +64,9 @@ test("an incoming 2-sat chat request is paid and both sides see it paid", async 
       await expect(paidCards(requester.page)).toHaveCount(1);
       // Paid renders before the send finishes and navigates back to chat.
       await expect(payer.page.locator('[data-guide="chat-pay"]')).toBeEnabled();
-      // The dev mint takes one sat for the payer swap and one for receipt.
-      await expectBalance(payer.page, 47);
-      await expectBalance(requester.page, 1);
+      // The dev mint takes one sat per swap; NUT-18 has the payer cover the requester's too, so it nets 2.
+      await expectBalance(payer.page, 46);
+      await expectBalance(requester.page, 2);
       await expect(payer.page.getByText(/Payment failed:/)).toHaveCount(0);
       await expect(requester.page.getByText(/Payment failed:/)).toHaveCount(0);
     });

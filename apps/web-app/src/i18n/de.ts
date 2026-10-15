@@ -1118,6 +1118,9 @@ export const de = {
   paymentNotePlaceholder: "Notiz hinzufügen",
   paymentRequestPreviewIncoming: "Fordert {amount} an",
   paymentRequestPreviewOutgoing: "Du forderst {amount} an",
+  paymentRequestPreviewIncomingAnyAmount: "Fordert eine Zahlung an",
+  paymentRequestPreviewOutgoingAnyAmount: "Du forderst eine Zahlung an",
+  paymentRequestAnyAmount: "Beliebiger Betrag",
   paymentRequestDeclinedPreviewIncoming: "Zahlungsanforderung abgelehnt",
   paymentRequestDeclinedPreviewOutgoing:
     "Du hast die Zahlungsanforderung abgelehnt",
@@ -1141,6 +1144,18 @@ export const de = {
     "Die Zahlungsanforderung nutzt einen unsicheren (http) Transport. Abgelehnt.",
   paymentRequestInsecureTransportWarning:
     "Achtung: Diese Anforderung sendet die Token über eine unsichere (http) Verbindung.",
+  paymentRequestAddMint:
+    "Über {mint} bezahlen? Die Mint wird zu deinen Mints hinzugefügt.",
+  paymentRequestFees: "Inklusive {amount} {unit} Gebühren",
+  paymentRequestOtherRecipient:
+    "Diese Zahlung geht an {recipient}, nicht an die Person in diesem Chat.",
+  paymentRequestEnterAmount: "Betrag eingeben",
+  paymentRequestNoTransport:
+    "Linky kann diese Anforderung noch nicht bezahlen: Sie sagt nicht, wohin die Zahlung gehen soll.",
+  paymentRequestMovedNotPaid:
+    "Zahlung fehlgeschlagen. {amount} {unit} sind in deiner Wallet bei {name} geblieben.",
+  paymentRequestLockUnsupported:
+    "Die Mint kann die Zahlung nicht an den Schlüssel des Empfängers binden.",
   payCancel: "Abbrechen",
   lnurlAuthConfirm: "Anmelden",
   lnurlAuthDoneLogin: "Angemeldet",

@@ -269,6 +269,35 @@ describe("publishCashuMessagePayment", () => {
     });
   });
 
+  it("sends a NUT-18 payment payload to the recipient's extra relays", async () => {
+    const args = createArgs();
+    const payload = JSON.stringify({
+      id: "request-1",
+      mint: "https://mint.example",
+      unit: "sat",
+      proofs: [{ id: "00ad268c4d1f5826", amount: 100, secret: "s", C: "02" }],
+    });
+    const payeeRelay = RelayUrl.make("wss://payee.example");
+
+    const result = await publishCashuMessagePayment({
+      ...args,
+      batches: [{ ...args.batches[0], token: payload }],
+      recipientRelays: [payeeRelay],
+    });
+
+    const input = args.enqueueOutbox.mock.calls[0]?.[0];
+    const draft = input?.op._tag === "chat.token" ? input.op.draft : undefined;
+    expect(draft).toMatchObject({
+      to: contactPublicKey,
+      token: payload,
+      recipientRelays: [payeeRelay],
+    });
+    expect(args.appendLocalNostrMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ content: payload }),
+    );
+    expect(result.publishedTokenTexts).toEqual([payload]);
+  });
+
   it.each([
     [
       "LinkstrNotConfigured",

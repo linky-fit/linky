@@ -58,7 +58,6 @@ const commandsAnswering = ({
 }) => {
   commandsRef.current = {
     fundsFor: vi.fn(),
-    payCashuPaymentRequestByPost: vi.fn(),
     payContact: vi.fn(),
     payLightningAddress: vi.fn(async (_args, options) => {
       options?.onSending?.();
@@ -68,6 +67,8 @@ const commandsAnswering = ({
       options?.onSending?.();
       return invoice;
     }),
+    payPaymentRequest: vi.fn(),
+    quotePaymentRequest: vi.fn(),
   };
 };
 
