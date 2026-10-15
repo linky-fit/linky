@@ -168,6 +168,12 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "An offline payment was sent after reconnecting and failed after it may have created a token. It is not retried, so it can never be paid twice; its chat placeholder shows the error.",
   "paymentRequest.authorizationLost":
     "The reviewed request or approved recipient changed during token creation. Delivery was stopped and the app attempted to return the pending transfer to the wallet; a failed return leaves it recoverable.",
+  "paymentRequest.planned":
+    "The wallet chose how to pay a NUT-18 payment request of this amount, before anything moved: Direct from a mint the request accepts (other mints before the default one), NeedsMintMove into the default mint, Lightning from another mint into one the request accepts, or why it cannot pay. The fee is what leaves the wallet on top of the amount.",
+  "paymentRequest.lightningMove":
+    "To pay a request at a mint the wallet held too little at, the amount plus the send's fee allowance was moved over Lightning (melt at the source, mint at the target). Once moved, the sats stay at the target even if the payment then fails.",
+  "paymentRequest.delivery":
+    "The NUT-18 payment payload left over the request's transport: a NIP-17 message to the request's nprofile and its relays, or a POST to its URL. queued means the message is stored but no relay took it yet; failed POSTs are taken back into the wallet.",
   "messages.deleted":
     "The user deleted a message for both sides: the local row became a placeholder (deletedAtSec set, text replaced), its reactions went, and a NIP-09 deletion request (kind 5 with a k tag naming the message kind) was queued for the peer. The rumor link is the deletion, the message link the deleted rumor id.",
   "messages.deletedByPeer":
@@ -176,6 +182,10 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "The echo of an own deletion sent from another device still found the message here and turned it into a placeholder; usually Evolu sync marked the row first and this never fires.",
   "paymentRequest.editRejected":
     "An incoming edit tried to create or change a payment request. Payment requests are immutable; the sender must send a new request.",
+  "paymentRequest.paymentLinked":
+    "An incoming NUT-18 payment payload names the request id of a payment request the user sent in the same conversation, so its receive is recorded as that request's fulfillment. Fires when the auto-receive starts; the paymentRequest link is the request id, the rumor link the payment message.",
+  "paymentRequest.paymentUnlinked":
+    "An incoming NUT-18 payment payload names a request id the user sent no payment request with in that conversation (a topup QR, another wallet's request, or a copied id). It is still received, just not linked to a request. A bare token names no request and emits nothing.",
   "bankOffer.snapshotNotAuthorized":
     "A bank-offer snapshot was rejected or held for an authenticated offerer snapshot. It cannot update the offer or authorize settlement yet.",
   "bankOffer.staggerDropped":
@@ -310,6 +320,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "linkshu moved a deterministic derivation counter (NUT-13) for one mint/unit/keyset — the audit trail for output derivation and collision recovery.",
   QuoteStateChanged:
     "A mint or melt quote was observed in a new state while a linkshu flow (topup, autoswap, melt) watched it; the quote link ties the sequence together. `via` says which watcher saw it — the poll, or a NUT-17 websocket subscription the mint pushed it over.",
+  "topup.paidByCashuRequest":
+    "A payment payload naming the request id of the topup QR's cashu request was received, so the invoice screen closed. The receive logged and announced the payment; the unpaid Lightning quote stays pending until the mint retires it. Quote and paymentRequest links tie it to the topup and the receive.",
   "topup.subscribe":
     "A topup's NUT-17 subscription failed or its socket closed. It will retry with backoff while HTTP polling continues. The quote link connects the retry to settlement; normal cancellation emits no failure.",
   "autoswap.estimate":

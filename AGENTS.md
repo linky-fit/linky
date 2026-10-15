@@ -17,7 +17,8 @@ Read `GLOSSARY.md` before discussing domain concepts. When the user uses a term 
 - Owner ids, table names and shard indexes belong in `@linky-fit/linksync`, Nostr wire shapes in `@linky-fit/linkstr`, cashu state transitions in `@linky-fit/linkshu`
 - Keryx protocol verification belongs in `@linky-fit/keryx`
 - UI elements, icons and design tokens belong in `@linky-fit/ui`; a missing element is added there, with an entry in `apps/ui-book`
-- Funds move between mints only on an explicit user action; changing the default mint moves nothing, and one payment uses one mint
+- Funds move between mints only on an explicit user action; changing the default mint moves nothing, and one payment uses one mint; for a payment request no held mint can pay, the funds first move over Lightning into one of its mints
+- A payment matches a payment request only by the request's NUT-18 id, never by amount
 - Quote ids and proofs go straight from the wallet to the mint, never through Linky infrastructure
 - The recovery seed stays out of every HTTP request; secrets stay out of every log
 - Inspector rows hold decrypted plaintext and stay on the device in production

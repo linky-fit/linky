@@ -43,7 +43,6 @@ interface UseWalletPaymentsParams {
   >;
   currentNpub: string | null;
   currentNsec: string | null;
-  defaultMintUrl: string | null;
   dismissPaymentSending: () => void;
   formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
   lightningInvoiceAutoPayLimit: number;
@@ -69,7 +68,6 @@ export const useWalletPayments = ({
   contactsMessaging,
   currentNpub,
   currentNsec,
-  defaultMintUrl,
   dismissPaymentSending,
   formatDisplayedAmountParts,
   lightningInvoiceAutoPayLimit,
@@ -151,10 +149,8 @@ export const useWalletPayments = ({
     ...contactsMessaging,
     autoPayLimit: lightningInvoiceAutoPayLimit,
     currentNpub,
-    defaultMintUrl,
     logPaymentEvent,
     payAmount,
-    payContactWithCashuMessage: contactPayments.payContactWithCashuMessage,
     route,
     walletOpRunning,
   });

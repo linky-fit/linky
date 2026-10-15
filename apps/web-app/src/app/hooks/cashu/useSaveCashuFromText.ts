@@ -47,6 +47,8 @@ export interface SaveCashuFromTextOptions {
    * auto-retry" decision without re-deriving it from token text.
    */
   onResolved?: (resolution: "terminal" | "transient") => void;
+  /** Called once this attempt put the token's proofs into the wallet. */
+  onReceived?: () => void;
 }
 
 interface UseSaveCashuFromTextParams {
@@ -206,6 +208,7 @@ export const useSaveCashuFromText = ({
           const receipt = outcome.success;
           rememberCashuTokenKnown(tokenRaw, receipt.tokenText);
           options?.onResolved?.("terminal");
+          options?.onReceived?.();
 
           touchReceivingMint(receipt.mint, {
             isMintDeleted,

@@ -233,8 +233,12 @@ The hosted service that gives each identity a lightning address paying into the 
 _Avoid_: address service, custodial address
 
 **Payment request**:
-A message asking the peer to pay a stated amount; once received it cannot be changed.
+A NUT-18 request to be paid at one of the mints it lists, usually a stated amount, sent as a message or shown as a QR code; once received it cannot be changed.
 _Avoid_: invoice, bill, request for payment
+
+**Request id**:
+The id a payment request carries and its payment repeats; the only link between the two. It is not the id of the message that carried the request.
+_Avoid_: payment id, request message id
 
 **Note**:
 The free text the user attaches to a payment or payment request, carried as the bolt11 description, the token memo, the LNURL comment or the request description, and kept on the transaction.

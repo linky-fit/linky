@@ -143,11 +143,11 @@ export function AuthenticatedLayout({
       !pendingPaymentMintMove &&
       !paidOverlay.paidOverlayIsOpen ? (
         <CashuPaymentRequestConfirmModal
-          cashuBalance={cashuBalanceAfterMelt}
           cashuIsBusy={cashuIsBusy}
           confirmation={pendingCashuPaymentRequest}
           onClose={wallet.closeCashuPaymentRequestConfirmation}
           onConfirm={wallet.confirmCashuPaymentRequest}
+          onEnterAmount={wallet.enterCashuPaymentRequestAmount}
           t={t}
         />
       ) : null}

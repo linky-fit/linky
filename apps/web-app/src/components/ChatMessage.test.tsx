@@ -1,3 +1,4 @@
+import { PaymentRequestId } from "@linky-fit/linkshu/payment-request";
 import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
@@ -444,15 +445,21 @@ describe("ChatMessage cashu token pill", () => {
 describe("ChatMessage payment request card", () => {
   const requestInfo = (
     description: string | null,
+    amount: number | null = 21,
   ): CashuPaymentRequestMessageInfo => ({
-    amount: 21,
+    amount,
     description,
     encodedRequest: "creqA",
+    lockTo: null,
     mintUrls: [],
-    requestId: "request-1",
+    mintsAdvisory: false,
+    outsideMintFee: 0,
+    preferredTransport: null,
+    requestId: PaymentRequestId.make("request-1"),
     transportNprofile: null,
     transportPostUrl: null,
     transportPubkeyHex: null,
+    transportRelays: [],
     unit: "sat",
   });
 
@@ -466,6 +473,24 @@ describe("ChatMessage payment request card", () => {
         ?.textContent,
     ).toContain("lunch");
   });
+
+  it.each([
+    [21, "21", "paymentRequestAnyAmount"],
+    [null, "paymentRequestAnyAmount", "21"],
+  ])(
+    "for an amount of %s shows %s and not %s",
+    async (amount, shown, hidden) => {
+      const container = await renderChatMessage("creqA", {
+        paymentRequestInfo: requestInfo(null, amount),
+      });
+      const card = container.querySelector(
+        '[data-testid="chat-payment-request-card"]',
+      )?.textContent;
+
+      expect(card).toContain(shown);
+      expect(card).not.toContain(hidden);
+    },
+  );
 
   it("renders no note line for a request without one", async () => {
     const container = await renderChatMessage("creqA", {

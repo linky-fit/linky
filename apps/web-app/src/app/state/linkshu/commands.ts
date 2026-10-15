@@ -56,6 +56,7 @@ import type {
   MintInfo,
   MintRejected,
   NewOperation,
+  P2pkPubkey,
   OperationNotFound,
   ProofStateSnapshot,
   ReceiveError,
@@ -103,6 +104,10 @@ interface SendCashuTokenArgs {
   readonly mint: string;
   /** `issued` for QR/share (claim-watched), `pending` for messenger sends. */
   readonly produceAs: "issued" | "pending";
+  /** NUT-11 key the sent proofs are locked to. */
+  readonly lockTo?: P2pkPubkey | null;
+  /** Adds the recipient's redemption fee, so it nets `amountSat` (NUT-18). */
+  readonly includeRecipientFee?: boolean;
 }
 
 /** linkshu Send; invalid mint/amount input and defects reject. */
@@ -407,6 +412,8 @@ const makeLinkshuCommands = (run: LinkshuRun) => {
 
   const sendCashuToken: SendCashuToken = ({
     amountSat,
+    includeRecipientFee,
+    lockTo,
     memo,
     mint,
     produceAs,
@@ -418,6 +425,8 @@ const makeLinkshuCommands = (run: LinkshuRun) => {
           mint,
           produceAs,
           ...(memo ? { memo } : {}),
+          ...(lockTo ? { lockTo } : {}),
+          ...(includeRecipientFee ? { includeRecipientFee } : {}),
         });
         return Effect.flatMap(Send, (send) => send.send(draft));
       }),

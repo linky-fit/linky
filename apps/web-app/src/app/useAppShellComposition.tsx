@@ -238,6 +238,7 @@ export const useAppShellComposition = ({
     usePersistContactsOnboardingDismissed();
   useScanNativeComposition({
     addNewContactFromIdentifier: messaging.addNewContactFromIdentifier,
+    canPayCashuRequest: wallet.canPayCashuRequest,
     cashuBalance: wallet.cashuBalance,
     contacts: messaging.contacts,
     contactsLatestRef: messaging.contactsLatestRef,

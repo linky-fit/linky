@@ -6,6 +6,8 @@ import type {
 import { Atom } from "effect/reactivity";
 import type { PendingSiteLogin } from "../../../siteLogin";
 import type { CashuPaymentRequestMessageInfo } from "../../lib/paymentRequestMessage";
+import type { ContactRowLike, LocalNostrMessage } from "../../types/appTypes";
+import type { PaymentRequestQuote } from "../wallet/payments";
 import { ownerCommandsAtom } from "./ownerCommands";
 
 /** A scanned invoice above the auto-pay limit, waiting for the user to pay it. */
@@ -13,9 +15,24 @@ export const pendingLightningInvoiceAtom = Atom.keepAlive(
   Atom.make<LightningInvoicePreview | null>(null),
 );
 
-/** A payment request above the auto-pay limit, waiting for the user to pay it. */
+export interface PendingCashuPaymentRequest {
+  readonly request: CashuPaymentRequestMessageInfo;
+  /** Null until the user entered the amount of an amountless request. */
+  readonly quote: PaymentRequestQuote | null;
+  /** The chat message that carried the request and its conversation's contact. */
+  readonly chat: {
+    readonly message: LocalNostrMessage;
+    readonly contact: ContactRowLike;
+  } | null;
+  /** The request pays someone other than the chat's contact. */
+  readonly recipientDiffers: boolean;
+  /** The last entered amount no mint covers. */
+  readonly insufficientAmount: number | null;
+}
+
+/** A payment request the user has to review, enter the amount of or agree to a new mint for. */
 export const pendingCashuPaymentRequestAtom = Atom.keepAlive(
-  Atom.make<CashuPaymentRequestMessageInfo | null>(null),
+  Atom.make<PendingCashuPaymentRequest | null>(null),
 );
 
 export interface MintMoveConfirmation {

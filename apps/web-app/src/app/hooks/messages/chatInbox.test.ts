@@ -1,3 +1,4 @@
+import { PaymentRequestId } from "@linky-fit/linkshu/payment-request";
 import { encodeNprofile } from "@linky-fit/linkstr";
 import { buildCashuPaymentRequestMessage } from "../../lib/paymentRequestMessage";
 import {
@@ -454,7 +455,7 @@ describe("immutable chat payment requests", () => {
       amount,
       mintUrls: [],
       recipientNprofile: encodeNprofile(Pubkey.make(peerPubkey), []),
-      requestId: "request-1",
+      requestId: PaymentRequestId.make("request-1"),
     });
   it("keeps the original amount when its sender edits a rendered request", () => {
     const harness = createHarness();
@@ -625,7 +626,7 @@ describe("applyChatMessageDeletion", () => {
       amount: 21,
       mintUrls: [],
       recipientNprofile: encodeNprofile(Pubkey.make(peerPubkey), []),
-      requestId: "request-1",
+      requestId: PaymentRequestId.make("request-1"),
     });
     const harness = createHarness({ messages: [stored({ content: request })] });
 

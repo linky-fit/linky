@@ -1,4 +1,9 @@
 import {
+  encodePaymentRequestPayload,
+  PaymentRequestId,
+} from "@linky-fit/linkshu/payment-request";
+import { encode } from "cbor-x";
+import {
   derivePubkey,
   encodeNprofile,
   encodeNpub,
@@ -13,6 +18,7 @@ import type {
 } from "../app/types/appTypes";
 import { buildCashuPaymentRequestMessage } from "../app/lib/paymentRequestMessage";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
+import { encodeBase64Url } from "../utils/base64";
 import { ChatComposer, ChatNearbyBanner, ChatPage } from "./ChatPage";
 
 const nearby = vi.hoisted(() => ({
@@ -30,8 +36,10 @@ vi.mock("../app/hooks/shell", async () =>
 
 const rows = vi.hoisted(() => {
   const canDelete = new Map<string, boolean>();
+  const payDisabled = new Map<string, boolean>();
   const rendered: string[] = [];
-  return { canDelete, rendered };
+  const requestStatus = new Map<string, string | null>();
+  return { canDelete, payDisabled, rendered, requestStatus };
 });
 
 vi.mock("../components/ChatMessage", async (importOriginal) => ({
@@ -39,11 +47,17 @@ vi.mock("../components/ChatMessage", async (importOriginal) => ({
   ChatMessage: memo(function ChatMessageProbe({
     canDelete,
     message,
+    payPaymentRequestDisabled,
+    paymentRequestStatus,
   }: {
     canDelete: boolean;
     message: LocalNostrMessage;
+    payPaymentRequestDisabled: boolean;
+    paymentRequestStatus: string | null;
   }) {
     rows.canDelete.set(message.id, canDelete);
+    rows.payDisabled.set(message.id, payPaymentRequestDisabled);
+    rows.requestStatus.set(message.id, paymentRequestStatus);
     rows.rendered.push(message.id);
     return null;
   }),
@@ -275,6 +289,8 @@ describe("ChatPage message rows", () => {
 
   afterEach(() => {
     rows.canDelete.clear();
+    rows.payDisabled.clear();
+    rows.requestStatus.clear();
     rows.rendered = [];
     vi.unstubAllGlobals();
   });
@@ -331,7 +347,7 @@ describe("ChatPage message rows", () => {
           derivePubkey(NostrSecretKey.make(new Uint8Array(32).fill(1))),
           [],
         ),
-        requestId: "request-1",
+        requestId: PaymentRequestId.make("request-1"),
       }),
     };
     const { unmount } = await renderIntoDocument(
@@ -346,6 +362,62 @@ describe("ChatPage message rows", () => {
     });
     await unmount();
   });
+
+  it("marks a request paid by a payload naming its request id", async () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: false }));
+    const requestId = PaymentRequestId.make("request-1");
+    const request = {
+      ...message("request", 100),
+      direction: "out" as const,
+      content: buildCashuPaymentRequestMessage({
+        amount: 21,
+        mintUrls: [],
+        recipientNprofile: encodeNprofile(
+          derivePubkey(NostrSecretKey.make(new Uint8Array(32).fill(1))),
+          [],
+        ),
+        requestId,
+      }),
+    };
+    const payment = {
+      ...message("payment", 200),
+      content: encodePaymentRequestPayload({
+        id: requestId,
+        mint: "https://mint.example",
+        unit: "sat",
+        proofs: [{ id: "009a1f293253e41e", amount: 21, secret: "s", C: "02" }],
+      }),
+    };
+    const { unmount } = await renderIntoDocument(
+      <ChatPage {...pageProps([request, payment], new Map(), false)} />,
+    );
+
+    expect(rows.requestStatus.get("request")).toBe("paid");
+    await unmount();
+  });
+
+  it.each([
+    [100, false],
+    [0, true],
+  ])(
+    "with %i sats left disables paying an amountless request: %s",
+    async (cashuBalanceAfterMelt, disabled) => {
+      vi.stubGlobal("matchMedia", () => ({ matches: false }));
+      const request = {
+        ...message("request", 100),
+        content: `creqA${encodeBase64Url(encode({ u: "sat", m: [] }))}`,
+      };
+      const { unmount } = await renderIntoDocument(
+        <ChatPage
+          {...pageProps([request], new Map(), false)}
+          cashuBalanceAfterMelt={cashuBalanceAfterMelt}
+        />,
+      );
+
+      expect(rows.payDisabled.get("request")).toBe(disabled);
+      await unmount();
+    },
+  );
 
   it("re-renders a row showing a token or an npub when its getter changes", async () => {
     vi.stubGlobal("matchMedia", () => ({ matches: false }));

@@ -1099,6 +1099,9 @@ export const en = {
   paymentNotePlaceholder: "Add a note",
   paymentRequestPreviewIncoming: "Requesting {amount}",
   paymentRequestPreviewOutgoing: "You are requesting {amount}",
+  paymentRequestPreviewIncomingAnyAmount: "Requesting a payment",
+  paymentRequestPreviewOutgoingAnyAmount: "You are requesting a payment",
+  paymentRequestAnyAmount: "Any amount",
   paymentRequestDeclinedPreviewIncoming: "Payment request declined",
   paymentRequestDeclinedPreviewOutgoing: "You declined the payment request",
   paymentRequestChanged:
@@ -1121,6 +1124,17 @@ export const en = {
     "The payment request uses an insecure (http) transport. Rejected.",
   paymentRequestInsecureTransportWarning:
     "Warning: this request sends the tokens over an insecure (http) connection.",
+  paymentRequestAddMint: "Pay through {mint}? It will be added to your mints.",
+  paymentRequestFees: "Includes {amount} {unit} in fees",
+  paymentRequestOtherRecipient:
+    "This payment goes to {recipient}, not to the person in this chat.",
+  paymentRequestEnterAmount: "Enter the amount",
+  paymentRequestNoTransport:
+    "Linky can't pay this request yet: it doesn't say where to send the payment.",
+  paymentRequestMovedNotPaid:
+    "Payment failed. {amount} {unit} stayed in your wallet at {name}.",
+  paymentRequestLockUnsupported:
+    "The mint can't lock the payment to the recipient's key.",
   payCancel: "Cancel",
   lnurlAuthConfirm: "Log in",
   lnurlAuthDoneLogin: "Signed in",

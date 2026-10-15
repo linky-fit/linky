@@ -1116,6 +1116,9 @@ export const pt = {
   paymentNotePlaceholder: "Adicionar uma nota",
   paymentRequestPreviewIncoming: "Pedindo {amount}",
   paymentRequestPreviewOutgoing: "Você está pedindo {amount}",
+  paymentRequestPreviewIncomingAnyAmount: "Pedindo um pagamento",
+  paymentRequestPreviewOutgoingAnyAmount: "Você está pedindo um pagamento",
+  paymentRequestAnyAmount: "Qualquer valor",
   paymentRequestDeclinedPreviewIncoming: "Pedido de pagamento recusado",
   paymentRequestDeclinedPreviewOutgoing: "Você recusou o pedido de pagamento",
   paymentRequestChanged:
@@ -1138,6 +1141,18 @@ export const pt = {
     "O pedido de pagamento usa um transporte inseguro (http). Rejeitado.",
   paymentRequestInsecureTransportWarning:
     "Aviso: este pedido envia os tokens por uma conexão insegura (http).",
+  paymentRequestAddMint:
+    "Pagar através de {mint}? Ela será adicionada às suas mints.",
+  paymentRequestFees: "Inclui {amount} {unit} em taxas",
+  paymentRequestOtherRecipient:
+    "Este pagamento vai para {recipient}, não para a pessoa desta conversa.",
+  paymentRequestEnterAmount: "Digite o valor",
+  paymentRequestNoTransport:
+    "O Linky ainda não consegue pagar este pedido: ele não diz para onde enviar o pagamento.",
+  paymentRequestMovedNotPaid:
+    "O pagamento falhou. {amount} {unit} ficaram na sua carteira em {name}.",
+  paymentRequestLockUnsupported:
+    "A mint não consegue bloquear o pagamento na chave do destinatário.",
   payCancel: "Cancelar",
   lnurlAuthConfirm: "Entrar",
   lnurlAuthDoneLogin: "Conectado",

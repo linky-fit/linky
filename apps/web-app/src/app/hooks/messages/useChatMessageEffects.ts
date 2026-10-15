@@ -7,7 +7,13 @@ import {
   markCashuAutoAcceptResolved,
 } from "../../lib/autoAcceptedCashuMessages";
 import { decodeBankPaymentOffer } from "@linky-fit/proxy-payment";
-import { parseCashuPaymentRequestMessage } from "../../lib/paymentRequestMessage";
+import { useAtomSet, useAtomValue } from "@linky-fit/linkstr-react";
+import type { PaymentRequestId } from "@linky-fit/linkshu/payment-request";
+import { reportAppLog } from "../../../devtools/inspector/appLog";
+import { paymentRequestIdOfPayment } from "../../lib/paymentRequestMessage";
+import { requestIdFulfilledBy } from "../../lib/paymentRequestStatus";
+import { messagesByContactAtom } from "../../state/messages/readModel";
+import { receivedPaymentRequestIdsAtom } from "../../state/wallet/tokenActivity";
 import { parsePrivateImageMessage } from "../../lib/privateImageMessage";
 import type { ContactRowLike, LocalNostrMessage } from "../../types/appTypes";
 import type { SaveCashuFromTextOptions } from "../cashu/useSaveCashuFromText";
@@ -42,6 +48,26 @@ interface UseChatMessageEffectsParams<TContact extends ContactRowLike> {
   selectedContact: TContact | null;
 }
 
+const reportPaymentRequestLink = (
+  message: LocalNostrMessage,
+  requestId: PaymentRequestId,
+  linked: boolean,
+): void =>
+  reportAppLog({
+    tag: linked
+      ? "paymentRequest.paymentLinked"
+      : "paymentRequest.paymentUnlinked",
+    summary: linked
+      ? "Linked an incoming payment to the user's payment request"
+      : "An incoming payment names a request id the user did not send in this conversation",
+    links: {
+      paymentRequest: requestId,
+      ...(message.rumorId ? { rumor: message.rumorId } : {}),
+      contact: message.contactId,
+    },
+    payload: null,
+  });
+
 export const useChatMessageEffects = <TContact extends ContactRowLike>({
   autoAcceptedChatMessageIdsRef,
   cashuIsBusy,
@@ -62,38 +88,9 @@ export const useChatMessageEffects = <TContact extends ContactRowLike>({
   saveCashuFromText,
   selectedContact,
 }: UseChatMessageEffectsParams<TContact>) => {
-  const requestIdByMessageRumorId = React.useMemo(() => {
-    const byRumorId = new Map<string, string>();
-
-    for (const message of [...nostrMessagesRecent, ...chatMessages]) {
-      const rumorId = (message.rumorId ?? "").trim();
-      if (!rumorId) continue;
-
-      const requestInfo = parseCashuPaymentRequestMessage(message.content);
-      const requestId = (requestInfo?.requestId ?? "").trim();
-      if (!requestId) continue;
-
-      byRumorId.set(rumorId, requestId);
-    }
-
-    return byRumorId;
-  }, [chatMessages, nostrMessagesRecent]);
-
-  const getRequestIdForPaymentReply = React.useCallback(
-    (message: LocalNostrMessage): string | null => {
-      const replyToId = (message.replyToId ?? "").trim();
-      if (replyToId) {
-        return requestIdByMessageRumorId.get(replyToId) ?? null;
-      }
-
-      const rootMessageId = (message.rootMessageId ?? "").trim();
-      if (rootMessageId) {
-        return requestIdByMessageRumorId.get(rootMessageId) ?? null;
-      }
-
-      return null;
-    },
-    [requestIdByMessageRumorId],
+  const { messagesByContactId } = useAtomValue(messagesByContactAtom);
+  const setReceivedPaymentRequestIds = useAtomSet(
+    receivedPaymentRequestIdsAtom,
   );
 
   const autoAcceptCashuTokenFromMessages = React.useCallback(
@@ -121,8 +118,15 @@ export const useChatMessageEffects = <TContact extends ContactRowLike>({
         if (isCashuTokenKnownAny(info.tokenRaw)) continue;
         if (isCashuTokenStored(info.tokenRaw)) continue;
 
-        const requestId = getRequestIdForPaymentReply(message);
         const contactId = message.contactId.trim();
+        const paidRequestId = paymentRequestIdOfPayment(content);
+        const requestId = requestIdFulfilledBy(
+          message,
+          messagesByContactId.get(contactId) ?? [],
+        );
+        if (paidRequestId) {
+          reportPaymentRequestLink(message, paidRequestId, requestId !== null);
+        }
         void saveCashuFromText(info.tokenRaw, {
           automatic: true,
           ...(contactId ? { contactId } : {}),
@@ -130,6 +134,14 @@ export const useChatMessageEffects = <TContact extends ContactRowLike>({
           onResolved: (resolution) => {
             if (resolution === "terminal") markCashuAutoAcceptResolved(message);
           },
+          ...(paidRequestId
+            ? {
+                onReceived: () =>
+                  setReceivedPaymentRequestIds(
+                    (ids) => new Set([...ids, paidRequestId]),
+                  ),
+              }
+            : {}),
         });
         return;
       }
@@ -137,10 +149,11 @@ export const useChatMessageEffects = <TContact extends ContactRowLike>({
     [
       autoAcceptedChatMessageIdsRef,
       getCashuTokenMessageInfo,
-      getRequestIdForPaymentReply,
       isCashuTokenKnownAny,
       isCashuTokenStored,
+      messagesByContactId,
       saveCashuFromText,
+      setReceivedPaymentRequestIds,
     ],
   );
 

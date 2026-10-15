@@ -4,6 +4,7 @@ import {
   decodeNpub,
   OutboxRef,
   PaymentNoticeDraft,
+  PaymentRequestPayloadText,
   Pubkey,
   RumorId,
   TokenMessageDraft,
@@ -12,6 +13,7 @@ import type {
   EnqueueReceipt,
   PaymentNoticeContext,
   PaymentNoticeReceipt,
+  RelayUrl,
 } from "@linky-fit/linkstr";
 import type { EnqueueOutboxInput } from "@linky-fit/linkstr-react";
 import { Cause, Result, Exit, Option, Schema } from "effect";
@@ -59,13 +61,17 @@ interface PublishCashuMessagePaymentArgs {
   paymentNoticeContext?: PaymentNoticeContext;
   paymentNoticeOfferId?: string;
   pendingMessageId: string | null;
+  /** Also get the recipient copy, e.g. a payment request's nprofile relays. */
+  recipientRelays?: readonly RelayUrl[];
   replyContext?: ReplyContext | null;
   sendPaymentNotice: SendPaymentNotice;
   updateLocalNostrMessage: UpdateLocalNostrMessage;
 }
 
 const isRumorId = Schema.is(RumorId);
-const decodeCashuTokenText = Schema.decodeUnknownResult(CashuTokenText);
+const decodeTokenMessageText = Schema.decodeUnknownResult(
+  Schema.Union([CashuTokenText, PaymentRequestPayloadText]),
+);
 
 const decodeRequiredNpub = (npub: string): Pubkey => {
   const pubkey = decodeNpub(npub);
@@ -94,6 +100,7 @@ export const publishCashuMessagePayment = async ({
   paymentNoticeContext,
   paymentNoticeOfferId,
   pendingMessageId,
+  recipientRelays = [],
   replyContext,
   sendPaymentNotice,
   updateLocalNostrMessage,
@@ -139,7 +146,7 @@ export const publishCashuMessagePayment = async ({
     let localMessageId = "";
     let messageId: RumorId | null = null;
     let sendError: string | null = null;
-    const token = decodeCashuTokenText(messageText);
+    const token = decodeTokenMessageText(messageText);
     if (Result.isFailure(token)) {
       sendError = "invalid cashu token";
     } else {
@@ -187,6 +194,9 @@ export const publishCashuMessagePayment = async ({
           to: contactPublicKey,
           token: token.success,
           clientId,
+          ...(recipientRelays.length > 0
+            ? { recipientRelays: [...recipientRelays] }
+            : {}),
           ...(replyTo === undefined ? {} : { replyTo }),
           ...(root === undefined ? {} : { root }),
         });

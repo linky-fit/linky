@@ -1,3 +1,4 @@
+import { PaymentRequestId } from "@linky-fit/linkshu/payment-request";
 import { describe, expect, it } from "vitest";
 import { encode } from "cbor-x";
 import { nip19 } from "nostr-tools";
@@ -25,7 +26,7 @@ describe("paymentRequestMessage", () => {
       description: "Payment request from Linky chat.",
       mintUrls: ["https://mint.example"],
       recipientNprofile,
-      requestId: "request-1",
+      requestId: PaymentRequestId.make("request-1"),
     });
 
     const parsed = parseCashuPaymentRequestMessage(message);
@@ -61,6 +62,51 @@ describe("paymentRequestMessage", () => {
     expect(parsed?.transportNprofile).toBeNull();
     expect(parsed?.transportPostUrl).toBe("https://pay.example/request-1");
     expect(parsed?.transportPubkeyHex).toBeNull();
+  });
+
+  it("takes the first usable transport in the request's order, and the melt fee owed outside its mints", () => {
+    const nprofile = nip19.nprofileEncode({
+      pubkey:
+        "1b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f",
+      relays: ["wss://relay.example"],
+    });
+    const parse = (fields: Record<string, unknown>) =>
+      parseCashuPaymentRequestMessage(
+        `creqA${encodeBase64Url(encode({ a: 21, u: "sat", ...fields }))}`,
+      );
+
+    expect(
+      parse({
+        t: [
+          { t: "post", a: "https://pay.example/1" },
+          { t: "nostr", a: nprofile },
+        ],
+        m: ["https://mint.example"],
+        mp: true,
+        sm: [
+          { mn: "bolt12", mf: 1 },
+          { mn: "bolt11", mf: 3 },
+        ],
+      }),
+    ).toMatchObject({
+      preferredTransport: "post",
+      transportRelays: ["wss://relay.example"],
+      mintsAdvisory: true,
+      outsideMintFee: 3,
+    });
+    expect(
+      parse({
+        t: [
+          { t: "nostr", a: "not-an-nprofile" },
+          { t: "nostr", a: nprofile },
+        ],
+        sm: [{ mn: "onchain", mf: 5 }, { mn: "bolt12" }],
+      }),
+    ).toMatchObject({
+      preferredTransport: "nostr",
+      transportNprofile: nprofile,
+      outsideMintFee: 5,
+    });
   });
 
   it("parses a payment request decline marker", () => {

@@ -91,6 +91,10 @@ import {
   parseLinkyPaymentRequestDeclineMessage,
   type CashuPaymentRequestMessageInfo,
 } from "../app/lib/paymentRequestMessage";
+import {
+  paymentRequestAnswersByRumorId,
+  type PaymentRequestStatus,
+} from "../app/lib/paymentRequestStatus";
 import { parsePrivateImageMessage } from "../app/lib/privateImageMessage";
 import {
   getCashuTokenMessageInfo as readCashuTokenMessageInfo,
@@ -274,7 +278,7 @@ interface ChatMessageViewModel extends ParsedChatMessage {
   message: LocalNostrMessage;
   nextMessage: LocalNostrMessage | null;
   payPaymentRequestDisabled: boolean;
-  paymentRequestStatus: "declined" | "paid" | "requested" | null;
+  paymentRequestStatus: PaymentRequestStatus | null;
   previousMessage: LocalNostrMessage | null;
   reactions: readonly ChatReactionChip[];
   replyQuoteText: string | null;
@@ -523,24 +527,7 @@ const ChatMessageList = memo(function ChatMessageList({
       if (rumorId) byRumorId.set(rumorId, message);
     }
 
-    const latestRequestResponseByRumorId = new Map<
-      string,
-      { respondedAtSec: number; status: "declined" | "paid" }
-    >();
-    for (const message of chatMessages) {
-      const replyToId = (message.replyToId ?? "").trim();
-      if (!replyToId) continue;
-      const parsed = parseChatMessageContent(message.content);
-      if (!parsed.isCashuToken && !parsed.declineInfo) continue;
-
-      const createdAtSec = message.createdAtSec || 0;
-      const previous = latestRequestResponseByRumorId.get(replyToId);
-      if (previous && previous.respondedAtSec > createdAtSec) continue;
-      latestRequestResponseByRumorId.set(replyToId, {
-        respondedAtSec: createdAtSec,
-        status: parsed.isCashuToken ? "paid" : "declined",
-      });
-    }
+    const requestAnswerByRumorId = paymentRequestAnswersByRumorId(chatMessages);
 
     const offersById = buildBankPaymentOfferIndex(bankPaymentOfferMessages);
 
@@ -552,9 +539,8 @@ const ChatMessageList = memo(function ChatMessageList({
         message.direction === "out" &&
         createdAtSec > peerSeenSinceSec &&
         createdAtSec <= peerSeenUpToSec;
-      const paymentRequestStatus = rumorId
-        ? (latestRequestResponseByRumorId.get(rumorId)?.status ?? "requested")
-        : "requested";
+      const paymentRequestStatus: PaymentRequestStatus =
+        requestAnswerByRumorId.get(rumorId) ?? "requested";
       const replyToId = (message.replyToId ?? "").trim();
       const fallbackReplyContent =
         (message.replyToContent ?? "").trim() || null;
@@ -621,7 +607,8 @@ const ChatMessageList = memo(function ChatMessageList({
         payPaymentRequestDisabled:
           !parsed.paymentRequestInfo ||
           cashuIsBusy ||
-          parsed.paymentRequestInfo.amount > cashuBalanceAfterMelt,
+          // An amountless request still takes at least one sat.
+          (parsed.paymentRequestInfo.amount ?? 1) > cashuBalanceAfterMelt,
         paymentRequestStatus: parsed.paymentRequestInfo
           ? paymentRequestStatus
           : null,
