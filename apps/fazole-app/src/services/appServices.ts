@@ -24,6 +24,10 @@ import {
 } from "../storage/repositories";
 import { readShop, saveShop } from "../storage/shop";
 import { readOfferTips, saveOfferTips } from "../storage/tipSetting";
+import {
+  readLightningOnlyQr,
+  saveLightningOnlyQr,
+} from "../storage/bitcoinQrSetting";
 import { readFazoleRecords, type FazoleRecords } from "../storage/transactions";
 import {
   createBitcoinPayments,
@@ -82,6 +86,8 @@ export interface LiveSources {
   readonly shop: LiveSource<ShopProfile | null>;
   /** Whether the terminal offers a tip before the payment. */
   readonly offerTips: LiveSource<boolean>;
+  /** Whether the Bitcoin QR carries the Lightning invoice alone, without Cashu. */
+  readonly lightningOnlyQr: LiveSource<boolean>;
   readonly records: LiveSource<FazoleRecords>;
   readonly balances: LiveSource<WalletBalances>;
 }
@@ -98,6 +104,7 @@ export interface AppServices {
   readonly rates: Rates;
   readonly shop: Shop;
   readonly saveOfferTips: (offer: boolean) => Promise<void>;
+  readonly saveLightningOnlyQr: (lightningOnly: boolean) => Promise<void>;
   readonly payments: Payments;
   readonly history: History;
   readonly payers: Payers;
@@ -222,6 +229,10 @@ export const createAppServices = ({
     },
     saveOfferTips: (offer) =>
       Effect.runPromise(saveOfferTips(repositories.settings, offer)),
+    saveLightningOnlyQr: (lightningOnly) =>
+      Effect.runPromise(
+        saveLightningOnlyQr(repositories.settings, lightningOnly),
+      ),
     payments: {
       create: ledger.createPayment,
       requestBitcoin: bitcoinPayments.request,
@@ -252,6 +263,10 @@ export const createAppServices = ({
       },
       offerTips: {
         all: readOfferTips(repositories.settings),
+        subscribe: repositories.settings.subscribe,
+      },
+      lightningOnlyQr: {
+        all: readLightningOnlyQr(repositories.settings),
         subscribe: repositories.settings.subscribe,
       },
       records: {

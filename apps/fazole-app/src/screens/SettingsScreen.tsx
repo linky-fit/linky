@@ -21,6 +21,7 @@ import {
 import {
   useAppServices,
   useDevice,
+  useLightningOnlyQr,
   useOfferTips,
   useSupportChat,
 } from "../services/react";
@@ -49,8 +50,9 @@ const hostOf = (url: string) => {
 
 export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
   const device = useDevice();
-  const { config, saveOfferTips } = useAppServices();
+  const { config, saveOfferTips, saveLightningOnlyQr } = useAppServices();
   const offerTips = useOfferTips() ?? true;
+  const lightningOnlyQr = useLightningOnlyQr() ?? false;
   const supportUnread = useSupportChat()?.unread ?? false;
   const [dialog, setDialog] = useState<OpenDialog | null>(null);
   const close = () => setDialog(null);
@@ -97,6 +99,20 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
                 accessibilityLabel={copy.settings.offerTips}
                 value={offerTips}
                 onValueChange={(offer) => void saveOfferTips(offer)}
+              />
+            }
+          />
+          <ListRow
+            testID="settings-lightning-only-qr"
+            icon="Zap"
+            title={copy.settings.lightningOnlyQr}
+            description={copy.settings.lightningOnlyQrDescription}
+            chevron={false}
+            trailing={
+              <Switch
+                accessibilityLabel={copy.settings.lightningOnlyQr}
+                value={lightningOnlyQr}
+                onValueChange={(only) => void saveLightningOnlyQr(only)}
               />
             }
           />

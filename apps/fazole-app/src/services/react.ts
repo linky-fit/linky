@@ -64,6 +64,13 @@ export const useShopProfile = (): ShopProfile | null | undefined =>
 export const useOfferTips = (): boolean | undefined =>
   useLiveValue<boolean | undefined>(useAppServices().live.offerTips, undefined);
 
+/** Whether the Bitcoin QR carries the Lightning invoice alone; `undefined` until read. */
+export const useLightningOnlyQr = (): boolean | undefined =>
+  useLiveValue<boolean | undefined>(
+    useAppServices().live.lightningOnlyQr,
+    undefined,
+  );
+
 /** The payer's Nostr profile once a relay answers; `null` before, without one, or for no payer. */
 export const usePayerProfile = (pubkey: Pubkey | null): PayerProfile | null => {
   const { payers } = useAppServices();

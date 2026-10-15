@@ -29,7 +29,12 @@ import { formatCzkValue, formatWhole, shortNpub } from "../format";
 import { copyText } from "../platform/clipboard";
 import { navigateTo } from "../platform/hashRoute";
 import type { BitcoinRequestFailure } from "../services/bitcoinPayments";
-import { useAppServices, usePayerProfile, usePayment } from "../services/react";
+import {
+  useAppServices,
+  useLightningOnlyQr,
+  usePayerProfile,
+  usePayment,
+} from "../services/react";
 import { DetailRows } from "./DetailRows";
 import { Page, WithTopBar } from "./Page";
 import { statusTones } from "./paymentLabels";
@@ -163,7 +168,7 @@ function OpenPayment({
       {leg === "bank" ? (
         <BankLeg payment={payment} shop={shop} />
       ) : (
-        <BitcoinLeg payment={payment} shop={shop} />
+        <BitcoinLeg payment={payment} />
       )}
       <Stack gap="$sm">
         {leg === "bank" && shop.iban !== null ? (
@@ -272,15 +277,9 @@ const useBitcoinRequest = (payment: Payment) => {
   };
 };
 
-function BitcoinLeg({
-  payment,
-  shop,
-}: {
-  readonly payment: Payment;
-  readonly shop: ShopProfile;
-}) {
+function BitcoinLeg({ payment }: { readonly payment: Payment }) {
   const { failure, retry } = useBitcoinRequest(payment);
-  const [lightningOnly, setLightningOnly] = useState(false);
+  const lightningOnly = useLightningOnlyQr() === true;
   const [copied, setCopied] = useState(false);
   useEffect(() => {
     if (!copied) return;
@@ -338,15 +337,6 @@ function BitcoinLeg({
         // Uppercase fits QR's alphanumeric mode, a coarser code for weak cameras.
         value={lightningOnly ? invoice.toUpperCase() : uri}
       />
-      <SegmentedControl
-        accessibilityLabel={copy.payment.qrKind}
-        value={lightningOnly ? "lightning" : "combined"}
-        onValueChange={(kind) => setLightningOnly(kind === "lightning")}
-        options={[
-          { value: "combined", label: copy.payment.qrCombined },
-          { value: "lightning", label: copy.payment.qrLightning },
-        ]}
-      />
       <Stack alignItems="center" gap="$md">
         <Amount value={amount} unit={copy.czk} caption={sats} size="md" />
         <Row justifyContent="center" flexWrap="wrap" gap="$sm">
@@ -374,21 +364,6 @@ function BitcoinLeg({
           </Button>
         </Row>
       </Stack>
-      <Card>
-        <DetailRows
-          details={[
-            { label: copy.payment.sats, value: sats },
-            {
-              label: copy.payment.rate,
-              value: copy.payment.rateValue(formatWhole(leg.czkPerBtc)),
-            },
-            { label: copy.payment.recipient, value: shop.name },
-          ]}
-        />
-        <Text variant="caption" color="$colorMuted">
-          {copy.payment.bitcoinHint}
-        </Text>
-      </Card>
     </>
   );
 }
