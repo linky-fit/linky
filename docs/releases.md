@@ -17,7 +17,7 @@ The desktop shell loads `app.linky.fit`, so it follows the app release.
 
 ## CI gates every release
 
-`ci.yml` has six checks: `lint` (typecheck, ESLint and Prettier for the whole repo), `unit-tests` (every workspace), `linkshu-integration`, `npm-packages`, `app-e2e` and `site-e2e`. Pushes to `main` and `hotfix/**` run all six. Pull requests and merge-queue groups skip the jobs their change cannot affect: anything outside `apps/` runs all six, `apps/web-app` or `apps/site` adds the two e2e suites to `lint` and `unit-tests`, and any other app runs only `lint` and `unit-tests`. The `main` ruleset merges through a merge queue and requires `ci-ok`, which fails if any job that ran failed.
+`ci.yml` has six checks: `lint` (typecheck, ESLint and Prettier for the whole repo), `unit-tests` (every workspace), `linkshu-integration`, `npm-packages`, `app-e2e` and `site-e2e`. Pushes to `main` and `hotfix/**` run all six. Pull requests and merge-queue groups skip the jobs their change cannot affect: anything outside `apps/` runs all six, `apps/linky-app` or `apps/linky-site` adds the two e2e suites to `lint` and `unit-tests`, and any other app runs only `lint` and `unit-tests`. The `main` ruleset merges through a merge queue and requires `ci-ok`, which fails if any job that ran failed.
 
 Release workflows run no tests. They ship a commit only after `.github/actions/require-ci` confirms that all six checks succeeded on it, so a release always ships code its CI run tested. It waits up to 45 minutes for checks that are still running or not yet started, and fails as soon as one fails.
 
@@ -27,16 +27,16 @@ One release ships the web app to `app.linky.fit`, the Android app to Google Play
 
 ### Release
 
-1. On a branch from `main`, move the `[Unreleased]` entries in `CHANGELOG.md` under `## [<version>] - <date>`, `en-US` first, then `cs-CZ`. Each language becomes the Google Play notes and must stay within 500 characters; `apps/native-shell/scripts/extract-release-notes.sh v<version> /tmp/notes <locale>` checks it. Leave an empty `## [Unreleased]` above.
-2. Set `version` to the new version in the root `package.json`, `apps/web-app/package.json` and the `apps/web-app` entry of `bun.lock`, which `bun install` leaves alone.
+1. On a branch from `main`, move the `[Unreleased]` entries in `apps/linky-app/CHANGELOG.md` under `## [<version>] - <date>`, `en-US` first, then `cs-CZ`. Each language becomes the Google Play notes and must stay within 500 characters; `apps/native-shell/scripts/extract-release-notes.sh v<version> /tmp/notes <locale>` checks it. Leave an empty `## [Unreleased]` above.
+2. Set `version` to the new version in the root `package.json`, `apps/linky-app/package.json` and the `apps/linky-app` entry of `bun.lock`, which `bun install` leaves alone.
 3. Open a PR and merge it once its checks pass.
 
-`CI` runs on the merged commit. When it succeeds, `release-app.yml` starts, confirms the six checks, and, because `v<version>` has no tag yet:
+`CI` runs on the merged commit. When it succeeds, `release-linky.yml` starts, confirms the six checks, and, because `v<version>` has no tag yet:
 
 1. `publish` builds the APK and AAB and creates the `v<version>` tag and GitHub release on that commit.
 2. In parallel: `web-production` moves `production` to the tag and Vercel deploys `app.linky.fit`; `google-play`, `macos` and `zapstore` publish.
 
-Every other push to `main` also starts `release-app.yml`; it stops after `resolve` because its version is already tagged. Settings > Advanced on `app.linky.fit` shows the new version once the deploy finishes; installed PWAs update through their update prompt.
+Every other push to `main` also starts `release-linky.yml`; it stops after `resolve` because its version is already tagged. Settings > Advanced on `app.linky.fit` shows the new version once the deploy finishes; installed PWAs update through their update prompt.
 
 ### When a run fails
 
@@ -49,7 +49,7 @@ Every other push to `main` also starts `release-app.yml`; it stops after `resolv
 
 1. Create `hotfix/<name>` from the release tag.
 2. Commit the fix, bump `version` as in a release, and push the branch.
-3. `CI` runs on the branch; once it passes, `release-app.yml` ships it.
+3. `CI` runs on the branch; once it passes, `release-linky.yml` ships it.
 4. Cherry-pick the fix to `main`, or the next release drops it.
 
 Don't open a PR from a hotfix branch; the push already runs `CI`, and a PR would run it twice.
@@ -107,13 +107,13 @@ Like the site, the push server ships ahead of the app and must keep working with
 
 ## Vercel and GitHub setup
 
-- Web-app project: production branch `production` with domain `app.linky.fit` and no Deployment Checks, because `release-app.yml` gates it. Custom Environment `nightly` tracks `main` with domain `nightly.app.linky.fit`, the same environment variables as Production and no Deployment Protection on its domain.
+- Web-app project: production branch `production` with domain `app.linky.fit` and no Deployment Checks, because `release-linky.yml` gates it. Custom Environment `nightly` tracks `main` with domain `nightly.app.linky.fit`, the same environment variables as Production and no Deployment Protection on its domain.
 - Site project: Deployment Checks `lint`, `unit-tests` and `site-e2e`.
 - Fazole app project: production branch `fazole-production` and no Deployment Checks, because `release-fazole.yml` gates it. Custom Environment `nightly` tracks `main`, like the web-app's.
 - Fazole site project: Deployment Checks `lint` and `unit-tests`.
 - Error tracker project: Deployment Checks `lint` and `unit-tests`.
 - The `main` ruleset requires a merge queue and the status check `ci-ok`, without requiring branches to be up to date.
-- The `production` branch has a ruleset that restricts updates and deletions, with the `Linky releases` GitHub App as the only bypass. `release-app.yml` pushes with that app's token, whose credentials (variable `RELEASE_APP_CLIENT_ID`, secret `RELEASE_APP_PRIVATE_KEY`) live in the `Production` environment, which admits only `main` and `v*` tags (a release started by `CI` runs in `main`'s context, hotfixes included); `GITHUB_TOKEN` can't bypass rulesets, and the organization blocks deploy keys.
+- The `production` branch has a ruleset that restricts updates and deletions, with the `Linky releases` GitHub App as the only bypass. `release-linky.yml` pushes with that app's token, whose credentials (variable `RELEASE_APP_CLIENT_ID`, secret `RELEASE_APP_PRIVATE_KEY`) live in the `Production` environment, which admits only `main` and `v*` tags (a release started by `CI` runs in `main`'s context, hotfixes included); `GITHUB_TOKEN` can't bypass rulesets, and the organization blocks deploy keys.
 - The `fazole-production` branch has the same ruleset as `production`. The `Fazole production` environment holds the same release app credentials and admits only `main` and `fazole-v*` tags.
 - Tags `v*`, `fazole-v*` and `packages-v*` have a ruleset that restricts updates and deletions. Creation stays open, because the releases create their tags with `GITHUB_TOKEN`.
 - The `zapstore` environment admits `main` and `v*` tags, so a release run started from a tag can publish.

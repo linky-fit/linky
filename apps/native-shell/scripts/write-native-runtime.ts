@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 const shellDir = path.resolve(import.meta.dirname, "..");
 const outputFile = path.resolve(
   shellDir,
-  "../web-app/dist/native-runtime.json",
+  "../linky-app/dist/native-runtime.json",
 );
 
 interface PackageManifest {

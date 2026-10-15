@@ -1,4 +1,4 @@
-import recommendedRelays from "@linky-fit/site/recommended-relays.json";
+import recommendedRelays from "@linky-fit/linky-site/recommended-relays.json";
 import { RelayUrl } from "@linky-fit/linkstr";
 import { Schema } from "effect";
 

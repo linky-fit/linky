@@ -44,8 +44,8 @@ Read `GLOSSARY.md` before discussing domain concepts. When the user uses a term 
 
 ## Versions
 
-Linky and Fazole each have their own CalVer `YY.M.MICRO` version (the counter resets monthly) and changelog (`CHANGELOG.md`, `apps/fazole-app/CHANGELOG.md`); `docs/releases.md` covers both releases. Leave `version` fields alone; `@linky-fit/linkshu`, `@linky-fit/linkstr` and `@linky-fit/linkauth` releases follow `docs/npm-releases.md`.
+Linky and Fazole each have their own CalVer `YY.M.MICRO` version (the counter resets monthly) and changelog (`apps/linky-app/CHANGELOG.md`, `apps/fazole-app/CHANGELOG.md`); `docs/releases.md` covers both releases. Leave `version` fields alone; `@linky-fit/linkshu`, `@linky-fit/linkstr` and `@linky-fit/linkauth` releases follow `docs/npm-releases.md`.
 
 ## Debugging the dev app
 
-The dev server records inspector events: `GET /__inspector/events?cursor=0[&channel=nostr.wire]`, SSE `/__inspector/stream`, `POST /__inspector/clear`, or tail `apps/web-app/.inspector/rows-<port>.ndjson`; viewer at `/inspector.html`.
+The dev server records inspector events: `GET /__inspector/events?cursor=0[&channel=nostr.wire]`, SSE `/__inspector/stream`, `POST /__inspector/clear`, or tail `apps/linky-app/.inspector/rows-<port>.ndjson`; viewer at `/inspector.html`.

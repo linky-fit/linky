@@ -16,7 +16,7 @@ const liveReloadUrl = resolveLiveReloadUrl();
 const config: CapacitorConfig = {
   appId: "fit.linky.app",
   appName: "Linky",
-  webDir: "../web-app/dist",
+  webDir: "../linky-app/dist",
   android: {
     backgroundColor: nativeBackgroundColor,
   },

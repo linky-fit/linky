@@ -21,7 +21,7 @@
     "@linky-fit/linkshu": "workspace:*",
     "@linky-fit/linkstr": "workspace:*",
     "@linky-fit/linksync": "workspace:*",
-    "@linky-fit/site": "workspace:*",
+    "@linky-fit/linky-site": "workspace:*",
     "@linky-fit/ui": "workspace:*",
     "@noble/hashes": "^2.0.1",
     "core-js": "^3.50.0",

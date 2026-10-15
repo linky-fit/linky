@@ -12,7 +12,7 @@ docker compose -f docker-compose.dev.yml up -d --wait   # Nostr relay :7777, Evo
 bun run fazole:dev                                      # http://localhost:5280
 ```
 
-`.env.development` points the app at those services. The local mint's FakeWallet settles every invoice it issues, so a Bitcoin payment turns paid by itself a moment after its QR appears. Linky's web app (`bun run --filter @linky-fit/web-app dev`) on the same services is the customer wallet and a withdrawal target.
+`.env.development` points the app at those services. The local mint's FakeWallet settles every invoice it issues, so a Bitcoin payment turns paid by itself a moment after its QR appears. Linky's web app (`bun run --filter @linky-fit/linky-app dev`) on the same services is the customer wallet and a withdrawal target.
 
 `bun run --filter @linky-fit/fazole-app test` runs the unit tests; `src/services/localMint.test.ts` also runs against the local mint when it answers and is skipped otherwise.
 

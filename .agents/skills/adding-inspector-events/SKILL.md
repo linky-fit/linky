@@ -5,7 +5,7 @@ description: Design rules for emitting events to the Linky inspector. Use whenev
 
 # Adding inspector events
 
-Producers call `reportInspectorRows` (`apps/web-app/src/devtools/inspector/`). It makes each payload JSON-safe once and fans the rows out to every active sink: the in-memory viewer store, the persistent 24h log buffer, and in dev the Vite collector. The viewer correlates rows across domains by shared link ids, which is why there is one inspector instead of per-domain debug pages.
+Producers call `reportInspectorRows` (`apps/linky-app/src/devtools/inspector/`). It makes each payload JSON-safe once and fans the rows out to every active sink: the in-memory viewer store, the persistent 24h log buffer, and in dev the Vite collector. The viewer correlates rows across domains by shared link ids, which is why there is one inspector instead of per-domain debug pages.
 
 ## When to emit
 
@@ -35,6 +35,6 @@ For an `app.log` row call `reportAppLog` (`devtools/inspector/appLog.ts`); it st
 1. Pick the channel (an existing domain if possible) and a stable tag.
 2. Put every correlating id in `links`, location metadata in `context`.
 3. Gate emission behind `getInspectorEmissionEnabled()`.
-4. Add an entry to `apps/web-app/src/devtools/inspectorPage/inspectorGlossary.ts` saying what the event means and when it fires.
+4. Add an entry to `apps/linky-app/src/devtools/inspectorPage/inspectorGlossary.ts` saying what the event means and when it fires.
 5. When the row schema changes, unit-test an export and import round-trip (`serializeInspectorLogsNdjson`, then `parseInspectorNdjson`).
 6. Check in the viewer (`#advanced/inspector`, or `/inspector.html` in dev) that the new rows correlate with their related rows.

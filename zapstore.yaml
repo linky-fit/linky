@@ -1,6 +1,6 @@
 repository: https://github.com/linky-fit/linky
 release_source: ./apps/native-shell/android/app/build/outputs/apk/release/app-release.apk
-release_notes: ./CHANGELOG.md
+release_notes: ./apps/linky-app/CHANGELOG.md
 description: |
     Linky is a mobile-first app for contacts, private Nostr messaging, and
     Lightning/Cashu payments.
@@ -16,11 +16,11 @@ tags:
     - contacts
 license: 0BSD
 website: https://linky.fit
-icon: ./apps/web-app/public/pwa-512x512.png
+icon: ./apps/linky-app/public/pwa-512x512.png
 images:
-    - ./apps/site/public/contacts_mock.png
-    - ./apps/site/public/request_mock.png
-    - ./apps/site/public/issue_mock.png
+    - ./apps/linky-site/public/contacts_mock.png
+    - ./apps/linky-site/public/request_mock.png
+    - ./apps/linky-site/public/issue_mock.png
 supported_nips:
     - "01"
     - "05"

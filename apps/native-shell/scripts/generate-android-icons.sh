@@ -6,7 +6,7 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 native_dir="$(cd -- "$script_dir/.." && pwd)"
 workspace_dir="$(cd -- "$native_dir/../.." && pwd)"
 res_dir="$native_dir/android/app/src/main/res"
-icon_source="$workspace_dir/apps/web-app/public/icon.svg"
+icon_source="$workspace_dir/apps/linky-app/public/icon.svg"
 
 if ! command -v rsvg-convert >/dev/null 2>&1; then
   echo "rsvg-convert is required to generate Android icons." >&2

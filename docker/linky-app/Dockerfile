@@ -19,9 +19,9 @@ COPY apps/fazole-site/package.json apps/fazole-site/
 COPY apps/linkshu-cli/package.json apps/linkshu-cli/
 COPY apps/native-shell/package.json apps/native-shell/
 COPY apps/push/package.json apps/push/
-COPY apps/site/package.json apps/site/
+COPY apps/linky-site/package.json apps/linky-site/
 COPY apps/ui-book/package.json apps/ui-book/
-COPY apps/web-app/package.json apps/web-app/
+COPY apps/linky-app/package.json apps/linky-app/
 COPY packages/config/package.json packages/config/
 COPY packages/identity/package.json packages/identity/
 COPY packages/keryx/package.json packages/keryx/
@@ -54,7 +54,7 @@ ENV VITE_ALLOW_INSECURE_LOCALHOST_RELAYS=$VITE_ALLOW_INSECURE_LOCALHOST_RELAYS \
     VITE_PUSH_SERVER_URL=$VITE_PUSH_SERVER_URL \
     VITE_E2E=$VITE_E2E
 
-WORKDIR /app/apps/web-app
+WORKDIR /app/apps/linky-app
 # Sourcemaps keep Playwright traces readable; passed on the CLI so this test
 # setup stays out of vite.config.ts. No typecheck here — the e2e workflow
 # runs it as a separate step, off the image-build critical path.
@@ -64,6 +64,6 @@ FROM nginx:alpine
 # nginx >= 1.21.2 required: its mime.types maps .wasm to application/wasm,
 # without which instantiateStreaming rejects and Evolu never initialises.
 # (In dev a Vite plugin sets that Content-Type; here it is a plain static asset.)
-COPY --from=build /app/apps/web-app/dist /usr/share/nginx/html
-COPY docker/web-app/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/apps/linky-app/dist /usr/share/nginx/html
+COPY docker/linky-app/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80

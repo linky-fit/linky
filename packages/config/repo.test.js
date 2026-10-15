@@ -13,7 +13,7 @@ const workspaces = readJson("package.json").workspaces.flatMap((pattern) => {
     .filter((workspace) => existsSync(join(root, workspace, "package.json")));
 });
 
-test.each(["docker/web-app/Dockerfile", "apps/push/Dockerfile"])(
+test.each(["docker/linky-app/Dockerfile", "apps/push/Dockerfile"])(
   "%s copies every workspace manifest before bun install",
   (dockerfile) => {
     const missing = workspaces.filter(
@@ -25,7 +25,7 @@ test.each(["docker/web-app/Dockerfile", "apps/push/Dockerfile"])(
 );
 
 test("the evolu relay pins the web app's @evolu/common version", () => {
-  const installed = ["apps/web-app/node_modules", "node_modules"]
+  const installed = ["apps/linky-app/node_modules", "node_modules"]
     .map((dir) => join(dir, "@evolu/common/package.json"))
     .find((path) => existsSync(join(root, path)));
   const webApp = readJson(installed);

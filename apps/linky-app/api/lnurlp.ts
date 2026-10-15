@@ -5,8 +5,8 @@ import {
   sendProxyResult,
   type ApiRequest,
   type ApiResponse,
-} from "../../site/api/_npubcash.js";
-import { isAllowedTarget, safeFetch } from "../../site/api/_safeFetch.js";
+} from "../../linky-site/api/_npubcash.js";
+import { isAllowedTarget, safeFetch } from "../../linky-site/api/_safeFetch.js";
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   const origin = getFirstQueryValue(req.headers?.origin);

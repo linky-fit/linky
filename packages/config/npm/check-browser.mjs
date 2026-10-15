@@ -4,7 +4,7 @@ import { once } from "node:events";
 
 const { chromium } = await import(
   new URL(
-    "../../../apps/web-app/node_modules/@playwright/test/index.mjs",
+    "../../../apps/linky-app/node_modules/@playwright/test/index.mjs",
     import.meta.url,
   )
 );

@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   # Pushes run everything: require-ci and Vercel need every check on the commit
-  # they ship. Anything outside apps/ counts as shared, and web-app imports site.
+  # they ship. Anything outside apps/ counts as shared, and linky-app imports linky-site.
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -41,7 +41,7 @@ jobs:
             changed=$(git diff --name-only "$BASE" HEAD)
             echo "$changed"
             grep -qv '^apps/' <<< "$changed" || shared=false
-            grep -qE '^apps/(web-app|site)/' <<< "$changed" || linky_e2e=$shared
+            grep -qE '^apps/linky-(app|site)/' <<< "$changed" || linky_e2e=$shared
           fi
           echo "shared=$shared" >> "$GITHUB_OUTPUT"
           echo "linky-e2e=$linky_e2e" >> "$GITHUB_OUTPUT"
@@ -145,7 +145,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Install Chromium
-        working-directory: apps/web-app
+        working-directory: apps/linky-app
         run: bunx playwright install --with-deps chromium
 
       - name: Verify npm tarballs in an isolated consumer
@@ -189,8 +189,8 @@ jobs:
             docker buildx bake -f docker-compose.dev.yml \
               --set 'evolu-relay.cache-from=type=gha,scope=evolu-relay' \
               --set 'evolu-relay.cache-to=type=gha,scope=evolu-relay,mode=max' \
-              --set 'web-app.cache-from=type=gha,scope=web-app' \
-              --set 'web-app.cache-to=type=gha,scope=web-app,mode=max' \
+              --set 'linky-app.cache-from=type=gha,scope=linky-app' \
+              --set 'linky-app.cache-to=type=gha,scope=linky-app,mode=max' \
               --load &
             bake=$!
             status=0
@@ -207,15 +207,15 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # Previously ran inside the web-app image build; here it overlaps the
+      # Previously ran inside the linky-app image build; here it overlaps the
       # background image prep while still failing the `app-e2e` check that gates
       # releases.
       - name: Typecheck web app
-        run: bun run --filter @linky-fit/web-app typecheck
+        run: bun run --filter @linky-fit/linky-app typecheck
 
       - name: Resolve Playwright version
         id: playwright-version
-        working-directory: apps/web-app
+        working-directory: apps/linky-app
         run: echo "version=$(bunx playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
@@ -227,7 +227,7 @@ jobs:
       # --only-shell: the config runs headless-only, so the full Chromium
       # download is unnecessary.
       - name: Install Playwright browsers
-        working-directory: apps/web-app
+        working-directory: apps/linky-app
         run: bunx playwright install --with-deps --only-shell chromium
 
       - name: Start local stack
@@ -241,7 +241,7 @@ jobs:
         run: docker run --rm -v "$PWD/docker/evolu-relay/relay.test.js:/app/relay.test.js:ro" linky-evolu-relay npm test
 
       - name: Run e2e tests
-        working-directory: apps/web-app
+        working-directory: apps/linky-app
         run: bunx playwright test --project=local-stack
 
       - name: Dump service logs
@@ -253,7 +253,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: app-e2e-test-results
-          path: apps/web-app/test-results/
+          path: apps/linky-app/test-results/
           retention-days: 7
 
   site-e2e:
@@ -266,9 +266,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      # web-app is the Linky the demo-auth spec logs in with; its image is built here.
+      # linky-app is the Linky the demo-auth spec logs in with; its image is built here.
       - name: Start relay, mints and web app
-        run: docker compose -f docker-compose.dev.yml --profile e2e up -d --build --wait nostr-relay cashu-mint cashu-mint-target web-app
+        run: docker compose -f docker-compose.dev.yml --profile e2e up -d --build --wait nostr-relay cashu-mint cashu-mint-target linky-app
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
@@ -280,7 +280,7 @@ jobs:
 
       - name: Resolve Playwright version
         id: playwright-version
-        working-directory: apps/site
+        working-directory: apps/linky-site
         run: echo "version=$(bunx playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
@@ -290,22 +290,22 @@ jobs:
           key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
 
       - name: Install Playwright browsers
-        working-directory: apps/site
+        working-directory: apps/linky-site
         run: bunx playwright install --with-deps --only-shell chromium
 
       - name: Run site e2e tests
-        run: bun run --filter @linky-fit/site test:e2e
+        run: bun run --filter @linky-fit/linky-site test:e2e
 
       - name: Dump service logs
         if: failure()
-        run: docker compose -f docker-compose.dev.yml --profile e2e logs nostr-relay cashu-mint cashu-mint-target web-app
+        run: docker compose -f docker-compose.dev.yml --profile e2e logs nostr-relay cashu-mint cashu-mint-target linky-app
 
       - name: Upload traces
         if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: site-e2e-test-results
-          path: apps/site/test-results/
+          path: apps/linky-site/test-results/
           retention-days: 7
 
   # Skipped jobs count as passed, so a path-scoped run can still satisfy the ruleset.

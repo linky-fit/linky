@@ -2,12 +2,12 @@ import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import {
   MOBILE_VIEWPORT,
   setBaseStorage,
-} from "../../web-app/tests/helpers/appState";
+} from "../../linky-app/tests/helpers/appState";
 import {
   createSeedIdentity,
   setSeedLoginStorage,
   type SeedIdentity,
-} from "../../web-app/tests/helpers/identity";
+} from "../../linky-app/tests/helpers/identity";
 
 const DEMO_PATH = "/demo/auth/";
 const LOG_IN = { name: "Log in" };
