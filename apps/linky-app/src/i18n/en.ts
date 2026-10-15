@@ -259,6 +259,11 @@ export const en = {
   bankPaymentOfferStaggerDelayIncrease: "Increase delay",
   custom: "Custom",
   restore: "Restore",
+  claimOwnLightningAddressStart: "Reserve address",
+  claimOwnLightningAddressCongratsTitle: "Perfect name!",
+  claimOwnLightningAddressCongratsBody:
+    "Thank you for your support. Your friends on Linky can find you by this name, and you can receive bitcoin on it from any Lightning wallet.",
+  claimOwnLightningAddressCongratsAction: "Done",
   claimOwnLightningAddressInvoiceInvalid: "Invalid or expired payment invoice",
   claimOwnLightningAddressPurchase: "Purchase",
   claimOwnLightningAddressPurchaseFor: "Purchase for {amount}",
@@ -654,7 +659,7 @@ export const en = {
   guideLinkyNameStep2Body: "Tap the pencil to edit your profile.",
   guideLinkyNameStep3Title: "Pick a name",
   guideLinkyNameStep3Body:
-    "Type the name you want into the Lightning address field, e.g. alice. Linky checks whether alice@linky.fit is free and offers to buy it with sats from your wallet.",
+    "Tap Reserve address and type the name you want, e.g. alice. Linky checks whether alice@linky.fit is free and offers to buy it with sats from your wallet.",
   guideGroupsStep1Title: "Groups",
   guideGroupsStep1Body: "Open a contact you want to put into a group.",
   guideGroupsStep2Title: "Edit contact",

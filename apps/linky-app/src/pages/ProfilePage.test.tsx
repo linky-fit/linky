@@ -154,6 +154,20 @@ describe("username purchase approval", () => {
       JSON.stringify({ paymentToken: "original-token", username: "alice" }),
     );
     expect(save).toHaveBeenCalledWith("alice@linky.fit");
+    expect(
+      document.querySelector('[data-testid="profile-own-ln-address-claimed"]')
+        ?.textContent,
+    ).toContain("alice@linky.fit");
+  });
+  it("does not celebrate a claim that was not saved", async () => {
+    save.mockResolvedValueOnce(false);
+    const { container } = await setup(makeLightningInvoice());
+    await act(async () => {
+      purchaseButton(container)?.click();
+    });
+    expect(
+      document.querySelector('[data-testid="profile-own-ln-address-claimed"]'),
+    ).toBeNull();
   });
   it("rechecks expiry at the click before paying", async () => {
     const { container } = await setup(makeLightningInvoice("20u", 2));
@@ -165,6 +179,112 @@ describe("username purchase approval", () => {
     expect(container.textContent).toContain(
       "claimOwnLightningAddressInvoiceInvalid",
     );
+  });
+});
+
+describe("getting an own lightning address", () => {
+  const renderEditor = async (
+    lnAddress: string,
+    setLnAddress = vi.fn<(value: string) => void>(),
+  ) => {
+    rendered = await renderIntoDocument(
+      <ProfilePage
+        {...props}
+        profileEditLnAddress={lnAddress}
+        unregisteredOwnLightningAddress={null}
+        setProfileEditLnAddress={setLnAddress}
+      />,
+    );
+    const { container } = rendered;
+    return {
+      container,
+      setLnAddress,
+      startButton: () =>
+        container.querySelector<HTMLElement>(
+          '[data-testid="profile-own-ln-address"]',
+        ),
+      suffix: () =>
+        container.querySelector<HTMLElement>(
+          '[data-testid="profile-own-ln-address-suffix"]',
+        ),
+      input: () => container.querySelector<HTMLInputElement>("#profileLn"),
+      saveButton: () =>
+        Array.from(container.querySelectorAll("button")).find((button) =>
+          button.textContent?.includes("saveChanges"),
+        ) ?? null,
+    };
+  };
+
+  it("clears the npub address and appends the linky.fit domain", async () => {
+    const { startButton, suffix, setLnAddress } = await renderEditor(
+      "npub1test@linky.fit",
+    );
+    expect(suffix()).toBeNull();
+    await act(async () => {
+      startButton()?.click();
+    });
+    expect(setLnAddress).toHaveBeenCalledExactlyOnceWith("");
+    expect(suffix()?.textContent).toBe("@linky.fit");
+    expect(startButton()).toBeNull();
+  });
+  it("focuses the field and turns into a disabled purchase button", async () => {
+    const { container, startButton, input } = await renderEditor(
+      "npub1test@linky.fit",
+    );
+    await act(async () => {
+      startButton()?.click();
+    });
+    expect(document.activeElement).toBe(input());
+    const purchase = container.querySelector<HTMLElement>(
+      '[data-testid="profile-own-ln-address-purchase"]',
+    );
+    expect(purchase?.textContent).toBe("claimOwnLightningAddressPurchase");
+    expect(purchase?.getAttribute("aria-disabled")).toBe("true");
+  });
+  it("hides saving until a username is bought", async () => {
+    const setLnAddress = vi.fn<(value: string) => void>();
+    const { startButton, saveButton } = await renderEditor(
+      "npub1test@linky.fit",
+      setLnAddress,
+    );
+    expect(saveButton()).not.toBeNull();
+    await act(async () => {
+      startButton()?.click();
+    });
+    await act(async () => {
+      rendered?.rerender(
+        <ProfilePage
+          {...props}
+          profileEditLnAddress=""
+          unregisteredOwnLightningAddress={null}
+          setProfileEditLnAddress={setLnAddress}
+        />,
+      );
+    });
+    expect(saveButton()).toBeNull();
+  });
+  it("keeps the username of a linky.fit draft and hides the button for one", async () => {
+    const { startButton, input } = await renderEditor("alice@linky.fit");
+    expect(startButton()).toBeNull();
+    expect(input()?.value).toBe("alice@linky.fit");
+  });
+  it("shows the username only while in own-address mode", async () => {
+    const setLnAddress = vi.fn<(value: string) => void>();
+    const { startButton, input } = await renderEditor("", setLnAddress);
+    await act(async () => {
+      startButton()?.click();
+    });
+    await act(async () => {
+      rendered?.rerender(
+        <ProfilePage
+          {...props}
+          profileEditLnAddress="Bob@linky.fit"
+          unregisteredOwnLightningAddress={null}
+          setProfileEditLnAddress={setLnAddress}
+        />,
+      );
+    });
+    expect(input()?.value).toBe("Bob");
   });
 });
 

@@ -32,6 +32,7 @@ import { currentNpubAtom } from "../app/state/session/session";
 import { NPUB_CASH_SERVER_BASE_URL } from "../utils/npubCashServer";
 import { ProfileAvatarEditor } from "../components/ProfileAvatarEditor";
 import { ProfileShareSheet } from "../components/ProfileShareSheet";
+import { OwnLightningAddressClaimedModal } from "../components/OwnLightningAddressClaimedModal";
 import { parseProfileGeneralStatus } from "../nostrStatus";
 import type { FilePickerHandle } from "../utils/pickFile";
 import {
@@ -41,8 +42,10 @@ import {
 import { buildOwnProfileShareUrl } from "../sharedProfileLink";
 import {
   type Nip98AuthHeaderFactory,
+  OWN_LIGHTNING_ADDRESS_DOMAIN,
   type OwnLightningAddressInputCandidate,
   type OwnLightningClaimAvailableResult,
+  getOwnLightningAddressInputCandidate,
   purchaseOwnLightningAddressClaim,
   requestOwnLightningAddressClaimPreview,
 } from "../utils/npubCashUsernameClaim";
@@ -150,6 +153,34 @@ export function ProfilePage({
     React.useState<OwnLightningClaimAvailableResult | null>(null);
   const inlineClaimRequestSeqRef = React.useRef(0);
   const [shareSheetOpen, setShareSheetOpen] = React.useState(false);
+  const [claimedLightningAddress, setClaimedLightningAddress] = React.useState<
+    string | null
+  >(null);
+  const lnInputRef = React.useRef<HTMLInputElement | null>(null);
+  // Own-address mode: the field holds just the username and shows the linky.fit domain as a suffix.
+  const [ownAddressMode, setOwnAddressMode] = React.useState(false);
+  const ownAddressSuffix = `@${OWN_LIGHTNING_ADDRESS_DOMAIN}`;
+  const ownAddressUsername = profileEditLnAddress
+    .toLowerCase()
+    .endsWith(ownAddressSuffix)
+    ? profileEditLnAddress.slice(0, -ownAddressSuffix.length)
+    : profileEditLnAddress;
+  // The default npub@linky.fit address parses as a candidate too, but with an invalid username.
+  const ownAddressCandidate =
+    getOwnLightningAddressInputCandidate(profileEditLnAddress);
+  const isOwnAddressDraft =
+    ownAddressCandidate !== null &&
+    ownAddressCandidate.issue !== "invalid_format";
+  const startOwnAddress = () => {
+    setOwnAddressMode(true);
+    setProfileEditLnAddress(isOwnAddressDraft ? ownAddressUsername : "");
+    lnInputRef.current?.focus();
+  };
+  const changeLnAddress = (text: string) => {
+    // Typing a domain leaves own-address mode, so any provider stays reachable.
+    if (ownAddressMode && text.includes("@")) setOwnAddressMode(false);
+    setProfileEditLnAddress(text);
+  };
   const profileStatusText = parseProfileGeneralStatus(profileStatus).text;
   const restoreLightningAddress = React.useMemo(() => {
     for (const lightningAddress of ownedLightningAddresses) {
@@ -183,8 +214,11 @@ export function ProfilePage({
             `${displayAmount.approxPrefix}${displayAmount.amountText} ${displayAmount.unitLabel}`,
           );
         })();
+  // In own-address mode there is nothing to save until a username is bought.
   const canSaveProfileEdits =
-    profileEditsSavable && !unregisteredOwnLightningAddress;
+    profileEditsSavable &&
+    !unregisteredOwnLightningAddress &&
+    !(ownAddressMode && !isOwnAddressDraft);
 
   React.useEffect(() => {
     const requestSeq = inlineClaimRequestSeqRef.current + 1;
@@ -271,6 +305,10 @@ export function ProfilePage({
         serverBaseUrl,
       });
       if (result.kind === "cancelled") return;
+      if (result.kind === "success") {
+        setClaimedLightningAddress(inlineClaimPreview.lightningAddress);
+        return;
+      }
       if (result.kind === "error") {
         setInlineClaimError(
           result.message === "Invoice unpaid..."
@@ -297,6 +335,13 @@ export function ProfilePage({
   ]);
 
   if (!currentNpub) return <EmptyState title={t("profileMissingNpub")} />;
+
+  const claimedModal = claimedLightningAddress ? (
+    <OwnLightningAddressClaimedModal
+      lightningAddress={claimedLightningAddress}
+      onClose={() => setClaimedLightningAddress(null)}
+    />
+  ) : null;
 
   if (!isProfileEditing) {
     const displayName = effectiveProfileName ?? formatShortNpub(currentNpub);
@@ -361,7 +406,7 @@ export function ProfilePage({
           <Button
             variant="ghost"
             size="sm"
-            icon="Copy"
+            icon="Zap"
             aria-label={t("lightningAddress")}
             onPress={() => void copyText(effectiveMyLightningAddress)}
           >
@@ -373,6 +418,7 @@ export function ProfilePage({
             {profileStatusText}
           </Text>
         ) : null}
+        {claimedModal}
       </PageCard>
     );
   }
@@ -380,6 +426,18 @@ export function ProfilePage({
   const showPurchaseButton =
     inlineClaimPreview !== null &&
     inlineClaimPreview.username === unregisteredOwnLightningAddress?.username;
+  const restoreButton =
+    canRestoreDefaultLightningAddress && restoreLightningAddress ? (
+      <IconButton
+        icon="RefreshCcw"
+        size="sm"
+        accessibilityLabel={t("restore")}
+        onPress={() => {
+          setOwnAddressMode(false);
+          setProfileEditLnAddress(restoreLightningAddress);
+        }}
+      />
+    ) : null;
 
   const saveButton = (
     <Button
@@ -446,34 +504,45 @@ export function ProfilePage({
         <Row alignItems="flex-start" gap="$sm">
           <Stack flex={1}>
             <TextField
+              ref={(node) => {
+                lnInputRef.current =
+                  node instanceof HTMLInputElement ? node : null;
+              }}
               id="profileLn"
               label={t("lightningAddress")}
               hideLabel
-              value={profileEditLnAddress}
-              onChangeText={setProfileEditLnAddress}
-              placeholder={t("lightningAddress")}
+              value={ownAddressMode ? ownAddressUsername : profileEditLnAddress}
+              onChangeText={changeLnAddress}
+              placeholder={ownAddressMode ? t("name") : t("lightningAddress")}
               autoCapitalize="none"
               autoCorrect={false}
               spellCheck={false}
               error={inlineClaimError ?? undefined}
               trailing={
-                canRestoreDefaultLightningAddress && restoreLightningAddress ? (
-                  <IconButton
-                    icon="RefreshCcw"
-                    size="sm"
-                    accessibilityLabel={t("restore")}
-                    onPress={() =>
-                      setProfileEditLnAddress(restoreLightningAddress)
-                    }
-                  />
-                ) : null
+                ownAddressMode ? (
+                  <Row alignItems="center" gap="$xs">
+                    <Text
+                      variant="caption"
+                      color="$colorMuted"
+                      numberOfLines={1}
+                      testID="profile-own-ln-address-suffix"
+                    >
+                      {ownAddressSuffix}
+                    </Text>
+                    {restoreButton}
+                  </Row>
+                ) : (
+                  restoreButton
+                )
               }
             />
           </Stack>
-          {showPurchaseButton ? (
+          {ownAddressMode || isOwnAddressDraft ? (
             <Button
+              minHeight={size.field}
               loading={inlineClaimIsConfirming}
               disabled={
+                !showPurchaseButton ||
                 cashuIsBusy ||
                 inlineClaimInsufficientBalance ||
                 inlineClaimIsChecking
@@ -483,11 +552,22 @@ export function ProfilePage({
                   ? t("payInsufficient")
                   : undefined
               }
+              testID="profile-own-ln-address-purchase"
               onPress={() => void purchaseInlineLightningAddress()}
             >
               {inlineClaimButtonLabel}
             </Button>
-          ) : null}
+          ) : (
+            <Button
+              minHeight={size.field}
+              variant="secondary"
+              icon="Zap"
+              testID="profile-own-ln-address"
+              onPress={startOwnAddress}
+            >
+              {t("claimOwnLightningAddressStart")}
+            </Button>
+          )}
         </Row>
       </Stack>
 
@@ -500,6 +580,7 @@ export function ProfilePage({
       />
 
       {canSaveProfileEdits ? saveAction : null}
+      {claimedModal}
     </PageCard>
   );
 }

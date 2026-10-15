@@ -265,6 +265,11 @@ export const pt = {
   bankPaymentOfferStaggerDelayIncrease: "Aumentar intervalo",
   custom: "Personalizado",
   restore: "Restaurar",
+  claimOwnLightningAddressStart: "Reservar endereço",
+  claimOwnLightningAddressCongratsTitle: "Nome perfeito!",
+  claimOwnLightningAddressCongratsBody:
+    "Obrigado pelo seu apoio. Seus amigos no Linky encontram você por este nome, e você pode receber bitcoin nele de qualquer carteira Lightning.",
+  claimOwnLightningAddressCongratsAction: "Concluído",
   claimOwnLightningAddressInvoiceInvalid:
     "Fatura de pagamento inválida ou expirada",
   claimOwnLightningAddressPurchase: "Comprar",
@@ -675,7 +680,7 @@ export const pt = {
   guideLinkyNameStep2Body: "Toque no lápis para editar seu perfil.",
   guideLinkyNameStep3Title: "Escolha um nome",
   guideLinkyNameStep3Body:
-    "Digite o nome que você quer no campo Endereço Lightning, por exemplo alice. O Linky verifica se alice@linky.fit está livre e oferece a compra com sats da sua carteira.",
+    "Toque em Reservar endereço e digite o nome que você quer, por exemplo alice. O Linky verifica se alice@linky.fit está livre e oferece a compra com sats da sua carteira.",
   guideGroupsStep1Title: "Grupos",
   guideGroupsStep1Body: "Abra um contato que você quer colocar em um grupo.",
   guideGroupsStep2Title: "Editar contato",

@@ -96,6 +96,8 @@ export const size = {
   controlSm: 32,
   control: 44,
   avatar: 48,
+  // A single-line text field: a body line, $md padding and a hairline border on each side.
+  field: 50,
   controlLg: 56,
   row: 64,
   hero: 112,

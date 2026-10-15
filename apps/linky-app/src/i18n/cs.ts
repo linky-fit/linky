@@ -258,6 +258,11 @@ export const cs = {
   bankPaymentOfferStaggerDelayIncrease: "Prodloužit prodlevu",
   custom: "Vlastní",
   restore: "Obnovit",
+  claimOwnLightningAddressStart: "Rezervovat adresu",
+  claimOwnLightningAddressCongratsTitle: "Perfektní jméno!",
+  claimOwnLightningAddressCongratsBody:
+    "Moc díky za vaši podporu. Podle tohoto jména vás přátelé na Linky snadno najdou a můžete na něj přijímat bitcoin z kterékoliv lightning peněženky.",
+  claimOwnLightningAddressCongratsAction: "Hotovo",
   claimOwnLightningAddressInvoiceInvalid:
     "Neplatná nebo vypršená platební faktura",
   claimOwnLightningAddressPurchase: "Koupit",
@@ -665,7 +670,7 @@ export const cs = {
   guideLinkyNameStep2Body: "Klepněte na tužku a upravte profil.",
   guideLinkyNameStep3Title: "Zvolte jméno",
   guideLinkyNameStep3Body:
-    "Do pole Lightning adresa napište jméno, které chcete, třeba alice. Linky ověří, zda je alice@linky.fit volné, a nabídne koupi za saty z peněženky.",
+    "Klepněte na Rezervovat adresu a napište jméno, které chcete, třeba alice. Linky ověří, zda je alice@linky.fit volné, a nabídne koupi za saty z peněženky.",
   guideGroupsStep1Title: "Skupiny",
   guideGroupsStep1Body: "Otevřete kontakt, který chcete zařadit do skupiny.",
   guideGroupsStep2Title: "Upravit kontakt",
