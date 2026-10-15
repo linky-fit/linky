@@ -65,6 +65,7 @@
     "workbox-window": "^7.3.0"
   },
   "devDependencies": {
+    "@cashu/cashu-ts": "^4.0.0",
     "@evolu/sqlite-wasm": "2.2.4",
     "@linky-fit/config": "workspace:*",
     "@playwright/test": "^1.58.1",
