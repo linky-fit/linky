@@ -1,7 +1,12 @@
 import { createIdFromString } from "@linky-fit/domain";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { describe, expect, it } from "vitest";
-import { groupByDay, historyEntries, relativeDay } from "./history";
+import {
+  canHideFromHistory,
+  groupByDay,
+  historyEntries,
+  relativeDay,
+} from "./history";
 import { CzkAmount } from "./money";
 import type { PaymentStatus } from "./payment";
 import type { DirectTransfer, Payment } from "./records";
@@ -29,6 +34,7 @@ const payment = (
   bitcoin: null,
   cashuReceive: null,
   payerPubkey: null,
+  hiddenAtSec: null,
 });
 
 const transfer = (
@@ -45,6 +51,7 @@ const transfer = (
   mintUrl: "http://localhost:3338",
   payerPubkey: makeIdentity().pubkey,
   note: null,
+  hiddenAtSec: null,
 });
 
 const summary = (days: ReturnType<typeof groupByDay>) =>
@@ -99,6 +106,26 @@ describe("groupByDay", () => {
     ]);
   });
 
+  it("leaves out hidden entries and what they received", () => {
+    const days = groupByDay(
+      historyEntries(
+        [
+          payment("shown", at(6, 9), 100_00, "paid"),
+          { ...payment("hidden", at(6, 10), 250_00, "paid"), hiddenAtSec: 1 },
+        ],
+        [
+          {
+            ...transfer("hidden-direct", at(6, 11), 10_000, 2_500_000),
+            hiddenAtSec: 1,
+          },
+        ],
+      ),
+    );
+    expect(summary(days)).toEqual([
+      { startSec: at(6, 0), paidTotal: 100_00, ids: [id("shown")] },
+    ]);
+  });
+
   it("sorts entries that synced out of order", () => {
     const [day] = groupByDay(
       historyEntries(
@@ -107,6 +134,25 @@ describe("groupByDay", () => {
       ),
     );
     expect(day?.entries.map((entry) => entry.id)).toEqual([id("b"), id("a")]);
+  });
+});
+
+describe("canHideFromHistory", () => {
+  it("offers to hide anything but a pending payment", () => {
+    const [pending, paid, cancelled, direct] = historyEntries(
+      [
+        payment("pending", at(6, 9), 1, "pending"),
+        payment("paid", at(6, 9), 1, "paid"),
+        payment("cancelled", at(6, 9), 1, "cancelled"),
+      ],
+      [transfer("direct", at(6, 9), 1, null)],
+    ).map(canHideFromHistory);
+    expect({ pending, paid, cancelled, direct }).toEqual({
+      pending: false,
+      paid: true,
+      cancelled: true,
+      direct: true,
+    });
   });
 });
 

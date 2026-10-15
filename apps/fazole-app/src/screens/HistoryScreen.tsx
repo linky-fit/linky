@@ -11,10 +11,12 @@ import {
   Stack,
   Text,
 } from "@linky-fit/ui";
+import type { TransactionId } from "@linky-fit/domain";
 import type { Pubkey } from "@linky-fit/linkstr";
 import { useState } from "react";
 import { copy } from "../copy";
 import {
+  canHideFromHistory,
   CzkAmount,
   directTransferCzk,
   groupByDay,
@@ -34,8 +36,14 @@ import {
 } from "../format";
 import { navigateTo } from "../platform/hashRoute";
 import { paymentRoute } from "../routing";
-import { useHistory, usePayerName, usePayerProfile } from "../services/react";
+import {
+  useAppServices,
+  useHistory,
+  usePayerName,
+  usePayerProfile,
+} from "../services/react";
 import { nowSeconds } from "../utils/time";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { DetailRows, type Detail } from "./DetailRows";
 import { Page } from "./Page";
 import { methodIcons, methodLabel, statusTones } from "./paymentLabels";
@@ -50,8 +58,10 @@ const dayTitle = (startSec: number, nowSec: number) => {
 };
 
 export function HistoryScreen() {
+  const { history } = useAppServices();
   const entries = useHistory();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [hidingId, setHidingId] = useState<TransactionId | null>(null);
   const [nowSec] = useState(nowSeconds);
   const selected = entries.find((entry) => entry.id === selectedId);
 
@@ -105,8 +115,28 @@ export function HistoryScreen() {
         }}
         title={copy.history.detail}
       >
-        {selected ? <EntryDetail entry={selected} /> : null}
+        {selected ? (
+          <EntryDetail
+            entry={selected}
+            onHide={() => {
+              setSelectedId(null);
+              setHidingId(selected.id);
+            }}
+          />
+        ) : null}
       </Sheet>
+      <ConfirmDialog
+        open={hidingId !== null}
+        onClose={() => setHidingId(null)}
+        title={copy.history.hide}
+        description={copy.history.hideConfirmDescription}
+        confirm={copy.history.hide}
+        destructive
+        onConfirm={() => {
+          if (hidingId !== null) void history.hide(hidingId);
+          setHidingId(null);
+        }}
+      />
     </Page>
   );
 }
@@ -212,11 +242,31 @@ const paymentDetails = (payment: Payment): Detail[] => [
       ]),
 ];
 
-function EntryDetail({ entry }: { readonly entry: HistoryEntry }) {
-  return entry.kind === "payment" ? (
-    <PaymentDetail payment={entry.payment} />
-  ) : (
-    <DirectTransferDetail transfer={entry.transfer} />
+function EntryDetail({
+  entry,
+  onHide,
+}: {
+  readonly entry: HistoryEntry;
+  readonly onHide: () => void;
+}) {
+  return (
+    <Stack gap="$lg">
+      {entry.kind === "payment" ? (
+        <PaymentDetail payment={entry.payment} />
+      ) : (
+        <DirectTransferDetail transfer={entry.transfer} />
+      )}
+      {canHideFromHistory(entry) ? (
+        <Button
+          testID="history-hide"
+          variant="ghost"
+          icon="EyeOff"
+          onPress={onHide}
+        >
+          {copy.history.hide}
+        </Button>
+      ) : null}
+    </Stack>
   );
 }
 

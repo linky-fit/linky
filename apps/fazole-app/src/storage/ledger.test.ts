@@ -97,6 +97,37 @@ describe("payments", () => {
     expect(await ledger.completePayment(paid, "bank")).toBe(false);
   });
 
+  it("hide from the history once settled, and show again when a hidden cancelled one is paid", async () => {
+    const { ledger, repositories } = setup();
+    const created = await ledger.createPayment(CzkAmount.make(100));
+    expect(await ledger.hideFromHistory(created.id)).toBe(false);
+    expect(await ledger.cancelPayment(created)).toBe(true);
+    expect(await ledger.hideFromHistory(created.id)).toBe(true);
+
+    const [row] = await Effect.runPromise(repositories.transactions.all);
+    expect(row).toMatchObject({ id: created.id, status: "declined" });
+    const hidden = await ledger.payment(created.id);
+    if (!hidden) throw new Error("no payment");
+    expect(hidden).toMatchObject({
+      status: "cancelled",
+      vs: created.vs,
+      hiddenAtSec: expect.any(Number),
+    });
+    expect(JSON.parse(row?.detailsJson ?? "")).toMatchObject({
+      hiddenAtSec: hidden.hiddenAtSec,
+    });
+
+    expect(await ledger.completePayment(hidden, "lightning")).toBe(true);
+    const [paidRow] = await Effect.runPromise(repositories.transactions.all);
+    expect(JSON.parse(paidRow?.detailsJson ?? "")).not.toHaveProperty(
+      "hiddenAtSec",
+    );
+    expect(await ledger.payment(created.id)).toMatchObject({
+      status: "paid",
+      hiddenAtSec: null,
+    });
+  });
+
   it("keeps a quote's Cashu request when its Lightning quote expires", async () => {
     const { ledger } = setup();
     const created = await ledger.createPayment(CzkAmount.make(100));
@@ -187,6 +218,33 @@ describe("records", () => {
     expect((await ledger.records()).directTransfers).toMatchObject([
       { ...transfer, id: row?.id },
     ]);
+  });
+
+  it("hide a direct transfer from the history, keeping its row for the wallet", async () => {
+    const { ledger, repositories } = setup();
+    await ledger.recordDirectTransfer({
+      operationId: "receive-1",
+      sats: 300,
+      czkPerBtc: 2_500_000,
+      mintUrl: testMint,
+      payerPubkey: makeIdentity().pubkey,
+      note: "Za kávu",
+    });
+    const [transfer] = (await ledger.records()).directTransfers;
+    if (!transfer) throw new Error("no transfer");
+    expect(transfer.hiddenAtSec).toBeNull();
+
+    expect(await ledger.hideFromHistory(transfer.id)).toBe(true);
+    expect(await ledger.hideFromHistory(transfer.id)).toBe(false);
+    const [row] = await Effect.runPromise(repositories.transactions.all);
+    expect(row).toMatchObject({ status: "ok", amount: 300, note: "Za kávu" });
+    expect((await ledger.records()).directTransfers).toEqual([
+      {
+        ...transfer,
+        hiddenAtSec: JSON.parse(row?.detailsJson ?? "").hiddenAtSec,
+      },
+    ]);
+    expect(await ledger.hasReceipt("receive-1")).toBe(true);
   });
 });
 

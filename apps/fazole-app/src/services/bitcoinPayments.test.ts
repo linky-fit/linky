@@ -370,6 +370,7 @@ describe("tokens sent to the account", () => {
         mintUrl: mint,
         payerPubkey: payer,
         note: "Za kávu a dort",
+        hiddenAtSec: null,
       },
     ]);
   });

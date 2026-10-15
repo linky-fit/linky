@@ -1,3 +1,4 @@
+import type { TransactionId } from "@linky-fit/domain";
 import { CzkAmount, satsToCzk } from "./money";
 import type { DirectTransfer, Payment } from "./records";
 
@@ -5,18 +6,25 @@ import type { DirectTransfer, Payment } from "./records";
 export type HistoryEntry =
   | {
       readonly kind: "payment";
-      readonly id: string;
+      readonly id: TransactionId;
       readonly atSec: number;
       readonly receivedCzk: CzkAmount;
       readonly payment: Payment;
     }
   | {
       readonly kind: "direct";
-      readonly id: string;
+      readonly id: TransactionId;
       readonly atSec: number;
       readonly receivedCzk: CzkAmount;
       readonly transfer: DirectTransfer;
     };
+
+const isShown = (record: { readonly hiddenAtSec: number | null }) =>
+  record.hiddenAtSec === null;
+
+/** A pending payment can still turn paid, so the merchant hides only an entry that settled. */
+export const canHideFromHistory = (entry: HistoryEntry): boolean =>
+  entry.kind === "direct" || entry.payment.status !== "pending";
 
 /** A direct transfer's CZK value at the rate it arrived at; `null` without one. */
 export const directTransferCzk = (
@@ -28,15 +36,16 @@ export const directTransferCzk = (
 
 /**
  * Payments at the time they were created and direct transfers at the time
- * they arrived. What each adds to the day's takings: a paid payment its
- * amount, a direct transfer its CZK value at its rate, so the day total is
- * all the money received; a transfer without a rate adds nothing.
+ * they arrived, without the ones the merchant hid. What each adds to the
+ * day's takings: a paid payment its amount, a direct transfer its CZK value
+ * at its rate, so the day total is all the money received; a transfer
+ * without a rate adds nothing.
  */
 export const historyEntries = (
   payments: readonly Payment[],
   transfers: readonly DirectTransfer[],
 ): HistoryEntry[] => [
-  ...payments.map(
+  ...payments.filter(isShown).map(
     (payment): HistoryEntry => ({
       kind: "payment",
       id: payment.id,
@@ -46,7 +55,7 @@ export const historyEntries = (
       payment,
     }),
   ),
-  ...transfers.map(
+  ...transfers.filter(isShown).map(
     (transfer): HistoryEntry => ({
       kind: "direct",
       id: transfer.id,
