@@ -10,7 +10,9 @@ import { MintUrl, QuoteId } from "@linky-fit/linkshu";
 import { Effect } from "effect";
 import {
   canChangePaymentStatus,
+  canHideFromHistory,
   generateVariableSymbol,
+  historyEntries,
   type BitcoinLeg,
   type CzkAmount,
   type DirectTransfer,
@@ -26,6 +28,7 @@ import {
   insertReceipt,
   insertWithdrawal,
   readFazoleRecords,
+  updateDirectTransfer,
   updatePayment,
   updateWithdrawal,
   type FazoleRecords,
@@ -62,12 +65,14 @@ export interface Ledger {
   ) => Promise<Payment>;
   /** Drops an expired Lightning quote; the Cashu request stays payable. */
   readonly clearLightningQuote: (payment: Payment) => Promise<void>;
-  /** Marks the payment paid when its status still allows it. */
+  /** Marks the payment paid when its status still allows it; a hidden one shows in the history again. */
   readonly completePayment: (
     payment: Payment,
     paidBy: PaidBy,
   ) => Promise<boolean>;
   readonly cancelPayment: (payment: Payment) => Promise<boolean>;
+  /** Hides a history entry; `false` when it is not listed or is a pending payment. */
+  readonly hideFromHistory: (id: TransactionId) => Promise<boolean>;
   /** Whether the receive `operationId` was already recorded, by a payment, a receipt or a direct transfer. */
   readonly hasReceipt: (operationId: string) => Promise<boolean>;
   /** Records sats a payment's own settlement does not account for, once per receive. */
@@ -76,7 +81,7 @@ export interface Ledger {
   ) => Promise<void>;
   /** Records sats that paid no payment, once per receive. */
   readonly recordDirectTransfer: (
-    transfer: Omit<DirectTransfer, "id" | "receivedAtSec">,
+    transfer: Omit<DirectTransfer, "id" | "receivedAtSec" | "hiddenAtSec">,
   ) => Promise<void>;
   readonly createWithdrawal: (withdrawal: {
     readonly kind: WithdrawalKind;
@@ -142,6 +147,7 @@ export const makeLedger = (transactions: TransactionsRepository): Ledger => {
         bitcoin: null,
         cashuReceive: null,
         payerPubkey: null,
+        hiddenAtSec: null,
       };
       await run(insertPayment(transactions, created));
       return created;
@@ -161,6 +167,7 @@ export const makeLedger = (transactions: TransactionsRepository): Ledger => {
         ...current,
         status: "paid",
         paidAtSec: nowSeconds(),
+        hiddenAtSec: null,
         ...(typeof paidBy === "string"
           ? { method: paidBy }
           : {
@@ -174,6 +181,23 @@ export const makeLedger = (transactions: TransactionsRepository): Ledger => {
     cancelPayment: async (current) => {
       if (!canChangePaymentStatus(current.status, "cancelled")) return false;
       await savePayment({ ...current, status: "cancelled" });
+      return true;
+    },
+    hideFromHistory: async (id) => {
+      const { payments, directTransfers } = await records();
+      const entry = historyEntries(payments, directTransfers).find(
+        (candidate) => candidate.id === id,
+      );
+      if (entry === undefined || !canHideFromHistory(entry)) return false;
+      const hiddenAtSec = nowSeconds();
+      await (entry.kind === "payment"
+        ? savePayment({ ...entry.payment, hiddenAtSec })
+        : run(
+            updateDirectTransfer(transactions, {
+              ...entry.transfer,
+              hiddenAtSec,
+            }),
+          ));
       return true;
     },
     hasReceipt: async (operationId) => {
@@ -202,6 +226,7 @@ export const makeLedger = (transactions: TransactionsRepository): Ledger => {
           ...transfer,
           id: receiptIdFor(transfer.operationId),
           receivedAtSec: nowSeconds(),
+          hiddenAtSec: null,
         }),
       );
     },

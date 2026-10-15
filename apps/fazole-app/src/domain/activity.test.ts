@@ -29,6 +29,7 @@ const payment = (name: string, overrides: Partial<Payment>): Payment => ({
   cashuReceive: null,
   tipCzk: null,
   payerPubkey: null,
+  hiddenAtSec: null,
   ...overrides,
 });
 
@@ -73,6 +74,7 @@ const direct = (
   mintUrl: "http://localhost:3338",
   payerPubkey: makeIdentity().pubkey,
   note: "Za kávu",
+  hiddenAtSec: null,
   ...overrides,
 });
 

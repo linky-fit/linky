@@ -47,6 +47,8 @@ export interface Payment {
   } | null;
   /** Who sent the Cashu token that paid it; `null` for other payments. */
   readonly payerPubkey: Pubkey | null;
+  /** When the merchant hid it from the history; `null` while it shows. */
+  readonly hiddenAtSec: number | null;
 }
 
 /**
@@ -81,6 +83,8 @@ export interface DirectTransfer {
   readonly payerPubkey: Pubkey;
   /** The sender's note, sanitized to plain text. */
   readonly note: string | null;
+  /** When the merchant hid it from the history; `null` while it shows. */
+  readonly hiddenAtSec: number | null;
 }
 
 /** Where a withdrawal sends the sats; the transaction `method` it is stored under. */

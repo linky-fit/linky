@@ -1,3 +1,4 @@
+import type { TransactionId } from "@linky-fit/domain";
 import type {
   FiatRates,
   KeyValueStore,
@@ -56,6 +57,12 @@ export interface Payments {
   readonly cancel: (paymentId: string) => Promise<boolean>;
 }
 
+/** The merchant's view of payments and direct transfers. */
+export interface History {
+  /** Hides the entry from the history and its day total; the wallet still counts its sats. */
+  readonly hide: (id: TransactionId) => Promise<boolean>;
+}
+
 export interface Shop {
   readonly load: () => Promise<ShopProfile | null>;
   /** Saves the profile and publishes its name and picture as the account's Nostr profile. */
@@ -92,6 +99,7 @@ export interface AppServices {
   readonly shop: Shop;
   readonly saveOfferTips: (offer: boolean) => Promise<void>;
   readonly payments: Payments;
+  readonly history: History;
   readonly payers: Payers;
   readonly withdrawals: Withdrawals;
   readonly supportChat: SupportChat;
@@ -221,6 +229,7 @@ export const createAppServices = ({
         settle(id, (payment) => ledger.completePayment(payment, "bank")),
       cancel: (id) => settle(id, ledger.cancelPayment),
     },
+    history: { hide: ledger.hideFromHistory },
     payers: {
       profile: (pubkey) => {
         const cached = payerProfiles.get(pubkey);

@@ -62,6 +62,7 @@ const PaymentDetails = Schema.Struct({
     Schema.Struct({ operationId: Schema.String, sats: Schema.Natural }),
   ),
   payerPubkey: Schema.optionalKey(Pubkey),
+  hiddenAtSec: Schema.optionalKey(Schema.Int),
 });
 
 const ReceiptDetails = Schema.Struct({
@@ -77,6 +78,7 @@ const DirectTransferDetails = Schema.Struct({
   operationId: Schema.String,
   payerPubkey: Pubkey,
   czkPerBtc: Schema.optionalKey(Schema.Finite),
+  hiddenAtSec: Schema.optionalKey(Schema.Int),
 });
 
 const WithdrawalDetails = Schema.Struct({
@@ -167,6 +169,7 @@ export const toFazoleRecords = (
           bitcoin: value.bitcoin ?? null,
           cashuReceive: value.cashuReceive ?? null,
           payerPubkey: value.payerPubkey ?? null,
+          hiddenAtSec: value.hiddenAtSec ?? null,
         });
         break;
       case "receipt":
@@ -195,6 +198,7 @@ export const toFazoleRecords = (
             mintUrl: row.mint,
             payerPubkey: value.payerPubkey,
             note: row.note,
+            hiddenAtSec: value.hiddenAtSec ?? null,
           });
         }
         break;
@@ -257,6 +261,9 @@ const paymentColumns = (payment: Payment) => ({
     ...(payment.payerPubkey === null
       ? {}
       : { payerPubkey: payment.payerPubkey }),
+    ...(payment.hiddenAtSec === null
+      ? {}
+      : { hiddenAtSec: payment.hiddenAtSec }),
   }),
 });
 
@@ -291,6 +298,9 @@ const directTransferColumns = (transfer: DirectTransfer) => ({
     operationId: transfer.operationId,
     payerPubkey: transfer.payerPubkey,
     ...(transfer.czkPerBtc === null ? {} : { czkPerBtc: transfer.czkPerBtc }),
+    ...(transfer.hiddenAtSec === null
+      ? {}
+      : { hiddenAtSec: transfer.hiddenAtSec }),
   }),
 });
 
@@ -373,6 +383,11 @@ export const insertDirectTransfer = (
   transactions.insertIfAbsent(
     insertRow(transfer.id, directTransferColumns(transfer)),
   );
+
+export const updateDirectTransfer = (
+  transactions: TransactionsRepository,
+  transfer: DirectTransfer,
+) => transactions.update(transfer.id, directTransferColumns(transfer));
 
 export const insertWithdrawal = (
   transactions: TransactionsRepository,
