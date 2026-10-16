@@ -109,7 +109,7 @@ Like the site, the push server ships ahead of the app and must keep working with
 
 - Linky app project: root directory `apps/linky-app`, production branch `linky-production` with domain `app.linky.fit` and no Deployment Checks, because `release-linky.yml` gates it. Custom Environment `nightly` tracks `main` with domain `nightly.app.linky.fit`, the same environment variables as Production and no Deployment Protection on its domain.
 - Linky site project: root directory `apps/linky-site`, Deployment Checks `lint`, `unit-tests` and `site-e2e`.
-- Fazole app project: production branch `fazole-production` and no Deployment Checks, because `release-fazole.yml` gates it. Custom Environment `nightly` tracks `main`, like the Linky app's.
+- Fazole app project: production branch `fazole-production` and no Deployment Checks, because `release-fazole.yml` gates it. Custom Environment `nightly` tracks `main` with domain `nightly.app.fazole.fit` and no Deployment Protection on its domain, like the Linky app's.
 - Fazole site project: Deployment Checks `lint` and `unit-tests`.
 - Error tracker project: Deployment Checks `lint` and `unit-tests`.
 - The `main` ruleset requires a merge queue and the status check `ci-ok`, without requiring branches to be up to date.
@@ -118,6 +118,6 @@ Like the site, the push server ships ahead of the app and must keep working with
 - Tags `linky-v*`, `fazole-v*` and `packages-v*`, and the `v*` tags of releases before the rename, have a ruleset that restricts updates and deletions. Creation stays open, because the releases create their tags with `GITHUB_TOKEN`.
 - The `zapstore` environment admits `main` and `linky-v*` tags, so a release run started from a tag can publish.
 - npm: the trusted publisher of both packages names `release-npm.yml`, with no environment or the `npm` environment.
-- The README badges read GitHub deployments: `Production` (Linky app release), `Production – linky-website` (Vercel), `push` (`release-push.yml`) and `npm` (`release-npm.yml`). A job using an environment records a deployment, and GitHub creates the `push` and `npm` environments on their first run.
+- The README's app version badges read `version` from `apps/linky-app/package.json` on `linky-production` and `apps/fazole-app/package.json` on `fazole-production`. The other badges read GitHub deployments: `Production – linky-website` and `Production – fazole-site` (Vercel), `push` (`release-push.yml`) and `npm` (`release-npm.yml`). A job using an environment records a deployment, and GitHub creates the `push` and `npm` environments on their first run.
 
 Pull requests keep their preview deployments.
