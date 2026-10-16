@@ -1,20 +1,81 @@
 # Linky
 
-[![Linky release](https://img.shields.io/github/v/release/linky-fit/linky?label=release&display_name=release&filter=Linky*)](https://github.com/linky-fit/linky/releases/latest)
-[![app.linky.fit](https://img.shields.io/github/deployments/linky-fit/linky/Production?label=app.linky.fit)](https://github.com/linky-fit/linky/deployments/Production)
+A Bun monorepo for local-first Bitcoin apps on Nostr, Cashu and Evolu: the Linky and Fazole apps, their websites and services, and the TypeScript packages they share. Data lives in Evolu (SQLite) on the device and syncs between devices through an Evolu relay; Users talk to each other using Nostr. Wallets talk to Cashu mints directly. Some packages publish to npm for anyone to use.
+
+## Linky
+
+[![Linky release](https://img.shields.io/github/v/release/linky-fit/linky?label=release&filter=linky-v*)](https://github.com/linky-fit/linky/releases/latest)
+[![app.linky.fit](https://img.shields.io/github/package-json/v/linky-fit/linky/linky-production?filename=apps/linky-app/package.json&label=app.linky.fit)](https://app.linky.fit)
 [![linky.fit](https://img.shields.io/github/deployments/linky-fit/linky/Production%20%E2%80%93%20linky-website?label=linky.fit)](https://github.com/linky-fit/linky/deployments/Production%20%E2%80%93%20linky-website)
 [![push.linky.fit](https://img.shields.io/github/deployments/linky-fit/linky/push?label=push.linky.fit)](https://github.com/linky-fit/linky/deployments/push)
-[![Fazole release](https://img.shields.io/github/v/release/linky-fit/linky?label=release&display_name=release&filter=Fazole*)](https://github.com/linky-fit/linky/releases?q=fazole-v)
-[![app.fazole.fit](https://img.shields.io/github/deployments/linky-fit/linky/Fazole%20production?label=app.fazole.fit)](https://github.com/linky-fit/linky/deployments/Fazole%20production)
+
+[![Linky](./docs/images/linky.png)](https://linky.fit)
+
+A mobile-first PWA for contacts, private Nostr messaging and Lightning/Cashu payments. It runs in the browser, on Android and as a macOS desktop app.
+
+[Download](https://linky.fit) Linky!
+
+### Public sites
+
+- [linky.fit](https://linky.fit): the website
+- [app.linky.fit](https://app.linky.fit): the app
+- [nightly.app.linky.fit](https://nightly.app.linky.fit): the app built from `main`, ahead of the last release
+- [Google Play](https://play.google.com/store/apps/details?id=fit.linky.app) and [Zapstore](https://zapstore.dev/apps/fit.linky.app): the Android app
+
+### Code
+
+- [`apps/linky-app`](./apps/linky-app/): the PWA; changes in [`CHANGELOG.md`](./apps/linky-app/CHANGELOG.md)
+- [`apps/linky-site`](./apps/linky-site/): the website `linky.fit`
+- [`apps/native-shell`](./apps/native-shell/README.md): Android and iOS builds, signing, push setup
+- [`apps/desktop`](./apps/desktop/README.md): macOS desktop shell
+- [`apps/push`](./apps/push/README.md): Web Push and FCM service at `push.linky.fit`
+
+## Fazole
+
+[![Fazole release](https://img.shields.io/github/v/release/linky-fit/linky?label=release&filter=fazole-v*)](https://github.com/linky-fit/linky/releases?q=fazole-v)
+[![app.fazole.fit](https://img.shields.io/github/package-json/v/linky-fit/linky/fazole-production?filename=apps/fazole-app/package.json&label=app.fazole.fit)](https://app.fazole.fit)
 [![fazole.fit](https://img.shields.io/github/deployments/linky-fit/linky/Production%20%E2%80%93%20fazole-site?label=fazole.fit)](https://github.com/linky-fit/linky/deployments/Production%20%E2%80%93%20fazole-site)
-[![@linky-fit/linkshu](https://img.shields.io/npm/v/@linky-fit/linkshu?label=%40linky-fit%2Flinkshu)](https://www.npmjs.com/package/@linky-fit/linkshu)
-[![@linky-fit/linkstr](https://img.shields.io/npm/v/@linky-fit/linkstr?label=%40linky-fit%2Flinkstr)](https://www.npmjs.com/package/@linky-fit/linkstr)
-[![@linky-fit/linkauth](https://img.shields.io/npm/v/@linky-fit/linkauth?label=%40linky-fit%2Flinkauth)](https://www.npmjs.com/package/@linky-fit/linkauth)
+
+[![Fazole](./docs/images/fazole.png)](https://fazole.fit)
+
+A payment terminal PWA for Czech merchants: bank transfers (SPD QR), Lightning and Cashu. It runs on Linky's packages and shares Linky accounts, but ships on its own version and release.
+
+### Public sites
+
+- [fazole.fit](https://fazole.fit): the website
+- [app.fazole.fit](https://app.fazole.fit): the app
+- [nightly.app.fazole.fit](https://nightly.app.fazole.fit): the app built from `main`, ahead of the last release
+
+### Code
+
+- [`apps/fazole-app`](./apps/fazole-app/README.md): the PWA at `app.fazole.fit`; changes in [`CHANGELOG.md`](./apps/fazole-app/CHANGELOG.md)
+- [`apps/fazole-site`](./apps/fazole-site/): the website `fazole.fit`
+
+[`docs/releases.md`](./docs/releases.md) covers how each Linky and Fazole target ships.
+
+## Published packages
+
 [![npm release](https://img.shields.io/github/deployments/linky-fit/linky/npm?label=npm%20release)](https://github.com/linky-fit/linky/deployments/npm)
 
-Linky is a mobile-first PWA for contacts, private Nostr messaging and Lightning/Cashu payments. Data lives in Evolu (SQLite) on the device and syncs between devices through an Evolu relay. The app runs at `app.linky.fit` and as an Android app; `nightly.app.linky.fit` runs `main` ahead of the last release (see [`docs/releases.md`](./docs/releases.md)). `apps/linky-site/` is the public website `linky.fit`, with the `/cashu/` token redemption page.
+We also publish npm packages, to make it easier for other developers to work with tools we use. Those packages are in very early stage of it's development so please, use with caution. The three libraries share one SemVer version and publish together; see [`docs/npm-releases.md`](./docs/npm-releases.md).
 
-Fazole (`app.fazole.fit`) is a payment terminal PWA for Czech merchants: bank transfers (SPD QR), Lightning and Cashu. It runs on Linky's packages and shares Linky accounts, but ships on its own version and release (see [`docs/releases.md`](./docs/releases.md)). `apps/fazole-site/` is its website `fazole.fit`.
+- [![@linky-fit/linkstr](https://img.shields.io/npm/v/@linky-fit/linkstr?label=%40linky-fit%2Flinkstr)](https://www.npmjs.com/package/@linky-fit/linkstr) [`packages/linkstr`](./packages/linkstr/README.md): typed Nostr messaging, profiles and relay services, built on Effect
+- [![@linky-fit/linkshu](https://img.shields.io/npm/v/@linky-fit/linkshu?label=%40linky-fit%2Flinkshu)](https://www.npmjs.com/package/@linky-fit/linkshu) [`packages/linkshu`](./packages/linkshu/README.md): typed Cashu wallet services with pluggable storage, built on Effect
+- [![@linky-fit/linkauth](https://img.shields.io/npm/v/@linky-fit/linkauth?label=%40linky-fit%2Flinkauth)](https://www.npmjs.com/package/@linky-fit/linkauth) [`packages/linkauth`](./packages/linkauth/README.md): log in with a Nostr key, with origin-bound assertions for servers and browsers
+
+## Internal packages
+
+- [`packages/linksync`](./packages/linksync/README.md): synced storage (Evolu schema, repositories, shards); guides in [`docs/`](./packages/linksync/docs/)
+- [`packages/linkstr-react`](./packages/linkstr-react/): React bindings for linkstr; guide in [`linkstr/docs/react.md`](./packages/linkstr/docs/react.md)
+- [`packages/proxy-payment`](./packages/proxy-payment/README.md): proxy bank payments (bank QR parsing, offer rules); guides in [`docs/`](./packages/proxy-payment/docs/)
+- [`packages/recurring-payment`](./packages/recurring-payment/README.md): recurring payments (schedule math, the planner, claims between devices); guides in [`docs/`](./packages/recurring-payment/docs/)
+- [`packages/keryx`](./packages/keryx/README.md): Keryx client (join URLs, pairing, TUF and item verification for company announcements); guide in [`docs/keryx.md`](./packages/keryx/docs/keryx.md)
+- [`packages/ui`](./packages/ui/README.md): Tamagui design system for Expo and the web; catalog in [`apps/ui-book`](./apps/ui-book/README.md)
+- [`packages/domain`](./packages/domain/README.md): the branded ids every package and app share
+- [`packages/identity`](./packages/identity/): key derivation (SLIP-39, Nostr, LNURL auth)
+- [`packages/config`](./packages/config/): shared ESLint, Prettier, tsconfig and npm packaging
+
+Tools: [`apps/linkshu-cli`](./apps/linkshu-cli/README.md) (terminal Cashu wallet), [`tools/nostr-error-tracker`](./tools/nostr-error-tracker/README.md) (error dashboard), [`docker/evolu-relay`](./docker/evolu-relay/README.md) (relay image and per-owner quota).
 
 ## Development
 
@@ -38,41 +99,11 @@ bun run e2e site     # linky-site suite
 bun run e2e down     # stop the stack and drop its data
 ```
 
-## Workspaces
-
-Apps: `apps/linky-app` (Linky), `apps/linky-site`, `apps/fazole-app` (Fazole), `apps/fazole-site`, `apps/push` (Web Push and FCM service), `apps/native-shell` (Capacitor Android and iOS shells), `apps/desktop` (Electron shell for macOS), `apps/linkshu-cli` (terminal cashu wallet), `apps/ui-book` (catalog of `@linky-fit/ui`), `tools/nostr-error-tracker`.
-
-Packages:
-
-- [`packages/linkstr`](./packages/linkstr/README.md): Nostr protocol library; guides in [`docs/`](./packages/linkstr/docs/), which also cover `@linky-fit/linkstr-react`
-- [`packages/linkauth`](./packages/linkauth/README.md): Nostr authentication SDK (client, server and signer); guides in [`docs/`](./packages/linkauth/docs/)
-- [`packages/linkshu`](./packages/linkshu/README.md): cashu wallet library; guides in [`docs/`](./packages/linkshu/docs/)
-- [`packages/linksync`](./packages/linksync/README.md): synced storage (Evolu schema, repositories, shards); guides in [`docs/`](./packages/linksync/docs/)
-- [`packages/proxy-payment`](./packages/proxy-payment/README.md): proxy bank payments (bank QR parsing, offer rules); guides in [`docs/`](./packages/proxy-payment/docs/)
-- [`packages/recurring-payment`](./packages/recurring-payment/README.md): recurring payments (schedule math, the planner, claims between devices); guides in [`docs/`](./packages/recurring-payment/docs/)
-- [`packages/keryx`](./packages/keryx/README.md): Keryx client (join URLs, pairing, TUF and item verification for company announcements); guide in [`docs/keryx.md`](./packages/keryx/docs/keryx.md)
-- [`packages/ui`](./packages/ui/README.md): Tamagui design system for Expo and the web (react-native-web)
-- `packages/domain`: the branded ids every package and the app share
-- `packages/identity`: key derivation (SLIP-39, Nostr, LNURL auth) shared by the app and the error tracker
-- `packages/config`: shared eslint, prettier, tsconfig and npm packaging
-
-`@linky-fit/linkshu`, `@linky-fit/linkstr` and `@linky-fit/linkauth` publish to npm together; see [`docs/npm-releases.md`](./docs/npm-releases.md).
-
-Further reading:
-
-- [`AGENTS.md`](./AGENTS.md): invariants and conventions
-- [`docs/releases.md`](./docs/releases.md): how each Linky and Fazole target ships
-- [`apps/fazole-app/README.md`](./apps/fazole-app/README.md): Fazole development and its local mint
-- [`apps/native-shell/README.md`](./apps/native-shell/README.md): Android and iOS builds, signing, push setup
-- [`apps/desktop/README.md`](./apps/desktop/README.md): macOS desktop shell
-- [`apps/push/README.md`](./apps/push/README.md): push service configuration and deployment
-- [`apps/linkshu-cli/README.md`](./apps/linkshu-cli/README.md): terminal wallet
-- [`tools/nostr-error-tracker/README.md`](./tools/nostr-error-tracker/README.md): error dashboard
-- [`docker/evolu-relay/README.md`](./docker/evolu-relay/README.md): relay image and per-owner quota
+[`AGENTS.md`](./AGENTS.md) lists the invariants and conventions; [`GLOSSARY.md`](./GLOSSARY.md) defines the domain terms.
 
 ## Contributing
 
-Open an issue before a PR for anything beyond a plain bug fix. See [`CONTRIBUTING.md`](./CONTRIBUTING.md).
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 ## License
 
