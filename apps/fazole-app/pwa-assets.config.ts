@@ -3,7 +3,7 @@ import {
   minimal2023Preset,
 } from "@vite-pwa/assets-generator/config";
 
-// The bean tile's black, so maskable and Apple icons bleed into it seamlessly.
+// The bean is cut out on a transparent background; maskable and Apple icons must be opaque, so they get the brand black behind it.
 const tile = { padding: 0, resizeOptions: { background: "#000000" } };
 
 export default defineConfig({

@@ -11,7 +11,9 @@ Každá vydaná verze musí obsahovat nejprve `en-US` a potom `cs-CZ`.
 ## [Unreleased]
 
 - Selected text in a field is highlighted again.
+- The bean icon has a transparent background.
 - Označený text v poli je zase zvýrazněný.
+- Ikona fazole má průhledné pozadí.
 ## [26.10.2] - 2026-10-15
 
 ### en-US
