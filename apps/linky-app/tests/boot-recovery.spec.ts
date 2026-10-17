@@ -14,6 +14,7 @@ import {
   EVOLU_WORKER_REQUEST,
   MAIN_BUNDLE,
 } from "./helpers/bundles";
+import { gotoRoute } from "./helpers/routes";
 
 test.use({ serviceWorkers: "block" });
 
@@ -150,10 +151,10 @@ test("a SQLite pool lock failure before or after other acquisitions preserves lo
       JSON.stringify([relay]),
     );
   }, EVOLU_RELAY_URL);
-  await page.goto("/#wallet");
+  await gotoRoute(page, "wallet");
   await expect(page.getByLabel("Available balance")).toBeVisible();
   await addContactByNpub(page, (await createSeedIdentity()).npub);
-  await page.goto("/#contacts");
+  await gotoRoute(page, "contacts");
   await expect(page.locator('[data-guide="contact-card"]')).toHaveCount(1);
 
   const recoveries: string[] = [];

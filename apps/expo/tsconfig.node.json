@@ -1,0 +1,14 @@
+{
+  "extends": "@linky-fit/config/tsconfig/node",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+    "types": ["bun", "node"]
+  },
+  "include": [
+    "app.config.ts",
+    "plugins",
+    "scripts",
+    "server",
+    "../linky-app/src/vite-env.d.ts"
+  ]
+}

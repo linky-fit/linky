@@ -40,7 +40,7 @@ const contacts = makeContactsRepository(store);
 
 ## Evolu 7
 
-`createEvoluShardDb(evolu, ownerSync)` from `@linky-fit/linksync/evolu` takes an `EvoluRuntime`: structurally, an Evolu instance whose schema contains `LinkySchema` (a superset is fine). Each row is validated before it is queued, so one rejected row fails as `ShardDbError` instead of failing Evolu's whole mutation batch. A `mutate` resolves once Evolu's worker has applied the batch. Evolu never completes a batch it dropped, so one not applied within ten seconds fails as `ShardDbError` and stops being served from the adapter's read overlay; writing it again may succeed. Pass `onWriteUnconfirmed` in the third argument to hear about each such write. `ownerUsage` is measured over `evolu_history`. `deleteOwner` is `null`: a forgotten shard keeps its local bytes and relay history until Evolu can delete an owner.
+`createEvoluShardDb(evolu, ownerSync)` from `@linky-fit/linksync/evolu` takes an `EvoluRuntime`: structurally, an Evolu instance whose schema contains `LinkySchema` (a superset is fine). Each row is validated before it is queued, so one rejected row fails as `ShardDbError` instead of failing Evolu's whole mutation batch. A `mutate` resolves once Evolu's worker has applied the batch. Evolu never completes a batch it dropped, so one not applied within ten seconds fails as `ShardDbError` and stops being served from the adapter's read overlay; writing it again may succeed. Pass `onWriteUnconfirmed` in the third argument to hear about each such write. Evolu's worker drops every query asked in the same turn as one that fails and never answers them, so a read still waiting when Evolu reports an error is asked again under a fresh query, up to three times, and so is every later read of the dropped query. `ownerUsage` is measured over `evolu_history`. `deleteOwner` is `null`: a forgotten shard keeps its local bytes and relay history until Evolu can delete an owner.
 
 Evolu 7 syncs in its database worker and tells the page nothing about it, so `ownerSync` needs the worker to come from this package. Run it in the worker module through `@linky-fit/linksync/evolu/worker`, which keeps the store out of the worker bundle, and hand Evolu the page side:
 
@@ -54,11 +54,14 @@ import {
   createWebSocket,
 } from "@evolu/common";
 import { createWasmSqliteDriver } from "@evolu/web";
-import { runOwnerSyncDbWorker } from "@linky-fit/linksync/evolu/worker";
+import {
+  guardOpfsIdle,
+  runOwnerSyncDbWorker,
+} from "@linky-fit/linksync/evolu/worker";
 
 runOwnerSyncDbWorker(self, {
   console: createConsole(),
-  createSqliteDriver: createWasmSqliteDriver,
+  createSqliteDriver: guardOpfsIdle(createWasmSqliteDriver),
   createWebSocket,
   random: createRandom(),
   randomBytes: createRandomBytes(),
@@ -81,6 +84,10 @@ const { createDbWorker, ownerSync } = trackOwnerSync((name) =>
 const evolu = createEvolu({ ...deps, createDbWorker })(schema, config);
 const db = createEvoluShardDb(evolu, ownerSync);
 ```
+
+`guardOpfsIdle` wraps the driver to read the database every four minutes: in Chrome's Incognito and other ephemeral profiles OPFS lives in memory, and a database file left unread for about ten minutes reads as empty through its open handle, so every query fails with "no such table" until the page reloads.
+
+The worker gives each write its own millisecond, at most a second ahead of the system clock, so rows a device writes in a burst get distinct `createdAt` times in write order; the in-memory adapter and the read overlay stamp the same way. Evolu's clock never runs behind the latest timestamp it has seen, so a peer whose clock runs ahead can still leave rows sharing a millisecond.
 
 Without workers, as on React Native, run the same database worker on the calling thread with `createInProcessOwnerSyncDbWorker` from `@linky-fit/linksync/evolu/worker`, and hand it to `trackOwnerSync` in place of the web worker. Evolu's database work then shares the thread with the UI.
 
@@ -157,7 +164,7 @@ const store = await openLinkyStore(evolu, ownerSync, {
 ```
 
 - `kv` is a `KeyValueStorage`: synchronous, device-local `getItem`, `setItem` and `removeItem` that swallow storage failures (a `localStorage` wrapper on the web). The keys the package writes start with `linky.` and never change, because existing devices read them.
-- `createLinkyEvolu` wraps the worker with `trackOwnerSync` and opens `LinkyEvoluSchema`, which is `LinkySchema` plus the legacy lane tables and columns only the lane migration reads. The database is named by `generateDbNameFromMnemonic(mnemonic)` (`linky-anon` without a mnemonic) and owned by the mnemonic's app owner; without one Evolu creates its own. Call it once per page: each call starts its own worker tracking.
+- `createLinkyEvolu` wraps the worker with `trackOwnerSync` and opens `LinkyEvoluSchema`, which is `LinkySchema` plus the legacy lane tables and columns only the lane migration reads. The database is named by `generateDbNameFromMnemonic(mnemonic)` (`linky-anon` without a mnemonic) and owned by the mnemonic's app owner; without one Evolu creates its own. It also returns that `appOwner` (`null` without a mnemonic), so the app can key device-local state such as the [first hydration](./core.md#hydration) marker before the worker answers. Evolu keeps one instance per database name, so a later call for the same database, as a hot reload makes, returns the running Evolu with its owner sync.
 - `openLinkyStore` resolves once the app owner is known and the local database has answered a query. It creates the store, reconciles sync, follows pointers for the store's lifetime and starts pointer repair in the background, so the caller only keeps the returned store; call it once per database. It applies the [first hydration](./core.md#hydration) marker and keeps [retention](./core.md#device-local-retention) in `kv`.
 - `makeEvoluRelaySettings` is the device-local Evolu relay list: the recommended relays (`envDefaults` replaces them when non-empty) followed by the user's, minus the disabled ones. `setUrls` saves the user's list without the recommended relays; `setDisabled` toggles one relay. Creating it migrates the storage of versions before recommended relays once: an existing device (`hasStoredAccount`, or one with a stored legacy selection) keeps the old default relays unless the user had removed them. The recommendation is read once, so a change applies to settings created later; the transports are built at startup, so a changed list applies after a reload. `normalizeEvoluRelayUrl` gives a relay URL's stable identity, or `null` when it is not `ws:` or `wss:`.
 - `onEvent` hears a `LinkyEvoluEvent` for what an inspector should show: relay protocol errors per owner, rotations, the owners subscribed at boot and after each rotation, hydration, unconfirmed writes, pointer repairs and their failure, and the relay migration. The events carry the owner ids to correlate on; turning them into rows is the app's job.

@@ -68,6 +68,18 @@ export const takenTokenProofs = (
   );
 };
 
+/** Tokens, by `tokenProofsKey`, whose funds the wallet received. */
+export const receivedTokenProofs = (
+  transfers: ReadonlyArray<TokenTransfer>,
+): ReadonlySet<string> =>
+  new Set(
+    transfers
+      .filter(
+        (transfer) => transfer.kind === "receive" && transfer.status === "done",
+      )
+      .flatMap((transfer) => tokenProofsKey(transfer.tokenText) ?? []),
+  );
+
 /**
  * The wallet's own sends by `tokenProofsKey`: true once the recipient claimed it,
  * i.e. the mint reported spent proofs covering the whole amount, so a send

@@ -6,8 +6,10 @@ import {
 import { sha256 } from "@noble/hashes/sha2.js";
 import { Schema } from "effect";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
+import { bytesToBlob } from "../../platform/files";
 import { decodeBase64Url, encodeBase64Url } from "../../utils/base64";
 import { getBlossomUploadProxyUrl } from "../../utils/blossomUploadProxy";
+import { openImage } from "../../utils/image";
 import { getUnknownErrorMessage, isRecord } from "../../utils/unknown";
 import { asNonEmptyString } from "../../utils/validation";
 import { nowSeconds } from "../../utils/time";
@@ -138,36 +140,6 @@ const readPositiveInteger = (value: unknown): number | null => {
   return Math.trunc(value);
 };
 
-const loadImage = async (file: File): Promise<HTMLImageElement> => {
-  const objectUrl = URL.createObjectURL(file);
-  try {
-    return await new Promise<HTMLImageElement>((resolve, reject) => {
-      const image = new Image();
-      image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error("image-load-failed"));
-      image.src = objectUrl;
-    });
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
-};
-
-const canvasToBlob = async (
-  canvas: HTMLCanvasElement,
-  type: string,
-  quality: number,
-): Promise<Blob> =>
-  await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => {
-        if (blob) resolve(blob);
-        else reject(new Error("image-encode-failed"));
-      },
-      type,
-      quality,
-    );
-  });
-
 const isPdfFileType = (fileType: string): boolean => fileType === PDF_FILE_TYPE;
 
 export const isPrivatePdfPayload = (
@@ -215,14 +187,10 @@ const resizeImageToJpegBytes = async (
     throw new Error("chat-image-too-large");
   }
 
-  const image = await loadImage(file);
-  const sourceWidth = image.naturalWidth || image.width;
-  const sourceHeight = image.naturalHeight || image.height;
+  const image = await openImage(file);
+  const sourceWidth = image.width;
+  const sourceHeight = image.height;
   if (!sourceWidth || !sourceHeight) throw new Error("chat-image-invalid");
-
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("chat-image-canvas-unavailable");
 
   let maxSide = MAX_IMAGE_SIDE_PX;
   let quality = IMAGE_JPEG_QUALITY;
@@ -230,16 +198,11 @@ const resizeImageToJpegBytes = async (
     const scale = Math.min(1, maxSide / Math.max(sourceWidth, sourceHeight));
     const width = Math.max(1, Math.round(sourceWidth * scale));
     const height = Math.max(1, Math.round(sourceHeight * scale));
-    canvas.width = width;
-    canvas.height = height;
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(image, 0, 0, width, height);
 
-    const blob = await canvasToBlob(canvas, "image/jpeg", quality);
-    if (blob.size <= MAX_IMAGE_OUTPUT_BYTES) {
+    const bytes = await image.toJpeg(width, height, quality);
+    if (bytes.byteLength <= MAX_IMAGE_OUTPUT_BYTES) {
       return {
-        bytes: new Uint8Array(await blob.arrayBuffer()),
+        bytes,
         fileType: "image/jpeg",
         height,
         width,
@@ -585,7 +548,7 @@ export const decryptPrivateImageMessage = async (
     throw new Error("chat-file-not-pdf");
   }
 
-  return new Blob([decryptedBytes], { type: payload.fileType });
+  return bytesToBlob(decryptedBytes, payload.fileType);
 };
 
 export const privateImagePreviewText = (

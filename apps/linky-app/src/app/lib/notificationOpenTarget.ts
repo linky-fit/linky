@@ -49,26 +49,25 @@ export const readNotificationOpenTarget = (
   return { outerEventId, recipientPubkey, senderPubkey };
 };
 
-export const consumeNotificationOpenDetailFromHash = (): string | null => {
-  if (typeof window === "undefined") return null;
-
-  const rawHash = window.location.hash;
-  const queryIndex = rawHash.indexOf("?");
+/**
+ * The notification a fragment opens (`#contacts?notificationOpen=<json>`,
+ * the service worker's tap target) and the route left once it is taken.
+ */
+export const readNotificationOpenHashLink = (
+  hash: string,
+): { detail: string; routePath: string } | null => {
+  const queryIndex = hash.indexOf("?");
   if (queryIndex < 0) return null;
 
-  const baseHash = rawHash.slice(0, queryIndex) || "#contacts";
-  const params = new URLSearchParams(rawHash.slice(queryIndex + 1));
+  const basePath = hash.slice(1, queryIndex);
+  const params = new URLSearchParams(hash.slice(queryIndex + 1));
   const detail = params.get(NOTIFICATION_OPEN_HASH_PARAM);
   if (!detail) return null;
 
   params.delete(NOTIFICATION_OPEN_HASH_PARAM);
   const nextQuery = params.toString();
-  const nextHash = nextQuery ? `${baseHash}?${nextQuery}` : baseHash;
-  window.history.replaceState(
-    null,
-    "",
-    `${window.location.pathname}${window.location.search}${nextHash}`,
-  );
-
-  return detail;
+  return {
+    detail,
+    routePath: nextQuery ? `${basePath}?${nextQuery}` : basePath,
+  };
 };

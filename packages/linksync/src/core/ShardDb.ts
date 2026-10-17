@@ -12,7 +12,7 @@ import { Effect, Schema } from "effect";
  * within one operation and holds no cache of its own.
  */
 
-/** Evolu adds these to every row. `createdAt`/`updatedAt` are ISO strings. */
+/** Evolu adds these to every row. `createdAt`/`updatedAt` are ISO strings; rows one device writes get distinct `createdAt` milliseconds. */
 export interface SystemColumns {
   readonly ownerId: OwnerId;
   readonly createdAt: string;

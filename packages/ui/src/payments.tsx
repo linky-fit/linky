@@ -1,5 +1,7 @@
+import type { Ref } from "react";
 import QRCodeSvg from "react-native-qrcode-svg";
 import { getVariableValue, Portal, useTheme, View } from "tamagui";
+import type { TamaguiElement } from "tamagui";
 import { Button, Pressable } from "./controls";
 import { Amount, Avatar } from "./display";
 import { Spinner } from "./spinner";
@@ -95,6 +97,8 @@ export interface QRCodeProps {
   accessibilityLabel: string;
   onPress?: (() => void) | undefined;
   testID?: string | undefined;
+  /** The rendered element, e.g. for measuring where it is on screen. */
+  ref?: Ref<TamaguiElement> | undefined;
   /** An icon in a cleared centre, e.g. a hint that pressing the code copies it. */
   badge?: IconName | undefined;
   /** A browser tooltip on the web; ignored on native. */
@@ -107,6 +111,7 @@ export function QRCode({
   accessibilityLabel,
   onPress,
   testID,
+  ref,
   badge,
   tooltip,
 }: QRCodeProps) {
@@ -114,6 +119,7 @@ export function QRCode({
   const Frame = onPress ? Pressable : View;
   return (
     <Frame
+      ref={ref}
       testID={testID}
       role={onPress ? "button" : "img"}
       aria-label={accessibilityLabel}

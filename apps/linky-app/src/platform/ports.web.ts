@@ -2,10 +2,13 @@ import { deferPwaUpdateWhile } from "../utils/pwaUpdate";
 import { localStorageKv, safeLocalStorageGet } from "../utils/storage";
 import { getUnknownErrorMessage } from "../utils/unknown";
 import { asNonEmptyString } from "../utils/validation";
+import { parseEvoluRelayUrls } from "./evoluRelayUrls";
 import type { PlatformPorts, SecretRead } from "./ports";
 import { isNativePlatform } from "./runtime";
 import { readNativeSecret } from "./secretStorage";
 import { envEvoluServerUrls, isDevBuild, isE2eBuild } from "./buildEnv";
+import { isOnline } from "./appEvents";
+import { reloadApp } from "./reload";
 
 // Undefined: the shell has no native store, so the localStorage copy is the secret.
 const toSecretRead = (value: string | null | undefined): SecretRead => {
@@ -27,12 +30,6 @@ const readSecret = async (key: string): Promise<SecretRead> => {
   }
 };
 
-const parseEvoluRelayUrls = (value: string | undefined): string[] =>
-  (value ?? "")
-    .split(",")
-    .map((url) => url.trim())
-    .filter((url) => url.startsWith("ws://") || url.startsWith("wss://"));
-
 export const makeWebPlatformPorts = (): PlatformPorts => ({
   kv: localStorageKv,
   secrets: { read: readSecret },
@@ -40,11 +37,11 @@ export const makeWebPlatformPorts = (): PlatformPorts => ({
     evoluRelayDefaults: parseEvoluRelayUrls(envEvoluServerUrls),
     isE2e: isE2eBuild,
     isDev: isDevBuild,
+    blockOnFirstHydration: false,
   },
   lifecycle: {
-    reload: () => globalThis.location.reload(),
+    reload: reloadApp,
     deferUpdateWhile: deferPwaUpdateWhile,
-    isOnline: () =>
-      typeof navigator === "undefined" || navigator.onLine !== false,
+    isOnline,
   },
 });

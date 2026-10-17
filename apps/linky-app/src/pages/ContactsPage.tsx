@@ -7,6 +7,7 @@ import {
   type NearbyBadge,
   NearbyRow,
   Row,
+  SafeAreaPad,
   ScrollList,
   ScrollView,
   Section,
@@ -27,6 +28,8 @@ import { useContactRows } from "../app/hooks/useLinksync";
 import type { ContactRowLike } from "../app/types/appTypes";
 import { navigateTo } from "../hooks/useRouting";
 import type { Translate } from "../i18n";
+import { keepInputFocus } from "../utils/keepInputFocus";
+import { asInputElement } from "../utils/domNodes";
 import { firstName, formatShortNpub } from "../utils/formatting";
 
 interface ContactsPageProps {
@@ -143,7 +146,7 @@ export const ContactsPage: FC<ContactsPageProps> = React.memo(
       <>
         {onboardingContent}
         {filterOpen && (
-          <Stack
+          <SafeAreaPad
             position="sticky"
             top="$none"
             zIndex="$sticky"
@@ -153,8 +156,7 @@ export const ContactsPage: FC<ContactsPageProps> = React.memo(
           >
             <TextField
               ref={(node) => {
-                contactsSearchInputRef.current =
-                  node instanceof HTMLInputElement ? node : null;
+                contactsSearchInputRef.current = asInputElement(node);
               }}
               label={t("contactsSearchPlaceholder")}
               hideLabel
@@ -170,7 +172,7 @@ export const ContactsPage: FC<ContactsPageProps> = React.memo(
                     size="sm"
                     variant="secondary"
                     accessibilityLabel={t("contactsSearchClear")}
-                    onPointerDown={(event) => event.preventDefault()}
+                    onPointerDown={keepInputFocus}
                     onPress={() => {
                       setContactsSearch("");
                       requestAnimationFrame(() => {
@@ -205,7 +207,7 @@ export const ContactsPage: FC<ContactsPageProps> = React.memo(
                 </Row>
               </ScrollView>
             )}
-          </Stack>
+          </SafeAreaPad>
         )}
 
         <ContactList flex={wide ? 1 : undefined}>

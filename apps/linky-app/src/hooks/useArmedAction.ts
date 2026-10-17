@@ -12,8 +12,8 @@ export const useArmedAction = (onArm?: () => void) => {
 
   React.useEffect(() => {
     if (!armed) return;
-    const timeoutId = window.setTimeout(() => setArmed(false), ARMED_MS);
-    return () => window.clearTimeout(timeoutId);
+    const timeoutId = setTimeout(() => setArmed(false), ARMED_MS);
+    return () => clearTimeout(timeoutId);
   }, [armed]);
 
   const confirm = (action: () => void) => {

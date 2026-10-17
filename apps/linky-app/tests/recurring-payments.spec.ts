@@ -27,6 +27,7 @@ import {
   waitUntil,
 } from "./helpers/recurringPayments";
 import { topUp } from "./helpers/wallet";
+import { expectRoute, gotoRoute, routeUrl } from "./helpers/routes";
 
 test.describe.configure({ mode: "parallel" });
 test.use({ actionTimeout: 20_000 });
@@ -39,7 +40,7 @@ test("the countdown's Cancel skips a period and its Pay consumes the next, linke
   const a = await bootAccount("A");
   const b = await bootAccount("B");
   await test.step("fund A and save both contacts", () => fundAndConnect(a, b));
-  const hash =
+  const orderPath =
     await test.step("create a daily payment bound to the default mint", async () => {
       await openForm(a.page);
       return saveOrder(a.page);
@@ -56,12 +57,12 @@ test("the countdown's Cancel skips a period and its Pay consumes the next, linke
     await expect(detailValue(a.page, "Last payment")).toContainText("skipped");
     expect(await readOrder(a.page)).toMatchObject({ runCount: 0 });
     expect((await readOrder(a.page)).nextDueAtSec).toBeGreaterThan(due);
-    await a.page.goto("/#wallet/transactions");
+    await gotoRoute(a.page, "wallet/transactions");
     await expect(a.page.getByTestId("recurring-order-card")).toHaveCount(1);
     await expect(a.page.getByTestId("transaction-recurring-pill")).toHaveCount(
       0,
     );
-    await a.page.goto("/#wallet");
+    await gotoRoute(a.page, "wallet");
     expect(await readBalanceSat(a.page)).toBe(FUNDING_SAT);
     expect(await readBalanceSat(b.page)).toBe(0);
   });
@@ -74,13 +75,13 @@ test("the countdown's Cancel skips a period and its Pay consumes the next, linke
       a.page.getByRole("status").filter({ hasText: /Sent\s*10\s*sat/ }),
     ).toBeVisible({ timeout: 60_000 });
     await expectReceived(b.page);
-    await expectPaidHistory(a.page, hash);
+    await expectPaidHistory(a.page, orderPath);
   });
   await test.step("the paid run moves the schedule to the next day", async () => {
     const order = await readOrder(a.page);
     expect(order.runCount).toBe(1);
     expect(order.nextDueAtSec).toBeGreaterThan(nowSec() + DAY_SEC / 2);
-    await a.page.goto("/#wallet");
+    await gotoRoute(a.page, "wallet");
     const balance = await readBalanceSat(a.page);
     expect(balance).toBeLessThanOrEqual(FUNDING_SAT - ORDER_SAT);
     expect(balance).toBeGreaterThanOrEqual(
@@ -100,7 +101,7 @@ test("an expired countdown pays and its note reaches the contact and both histor
     await openForm(a.page);
     await a.page.getByRole("textbox", { name: "Note", exact: true }).fill(note);
   });
-  const hash = await saveOrder(a.page);
+  const orderPath = await saveOrder(a.page);
   await expect(detailValue(a.page, "Note")).toHaveText(note);
   await test.step("let the countdown run out", async () => {
     await showCountdown(a.page);
@@ -114,10 +115,10 @@ test("an expired countdown pays and its note reaches the contact and both histor
     expect(Date.now() - appearedAt).toBeGreaterThanOrEqual(8_000);
     expect(Date.now() - appearedAt).toBeLessThan(15_000);
     await expectReceived(b.page);
-    await expectPaidHistory(a.page, hash);
+    await expectPaidHistory(a.page, orderPath);
   });
   await test.step("the payer's history row shows the note", async () => {
-    await a.page.goto("/#wallet/transactions");
+    await gotoRoute(a.page, "wallet/transactions");
     await expect(a.page.getByTestId("recurring-order-note")).toHaveText(note);
     await expect(
       a.page
@@ -126,7 +127,7 @@ test("an expired countdown pays and its note reaches the contact and both histor
     ).toContainText(note);
   });
   await test.step("the contact's received payment shows the note", async () => {
-    await b.page.goto("/#wallet/transactions");
+    await gotoRoute(b.page, "wallet/transactions");
     await expect(
       b.page.getByTestId("transaction-card").filter({ hasText: note }),
     ).toHaveCount(1);
@@ -142,11 +143,11 @@ test("an overdue payment goes out right after the app launches", async ({
     await fundAndConnect(a, b);
     await openForm(a.page);
   });
-  const hash = await saveOrder(a.page);
+  const orderPath = await saveOrder(a.page);
   // Due a few seconds out, so no pass of the open app pays it before it closes.
   const due = await makeDue(a.page, nowSec() + 5);
   await test.step("keep the app closed past the due time", () =>
-    relaunchApp(a.page, "/#wallet", async () => {
+    relaunchApp(a.page, routeUrl("wallet"), async () => {
       expect(nowSec()).toBeLessThan(due);
       await waitUntil(due + 2);
     }));
@@ -157,7 +158,7 @@ test("an overdue payment goes out right after the app launches", async ({
       })
       .toBe(1);
     await expectReceived(b.page);
-    await expectPaidHistory(a.page, hash);
+    await expectPaidHistory(a.page, orderPath);
   });
 });
 
@@ -172,10 +173,10 @@ test("a run paid from the countdown and a background device at once goes out onc
     await expect
       .poll(() => readBalanceSat(a2.page), { timeout: 60_000 })
       .toBe(FUNDING_SAT);
-    await a2.page.goto("/#wallet/transactions");
+    await gotoRoute(a2.page, "wallet/transactions");
     await openForm(a.page);
   });
-  const hash = await saveOrder(a.page);
+  const orderPath = await saveOrder(a.page);
   await expect(a2.page.getByTestId("recurring-order-card")).toHaveCount(1);
   await test.step("A presses Pay while the hidden A2 runs its own pass", async () => {
     await showCountdown(a.page);
@@ -203,9 +204,10 @@ test("a run paid from the countdown and a background device at once goes out onc
         .toBe(1);
     }
     await expect(dueDialog(a.page)).toBeHidden();
-    for (const device of [a, a2]) await expectPaidHistory(device.page, hash);
-    await a.page.goto("/#wallet");
-    await a2.page.goto("/#wallet");
+    for (const device of [a, a2])
+      await expectPaidHistory(device.page, orderPath);
+    await gotoRoute(a.page, "wallet");
+    await gotoRoute(a2.page, "wallet");
     await expect
       .poll(
         async () => {
@@ -231,7 +233,7 @@ test("a contact with only a Lightning address is paid by melting the envelope", 
     await addLightningContact(a.page);
     await openForm(a.page);
   });
-  const hash = await saveOrder(a.page);
+  const orderPath = await saveOrder(a.page);
   expect((await readOrder(a.page)).rail).toBe("lightning");
   await test.step("the countdown's Pay pays the contact's invoice once", async () => {
     await showCountdown(a.page);
@@ -245,13 +247,13 @@ test("a contact with only a Lightning address is paid by melting the envelope", 
     ).toBeVisible({ timeout: 60_000 });
     expect(quoteIds).toHaveLength(1);
     expect(await invoicePaid(request, quoteIds[0] ?? "")).toBe(true);
-    await expectPaidHistory(a.page, hash);
+    await expectPaidHistory(a.page, orderPath);
   });
   await test.step("the paid run moves on and nothing more is paid", async () => {
     const order = await readOrder(a.page);
     expect(order.runCount).toBe(1);
     expect(order.nextDueAtSec).toBeGreaterThan(nowSec() + DAY_SEC / 2);
-    await a.page.goto("/#wallet");
+    await gotoRoute(a.page, "wallet");
     const balance = await readBalanceSat(a.page);
     // Paid once: the swap into the envelope and the melt each cost fees.
     expect(balance).toBeLessThanOrEqual(FUNDING_SAT - ORDER_SAT);
@@ -259,12 +261,12 @@ test("a contact with only a Lightning address is paid by melting the envelope", 
     expect(quoteIds).toHaveLength(1);
   });
   await test.step("two taps on Delete remove the payment", async () => {
-    await a.page.goto(`/${hash}`);
+    await gotoRoute(a.page, orderPath);
     await a.page.getByRole("button", { name: "Delete", exact: true }).click();
     await a.page
       .getByRole("button", { name: "Click once more to delete.", exact: true })
       .click();
-    await expect(a.page).toHaveURL(/#wallet\/transactions$/);
+    await expectRoute(a.page, "wallet/transactions");
     await expect(a.page.getByTestId("recurring-order-card")).toHaveCount(0);
   });
 });
@@ -303,7 +305,7 @@ test("editing amount and date saves the new values into the payment", async ({
     .poll(async () => (await readOrder(a.page)).nextDueAtSec)
     .toBe(Math.floor(newDate.getTime() / 60_000) * 60);
   await a.page.getByRole("button", { name: "Edit", exact: true }).click();
-  await expect(a.page).toHaveURL(/\/edit$/);
+  await expectRoute(a.page, /\/edit$/);
   await expect(
     a.page.getByRole("textbox", { name: "Next payment", exact: true }),
   ).toHaveValue(dateTimeLocal(newDate));
@@ -329,13 +331,13 @@ test("a fiat recurring amount stays fixed in CZK and shows only the display unit
     await expect(a.page.getByTestId("recurring-detail-amount")).toHaveText(
       "1 CZK",
     );
-    await a.page.goto("/#wallet/transactions");
+    await gotoRoute(a.page, "wallet/transactions");
     const card = a.page.getByTestId("recurring-order-card");
     await expect(card).toContainText("1 CZK");
     await expect(card).not.toContainText("sat");
-    await a.page.goto("/#wallet");
+    await gotoRoute(a.page, "wallet");
     await a.page.getByTitle("Switch unit", { exact: true }).click();
-    await a.page.goto("/#wallet/transactions");
+    await gotoRoute(a.page, "wallet/transactions");
     await expect(card).toContainText(`~${FIXTURE_AMOUNT_SAT} sat`);
     await expect(card).not.toContainText("CZK");
   });

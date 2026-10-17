@@ -17,14 +17,16 @@ import {
   safeSessionStorageSet,
 } from "../../utils/storage";
 import { nowSeconds } from "../../utils/time";
+import {
+  type StoredSpdRecord,
+  updateSpdRecords,
+} from "../../platform/bankPaymentOfferSpdStore";
 
 const isBankOfferId = Schema.is(BankOfferId);
 const isPubkey = Schema.is(Pubkey);
 
 const MINIMIZED_KEY_PREFIX = "linky.bank_payment_offer_minimized.v1";
 const LEGACY_SPD_KEY_PREFIX = "linky.bank_payment_offer_spd.v1";
-const SPD_DB_NAME = "linky.bank_payment_offer_spd";
-const SPD_STORE_NAME = "offers";
 const SPD_MAX_AGE_SEC = 60 * 60;
 const STAGGER_KEY_PREFIX = "linky.bank_payment_offer_stagger.v1";
 export const BANK_PAYMENT_OFFER_DETAILS_LOCK_KEY_PREFIX =
@@ -89,41 +91,13 @@ const isLiveSpdRecord = (
   record.createdAtSec <= nowSec &&
   nowSec - record.createdAtSec < SPD_MAX_AGE_SEC;
 
-const openSpdDb = (): Promise<IDBDatabase> =>
-  new Promise((resolve, reject) => {
-    const request = indexedDB.open(SPD_DB_NAME, 1);
-    request.onupgradeneeded = () => {
-      request.result.createObjectStore(SPD_STORE_NAME, { keyPath: "offerId" });
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-
-/**
- * Runs `run` in one transaction and resolves with what its returned getter
- * reads once the transaction committed. localStorage writes are flushed
- * asynchronously and a killed WebKit loses the last ones; a committed
- * IndexedDB transaction survives the kill.
- */
-const inSpdStore = async <A>(
-  mode: IDBTransactionMode,
-  run: (store: IDBObjectStore) => () => A,
-): Promise<A> => {
-  const db = await openSpdDb();
-  try {
-    const transaction = db.transaction(SPD_STORE_NAME, mode, {
-      durability: "strict",
-    });
-    const result = run(transaction.objectStore(SPD_STORE_NAME));
-    await new Promise<void>((resolve, reject) => {
-      transaction.oncomplete = () => resolve();
-      transaction.onabort = () => reject(transaction.error);
-    });
-    return result();
-  } finally {
-    db.close();
-  }
-};
+const findSpdRecord = (
+  stored: readonly StoredSpdRecord[],
+  offerId: BankOfferId,
+): BankPaymentOfferSpdRecord | null =>
+  Option.getOrNull(
+    decodeSpdRecord(stored.find((entry) => entry.offerId === offerId)?.value),
+  );
 
 const fromLegacySpdRecord = (key: string): BankPaymentOfferSpdRecord | null => {
   const offerId = decodeURIComponent(
@@ -158,19 +132,30 @@ const readSpdRecords = async (
 ): Promise<BankPaymentOfferSpdRecord[]> => {
   const legacy = legacySpdRecords();
   const nowSec = nowSeconds();
-  const records = await inSpdStore("readwrite", (store) => {
-    for (const { record } of legacy) if (record) store.put(record);
+  const records = await updateSpdRecords((stored) => {
     const live: BankPaymentOfferSpdRecord[] = [];
-    const request = store.openCursor();
-    request.onsuccess = () => {
-      const cursor = request.result;
-      if (!cursor) return;
-      const record = Option.getOrNull(decodeSpdRecord(cursor.value));
+    const expired: string[] = [];
+    const legacyRecords = legacy.flatMap(({ record }) =>
+      record ? [record] : [],
+    );
+    const legacyIds = new Set<string>(
+      legacyRecords.map((record) => record.offerId),
+    );
+    for (const entry of stored) {
+      if (legacyIds.has(entry.offerId)) continue;
+      const record = Option.getOrNull(decodeSpdRecord(entry.value));
       if (record && isLiveSpdRecord(record, nowSec)) live.push(record);
-      else cursor.delete();
-      cursor.continue();
+      else expired.push(entry.offerId);
+    }
+    for (const record of legacyRecords) {
+      if (isLiveSpdRecord(record, nowSec)) live.push(record);
+      else expired.push(record.offerId);
+    }
+    return {
+      put: legacyRecords.filter((record) => !expired.includes(record.offerId)),
+      remove: expired,
+      result: live,
     };
-    return () => live;
   });
   for (const { key } of legacy) safeLocalStorageRemove(key);
   return records.filter((record) => record.ownerPubkey === ownerPubkey);
@@ -191,10 +176,7 @@ export const rememberBankPaymentOfferSpdPayload = async (args: {
     ...(args.singleTabRiskAccepted ? { singleTabRiskAccepted: true } : {}),
     spdPayload,
   };
-  await inSpdStore("readwrite", (store) => {
-    store.put(record);
-    return () => undefined;
-  });
+  await updateSpdRecords(() => ({ put: [record], remove: [], result: null }));
 };
 
 export const readBankPaymentOfferSpdRecord = async (args: {
@@ -225,23 +207,22 @@ export const reserveBankPaymentOfferBankDetails = async (args: {
   peer: Pubkey;
 }): Promise<boolean> => {
   const reserve = () =>
-    inSpdStore("readwrite", (store) => {
-      let pinned: Pubkey | null = null;
-      const request = store.get(args.offerId);
-      request.onsuccess = () => {
-        const record = Option.getOrNull(decodeSpdRecord(request.result));
-        if (
-          !record ||
-          record.ownerPubkey !== args.ownerPubkey ||
-          !isLiveSpdRecord(record, nowSeconds())
-        )
-          return;
-        if (!record.pin) {
-          store.put({ ...record, pin: { delivered: false, peer: args.peer } });
-        }
-        pinned = record.pin?.peer ?? args.peer;
+    updateSpdRecords((stored) => {
+      const record = findSpdRecord(stored, args.offerId);
+      if (
+        !record ||
+        record.ownerPubkey !== args.ownerPubkey ||
+        !isLiveSpdRecord(record, nowSeconds())
+      )
+        return { put: [], remove: [], result: false };
+      if (record.pin) {
+        return { put: [], remove: [], result: record.pin.peer === args.peer };
+      }
+      return {
+        put: [{ ...record, pin: { delivered: false, peer: args.peer } }],
+        remove: [],
+        result: true,
       };
-      return () => pinned === args.peer;
     });
   if (canLockAcrossTabs()) {
     return navigator.locks.request(
@@ -260,25 +241,23 @@ export const markBankPaymentOfferBankDetailsDelivered = (args: {
   offerId: BankOfferId;
   peer: Pubkey;
 }): Promise<void> =>
-  inSpdStore("readwrite", (store) => {
-    const request = store.get(args.offerId);
-    request.onsuccess = () => {
-      const record = Option.getOrNull(decodeSpdRecord(request.result));
-      if (record?.pin?.peer === args.peer) {
-        store.put({ ...record, pin: { delivered: true, peer: args.peer } });
-      }
+  updateSpdRecords((stored) => {
+    const record = findSpdRecord(stored, args.offerId);
+    return {
+      put:
+        record?.pin?.peer === args.peer
+          ? [{ ...record, pin: { delivered: true, peer: args.peer } }]
+          : [],
+      remove: [],
+      result: undefined,
     };
-    return () => undefined;
   });
 
 export const forgetBankPaymentOfferSpdPayloads = async (
   offerIds: readonly BankOfferId[],
 ): Promise<void> => {
   if (offerIds.length === 0) return;
-  await inSpdStore("readwrite", (store) => {
-    for (const offerId of offerIds) store.delete(offerId);
-    return () => undefined;
-  });
+  await updateSpdRecords(() => ({ put: [], remove: offerIds, result: null }));
 };
 
 const staggerKey = (offerId: BankOfferId): string =>

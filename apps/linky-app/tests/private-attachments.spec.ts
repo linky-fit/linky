@@ -6,6 +6,7 @@ import { addContactByNpub } from "./helpers/contacts";
 import { watchAppErrors } from "./helpers/diagnostics";
 import { createSeedIdentity, setSeedLoginStorage } from "./helpers/identity";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
+import { gotoRoute } from "./helpers/routes";
 
 const makePdf = (): Buffer => {
   const stream = "BT /F1 24 Tf 40 100 Td (Private attachment smoke) Tj ET";
@@ -83,7 +84,7 @@ test("private images and PDFs reach a peer, decrypt, save and share with seen re
       if (!body) return route.fallback();
       await route.fulfill({ headers, body, contentType: "text/plain" });
     });
-    await page.goto("/#wallet");
+    await gotoRoute(page, "wallet");
     await expect(page.getByLabel("Available balance")).toBeVisible();
     accounts.push({ context, page, identity, errors });
   }

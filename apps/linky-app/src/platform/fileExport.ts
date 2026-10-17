@@ -1,29 +1,15 @@
 import { Directory, Filesystem } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
+import { type FileExport, type PhotoLibrarySave } from "./fileExportShared";
 import { isNativePlatform } from "./runtime";
 
+export {
+  type FileExport,
+  isCancelledShareError,
+  type PhotoLibrarySave,
+} from "./fileExportShared";
+
 const NATIVE_EXPORT_DIRECTORY = "linky-exports";
-
-export interface FileExport {
-  blob: Blob;
-  fileName: string;
-  /** Title of the native share sheet; browsers save the file directly. */
-  title: string;
-}
-
-export const isCancelledShareError = (error: unknown): boolean => {
-  if (typeof error !== "object" || error === null) return false;
-
-  const name =
-    "name" in error && typeof error.name === "string" ? error.name : "";
-  if (name === "AbortError") return true;
-
-  const message =
-    "message" in error && typeof error.message === "string"
-      ? error.message
-      : "";
-  return /cancel|abort|dismiss/i.test(message);
-};
 
 const blobToBase64 = (blob: Blob): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -73,3 +59,8 @@ export const saveFile = async (file: FileExport): Promise<void> => {
   }
   downloadFileInBrowser(file.blob, file.fileName);
 };
+
+/** Browsers and the Capacitor shells have no photo library to save to: null saves a file instead. */
+export const saveImageToPhotoLibrary:
+  | ((file: FileExport) => Promise<PhotoLibrarySave>)
+  | null = null;

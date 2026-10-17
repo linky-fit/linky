@@ -1,4 +1,5 @@
-import { navigateTo } from "../../hooks/useRouting";
+import { reloadAtRoutePath } from "../../platform/navigation";
+import { routePathFor } from "../../types/route";
 import {
   appOwnerFromMnemonic,
   NonEmptyString100,
@@ -67,6 +68,8 @@ import {
 } from "../../utils/slip39Nostr";
 import { looksLikeSlip39Share } from "@linky-fit/identity";
 import { myProfileMetadataAtom } from "../state/contacts/profiles";
+import { secretsWriteFailureAtom } from "../state/session/secretsWrite";
+import { SecretsWriteFailed } from "../../platform/secureStoreSecrets";
 import {
   attachedNpubAtom,
   attachedNsecAtom,
@@ -97,6 +100,7 @@ import {
 } from "../lib/keySwitchProfile";
 import { fetchOwnedLightningAddress } from "../../utils/npubCashInfo";
 import type { I18nKey, Translate } from "../../i18n";
+import { reloadApp } from "../../platform/reload";
 
 export type { NostrIdentitySource };
 
@@ -476,6 +480,7 @@ export const useProfileAuthDomain = ({
     ],
   );
 
+  const setSecretsWriteFailure = useAtomSet(secretsWriteFailureAtom);
   const setIdentityFromNsecAndReload = React.useCallback(
     async (
       nsec: string,
@@ -540,44 +545,58 @@ export const useProfileAuthDomain = ({
         return;
       }
 
-      if (options?.attachNsec)
-        await writeStoredAttachedNsec(options.attachNsec);
-      await persistIdentitySecrets({
-        appMnemonic,
-        cashuMnemonic: derivedCashuMnemonic,
-        identitySource,
-        nsec: raw,
-        slip39Seed: normalizedSlip39,
-        switchedAtSec,
-      });
-      if (options?.restoredAccount === true)
-        markAwaitingFirstHydration(localStorageKv, appMnemonic);
-
-      if (options?.persistSyncedIdentity !== false) {
-        await upsertActiveNostrIdentity(raw, identitySource, switchedAtSec);
-      }
-
-      if (shouldRecordChatNotice) {
-        await messagesCommands?.appendIdentityChangeNotices({
-          changedAtSec,
+      const storeAndReload = async (): Promise<void> => {
+        if (options?.attachNsec)
+          await writeStoredAttachedNsec(options.attachNsec);
+        await persistIdentitySecrets({
+          appMnemonic,
+          cashuMnemonic: derivedCashuMnemonic,
           identitySource,
+          nsec: raw,
+          slip39Seed: normalizedSlip39,
+          switchedAtSec,
         });
-      }
+        if (options?.restoredAccount === true)
+          markAwaitingFirstHydration(localStorageKv, appMnemonic);
 
-      clearLegacyLaneStorage();
+        if (options?.persistSyncedIdentity !== false) {
+          await upsertActiveNostrIdentity(raw, identitySource, switchedAtSec);
+        }
 
-      setIsSeedLogin(true);
-      setActiveNostrIdentitySource(identitySource);
-      setSlip39Seed(normalizedSlip39);
-      setCashuSeedMnemonic(derivedCashuMnemonic);
+        if (shouldRecordChatNotice) {
+          await messagesCommands?.appendIdentityChangeNotices({
+            changedAtSec,
+            identitySource,
+          });
+        }
 
-      navigateTo({ route: "contacts" });
-      stopBeaconForIdentityChange();
-      // The next boot creates the Evolu instance from the app mnemonic saved
-      // above. Resetting the currently open instance here is both unnecessary
-      // and unsafe: Evolu's restore promise stays pending when its DB reset
-      // fails, which would leave onboarding busy forever and skip this reload.
-      globalThis.location.reload();
+        clearLegacyLaneStorage();
+
+        setIsSeedLogin(true);
+        setActiveNostrIdentitySource(identitySource);
+        setSlip39Seed(normalizedSlip39);
+        setCashuSeedMnemonic(derivedCashuMnemonic);
+
+        stopBeaconForIdentityChange();
+        // The next boot creates the Evolu instance from the app mnemonic saved
+        // above. Resetting the currently open instance here is both unnecessary
+        // and unsafe: Evolu's restore promise stays pending when its DB reset
+        // fails, which would leave onboarding busy forever and skip this reload.
+        reloadAtRoutePath(routePathFor({ route: "contacts" }));
+      };
+      // The secure store refused the keys (native only): they stay in memory
+      // until a retry stores them or the user cancels.
+      const retry = async (): Promise<boolean> => {
+        try {
+          await storeAndReload();
+          return true;
+        } catch (error) {
+          if (!(error instanceof SecretsWriteFailed)) throw error;
+          return false;
+        }
+      };
+      if (!(await retry()))
+        setSecretsWriteFailure({ backupWords: normalizedSlip39, retry });
     },
     [
       currentNsec,
@@ -588,6 +607,7 @@ export const useProfileAuthDomain = ({
       pushToast,
       t,
       upsertActiveNostrIdentity,
+      setSecretsWriteFailure,
       setSlip39Seed,
     ],
   );
@@ -1260,7 +1280,7 @@ export const useProfileAuthDomain = ({
         // Native secret storage lives outside the site data the wipe deletes.
         await clearIdentitySecrets();
         markLogoutPending();
-        globalThis.location.reload();
+        reloadApp();
       })();
     },
     [logoutArmed, pushToast, t, setLogoutArmed],
@@ -1269,12 +1289,12 @@ export const useProfileAuthDomain = ({
   React.useEffect(() => {
     if (!logoutArmed) return;
 
-    const timeoutId = window.setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       setLogoutArmed(false);
     }, 5000);
 
     return () => {
-      window.clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
     };
   }, [logoutArmed, setLogoutArmed]);
 

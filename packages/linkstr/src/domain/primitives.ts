@@ -55,13 +55,16 @@ export const ClientId = Schema.Trimmed.check(Schema.isNonEmpty()).pipe(
 export type ClientId = typeof ClientId.Type;
 export const isClientId = Schema.is(ClientId);
 
+// Loopback plus the RFC 1918 ranges, so a phone can reach a dev machine's relay.
+const LOCAL_HOST =
+  /^(localhost|127\.0\.0\.1|\[::1\]|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+)$/;
+
 const isRelayUrl = (value: string): boolean => {
   try {
     const url = new URL(value);
     return (
       (url.protocol === "wss:" ||
-        (url.protocol === "ws:" &&
-          ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))) &&
+        (url.protocol === "ws:" && LOCAL_HOST.test(url.hostname))) &&
       url.hostname.length > 0 &&
       url.username === "" &&
       url.password === "" &&
@@ -76,7 +79,7 @@ export const RelayUrl = Schema.Trimmed.check(
   Schema.isNonEmpty(),
   Schema.makeFilter(isRelayUrl, {
     expected:
-      "a wss:// URL, or a loopback ws:// URL for explicitly enabled local development",
+      "a wss:// URL, or a loopback or private-network ws:// URL for explicitly enabled local development",
   }),
 ).pipe(Schema.brand("RelayUrl"));
 export type RelayUrl = typeof RelayUrl.Type;

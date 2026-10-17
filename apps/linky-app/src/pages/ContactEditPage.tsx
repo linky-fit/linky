@@ -14,6 +14,7 @@ import type { ContactId } from "../evolu";
 import { ContactFields, type ContactFormData } from "./ContactNewPage";
 import type { Translate } from "../i18n";
 import { PageCard } from "../components/PageCard";
+import { guideTarget } from "../app/lib/guideTargets";
 
 interface Contact {
   id: ContactId;
@@ -109,7 +110,7 @@ export const ContactEditPage: FC<ContactEditPageProps> = ({
         ) : (
           <Button
             onPress={handleSaveContact}
-            data-guide="contact-save"
+            {...guideTarget("contact-save")}
             loading={isSavingContact}
           >
             {t("saveContact")}

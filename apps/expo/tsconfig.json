@@ -1,0 +1,22 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./tsconfig.app.json"
+    },
+    {
+      "path": "./tsconfig.node.json"
+    },
+    {
+      "path": "./tsconfig.native.json"
+    },
+    {
+      "path": "./tsconfig.contract.json"
+    },
+    {
+      "path": "./tsconfig.test.json"
+    }
+  ],
+  "compilerOptions": {},
+  "extends": "expo/tsconfig.base"
+}

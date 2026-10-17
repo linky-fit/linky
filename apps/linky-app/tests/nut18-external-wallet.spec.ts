@@ -7,6 +7,7 @@ import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
 import { NOSTR_RELAY_URL } from "./helpers/stack";
 import { watchNostrInbox } from "./helpers/relay";
 import { shardRows } from "./helpers/linkyHooks";
+import { expectRoute, gotoRoute } from "./helpers/routes";
 import {
   ExternalWallet,
   mintToken,
@@ -31,13 +32,13 @@ const enterAmount = async (page: Page, amount: number) => {
 };
 
 const importFunds = async (page: Page, mint: string, amount: number) => {
-  await page.goto("/#wallet/token/new");
+  await gotoRoute(page, "wallet/token/new");
   await page.locator("textarea").fill(await mintToken(mint, amount));
-  await expect(page).toHaveURL(/#wallet\/tokens$/);
+  await expectRoute(page, "wallet/tokens");
 };
 
 const chooseDefaultMint = async (page: Page, mint: string) => {
-  await page.goto("/#advanced/mints/new");
+  await gotoRoute(page, "advanced/mints/new");
   await page.getByLabel("Mint URL").fill(mint);
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect(
@@ -48,7 +49,7 @@ const chooseDefaultMint = async (page: Page, mint: string) => {
 };
 
 const pasteRequest = async (page: Page, request: string) => {
-  await page.goto("/#wallet");
+  await gotoRoute(page, "wallet");
   await page.evaluate((text) => {
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
@@ -111,7 +112,10 @@ for (const scenario of scenarios) {
       await importFunds(page, mintUrl, 128);
       if ("fundBoth" in scenario) {
         await importFunds(page, targetMintUrl, 64);
-        await page.goto(`/#advanced/mint/${encodeURIComponent(targetMintUrl)}`);
+        await gotoRoute(
+          page,
+          `advanced/mint/${encodeURIComponent(targetMintUrl)}`,
+        );
         await expect(page.getByLabel("Balance", { exact: true })).toContainText(
           "63",
         );
@@ -252,14 +256,14 @@ test("external wallet: 7 Linky QR and conversation requests, 8 bare token, 9 wro
         json: { ...body, state: "UNPAID", paid: false },
       });
     });
-    await page.goto("/#wallet");
+    await gotoRoute(page, "wallet");
     await expect(page.getByLabel("Available balance")).toBeVisible();
     await inboxReady();
     await chooseDefaultMint(page, targetMintUrl);
     await chooseDefaultMint(page, mintUrl);
     await addContactByNpub(page, nip19.npubEncode(external.pubkey));
     const conversationUrl = page.url();
-    await page.goto("/#wallet/topup");
+    await gotoRoute(page, "wallet/topup");
     await enterAmount(page, 8);
     await page.evaluate(() => {
       Object.defineProperty(navigator, "clipboard", {
@@ -308,7 +312,7 @@ test("external wallet: 7 Linky QR and conversation requests, 8 bare token, 9 wro
         )
         .toBe(1);
       await expect(page.getByTestId("topup-invoice-qr")).toBeVisible();
-      await expect(page).toHaveURL(/#wallet\/topup\/invoice$/);
+      await expectRoute(page, "wallet/topup/invoice");
     });
     await test.step("9 a wrong request id receives funds without completing the topup", async () => {
       await external.pay(request, `wrong-${request.id}`);
@@ -321,11 +325,11 @@ test("external wallet: 7 Linky QR and conversation requests, 8 bare token, 9 wro
         )
         .toBe(2);
       await expect(page.getByTestId("topup-invoice-qr")).toBeVisible();
-      await expect(page).toHaveURL(/#wallet\/topup\/invoice$/);
+      await expectRoute(page, "wallet/topup/invoice");
     });
     await test.step("7 the matching payload completes the QR topup", async () => {
       await external.pay(request);
-      await expect(page).toHaveURL(/#wallet$/);
+      await expectRoute(page, "wallet");
       await expect.poll(() => readBalanceSat(page)).toBe(24);
     });
     await test.step("7 a conversation request is decoded and paid independently", async () => {
@@ -379,7 +383,7 @@ test("external wallet: 7 Linky QR and conversation requests, 8 bare token, 9 wro
       await expect(card).toHaveAttribute("data-status", "requested");
       await external.pay(chatRequest);
       await expect(card).toHaveAttribute("data-status", "paid");
-      await page.goto("/#wallet");
+      await gotoRoute(page, "wallet");
       await expect.poll(() => readBalanceSat(page)).toBe(48);
     });
   } finally {

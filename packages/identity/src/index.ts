@@ -3,6 +3,7 @@ export { IdentityProvider, IdentityProviderError } from "./IdentityProvider";
 export { MasterSecretProvider } from "./MasterSecretProvider";
 export {
   deriveCashuMnemonicFromMasterSecret,
+  deriveNostrSecretKeyFromMasterSecret,
   deriveOwnerMnemonicsFromMasterSecret,
   parseOwnerLaneIndex,
   type OwnerMnemonicRequest,

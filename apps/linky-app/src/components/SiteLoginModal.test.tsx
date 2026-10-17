@@ -167,6 +167,28 @@ describe("SiteLoginModal", () => {
     await view.unmount();
   });
 
+  it("cancels on Escape, but not while the login is in flight", async () => {
+    const pressEscape = () =>
+      act(async () => {
+        document.activeElement?.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+        );
+      });
+    const onClose = vi.fn();
+    const busy = await renderModal(verifiedCallback, {
+      onClose,
+      phase: "busy",
+    });
+    await pressEscape();
+    expect(onClose).not.toHaveBeenCalled();
+    await busy.unmount();
+
+    const view = await renderModal(verifiedCallback, { onClose });
+    await pressEscape();
+    expect(onClose).toHaveBeenCalledOnce();
+    await view.unmount();
+  });
+
   it("announces the device link and names it on the button when the site asks for it", async () => {
     const view = await renderModal(
       relayLogin(["sign_event:24139", DEVICE_AUTHORIZATION_PERMISSION]),

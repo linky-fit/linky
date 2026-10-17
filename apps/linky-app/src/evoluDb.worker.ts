@@ -8,11 +8,14 @@ import {
   createWebSocket,
 } from "@evolu/common";
 import { createWasmSqliteDriver } from "@evolu/web";
-import { runOwnerSyncDbWorker } from "@linky-fit/linksync/evolu/worker";
+import {
+  guardOpfsIdle,
+  runOwnerSyncDbWorker,
+} from "@linky-fit/linksync/evolu/worker";
 
 runOwnerSyncDbWorker(self, {
   console: createConsole(),
-  createSqliteDriver: createWasmSqliteDriver,
+  createSqliteDriver: guardOpfsIdle(createWasmSqliteDriver),
   createWebSocket,
   random: createRandom(),
   randomBytes: createRandomBytes(),

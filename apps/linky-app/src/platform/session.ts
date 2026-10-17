@@ -10,7 +10,17 @@ import {
   setStoredPushNsec,
 } from "../utils/pushNsecStorage";
 import { asNonEmptyString } from "../utils/validation";
-import type { PlatformPorts, SecretRead, SecretsPort } from "./ports";
+import {
+  readAppMnemonicState,
+  writeAppMnemonicState,
+  type AppMnemonicState,
+} from "./appMnemonicState";
+import type {
+  KeyValuePort,
+  PlatformPorts,
+  SecretRead,
+  SecretsPort,
+} from "./ports";
 
 export interface SessionSecrets {
   readonly nsec: string;
@@ -34,7 +44,10 @@ export type SessionState =
       /** Failed in the secure store with no localStorage copy: unknown, not missing. */
       readonly unreadable: ReadonlySet<keyof SessionSecrets>;
     }
-  // The secure store failed and the fallback holds no nsec; renders as signed out for now.
+  /**
+   * The secure store failed and the fallback holds no nsec, or no app
+   * mnemonic this device may hold; nothing opens until the user decides.
+   */
   | { readonly _tag: "SecretsUnavailable"; readonly cause: string };
 
 export type SignedInSession = Extract<
@@ -99,6 +112,23 @@ const readKey = async (
 const describeFailures = (reads: ReadonlyArray<KeyRead>): string =>
   reads.map(({ key, failure }) => `${key}: ${failure}`).join("; ");
 
+/** The marker after this read: a found mnemonic raises it, a definite miss only fills an unknown one. */
+const settleAppMnemonicState = (
+  kv: KeyValuePort,
+  read: KeyRead,
+): AppMnemonicState | null => {
+  const stored = readAppMnemonicState(kv);
+  // Android's bridge reports a failed read as a miss, so a miss never lowers a recorded marker.
+  const next =
+    read.value !== null
+      ? "present"
+      : read.failure === null
+        ? (stored ?? "absent")
+        : stored;
+  if (next !== null && next !== stored) writeAppMnemonicState(kv, next);
+  return next;
+};
+
 /**
  * The identity secrets this page load runs on: the secure store first, the
  * localStorage copy when it has nothing or fails.
@@ -116,6 +146,7 @@ export const loadSession = async (
     (read) => read.failure !== null,
   );
   const keys = failed.map((read) => read.key);
+  const appMnemonicState = settleAppMnemonicState(ports.kv, appMnemonic);
   if (nsec.value === null) {
     if (nsec.failure === null) return { _tag: "SignedOut" };
     reportAppLog({
@@ -125,6 +156,18 @@ export const loadSession = async (
     });
     return { _tag: "SecretsUnavailable", cause: describeFailures(failed) };
   }
+  // Without the app mnemonic Evolu would open the empty anonymous database.
+  if (appMnemonic.value === null && appMnemonicState !== "absent") {
+    reportAppLog({
+      tag: "session.appMnemonicUnreadable",
+      summary: `No app mnemonic could be read, though this device ${appMnemonicState === "present" ? "holds one" : "may hold one"}; asking the user`,
+      payload: { keys, appMnemonicState: appMnemonicState ?? "unknown" },
+    });
+    return {
+      _tag: "SecretsUnavailable",
+      cause: describeFailures(failed) || `${appMnemonic.key}: missing`,
+    };
+  }
   const secrets: SessionSecrets = {
     nsec: nsec.value,
     appMnemonic: appMnemonic.value,
@@ -133,7 +176,10 @@ export const loadSession = async (
   };
   if (failed.length === 0)
     return { _tag: "SignedIn", secrets, degraded: false };
-  const unreadable = failed.filter((read) => read.value === null);
+  // An app mnemonic that got here unread is recorded as absent: missing, not unknown.
+  const unreadable = failed.filter(
+    (read) => read.value === null && read.name !== "appMnemonic",
+  );
   reportAppLog({
     tag: "session.secretsDegraded",
     summary: `Secure storage failed for ${failed.length} secrets; using their localStorage copies`,

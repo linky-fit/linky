@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { MOBILE_VIEWPORT, setBaseStorage } from "./helpers/appState";
 import { setRandomIdentityStorage } from "./helpers/identity";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
+import { gotoRoute } from "./helpers/routes";
 
 test.use({ serviceWorkers: "block", viewport: MOBILE_VIEWPORT });
 
@@ -60,11 +61,11 @@ test("only the tilt toggle requests permission and a new launch requires a new g
   const toggle = page.getByRole("switch", { name: "Tilt to show profile" });
   const overlay = page.getByRole("dialog", { name: "Your contact" });
 
-  await page.goto("/#");
+  await gotoRoute(page, "contacts");
   await page.getByTestId("profile-qr-button").click();
   await expect(page.getByTestId("profile-detail")).toBeVisible();
   expect(await requests()).toBe(0);
-  await page.goto("/#settings");
+  await gotoRoute(page, "settings");
   await expect(toggle).not.toBeChecked();
   await tilt(page);
   await expect(overlay).not.toBeVisible();
@@ -90,11 +91,11 @@ test("only the tilt toggle requests permission and a new launch requires a new g
   await tilt(page);
   await expect(overlay).toBeVisible();
   await overlay.click();
-  await page.goto("/#");
+  await gotoRoute(page, "contacts");
   await page.getByTestId("profile-qr-button").click();
   await expect(page.getByTestId("profile-detail")).toBeVisible();
   expect(await requests()).toBe(3);
-  await page.goto("/#settings");
+  await gotoRoute(page, "settings");
   await expect(toggle).toBeChecked();
   await toggle.click();
   await expect(toggle).not.toBeChecked();
@@ -118,7 +119,7 @@ test("only the tilt toggle requests permission and a new launch requires a new g
   await expect.poll(requests).toBe(1);
   await answer("granted");
   await expect(toggle).toBeChecked();
-  await page.goto("/#advanced/inspector/timeline");
+  await gotoRoute(page, "advanced/inspector/timeline");
   await page
     .getByRole("searchbox", { name: "Filter rows" })
     .fill("profileShare.tiltSettingChanged");
@@ -136,7 +137,7 @@ test("browsers without a permission API retain the saved tilt preference", async
       value: undefined,
     });
   });
-  await page.goto("/#settings");
+  await gotoRoute(page, "settings");
   const toggle = page.getByRole("switch", { name: "Tilt to show profile" });
   await expect(toggle).toBeChecked();
   await toggle.click();

@@ -4,6 +4,7 @@ import { createSeedIdentity, setSeedLoginStorage } from "./helpers/identity";
 import { addContactByNpub } from "./helpers/contacts";
 import { stubFiatRates } from "./helpers/network";
 import { watchAppErrors, expectNoBootErrorPanel } from "./helpers/diagnostics";
+import { gotoRoute } from "./helpers/routes";
 
 test("chat reaches a peer, edit and reaction survive reload with the service worker active", async ({
   browser,
@@ -29,7 +30,7 @@ test("chat reaches a peer, edit and reaction survive reload with the service wor
       localStorage.setItem("linky.seen_receipts_enabled_at_sec.v1", "1");
     });
     await stubFiatRates(page);
-    await page.goto("/#wallet");
+    await gotoRoute(page, "wallet");
     await expect(page.getByLabel("Available balance")).toBeVisible();
     await page.evaluate(async () => {
       await navigator.serviceWorker.ready;

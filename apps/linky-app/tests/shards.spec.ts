@@ -19,6 +19,7 @@ import {
 } from "./helpers/identity";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
 import { topUp } from "./helpers/wallet";
+import { gotoRoute } from "./helpers/routes";
 
 declare global {
   interface Window {
@@ -87,7 +88,7 @@ const openDevice = async (
   await setSeedLoginStorage(page, identity);
   await stubFiatRates(page);
   await stubThirdPartyAssets(page);
-  await page.goto("/#wallet");
+  await gotoRoute(page, "wallet");
   await expect(page.getByLabel("Available balance")).toBeVisible();
   return { context, page, errors, label };
 };
@@ -99,7 +100,7 @@ const readCurrentRows = async (page: Page): Promise<number> => {
 };
 
 const rotateFromDebugPage = async (page: Page, scope: string) => {
-  await page.goto("/#evolu-current-data");
+  await gotoRoute(page, "evolu-current-data");
   await page
     .getByRole("button", { name: `Rotate ${scope} shard`, exact: true })
     .click();
@@ -116,7 +117,7 @@ test("shard rotations keep old rows, copy edited rows forward, sync new writes, 
   const devices = [source, follower];
   const closers = [source.context, follower.context];
   try {
-    await follower.page.goto("/#evolu-servers");
+    await gotoRoute(follower.page, "evolu-servers");
     const initialRows = await readCurrentRows(follower.page);
     const contactId = await addContactByNpub(source.page, peer.npub);
     await source.page
@@ -127,13 +128,13 @@ test("shard rotations keep old rows, copy edited rows forward, sync new writes, 
       .locator('[data-guide="chat-input"]')
       .fill("Also before rotation");
     await source.page.locator('[data-guide="chat-send"]').click();
-    await follower.page.goto(`/#chat/${contactId}`);
+    await gotoRoute(follower.page, `chat/${contactId}`);
     for (const text of ["Before shard rotation", "Also before rotation"])
       await expect(
         follower.page.getByTestId("chat-bubble").filter({ hasText: text }),
       ).toBeVisible();
     await test.step("the follower's Evolu row counts include the synced rows without a reload", async () => {
-      await follower.page.goto("/#evolu-servers");
+      await gotoRoute(follower.page, "evolu-servers");
       await expect
         .poll(() => readCurrentRows(follower.page))
         .toBeGreaterThan(initialRows);
@@ -169,7 +170,7 @@ test("shard rotations keep old rows, copy edited rows forward, sync new writes, 
     await topUp(source.page, 32);
     await expect.poll(() => readBalanceSat(source.page)).toBe(32);
     for (const device of devices) {
-      await device.page.goto("/#wallet/transactions");
+      await gotoRoute(device.page, "wallet/transactions");
       await expect(device.page.getByTestId("transaction-card")).toHaveCount(1);
     }
 
@@ -183,7 +184,7 @@ test("shard rotations keep old rows, copy edited rows forward, sync new writes, 
     });
 
     await test.step("an edit of a row born in shard 0 lands as a copy in shard 1 on the other device", async () => {
-      await source.page.goto(`/#contact/${contactId}/edit`);
+      await gotoRoute(source.page, `contact/${contactId}/edit`);
       await source.page
         .getByRole("textbox", { name: "Name", exact: true })
         .fill("Updated after rotation");
@@ -208,14 +209,14 @@ test("shard rotations keep old rows, copy edited rows forward, sync new writes, 
         .toEqual({ name: "Updated after rotation", ownerId: contactsShard1 });
       const nextPeer = await createSeedIdentity();
       await addContactByNpub(source.page, nextPeer.npub);
-      await follower.page.goto("/#contacts");
+      await gotoRoute(follower.page, "contacts");
       await expect(
         follower.page.locator('[data-guide="contact-card"]'),
       ).toHaveCount(2);
     });
 
     await test.step("new messages and topups coexist with shard 0 history", async () => {
-      await source.page.goto(`/#chat/${contactId}`);
+      await gotoRoute(source.page, `chat/${contactId}`);
       await source.page
         .locator('[data-guide="chat-input"]')
         .fill("After shard rotation");
@@ -223,18 +224,18 @@ test("shard rotations keep old rows, copy edited rows forward, sync new writes, 
       await topUp(source.page, 16);
       await expect.poll(() => readBalanceSat(source.page)).toBe(48);
       for (const device of devices) {
-        await device.page.goto("/#wallet/transactions");
+        await gotoRoute(device.page, "wallet/transactions");
         await expect(device.page.getByTestId("transaction-card")).toHaveCount(
           2,
         );
       }
       for (const device of devices) {
         await device.page.reload();
-        await device.page.goto("/#contacts");
+        await gotoRoute(device.page, "contacts");
         await expect(
           device.page.locator('[data-guide="contact-card"]'),
         ).toHaveCount(2);
-        await device.page.goto(`/#chat/${contactId}`);
+        await gotoRoute(device.page, `chat/${contactId}`);
         for (const text of [
           "Before shard rotation",
           "Also before rotation",
@@ -243,7 +244,7 @@ test("shard rotations keep old rows, copy edited rows forward, sync new writes, 
           await expect(
             device.page.getByTestId("chat-bubble").filter({ hasText: text }),
           ).toBeVisible();
-        await device.page.goto("/#wallet/transactions");
+        await gotoRoute(device.page, "wallet/transactions");
         await expect(device.page.getByTestId("transaction-card")).toHaveCount(
           2,
         );
@@ -252,7 +253,7 @@ test("shard rotations keep old rows, copy edited rows forward, sync new writes, 
     });
 
     await test.step("an edit of a shard 0 message lands as a copy in shard 1 on the other device", async () => {
-      await source.page.goto(`/#chat/${contactId}`);
+      await gotoRoute(source.page, `chat/${contactId}`);
       await source.page
         .getByTestId("chat-bubble")
         .filter({ hasText: "Before shard rotation" })
@@ -285,7 +286,7 @@ test("shard rotations keep old rows, copy edited rows forward, sync new writes, 
           return row ? { isEdited: row.isEdited, ownerId: row.ownerId } : null;
         })
         .toEqual({ isEdited: "1", ownerId: messagesShard1 });
-      await follower.page.goto(`/#chat/${contactId}`);
+      await gotoRoute(follower.page, `chat/${contactId}`);
       await expect(
         follower.page
           .getByTestId("chat-message")
@@ -327,11 +328,11 @@ test("shard rotations keep old rows, copy edited rows forward, sync new writes, 
       expect(await hooks.syncOwnerIds(fresh.page)).not.toContain(
         messagesShard0,
       );
-      await fresh.page.goto("/#contacts");
+      await gotoRoute(fresh.page, "contacts");
       await expect(
         fresh.page.locator('[data-guide="contact-card"]'),
       ).toHaveCount(2);
-      await fresh.page.goto(`/#chat/${contactId}`);
+      await gotoRoute(fresh.page, `chat/${contactId}`);
       for (const text of [
         "After shard rotation",
         "Before shard rotation, edited",
@@ -344,9 +345,9 @@ test("shard rotations keep old rows, copy edited rows forward, sync new writes, 
           .getByTestId("chat-bubble")
           .filter({ hasText: "Also before rotation" }),
       ).toHaveCount(0);
-      await fresh.page.goto("/#wallet/transactions");
+      await gotoRoute(fresh.page, "wallet/transactions");
       await expect(fresh.page.getByTestId("transaction-card")).toHaveCount(2);
-      await fresh.page.goto("/#wallet");
+      await gotoRoute(fresh.page, "wallet");
       await expect.poll(() => readBalanceSat(fresh.page)).toBe(48);
       await testInfo.attach("fresh device after forgetting shard 0", {
         body: await fresh.page.screenshot(),
@@ -382,7 +383,7 @@ test("natural message rotations retain local history until forget and sync only 
     const proofs = await hooks.shardRows(source.page, "cashu", "cashuProof");
     expect(proofs.length).toBeGreaterThan(0);
     const contacts = await hooks.shardRows(source.page, "contacts", "contact");
-    await source.page.goto(`/#chat/${contactId}`);
+    await gotoRoute(source.page, `chat/${contactId}`);
     await source.page.evaluate(() =>
       window.__linkyE2E?.setMessagesRotation(true),
     );
@@ -525,7 +526,7 @@ test("natural message rotations retain local history until forget and sync only 
       await expect(
         source.page.getByText(forgottenContent, { exact: true }),
       ).toBeVisible();
-      await source.page.goto("/#advanced/chat-storage");
+      await gotoRoute(source.page, "advanced/chat-storage");
       await expect(source.page.getByTestId("chat-storage-total")).toHaveText(
         "Chat shards created5",
       );
@@ -557,7 +558,7 @@ test("natural message rotations retain local history until forget and sync only 
         body: await source.page.screenshot(),
         contentType: "image/png",
       });
-      await source.page.goto(`/#chat/${contactId}`);
+      await gotoRoute(source.page, `chat/${contactId}`);
       await expect(
         source.page.getByText(forgottenContent, { exact: true }),
       ).toHaveCount(0);
@@ -566,7 +567,7 @@ test("natural message rotations retain local history until forget and sync only 
           .getByTestId("chat-bubble")
           .filter({ hasText: "Active chat after natural rotation" }),
       ).toBeVisible();
-      await source.page.goto("/#advanced/inspector/timeline");
+      await gotoRoute(source.page, "advanced/inspector/timeline");
       const forgottenRow = source.page
         .getByTestId("timeline-row")
         .filter({ hasText: "ShardsForgotten" });
@@ -595,7 +596,7 @@ test("natural message rotations retain local history until forget and sync only 
         )
         .toEqual(expectedIds);
       expect(await hooks.syncOwnerIds(source.page)).not.toContain(oldOwner);
-      await source.page.goto("/#wallet");
+      await gotoRoute(source.page, "wallet");
       await expect.poll(() => readBalanceSat(source.page)).toBe(32);
     });
     source.errors.assertClean();

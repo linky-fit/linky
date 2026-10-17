@@ -1,12 +1,12 @@
 import React from "react";
 import { useToasts } from "../hooks/useToasts";
-import { takeAddContactHashLink } from "../sharedProfileLink";
-import { takeSiteLoginHashLink } from "../siteLogin";
 import {
-  PENDING_DEEP_LINK_TEXT_STORAGE_KEY,
-  PENDING_SHARED_PROFILE_NPUB_STORAGE_KEY,
-} from "../utils/constants";
+  subscribeAddContactHashLinks,
+  subscribeScanHashLinks,
+} from "../platform/hashLinks";
+import { PENDING_SHARED_PROFILE_NPUB_STORAGE_KEY } from "../utils/constants";
 import { safeLocalStorageSet } from "../utils/storage";
+import { appendPendingDeepLink } from "./lib/pendingDeepLinks";
 import { useAppLanguage } from "./hooks/useAppLanguage";
 import { useProfileAuthDomain } from "./hooks/useProfileAuthDomain";
 
@@ -17,17 +17,14 @@ export const useUnauthenticatedAppShellComposition = () => {
   // The signed-in shell reads the pending links on mount, so a web link opened
   // before onboarding runs right after it.
   React.useEffect(() => {
-    const siteLoginLink = takeSiteLoginHashLink();
-    if (siteLoginLink) {
-      safeLocalStorageSet(PENDING_DEEP_LINK_TEXT_STORAGE_KEY, siteLoginLink);
-    }
-    const sharedProfileNpub = takeAddContactHashLink();
-    if (sharedProfileNpub) {
-      safeLocalStorageSet(
-        PENDING_SHARED_PROFILE_NPUB_STORAGE_KEY,
-        sharedProfileNpub,
-      );
-    }
+    const unsubscribeScan = subscribeScanHashLinks(appendPendingDeepLink);
+    const unsubscribeAddContact = subscribeAddContactHashLinks((npub) =>
+      safeLocalStorageSet(PENDING_SHARED_PROFILE_NPUB_STORAGE_KEY, npub),
+    );
+    return () => {
+      unsubscribeScan();
+      unsubscribeAddContact();
+    };
   }, []);
 
   const onboarding = useProfileAuthDomain({

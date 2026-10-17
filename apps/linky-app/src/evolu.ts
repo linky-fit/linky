@@ -18,6 +18,7 @@ import { useAtom, useAtomSet, useAtomValue } from "@linky-fit/linkstr-react";
 import { Effect } from "effect";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDeferredOnlineReady } from "./hooks/useDeferredOnlineReady";
+import { evoluDatabaseBytes } from "./platform/evoluDatabaseSize";
 import type { JsonValue } from "./types/json";
 import { base64 } from "@scure/base";
 import { localStorageKv } from "./utils/storage";
@@ -374,39 +375,9 @@ const getEvoluDatabaseInfo = async (
     "setting",
   ] as const;
 
-  const dbBytesPromise = (async () => {
-    try {
-      const root = await navigator.storage?.getDirectory?.();
-      if (!root) return 0;
-
-      const expectedDir = `.${generateDbNameFromMnemonic(mnemonic)}`;
-
-      let totalSize = 0;
-      const allDirs: string[] = [];
-      // @ts-expect-error OPFS FileSystemDirectoryHandle.entries() not yet in all TS libs
-      for await (const [name, handle] of root.entries()) {
-        if (handle.kind === "directory") allDirs.push(name);
-        if (name === expectedDir && handle.kind === "directory") {
-          for await (const [sub, subH] of handle.entries()) {
-            if (sub === ".opaque" && subH.kind === "directory") {
-              let maxSize = 0;
-              for await (const [, fileH] of subH.entries()) {
-                if (fileH.kind === "file") {
-                  const f = await fileH.getFile();
-                  if (f.size > maxSize) maxSize = f.size;
-                }
-              }
-              totalSize = maxSize; // Take only the largest file (main SQLite)
-            }
-          }
-          break;
-        }
-      }
-      return totalSize;
-    } catch {
-      return 0;
-    }
-  })();
+  const dbBytesPromise = evoluDatabaseBytes(
+    generateDbNameFromMnemonic(mnemonic),
+  );
 
   const tableCountsPromise = (async () => {
     const out: Record<string, number | null> = {};

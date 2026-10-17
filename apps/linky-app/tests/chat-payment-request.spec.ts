@@ -5,12 +5,13 @@ import { expectNoBootErrorPanel, watchAppErrors } from "./helpers/diagnostics";
 import { createSeedIdentity, setSeedLoginStorage } from "./helpers/identity";
 import { stubFiatRates } from "./helpers/network";
 import { topUp } from "./helpers/wallet";
+import { expectRoute, gotoRoute, routePathOf } from "./helpers/routes";
 
 const expectBalance = async (page: Page, balance: number): Promise<void> => {
-  const chatHash = new URL(page.url()).hash;
-  await page.goto("/#wallet");
+  const chatRoute = routePathOf(page);
+  await gotoRoute(page, "wallet");
   await expect.poll(() => readBalanceSat(page)).toBe(balance);
-  await page.goto(`/${chatHash}`);
+  await gotoRoute(page, chatRoute);
 };
 
 test("an incoming 2-sat chat request is paid and both sides see it paid", async ({
@@ -28,7 +29,7 @@ test("an incoming 2-sat chat request is paid and both sides see it paid", async 
     await setBaseStorage(page);
     await setSeedLoginStorage(page, identity);
     await stubFiatRates(page);
-    await page.goto("/#wallet");
+    await gotoRoute(page, "wallet");
     await expect(page.getByLabel("Available balance")).toBeVisible();
     await page.evaluate(async () => {
       await navigator.serviceWorker.ready;
@@ -55,7 +56,7 @@ test("an incoming 2-sat chat request is paid and both sides see it paid", async 
         .getByRole("button", { name: "2", exact: true })
         .click();
       await requester.page.locator('[data-guide="request-send"]').click();
-      await expect(requester.page).toHaveURL(/#chat\/[^/]+$/);
+      await expectRoute(requester.page, /^chat\/[^/]+$/);
       const incoming = payer.page.getByTestId("chat-payment-request-card");
       await expect(incoming).toHaveCount(1);
       await expect(incoming).toContainText(/2\s*sat/);

@@ -16,13 +16,11 @@ import {
   insertMessageEditorText,
   setMessageEditorCaret,
 } from "../app/lib/messageEditorDom";
+import { MESSAGE_ENTITY_PATTERN } from "../app/lib/messageEditorEntities";
 import type { CashuTokenMessageInfo } from "../app/lib/tokenMessageInfo";
 import { deriveDefaultProfile } from "../derivedProfile";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 import type { NpubMessageContactInfo } from "./ChatMessage";
-
-const ENTITY_PATTERN =
-  /(?:nostr:)?npub1[023456789acdefghjklmnpqrstuvwxyz]+(?:@npub\.cash)?|cashu[0-9A-Za-z_-]+={0,2}/gi;
 
 interface ChatMessageEditorProps {
   disabled: boolean;
@@ -215,7 +213,7 @@ export const ChatMessageEditor = React.forwardRef<
 
     const fragment = document.createDocumentFragment();
     let cursor = 0;
-    for (const match of value.matchAll(ENTITY_PATTERN)) {
+    for (const match of value.matchAll(MESSAGE_ENTITY_PATTERN)) {
       const rawValue = match[0];
       const start = match.index ?? 0;
       if (start > cursor)
@@ -266,7 +264,7 @@ export const ChatMessageEditor = React.forwardRef<
       editor.querySelectorAll<HTMLElement>("[data-message-entity-value]"),
     ).map((element) => element.dataset.messageEntityValue ?? "");
     const expectedValues: string[] = [];
-    for (const match of nextValue.matchAll(ENTITY_PATTERN)) {
+    for (const match of nextValue.matchAll(MESSAGE_ENTITY_PATTERN)) {
       const rawValue = match[0];
       const { contactInfo, tokenInfo } = resolveEntity(rawValue);
       if (contactInfo || tokenInfo) expectedValues.push(rawValue);

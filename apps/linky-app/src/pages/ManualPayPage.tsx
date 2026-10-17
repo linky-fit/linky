@@ -6,11 +6,13 @@ import { useTranslation } from "../app/hooks/shell";
 import type { ContactId } from "../evolu";
 import { navigateTo } from "../hooks/useRouting";
 import type { Translate } from "../i18n";
+import { isDeletedContact } from "../utils/contactName";
 import { formatMiddleDots } from "../utils/formatting";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 import { useScanCommands } from "../app/hooks/shell/scan";
 
 interface ManualPayContact {
+  archivedAtSec?: number | string | null;
   id: ContactId;
   lnAddress?: string | null;
   name?: string | null;
@@ -79,11 +81,15 @@ const findExactContact = (
 };
 
 export const ManualPayPage: FC<ManualPayPageProps> = ({
-  contacts,
+  contacts: savedContacts,
   nostrPictureByNpub,
   onSubmitText,
   t,
 }) => {
+  const contacts = React.useMemo(
+    () => savedContacts.filter((contact) => !isDeletedContact(contact)),
+    [savedContacts],
+  );
   const [value, setValue] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const query = value.trim();

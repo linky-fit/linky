@@ -1,5 +1,5 @@
 import { act, useState } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render } from "../test/render";
 import { Button } from "./controls";
 import { Dialog } from "./overlays";
@@ -40,5 +40,31 @@ describe("Dialog", () => {
     const dialog = document.querySelector("[role=dialog]");
     expect(dialog?.querySelector("[data-safe-area=top]")).not.toBeNull();
     expect(dialog?.querySelector("[data-safe-area=bottom]")).not.toBeNull();
+  });
+
+  it("stays open on a press outside when told to, and still closes on Escape", async () => {
+    const onOpenChange = vi.fn<(open: boolean) => void>();
+    await render(
+      <Dialog
+        open
+        onOpenChange={onOpenChange}
+        closeOnOutsidePress={false}
+        title="Login"
+      >
+        Approve?
+      </Dialog>,
+    );
+    await act(async () => {
+      document.body.dispatchEvent(
+        new PointerEvent("pointerdown", { bubbles: true }),
+      );
+    });
+    expect(onOpenChange).not.toHaveBeenCalled();
+    await act(async () => {
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+    });
+    expect(onOpenChange).toHaveBeenCalledExactlyOnceWith(false);
   });
 });

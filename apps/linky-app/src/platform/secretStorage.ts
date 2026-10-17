@@ -13,6 +13,7 @@ import {
   removeAndroidStoredSecret,
   writeAndroidStoredSecret,
 } from "./nativeBridge";
+import { reportAppLog } from "../devtools/inspector/appLog";
 import { getPlatformTarget, isNativePlatform } from "./runtime";
 import { isRecord } from "../utils/unknown";
 import { asNonEmptyString } from "../utils/validation";
@@ -192,4 +193,57 @@ export const removeStoredSecret = async (key: string): Promise<void> => {
   }
 
   safeLocalStorageRemove(key);
+};
+
+const nativeHolds = async (key: string, value: string): Promise<boolean> => {
+  try {
+    return (await readNativeSecret(key)) === asNonEmptyString(value);
+  } catch {
+    return false;
+  }
+};
+
+const writeLocalSecret = (key: string, value: string): void => {
+  const normalized = asNonEmptyString(value);
+  if (normalized) safeLocalStorageSet(key, normalized);
+  else safeLocalStorageRemove(key);
+};
+
+/**
+ * Writes the secrets as one set. Boot reads the native store first, so when
+ * it misses any of them the set is removed from it and boot reads the
+ * complete localStorage copy instead of a mix of old and new secrets.
+ */
+export const writeSecretSet = async (
+  secrets: Readonly<Record<string, string>>,
+): Promise<void> => {
+  const entries = Object.entries(secrets);
+  const writes = entries.map(([key, value]) => writeStoredSecret(key, value));
+  if (!isNativePlatform()) {
+    await Promise.all(writes);
+    return;
+  }
+  await Promise.allSettled(writes);
+  const held = await Promise.all(
+    entries.map(([key, value]) => nativeHolds(key, value)),
+  );
+  const missed = entries.filter((_, index) => !held[index]);
+  if (missed.length === 0) return;
+
+  // A native write that throws skips its localStorage write.
+  for (const [key, value] of entries) writeLocalSecret(key, value);
+  const removals = await Promise.allSettled(
+    entries.map(([key]) => removeNativeSecret(key)),
+  );
+  reportAppLog({
+    tag: "secrets.nativeWriteRolledBack",
+    summary: `Native secure storage missed ${missed.length} of ${entries.length} secrets; removed the set from it so boot reads localStorage`,
+    payload: {
+      keys: entries.map(([key]) => key),
+      missed: missed.map(([key]) => key),
+      notRemoved: entries
+        .filter((_, index) => removals[index].status === "rejected")
+        .map(([key]) => key),
+    },
+  });
 };

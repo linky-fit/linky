@@ -9,16 +9,6 @@ export const readAddContactNpubFromHash = (hash: string): string | null => {
   return npub && decodeNpub(npub) ? npub : null;
 };
 
-/** Takes an `#add/<npub>` link out of the address bar and its history entry. */
-export const takeAddContactHashLink = (): string | null => {
-  const npub = readAddContactNpubFromHash(window.location.hash);
-  if (npub) {
-    const { pathname, search } = window.location;
-    window.history.replaceState(null, "", `${pathname}${search}#contacts`);
-  }
-  return npub;
-};
-
 /** Prefers the claimed linky.fit name, which reads better in a chat than an npub. */
 export const buildOwnProfileShareUrl = (
   npub: string,

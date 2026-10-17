@@ -93,7 +93,7 @@ export const useTopupFlow = ({
   React.useEffect(
     () => () => {
       if (topupPaidNavTimerRef.current !== null) {
-        window.clearTimeout(topupPaidNavTimerRef.current);
+        clearTimeout(topupPaidNavTimerRef.current);
       }
       topupPaidNavTimerRef.current = null;
     },
@@ -124,9 +124,9 @@ export const useTopupFlow = ({
       startedKeyRef.current = null;
       if (routeKindRef.current !== "topupInvoice") return;
       if (topupPaidNavTimerRef.current !== null) {
-        window.clearTimeout(topupPaidNavTimerRef.current);
+        clearTimeout(topupPaidNavTimerRef.current);
       }
-      topupPaidNavTimerRef.current = window.setTimeout(() => {
+      topupPaidNavTimerRef.current = setTimeout(() => {
         topupPaidNavTimerRef.current = null;
         // The user may have navigated elsewhere during the celebration delay;
         // yanking them to the wallet then would stomp their navigation.

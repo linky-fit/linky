@@ -62,7 +62,7 @@ import { profileCacheAtom } from "../../state/contacts/profiles";
 import { currentNpubAtom } from "../../state/session/session";
 import type { ContactFormState, ContactRowLike } from "../../types/appTypes";
 import { useSetStatus, useTranslation } from "../shell";
-import { useReadNavIntent, useSetNavIntent } from "../shell/navIntents";
+import { useNavIntent, useSetNavIntent } from "../shell/navIntents";
 import { fetchAndCacheProfile } from "../useLinkstrProfileSync";
 import { useContactsRepository } from "../useLinksync";
 import { useContacts, useRouteContact } from "./useDisplayContacts";
@@ -235,7 +235,7 @@ export const useContactEditorWatchers = ({
   );
   const setContactNewStep = useAtomSet(contactNewStepAtom);
   const previousRouteKindRef = React.useRef<Route["kind"] | null>(null);
-  const readSavedContactNpub = useReadNavIntent("openSavedContactNpub");
+  const savedContactNpub = useNavIntent("openSavedContactNpub");
   const setSavedContactNpub = useSetNavIntent("openSavedContactNpub");
 
   const contactSuggestionKnownNpubsKey = Array.from(
@@ -328,10 +328,10 @@ export const useContactEditorWatchers = ({
     setForm,
   ]);
 
+  // The saved row can be read back before the intent is set, so either one arriving last opens it.
   React.useEffect(() => {
-    const targetNpub = readSavedContactNpub();
-    if (!targetNpub) return;
-    const normalizedTarget = normalizeNpubIdentifier(targetNpub);
+    if (!savedContactNpub) return;
+    const normalizedTarget = normalizeNpubIdentifier(savedContactNpub);
     if (!normalizedTarget) return;
     const existing = contacts.find(
       (c) => normalizeNpubIdentifier(c.npub ?? "") === normalizedTarget,
@@ -339,7 +339,7 @@ export const useContactEditorWatchers = ({
     if (!existing?.id) return;
     setSavedContactNpub(null);
     navigateTo({ route: "contact", id: ContactId.orThrow(existing.id) });
-  }, [contacts, readSavedContactNpub, setSavedContactNpub]);
+  }, [contacts, savedContactNpub, setSavedContactNpub]);
 };
 
 /** The new/edit contact form and its actions; free of effects, so any screen may use it. */

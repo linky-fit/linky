@@ -4,6 +4,7 @@ import { IconButton } from "./controls";
 import { useDialogBehavior } from "./dialogBehavior";
 import { Row, ScrollList, Stack } from "./layout";
 import { textVariant } from "./styles";
+import { SafeAreaPad } from "./safe-area";
 import { enterScale, shadow, space } from "./tokens";
 
 const fade = { opacity: 0 } as const;
@@ -66,16 +67,22 @@ const placements = {
 interface ModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** False keeps a press outside the dialog from closing it; Escape and Android back still do. */
+  closeOnOutsidePress?: boolean | undefined;
   placement: keyof typeof placements;
   described: boolean;
   testID?: string | undefined;
   children: ReactNode;
 }
 
+const keepOpen = (event: { preventDefault: () => void }) =>
+  event.preventDefault();
+
 /** Tamagui's dialog: focus trap, Escape, Android back and focus return on every placement. */
 function Modal({
   open,
   onOpenChange,
+  closeOnOutsidePress = true,
   placement,
   described,
   testID,
@@ -92,11 +99,14 @@ function Modal({
           transition="fast"
           enterStyle={fade}
           exitStyle={fade}
-          onPress={() => onOpenChange(false)}
+          onPress={() => {
+            if (closeOnOutsidePress) onOpenChange(false);
+          }}
         />
         <TamaguiDialog.Content
           key="content"
           {...behavior}
+          {...(closeOnOutsidePress ? {} : { onPointerDownOutside: keepOpen })}
           {...styles.content}
           // Without a Description, drop Tamagui's dangling aria-describedby id.
           {...(described ? {} : { "aria-describedby": undefined })}
@@ -114,6 +124,8 @@ function Modal({
 export interface DialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** False keeps a press outside the dialog from closing it; Escape and Android back still do. */
+  closeOnOutsidePress?: boolean | undefined;
   title: string;
   /** Hides the visible title; it still names the dialog for assistive technology. */
   hideTitle?: boolean | undefined;
@@ -130,6 +142,7 @@ export interface DialogProps {
 export function Dialog({
   open,
   onOpenChange,
+  closeOnOutsidePress,
   title,
   hideTitle = false,
   description,
@@ -191,6 +204,7 @@ export function Dialog({
     <Modal
       open={open}
       onOpenChange={onOpenChange}
+      closeOnOutsidePress={closeOnOutsidePress}
       placement={fullScreen ? "fullScreen" : "center"}
       described={description !== undefined}
       testID={testID}
@@ -200,14 +214,14 @@ export function Dialog({
   );
 }
 
-/** Marks the screen edges that the web app pads by the device insets (see README). */
+/** Pads a full-screen dialog by the device insets. */
 function SafeAreaEdges({ children }: { children: ReactNode }) {
   return (
-    <Stack flex={1} minHeight={0} data-safe-area="top">
-      <Stack flex={1} minHeight={0} data-safe-area="bottom">
+    <SafeAreaPad flex={1} minHeight={0} edge="top">
+      <SafeAreaPad flex={1} minHeight={0} edge="bottom">
         {children}
-      </Stack>
-    </Stack>
+      </SafeAreaPad>
+    </SafeAreaPad>
   );
 }
 

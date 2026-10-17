@@ -18,6 +18,7 @@ import type {
 } from "../../types/appTypes";
 import type { InsertedChatMessage } from "./chatInbox";
 import { trimString } from "../../../utils/validation";
+import { isAppVisible } from "../../../platform/appEvents";
 import type { Translate } from "../../../i18n";
 
 const PAYMENT_NOTICE_MATCH_WINDOW_SECONDS = 120;
@@ -77,14 +78,9 @@ const showVisibleToast = (
   message: string,
   options?: PushToastOptions,
 ): void => {
-  try {
-    if (document.visibilityState === "visible") {
-      if (options) ctx.pushToast(message, options);
-      else ctx.pushToast(message);
-    }
-  } catch {
-    // No document in non-browser environments.
-  }
+  if (!isAppVisible()) return;
+  if (options) ctx.pushToast(message, options);
+  else ctx.pushToast(message);
 };
 
 export const notifyInsertedChatMessage = (

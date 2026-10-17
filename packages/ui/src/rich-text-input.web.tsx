@@ -21,6 +21,8 @@ export function RichTextInput({
   ref,
   onFocus,
   onBlur,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept off the DOM
+  native: _native,
   ...props
 }: RichTextInputProps) {
   const theme = useTheme();

@@ -2,7 +2,7 @@
   "name": "linky",
   "private": true,
   "license": "0BSD",
-  "packageManager": "bun@1.3.9",
+  "packageManager": "bun@1.3.14",
   "workspaces": [
     "apps/*",
     "packages/*",
@@ -14,6 +14,13 @@
     "dev:services": "docker compose -f docker-compose.dev.yml up",
     "build": "bun run --filter @linky-fit/linky-app build",
     "preview": "bun run --filter @linky-fit/linky-app preview",
+    "expo:dev": "bun run --filter @linky-fit/expo dev",
+    "expo:build": "bun run --filter @linky-fit/expo build",
+    "expo:preview": "bun run --filter @linky-fit/expo preview",
+    "expo:android": "bun run --filter @linky-fit/expo android:debug",
+    "expo:ios": "bun run --filter @linky-fit/expo ios:debug",
+    "expo:android:release": "bun run --filter @linky-fit/expo android:release",
+    "expo:ios:release": "bun run --filter @linky-fit/expo ios:release",
     "site:dev": "bun run --filter @linky-fit/linky-site dev",
     "site:build": "bun run --filter @linky-fit/linky-site build",
     "site:preview": "bun run --filter @linky-fit/linky-site preview",
@@ -53,6 +60,7 @@
   },
   "patchedDependencies": {
     "bysquare@4.0.0": "patches/bysquare@4.0.0.patch",
-    "@evolu/sqlite-wasm@2.2.4": "patches/@evolu%2Fsqlite-wasm@2.2.4.patch"
+    "@evolu/sqlite-wasm@2.2.4": "patches/@evolu%2Fsqlite-wasm@2.2.4.patch",
+    "expo-camera@57.0.6": "patches/expo-camera@57.0.6.patch"
   }
 }

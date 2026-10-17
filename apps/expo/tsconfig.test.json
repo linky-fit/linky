@@ -1,0 +1,15 @@
+{
+  "extends": "@linky-fit/config/tsconfig/app",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo",
+    "types": ["bun"],
+    "paths": {
+      "expo": ["./node_modules/expo"]
+    }
+  },
+  "include": [
+    "src/**/*.test.ts",
+    "../linky-app/src/vite-env.d.ts",
+    "../linky-app/src/types/browser.ts"
+  ]
+}

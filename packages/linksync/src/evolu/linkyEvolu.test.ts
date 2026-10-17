@@ -23,7 +23,9 @@ const evoluMock = vi.hoisted(() => {
   const state: {
     calls: Array<{ schema: unknown; config: unknown }>;
     instance: object;
-  } = { calls: [], instance: {} };
+    /** Returns the instance without starting a worker, as Evolu does for a name it already opened. */
+    cached: boolean;
+  } = { calls: [], instance: {}, cached: false };
   return state;
 });
 // Plays Evolu: records what it was opened with and starts the database worker.
@@ -34,6 +36,7 @@ vi.mock("@evolu/common", async (importOriginal) => {
     createEvolu:
       (deps: EvoluDeps) => (schema: unknown, config: EvoluConfig) => {
         evoluMock.calls.push({ schema, config });
+        if (evoluMock.cached) return evoluMock.instance;
         deps
           .createDbWorker(config.name ?? original.SimpleName.orThrow("evolu"))
           .onMessage(() => {});
@@ -125,6 +128,21 @@ describe("createLinkyEvolu", () => {
     });
   });
 
+  it("keeps the running database's owner sync when Evolu hands back the instance it already opened", () => {
+    evoluMock.instance = {};
+    const first = open(mnemonic);
+    evoluMock.cached = true;
+    try {
+      const again = open(mnemonic);
+      expect(again.evolu).toBe(first.evolu);
+      expect(again.ownerSync).toBe(first.ownerSync);
+      first.deliver({ type: "linksync.ownersSynced", ownerIds: [appOwner.id] });
+      expect(again.ownerSync.syncedOwners().has(appOwner.id)).toBe(true);
+    } finally {
+      evoluMock.cached = false;
+    }
+  });
+
   it("reports the relay protocol errors the worker hears", () => {
     const events: LinkyEvoluEvent[] = [];
     const { deliver } = open(mnemonic, (event) => events.push(event));
@@ -148,6 +166,7 @@ describe("openLinkyStore", () => {
       createQuery: () => "query",
       loadQuery: () => Promise.resolve([]),
       subscribeQuery: () => () => () => {},
+      subscribeError: () => () => {},
     };
     const { evolu, ownerSync, deliver } = open(mnemonic);
     const kv = memoryKeyValueStorage();

@@ -22,13 +22,12 @@ interface LnurlAuthModalProps {
 }
 
 const pop = { opacity: 0, scale: enterScale.pop } as const;
-const ignoreDismiss = () => {};
 
 /**
  * One dialog for the whole login: it names the domain and asks for consent,
  * shows the request in flight, and then pops the padlock open once the domain
  * confirmed. Tapping outside does nothing — the user either confirms or
- * cancels.
+ * cancels; Escape and Android back cancel.
  */
 export function LnurlAuthModal({
   confirmation,
@@ -46,7 +45,10 @@ export function LnurlAuthModal({
   return (
     <Dialog
       open
-      onOpenChange={ignoreDismiss}
+      onOpenChange={(open) => {
+        if (!open && !isDone && !isBusy) onClose();
+      }}
+      closeOnOutsidePress={false}
       title={title}
       hideTitle
       actions={

@@ -6,6 +6,7 @@ import { setBankPaymentOfferMinimized } from "./bankPaymentOfferStorage";
 import {
   buildTopbar,
   buildTopbarRight,
+  buildTopbarTitle,
   resolveBackAction,
   type BackActionContext,
 } from "./topbarConfig";
@@ -320,5 +321,16 @@ describe("resolveBackAction for bank payment editing", () => {
     expect(backHashFor({ kind: "bankPayment", spdPayload: "SPD*1.0" })).toBe(
       "#wallet",
     );
+  });
+});
+
+describe("buildTopbarTitle", () => {
+  const t = (key: string) => key;
+
+  it("titles the contact pay screen by its intent", () => {
+    const route: Route = { kind: "contactPay", id: contactId };
+    expect(buildTopbarTitle(route, t, "pay")).toBe("contactPayTitle");
+    expect(buildTopbarTitle(route, t, "request")).toBe("contactRequestTitle");
+    expect(buildTopbarTitle({ kind: "wallet" }, t, "request")).toBe("wallet");
   });
 });

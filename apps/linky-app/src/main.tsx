@@ -1,7 +1,6 @@
 import "./platform/browserPolyfills";
-import { Buffer } from "buffer";
+import "./boot/nodeGlobals";
 import { Capacitor } from "@capacitor/core";
-import { StrictMode } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import {
@@ -15,7 +14,6 @@ import {
   zIndex,
 } from "@linky-fit/ui/tokens";
 import type { TextVariant } from "@linky-fit/ui/tokens";
-import { BootCommitSignal } from "./components/BootCommitSignal";
 import "./index.css";
 import {
   enableInMemoryEvoluStorageForSession,
@@ -30,7 +28,6 @@ import {
   isLogoutPending,
   onLogoutInAnotherTab,
 } from "./platform/logoutWipe";
-import { decodeBase64Url, encodeBase64Url } from "./utils/base64";
 import { getColorMode } from "./utils/colorMode";
 import {
   downloadBootDiagnostics,
@@ -54,122 +51,8 @@ import {
 import { getUnknownErrorMessage, isRecord } from "./utils/unknown";
 import { isDevBuild, isE2eBuild } from "./platform/buildEnv";
 import { registerServiceWorker } from "./platform/serviceWorker";
-
-type BufferFromArgs =
-  | [arrayLike: ArrayLike<number> | ArrayBufferView]
-  | [
-      arrayBuffer: ArrayBuffer | SharedArrayBuffer,
-      byteOffset?: number,
-      length?: number,
-    ]
-  | [value: string, encoding?: string];
-
-interface ProcessLike {
-  emitWarning?: (message: string, type?: string, code?: string) => void;
-  env?: Record<string, string | undefined>;
-}
-
-const isBufferConstructor = (value: unknown): value is typeof Buffer => {
-  return typeof value === "function" && "from" in value && "prototype" in value;
-};
-
-const getGlobalBuffer = (): typeof Buffer | null => {
-  const candidate = Reflect.get(globalThis, "Buffer");
-  return isBufferConstructor(candidate) ? candidate : null;
-};
-
-const getGlobalProcess = (): object | null => {
-  const candidate = Reflect.get(globalThis, "process");
-  if (candidate && typeof candidate === "object") {
-    return candidate;
-  }
-  return null;
-};
-
-// Some dependencies (e.g. Cashu libs) expect Node's global Buffer.
-// Provide a safe browser polyfill.
-if (!getGlobalBuffer()) {
-  try {
-    Object.defineProperty(globalThis, "Buffer", {
-      configurable: true,
-      value: Buffer,
-      writable: true,
-    });
-  } catch {
-    Reflect.set(globalThis, "Buffer", Buffer);
-  }
-}
-
-// Some browserified Node deps still expect a global `process`.
-// Provide a tiny shim before any lazy-loaded app code runs.
-if (!getGlobalProcess()) {
-  const processShim: ProcessLike = {
-    emitWarning: (message: string, type?: string, code?: string) => {
-      if (
-        typeof console !== "undefined" &&
-        typeof console.warn === "function"
-      ) {
-        console.warn(message, type, code);
-      }
-    },
-    env: {},
-  };
-
-  try {
-    Object.defineProperty(globalThis, "process", {
-      configurable: true,
-      value: processShim,
-      writable: true,
-    });
-  } catch {
-    Reflect.set(globalThis, "process", processShim);
-  }
-}
-
-// The `buffer` polyfill doesn't implement Node's newer "base64url" encoding.
-// Some deps (e.g. Evolu) use it for compact URL-safe IDs.
-// Patch in minimal support to avoid boot crashes in the browser.
-(() => {
-  const B = getGlobalBuffer();
-  if (!B) return;
-
-  const patchMarker = "__linkyBase64UrlPatched";
-  if (Reflect.get(B.prototype, patchMarker) === true) return;
-
-  const origToString = B.prototype.toString;
-  Object.defineProperty(B.prototype, "toString", {
-    configurable: true,
-    value: function (
-      this: Buffer,
-      encoding?: string,
-      start?: number,
-      end?: number,
-    ) {
-      if (encoding === "base64url") {
-        return encodeBase64Url(this.subarray(start, end));
-      }
-      return origToString.call(this, encoding, start, end);
-    },
-    writable: true,
-  });
-
-  const origFrom = B.from;
-  Object.defineProperty(B, "from", {
-    configurable: true,
-    value: function (this: typeof Buffer, ...args: BufferFromArgs) {
-      const [value, encodingOrOffset] = args;
-      if (typeof value === "string" && encodingOrOffset === "base64url") {
-        return Reflect.apply(origFrom, this, [
-          decodeBase64Url(value) ?? new Uint8Array(0),
-        ]);
-      }
-      return Reflect.apply(origFrom, this, args);
-    },
-    writable: true,
-  });
-
-  Reflect.set(B.prototype, patchMarker, true);
-})();
+import { emitAppEvent } from "./platform/appEvents";
+import { reloadApp } from "./platform/reload";
 
 const updateSW = registerServiceWorker({
   onOfflineReady() {
@@ -252,7 +135,7 @@ if ("serviceWorker" in navigator) {
     // SW's purged precache. Skipped on first install (no controller at
     // load) and in the tab that initiated the update (it reloads itself).
     if (hadControllerAtLoad && !isApplyingPwaUpdate()) {
-      window.location.reload();
+      reloadApp();
     }
   });
 
@@ -400,7 +283,7 @@ const recoverFromLocalDynamicImportFetch = async (
     await Promise.all(keys.map((key) => caches.delete(key)));
   }
 
-  window.location.reload();
+  reloadApp();
   return true;
 };
 
@@ -477,7 +360,7 @@ const bootCodeStyle = (color: string, background: string): string =>
   `overflow:auto;color:${color};background:${background};padding:${space.md}px;white-space:pre-wrap;border-radius:${radius.sm}px`;
 
 const signalBootFailure = (): void => {
-  window.dispatchEvent(new Event("linky-boot-failed"));
+  emitAppEvent("linky-boot-failed");
 };
 
 const renderBootError = (error: unknown, source: string) => {
@@ -530,7 +413,7 @@ const renderBootError = (error: unknown, source: string) => {
     temporary.addEventListener("click", () => {
       temporary.disabled = true;
       enableInMemoryEvoluStorageForSession();
-      window.location.reload();
+      reloadApp();
     });
     actions.append(temporary);
   }
@@ -549,7 +432,7 @@ const renderBootError = (error: unknown, source: string) => {
   reload.textContent = text.reload;
   reload.addEventListener("click", () => {
     reload.disabled = true;
-    window.dispatchEvent(new Event("linky-clear-cache-and-reload"));
+    emitAppEvent("linky-clear-cache-and-reload");
   });
 
   actions.append(download, reload);
@@ -653,10 +536,10 @@ const bootstrap = async () => {
     if (isLogoutPending()) {
       setStage("logout-wipe");
       await finishPendingLogout();
-      window.location.reload();
+      reloadApp();
       return;
     }
-    onLogoutInAnotherTab(() => window.location.reload());
+    onLogoutInAnotherTab(reloadApp);
 
     if (Capacitor.isNativePlatform()) {
       setStage("secret-backfill");
@@ -676,14 +559,14 @@ const bootstrap = async () => {
         // reload replaces the screen in the meantime.
         storagePromptShown = true;
         window.clearTimeout(stuckTimer);
-        window.dispatchEvent(new Event("linky-boot-decision-pending"));
+        emitAppEvent("linky-boot-decision-pending");
         return showTemporarySessionPrompt(issue);
       },
     });
     if (storagePromptShown) {
       removeTemporarySessionPrompt();
       armStuckTimer();
-      window.dispatchEvent(new Event("linky-boot-decision-resolved"));
+      emitAppEvent("linky-boot-decision-resolved");
     }
     console.log("[linky][boot] storage compatibility checked", {
       inMemory: shouldUseInMemoryEvoluStorage(),
@@ -691,46 +574,34 @@ const bootstrap = async () => {
 
     setStage("import-app");
     const [
-      { default: App },
-      { ErrorBoundary },
-      { makeAppRegistry, RegistryContext },
-      { evoluAtom, evoluRelaySettingsAtom },
+      { AppRoot },
+      { bootSession },
       { makeWebPlatformPorts },
-      { loadSession, mirrorPushNsec },
       { probeLocalDatabase },
+      { captureLaunchHashLink },
     ] = await Promise.all([
-      import("./App.tsx"),
-      import("./ErrorBoundary.tsx"),
-      import("./app/registry.ts"),
-      import("./app/state/session/evolu.ts"),
+      import("./boot/AppRoot.tsx"),
+      import("./boot/bootSession.ts"),
       import("./platform/ports.web.ts"),
-      import("./platform/session.ts"),
       import("./evolu.ts"),
+      import("./platform/hashLinks"),
     ]);
     console.log("[linky][boot] app modules loaded");
+    captureLaunchHashLink();
 
     setStage("load-session");
-    const ports = makeWebPlatformPorts();
-    const session = await loadSession(ports);
-    mirrorPushNsec(session);
-    console.log("[linky][boot] session loaded", { session: session._tag });
-
-    // Only a signed-in session opens the database.
-    const signedIn = session._tag === "SignedIn";
+    const { registry, session, opened } = await bootSession({
+      ports: makeWebPlatformPorts(),
+      makeEvoluPlatform: async () => {
+        setStage("import-evolu");
+        return (await import("./platform/evolu.web.ts")).makeWebEvoluPlatform();
+      },
+    });
     // The native beacon outlives the page, so a signed-out boot stops whatever an earlier page left running.
     if (session._tag === "SignedOut" && Capacitor.isNativePlatform())
-      await import("./platform/nativeBridge.ts").then(({ stopNativeBeacon }) =>
+      await import("./platform/nativeBridge").then(({ stopNativeBeacon }) =>
         stopNativeBeacon(),
       );
-    if (signedIn) setStage("import-evolu");
-    const evoluPlatform = signedIn
-      ? (await import("./platform/evolu.web.ts")).makeWebEvoluPlatform()
-      : null;
-    const registry = makeAppRegistry({ ports, session, evoluPlatform });
-    // Built on every boot: building it migrates the stored relay list once.
-    registry.get(evoluRelaySettingsAtom);
-    const opened = registry.get(evoluAtom);
-    console.log("[linky][boot] evolu loaded", { opened: opened !== null });
     if (isDevBuild || isE2eBuild) {
       const { installLinkyE2eHooks } =
         await import("./devtools/e2e/installLinkyE2eHooks.ts");
@@ -745,7 +616,7 @@ const bootstrap = async () => {
       setStage("mounted");
       window.clearTimeout(stuckTimer);
       appHasMounted = true;
-      window.dispatchEvent(new Event("linky-app-mounted"));
+      emitAppEvent("linky-app-mounted");
       dynamicImportFetchRetry.clear();
       evoluOpenRetry.clear();
       if (Capacitor.getPlatform() === "android" && !isDevBuild) {
@@ -756,19 +627,14 @@ const bootstrap = async () => {
     };
     flushSync(() => {
       root.render(
-        <StrictMode>
-          <RegistryContext.Provider value={registry}>
-            <ErrorBoundary
-              onError={() => {
-                window.clearTimeout(stuckTimer);
-                signalBootFailure();
-              }}
-            >
-              <BootCommitSignal onCommit={recordAppCommit} />
-              <App />
-            </ErrorBoundary>
-          </RegistryContext.Provider>
-        </StrictMode>,
+        <AppRoot
+          registry={registry}
+          onCommit={recordAppCommit}
+          onError={() => {
+            window.clearTimeout(stuckTimer);
+            signalBootFailure();
+          }}
+        />,
       );
     });
     console.log("[linky][boot] render scheduled");
@@ -801,7 +667,7 @@ const bootstrap = async () => {
       console.warn("[linky][boot] local database failed to open, reloading", {
         delayMs,
       });
-      window.setTimeout(() => window.location.reload(), delayMs);
+      window.setTimeout(reloadApp, delayMs);
     });
   } catch (error) {
     window.clearTimeout(stuckTimer);

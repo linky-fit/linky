@@ -127,6 +127,8 @@ services:
       context: .
       dockerfile: docker/linky-app/Dockerfile
       args:
+        # vite or expo: which bundler builds the app (see the Dockerfile).
+        WEB_BUNDLER: ${LINKY_E2E_WEB_BUNDLER:-vite}
         VITE_ALLOW_INSECURE_LOCALHOST_RELAYS: "1"
         VITE_NOSTR_RELAYS: ws://localhost:${LINKY_E2E_NOSTR_PORT:-7777}
         VITE_EVOLU_SERVER_URLS: ws://localhost:${LINKY_E2E_EVOLU_PORT:-4001}

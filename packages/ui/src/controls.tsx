@@ -1,6 +1,6 @@
-import type { ReactNode } from "react";
-import { Slider, Button as TamaguiButton, View } from "tamagui";
-import type { ColorTokens, GetProps } from "tamagui";
+import type { ReactNode, Ref } from "react";
+import { isWeb, Slider, Button as TamaguiButton, View } from "tamagui";
+import type { ColorTokens, GetProps, TamaguiElement } from "tamagui";
 import { Icon } from "./icons";
 import type { IconName, IconSize } from "./icons";
 import { Row, Stack, Text } from "./layout";
@@ -11,6 +11,8 @@ import { opacity, size as sizes } from "./tokens";
 export type PressableProps = GetProps<typeof TamaguiButton> & {
   /** A browser tooltip on the web; ignored on native. */
   tooltip?: string | undefined;
+  /** The rendered element, e.g. for measuring where it is on screen. */
+  ref?: Ref<TamaguiElement> | undefined;
 };
 
 /** An unstyled, focusable press target; every pressable in the library builds on it. */
@@ -29,7 +31,11 @@ export function Pressable({ disabled, tooltip, ...props }: PressableProps) {
       padding="$none"
       focusVisibleStyle={focusRing}
       disabledStyle={{ opacity: opacity.disabled, cursor: "default" }}
+      // Android fades each child on its own otherwise, so a label washes into its dimmed background.
+      needsOffscreenAlphaCompositing={disabled}
       disabled={disabled}
+      // Android keeps a view disabled until its accessibility state says otherwise, and Tamagui only ever sets `aria-disabled` true.
+      {...(isWeb ? {} : { "aria-disabled": Boolean(disabled) })}
       // Tamagui's disabled button ignores the pointer, which would hide its tooltip.
       pointerEvents="auto"
       {...tooltipProps(tooltip)}

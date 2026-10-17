@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   isNativePlatform: vi.fn(() => false),
   reportAppLog: vi.fn(),
+  writeSecretSet: vi.fn(),
 }));
 
 vi.mock("./runtime", async (importOriginal) => ({
@@ -11,6 +12,11 @@ vi.mock("./runtime", async (importOriginal) => ({
   getPlatformTarget: () => (mocks.isNativePlatform() ? "android" : "web"),
   isNativePlatform: mocks.isNativePlatform,
 }));
+vi.mock("./secretStorage", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./secretStorage")>();
+  mocks.writeSecretSet.mockImplementation(actual.writeSecretSet);
+  return { ...actual, writeSecretSet: mocks.writeSecretSet };
+});
 vi.mock("../devtools/inspector/appLog", () => ({
   reportAppLog: mocks.reportAppLog,
 }));
@@ -27,8 +33,13 @@ vi.mock("./linkshu/wipeLinkshuSeedBoundState", () => ({
   wipeLinkshuSeedBoundState: () => Promise.resolve(),
 }));
 
-import { persistIdentitySecrets } from "./identitySecrets";
+import {
+  clearIdentitySecrets,
+  persistIdentitySecrets,
+  persistSyncedActiveNostrIdentity,
+} from "./identitySecrets";
 import { makeWebPlatformPorts } from "./ports.web";
+import { SecretsWriteFailed } from "./secureStoreSecrets";
 import { loadSession } from "./session";
 
 const NSEC = "linky.nostr_nsec";
@@ -36,6 +47,7 @@ const APP_MNEMONIC = "linky.initialMnemonic";
 const CASHU_MNEMONIC = "linky.cashu_bip85_mnemonic";
 const SLIP39 = "linky.nostr_slip39_seed";
 const IDENTITY_KEYS = [NSEC, SLIP39, CASHU_MNEMONIC, APP_MNEMONIC];
+const APP_MNEMONIC_STATE = "linky.app_mnemonic_state.v1";
 
 const identity = (name: string) => ({
   nsec: `nsec-${name}`,
@@ -44,18 +56,23 @@ const identity = (name: string) => ({
   slip39Seed: `slip39-${name}`,
 });
 
-/** Persists with the push mirror's timeout elapsed, since its fake never settles. */
-const persist = async (name: string) => {
+/** Awaits `work` with the push mirror's timeout elapsed, since its fake never settles. */
+const pastPushMirror = async (work: Promise<void>) => {
   vi.useFakeTimers();
-  const persisting = persistIdentitySecrets({
-    ...identity(name),
-    identitySource: "derived",
-    switchedAtSec: null,
-  });
   await vi.advanceTimersByTimeAsync(1_500);
-  await persisting;
+  await work;
   vi.useRealTimers();
 };
+
+const persist = (name: string, overrides: { appMnemonic?: string } = {}) =>
+  pastPushMirror(
+    persistIdentitySecrets({
+      ...identity(name),
+      ...overrides,
+      identitySource: "derived",
+      switchedAtSec: null,
+    }),
+  );
 
 interface NativeWriteFailure {
   /** Keys whose write throws. */
@@ -179,5 +196,60 @@ describe("persistIdentitySecrets", () => {
     expect(native.store.size).toBe(0);
     expect(localSecrets()[NSEC]).toBe("nsec-b");
     expect(mocks.reportAppLog).not.toHaveBeenCalled();
+  });
+});
+
+describe("the app mnemonic marker", () => {
+  it("records whether a persisted identity has an app mnemonic", async () => {
+    await persist("a");
+    expect(localStorage.getItem(APP_MNEMONIC_STATE)).toBe("present");
+
+    await persist("b", { appMnemonic: "" });
+    expect(localStorage.getItem(APP_MNEMONIC_STATE)).toBe("absent");
+  });
+
+  it("is left alone by an nsec-only re-save", async () => {
+    await persist("a");
+    localStorage.removeItem(APP_MNEMONIC);
+
+    await pastPushMirror(
+      persistSyncedActiveNostrIdentity({
+        identitySource: "custom",
+        nsec: "nsec-c",
+        switchedAtSec: null,
+      }),
+    );
+
+    expect(localStorage.getItem(APP_MNEMONIC_STATE)).toBe("present");
+  });
+
+  it.each([["absent"], [null]])(
+    "stays %s when the secure store refuses the identity",
+    async (before) => {
+      if (before === null) localStorage.removeItem(APP_MNEMONIC_STATE);
+      else localStorage.setItem(APP_MNEMONIC_STATE, before);
+      mocks.writeSecretSet.mockRejectedValueOnce(
+        new SecretsWriteFailed([NSEC]),
+      );
+
+      await expect(
+        persistIdentitySecrets({
+          ...identity("a"),
+          identitySource: "derived",
+          switchedAtSec: null,
+        }),
+      ).rejects.toBeInstanceOf(SecretsWriteFailed);
+
+      expect(localStorage.getItem(APP_MNEMONIC_STATE)).toBe(before);
+    },
+  );
+
+  it("records the app mnemonic absent once the identity is cleared", async () => {
+    await persist("a");
+
+    await clearIdentitySecrets();
+
+    expect(localStorage.getItem(APP_MNEMONIC)).toBeNull();
+    expect(localStorage.getItem(APP_MNEMONIC_STATE)).toBe("absent");
   });
 });

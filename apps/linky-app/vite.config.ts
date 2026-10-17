@@ -1,70 +1,24 @@
 import { linkyUi } from "@linky-fit/ui/vite";
 import basicSsl from "@vitejs/plugin-basic-ssl";
 import react from "@vitejs/plugin-react-swc";
-import { execSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import fs from "node:fs/promises";
 import type { ServerResponse } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Connect, Plugin, ViteDevServer } from "vite";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
-import lnurlpHandler from "./api/lnurlp.js";
 import { contentSecurityPolicyMeta } from "./server/contentSecurityPolicy";
+import { appCommitSha, appVersion } from "./server/buildInfo";
 import { bootDiagnosticRedaction } from "./server/bootDiagnosticRedaction";
+import { linkPreviewMiddleware, lnurlpMiddleware } from "./server/devApi";
 import { inspectorCollector } from "./server/inspectorCollector";
-import { fetchLinkPreview } from "./server/linkPreview";
+import { webManifest } from "./server/webManifest";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const sqliteWasmPath = path.join(__dirname, "public/sqlite-wasm/sqlite3.wasm");
-const packageJsonPath = path.join(__dirname, "package.json");
-
-const isUnknownRecord = (value: unknown): value is Record<string, unknown> => {
-  return value !== null && typeof value === "object";
-};
-
-const appVersion = (() => {
-  try {
-    const raw = readFileSync(packageJsonPath, "utf8");
-    const pkg = JSON.parse(raw);
-    if (!isUnknownRecord(pkg)) return "0.0.0";
-    const version = pkg.version;
-    return typeof version === "string" && version.trim()
-      ? version.trim()
-      : "0.0.0";
-  } catch {
-    return "0.0.0";
-  }
-})();
-
-const normalizeShortCommitSha = (value: string | undefined): string => {
-  const trimmed = String(value ?? "").trim();
-  return /^[0-9a-f]{7,40}$/i.test(trimmed) ? trimmed.slice(0, 7) : "";
-};
-
-const appCommitSha = (() => {
-  const envSha = normalizeShortCommitSha(
-    process.env.VERCEL_GIT_COMMIT_SHA ??
-      process.env.VITE_VERCEL_GIT_COMMIT_SHA ??
-      process.env.GIT_COMMIT_SHA,
-  );
-  if (envSha) return envSha;
-
-  try {
-    return normalizeShortCommitSha(
-      execSync("git rev-parse --short=7 HEAD", {
-        cwd: __dirname,
-        stdio: ["ignore", "pipe", "ignore"],
-      }).toString("utf8"),
-    );
-  } catch {
-    return "";
-  }
-})();
-
 const useHttps = process.env.VITE_HTTPS === "1";
 
 const serveSqliteWasm = (): Plugin => ({
@@ -101,79 +55,30 @@ const serveSqliteWasm = (): Plugin => ({
 const lnurlProxy = (): Plugin => ({
   name: "lnurl-proxy",
   configureServer(server: ViteDevServer) {
-    server.middlewares.use(
-      async (
-        req: Connect.IncomingMessage,
-        res: ServerResponse,
-        next: Connect.NextFunction,
-      ) => {
-        const url = new URL(req.url ?? "", "http://localhost");
-        if (url.pathname !== "/api/lnurlp") return next();
-        await lnurlpHandler(
-          {
-            method: req.method ?? "",
-            headers: req.headers,
-            query: Object.fromEntries(url.searchParams),
-          },
-          {
-            setHeader: (name, value) => {
-              res.setHeader(name, value);
-            },
-            status: (code) => {
-              res.statusCode = code;
-              return {
-                json: (body) => {
-                  res.end(JSON.stringify(body));
-                },
-                send: (body) => {
-                  res.end(body);
-                },
-              };
-            },
-          },
-        );
-      },
-    );
+    server.middlewares.use(lnurlpMiddleware);
   },
 });
 
 const linkPreviewApi = (): Plugin => ({
   name: "link-preview-api",
   configureServer(server: ViteDevServer) {
-    server.middlewares.use(
-      async (
-        req: Connect.IncomingMessage,
-        res: ServerResponse,
-        next: Connect.NextFunction,
-      ) => {
-        const requestUrl = req.url ?? "";
-        if (!requestUrl.startsWith("/api/link-preview")) return next();
+    server.middlewares.use(linkPreviewMiddleware(server.config.logger));
+  },
+});
 
-        if (req.method !== "GET") {
-          res.statusCode = 405;
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ error: "Method not allowed" }));
-          return;
-        }
-
-        try {
-          const parsed = new URL(requestUrl, "http://localhost");
-          const target = String(parsed.searchParams.get("url") ?? "").trim();
-          const preview = await fetchLinkPreview(target);
-          res.statusCode = 200;
-          res.setHeader("Content-Type", "application/json");
-          res.setHeader("Cache-Control", "no-store");
-          res.end(JSON.stringify(preview));
-        } catch (error) {
-          server.config.logger.warn(
-            `Link preview error: ${String(error ?? "unknown")}`,
-          );
-          res.statusCode = 422;
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ error: "Preview unavailable" }));
-        }
-      },
-    );
+// A phone's web peer needs the LAN URLs the phone uses, as in apps/expo/metro.config.cjs.
+const devHostServices = (): Plugin => ({
+  name: "dev-host-services",
+  config(_, { mode }) {
+    const host = process.env.LINKY_DEV_HOST;
+    if (!host) return;
+    for (const [name, value] of Object.entries(
+      loadEnv(mode, __dirname, "VITE_"),
+    ))
+      process.env[name] = value.replaceAll(
+        /\/\/localhost(?=[:/]|$)/g,
+        `//${host}`,
+      );
   },
 });
 
@@ -230,6 +135,7 @@ export default defineConfig({
     },
   },
   plugins: [
+    devHostServices(),
     linkyUi(),
     bootDiagnosticRedaction(),
     serveSqliteWasm(),
@@ -257,47 +163,7 @@ export default defineConfig({
         // database worker never starts (src/evoluDb.worker.ts replaces it).
         globIgnores: ["**/pdf.worker*", "**/pdfjs-*", "**/Db.worker*"],
       },
-      manifest: {
-        name: "Linky",
-        short_name: "Linky",
-        id: "/",
-        scope: "/",
-        start_url: "/",
-        display: "standalone",
-        orientation: "portrait-primary",
-        protocol_handlers: [
-          {
-            protocol: "web+cashu",
-            url: "/#wallet?cashu=%s",
-          },
-        ],
-        related_applications: [
-          {
-            platform: "webapp",
-            url: "/manifest.webmanifest",
-            id: "/",
-          },
-        ],
-        background_color: "#ffffff",
-        theme_color: "#14b8a6",
-        icons: [
-          {
-            src: "/icon.svg",
-            sizes: "any",
-            type: "image/svg+xml",
-          },
-          {
-            src: "/pwa-192x192.png",
-            sizes: "192x192",
-            type: "image/png",
-          },
-          {
-            src: "/pwa-512x512.png",
-            sizes: "512x512",
-            type: "image/png",
-          },
-        ],
-      },
+      manifest: webManifest,
     }),
     contentSecurityPolicyMeta(),
   ],

@@ -8,6 +8,7 @@ import {
   type PaymentNoteInputProps,
 } from "./PaymentNoteInput";
 import { useAmountInputKeypad } from "./useAmountInputKeypad";
+import { guideTarget } from "../app/lib/guideTargets";
 
 interface PaymentAmountPanelProps {
   amount: string;
@@ -53,7 +54,7 @@ export const PaymentAmountPanel: FC<PaymentAmountPanelProps> = ({
       {header}
       {notices}
 
-      <Stack gap="$md" data-guide={stepGuideId}>
+      <Stack gap="$md" {...(stepGuideId ? guideTarget(stepGuideId) : {})}>
         <AmountKeypad
           amount={amount}
           input={amountInput}
@@ -74,7 +75,7 @@ export const PaymentAmountPanel: FC<PaymentAmountPanelProps> = ({
           loading={submitBusy ?? cashuIsBusy}
           onPress={onSubmit}
           disabled={cashuIsBusy || submitDisabled}
-          data-guide={sendGuideId}
+          {...(sendGuideId ? guideTarget(sendGuideId) : {})}
           tooltip={submitBlockedReason}
         >
           {submitLabel ?? t("paySend")}

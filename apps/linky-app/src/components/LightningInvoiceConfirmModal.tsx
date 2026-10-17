@@ -46,12 +46,12 @@ export function LightningInvoiceConfirmModal({
   React.useEffect(() => {
     if (confirmation.expiresAtSec === null) return;
 
-    const intervalId = window.setInterval(() => {
+    const intervalId = setInterval(() => {
       setNowMs(Date.now());
     }, 1000);
 
     return () => {
-      window.clearInterval(intervalId);
+      clearInterval(intervalId);
     };
   }, [confirmation.expiresAtSec]);
 

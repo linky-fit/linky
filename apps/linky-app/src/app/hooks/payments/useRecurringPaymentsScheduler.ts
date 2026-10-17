@@ -69,6 +69,12 @@ import {
   type RecurringRunResult,
 } from "./payRecurringRun";
 import type { SendTokenMessage } from "./useSendTokenMessage";
+import {
+  isAppVisible,
+  isOnline,
+  onAppResume,
+  onOnline,
+} from "../../../platform/appEvents";
 
 /** Short enough that a payment goes out within seconds of its due time. */
 export const RECURRING_TICK_INTERVAL_MS = 15_000;
@@ -178,9 +184,6 @@ const orderLinks = (order: RecurringPaymentOrder): Record<string, string> => ({
   contact: order.contactId,
 });
 
-const documentIsVisible = (): boolean =>
-  typeof document === "undefined" || document.visibilityState === "visible";
-
 export const contactDisplayName = (contact: ContactRowLike): string => {
   const npub = String(contact.npub ?? "").trim();
   return (
@@ -288,7 +291,7 @@ export const useRecurringPaymentsScheduler = ({
   });
   const enabled = envelopes !== null && hydrated;
   const nowSec = dependencies?.nowSec ?? nowSeconds;
-  const isVisible = dependencies?.isVisible ?? documentIsVisible;
+  const isVisible = dependencies?.isVisible ?? isAppVisible;
   const tickIntervalMs =
     dependencies?.tickIntervalMs ?? RECURRING_TICK_INTERVAL_MS;
   const tickInFlightRef = React.useRef<Promise<void> | null>(null);
@@ -823,7 +826,7 @@ export const useRecurringPaymentsScheduler = ({
   const tick = React.useCallback(async (): Promise<void> => {
     if (tickInFlightRef.current) return tickInFlightRef.current;
     if (latest.current.envelopes === null) return;
-    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+    if (!isOnline()) return;
 
     const pass = inTabLock(async () => {
       const orders = await loadOrders();
@@ -992,17 +995,13 @@ export const useRecurringPaymentsScheduler = ({
   React.useEffect(() => {
     if (!enabled) return;
     void tick();
-    const interval = window.setInterval(() => void tick(), tickIntervalMs);
-    const onOnline = () => void tick();
-    const onVisible = () => {
-      if (document.visibilityState === "visible") void tick();
-    };
-    window.addEventListener("online", onOnline);
-    document.addEventListener("visibilitychange", onVisible);
+    const interval = setInterval(() => void tick(), tickIntervalMs);
+    const unsubscribeOnline = onOnline(() => void tick());
+    const unsubscribeResume = onAppResume(() => void tick());
     return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("online", onOnline);
-      document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(interval);
+      unsubscribeOnline();
+      unsubscribeResume();
     };
   }, [enabled, tick, tickIntervalMs]);
 

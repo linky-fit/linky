@@ -7,11 +7,14 @@ import {
   EmptyState,
   IconButton,
   ListRow,
+  LogScroll,
   MessageComposerFrame,
   NearbyBanner,
   Notice,
   ReplyPreview,
   Row,
+  SafeAreaPad,
+  ScrollView,
   Stack,
 } from "@linky-fit/ui";
 import { useDivRef } from "../hooks/useDivRef";
@@ -118,6 +121,7 @@ import {
 import { ChatMessageEditor } from "../components/ChatMessageEditor";
 import { navigateTo } from "../hooks/useRouting";
 import type { Translate } from "../i18n";
+import { keepInputFocus } from "../utils/keepInputFocus";
 import { formatChatDayLabel, normalizeLocale } from "../utils/formatting";
 import type { MintIcon } from "../utils/mint";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
@@ -125,6 +129,7 @@ import { boundedMemo } from "../utils/boundedMemo";
 import { pickFiles } from "../utils/pickFile";
 import { nowSeconds } from "../utils/time";
 import { isDeletedMessage } from "../app/lib/deletedMessage";
+import { guideTarget } from "../app/lib/guideTargets";
 
 interface Contact {
   id: string;
@@ -646,13 +651,10 @@ const ChatMessageList = memo(function ChatMessageList({
   ]);
 
   return (
-    <Stack
+    <LogScroll
       ref={messagesNodeRef}
       role="log"
       aria-live="polite"
-      flex={1}
-      minHeight={0}
-      overflowY="auto"
       paddingHorizontal="$xl"
     >
       <Stack
@@ -723,7 +725,7 @@ const ChatMessageList = memo(function ChatMessageList({
           ))
         )}
       </Stack>
-    </Stack>
+    </LogScroll>
   );
 });
 
@@ -928,12 +930,10 @@ export const ChatComposer = memo(function ChatComposer({
         if (files.length > 0 && canAttach) addChatAttachments(files);
       });
   };
-  // Keeps the editor focused, and the iOS keyboard open, while tapping composer controls.
-  const keepEditorFocus = (event: React.PointerEvent) => event.preventDefault();
   const showSend = hasDraftText || chatAttachments.length > 0;
 
   return (
-    <Stack testID="chat-compose" data-safe-area="bottom">
+    <SafeAreaPad testID="chat-compose" edge="bottom">
       <MessageComposerFrame
         header={
           replyContext ||
@@ -967,48 +967,53 @@ export const ChatComposer = memo(function ChatComposer({
                 />
               ) : null}
               {mentionSuggestions.length > 0 ? (
-                <Stack
-                  role="list"
+                <ScrollView
                   maxHeight="$qr"
-                  overflowY="auto"
-                  padding="$xs"
+                  flexGrow={0}
                   borderRadius="$control"
                   backgroundColor="$surfaceRaised"
-                  onPointerDown={keepEditorFocus}
+                  keyboardShouldPersistTaps="handled"
                 >
-                  {mentionSuggestions.map((suggestion) =>
-                    suggestion.kind === "group" ? (
-                      <ListRow
-                        key={`group-${suggestion.groupName}`}
-                        title={`@${suggestion.groupName}`}
-                        meta={t("chatMentionGroupCount").replace(
-                          "{count}",
-                          String(suggestion.contacts.length),
-                        )}
-                        chevron={false}
-                        onPress={() => selectMentionSuggestion(suggestion)}
-                      />
-                    ) : (
-                      <ListRow
-                        key={`contact-${suggestion.contact.npub}`}
-                        leading={
-                          <Avatar
-                            name={suggestion.contact.name}
-                            uri={
-                              getNpubMessageContactInfo(suggestion.contact.npub)
-                                ?.pictureUrl ?? undefined
-                            }
-                            size="sm"
-                          />
-                        }
-                        title={suggestion.contact.name}
-                        meta={suggestion.contact.groupName ?? undefined}
-                        chevron={false}
-                        onPress={() => selectMentionSuggestion(suggestion)}
-                      />
-                    ),
-                  )}
-                </Stack>
+                  <Stack
+                    role="list"
+                    padding="$xs"
+                    onPointerDown={keepInputFocus}
+                  >
+                    {mentionSuggestions.map((suggestion) =>
+                      suggestion.kind === "group" ? (
+                        <ListRow
+                          key={`group-${suggestion.groupName}`}
+                          title={`@${suggestion.groupName}`}
+                          meta={t("chatMentionGroupCount").replace(
+                            "{count}",
+                            String(suggestion.contacts.length),
+                          )}
+                          chevron={false}
+                          onPress={() => selectMentionSuggestion(suggestion)}
+                        />
+                      ) : (
+                        <ListRow
+                          key={`contact-${suggestion.contact.npub}`}
+                          leading={
+                            <Avatar
+                              name={suggestion.contact.name}
+                              uri={
+                                getNpubMessageContactInfo(
+                                  suggestion.contact.npub,
+                                )?.pictureUrl ?? undefined
+                              }
+                              size="sm"
+                            />
+                          }
+                          title={suggestion.contact.name}
+                          meta={suggestion.contact.groupName ?? undefined}
+                          chevron={false}
+                          onPress={() => selectMentionSuggestion(suggestion)}
+                        />
+                      ),
+                    )}
+                  </Stack>
+                </ScrollView>
               ) : null}
             </>
           ) : null
@@ -1025,7 +1030,7 @@ export const ChatComposer = memo(function ChatComposer({
                     openContactPay(selectedContact.id, true, "request")
                   }
                   disabled={cashuIsBusy}
-                  data-guide="chat-request"
+                  {...guideTarget("chat-request")}
                 >
                   {t("requestPayment")}
                 </Button>
@@ -1037,7 +1042,7 @@ export const ChatComposer = memo(function ChatComposer({
                 onPress={() => openContactPay(selectedContact.id, true)}
                 disabled={cashuIsBusy || !canStartPay}
                 tooltip={!canStartPay ? t("payInsufficient") : undefined}
-                data-guide="chat-pay"
+                {...guideTarget("chat-pay")}
               >
                 {isFeedbackContact ? t("donate") : t("pay")}
               </Button>
@@ -1067,10 +1072,10 @@ export const ChatComposer = memo(function ChatComposer({
                 accessibilityLabel={
                   editContext ? t("chatSaveAction") : t("send")
                 }
-                onPointerDown={keepEditorFocus}
+                onPointerDown={keepInputFocus}
                 onPress={() => void requestSend()}
                 disabled={!canSendChat}
-                data-guide="chat-send"
+                {...guideTarget("chat-send")}
               />
             ) : (
               <IconButton
@@ -1078,7 +1083,7 @@ export const ChatComposer = memo(function ChatComposer({
                 variant="secondary"
                 size="sm"
                 accessibilityLabel={t("chatImageAttach")}
-                onPointerDown={keepEditorFocus}
+                onPointerDown={keepInputFocus}
                 onPress={attachFiles}
                 disabled={!canAttach}
               />
@@ -1090,7 +1095,7 @@ export const ChatComposer = memo(function ChatComposer({
           getNpubMessageContactInfo={getNpubMessageContactInfo}
         />
       </MessageComposerFrame>
-    </Stack>
+    </SafeAreaPad>
   );
 });
 

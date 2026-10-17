@@ -40,7 +40,6 @@ interface SiteLoginModalProps {
 }
 
 const pop = { opacity: 0, scale: enterScale.pop } as const;
-const ignoreDismiss = () => {};
 
 const REFUSAL_COPY: Record<
   SiteLoginRefusal,
@@ -77,7 +76,7 @@ const withSite = (text: string, site: string | null): string =>
  * the origin unverified. The approval names the identity the site will see.
  * The padlock pops open once the login is sent. A request Linky would not
  * sign has no origin and no approve button. Tapping outside does nothing, so
- * the user either confirms or cancels.
+ * the user either confirms or cancels; Escape and Android back cancel.
  */
 export function SiteLoginModal({
   identity,
@@ -92,6 +91,7 @@ export function SiteLoginModal({
     return (
       <Shell
         title={title}
+        onCancel={onClose}
         actions={
           <Button variant="secondary" onPress={onClose}>
             {t("payCancel")}
@@ -119,6 +119,7 @@ export function SiteLoginModal({
     return (
       <Shell
         title={title}
+        onCancel={onClose}
         actions={
           <Button variant="secondary" onPress={onClose}>
             {t("close")}
@@ -144,16 +145,22 @@ export function SiteLoginModal({
 function Shell({
   actions,
   children,
+  onCancel,
   title,
 }: {
   actions: React.ReactNode;
   children: React.ReactNode;
+  /** Null while the login is in flight or done, which nothing cancels. */
+  onCancel: (() => void) | null;
   title: string;
 }): React.ReactElement {
   return (
     <Dialog
       open
-      onOpenChange={ignoreDismiss}
+      onOpenChange={(open) => {
+        if (!open) onCancel?.();
+      }}
+      closeOnOutsidePress={false}
       title={title}
       hideTitle
       actions={actions}
@@ -212,6 +219,7 @@ function ApprovalDialog({
   return (
     <Shell
       title={title}
+      onCancel={isDone || isBusy ? null : onClose}
       actions={
         isDone ? null : (
           <>

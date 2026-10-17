@@ -1,21 +1,27 @@
 import { Result, Schema } from "effect";
+import { getConversationKey } from "nostr-tools/nip44";
 import { wrapEvent } from "nostr-tools/nip59";
 import { makeIdentity } from "../testing";
 import { SignedWrapEvent } from "./nostrEvent";
 import { unwrapToRumor } from "./giftWrap";
 
+vi.mock("nostr-tools/nip44", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("nostr-tools/nip44")>();
+  return { ...actual, getConversationKey: vi.fn(actual.getConversationKey) };
+});
+
 const alice = makeIdentity();
 const bob = makeIdentity();
-const makeWrap = (createdAt: number) => {
+const makeWrap = (createdAt: number, sender = alice) => {
   const fields = {
-    pubkey: alice.pubkey,
+    pubkey: sender.pubkey,
     created_at: createdAt,
     kind: 14,
     tags: [["p", bob.pubkey]],
     content: "hello",
   };
   return Schema.decodeUnknownSync(SignedWrapEvent)(
-    wrapEvent(fields, alice.secretKey, bob.pubkey),
+    wrapEvent(fields, sender.secretKey, bob.pubkey),
   );
 };
 
@@ -77,4 +83,15 @@ describe("authenticated wrap boundaries", () => {
       );
     },
   );
+
+  it("derives a sender's seal key once across its wraps", () => {
+    const carol = makeIdentity();
+    const now = Math.floor(Date.now() / 1000);
+    const wraps = [makeWrap(now, carol), makeWrap(now, carol)];
+    vi.mocked(getConversationKey).mockClear();
+    for (const wrap of wraps)
+      expect(Result.isSuccess(unwrapToRumor(wrap, bob.secretKey))).toBe(true);
+    // One per wrap for its one-off key, one for carol's seals.
+    expect(getConversationKey).toHaveBeenCalledTimes(3);
+  });
 });

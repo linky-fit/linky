@@ -465,5 +465,13 @@ const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
   wallet: "wallet",
 };
 
-export const buildTopbarTitle = (route: Route, t: Translate): string =>
-  t(TOPBAR_TITLE_KEY[route.kind]);
+export const buildTopbarTitle = (
+  route: Route,
+  t: Translate,
+  contactPaymentIntent: "pay" | "request",
+): string =>
+  t(
+    route.kind === "contactPay" && contactPaymentIntent === "request"
+      ? "contactRequestTitle"
+      : TOPBAR_TITLE_KEY[route.kind],
+  );

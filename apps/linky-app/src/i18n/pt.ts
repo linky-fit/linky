@@ -401,6 +401,25 @@ export const pt = {
   evoluSyncedOwners: "Donos sincronizados",
   migratingDataTitle: "Migrando dados",
   migratingDataBody: "Isso leva um momento. Mantenha o aplicativo aberto.",
+  hydrationTitle: "Baixando seus dados",
+  hydrationBody:
+    "Seus contatos, mensagens e carteira estão chegando do relay Evolu. Mantenha o aplicativo aberto.",
+  hydrationSlowBody:
+    "Isso está demorando. O relay Evolu pode estar inacessível; verifique seus relays Evolu.",
+  hydrationProgress: "{synced} de {total} partes sincronizadas",
+  hydrationOpenRelaySettings: "Relays Evolu",
+  secretsUnavailableTitle: "Não foi possível ler suas chaves",
+  secretsUnavailableBody:
+    "O Linky não conseguiu ler suas chaves do armazenamento seguro deste aparelho, então manteve sua conta fechada para proteger seus dados. Tente de novo ou restaure sua conta com as palavras do seu backup.",
+  secretsUnavailableRetry: "Tentar de novo",
+  secretsUnavailableContinue: "Restaurar com as palavras do backup",
+  secretsWriteFailedTitle: "Não foi possível guardar suas chaves com segurança",
+  secretsWriteFailedBody:
+    "O armazenamento seguro deste aparelho recusou suas chaves. O Linky nunca as guarda em um lugar menos seguro, então elas ainda não foram salvas. Tente de novo. Se continuar falhando, anote antes as palavras do seu backup: com elas você restaura sua conta neste ou em qualquer outro aparelho.",
+  secretsWriteFailedWords: "As palavras do seu backup",
+  secretsWriteFailedRetry: "Tentar de novo",
+  secretsWriteFailedAgain:
+    "Ainda não foi possível guardá-las. Tente de novo daqui a pouco ou reinicie o aparelho.",
   evoluNoDataYet: "Nenhum dado gravado aqui ainda.",
   evoluData: "Dados",
   evoluStorage: "Armazenamento",
@@ -544,6 +563,7 @@ export const pt = {
   chatSeenShort: "visto",
   chatImageAttach: "Adicionar imagem ou PDF",
   chatPdfDecrypting: "Descriptografando PDF…",
+  chatAttachmentRetry: "Tentar novamente",
   chatPdfLoadFailed: "Não foi possível carregar o PDF.",
   chatPdfMessage: "PDF",
   chatPdfOpen: "Abrir PDF",
@@ -559,6 +579,10 @@ export const pt = {
   chatImageOpen: "Abrir imagem",
   chatImageBackToChat: "Voltar ao chat",
   chatImageSave: "Salvar nas fotos",
+  chatImageSaved: "Salvo nas fotos",
+  chatImageSaveDenied:
+    "O Linky não tem permissão para salvar nas suas fotos. Permita o acesso às fotos nos Ajustes.",
+  chatImageSaveFailed: "Não foi possível salvar nas fotos.",
   chatReplyAction: "Responder",
   chatReactAction: "Reagir",
   chatMoreEmojis: "Mais emojis",
@@ -748,6 +772,7 @@ export const pt = {
   editContact: "Editar contato",
   contactEditTitle: "Editar contato",
   contactPayTitle: "Pagar ao contato",
+  contactRequestTitle: "Pedir pagamento ao contato",
   messagesTitle: "Mensagens",
   newContact: "Adicionar contato",
   close: "Fechar",
@@ -1231,6 +1256,8 @@ export const pt = {
   payNetworkError: "Não foi possível enviar devido a um erro de rede.",
   payApprovalChanged:
     "A aprovação do pagamento não é mais válida. Revise o destinatário e pague de novo.",
+  payWalletBusy:
+    "A carteira está ocupada com outro pagamento, tente novamente em instantes.",
   payFailed: "O pagamento falhou",
   payPending:
     "O pagamento está aguardando a confirmação do mint. Ele termina sozinho quando o mint responder.",
@@ -1256,6 +1283,7 @@ export const pt = {
   // Locale-specific strings
   paid: "Pago",
   cashuTokenClaimed: "Token resgatado",
+  cashuTokenReceived: "Token recebido",
   cashuTokenClaimedWithAmount: "Seu token de {amount} foi resgatado",
   conversations: "Conversas",
   proxyPayments: "Pagamentos proxy",
@@ -1360,4 +1388,7 @@ export const pt = {
   keryxMediaUnavailable:
     "O arquivo não corresponde ao que a empresa assinou, por isso não foi aberto.",
   keryxNotFound: "Não encontrado",
+  pickSourceTitle: "Anexar de",
+  pickSourcePhotos: "Fotos",
+  pickSourceFiles: "Arquivos",
 } satisfies Record<keyof typeof cs, string>;

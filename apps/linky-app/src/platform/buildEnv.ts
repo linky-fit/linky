@@ -2,6 +2,8 @@
 // replaces just this file. Values are fixed at build time.
 
 export const isDevBuild: boolean = import.meta.env.DEV;
+/** vite-plugin-pwa serves the development service worker as an ES module under its own name. */
+export const devServiceWorkerUrl: string | null = "/dev-sw.js?dev-sw";
 /** Installs the Playwright test hooks (`window.__linkyE2E`) in a production build. */
 export const isE2eBuild = import.meta.env.VITE_E2E === "1";
 export const allowInsecureLocalhostRelays =
@@ -16,3 +18,7 @@ export const envMainMintUrl = import.meta.env.VITE_MAIN_MINT_URL;
 export const envPushServerUrl = import.meta.env.VITE_PUSH_SERVER_URL;
 export const envNotificationServerUrl = import.meta.env
   .VITE_NOTIFICATION_SERVER_URL;
+/** Origin serving the Linky `/api/*` functions; empty for the page's own origin. */
+export const apiOrigin: string = "";
+/** Origin of the dev server collecting inspector rows; empty for the page's own origin. */
+export const inspectorCollectorOrigin: string = "";

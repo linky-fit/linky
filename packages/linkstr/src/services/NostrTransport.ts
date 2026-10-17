@@ -224,7 +224,7 @@ export const makeRelayPoolTransport = (
         options?.allowInsecureLocalhost !== true)
     ) {
       return Promise.reject(
-        new Error("Relay requires WSS; loopback WS needs explicit opt-in"),
+        new Error("Relay requires WSS; local WS needs explicit opt-in"),
       );
     }
     return pool.ensureRelay(relay, {

@@ -1,0 +1,20 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'fit.linky'
+version = '1.0.0'
+
+android {
+  namespace "fit.linky.legacysecrets"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+}
+
+dependencies {
+  // The version apps/native-shell writes the store with.
+  implementation "androidx.security:security-crypto:1.1.0"
+}

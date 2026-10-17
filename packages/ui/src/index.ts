@@ -58,7 +58,11 @@ export type { TextFieldProps } from "./fields";
 export { SelectField } from "./select-field";
 export type { SelectFieldProps, SelectOption } from "./select-field";
 export { RichTextInput } from "./rich-text-input";
-export type { RichTextInputProps } from "./rich-text-input";
+export type {
+  RichTextInputNative,
+  RichTextInputProps,
+  RichTextSegment,
+} from "./rich-text-input";
 export { Form, SubmitButton } from "./form";
 export type { FormProps, SubmitButtonProps } from "./form";
 
@@ -115,6 +119,7 @@ export type {
 export { Spinner } from "./spinner";
 export type { SpinnerProps } from "./spinner";
 export { Dialog, Sheet } from "./overlays";
+export { dispatchBackPress, onBackPress } from "./backPress";
 export type { DialogProps, SheetProps } from "./overlays";
 export { GuidedTour } from "./guided-tour";
 export type { GuidedTourProps, TourTarget } from "./guided-tour";
@@ -183,3 +188,8 @@ export { VideoEmbed } from "./video-embed";
 export type { VideoEmbedProps } from "./video-embed";
 export type { SandboxedHtmlProps } from "./sandboxed-html";
 export type { CameraPreviewProps } from "./camera-preview";
+export { LogScroll, PageScroll } from "./page-scroll";
+export { revealInPageScroll, usePageScrollHeight } from "./page-scroll-frame";
+export type { LogScrollProps, PageScrollProps } from "./page-scroll";
+export { SafeAreaPad } from "./safe-area";
+export type { SafeAreaPadProps } from "./safe-area";

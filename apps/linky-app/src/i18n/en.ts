@@ -390,6 +390,25 @@ export const en = {
   evoluSyncedOwners: "Synced owners",
   migratingDataTitle: "Migrating data",
   migratingDataBody: "This takes a moment. Keep the app open.",
+  hydrationTitle: "Downloading your data",
+  hydrationBody:
+    "Your contacts, messages and wallet are arriving from the Evolu relay. Keep the app open.",
+  hydrationSlowBody:
+    "This is taking long. The Evolu relay may be unreachable; check your Evolu relays.",
+  hydrationProgress: "{synced} of {total} parts synced",
+  hydrationOpenRelaySettings: "Evolu relays",
+  secretsUnavailableTitle: "Couldn't read your keys",
+  secretsUnavailableBody:
+    "Linky couldn't read your keys from this device's secure storage, so it kept your account closed to keep your data safe. Try again, or restore your account with your backup words.",
+  secretsUnavailableRetry: "Try again",
+  secretsUnavailableContinue: "Restore with backup words",
+  secretsWriteFailedTitle: "Couldn't store your keys securely",
+  secretsWriteFailedBody:
+    "This device's secure storage refused your keys. Linky never keeps them anywhere less safe, so they aren't saved yet. Try again. If it keeps failing, write down your backup words first: they restore your account on this or any other device.",
+  secretsWriteFailedWords: "Your backup words",
+  secretsWriteFailedRetry: "Try again",
+  secretsWriteFailedAgain:
+    "Still couldn't store them. Try again in a moment or restart the device.",
   evoluNoDataYet: "No data stored here yet.",
   evoluData: "Data",
   evoluStorage: "Storage",
@@ -532,6 +551,7 @@ export const en = {
   chatSeenShort: "seen",
   chatImageAttach: "Add image or PDF",
   chatPdfDecrypting: "Decrypting PDF…",
+  chatAttachmentRetry: "Try again",
   chatPdfLoadFailed: "Could not load PDF.",
   chatPdfMessage: "PDF",
   chatPdfOpen: "Open PDF",
@@ -547,6 +567,10 @@ export const en = {
   chatImageOpen: "Open image",
   chatImageBackToChat: "Back to chat",
   chatImageSave: "Save to photos",
+  chatImageSaved: "Saved to photos",
+  chatImageSaveDenied:
+    "Linky can't save to your photos. Allow photo access in Settings.",
+  chatImageSaveFailed: "Could not save to photos.",
   chatReplyAction: "Reply",
   chatReactAction: "React",
   chatMoreEmojis: "More emojis",
@@ -736,6 +760,7 @@ export const en = {
   editContact: "Edit contact",
   contactEditTitle: "Edit contact",
   contactPayTitle: "Pay to contact",
+  contactRequestTitle: "Request from contact",
   messagesTitle: "Messages",
   newContact: "Add contact",
   close: "Close",
@@ -1214,6 +1239,8 @@ export const en = {
   payNetworkError: "Unable to send due to a network error.",
   payApprovalChanged:
     "Payment approval is no longer valid. Review the recipient and pay again.",
+  payWalletBusy:
+    "The wallet is busy with another payment, try again in a moment.",
   payFailed: "Payment failed",
   payPending:
     "Payment is waiting for the mint to confirm it. It finishes on its own once the mint answers.",
@@ -1239,6 +1266,7 @@ export const en = {
   // Locale-specific strings
   paid: "Paid",
   cashuTokenClaimed: "Token claimed",
+  cashuTokenReceived: "Token received",
   cashuTokenClaimedWithAmount: "Your token of {amount} has been claimed",
   conversations: "Conversations",
   proxyPayments: "Proxy payments",
@@ -1340,4 +1368,7 @@ export const en = {
   keryxMediaUnavailable:
     "The file didn't match what the company signed, so it wasn't opened.",
   keryxNotFound: "Not found",
+  pickSourceTitle: "Attach from",
+  pickSourcePhotos: "Photos",
+  pickSourceFiles: "Files",
 } satisfies Record<keyof typeof cs, string>;

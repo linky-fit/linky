@@ -11,7 +11,7 @@ import { linkauthAudience } from "@linky-fit/linkstr";
 import { useAtom, useLinkstrCommands } from "@linky-fit/linkstr-react";
 import { Cause, Exit, Option } from "effect";
 import React from "react";
-import { navigateAwayTo } from "../../hooks/useRouting";
+import { navigateAwayTo } from "../../platform/navigation";
 import { reportAppLog } from "../../devtools/inspector/appLog";
 import type { I18nKey, Translate } from "../../i18n";
 import {

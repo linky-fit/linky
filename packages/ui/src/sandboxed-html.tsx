@@ -1,11 +1,9 @@
-export interface SandboxedHtmlProps {
-  /** Sanitized HTML for the body; it renders without scripts, same-origin access or remote resources. */
-  html: string;
-  /** Names the frame for assistive technology. */
-  title: string;
-  /** The frame scrolls its own content past this height in px; defaults to most of the viewport. */
-  height?: number | undefined;
-}
+import type { ReactElement } from "react";
+import type { SandboxedHtmlProps } from "./sandboxed-html-document";
 
-/** Sandboxed frames are a web API; native apps render publisher HTML in their own web view instead. */
-export const SandboxedHtml: (props: SandboxedHtmlProps) => null = () => null;
+export type { SandboxedHtmlProps } from "./sandboxed-html-document";
+
+/** The props every platform's SandboxedHtml takes; `sandboxed-html.web.tsx` and `.native.tsx` render it. */
+export const SandboxedHtml: (
+  props: SandboxedHtmlProps,
+) => ReactElement | null = () => null;

@@ -61,6 +61,7 @@ import type {
   ChatReactionChip,
   LocalNostrMessage,
 } from "../app/types/appTypes";
+import { asDivElement } from "../utils/domNodes";
 import type { MintIcon } from "../utils/mint";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 import { CashuTokenPill } from "./CashuTokenPill";
@@ -74,6 +75,7 @@ import { MessageActionsMenu } from "./MessageActionsMenu";
 import { MessageReactions } from "./MessageReactions";
 import { PrivateFileBubble } from "./PrivateFileBubble";
 import { PrivateImageBubble } from "./PrivateImageBubble";
+import { useSavePrivateImage } from "../app/hooks/useSavePrivateImage";
 
 export interface NpubMessageContactInfo {
   displayName: string;
@@ -614,7 +616,8 @@ function ChatMessageComponent({
     if (isDeleted) return;
     // Close the keyboard while the action sheet is up; remember the field so
     // closeMenu can bring the keyboard back.
-    const active = document.activeElement;
+    const active =
+      typeof document === "undefined" ? null : document.activeElement;
     if (
       active instanceof HTMLElement &&
       (active instanceof HTMLInputElement ||
@@ -636,6 +639,7 @@ function ChatMessageComponent({
     if (el?.isConnected) el.focus();
   }, []);
 
+  const savePrivateImage = useSavePrivateImage();
   const imageActions = React.useMemo(() => {
     if (!privateImageInfo || !privateImageBlob) return null;
     const exportLinks = rumorId ? { rumor: rumorId } : {};
@@ -646,7 +650,7 @@ function ChatMessageComponent({
     return {
       canShare: canSharePrivateImage(),
       onSave: () => {
-        downloadPrivateImageBlob(privateImageBlob, exportLinks, fileName);
+        void savePrivateImage(privateImageBlob, exportLinks, fileName);
       },
       onShare: () => {
         void sharePrivateImageBlob(
@@ -660,7 +664,7 @@ function ChatMessageComponent({
         });
       },
     };
-  }, [privateImageBlob, privateImageInfo, rumorId, t]);
+  }, [privateImageBlob, privateImageInfo, rumorId, savePrivateImage, t]);
 
   const clearLongPress = React.useCallback(() => {
     if (longPressTimerRef.current == null) return;
@@ -747,7 +751,7 @@ function ChatMessageComponent({
   };
 
   const setMessageNode = (node: unknown) => {
-    const element = node instanceof HTMLDivElement ? node : null;
+    const element = asDivElement(node);
     messageDivRef.current = element;
     if (messageElRef && messageId) messageElRef(element, messageId);
   };

@@ -35,6 +35,7 @@ import type { ContactNewStep } from "../app/types/appTypes";
 import { isLightningAddress } from "../lnurlPay";
 
 import type { Translate } from "../i18n";
+import { keepInputFocus } from "../utils/keepInputFocus";
 import { readClipboardText } from "../platform/clipboard";
 import { normalizeContactGroups } from "../utils/contactGroups";
 import {
@@ -42,6 +43,7 @@ import {
   formatShortLightningAddress,
   formatShortNpub,
 } from "../utils/formatting";
+import { guideTarget } from "../app/lib/guideTargets";
 
 export interface ContactFormData {
   name: string;
@@ -81,7 +83,10 @@ export function ContactFields({
   const [groupInput, setGroupInput] = React.useState("");
   const allGroups = normalizeContactGroups([...form.groups, ...groupNames]);
   const addGroup = (value: string) => {
-    const groups = normalizeContactGroups([...form.groups, value]);
+    const groups = normalizeContactGroups([
+      ...form.groups,
+      ...value.split(","),
+    ]);
     if (groups.length === form.groups.length) return;
     setForm({ ...form, groups });
     setGroupInput("");
@@ -143,7 +148,7 @@ export function ContactFields({
         trailing={publicValueAndAction(lightningPublicValue, lightningAction)}
       />
 
-      <Stack gap="$xs" data-guide="contact-group">
+      <Stack gap="$xs" {...guideTarget("contact-group")}>
         <Text variant="label" color="$colorSubtle">
           {t("group")}
         </Text>
@@ -170,13 +175,13 @@ export function ContactFields({
           label={t("group")}
           hideLabel
           value={groupInput}
-          onChange={(event) => setGroupInput(event.target.value)}
-          onBlur={() => addGroup(groupInput)}
-          onKeyDown={(event) => {
-            if (event.key !== "Enter" && event.key !== ",") return;
-            event.preventDefault();
-            addGroup(groupInput);
+          onChange={(event) => {
+            const value = event.target.value;
+            if (value.includes(",")) addGroup(value);
+            else setGroupInput(value);
           }}
+          onBlur={() => addGroup(groupInput)}
+          onSubmitEditing={() => addGroup(groupInput)}
           placeholder={t("groupPlaceholder")}
         />
       </Stack>
@@ -490,11 +495,11 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
     if (searchResults?.query === searchQuery) return;
     if (lastSearchedQueryRef.current === searchQuery) return;
 
-    const timer = window.setTimeout(() => {
+    const timer = setTimeout(() => {
       void runSearch(searchQuery, { silentEmpty: true });
     }, 900);
 
-    return () => window.clearTimeout(timer);
+    return () => clearTimeout(timer);
   }, [runSearch, searchQuery, searchResults?.query, step]);
 
   const createManualFromSearch = () => {
@@ -529,7 +534,7 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
         icon="ScanLine"
         onPress={openScan}
         disabled={isSavingContact}
-        data-guide="scan-contact-button"
+        {...guideTarget("scan-contact-button")}
       >
         {t("contactLoadQr")}
       </Button>
@@ -543,11 +548,7 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
           clearSearchFeedback();
           setForm({ ...form, npub: event.target.value });
         }}
-        onKeyDown={(event) => {
-          if (event.key !== "Enter") return;
-          event.preventDefault();
-          void runSearch();
-        }}
+        onSubmitEditing={() => void runSearch()}
         onPaste={(event) => {
           const queryText = event.clipboardData.getData("text").trim();
           if (!queryText) return;
@@ -558,13 +559,13 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
         }}
         placeholder={t("contactSearchPlaceholder")}
         autoComplete="off"
-        data-guide="contact-search-input"
+        {...guideTarget("contact-search-input")}
         trailing={
           <IconButton
             icon="ClipboardPaste"
             size="sm"
             accessibilityLabel={t("paste")}
-            onPointerDown={(event) => event.preventDefault()}
+            onPointerDown={keepInputFocus}
             onPress={() => void pasteSearch()}
           />
         }
@@ -632,7 +633,7 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
   return (
     <Stack
       gap="$md"
-      minHeight="100%"
+      flexGrow={1}
       onLayout={({ nativeEvent }) => {
         if (nativeEvent.layout.width > 0) setRowWidth(nativeEvent.layout.width);
       }}

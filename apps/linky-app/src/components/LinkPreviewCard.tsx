@@ -1,7 +1,7 @@
 import { LinkPreview, Stack } from "@linky-fit/ui";
 import React from "react";
 import { useDivRef } from "../hooks/useDivRef";
-import { isNativePlatform } from "../platform/runtime";
+import { apiUrl } from "../platform/runtime";
 import { isRecord } from "../utils/unknown";
 import { asNonEmptyString } from "../utils/validation";
 
@@ -18,7 +18,6 @@ interface LinkPreviewCardProps {
   url: string;
 }
 
-const HOSTED_APP_ORIGIN = "https://app.linky.fit";
 const MAX_PREVIEW_CACHE_SIZE = 200;
 const NEGATIVE_PREVIEW_CACHE_TTL_MS = 60_000;
 
@@ -46,10 +45,8 @@ const parseLinkPreview = (value: unknown): LinkPreview | null => {
   };
 };
 
-const getPreviewEndpoint = (url: string): string => {
-  const path = `/api/link-preview?url=${encodeURIComponent(url)}`;
-  return isNativePlatform() ? `${HOSTED_APP_ORIGIN}${path}` : path;
-};
+const getPreviewEndpoint = (url: string): string =>
+  apiUrl(`/api/link-preview?url=${encodeURIComponent(url)}`);
 
 const getCachedPreview = (url: string): LinkPreview | null | undefined => {
   const entry = previewCache.get(url);

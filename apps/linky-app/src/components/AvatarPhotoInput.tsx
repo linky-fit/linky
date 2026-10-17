@@ -8,7 +8,8 @@ import {
 import type { ImageCropCenter } from "@linky-fit/ui";
 import React from "react";
 import type { Translate } from "../i18n";
-import { createSquareAvatarDataUrl } from "../utils/image";
+import { blobUrl, revokeBlobUrl } from "../platform/files";
+import { createSquareAvatarDataUrl, openImage } from "../utils/image";
 import type { FilePickerHandle } from "../utils/pickFile";
 import { pickFile } from "../utils/pickFile";
 
@@ -28,23 +29,9 @@ interface AvatarPhotoInputProps {
 
 const loadPhoto = async (file: File): Promise<PendingPhoto> => {
   if (!file.type.startsWith("image/")) throw new Error("Unsupported file");
-
-  const objectUrl = URL.createObjectURL(file);
-  try {
-    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const element = new Image();
-      element.onload = () => resolve(element);
-      element.onerror = () => reject(new Error("Image load failed"));
-      element.src = objectUrl;
-    });
-    const width = image.naturalWidth || image.width;
-    const height = image.naturalHeight || image.height;
-    if (!width || !height) throw new Error("Invalid image");
-    return { file, height, objectUrl, width };
-  } catch (error) {
-    URL.revokeObjectURL(objectUrl);
-    throw error;
-  }
+  const { width, height } = await openImage(file);
+  if (!width || !height) throw new Error("Invalid image");
+  return { file, height, objectUrl: blobUrl(file), width };
 };
 
 /** Picks a photo and lets the user crop it to a square avatar. */
@@ -63,7 +50,7 @@ export function AvatarPhotoInput({
 
   const closeCrop = React.useCallback(() => {
     setPendingPhoto((current) => {
-      if (current) URL.revokeObjectURL(current.objectUrl);
+      if (current) revokeBlobUrl(current.objectUrl);
       return null;
     });
     setIsSaving(false);
@@ -71,7 +58,7 @@ export function AvatarPhotoInput({
 
   React.useEffect(
     () => () => {
-      if (pendingPhoto) URL.revokeObjectURL(pendingPhoto.objectUrl);
+      if (pendingPhoto) revokeBlobUrl(pendingPhoto.objectUrl);
     },
     [pendingPhoto],
   );
@@ -90,7 +77,7 @@ export function AvatarPhotoInput({
     try {
       const photo = await loadPhoto(file);
       if (photo.width === photo.height) {
-        URL.revokeObjectURL(photo.objectUrl);
+        revokeBlobUrl(photo.objectUrl);
         onSelected(await createSquareAvatarDataUrl(file));
         return;
       }

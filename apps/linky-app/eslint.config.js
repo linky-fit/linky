@@ -11,7 +11,8 @@ import { defineConfig } from "eslint/config";
 
 const storageMessage =
   "Browser storage goes through utils/storage.ts (safeLocalStorage* / safeSessionStorage* helpers).";
-const navigateMessage = "Navigate with navigateTo() from hooks/useRouting.ts.";
+const navigateMessage =
+  "Navigate with navigateTo() from hooks/useRouting.ts; only platform/navigation.ts touches the URL.";
 const evoluMessage =
   "App code never calls the Evolu instance; read and write through the @linky-fit/linksync repositories (app/hooks/useLinksync.ts).";
 
@@ -48,6 +49,18 @@ const navigationSyntax = [
     message: navigateMessage,
   },
 ];
+const routeReadMessage =
+  "Read the route with currentRoutePath() or useCurrentRoutePath() from platform/navigation.ts; inbound command links go through platform/hashLinks.ts.";
+const routeReadSyntax = [
+  {
+    selector:
+      "MemberExpression[property.name='hash']:matches([object.name='location'], [object.property.name='location'])",
+    message: routeReadMessage,
+  },
+  { selector: "Literal[value='hashchange']", message: routeReadMessage },
+];
+/** Inbound command links (`#add/…`, `#nostrconnect…`, `#linkauth…`, `?cashu=`, `?notificationOpen=`) are read from the hash in one place. */
+const commandLinkFiles = ["src/platform/hashLinks.ts"];
 
 const backSyntax = [
   {
@@ -61,7 +74,7 @@ const evoluImportPatterns = [
   {
     group: ["@evolu/*"],
     message:
-      "Take Evolu re-exports from @linky-fit/linksync; only src/evolu.ts, src/evoluDb.worker.ts, src/platform/evolu.web.ts and src/app/migrations import @evolu/* directly.",
+      "Take Evolu re-exports from @linky-fit/linksync; only src/evolu.ts, src/evoluDb.worker.ts, src/platform/evolu.web.ts, src/platform/evolu.native.ts and src/app/migrations import @evolu/* directly.",
   },
 ];
 const wipeImportPatterns = [
@@ -94,86 +107,41 @@ const stateImportPaths = ["react", "react-dom", "@effect/atom-react"].map(
 const platformSeamMessage =
   "Browser APIs go behind the platform seam in src/platform (or a .web.ts sibling), so native builds can supply their own implementation.";
 
+const nativeMessage =
+  "A .native module runs on iOS and Android without a DOM; use React Native or Expo APIs.";
+
 /** Files that predate the platform seam rule; move their browser access into src/platform and delete the line. */
 export const platformSeamRatchet = [
-  "src/ErrorBoundary.tsx",
-  "src/app/BeaconController.tsx",
-  "src/app/hooks/cashu/useDeferredReceiveRetry.ts",
-  "src/app/hooks/cashu/useTokenQr.ts",
   "src/app/hooks/composition/useScanNativeComposition.ts",
-  "src/app/hooks/contacts/useSharedProfileLink.ts",
-  "src/app/hooks/guide/useContactsGuide.ts",
-  "src/app/hooks/guide/useContactsOnboardingProgress.ts",
-  "src/app/hooks/layout/useNativeBackHandler.ts",
-  "src/app/hooks/messages/inboxNotifications.ts",
-  "src/app/hooks/messages/useEditChatMessage.ts",
-  "src/app/hooks/messages/useSendChatMessage.ts",
-  "src/app/hooks/messages/useSendReaction.ts",
-  "src/app/hooks/payments/useNowSeconds.ts",
-  "src/app/hooks/payments/useRecurringPaymentsScheduler.ts",
-  "src/app/hooks/payments/useRecurringReminderSync.ts",
-  "src/app/hooks/topup/useTopupFlow.ts",
-  "src/app/hooks/useAnonymousPaymentTelemetry.ts",
   "src/app/hooks/useAppLanguage.ts",
-  "src/app/hooks/useBankPaymentOffers.ts",
   "src/app/hooks/useGuideScannerDomain.ts",
   "src/app/hooks/useKeryxMedia.ts",
-  "src/app/hooks/useLnurlAuth.ts",
-  "src/app/hooks/useProfileAuthDomain.ts",
   "src/app/hooks/usePushNotificationsSetting.ts",
   "src/app/hooks/usePushRegistrationLifecycle.ts",
-  "src/app/hooks/useRecommendedRelays.ts",
-  "src/app/hooks/useRelayDomain.ts",
-  "src/app/hooks/useResumeOnLaunchAndOnline.ts",
   "src/app/hooks/useSiteLogin.ts",
   "src/app/hooks/useStoragePersistRequestEffect.ts",
-  "src/app/hooks/useTopDownTilt.ts",
   "src/app/lib/bankPaymentOfferStorage.ts",
   "src/app/lib/beaconStore.ts",
   "src/app/lib/keryxCacheStorage.ts",
   "src/app/lib/keryxHtml.ts",
   "src/app/lib/messageEditorDom.ts",
-  "src/app/lib/notificationOpenTarget.ts",
   "src/app/lib/pdfPreview.ts",
   "src/app/lib/privateImageFile.ts",
-  "src/app/lib/privateImageMessage.ts",
   "src/app/lib/pwaNotifications.ts",
-  "src/app/routes/AppRouteContent.tsx",
   "src/components/ChatMessage.tsx",
   "src/components/ChatMessageEditor.tsx",
   "src/components/InstallPwaBanner.tsx",
-  "src/components/LightningInvoiceConfirmModal.tsx",
-  "src/components/ProfileShareOverlay.tsx",
   "src/components/ProfileShareSheet.tsx",
   "src/components/SelfieCaptureModal.tsx",
   "src/evolu.ts",
   "src/evoluDb.worker.ts",
-  "src/hooks/useArmedAction.ts",
-  "src/hooks/useDeferredOnlineReady.ts",
   "src/hooks/useDesktopSplitView.ts",
-  "src/hooks/useDocumentVisible.ts",
-  "src/hooks/useOnline.ts",
-  "src/hooks/useRouting.ts",
-  "src/lnurlAuth.ts",
-  "src/lnurlPay.ts",
   "src/pages/AdvancedPage.tsx",
-  "src/pages/BankPaymentOfferDetailPage.tsx",
-  "src/pages/CashuTokenPage.tsx",
-  "src/pages/CashuTokensPage.tsx",
   "src/pages/ChatPage.tsx",
-  "src/pages/ContactNewPage.tsx",
-  "src/pages/EvoluReloadNotice.tsx",
-  "src/pages/ProfilePage.tsx",
   "src/pages/PushDebugPage.tsx",
-  "src/pages/RecurringPaymentFormPage.tsx",
   "src/profileCache.ts",
-  "src/sharedProfileLink.ts",
-  "src/siteLogin.ts",
-  "src/types/route.ts",
-  "src/utils/blossomUploadProxy.ts",
   "src/utils/bootDiagnostics.ts",
   "src/utils/browserPreferences.ts",
-  "src/utils/colorMode.ts",
   "src/utils/formatting.ts",
   "src/utils/image.ts",
   "src/utils/pickFile.ts",
@@ -232,6 +200,7 @@ export default defineConfig([
         ...backSyntax,
         ...storageSyntax,
         ...navigationSyntax,
+        ...routeReadSyntax,
         ...envSyntax,
       ],
     },
@@ -245,6 +214,20 @@ export default defineConfig([
         ...backSyntax,
         ...storageSyntax,
         ...navigationSyntax,
+        ...routeReadSyntax,
+      ],
+    },
+  },
+  {
+    files: commandLinkFiles,
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...restrictedSyntax,
+        ...backSyntax,
+        ...storageSyntax,
+        ...navigationSyntax,
+        ...envSyntax,
       ],
     },
   },
@@ -318,6 +301,40 @@ export default defineConfig([
     rules: platformSeamRules(platformSeamMessage),
   },
   {
+    files: ["src/**/*.native.{ts,tsx}"],
+    plugins: { "platform-seam": platformSeamPlugin },
+    rules: {
+      ...platformSeamRules(nativeMessage),
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            ...testHelperImportPatterns,
+            ...evoluImportPatterns,
+            ...wipeImportPatterns,
+            ...pureJsPbkdf2ImportPatterns,
+            { group: ["react-dom", "react-dom/*"], message: nativeMessage },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/platform/evolu.native.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            ...testHelperImportPatterns,
+            ...wipeImportPatterns,
+            ...pureJsPbkdf2ImportPatterns,
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ["src/**/*.tsx"],
     ignores: testHelperImportIgnores,
     plugins: { "linky-ui": uiOnlyPlugin },
@@ -354,18 +371,32 @@ export default defineConfig([
         ...restrictedSyntax,
         ...backSyntax,
         ...navigationSyntax,
+        ...routeReadSyntax,
         ...envSyntax,
       ],
     },
   },
   {
-    files: ["src/hooks/useRouting.ts", "src/utils/spdPayment.ts"],
+    files: ["src/platform/navigation.ts"],
     rules: {
       "no-restricted-syntax": [
         "error",
         ...restrictedSyntax,
         ...backSyntax,
         ...storageSyntax,
+        ...envSyntax,
+      ],
+    },
+  },
+  {
+    files: ["src/utils/spdPayment.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...restrictedSyntax,
+        ...backSyntax,
+        ...storageSyntax,
+        ...routeReadSyntax,
         ...envSyntax,
       ],
     },

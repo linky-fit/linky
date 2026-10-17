@@ -77,7 +77,7 @@ export const useTokenQr = (
       const showNextFrame = () => setValue(frames.next());
 
       showNextFrame();
-      timer = window.setInterval(showNextFrame, ANIMATED_QR_FRAME_MS);
+      timer = setInterval(showNextFrame, ANIMATED_QR_FRAME_MS);
     };
 
     const generate = async () => {
@@ -103,7 +103,7 @@ export const useTokenQr = (
 
     return () => {
       cancelled = true;
-      if (timer !== null) window.clearInterval(timer);
+      if (timer !== null) clearInterval(timer);
     };
   }, [tokenText, animationEnabled]);
 

@@ -7,6 +7,7 @@ import { stubFiatRates } from "./helpers/network";
 import { watchAppErrors } from "./helpers/diagnostics";
 import { sendDirectMessage, watchNostrInbox } from "./helpers/relay";
 import { EVOLU_RELAY_URL, isNostrRelay } from "./helpers/stack";
+import { expectRoute, gotoRoute } from "./helpers/routes";
 
 test("an unknown sender's message reaches a device that has no Nostr relay, and moves when the sender is added", async ({
   browser,
@@ -37,9 +38,9 @@ test("an unknown sender's message reaches a device that has no Nostr relay, and 
     );
   try {
     const inboxReady = watchNostrInbox(nostrDevice.page, identity.npub);
-    await nostrDevice.page.goto("/#contacts");
+    await gotoRoute(nostrDevice.page, "contacts");
     await inboxReady();
-    await evoluOnlyDevice.page.goto("/#contacts");
+    await gotoRoute(evoluOnlyDevice.page, "contacts");
     await expect.poll(() => isHydrated(evoluOnlyDevice.page)).toBe(true);
 
     await sendDirectMessage(unknownSender.nsec, identity.npub, text);
@@ -63,11 +64,11 @@ test("an unknown sender's message reaches a device that has no Nostr relay, and 
         .getByRole("button", { name: "Add contact", exact: true })
         .click();
       // Adding opens the contact's chat once the contact is saved.
-      await expect(nostrDevice.page).toHaveURL(/#chat\/(?!unknown)[^/]+$/);
+      await expectRoute(nostrDevice.page, /^chat\/(?!unknown)[^/]+$/);
       await expect(
         nostrDevice.page.getByTestId("chat-bubble").filter({ hasText: text }),
       ).toBeVisible();
-      await evoluOnlyDevice.page.goto("/#contacts");
+      await gotoRoute(evoluOnlyDevice.page, "contacts");
       await expect(unknownCard(evoluOnlyDevice.page)).toHaveCount(0, {
         timeout: 30_000,
       });
@@ -115,7 +116,7 @@ test("the Evolu wait status reserves space below the mobile navigation", async (
       ownerId: appOwnerFromMnemonic(identity.evoluMnemonic)!.id,
     },
   );
-  await page.goto("/#contacts");
+  await gotoRoute(page, "contacts");
   const status = page.getByRole("status").filter({
     hasText: "Waiting for the Evolu relay",
   });

@@ -2,9 +2,9 @@ import {
   Avatar,
   IconButton,
   Pressable,
-  Stack,
   Text,
   TopBar,
+  SafeAreaPad,
 } from "@linky-fit/ui";
 import React from "react";
 import { useNostrPictureByNpub } from "../app/hooks/contacts/useProfileCache";
@@ -19,6 +19,7 @@ import {
 import type { TopbarButton } from "../app/types/appTypes";
 import { navigateTo } from "../hooks/useRouting";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
+import { guideTarget } from "../app/lib/guideTargets";
 
 interface TopbarProps {
   /** Renders the static header of the desktop detail pane. */
@@ -39,7 +40,7 @@ const TopbarAction = ({
     variant={button.isActive ? "secondary" : "ghost"}
     aria-pressed={button.isActive}
     onPress={button.onClick}
-    data-guide={guide}
+    {...(guide ? guideTarget(guide) : {})}
   />
 );
 
@@ -121,8 +122,8 @@ export function Topbar({
   return desktopDetail ? (
     <TopBar {...props} />
   ) : (
-    <Stack data-safe-area="top" backgroundColor="$background">
+    <SafeAreaPad edge="top" backgroundColor="$background">
       <TopBar {...props} />
-    </Stack>
+    </SafeAreaPad>
   );
 }
