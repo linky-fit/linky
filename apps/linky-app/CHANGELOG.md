@@ -14,10 +14,12 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ### en-US
 
+- Selected text in a field is highlighted again.
 - The Lightning address field offers "Reserve address"; a bought address is saved right away and celebrated.
 
 ### cs-CZ
 
+- Označený text v poli je zase zvýrazněný.
 - Pole Lightning adresa nabízí „Rezervovat adresu“; koupená adresa se uloží hned a oslaví.
 
 ## [26.10.6] - 2026-10-15
