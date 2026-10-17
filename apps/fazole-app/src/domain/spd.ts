@@ -38,7 +38,10 @@ const toSpdMessage = (text: string): string => {
 const formatSpdAmount = (amount: CzkAmount): string =>
   `${Math.floor(amount / 100)}.${String(amount % 100).padStart(2, "0")}`;
 
-/** The Czech "QR platba" text: `SPD*1.0*ACC:<IBAN>*AM:<amount>*CC:CZK*X-VS:<vs>*MSG:<text>`. */
+/**
+ * The Czech "QR platba" text: `SPD*1.0*ACC:<IBAN>*AM:<amount>*CC:CZK*PT:IP*X-VS:<vs>*MSG:<text>`.
+ * `PT:IP` asks the payer's bank for an instant payment so the shop sees the money while the customer waits.
+ */
 export const buildSpd = (payment: SpdPayment): string => {
   const message = toSpdMessage(payment.message ?? "");
   return [
@@ -47,6 +50,7 @@ export const buildSpd = (payment: SpdPayment): string => {
     `ACC:${payment.iban}`,
     `AM:${formatSpdAmount(payment.amount)}`,
     "CC:CZK",
+    "PT:IP",
     ...(payment.variableSymbol ? [`X-VS:${payment.variableSymbol}`] : []),
     ...(message ? [`MSG:${message}`] : []),
   ].join("*");

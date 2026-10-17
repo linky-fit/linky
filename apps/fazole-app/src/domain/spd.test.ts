@@ -7,7 +7,7 @@ import { VariableSymbol } from "./variableSymbol";
 const iban = CzechIban.make("CZ5855000000001265098001");
 
 describe("buildSpd", () => {
-  it("matches the ČBA specification example", () => {
+  it("matches the ČBA specification example with an instant payment request", () => {
     expect(
       buildSpd({
         iban,
@@ -16,14 +16,14 @@ describe("buildSpd", () => {
         message: "Platba za elektřinu",
       }),
     ).toBe(
-      "SPD*1.0*ACC:CZ5855000000001265098001*AM:480.50*CC:CZK*X-VS:1234567890*MSG:Platba za elektrinu",
+      "SPD*1.0*ACC:CZ5855000000001265098001*AM:480.50*CC:CZK*PT:IP*X-VS:1234567890*MSG:Platba za elektrinu",
     );
   });
 
   it("formats whole amounts with two decimals and omits empty fields", () => {
     expect(
       buildSpd({ iban, amount: CzkAmount.make(100), message: " 🙂 " }),
-    ).toBe("SPD*1.0*ACC:CZ5855000000001265098001*AM:1.00*CC:CZK");
+    ).toBe("SPD*1.0*ACC:CZ5855000000001265098001*AM:1.00*CC:CZK*PT:IP");
   });
 
   it("escapes reserved characters", () => {
@@ -34,7 +34,7 @@ describe("buildSpd", () => {
         message: "Kafe*Bar 100% + čaj",
       }),
     ).toBe(
-      "SPD*1.0*ACC:CZ5855000000001265098001*AM:0.05*CC:CZK*MSG:Kafe%2ABar 100%25 %2B caj",
+      "SPD*1.0*ACC:CZ5855000000001265098001*AM:0.05*CC:CZK*PT:IP*MSG:Kafe%2ABar 100%25 %2B caj",
     );
   });
 

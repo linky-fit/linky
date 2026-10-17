@@ -10,10 +10,18 @@ Každá vydaná verze musí obsahovat nejprve `en-US` a potom `cs-CZ`.
 
 ## [Unreleased]
 
+### en-US
+
 - Selected text in a field is highlighted again.
 - The bean icon has a transparent background.
+- The bank QR code asks the customer's bank for an instant payment.
+
+### cs-CZ
+
 - Označený text v poli je zase zvýrazněný.
 - Ikona fazole má průhledné pozadí.
+- Bankovní QR kód žádá banku zákazníka o okamžitou platbu.
+
 ## [26.10.2] - 2026-10-15
 
 ### en-US
