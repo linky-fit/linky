@@ -64,6 +64,8 @@ export const fieldStyle = {
   backgroundColor: "$neutralSoft",
   color: "$color",
   placeholderTextColor: "$placeholderColor",
+  // Tamagui paints `::selection` with `--t_selectionColor`, which only this prop sets; unset, the selection is invisible.
+  selectionColor: "$selectionColor",
   fontFamily: "$body",
   ...textVariant("body"),
   focusStyle: focusRing,

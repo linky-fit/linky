@@ -211,6 +211,7 @@ const dark = {
   colorSubtle: palette.slate300,
   colorMuted: palette.slate400,
   placeholderColor: palette.slate500,
+  selectionColor: alpha(palette.teal500, 0.4),
   borderColor: alpha(palette.slate400, 0.2),
   borderColorHover: alpha(palette.slate400, 0.35),
   outlineColor: alpha(palette.teal500, 0.4),
@@ -251,6 +252,7 @@ const light: ThemeColors = {
   colorSubtle: palette.slate700,
   colorMuted: palette.slate600,
   placeholderColor: palette.slate500,
+  selectionColor: alpha(palette.teal500, 0.3),
   borderColor: alpha(palette.slate900, 0.12),
   borderColorHover: alpha(palette.slate900, 0.25),
   outlineColor: alpha(palette.teal500, 0.4),
@@ -290,6 +292,7 @@ const darkFazole: ThemeColors = {
   colorSubtle: palette.ink200,
   colorMuted: palette.ink400,
   placeholderColor: palette.ink500,
+  selectionColor: alpha(palette.gold400, 0.4),
   // fazole draws no borders; surfaces separate by fill alone.
   borderColor: alpha(palette.ink300, 0),
   borderColorHover: alpha(palette.ink300, 0),
