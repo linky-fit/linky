@@ -10,6 +10,8 @@ Každá vydaná verze musí obsahovat nejprve `en-US` a potom `cs-CZ`.
 
 ## [Unreleased]
 
+## [26.10.3] - 2026-10-19
+
 ### en-US
 
 - Selected text in a field is highlighted again.
