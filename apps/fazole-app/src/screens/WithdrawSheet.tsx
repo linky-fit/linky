@@ -2,7 +2,6 @@ import {
   Button,
   Card,
   IconButton,
-  ListRow,
   Notice,
   Row,
   Sheet,
@@ -21,33 +20,25 @@ import type {
   WithdrawFailure,
 } from "../services/withdrawals";
 import { useAppServices } from "../services/react";
+import { ContactField } from "./ContactField";
+import { useContactLookup, type ContactState } from "./contactState";
 import { DetailRows } from "./DetailRows";
 import { QrScanner } from "./QrScanner";
 import {
   acceptsTarget,
+  needsContactLookup,
   readWithdrawForm,
-  type WithdrawChoice,
 } from "./withdrawForm";
 
 type Step =
-  | { readonly kind: "choose" }
-  | { readonly kind: "form"; readonly choice: WithdrawChoice }
-  | {
-      readonly kind: "review";
-      readonly choice: WithdrawChoice;
-      readonly quote: WithdrawalQuote;
-    }
+  | { readonly kind: "form" }
+  | { readonly kind: "review"; readonly quote: WithdrawalQuote }
   | { readonly kind: "done"; readonly outcome: WithdrawalOutcome };
-
-const choiceTitles: Record<WithdrawChoice, string> = {
-  linky: copy.withdraw.chooseLinky,
-  lightning: copy.withdraw.chooseLightning,
-};
 
 const recipientOf = (target: WithdrawTarget): string => {
   switch (target.kind) {
     case "cashu_chat":
-      return shorten(target.npub, 24);
+      return target.address ?? shorten(target.npub, 24);
     case "lightning_invoice":
       return shorten(target.invoice, 24);
     case "lightning_address":
@@ -56,9 +47,10 @@ const recipientOf = (target: WithdrawTarget): string => {
 };
 
 /**
- * Sends sats out of the wallet: pick Linky or Lightning, name the recipient
- * (typed, pasted or scanned), review the amount and the most the fees take,
- * then send. Without an amount the whole balance goes, fees deducted.
+ * Sends sats out of the wallet: name the recipient (a Linky name, npub or
+ * profile link, a Lightning address or an invoice; typed, pasted or
+ * scanned), review the amount and the most the fees take, then send.
+ * Without an amount the whole balance goes, fees deducted.
  */
 export function WithdrawSheet({
   open,
@@ -73,16 +65,20 @@ export function WithdrawSheet({
   readonly czkPerBtc: number | null;
 }) {
   const { withdrawals } = useAppServices();
-  const [step, setStep] = useState<Step>({ kind: "choose" });
+  const [step, setStep] = useState<Step>({ kind: "form" });
   const [targetText, setTargetText] = useState("");
   const [amountText, setAmountText] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<WithdrawFailure | null>(null);
+  // Only a Linky name is looked up, and only while the sheet is open.
+  const lookup = useContactLookup(
+    open && needsContactLookup(targetText) ? targetText : "",
+  );
 
   const reset = () => {
-    setStep({ kind: "choose" });
+    setStep({ kind: "form" });
     setTargetText("");
     setAmountText("");
     setSubmitted(false);
@@ -113,38 +109,24 @@ export function WithdrawSheet({
 
   const body = () => {
     switch (step.kind) {
-      case "choose":
-        return (
-          <Card
-            backgroundColor="$neutralSoft"
-            paddingVertical="$sm"
-            gap="$xs"
-            testID="withdraw-choose"
-          >
-            <ListRow
-              testID="withdraw-linky"
-              icon="Send"
-              title={copy.withdraw.chooseLinky}
-              description={copy.withdraw.chooseLinkyDescription}
-              onPress={() => setStep({ kind: "form", choice: "linky" })}
-            />
-            <ListRow
-              testID="withdraw-lightning"
-              icon="Zap"
-              title={copy.withdraw.chooseLightning}
-              description={copy.withdraw.chooseLightningDescription}
-              onPress={() => setStep({ kind: "form", choice: "lightning" })}
-            />
-          </Card>
-        );
       case "form": {
-        const { choice } = step;
         const form = readWithdrawForm(
-          choice,
           targetText,
+          lookup,
           amountText,
           submitted,
         );
+        // A key named outright gets its profile shown like a looked-up one.
+        const fieldState: ContactState =
+          form.target?.kind === "cashu_chat"
+            ? {
+                kind: "resolved",
+                contact: {
+                  pubkey: form.target.pubkey,
+                  address: form.target.address ?? null,
+                },
+              }
+            : lookup;
         const review = () =>
           run(async () => {
             setSubmitted(true);
@@ -153,7 +135,7 @@ export function WithdrawSheet({
               amountSats: form.amountSats,
             });
             if (Result.isFailure(quoted)) setFailure(quoted.failure);
-            else setStep({ kind: "review", choice, quote: quoted.success });
+            else setStep({ kind: "review", quote: quoted.success });
           });
         const paste = async () => {
           const text = await pasteText();
@@ -165,38 +147,22 @@ export function WithdrawSheet({
             {scanning ? (
               <QrScanner
                 onScan={(text) => {
-                  if (!acceptsTarget(choice, text)) return false;
+                  if (!acceptsTarget(text)) return false;
                   setTargetText(text);
                   setScanning(false);
                   return true;
                 }}
               />
             ) : null}
-            <TextField
+            <ContactField
               testID="withdraw-target"
-              label={
-                choice === "linky"
-                  ? copy.withdraw.linkyRecipient
-                  : copy.withdraw.lightningTarget
-              }
-              placeholder={
-                choice === "linky"
-                  ? copy.withdraw.linkyRecipientPlaceholder
-                  : copy.withdraw.lightningTargetPlaceholder
-              }
-              hint={
-                form.targetHint ??
-                (choice === "linky"
-                  ? copy.withdraw.linkyRecipientHint
-                  : undefined)
-              }
-              error={form.targetError}
+              label={copy.withdraw.target}
+              placeholder={copy.withdraw.targetPlaceholder}
               value={targetText}
               onChangeText={setTargetText}
-              autoCapitalize="none"
-              autoComplete="off"
-              autoCorrect={false}
-              spellCheck={false}
+              state={fieldState}
+              hint={form.targetHint}
+              error={form.targetError}
               trailing={
                 <Row gap="$xs">
                   <IconButton
@@ -239,23 +205,18 @@ export function WithdrawSheet({
                 }
               />
             ) : null}
-            <Stack gap="$sm">
-              <Button
-                testID="withdraw-review"
-                loading={busy}
-                onPress={() => void review()}
-              >
-                {copy.withdraw.review}
-              </Button>
-              <Button variant="ghost" disabled={busy} onPress={reset}>
-                {copy.back}
-              </Button>
-            </Stack>
+            <Button
+              testID="withdraw-review"
+              loading={busy}
+              onPress={() => void review()}
+            >
+              {copy.withdraw.review}
+            </Button>
           </Stack>
         );
       }
       case "review": {
-        const { quote, choice } = step;
+        const { quote } = step;
         const send = () =>
           run(async () => {
             const executed = await withdrawals.execute(quote);
@@ -280,7 +241,7 @@ export function WithdrawSheet({
             <Stack gap="$sm">
               <Button
                 testID="withdraw-submit"
-                icon={choice === "linky" ? "Send" : "Zap"}
+                icon={quote.target.kind === "cashu_chat" ? "Send" : "Zap"}
                 loading={busy}
                 onPress={() => void send()}
               >
@@ -291,7 +252,7 @@ export function WithdrawSheet({
                 disabled={busy}
                 onPress={() => {
                   setFailure(null);
-                  setStep({ kind: "form", choice });
+                  setStep({ kind: "form" });
                 }}
               >
                 {copy.back}
@@ -338,11 +299,7 @@ export function WithdrawSheet({
       onOpenChange={(next) => {
         if (!next) close();
       }}
-      title={
-        step.kind === "form" || step.kind === "review"
-          ? choiceTitles[step.choice]
-          : copy.withdraw.title
-      }
+      title={copy.withdraw.title}
     >
       <Stack gap="$lg" paddingTop="$sm" testID="withdraw-sheet">
         {failure ? (

@@ -4,17 +4,18 @@ import type {
   KeyValueStore,
   WalletBalances,
 } from "@linky-fit/linkshu";
+import { ClientId, MessageText } from "@linky-fit/linkstr";
 import type {
   InboxCursorStore,
   NostrTransport,
   OutboxStore,
   Pubkey,
 } from "@linky-fit/linkstr";
-import type { LinkyStore } from "@linky-fit/linksync";
+import { createId, type LinkyStore } from "@linky-fit/linksync";
 import type { LiveSource } from "@linky-fit/linksync/react";
 import { Effect, type Layer } from "effect";
 import type { AppConfig } from "../config";
-import type { CzkAmount, Payment, ShopProfile } from "../domain";
+import type { CzkAmount, Payment, Pledge, ShopProfile } from "../domain";
 import type { Account } from "../storage/account";
 import { makeLedger, type Ledger } from "../storage/ledger";
 import {
@@ -22,6 +23,7 @@ import {
   whenHydrated,
   type Repositories,
 } from "../storage/repositories";
+import { readPledge } from "../storage/pledgeSetting";
 import { readShop, saveShop } from "../storage/shop";
 import { readOfferTips, saveOfferTips } from "../storage/tipSetting";
 import {
@@ -35,9 +37,14 @@ import {
   type BitcoinRequestFailure,
 } from "./bitcoinPayments";
 import { createNostr, type Nostr, type PayerProfile } from "./nostr";
+import { createPledges, type Pledges } from "./pledges";
 import { uploadToBlossom, type ImageFile } from "./blossom";
 import { createRates, type Rates } from "./rates";
-import { createSupportChat, type SupportChat } from "./supportChat";
+import {
+  createSupportChat,
+  supportPubkey,
+  type SupportChat,
+} from "./supportChat";
 import { makeLinkshuRuntime, makeLinkstrRuntime } from "./runtimes";
 import { createWallet, type Wallet } from "./wallet";
 import { createWithdrawals, type Withdrawals } from "./withdrawals";
@@ -76,6 +83,12 @@ export interface Shop {
   readonly setPicture: (image: ImageFile | null) => Promise<void>;
 }
 
+/** Asking someone for a cash payout of the wallet. */
+export interface CashRequests {
+  /** Sends the request as a chat message; one to support lands in the support chat. */
+  readonly send: (to: Pubkey, text: string) => Promise<void>;
+}
+
 /** Who paid with a Cashu token, as their Nostr profile names them. */
 export interface Payers {
   /** Fetched once per launch; `null` when they have no profile or no relay answered in time. */
@@ -90,6 +103,8 @@ export interface LiveSources {
   readonly bitcoinQrMode: LiveSource<BitcoinQrMode>;
   readonly records: LiveSource<FazoleRecords>;
   readonly balances: LiveSource<WalletBalances>;
+  /** The open pledge; `null` while the merchant owes nobody. */
+  readonly pledge: LiveSource<Pledge | null>;
 }
 
 /** Everything a signed-in screen uses: one linkstr and one linkshu runtime per launch. */
@@ -109,7 +124,9 @@ export interface AppServices {
   readonly history: History;
   readonly payers: Payers;
   readonly withdrawals: Withdrawals;
+  readonly pledges: Pledges;
   readonly supportChat: SupportChat;
+  readonly cashRequests: CashRequests;
   readonly live: LiveSources;
   /** Opens the inbox and, once the store is hydrated, resumes interrupted payments and withdrawals; once. */
   readonly start: () => void;
@@ -181,6 +198,14 @@ export const createAppServices = ({
     whenHydrated: hydrated,
   });
   const withdrawals = createWithdrawals({ ledger, nostr, wallet });
+  const pledges = createPledges({
+    ledger,
+    settings: repositories.settings,
+    nostr,
+    withdrawals,
+    czkPerBtc: rates.czkPerBtc,
+    whenHydrated: hydrated,
+  });
   const supportChat = createSupportChat({
     conversations: repositories.conversations,
     nostr,
@@ -203,7 +228,7 @@ export const createAppServices = ({
   const payerProfiles = new Map<Pubkey, Promise<PayerProfile | null>>();
 
   let started = false;
-  let stopOnline: (() => void) | null = null;
+  const stops: (() => void)[] = [];
 
   return {
     account,
@@ -253,7 +278,23 @@ export const createAppServices = ({
       },
     },
     withdrawals,
+    pledges,
     supportChat,
+    cashRequests: {
+      send: async (to, text) => {
+        if (to === supportPubkey) {
+          await supportChat.send(text);
+          return;
+        }
+        const clientId = ClientId.make(createId());
+        await nostr.sendText(
+          to,
+          MessageText.make(text.trim()),
+          clientId,
+          `fazole.cash-request:${clientId}`,
+        );
+      },
+    },
     live: {
       shop: {
         all: readShop(repositories.settings),
@@ -275,20 +316,41 @@ export const createAppServices = ({
         all: Effect.promise(wallet.balances),
         subscribe: repositories.wallet.subscribe,
       },
+      pledge: {
+        all: readPledge(repositories.settings),
+        subscribe: repositories.settings.subscribe,
+      },
     },
     start: () => {
       if (started) return;
       started = true;
       nostr.start();
       void hydrated().then(() => {
+        // The shop is what the pledger and support see as the sender: keep it on the relays this launch uses.
+        void loadShop().then((shop) => {
+          if (shop && (shop.name !== null || shop.picture !== null)) {
+            void nostr.publishProfile(shop);
+          }
+        });
         void bitcoinPayments.resume();
         void withdrawals.resume();
-        stopOnline =
-          ports.onOnline?.(() => void bitcoinPayments.resume()) ?? null;
+        // Inflows, settled withdrawals and a pledge opened on another device all ask for a forward.
+        const reconcile = () => void pledges.reconcile();
+        reconcile();
+        stops.push(
+          repositories.transactions.subscribe(reconcile),
+          repositories.settings.subscribe(reconcile),
+        );
+        const online = ports.onOnline?.(() => {
+          void bitcoinPayments.resume();
+          reconcile();
+        });
+        if (online) stops.push(online);
       });
     },
     dispose: async () => {
-      stopOnline?.();
+      for (const stop of stops.splice(0)) stop();
+      pledges.stop();
       await bitcoinPayments.stop();
       await Promise.all([linkstr.dispose(), linkshu.dispose()]);
     },

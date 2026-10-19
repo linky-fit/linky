@@ -25,3 +25,16 @@ export const minimumCzkFor = (sats: number, czkPerBtc: number): CzkAmount =>
   CzkAmount.make(
     Math.floor(((sats - 1) * czkPerBtc * 100) / Number(SATS_PER_BTC)) + 1,
   );
+
+/**
+ * A typed CZK amount, e.g. `100`, `100,50`, `1 000.5`; `null` unless it is
+ * a positive amount with at most two decimals.
+ */
+export const parseCzkInput = (text: string): CzkAmount | null => {
+  const compact = text.replace(/\s/gu, "").replace(",", ".");
+  const match = /^(\d{1,9})(?:\.(\d{1,2}))?$/u.exec(compact);
+  if (match === null) return null;
+  const [, whole = "0", fraction = ""] = match;
+  const amount = Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
+  return amount > 0 ? CzkAmount.make(amount) : null;
+};

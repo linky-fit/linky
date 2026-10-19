@@ -180,26 +180,54 @@ export const en: Copy = {
   wallet: {
     rateUnavailable: "Rate unavailable",
     switchUnit: "Switch between CZK and sat",
-    requestCash: "Request a cash payout",
-    cashRequested: "Cash request sent to support.",
-    cashRequestFailed: "The request could not be sent. Try again.",
     withdraw: "Withdraw",
+    cash: "Cash",
+    pledgeButton: (name: string, amount: string) =>
+      `Pledge · ${name} · ${amount} CZK left`,
+  },
+
+  contact: {
+    label: "Contact",
+    placeholder: "name",
+    invalid: "Enter a Linky name, an address or an npub.",
+    notFound: (address: string) => `${address} is not in Linky.`,
+    unreachable: "The contact could not be checked. Try again.",
+  },
+
+  cash: {
+    title: "Cash",
+    amount: "Amount",
+    amountInvalid: "Enter an amount in CZK.",
+    continue: "Continue",
+    requested: "Exchange request sent.",
+    requestFailed: "The request could not be sent. Try again.",
+    offerTitle: (amount: string, name: string) =>
+      `${amount} pledge from ${name}`,
+    offerDetail: (name: string, available: string | null) =>
+      `${available === null ? "The wallet does not hold that much." : `The wallet holds only ${available}.`} ${name} hands you the cash and every bitcoin payment goes to them until the amount is repaid.`,
+    createPledge: "Create the pledge",
+  },
+
+  pledge: {
+    title: "Pledge",
+    failed: "The pledge could not be recorded. Try again.",
+    openedTitle: (amount: string, name: string) =>
+      `${amount} taken as a pledge from ${name}`,
+    openedDetail:
+      "Every bitcoin payment now goes to this contact until the pledge is repaid.",
+    to: "To",
+    taken: "Pledge",
+    repaid: "Repaid",
+    remaining: "Left to repay",
+    settling: "The last repayment is on its way.",
   },
 
   withdraw: {
     title: "Withdraw from wallet",
-    chooseLinky: "Send to Linky",
-    chooseLinkyDescription: "To a Linky profile as a message with money.",
-    chooseLightning: "Lightning",
-    chooseLightningDescription: "To a Lightning address or invoice.",
-    linkyRecipient: "Linky profile",
-    linkyRecipientPlaceholder: "npub1…",
-    linkyRecipientHint: "npub, nprofile or a link to a Linky profile",
-    linkyRecipientInvalid: "This is not a Linky profile.",
-    lightningTarget: "Lightning address or invoice",
-    lightningTargetPlaceholder: "name@domain.com",
-    lightningTargetInvalid:
-      "Enter a Lightning address or an invoice with an amount.",
+    target: "Recipient",
+    targetPlaceholder: "name, npub or Lightning address",
+    targetInvalid:
+      "Enter a Linky name, an npub, a Lightning address or an invoice with an amount.",
     invoiceAmount: (sats: string) => `Invoice for ${sats} sat`,
     paste: "Paste from clipboard",
     scan: "Scan QR code",

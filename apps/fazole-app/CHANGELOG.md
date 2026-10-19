@@ -15,12 +15,18 @@ Každá vydaná verze musí obsahovat nejprve `en-US` a potom `cs-CZ`.
 - Selected text in a field is highlighted again.
 - The bean icon has a transparent background.
 - The bank QR code asks the customer's bank for an instant payment.
+- Cash: one button in the wallet names a Linky contact (by name, address or npub; hynek@linky.fit unless changed) and an amount. When the wallet holds that much, the contact gets a request to exchange it for cash; when it does not, the amount can be taken as a pledge: they hand the cash over and every bitcoin payment is forwarded to them until it is repaid, with a chat message at each step. The wallet shows what is still owed.
+- Withdrawing asks for the recipient straight away: a Linky name, an npub, a Lightning address or an invoice, with the Linky profile shown once found.
+- The shop's name and picture are republished as its Nostr profile on every start, so contacts see who writes to them.
 
 ### cs-CZ
 
 - Označený text v poli je zase zvýrazněný.
 - Ikona fazole má průhledné pozadí.
 - Bankovní QR kód žádá banku zákazníka o okamžitou platbu.
+- Hotovost: jedno tlačítko v peněžence, kde zadáte kontakt v Linky (jméno, adresu nebo npub; výchozí hynek@linky.fit) a částku. Když peněženka tolik má, kontakt dostane žádost o směnu za hotovost; když nemá, lze částku přijmout jako zástavu: kontakt vám dá hotovost a každá přijatá bitcoinová platba se mu přeposílá, dokud se nesplatí, o každém kroku dostane zprávu do chatu. Peněženka ukazuje, kolik zbývá doplatit.
+- Výběr se rovnou ptá na příjemce: jméno v Linky, npub, Lightning adresu nebo fakturu; nalezený profil v Linky se ukáže pod polem.
+- Název a obrázek obchodu se při každém spuštění znovu zveřejní jako jeho Nostr profil, takže kontakty vidí, kdo jim píše.
 
 ## [26.10.2] - 2026-10-15
 

@@ -1,20 +1,31 @@
-import { Amount, Button, Notice, Pressable, Stack } from "@linky-fit/ui";
+import { Amount, Button, Pressable, Stack } from "@linky-fit/ui";
 import { useState } from "react";
 import { copy } from "../copy";
-import { cashRequestMessage, satsToCzk, type ShopProfile } from "../domain";
+import { CzkAmount, satsToCzk, type Pledge, type ShopProfile } from "../domain";
 import { formatCzkValue, formatWhole } from "../format";
 import {
-  useAppServices,
   useCzkRate,
+  usePledgerName,
+  usePledgeStatus,
   useWalletBalance,
 } from "../services/react";
+import { CashSheet } from "./CashSheet";
 import { Page } from "./Page";
 import { WithdrawSheet } from "./WithdrawSheet";
+
+/** The CZK value with the pledge still owed taken off, e.g. "-100" while nothing came in yet. */
+const netCzkValue = (czk: CzkAmount, owedCzk: CzkAmount): string => {
+  const net = czk - owedCzk;
+  const value = formatCzkValue(CzkAmount.make(Math.abs(net)));
+  return net < 0 ? `-${value}` : value;
+};
 
 export function WalletScreen({ shop }: { readonly shop: ShopProfile }) {
   const balances = useWalletBalance();
   const rate = useCzkRate();
+  const pledge = usePledgeStatus();
   const [withdrawing, setWithdrawing] = useState(false);
+  const [cash, setCash] = useState(false);
   const total = balances?.total ?? 0;
   const czkPerBtc = rate.status === "ready" ? rate.czkPerBtc : null;
   // Starts in CZK on every visit, so a merchant never lands on sats unexpectedly.
@@ -25,7 +36,10 @@ export function WalletScreen({ shop }: { readonly shop: ShopProfile }) {
       value={
         czk === null
           ? formatWhole(total)
-          : formatCzkValue(satsToCzk(total, czk))
+          : netCzkValue(
+              satsToCzk(total, czk),
+              pledge?.remainingCzk ?? CzkAmount.make(0),
+            )
       }
       unit={czk === null ? copy.sat : copy.czk}
       caption={
@@ -59,56 +73,61 @@ export function WalletScreen({ shop }: { readonly shop: ShopProfile }) {
       >
         {copy.wallet.withdraw}
       </Button>
-      <CashRequest shopName={shop.name} sats={total} />
+      {pledge ? (
+        <PledgeButton
+          pledge={pledge.pledge}
+          remainingCzk={pledge.remainingCzk}
+          onPress={() => setCash(true)}
+        />
+      ) : (
+        <Button
+          testID="wallet-cash"
+          variant="secondary"
+          icon="Banknote"
+          minHeight="$controlLg"
+          onPress={() => setCash(true)}
+        >
+          {copy.wallet.cash}
+        </Button>
+      )}
       <WithdrawSheet
         open={withdrawing}
         onOpenChange={setWithdrawing}
         spendable={balances?.spendable ?? 0}
         czkPerBtc={czkPerBtc}
       />
+      <CashSheet
+        open={cash}
+        onOpenChange={setCash}
+        shopName={shop.name}
+        sats={total}
+        czkPerBtc={czkPerBtc}
+        current={pledge}
+      />
     </Page>
   );
 }
 
-function CashRequest({
-  shopName,
-  sats,
+/** The pledge button names who the shop owes and how much. */
+function PledgeButton({
+  pledge,
+  remainingCzk,
+  onPress,
 }: {
-  readonly shopName: string | null;
-  readonly sats: number;
+  readonly pledge: Pledge;
+  readonly remainingCzk: CzkAmount;
+  readonly onPress: () => void;
 }) {
-  const { supportChat } = useAppServices();
-  const [state, setState] = useState<"idle" | "sending" | "sent" | "failed">(
-    "idle",
-  );
-  const request = async () => {
-    setState("sending");
-    try {
-      await supportChat.send(cashRequestMessage(shopName, sats));
-      setState("sent");
-    } catch (error) {
-      console.warn("[fazole] cash request not sent", error);
-      setState("failed");
-    }
-  };
+  const name = usePledgerName(pledge);
   return (
-    <>
-      <Button
-        testID="wallet-request-cash"
-        variant="secondary"
-        icon="Banknote"
-        minHeight="$controlLg"
-        loading={state === "sending"}
-        disabled={sats === 0}
-        onPress={() => void request()}
-      >
-        {copy.wallet.requestCash}
-      </Button>
-      {state === "sent" ? (
-        <Notice tone="accent" title={copy.wallet.cashRequested} />
-      ) : state === "failed" ? (
-        <Notice tone="danger" title={copy.wallet.cashRequestFailed} />
-      ) : null}
-    </>
+    <Button
+      testID="wallet-cash"
+      variant="secondary"
+      icon="HandCoins"
+      minHeight="$controlLg"
+      onPress={onPress}
+    >
+      {copy.wallet.pledgeButton(name, formatCzkValue(remainingCzk))}
+    </Button>
   );
 }

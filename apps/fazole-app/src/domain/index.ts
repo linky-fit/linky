@@ -1,5 +1,6 @@
 export * from "./activity";
 export * from "./bitcoin";
+export * from "./contact";
 export * from "./czechAccount";
 export { CZECH_BANKS } from "./czechBanks";
 export * from "./history";
@@ -7,6 +8,7 @@ export * from "./keypad";
 export * from "./money";
 export * from "./note";
 export * from "./payment";
+export * from "./pledge";
 export type * from "./records";
 export * from "./spd";
 export * from "./supportChat";

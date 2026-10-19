@@ -17,6 +17,7 @@ import {
   type CzkAmount,
   type DirectTransfer,
   type Payment,
+  type PledgeRepayment,
   type Receipt,
   type Withdrawal,
   type WithdrawalKind,
@@ -91,6 +92,8 @@ export interface Ledger {
     readonly mintUrl: string;
     readonly quoteId?: string | undefined;
     readonly invoice?: string | undefined;
+    /** What it repays of a pledge, when it forwards inflows to the pledger. */
+    readonly pledge?: PledgeRepayment | undefined;
   }) => Promise<Withdrawal>;
   /** Patches the stored row, which another tab may have changed since it was read. */
   readonly updateWithdrawal: (
@@ -230,7 +233,7 @@ export const makeLedger = (transactions: TransactionsRepository): Ledger => {
         }),
       );
     },
-    createWithdrawal: async ({ quoteId, invoice, ...fields }) => {
+    createWithdrawal: async ({ quoteId, invoice, pledge, ...fields }) => {
       const mint = MintUrl.make(fields.mintUrl);
       const created: Withdrawal = {
         ...fields,
@@ -245,6 +248,7 @@ export const makeLedger = (transactions: TransactionsRepository): Ledger => {
         invoice: invoice ?? null,
         operationId: null,
         error: null,
+        pledge: pledge ?? null,
       };
       await run(insertWithdrawal(transactions, created));
       return created;

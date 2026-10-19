@@ -88,6 +88,9 @@ const WithdrawalDetails = Schema.Struct({
   quoteId: Schema.optionalKey(Schema.String),
   invoice: Schema.optionalKey(Schema.String),
   operationId: Schema.optionalKey(Schema.String),
+  pledge: Schema.optionalKey(
+    Schema.Struct({ czk: CzkAmount, sources: Schema.Array(Schema.String) }),
+  ),
 });
 
 const Details = Schema.fromJsonString(
@@ -218,6 +221,7 @@ export const toFazoleRecords = (
             invoice: value.invoice ?? null,
             operationId: value.operationId ?? null,
             error: row.error,
+            pledge: value.pledge ?? null,
           });
         }
         break;
@@ -326,6 +330,7 @@ const withdrawalColumns = (withdrawal: Withdrawal) => ({
     ...(withdrawal.operationId === null
       ? {}
       : { operationId: withdrawal.operationId }),
+    ...(withdrawal.pledge === null ? {} : { pledge: withdrawal.pledge }),
   }),
 });
 

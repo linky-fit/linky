@@ -3,6 +3,7 @@ import type { Pubkey } from "@linky-fit/linkstr";
 import type { CzechIban } from "./czechAccount";
 import type { CzkAmount, Sats } from "./money";
 import type { PaymentMethod, PaymentStatus } from "./payment";
+import type { PledgeRepayment } from "./pledge";
 import type { VariableSymbol } from "./variableSymbol";
 
 /** The shop this account takes payments for. */
@@ -113,4 +114,6 @@ export interface Withdrawal {
   /** The linkshu send holding a Linky withdrawal's token. */
   readonly operationId: string | null;
   readonly error: string | null;
+  /** What it repaid of a pledge; `null` for a withdrawal the merchant made. */
+  readonly pledge: PledgeRepayment | null;
 }

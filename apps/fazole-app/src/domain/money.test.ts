@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { CzkAmount, czkToSats, minimumCzkFor, satsToCzk } from "./money";
+import {
+  CzkAmount,
+  czkToSats,
+  minimumCzkFor,
+  parseCzkInput,
+  satsToCzk,
+} from "./money";
 
 describe("czkToSats", () => {
   it("converts exactly when the amount divides evenly", () => {
@@ -30,5 +36,19 @@ describe("minimumCzkFor", () => {
     const from = minimumCzkFor(10, rate);
     expect(czkToSats(from, rate)).toBe(10);
     expect(czkToSats(CzkAmount.make(from - 1), rate)).toBe(9);
+  });
+});
+
+describe("parseCzkInput", () => {
+  it("reads crowns with a comma or a dot and grouping spaces", () => {
+    expect(parseCzkInput("100")).toBe(10_000);
+    expect(parseCzkInput("100,5")).toBe(10_050);
+    expect(parseCzkInput("1 250.05")).toBe(125_005);
+  });
+
+  it("refuses nothing, zero, three decimals and anything else", () => {
+    for (const text of ["", "0", "0,00", "1,234", "abc", "-5", "1e3"]) {
+      expect(parseCzkInput(text)).toBeNull();
+    }
   });
 });
