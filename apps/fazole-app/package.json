@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:prod": "vite --mode prod-services",
     "build": "tsc -b && vite build",
     "eslint": "eslint --fix .",
     "prettier": "prettier --write .",

@@ -12,7 +12,7 @@ docker compose -f docker-compose.dev.yml up -d --wait   # Nostr relay :7777, Evo
 bun run fazole:dev                                      # http://localhost:5280
 ```
 
-`.env.development` points the app at those services. The local mint's FakeWallet settles every invoice it issues, so a Bitcoin payment turns paid by itself a moment after its QR appears. Linky's web app (`bun run --filter @linky-fit/linky-app dev`) on the same services is the customer wallet and a withdrawal target.
+`.env.development` points the app at those services. `bun run fazole:dev:prod` skips that file and runs the dev server against the production relays and mint (`https://cashu.cz`), which is the only way a message or a token reaches a real Linky user: the local relay and mint never leave your machine. The local mint's FakeWallet settles every invoice it issues, so a Bitcoin payment turns paid by itself a moment after its QR appears. Linky's web app (`bun run --filter @linky-fit/linky-app dev`) on the same services is the customer wallet and a withdrawal target.
 
 `bun run --filter @linky-fit/fazole-app test` runs the unit tests; `src/services/localMint.test.ts` also runs against the local mint when it answers and is skipped otherwise.
 
@@ -20,7 +20,7 @@ bun run fazole:dev                                      # http://localhost:5280
 
 - `src/domain`: pure rules: Czech accounts and IBAN, SPD, variable symbols, money and keypad, payment status, Bitcoin request matching, withdrawal targets, history and wallet activity.
 - `src/storage`: the account (recovery seed and what derives from it), the Evolu store, the shop profile, payments, receipts, direct transfers and withdrawals as Linky `setting` and `transaction` rows, and the support chat as a Linky conversation.
-- `src/services`: one linkstr and one linkshu runtime per launch behind `AppServices`; `Device` creates, restores and resets the account; `supportChat.ts` is the NIP-17 chat with Fazole support's hardcoded npub; `react.ts` holds the hooks screens use.
+- `src/services`: one linkstr and one linkshu runtime per launch behind `AppServices`; `Device` creates, restores and resets the account; `pledges.ts` forwards every inflow to the Linky user whose cash the shop holds as a pledge until it is repaid, naming them by NIP-05 (`contacts.ts`); `supportChat.ts` is the NIP-17 chat with Fazole support's hardcoded npub; `react.ts` holds the hooks screens use.
 - `src/platform`: browser APIs (localStorage, password manager, device wipe, service worker, clipboard, hash routes, the QR camera scanner, the image picker).
 - `src/routing.ts`: the hash routes and where each lands for the account's state; `src/shell` renders them, the terminal alone and the other sections with bottom tabs (a rail on wide screens).
 - `src/screens`: the screens, composed from `@linky-fit/ui` only; their form rules (`shopForm.ts`, `withdrawForm.ts`) are plain modules with unit tests. Strings live in `src/copy/`, one file per language; the app starts in the merchant's choice from Settings, otherwise in Czech on a Czech device and English on any other, and switching reloads it.

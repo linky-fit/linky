@@ -177,25 +177,54 @@ export const cs = {
   wallet: {
     rateUnavailable: "Kurz není dostupný",
     switchUnit: "Přepnout mezi Kč a sat",
-    requestCash: "Vyžádat platbu v hotovosti",
-    cashRequested: "Žádost o hotovost odeslána podpoře.",
-    cashRequestFailed: "Žádost se nepodařilo odeslat. Zkuste to znovu.",
     withdraw: "Vybrat",
+    cash: "Hotovost",
+    pledgeButton: (name: string, amount: string) =>
+      `Zástava · ${name} · zbývá ${amount} Kč`,
+  },
+
+  contact: {
+    label: "Kontakt",
+    placeholder: "jmeno",
+    invalid: "Zadejte jméno v Linky, adresu nebo npub.",
+    notFound: (address: string) => `${address} v Linky není.`,
+    unreachable: "Kontakt se nepodařilo ověřit. Zkuste to znovu.",
+  },
+
+  cash: {
+    title: "Hotovost",
+    amount: "Částka",
+    amountInvalid: "Zadejte částku v korunách.",
+    continue: "Pokračovat",
+    requested: "Žádost o směnu odeslána.",
+    requestFailed: "Žádost se nepodařilo odeslat. Zkuste to znovu.",
+    offerTitle: (amount: string, name: string) =>
+      `Zástava ${amount} od ${name}`,
+    offerDetail: (name: string, available: string | null) =>
+      `${available === null ? "V peněžence na to není dost." : `V peněžence je jen ${available}.`} ${name} vám dá hotovost a přijaté bitcoiny se mu budou automaticky posílat, dokud se částka nesplatí.`,
+    createPledge: "Vytvořit zástavu",
+  },
+
+  pledge: {
+    title: "Zástava",
+    failed: "Zástavu se nepodařilo zapsat. Zkuste to znovu.",
+    openedTitle: (amount: string, name: string) =>
+      `Přijato do zástavy ${amount} od ${name}`,
+    openedDetail:
+      "Každá bitcoinová platba teď putuje tomuto kontaktu, dokud se zástava nesplatí.",
+    to: "Komu",
+    taken: "Zástava",
+    repaid: "Splaceno",
+    remaining: "Zbývá doplatit",
+    settling: "Poslední splátka se doručuje.",
   },
 
   withdraw: {
     title: "Vybrat z peněženky",
-    chooseLinky: "Poslat do Linky",
-    chooseLinkyDescription: "Na profil v Linky jako zprávu s penězi.",
-    chooseLightning: "Lightning",
-    chooseLightningDescription: "Na Lightning adresu nebo fakturu.",
-    linkyRecipient: "Profil v Linky",
-    linkyRecipientPlaceholder: "npub1…",
-    linkyRecipientHint: "npub, nprofile nebo odkaz na profil v Linky",
-    linkyRecipientInvalid: "Tohle není profil v Linky.",
-    lightningTarget: "Lightning adresa nebo faktura",
-    lightningTargetPlaceholder: "jmeno@domena.cz",
-    lightningTargetInvalid: "Zadejte Lightning adresu nebo fakturu s částkou.",
+    target: "Příjemce",
+    targetPlaceholder: "jmeno, npub nebo Lightning adresa",
+    targetInvalid:
+      "Zadejte jméno v Linky, npub, Lightning adresu nebo fakturu s částkou.",
     invoiceAmount: (sats: string) => `Faktura na ${sats} sat`,
     paste: "Vložit ze schránky",
     scan: "Naskenovat QR kód",

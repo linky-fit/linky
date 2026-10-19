@@ -19,6 +19,8 @@ export type WithdrawTarget =
       readonly kind: "cashu_chat";
       readonly pubkey: Pubkey;
       readonly npub: string;
+      /** The NIP-05 address the merchant named them by, e.g. `hynek@linky.fit`. */
+      readonly address?: string | undefined;
     }
   | {
       /** A Lightning invoice; its amount is fixed. */

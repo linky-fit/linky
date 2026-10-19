@@ -19,6 +19,7 @@
     "site:preview": "bun run --filter @linky-fit/linky-site preview",
     "zapstore:screenshots": "bun run --filter @linky-fit/linky-site zapstore:screenshots",
     "fazole:dev": "bun run --filter @linky-fit/fazole-app dev",
+    "fazole:dev:prod": "bun run --filter @linky-fit/fazole-app dev:prod",
     "fazole:build": "bun run --filter @linky-fit/fazole-app build",
     "fazole-site:dev": "bun run --filter @linky-fit/fazole-site dev",
     "fazole-site:build": "bun run --filter @linky-fit/fazole-site build",

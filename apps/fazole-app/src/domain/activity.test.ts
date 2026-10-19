@@ -49,6 +49,7 @@ const withdrawal = (
   invoice: null,
   operationId: null,
   error: null,
+  pledge: null,
   ...overrides,
 });
 

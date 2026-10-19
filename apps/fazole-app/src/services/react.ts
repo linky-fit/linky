@@ -12,9 +12,12 @@ import {
 } from "react";
 import {
   historyEntries,
+  type CzkAmount,
   type DirectTransfer,
   type HistoryEntry,
   type Payment,
+  type Pledge,
+  pledgeRemainingCzk,
   type ShopProfile,
   type SupportChat,
   type Withdrawal,
@@ -129,6 +132,35 @@ export const usePayment = (id: string): Payment | null | undefined => {
 /** Every withdrawal, newest first; empty until read. */
 export const useWithdrawals = (): ReadonlyArray<Withdrawal> =>
   useFazoleRecords()?.withdrawals ?? [];
+
+/** The open pledge; `undefined` until read, `null` while there is none. */
+export const usePledge = (): Pledge | null | undefined =>
+  useLiveValue<Pledge | null | undefined>(
+    useAppServices().live.pledge,
+    undefined,
+  );
+
+/** Who the pledge is owed to: their Nostr name, the address typed, or their short npub. */
+export const usePledgerName = (pledge: Pledge): string =>
+  usePayerProfile(pledge.pubkey)?.name ??
+  pledge.address ??
+  shortNpub(pledge.pubkey);
+
+/** The open pledge with what is still owed; `null` while there is none. */
+export const usePledgeStatus = (): {
+  readonly pledge: Pledge;
+  readonly remainingCzk: CzkAmount;
+} | null => {
+  const pledge = usePledge();
+  const withdrawals = useWithdrawals();
+  return useMemo(
+    () =>
+      pledge
+        ? { pledge, remainingCzk: pledgeRemainingCzk(pledge, withdrawals) }
+        : null,
+    [pledge, withdrawals],
+  );
+};
 
 /** The wallet balance in sats, total and per mint; `null` until read. */
 export const useWalletBalance = (): WalletBalances | null =>
