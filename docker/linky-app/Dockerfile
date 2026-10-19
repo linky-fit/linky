@@ -6,14 +6,20 @@
 #
 # Vite inlines `import.meta.env` at build time and `vite build` does not load
 # .env.development, so these ARGs are the only source of the endpoints.
+#
+# WEB_BUNDLER=expo builds the same app with apps/expo (Metro) instead, which
+# reads the endpoints as EXPO_PUBLIC_*.
 
-FROM oven/bun:1.3.9-alpine AS build
+ARG WEB_BUNDLER=vite
+
+FROM oven/bun:1.3.14-alpine AS deps
 WORKDIR /app
 
 # Manifests first so editing source does not bust the dependency layer.
 COPY package.json bun.lock ./
 COPY patches patches
 COPY apps/desktop/package.json apps/desktop/
+COPY apps/expo/package.json apps/expo/
 COPY apps/fazole-app/package.json apps/fazole-app/
 COPY apps/fazole-site/package.json apps/fazole-site/
 COPY apps/linkshu-cli/package.json apps/linkshu-cli/
@@ -37,8 +43,6 @@ COPY packages/recurring-payment/package.json packages/recurring-payment/
 COPY tools/nostr-error-tracker/package.json tools/nostr-error-tracker/
 RUN bun install --frozen-lockfile
 
-COPY . .
-
 ARG VITE_ALLOW_INSECURE_LOCALHOST_RELAYS=0
 ARG VITE_NOSTR_RELAYS
 ARG VITE_EVOLU_SERVER_URLS
@@ -54,16 +58,34 @@ ENV VITE_ALLOW_INSECURE_LOCALHOST_RELAYS=$VITE_ALLOW_INSECURE_LOCALHOST_RELAYS \
     VITE_PUSH_SERVER_URL=$VITE_PUSH_SERVER_URL \
     VITE_E2E=$VITE_E2E
 
+FROM deps AS build-vite
+COPY . .
 WORKDIR /app/apps/linky-app
 # Sourcemaps keep Playwright traces readable; passed on the CLI so this test
 # setup stays out of vite.config.ts. No typecheck here — the e2e workflow
 # runs it as a separate step, off the image-build critical path.
-RUN ./node_modules/.bin/vite build --sourcemap
+RUN ./node_modules/.bin/vite build --sourcemap && mv dist /out
+
+FROM deps AS build-expo
+# The Expo CLI and Metro run on Node.
+RUN apk add --no-cache nodejs
+ENV EXPO_PUBLIC_ALLOW_INSECURE_LOCALHOST_RELAYS=$VITE_ALLOW_INSECURE_LOCALHOST_RELAYS \
+    EXPO_PUBLIC_NOSTR_RELAYS=$VITE_NOSTR_RELAYS \
+    EXPO_PUBLIC_EVOLU_SERVER_URLS=$VITE_EVOLU_SERVER_URLS \
+    EXPO_PUBLIC_MAIN_MINT_URL=$VITE_MAIN_MINT_URL \
+    EXPO_PUBLIC_NPUB_CASH_DISABLED=$VITE_NPUB_CASH_DISABLED \
+    EXPO_PUBLIC_PUSH_SERVER_URL=$VITE_PUSH_SERVER_URL \
+    EXPO_PUBLIC_E2E=$VITE_E2E
+COPY . .
+WORKDIR /app/apps/expo
+RUN bun run build --source-maps && mv dist /out
+
+FROM build-${WEB_BUNDLER} AS build
 
 FROM nginx:alpine
 # nginx >= 1.21.2 required: its mime.types maps .wasm to application/wasm,
 # without which instantiateStreaming rejects and Evolu never initialises.
 # (In dev a Vite plugin sets that Content-Type; here it is a plain static asset.)
-COPY --from=build /app/apps/linky-app/dist /usr/share/nginx/html
+COPY --from=build /out /usr/share/nginx/html
 COPY docker/linky-app/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80

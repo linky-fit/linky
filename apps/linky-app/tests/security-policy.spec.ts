@@ -12,17 +12,16 @@ test.use({ serviceWorkers: "block" });
 test("security headers cover the shell, assets, WASM and errors", async ({
   request,
 }) => {
+  const missing = "/assets/missing-security-test.js";
   for (const path of [
     "/",
     "/index.html",
     "/icon.svg",
     "/sqlite-wasm/sqlite3.wasm",
-    "/missing-security-test",
+    missing,
   ]) {
     const response = await request.get(path);
-    expect(response.status()).toBe(
-      path === "/missing-security-test" ? 404 : 200,
-    );
+    expect(response.status()).toBe(path === missing ? 404 : 200);
     for (const { key, value } of vercel.headers[0].headers) {
       expect(response.headers()[key.toLowerCase()], `${path}: ${key}`).toBe(
         value,

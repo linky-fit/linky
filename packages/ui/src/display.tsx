@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { Image, View, styled } from "tamagui";
+import { View, styled } from "tamagui";
+import { AvatarPhoto } from "./avatar-photo";
 import { Pressable } from "./controls";
 import { Icon } from "./icons";
 import type { IconName, IconSize } from "./icons";
@@ -77,12 +78,8 @@ export function Avatar({
         backgroundColor={raised ? "$surfaceRaised" : "$surface"}
       >
         {showPhoto ? (
-          <Image
-            src={uri}
-            width="100%"
-            height="100%"
-            objectFit="cover"
-            aria-hidden
+          <AvatarPhoto
+            uri={uri}
             onError={() => {
               setFailedUri(uri);
               onError?.(uri);

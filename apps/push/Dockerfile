@@ -1,10 +1,11 @@
-FROM oven/bun:1.3.9-alpine AS build
+FROM oven/bun:1.3.14-alpine AS build
 
 WORKDIR /app
 
 COPY package.json bun.lock ./
 COPY patches patches
 COPY apps/desktop/package.json apps/desktop/package.json
+COPY apps/expo/package.json apps/expo/package.json
 COPY apps/fazole-app/package.json apps/fazole-app/package.json
 COPY apps/fazole-site/package.json apps/fazole-site/package.json
 COPY apps/linkshu-cli/package.json apps/linkshu-cli/package.json
@@ -34,7 +35,7 @@ COPY packages/linkstr packages/linkstr
 
 RUN bun run --filter @linky-fit/push build
 
-FROM oven/bun:1.3.9-alpine AS runtime
+FROM oven/bun:1.3.14-alpine AS runtime
 
 WORKDIR /app
 

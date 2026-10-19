@@ -85,17 +85,9 @@ const readLinkauthLinkFromHash = (hash: string): string | null =>
   LINKAUTH_HASH.test(hash) ? hash.slice(1) : null;
 
 /**
- * Takes a site's login link out of the address bar and its history entry:
- * a `#nostrconnect://…` URI or a `#linkauth?…` link. Sites put them
- * in the hash so the secret or nonce never reaches a server log or Referer.
+ * The site login link a fragment carries: a `#nostrconnect://…` URI or a
+ * `#linkauth?…` link. Sites put them in the hash so the secret or nonce
+ * never reaches a server log or Referer.
  */
-export const takeSiteLoginHashLink = (): string | null => {
-  const { hash } = window.location;
-  const link =
-    readNostrConnectUriFromHash(hash) ?? readLinkauthLinkFromHash(hash);
-  if (link) {
-    const { pathname, search } = window.location;
-    window.history.replaceState(null, "", `${pathname}${search}#wallet`);
-  }
-  return link;
-};
+export const readSiteLoginHashLink = (hash: string): string | null =>
+  readNostrConnectUriFromHash(hash) ?? readLinkauthLinkFromHash(hash);

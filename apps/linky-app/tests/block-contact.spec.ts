@@ -26,6 +26,7 @@ import {
   waitForMuteListOnRelay,
   watchNostrInbox,
 } from "./helpers/relay";
+import { gotoRoute, waitForRoute } from "./helpers/routes";
 
 test.use({ actionTimeout: 20_000 });
 
@@ -45,13 +46,13 @@ const openDevice = async (
   await stubFiatRates(page);
   await stubThirdPartyAssets(page);
   const inboxReady = watchNostrInbox(page, identity.npub);
-  await page.goto("/#wallet");
+  await gotoRoute(page, "wallet");
   await inboxReady();
   return { context, errors, label, page };
 };
 
 const openBlockedPage = async (page: Page) => {
-  await page.goto("/#settings");
+  await gotoRoute(page, "settings");
   await page.getByText("Blocked", { exact: true }).click();
 };
 
@@ -75,7 +76,7 @@ test("blocks a deleted contact from the toast and unblocks it in Settings, on bo
         `[data-guide='contact-card'][data-guide-contact-id='${hynekId}']`,
       );
     const blockedRow = (on: Page) => on.getByTestId(`blocked-${hynekPubkey}`);
-    await secondPage.goto("/#contacts");
+    await gotoRoute(secondPage, "contacts");
     await expect(card(secondPage)).toBeVisible({ timeout: 30_000 });
     await openBlockedPage(secondPage);
     await expect(
@@ -83,13 +84,13 @@ test("blocks a deleted contact from the toast and unblocks it in Settings, on bo
     ).toBeVisible();
 
     await test.step("deleting offers to block, and blocking publishes the mute list", async () => {
-      await page.goto(`/#contact/${hynekId}/edit`);
+      await gotoRoute(page, `contact/${hynekId}/edit`);
       await page
         .getByRole("banner")
         .getByRole("button", { name: "Delete contact", exact: true })
         .click();
       // The edit page has its own Block button, so wait until the deletion left it.
-      await page.waitForURL(/#contacts$/);
+      await waitForRoute(page, "contacts");
       await page.getByRole("button", { name: "Block", exact: true }).click();
       await expect(page.getByText("Contact blocked.")).toBeVisible();
       await waitForMuteListOnRelay(dave.npub, hynekPubkey);
@@ -128,7 +129,7 @@ test("blocks a deleted contact from the toast and unblocks it in Settings, on bo
         afterDeletionSec(),
       );
       for (const { page: device } of devices) {
-        await device.goto("/#contacts");
+        await gotoRoute(device, "contacts");
         await expect(card(device)).toBeVisible();
         await card(device).click();
         const bubbles = device.getByTestId("chat-bubble");

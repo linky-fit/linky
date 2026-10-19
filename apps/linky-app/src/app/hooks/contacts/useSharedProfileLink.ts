@@ -4,7 +4,7 @@ import React from "react";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
 import { navigateTo } from "../../../hooks/useRouting";
 import type { Translate } from "../../../i18n";
-import { takeAddContactHashLink } from "../../../sharedProfileLink";
+import { subscribeAddContactHashLinks } from "../../../platform/hashLinks";
 import { PENDING_SHARED_PROFILE_NPUB_STORAGE_KEY } from "../../../utils/constants";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import {
@@ -48,18 +48,14 @@ export const useSharedProfileLink = ({
   const [openingContactId, setOpeningContactId] =
     React.useState<ContactId | null>(null);
 
-  // An open app gets the link as a hash change, not a fresh load.
-  React.useEffect(() => {
-    const acceptHashLink = () => {
-      const npub = takeAddContactHashLink();
-      if (!npub) return;
-      safeLocalStorageSet(PENDING_SHARED_PROFILE_NPUB_STORAGE_KEY, npub);
-      setPendingNpub(npub);
-    };
-    acceptHashLink();
-    window.addEventListener("hashchange", acceptHashLink);
-    return () => window.removeEventListener("hashchange", acceptHashLink);
-  }, []);
+  React.useEffect(
+    () =>
+      subscribeAddContactHashLinks((npub) => {
+        safeLocalStorageSet(PENDING_SHARED_PROFILE_NPUB_STORAGE_KEY, npub);
+        setPendingNpub(npub);
+      }),
+    [],
+  );
 
   React.useEffect(() => {
     if (!pendingNpub || !accountHydrated) return;

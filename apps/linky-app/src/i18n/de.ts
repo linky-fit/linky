@@ -402,6 +402,25 @@ export const de = {
   evoluSyncedOwners: "Synchronisierte Eigentümer",
   migratingDataTitle: "Daten werden migriert",
   migratingDataBody: "Das dauert einen Moment. Lass die App geöffnet.",
+  hydrationTitle: "Deine Daten werden geladen",
+  hydrationBody:
+    "Deine Kontakte, Nachrichten und dein Wallet kommen vom Evolu-Relay. Lass die App geöffnet.",
+  hydrationSlowBody:
+    "Das dauert lange. Das Evolu-Relay ist vielleicht nicht erreichbar; prüfe deine Evolu-Relays.",
+  hydrationProgress: "{synced} von {total} Teilen synchronisiert",
+  hydrationOpenRelaySettings: "Evolu-Relays",
+  secretsUnavailableTitle: "Schlüssel konnten nicht gelesen werden",
+  secretsUnavailableBody:
+    "Linky konnte deine Schlüssel nicht aus dem sicheren Speicher dieses Geräts lesen und hat dein Konto deshalb geschlossen gelassen, damit deine Daten sicher bleiben. Versuch es erneut oder stelle dein Konto mit deinen Sicherungswörtern wieder her.",
+  secretsUnavailableRetry: "Erneut versuchen",
+  secretsUnavailableContinue: "Mit Sicherungswörtern wiederherstellen",
+  secretsWriteFailedTitle: "Schlüssel konnten nicht sicher gespeichert werden",
+  secretsWriteFailedBody:
+    "Der sichere Speicher dieses Geräts hat deine Schlüssel abgelehnt. Linky legt sie nie an einem weniger sicheren Ort ab, deshalb sind sie noch nicht gespeichert. Versuch es erneut. Wenn es weiter fehlschlägt, schreib dir zuerst deine Sicherungswörter auf: Mit ihnen stellst du dein Konto auf diesem oder jedem anderen Gerät wieder her.",
+  secretsWriteFailedWords: "Deine Sicherungswörter",
+  secretsWriteFailedRetry: "Erneut versuchen",
+  secretsWriteFailedAgain:
+    "Sie konnten immer noch nicht gespeichert werden. Versuch es gleich noch einmal oder starte das Gerät neu.",
   evoluNoDataYet: "Hier sind noch keine Daten gespeichert.",
   evoluData: "Daten",
   evoluStorage: "Speicher",
@@ -548,6 +567,7 @@ export const de = {
   chatSeenShort: "gelesen",
   chatImageAttach: "Bild oder PDF hinzufügen",
   chatPdfDecrypting: "PDF wird entschlüsselt…",
+  chatAttachmentRetry: "Erneut versuchen",
   chatPdfLoadFailed: "PDF konnte nicht geladen werden.",
   chatPdfMessage: "PDF",
   chatPdfOpen: "PDF öffnen",
@@ -564,6 +584,10 @@ export const de = {
   chatImageOpen: "Bild öffnen",
   chatImageBackToChat: "Zurück zum Chat",
   chatImageSave: "In Fotos speichern",
+  chatImageSaved: "In Fotos gespeichert",
+  chatImageSaveDenied:
+    "Linky darf nicht in deine Fotos speichern. Erlaube den Fotozugriff in den Einstellungen.",
+  chatImageSaveFailed: "Speichern in Fotos fehlgeschlagen.",
   chatReplyAction: "Antworten",
   chatReactAction: "Reagieren",
   chatMoreEmojis: "Weitere Emojis",
@@ -752,6 +776,7 @@ export const de = {
   editContact: "Kontakt bearbeiten",
   contactEditTitle: "Kontakt bearbeiten",
   contactPayTitle: "Kontakt bezahlen",
+  contactRequestTitle: "Zahlung von Kontakt anfordern",
   messagesTitle: "Nachrichten",
   newContact: "Kontakt hinzufügen",
   close: "Schließen",
@@ -1234,6 +1259,8 @@ export const de = {
   payNetworkError: "Senden wegen eines Netzwerkfehlers nicht möglich.",
   payApprovalChanged:
     "Die Zahlungsfreigabe ist nicht mehr gültig. Prüfe den Empfänger und bezahle erneut.",
+  payWalletBusy:
+    "Die Wallet ist gerade mit einer anderen Zahlung beschäftigt, versuche es gleich noch einmal.",
   payFailed: "Zahlung fehlgeschlagen",
   payPending:
     "Die Zahlung wartet auf die Bestätigung der Mint. Sie wird abgeschlossen, sobald die Mint antwortet.",
@@ -1255,6 +1282,7 @@ export const de = {
   saveContactPromptSkip: "Nicht jetzt",
   paid: "Bezahlt",
   cashuTokenClaimed: "Token eingelöst",
+  cashuTokenReceived: "Token empfangen",
   cashuTokenClaimedWithAmount: "Dein Token über {amount} wurde eingelöst",
   conversations: "Unterhaltungen",
   proxyPayments: "Proxy-Zahlungen",
@@ -1358,4 +1386,7 @@ export const de = {
   keryxMediaUnavailable:
     "Die Datei stimmt nicht mit dem überein, was die Firma signiert hat, und wurde nicht geöffnet.",
   keryxNotFound: "Nicht gefunden",
+  pickSourceTitle: "Anhängen aus",
+  pickSourcePhotos: "Fotos",
+  pickSourceFiles: "Dateien",
 } satisfies Record<keyof typeof cs, string>;

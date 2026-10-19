@@ -20,6 +20,7 @@ vi.mock("../app/lib/privateImageMessage", async (importOriginal) => {
 });
 
 vi.mock("../app/lib/pdfPreview", () => ({
+  canRenderPdfPages: true,
   renderPdfPages: vi.fn(async () => [
     { height: 400, url: "blob:page-1", width: 300 },
   ]),
@@ -106,5 +107,37 @@ describe("PrivateFileBubble", () => {
     expect(container.querySelector("img")).toBeNull();
     expect(container.querySelector("[aria-label='chatPdfOpen']")).toBeNull();
     expect(container.textContent).toContain("invoice.pdf");
+  });
+
+  it("loads a failed file again when the device comes back online", async () => {
+    decryptMock.mockRejectedValueOnce(new Error("offline"));
+    const container = await render();
+    expect(container.textContent).toContain("chatPdfLoadFailed");
+
+    await act(async () => {
+      window.dispatchEvent(new Event("online"));
+    });
+
+    expect(decryptMock).toHaveBeenCalledTimes(2);
+    expect(container.textContent).not.toContain("chatPdfLoadFailed");
+    expect(
+      container.querySelector("[aria-label='chatPdfOpen'] img"),
+    ).not.toBeNull();
+  });
+
+  it("loads a failed file again on Try again", async () => {
+    decryptMock.mockRejectedValueOnce(new Error("offline"));
+    const container = await render();
+
+    await act(async () => {
+      Array.from(
+        container.querySelectorAll<HTMLElement>("button, [role=button]"),
+      )
+        .find((element) => element.textContent?.includes("chatAttachmentRetry"))
+        ?.click();
+    });
+
+    expect(decryptMock).toHaveBeenCalledTimes(2);
+    expect(container.textContent).not.toContain("chatPdfLoadFailed");
   });
 });

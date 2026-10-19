@@ -54,6 +54,30 @@ const buttonsOf = (root: Element | null) => [
   ...(root?.querySelectorAll("button") ?? []),
 ];
 
+const inputWith = (root: Element, placeholder: string) => {
+  const input = root.querySelector<HTMLInputElement>(
+    `input[placeholder="${placeholder}"]`,
+  );
+  if (!input) throw new Error(`no input "${placeholder}"`);
+  return input;
+};
+
+const typeInto = (input: HTMLInputElement, value: string) =>
+  act(async () => {
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )?.set?.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+
+const pressEnter = (input: HTMLInputElement) =>
+  act(async () => {
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+    );
+  });
+
 describe("ContactNewPage", () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -148,6 +172,47 @@ describe("ContactNewPage", () => {
     expect(scan?.getAttribute("data-guide")).toBe("scan-contact-button");
     await act(async () => scan?.click());
     expect(openScan).toHaveBeenCalledOnce();
+    await unmount();
+  });
+
+  it("searches the typed query on Enter without waiting for the typing pause", async () => {
+    vi.useFakeTimers();
+    const searchNewContact = vi.fn(async () => ({ kind: "empty" as const }));
+    const { container, unmount } = await renderPage({
+      form: { groups: [], lnAddress: "", name: "", npub: "alice" },
+      searchNewContact,
+    });
+
+    await pressEnter(inputWith(container, "contactSearchPlaceholder"));
+    expect(searchNewContact).toHaveBeenCalledWith(
+      "alice",
+      expect.any(Function),
+    );
+    await unmount();
+  });
+
+  it("adds the typed group on a comma and on Enter", async () => {
+    const setForm = vi.fn();
+    const form = {
+      groups: [],
+      lnAddress: "alice@example.com",
+      name: "",
+      npub: "",
+    };
+    const { container, unmount } = await renderPage({
+      form,
+      setForm,
+      step: "details",
+    });
+    const group = inputWith(container, "groupPlaceholder");
+
+    await typeInto(group, "Work,");
+    expect(setForm).toHaveBeenLastCalledWith({ ...form, groups: ["Work"] });
+    expect(group.value).toBe("");
+
+    await typeInto(group, "Family");
+    await pressEnter(group);
+    expect(setForm).toHaveBeenLastCalledWith({ ...form, groups: ["Family"] });
     await unmount();
   });
 

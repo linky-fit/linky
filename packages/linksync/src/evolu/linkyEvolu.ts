@@ -1,5 +1,6 @@
 import * as Evolu from "@evolu/common";
 import { createEvolu, SimpleName } from "@evolu/common";
+import type { CreateDbWorker } from "@evolu/common/local-first";
 import { ContactId } from "@linky-fit/domain";
 import { Effect, Schema } from "effect";
 import {
@@ -199,6 +200,10 @@ export const generateDbNameFromMnemonic = (
     : SimpleName.orThrow("linky-default");
 };
 
+// Evolu keeps one instance per database name, so a hot reload that calls
+// again gets the running database, whose worker only the first tracker hears.
+const ownerSyncs = new WeakMap<LinkyEvolu, OwnerSync>();
+
 /**
  * Opens the Linky database over a worker started with `runOwnerSyncDbWorker`,
  * owned by the mnemonic's app owner (Evolu's own when `null`).
@@ -221,11 +226,18 @@ export const createLinkyEvolu = ({
   readonly inMemory: boolean;
   readonly enableLogging: boolean;
   readonly onEvent?: (event: LinkyEvoluEvent) => void;
-}): { readonly evolu: LinkyEvolu; readonly ownerSync: OwnerSync } => {
-  const { createDbWorker, ownerSync } = trackOwnerSync(createWorker);
-  ownerSync.subscribeFailures((failure) =>
-    onEvent?.({ _tag: "OwnerSyncFailed", failure }),
-  );
+}): {
+  readonly evolu: LinkyEvolu;
+  readonly ownerSync: OwnerSync;
+  /** The mnemonic's app owner, known before the worker answers; `null` without a mnemonic. */
+  readonly appOwner: Evolu.AppOwner | null;
+} => {
+  const tracked = trackOwnerSync(createWorker);
+  let startedWorker = false;
+  const createDbWorker: CreateDbWorker = (name) => {
+    startedWorker = true;
+    return tracked.createDbWorker(name);
+  };
   const externalAppOwner = mnemonic ? appOwnerFromMnemonic(mnemonic) : null;
   const evolu = createEvolu({ ...evoluDeps, createDbWorker })(
     LinkyEvoluSchema,
@@ -237,7 +249,12 @@ export const createLinkyEvolu = ({
       ...(externalAppOwner ? { externalAppOwner } : {}),
     },
   );
-  return { evolu, ownerSync };
+  if (startedWorker) ownerSyncs.set(evolu, tracked.ownerSync);
+  const ownerSync = ownerSyncs.get(evolu) ?? tracked.ownerSync;
+  ownerSync.subscribeFailures((failure) =>
+    onEvent?.({ _tag: "OwnerSyncFailed", failure }),
+  );
+  return { evolu, ownerSync, appOwner: externalAppOwner };
 };
 
 const syncOwnerIds = (

@@ -6,6 +6,7 @@ import { watchAppErrors } from "./helpers/diagnostics";
 import { createSeedIdentity } from "./helpers/identity";
 import { shardRows } from "./helpers/linkyHooks";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
+import { expectRoute, routePathOf } from "./helpers/routes";
 
 test.use({ serviceWorkers: "block", viewport: MOBILE_VIEWPORT });
 
@@ -23,11 +24,9 @@ test("a new user lands in the shared profile's conversation after creating a pro
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Confirm profile" }).click();
 
-  await expect(page).toHaveURL(/#chat\/[^/]+$/, { timeout: 30_000 });
+  await expectRoute(page, /^chat\/[^/]+$/, { timeout: 30_000 });
   await expect(page.locator('[data-guide="chat-input"]')).toHaveText("Hi 👋");
-  const contactId = decodeURIComponent(
-    new URL(page.url()).hash.slice("#chat/".length),
-  );
+  const contactId = decodeURIComponent(routePathOf(page).slice("chat/".length));
   const contacts = await shardRows(page, "contacts", "contact");
   expect(
     contacts.filter((row) => row.npub === peer.npub).map((row) => row.id),

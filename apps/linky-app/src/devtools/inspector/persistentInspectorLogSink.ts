@@ -1,3 +1,4 @@
+import { saveFile } from "../../platform/fileExport";
 import { indexedDbInspectorLogStorage } from "./indexedDbInspectorLogStorage";
 import {
   appendPersistentInspectorLogRows,
@@ -117,14 +118,11 @@ export const downloadPersistentInspectorLogs = async (): Promise<number> => {
   const currentState = await enqueueOperation(ensureState);
   const rows = getPersistentInspectorLogRows(currentState);
   const text = serializeInspectorLogsNdjson(rows);
-  const blob = new Blob([text], { type: "application/x-ndjson;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = `linky-inspector-logs-${new Date().toISOString().slice(0, 10)}.ndjson`;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+  const fileName = `linky-inspector-logs-${new Date().toISOString().slice(0, 10)}.ndjson`;
+  await saveFile({
+    blob: new Blob([text], { type: "application/x-ndjson;charset=utf-8" }),
+    fileName,
+    title: fileName,
+  });
   return rows.length;
 };

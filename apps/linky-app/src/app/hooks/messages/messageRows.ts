@@ -104,6 +104,7 @@ export const toLocalNostrMessage = (
     rumorId: asNonEmptyString(row.rumorId),
     pubkey: trimString(row.pubkey),
     createdAtSec: toPositiveInt(row.createdAtSec, nowSec()),
+    storedAt: row.createdAt,
     ...syncedStatus(row.status),
     localOnly: isSqliteTrueish(row.localOnly),
     replyToId: asNonEmptyString(row.replyToId),

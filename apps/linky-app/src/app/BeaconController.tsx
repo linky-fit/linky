@@ -94,7 +94,7 @@ const BeaconKeyTable = ({
   const conversations = useConversationRows();
 
   React.useEffect(() => {
-    const timeout = window.setTimeout(() => {
+    const timeout = setTimeout(() => {
       const ordered = byLastMessage(contacts, conversations, messages);
       const keys = beaconKeysFor(
         secretKey,
@@ -116,7 +116,7 @@ const BeaconKeyTable = ({
         }),
       );
     }, KEY_TABLE_DEBOUNCE_MS);
-    return () => window.clearTimeout(timeout);
+    return () => clearTimeout(timeout);
   }, [contacts, conversations, messages, secretKey]);
 
   React.useEffect(() => () => setBeaconKeyTable(null), []);

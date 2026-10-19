@@ -78,11 +78,11 @@ export const useRecurringReminderSync = ({
     if (nextNotifyAtSec === undefined) return;
     const dueInMs =
       (nextNotifyAtSec - RECURRING_REMINDER_GRACE_SEC) * 1000 - Date.now();
-    const timeout = window.setTimeout(
+    const timeout = setTimeout(
       () => setNowSec(nowSeconds()),
       Math.min(dueInMs, MAX_TIMEOUT_MS),
     );
-    return () => window.clearTimeout(timeout);
+    return () => clearTimeout(timeout);
   }, [nextNotifyAtSec, nowSec]);
 
   const timesKey = reminders.times.join(",");
@@ -92,7 +92,7 @@ export const useRecurringReminderSync = ({
   React.useEffect(() => {
     if (!enabled || !currentNsec) return;
     let cancelled = false;
-    const timeout = window.setTimeout(() => {
+    const timeout = setTimeout(() => {
       void (async () => {
         const { syncRecurringReminders } =
           await import("../../../utils/pushNotifications");
@@ -141,7 +141,7 @@ export const useRecurringReminderSync = ({
     }, SYNC_DEBOUNCE_MS);
     return () => {
       cancelled = true;
-      window.clearTimeout(timeout);
+      clearTimeout(timeout);
     };
   }, [currentNsec, dependencies, enabled, latestReminders, notesKey, timesKey]);
 };

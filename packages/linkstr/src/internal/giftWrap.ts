@@ -73,17 +73,37 @@ export const wrapRumorFor = (
     ? createPushMarkedWrap(rumor, senderSecretKey, recipient)
     : decodeWrap(wrapEvent(rumor, senderSecretKey, recipient));
 
-const decryptJson = (
-  payload: string,
+// All seals from one sender decrypt with the same conversation key, and its
+// ECDH is the slowest step of an unwrap on Hermes; wraps use one-off keys.
+const sealConversationKeys = new WeakMap<
+  NostrSecretKey,
+  Map<Pubkey, Uint8Array>
+>();
+const MAX_CACHED_SENDERS = 1024;
+
+const sealConversationKey = (
   recipientSecretKey: NostrSecretKey,
   senderPubkey: Pubkey,
+): Uint8Array => {
+  let keys = sealConversationKeys.get(recipientSecretKey);
+  if (!keys) {
+    keys = new Map();
+    sealConversationKeys.set(recipientSecretKey, keys);
+  }
+  const cached = keys.get(senderPubkey);
+  if (cached) return cached;
+  if (keys.size >= MAX_CACHED_SENDERS) keys.clear();
+  const key = getConversationKey(recipientSecretKey, senderPubkey);
+  keys.set(senderPubkey, key);
+  return key;
+};
+
+const decryptJson = (
+  payload: string,
+  conversationKey: () => Uint8Array,
 ): Result.Result<unknown, UnwrapFailure> => {
   try {
-    return Result.succeed(
-      JSON.parse(
-        decrypt(payload, getConversationKey(recipientSecretKey, senderPubkey)),
-      ),
-    );
+    return Result.succeed(JSON.parse(decrypt(payload, conversationKey())));
   } catch {
     return Result.fail("unwrap-failed");
   }
@@ -107,10 +127,8 @@ export const unwrapToRumor = (
     if (!verifyEvent(wrap)) {
       return yield* Result.fail<UnwrapFailure>("invalid-wrap");
     }
-    const sealJson = yield* decryptJson(
-      wrap.content,
-      recipientSecretKey,
-      wrap.pubkey,
+    const sealJson = yield* decryptJson(wrap.content, () =>
+      getConversationKey(recipientSecretKey, wrap.pubkey),
     );
     const seal = yield* decodeSealResult(sealJson).pipe(
       Result.mapError((): UnwrapFailure => "invalid-seal"),
@@ -119,10 +137,8 @@ export const unwrapToRumor = (
       return yield* Result.fail<UnwrapFailure>("invalid-seal");
     }
 
-    const rumorJson = yield* decryptJson(
-      seal.content,
-      recipientSecretKey,
-      seal.pubkey,
+    const rumorJson = yield* decryptJson(seal.content, () =>
+      sealConversationKey(recipientSecretKey, seal.pubkey),
     );
     const rumor = yield* decodeRumorResult(rumorJson).pipe(
       Result.mapError((): UnwrapFailure => "malformed-rumor"),

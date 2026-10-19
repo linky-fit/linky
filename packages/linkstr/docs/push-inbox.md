@@ -47,7 +47,7 @@ process.on("SIGTERM", () => {
 | ------------------------ | -------------------------------------------------------------------------- |
 | `readRelays`             | relays to subscribe on; one reconnecting subscription each                 |
 | `lookbackSeconds`        | `since = now − lookback` on every (re)subscription                         |
-| `allowInsecureLocalhost` | opt into loopback `ws://` for development; default false                   |
+| `allowInsecureLocalhost` | opt into local `ws://` for development; default false                      |
 | `refreshInterval`        | force a fresh REQ this often (default 10 min) to detect deaf subscriptions |
 | `resubscribeDelay`       | base backoff after an attempt ends (default 5 s)                           |
 | `transport`              | test seam; defaults to the websocket pool transport                        |

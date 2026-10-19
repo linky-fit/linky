@@ -19,7 +19,7 @@ afterEach(async () => {
 });
 
 it.each(["0", "1"])(
-  "hashes final scripts and gates local connections with flag %s",
+  "hashes final scripts and gates local connections and images with flag %s",
   async (flag) => {
     vi.stubEnv("VITE_ALLOW_INSECURE_LOCALHOST_RELAYS", flag);
     const root = await realpath(await mkdtemp(join(tmpdir(), "linky-csp-")));
@@ -57,6 +57,11 @@ it.each(["0", "1"])(
     }
     expect(policy.includes("http://localhost:*")).toBe(flag === "1");
     expect(policy.includes("ws://127.0.0.1:*")).toBe(flag === "1");
+    expect(policy).toContain(
+      flag === "1"
+        ? "img-src 'self' data: blob: https: http://localhost:* http://127.0.0.1:*;"
+        : "img-src 'self' data: blob: https:;",
+    );
     expect(policy.split(/\s+/)).not.toContain("http:");
     expect(policy.split(/\s+/)).not.toContain("ws:");
   },

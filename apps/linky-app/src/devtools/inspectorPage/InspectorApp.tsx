@@ -20,6 +20,7 @@ import {
 } from "@linky-fit/ui";
 import type { Tone } from "@linky-fit/ui";
 import { useArmedAction } from "../../hooks/useArmedAction";
+import { writeClipboardText } from "../../platform/clipboard";
 import { pickFile } from "../../utils/pickFile";
 import { connectionStatus } from "../../utils/connectionStatus";
 import React from "react";
@@ -81,6 +82,14 @@ interface OfflineImport {
 }
 
 const timelineRowDomId = (id: number): string => `inspector-row-${id}`;
+
+interface TimelineScrollEvent {
+  nativeEvent: {
+    contentOffset: { y: number };
+    contentSize: { height: number };
+    layoutMeasurement: { height: number };
+  };
+}
 const channelTone = (channel: string): Tone =>
   channel.startsWith("nostr")
     ? "accent"
@@ -180,12 +189,7 @@ function DetailPane({
   }, [row]);
 
   const handleCopy = React.useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(rowJson);
-      setCopyStatus("copied");
-    } catch {
-      setCopyStatus("failed");
-    }
+    setCopyStatus((await writeClipboardText(rowJson)) ? "copied" : "failed");
   }, [rowJson]);
 
   return (
@@ -200,6 +204,7 @@ function DetailPane({
       borderLeftWidth={border.hairline}
       borderColor="$borderColor"
       $compact={{ width: "100%", flex: 1 }}
+      nestedScrollEnabled
     >
       <Stack gap="$lg" padding="$lg">
         <Row justifyContent="space-between">
@@ -335,7 +340,7 @@ export function InspectorApp({
   // high-water mark is enough to dedupe reconnect replays.
   const lastSeenIdRef = React.useRef(0);
   const isPausedRef = React.useRef(false);
-  const timelineRef = React.useRef<HTMLDivElement>(null);
+  const timelineRef = React.useRef<React.ComponentRef<typeof ScrollView>>(null);
 
   const activeDataSource = React.useMemo(
     () =>
@@ -389,6 +394,8 @@ export function InspectorApp({
   }, [activeDataSource, flushIncomingRows]);
 
   React.useEffect(() => {
+    // React Native has no global keyboard events.
+    if (!("addEventListener" in globalThis)) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setSelectedRow(null);
     };
@@ -468,22 +475,23 @@ export function InspectorApp({
 
   React.useLayoutEffect(() => {
     if (!isFollowing) return;
-    const timeline = timelineRef.current;
-    if (timeline) timeline.scrollTop = timeline.scrollHeight;
+    timelineRef.current?.scrollToEnd({ animated: false });
   }, [isFollowing, renderedRows]);
 
-  const handleTimelineScroll = React.useCallback(() => {
-    const timeline = timelineRef.current;
-    if (!timeline) return;
-    const distanceFromBottom =
-      timeline.scrollHeight - timeline.scrollTop - timeline.clientHeight;
-    setIsFollowing(distanceFromBottom <= FOLLOW_THRESHOLD_PX);
-  }, []);
+  const handleTimelineScroll = React.useCallback(
+    ({ nativeEvent }: TimelineScrollEvent) => {
+      const distanceFromBottom =
+        nativeEvent.contentSize.height -
+        nativeEvent.contentOffset.y -
+        nativeEvent.layoutMeasurement.height;
+      setIsFollowing(distanceFromBottom <= FOLLOW_THRESHOLD_PX);
+    },
+    [],
+  );
 
   const handleFollow = React.useCallback(() => {
     setIsFollowing(true);
-    const timeline = timelineRef.current;
-    if (timeline) timeline.scrollTop = timeline.scrollHeight;
+    timelineRef.current?.scrollToEnd({ animated: false });
   }, []);
 
   const handlePauseToggle = React.useCallback(() => {
@@ -505,6 +513,8 @@ export function InspectorApp({
   const handleJumpToRow = React.useCallback((row: CollectedInspectorRow) => {
     setSelectedRow(row);
     setIsFollowing(false);
+    // Native selects the row without scrolling to it: it has no DOM to look rows up in.
+    if (typeof document === "undefined") return;
     requestAnimationFrame(() => {
       document
         .getElementById(timelineRowDomId(row.id))
@@ -748,10 +758,9 @@ export function InspectorApp({
             minHeight={0}
             onScroll={handleTimelineScroll}
             scrollEventThrottle={16}
-            ref={(element) => {
-              timelineRef.current =
-                element instanceof HTMLDivElement ? element : null;
-            }}
+            // Android scrolls a scroller inside the page's only with this.
+            nestedScrollEnabled
+            ref={timelineRef}
           >
             {hiddenRowCount > 0 && (
               <Text variant="caption" color="$colorMuted" padding="$sm">

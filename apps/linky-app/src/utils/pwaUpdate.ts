@@ -1,4 +1,5 @@
 import { isDevBuild } from "../platform/buildEnv";
+import { reloadApp } from "../platform/reload";
 
 type Listener = (needRefresh: boolean) => void;
 
@@ -28,7 +29,7 @@ if (typeof window !== "undefined") {
 
 const reloadPage = () => {
   if (typeof location !== "undefined") {
-    location.reload();
+    reloadApp();
   }
 };
 

@@ -74,6 +74,12 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "The app told the push service when to remind this identity of upcoming recurring payments (a minute after each due time still ahead), or failed to. It syncs again when a due time passes, which cancels that reminder because this running app sends the payment. The server stores only the times, never notes, amounts or recipients; the notes due at each time stay on the device.",
   "contacts.npubSaved":
     "A Nostr contact was saved after the duplicate check. The contact link identifies the new row; the insert itself runs in the background.",
+  "secrets.secureWriteRefused":
+    "On iOS or Android the secure store (Keychain, Keystore) refused some of a set of identity secrets. Their keys got back the values they held before, nothing was written anywhere else, and the app shows the couldn't-store-your-keys screen with Retry and the backup words. Keys only, never values.",
+  "session.secretsWriteDecided":
+    "The user answered the couldn't-store-your-keys screen: retry stores the keys again and reloads into them, cancel drops them from memory and goes back to where the switch started.",
+  "navigation.incomingLink":
+    "The iOS or Android app was opened with a link it takes: kind ScanText (a nostr:, cashu: or nostrconnect: link for the scanned-text handler), HashLink (a #add, #linkauth or #wallet?cashu= command link) or Route (a linky:// path). initial: the link launched the app. The link itself is never logged, as it may carry a token.",
   "contacts.sharedProfileOpened":
     "A profile link (`#add/<npub>` from a linky.fit profile page) was opened once the account hydrated. The contact link identifies the saved or already existing contact whose conversation opens next; created tells which.",
   "contacts.deleted":
@@ -263,9 +269,27 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "session.secretsDegraded":
     "At boot the native secure storage failed (an error or no answer within 5 s) for the listed secrets, and the app runs on their localStorage copies. Keys under unreadable have no copy either, so the app treats them as unknown rather than missing: when the wallet seed would come from one, the wallet stays unconfigured for this launch instead of generating a new seed. The payload names the keys, never the values.",
   "session.secretsUnavailable":
-    "At boot the native secure storage failed and localStorage holds no identity, so the app shows the signed-out screen without touching the stored account. The payload names the keys that failed.",
+    "At boot the native secure storage failed and localStorage holds no identity, so the app asks the user to retry or restore from backup words, without touching the stored account. The payload names the keys that failed.",
+  "session.appMnemonicUnreadable":
+    "At boot the nsec was read but the app mnemonic was not, and the device's marker says it holds one (present) or never recorded it (unknown). Opening the database without it would open the empty anonymous one, so nothing opens, the wallet stays off, and the app asks the user to retry or restore from backup words. An absent marker (an nsec-only account) signs in instead. The payload names the keys that failed, never the values.",
+  "session.hydrationScreenLeft":
+    "On iOS and Android, a restored account waits on a full-screen hydration screen until its data has arrived from an Evolu relay. After 30 seconds the screen offers the Evolu relay settings; this row means the user took it, and the app opened without the account's data while writes stay held until hydration. The payload counts the owners synced so far.",
+  "session.secretsUnavailableDecided":
+    "On the screen shown after the keys could not be read, the user chose retry (the page reloads and reads the secure store again) or continue (the restore-from-backup-words step only; creating an account is not offered, since it could overwrite keys still in secure storage).",
   "secrets.nativeWriteRolledBack":
     "Saving identity secrets (a restore, identity switch or new cashu seed) on a native app: the native secure storage failed or did not read back the new value for the keys under missed. The app removed every key of the set from the native store, so the next boot reads the complete new set from localStorage instead of a mix of old and new secrets; notRemoved lists keys the native store also failed to remove. The payload names the keys, never the values.",
+  "secrets.secureStoreFailed":
+    "On the Expo app, the secure store (iOS Keychain, Android Keystore) failed to read, write or delete one key. A failed read at boot leaves that secret unknown, never missing; the cause is the store's own error. The payload names the key, never the value.",
+  "session.reinstallAwaitingHydration":
+    "First launch of an Expo app install that found the account's secrets in the iOS Keychain, which outlives an uninstall. The account waits for its first sync like a restore, so the empty database never writes over the synced data.",
+  "secrets.legacyMigrated":
+    "First launch of the Expo app over the Android Capacitor app. settings counts the device settings, relay lists and cashu state copied from the old WebView's localStorage (copied, kept: the native value won, invalid: its reader would reject it). The identity secrets came from source: the encrypted preferences, or the WebView's plaintext copy when those were missing or unreadable; copied, alreadyPresent, kept and failed count keys, failed lists their names. Without failures the old stores were deleted (clearFailure says why they couldn't be) and the account waits for its first sync. Values are never logged.",
+  "secrets.legacyMigrationFailed":
+    "The Expo app found what the Android Capacitor app left but couldn't read its secrets (cause), and the secure store holds no identity. Settings were still copied. The listed keys read as unreadable, so the app asks the user instead of onboarding; the old stores are kept and the next launch tries again.",
+  "secrets.legacyMigrationAbandoned":
+    "The secure store already held an identity the Android Capacitor app's secrets don't match (unreadable, no nsec, or another identity). No secret was copied and the old stores were deleted.",
+  "auth.logoutWiped":
+    "On the Expo app, the boot after a logout deleted the Linky database files, the secure-store secrets and on Android what the Capacitor app left (capacitorStoresRemoved), then cleared device storage. failure is why the database files could not be deleted; secretsNotRemoved lists keys the secure store kept.",
   "evolu.serversChanged":
     "The user changed the Evolu server list. The payload records the saved configured and enabled servers, including an empty selection. A reload applies the new transports.",
   "evolu.linkyRelayMigrated":

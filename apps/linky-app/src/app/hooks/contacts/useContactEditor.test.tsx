@@ -4,6 +4,7 @@ import { Effect, Exit } from "effect";
 import React, { act } from "react";
 import { expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
+import { useSetNavIntent } from "../shell/navIntents";
 import { useContactEditor, useContactEditorWatchers } from "./useContactEditor";
 
 const relays = vi.hoisted(() => ({
@@ -162,4 +163,32 @@ it("restores a deleted contact instead of adding it again", async () => {
   expect(insert).not.toHaveBeenCalled();
   expect(routing.navigateTo).toHaveBeenCalledWith({ route: "contacts" });
   await view.unmount();
+});
+
+it("opens a just-saved contact whose row was read back before the intent was set", async () => {
+  const npub = encodeNpub(
+    derivePubkey(NostrSecretKey.make(new Uint8Array(32).fill(9))),
+  );
+  const saved = { id: otherId, name: "Bob", npub };
+  const Watcher = () => {
+    useContactEditorWatchers({
+      ...params,
+      contacts: [initialContact, saved],
+      route: { kind: "contacts" },
+      selectedContact: null,
+    });
+    const openSavedContact = useSetNavIntent("openSavedContactNpub");
+    return <button onClick={() => openSavedContact(npub)}>Saved</button>;
+  };
+  routing.navigateTo.mockClear();
+  const view = await renderIntoDocument(<Watcher />);
+  expect(routing.navigateTo).not.toHaveBeenCalled();
+
+  await act(async () => {
+    view.container.querySelector("button")?.click();
+  });
+  expect(routing.navigateTo).toHaveBeenCalledWith({
+    route: "contact",
+    id: otherId,
+  });
 });

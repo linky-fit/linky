@@ -14,42 +14,36 @@ import {
   consumePendingNativeDeepLinkUrl,
   consumePendingNativeNotificationOpenDetail,
   consumePendingNativeNotificationRoute,
-  NATIVE_DEEP_LINK_EVENT,
-  NATIVE_NOTIFICATION_OPEN_EVENT,
-  NATIVE_PUSH_ACTION_EVENT,
+  onNativeDeepLinkUrl,
+  onNativeNotificationOpen,
 } from "../../../platform/nativeBridge";
 import { readClipboardText } from "../../../platform/clipboard";
-import { PENDING_DEEP_LINK_TEXT_STORAGE_KEY } from "../../../utils/constants";
+import { decodeQrImage } from "../../../utils/image";
 import { pickFile } from "../../../utils/pickFile";
 import { parseNativeDeepLinkUrl } from "../../../utils/deepLinks";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
-import {
-  safeLocalStorageGet,
-  safeLocalStorageRemove,
-  safeLocalStorageSet,
-} from "../../../utils/storage";
 import { useStopContactsGuide } from "../guide/useContactsGuideControls";
 import { useContactsOnboardingProgress } from "../guide/useContactsOnboardingProgress";
 import { buildUnknownContactId } from "../messages/contactIdentity";
 import type { DispatchInboxEvent } from "../messages/useLinkstrInboxSync";
 import type { LnurlAuthResult } from "../useLnurlAuth";
 import type { SiteLoginResult } from "../useSiteLogin";
-import { takeSiteLoginHashLink } from "../../../siteLogin";
+import {
+  subscribeNotificationOpenHashLinks,
+  subscribeScanHashLinks,
+} from "../../../platform/hashLinks";
 import { isAnimatedQrFrame } from "../../../utils/animatedQr";
 import { useExperimentalFeatures } from "../useExperimentalFeatures";
 import { useSetNavIntent } from "../shell/navIntents";
 import { useProvideOwnerCommands } from "../shell/ownerCommands";
 import { useGuideScannerDomain } from "../useGuideScannerDomain";
 import { useScannedTextHandler } from "../useScannedTextHandler";
+import { usePendingDeepLink } from "../usePendingDeepLink";
 import {
-  consumeNotificationOpenDetailFromHash,
   readNotificationOpenRoute,
   readNotificationOpenTarget,
 } from "../../lib/notificationOpenTarget";
-import {
-  extractCashuTokenFromText,
-  extractCashuTokenFromText as extractCashuTokenFromTextFromUrl,
-} from "../../lib/tokenText";
+import { extractCashuTokenFromText } from "../../lib/tokenText";
 import {
   pendingLightningInvoiceAtom,
   pendingLnurlWithdrawAtom,
@@ -99,6 +93,7 @@ interface UseScanNativeCompositionParams {
   addNewContactFromIdentifier: ContactsMessagingCompositionResult["addNewContactFromIdentifier"];
   canPayCashuRequest: CashuWalletCompositionResult["canPayCashuRequest"];
   cashuBalance: CashuWalletCompositionResult["cashuBalance"];
+  cashuReceiveReady: CashuWalletCompositionResult["cashuReceiveReady"];
   contacts: ContactsMessagingCompositionResult["contacts"];
   contactsLatestRef: ContactsMessagingCompositionResult["contactsLatestRef"];
   contactsOnboardingDismissedSynced: boolean;
@@ -129,6 +124,7 @@ export const useScanNativeComposition = ({
   addNewContactFromIdentifier,
   canPayCashuRequest,
   cashuBalance,
+  cashuReceiveReady,
   contacts,
   contactsLatestRef,
   contactsOnboardingDismissedSynced,
@@ -158,31 +154,6 @@ export const useScanNativeComposition = ({
   const pendingNotificationOpenDetailsRef = React.useRef<
     QueuedNotificationOpenDetail[]
   >([]);
-  const [pendingDeepLinkText, setPendingDeepLinkText] = React.useState<
-    string | null
-  >(() => {
-    const stored = (
-      safeLocalStorageGet(PENDING_DEEP_LINK_TEXT_STORAGE_KEY) ?? ""
-    ).trim();
-    return stored || null;
-  });
-
-  const updatePendingDeepLinkText = React.useCallback(
-    (value: string | null) => {
-      const normalized = (value ?? "").trim();
-
-      if (!normalized) {
-        safeLocalStorageRemove(PENDING_DEEP_LINK_TEXT_STORAGE_KEY);
-        setPendingDeepLinkText(null);
-        return;
-      }
-
-      safeLocalStorageSet(PENDING_DEEP_LINK_TEXT_STORAGE_KEY, normalized);
-      setPendingDeepLinkText(normalized);
-    },
-    [],
-  );
-
   // The scanner and the scanned text handler need each other; scan results only arrive after commit.
   const scannedTextHandlerRef = React.useRef<
     (rawValue: string) => Promise<void>
@@ -247,6 +218,16 @@ export const useScanNativeComposition = ({
   React.useLayoutEffect(() => {
     scannedTextHandlerRef.current = handleScannedText;
   }, [handleScannedText]);
+
+  // Deep links act on the wallet, so they wait until a token can be received.
+  const updatePendingDeepLinkText = usePendingDeepLink({
+    handle: handleScannedText,
+    ready: currentNsec !== null && cashuReceiveReady,
+  });
+  React.useEffect(
+    () => subscribeScanHashLinks(updatePendingDeepLinkText),
+    [updatePendingDeepLinkText],
+  );
 
   useContactsOnboardingProgress({
     cashuBalance,
@@ -361,22 +342,7 @@ export const useScanNativeComposition = ({
     acceptDeepLinkUrl(consumePendingNativeDeepLinkUrl());
     void consumePendingIosNativeDeepLinkUrl().then(acceptDeepLinkUrl);
 
-    const onDeepLink: EventListener = (event) => {
-      if (!(event instanceof CustomEvent)) {
-        return;
-      }
-
-      const detail = event.detail;
-      if (typeof detail !== "object" || detail === null) {
-        return;
-      }
-
-      const url: unknown = Reflect.get(detail, "url");
-      if (typeof url === "string") acceptDeepLinkUrl(url);
-    };
-
-    window.addEventListener(NATIVE_DEEP_LINK_EVENT, onDeepLink);
-    return () => window.removeEventListener(NATIVE_DEEP_LINK_EVENT, onDeepLink);
+    return onNativeDeepLinkUrl(acceptDeepLinkUrl);
   }, [updatePendingDeepLinkText]);
 
   React.useEffect(() => {
@@ -408,15 +374,13 @@ export const useScanNativeComposition = ({
 
     const pendingNotificationDetail =
       consumePendingNativeNotificationOpenDetail();
-    const pendingHashNotificationDetail =
-      consumeNotificationOpenDetailFromHash();
     if (pendingNotificationDetail) {
       openNotification(pendingNotificationDetail);
-    } else if (pendingHashNotificationDetail) {
-      openNotification(pendingHashNotificationDetail);
     } else {
       openNotificationRoute(consumePendingNativeNotificationRoute());
     }
+    const unsubscribeHashLinks =
+      subscribeNotificationOpenHashLinks(openNotification);
 
     if (nostrBootstrapReady) {
       const queuedDetails = pendingNotificationOpenDetailsRef.current.splice(0);
@@ -425,21 +389,8 @@ export const useScanNativeComposition = ({
       }
     }
 
-    const onNotificationOpen: EventListener = (event) => {
-      if (!(event instanceof CustomEvent)) {
-        return;
-      }
-
-      const detail = event.detail;
-      if (typeof detail !== "object" || detail === null) {
-        return;
-      }
-
-      openNotification(detail);
-    };
-
-    window.addEventListener(NATIVE_NOTIFICATION_OPEN_EVENT, onNotificationOpen);
-    window.addEventListener(NATIVE_PUSH_ACTION_EVENT, onNotificationOpen);
+    const unsubscribeNotificationOpens =
+      onNativeNotificationOpen(openNotification);
     const onServiceWorkerMessage = (event: MessageEvent) => {
       const data = event.data;
       if (typeof data !== "object" || data === null) {
@@ -460,74 +411,16 @@ export const useScanNativeComposition = ({
     }
 
     return () => {
+      unsubscribeHashLinks();
       if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
         navigator.serviceWorker.removeEventListener(
           "message",
           onServiceWorkerMessage,
         );
       }
-
-      window.removeEventListener(
-        NATIVE_NOTIFICATION_OPEN_EVENT,
-        onNotificationOpen,
-      );
-      window.removeEventListener(NATIVE_PUSH_ACTION_EVENT, onNotificationOpen);
+      unsubscribeNotificationOpens();
     };
   }, [nostrBootstrapReady, openNotificationChat]);
-
-  // An open app gets a web link as a hash change, not a fresh load.
-  React.useEffect(() => {
-    const acceptSiteLoginHashLink = () => {
-      const link = takeSiteLoginHashLink();
-      if (link) updatePendingDeepLinkText(link);
-    };
-    acceptSiteLoginHashLink();
-    window.addEventListener("hashchange", acceptSiteLoginHashLink);
-    return () =>
-      window.removeEventListener("hashchange", acceptSiteLoginHashLink);
-  }, [updatePendingDeepLinkText]);
-
-  React.useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const rawHash = window.location.hash;
-    const token = extractCashuTokenFromTextFromUrl(rawHash);
-    if (!token) {
-      return;
-    }
-
-    updatePendingDeepLinkText(`cashu:${token}`);
-
-    const cleanHash = rawHash.split("?")[0] ?? "#wallet";
-    const nextHash = cleanHash || "#wallet";
-    window.history.replaceState(
-      null,
-      "",
-      `${window.location.pathname}${window.location.search}${nextHash}`,
-    );
-  }, [updatePendingDeepLinkText]);
-
-  React.useEffect(() => {
-    if (!pendingDeepLinkText) {
-      return;
-    }
-
-    if (!currentNsec) {
-      return;
-    }
-
-    updatePendingDeepLinkText(null);
-    void handleScannedText(pendingDeepLinkText).catch(() => {
-      updatePendingDeepLinkText(pendingDeepLinkText);
-    });
-  }, [
-    currentNsec,
-    handleScannedText,
-    pendingDeepLinkText,
-    updatePendingDeepLinkText,
-  ]);
 
   const pasteScanValue = React.useCallback(async () => {
     let text = await readClipboardText();
@@ -555,65 +448,8 @@ export const useScanNativeComposition = ({
 
   const scanImageFile = React.useCallback(
     async (file: File) => {
-      const loadImage = async (imageFile: File): Promise<HTMLImageElement> => {
-        const objectUrl = URL.createObjectURL(imageFile);
-
-        try {
-          return await new Promise<HTMLImageElement>((resolve, reject) => {
-            const image = new Image();
-            image.onload = () => resolve(image);
-            image.onerror = () => reject(new Error("image-load-failed"));
-            image.src = objectUrl;
-          });
-        } finally {
-          URL.revokeObjectURL(objectUrl);
-        }
-      };
-
       try {
-        const image = await loadImage(file);
-        const detectorCtor = window.BarcodeDetector;
-
-        if (detectorCtor) {
-          const detector = new detectorCtor({ formats: ["qr_code"] });
-          const detectorValue = (
-            (await detector.detect(image))?.[0]?.rawValue ?? ""
-          ).trim();
-
-          if (detectorValue) {
-            if (isAnimatedQrFrame(detectorValue)) {
-              pushToast(t("scanAnimatedQrNeedsCamera"));
-              return;
-            }
-            await handleScannedText(detectorValue);
-            return;
-          }
-        }
-
-        const width = image.naturalWidth || image.width;
-        const height = image.naturalHeight || image.height;
-        if (width <= 0 || height <= 0) {
-          pushToast(t("scanImageUnsupported"));
-          return;
-        }
-
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext("2d", { willReadFrequently: true });
-        if (!ctx) {
-          pushToast(t("scanImageUnsupported"));
-          return;
-        }
-
-        ctx.drawImage(image, 0, 0, width, height);
-        const imageData = ctx.getImageData(0, 0, width, height);
-        const jsQr = (await import("jsqr")).default;
-        const qrValue = (
-          jsQr(imageData.data, width, height)?.data ?? ""
-        ).trim();
-
+        const qrValue = await decodeQrImage(file);
         if (!qrValue) {
           pushToast(t("scanImageUnsupported"));
           return;

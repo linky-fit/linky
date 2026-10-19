@@ -118,11 +118,26 @@ const mergeMessageMetadata = (
   };
 };
 
+const compareText = (a: string, b: string): number =>
+  a < b ? -1 : a > b ? 1 : 0;
+
+/**
+ * Oldest first. Rumors carry whole seconds, so messages of one second follow
+ * the order their rows were stored in, which for the sender is send order.
+ */
+const compareMessagesOldestFirst = (
+  a: LocalNostrMessage,
+  b: LocalNostrMessage,
+): number =>
+  a.createdAtSec - b.createdAtSec ||
+  compareText(a.storedAt ?? "", b.storedAt ?? "") ||
+  compareText(a.id, b.id);
+
 export const dedupeNostrMessagesByPriority = (
   input: readonly LocalNostrMessage[],
 ): LocalNostrMessage[] => {
   const rows = [...input];
-  rows.sort((a, b) => a.createdAtSec - b.createdAtSec);
+  rows.sort(compareMessagesOldestFirst);
 
   const deduped: LocalNostrMessage[] = [];
   const indexByWrapId = new Map<string, number>();
@@ -214,7 +229,7 @@ export const dedupeNostrMessagesByPriority = (
     if (droppedRumorKey) indexByRumorKey.set(droppedRumorKey, existingIndex);
   }
 
-  deduped.sort((a, b) => a.createdAtSec - b.createdAtSec);
+  deduped.sort(compareMessagesOldestFirst);
   return applyDeletions(deduped);
 };
 

@@ -80,10 +80,10 @@ export const useRecommendedRelays = (
       });
     };
     refresh();
-    const intervalId = window.setInterval(refresh, REFRESH_INTERVAL_MS);
+    const intervalId = setInterval(refresh, REFRESH_INTERVAL_MS);
     return () => {
       cancelled = true;
-      window.clearInterval(intervalId);
+      clearInterval(intervalId);
     };
   }, [networkEnabled, setRelays]);
 

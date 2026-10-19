@@ -22,6 +22,7 @@ Run every Playwright suite through `bun run e2e`. It starts a Docker stack owned
 - As the last step before you call a PR done, run both full suites (`bun run e2e`, then `bun run e2e site`) if the branch reaches linky-app, linky-site or anything outside `apps/`. Changes confined to other apps need no e2e run.
 - Add `-x` while iterating, so the run stops at the first failure.
 - After a failure, `bun run e2e --last-failed` reruns only the failed tests.
+- `bun run e2e expo [args]` runs the same web-app suite against the apps/expo (Metro) build. Run it too when a change touches apps/expo or how the app is bundled.
 - `bun run e2e site` runs the site suite against the same stack.
 - `bun run e2e down` stops the stack and drops its data. Run it when the task is done; every running stack holds memory in the shared Docker VM.
 - If `up` fails with "port is already allocated", another checkout hashed to the same ports: rerun with `LINKY_E2E_SLOT=<1-100>`.

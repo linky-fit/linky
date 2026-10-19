@@ -48,7 +48,7 @@ export const useLnurlAuth = ({
   React.useEffect(() => {
     const timerRef = successTimerRef;
     return () => {
-      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
       timerRef.current = null;
     };
   }, []);
@@ -56,9 +56,9 @@ export const useLnurlAuth = ({
   const showDone = React.useCallback(() => {
     setLnurlAuthIsDone(true);
     if (successTimerRef.current !== null) {
-      window.clearTimeout(successTimerRef.current);
+      clearTimeout(successTimerRef.current);
     }
-    successTimerRef.current = window.setTimeout(() => {
+    successTimerRef.current = setTimeout(() => {
       setLnurlAuthIsDone(false);
       setPendingLnurlAuthConfirmation(null);
       successTimerRef.current = null;

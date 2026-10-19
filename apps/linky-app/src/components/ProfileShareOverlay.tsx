@@ -1,6 +1,10 @@
 import { Avatar, Dialog, QRCode, Stack, Text } from "@linky-fit/ui";
 import React from "react";
 import type { Translate } from "../i18n";
+import {
+  isScreenUpsideDown,
+  subscribeScreenOrientation,
+} from "../platform/screenOrientation";
 import { formatShortNpub } from "../utils/formatting";
 import { optimizeCaseInsensitiveQrPayload } from "../utils/qrPayload";
 
@@ -11,15 +15,6 @@ interface ProfileShareOverlayProps {
   pictureUrl: string | null;
   t: Translate;
 }
-
-const subscribeScreenOrientation = (onChange: () => void): (() => void) => {
-  window.screen.orientation?.addEventListener("change", onChange);
-  return () =>
-    window.screen.orientation?.removeEventListener("change", onChange);
-};
-
-const isScreenUpsideDown = (): boolean =>
-  window.screen.orientation?.angle === 180;
 
 /**
  * Full-screen contact card shown while the phone is held top-down towards

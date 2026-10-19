@@ -18,6 +18,7 @@ import {
 } from "./helpers/linkyHooks";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
 import { sendDirectMessage, watchNostrInbox } from "./helpers/relay";
+import { gotoRoute } from "./helpers/routes";
 
 test("a message from a duplicated npub lands on the active contact", async ({
   browser,
@@ -37,7 +38,7 @@ test("a message from a duplicated npub lands on the active contact", async ({
     await stubFiatRates(page);
     await stubThirdPartyAssets(page);
     const inboxReady = watchNostrInbox(page, dave.npub);
-    await page.goto("/#contacts");
+    await gotoRoute(page, "contacts");
     await expect.poll(() => isHydrated(page), { timeout: 60_000 }).toBe(true);
     await inboxReady();
 

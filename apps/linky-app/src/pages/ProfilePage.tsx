@@ -12,6 +12,7 @@ import {
   size,
   space,
   useMedia,
+  SafeAreaPad,
 } from "@linky-fit/ui";
 import React from "react";
 import { useAtomValue } from "@linky-fit/linkstr-react";
@@ -53,6 +54,7 @@ import { PageCard } from "../components/PageCard";
 import { canWriteNfc, useWriteCurrentNpubToNfc } from "../app/hooks/shell/nfc";
 import { useShareText } from "../app/hooks/shell/share";
 import { useWalletCommands } from "../app/hooks/wallet/useWalletCommands";
+import { guideTarget } from "../app/lib/guideTargets";
 
 interface DerivedProfile {
   lnAddress: string;
@@ -231,7 +233,7 @@ export function ProfilePage({
     if (!canCheckInlineClaim || !unregisteredOwnLightningAddress) return;
 
     const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       setInlineClaimIsChecking(true);
       void requestOwnLightningAddressClaimPreview({
         makeNip98AuthHeader,
@@ -267,7 +269,7 @@ export function ProfilePage({
 
     return () => {
       controller.abort();
-      window.clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
     };
   }, [
     canCheckInlineClaim,
@@ -365,7 +367,7 @@ export function ProfilePage({
         <Text variant="display" textAlign="center">
           {displayName}
         </Text>
-        <Stack data-guide="profile-qr">
+        <Stack {...guideTarget("profile-qr")}>
           <QRCode
             value={currentNpub}
             accessibilityLabel={t("copy")}
@@ -451,19 +453,19 @@ export function ProfilePage({
   const saveAction = wide ? (
     saveButton
   ) : (
-    <Stack
+    <SafeAreaPad
       position="fixed"
       bottom="$none"
       left="$none"
       right="$none"
       backgroundColor="$background"
       zIndex="$sticky"
-      data-safe-area="bottom"
+      edge="bottom"
     >
       <Stack paddingHorizontal="$xl" paddingVertical="$lg">
         {saveButton}
       </Stack>
-    </Stack>
+    </SafeAreaPad>
   );
 
   return (
@@ -497,7 +499,7 @@ export function ProfilePage({
         placeholder={t("name")}
       />
 
-      <Stack gap="$xs" data-guide="profile-ln-address">
+      <Stack gap="$xs" {...guideTarget("profile-ln-address")}>
         <Text variant="label" color="$colorSubtle">
           {t("lightningAddress")}
         </Text>

@@ -1,9 +1,8 @@
-// @vitest-environment jsdom
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { describe, expect, it } from "vitest";
 import { readNotificationOpenData } from "./notificationOpen";
 import {
-  consumeNotificationOpenDetailFromHash,
+  readNotificationOpenHashLink,
   readNotificationOpenTarget,
 } from "./notificationOpenTarget";
 
@@ -35,12 +34,12 @@ describe("notification open targets", () => {
     }
   });
 
-  it("retains a cold-start target but drops its relay hints and removes the hash parameter", () => {
-    window.location.hash = `#contacts?${new URLSearchParams({ notificationOpen: JSON.stringify(data) })}`;
-    expect(
-      readNotificationOpenTarget(consumeNotificationOpenDetailFromHash()),
-    ).toEqual(target);
-    expect(window.location.hash).toBe("#contacts");
-    expect(consumeNotificationOpenDetailFromHash()).toBeNull();
+  it("retains a fragment's target but drops its relay hints and the parameter from the route", () => {
+    const link = readNotificationOpenHashLink(
+      `#contacts?${new URLSearchParams({ notificationOpen: JSON.stringify(data), tab: "1" })}`,
+    );
+    expect(readNotificationOpenTarget(link?.detail)).toEqual(target);
+    expect(link?.routePath).toBe("contacts?tab=1");
+    expect(readNotificationOpenHashLink("#contacts?tab=1")).toBeNull();
   });
 });

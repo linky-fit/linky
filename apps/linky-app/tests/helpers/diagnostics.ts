@@ -88,3 +88,27 @@ export const expectNoBootErrorPanel = async (
     `[${label}] the app rendered its boot-error panel`,
   ).toHaveCount(0);
 };
+
+const SHELL_MARK = "__linkyShellMark";
+
+/** Remembers the app shell's outermost element, so a remount on navigation shows up. */
+export const markShellMount = async (page: Page): Promise<void> => {
+  await page.evaluate((mark) => {
+    const shell = document.querySelector("#root .is_Theme");
+    if (!shell) throw new Error("app shell not rendered");
+    Reflect.set(window, mark, shell);
+  }, SHELL_MARK);
+};
+
+/** The element markShellMount remembered is still the one on the page. */
+export const expectShellNotRemounted = async (page: Page): Promise<void> => {
+  const mounted = await page.evaluate((mark) => {
+    const shell: unknown = Reflect.get(window, mark);
+    return (
+      shell instanceof Element &&
+      shell.isConnected &&
+      document.querySelector("#root .is_Theme") === shell
+    );
+  }, SHELL_MARK);
+  expect(mounted, "navigation remounted the app shell").toBe(true);
+};

@@ -498,7 +498,7 @@ describe("makeRelayPoolTransport fetch", () => {
   });
 });
 
-describe("loopback relay opt-in", () => {
+describe("local relay opt-in", () => {
   const local = RelayUrl.make("ws://localhost:7777");
   it("blocks publish, subscribe and fetch before opening a socket by default", async () => {
     let connected = false;
@@ -527,7 +527,7 @@ describe("loopback relay opt-in", () => {
     ).toBe(true);
     expect(connected).toBe(false);
   });
-  it("permits loopback with explicit development opt-in", async () => {
+  it("permits a local relay with explicit development opt-in", async () => {
     const localTransport = makeRelayPoolTransport(fakePool, {
       allowInsecureLocalhost: true,
     });

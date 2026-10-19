@@ -35,6 +35,7 @@ import { EVOLU_RELAY_URL } from "./helpers/stack";
 import { topUp } from "./helpers/wallet";
 import { mintUrl } from "../../../packages/linkshu/tests/integration/helpers";
 import type { LinkyE2eHooks } from "../src/devtools/e2e/installLinkyE2eHooks";
+import { expectRoute, gotoRoute, waitForRoute } from "./helpers/routes";
 
 declare global {
   interface Window {
@@ -74,16 +75,16 @@ const bootDevice = async (
 };
 
 const sendTokenInChat = async (page: Page, sat: number): Promise<void> => {
-  await page.goto("/#wallet/token/emit");
+  await gotoRoute(page, "wallet/token/emit");
   for (const digit of String(sat).split("")) {
     await page.getByRole("button", { exact: true, name: digit }).click();
   }
   await page.getByRole("button", { exact: true, name: "Issue" }).click();
-  await expect(page).toHaveURL(/#wallet\/token\/(?!emit$)[A-Za-z0-9_-]+$/);
+  await expectRoute(page, /^wallet\/token\/(?!emit$)[A-Za-z0-9_-]+$/);
   await page.getByRole("button", { name: "Send to Contact" }).click();
-  await page.waitForURL(/#contacts$/);
+  await waitForRoute(page, "contacts");
   await page.locator("[data-guide='contact-card']").first().click();
-  await page.waitForURL(/#chat\/[^/]+$/);
+  await waitForRoute(page, /^chat\/[^/]+$/);
 };
 
 /** Records every receive status the page renders, however briefly. */
@@ -143,16 +144,16 @@ const bootRestored = async (
       localStorage.removeItem("linky.evoluServers.disabled.v1");
     });
     await device.page.reload();
-    await device.page.goto("/#wallet");
+    await gotoRoute(device.page, "wallet");
     await waitForNetworkReady(device.page);
   };
   return { ...device, mintAnswers, mintCalls, releaseEvolu };
 };
 
 const openReplayedChat = async (page: Page): Promise<void> => {
-  await page.goto("/#wallet");
+  await gotoRoute(page, "wallet");
   await waitForNetworkReady(page);
-  await page.goto("/#contacts");
+  await gotoRoute(page, "contacts");
   await expect(page.locator("[data-guide='contact-card']")).toHaveCount(1, {
     timeout: 60_000,
   });
@@ -190,7 +191,7 @@ test("a seed restore does not re-accept chat tokens the old device received", as
   const a = await bootDevice(browser, "A", aIdentity);
   const b = await bootDevice(browser, "B", bIdentity);
   for (const device of [a, b]) {
-    await device.page.goto("/#wallet");
+    await gotoRoute(device.page, "wallet");
     await waitForNetworkReady(device.page);
   }
 
@@ -204,7 +205,7 @@ test("a seed restore does not re-accept chat tokens the old device received", as
     for (const sat of TOKEN_SATS) {
       await sendTokenInChat(a.page, sat);
       received += sat;
-      await b.page.goto("/#wallet");
+      await gotoRoute(b.page, "wallet");
       await expect
         .poll(() => readBalanceSat(b.page), { timeout: 60_000 })
         .toBeGreaterThanOrEqual(received - 2 * TOKEN_SATS.length);

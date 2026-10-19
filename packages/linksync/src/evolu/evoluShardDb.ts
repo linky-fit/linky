@@ -15,6 +15,7 @@ import type {
   SystemColumns,
 } from "../core";
 import { ShardDbError } from "../core";
+import { distinctMillis } from "../core/distinctMillis";
 import { LinkySchema, type LinkyDbSchema } from "../model/schema";
 import type { OwnerSync } from "./ownerSync";
 
@@ -40,6 +41,12 @@ import type { OwnerSync } from "./ownerSync";
  * completes, so one still unapplied after a bound fails, leaves
  * the overlay and is reported through `onWriteUnconfirmed`.
  *
+ * Evolu answers the queries asked in one turn as one batch, and when any of
+ * them fails it reports an error but never settles the batch: each promise
+ * stays pending in Evolu's cache, so loading that query again waits forever.
+ * A load still pending when Evolu reports an error, and every later load of
+ * its query, is asked again under a key Evolu has not cached.
+ *
  * An owner the worker reports synced counts as synced only after a fresh
  * query has answered: the worker answers queries in order, so by then the
  * refresh its sync round triggered has reached the subscribed queries too.
@@ -57,6 +64,8 @@ export interface EvoluRuntime {
 type LinkyTable = keyof LinkyDbSchema & string;
 
 const MAX_WRITE_COMPLETION_WAIT = Duration.seconds(10);
+/** Bounds the reloads of one read, so a database failing every query is not asked forever. */
+const MAX_REISSUES = 3;
 
 const isTable = (table: string): table is LinkyTable => table in LinkySchema;
 
@@ -108,12 +117,17 @@ const callUntyped = (
   return Reflect.apply(fn, target, args);
 };
 
+/** A select that takes further conditions. */
+interface UntypedQuery {
+  where: (
+    column: string,
+    op: "=" | "!=",
+    value: string | Uint8Array,
+  ) => UntypedQuery;
+}
+
 interface UntypedSelect {
-  selectFrom: (table: string) => {
-    selectAll: () => {
-      where: (column: string, op: "=", value: string) => unknown;
-    };
-  };
+  selectFrom: (table: string) => { selectAll: () => UntypedQuery };
 }
 
 const overlayKey = (table: string, ownerId: OwnerId, id: string): string =>
@@ -167,6 +181,7 @@ export const createEvoluShardDb = (
   { onWriteUnconfirmed }: EvoluShardDbOptions = {},
 ): ShardDb<LinkyDbSchema> => {
   const overlay = new Map<string, OverlayEntry>();
+  const writeMillis = distinctMillis();
   // Evolu queries are branded strings that Evolu keys its promise cache by;
   // they are passed back exactly as received.
   const queries = new Map<string, string>();
@@ -177,22 +192,63 @@ export const createEvoluShardDb = (
     return value;
   };
 
+  const createQuery = (select: Select): string =>
+    asQuery(callUntyped(evolu, "createQuery", select));
+
+  const selectTable =
+    (table: LinkyTable): Select =>
+    (db) =>
+      db.selectFrom(table).selectAll();
+
   const tableQuery = (table: LinkyTable): string => {
     const cached = queries.get(table);
     if (cached !== undefined) return cached;
-    const query = asQuery(
-      callUntyped(evolu, "createQuery", (db: UntypedSelect) =>
-        db.selectFrom(table).selectAll(),
-      ),
-    );
+    const query = createQuery(selectTable(table));
     queries.set(table, query);
     return query;
   };
 
-  const loadRows = (query: string): Effect.Effect<ReadonlyArray<UntypedRow>> =>
-    Effect.promise(async () => {
-      const rows = await callUntyped(evolu, "loadQuery", query);
-      return Array.isArray(rows) ? rows.filter(isUntypedRow) : [];
+  const reissues = new Set<() => void>();
+  const droppedQueries = new Set<string>();
+  callUntyped(evolu, "subscribeError", () => {
+    for (const reissue of [...reissues]) reissue();
+  });
+  let freshKeys = 0;
+
+  const loadRows = (
+    select: Select,
+    query: string = createQuery(select),
+  ): Effect.Effect<ReadonlyArray<UntypedRow>> =>
+    Effect.callback((resume) => {
+      let settled = false;
+      let reissued = 0;
+      const answer = (rows: unknown) => {
+        if (settled) return;
+        settled = true;
+        reissues.delete(reissue);
+        resume(
+          Effect.succeed(Array.isArray(rows) ? rows.filter(isUntypedRow) : []),
+        );
+      };
+      const ask = (key: string) => {
+        void Promise.resolve(callUntyped(evolu, "loadQuery", key)).then(answer);
+      };
+      const reissue = () => {
+        if (reissued === MAX_REISSUES) return;
+        reissued += 1;
+        droppedQueries.add(query);
+        freshKeys += 1;
+        const fresh = `linksync-fresh-${freshKeys}`;
+        // No row has this id, so the condition changes only the key.
+        ask(createQuery((db) => select(db).where("id", "!=", fresh)));
+      };
+      reissues.add(reissue);
+      if (droppedQueries.has(query)) reissue();
+      else ask(query);
+      return Effect.sync(() => {
+        settled = true;
+        reissues.delete(reissue);
+      });
     });
 
   const mergeOverlay = (
@@ -230,7 +286,7 @@ export const createEvoluShardDb = (
     table: string,
   ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
     if (!isTable(table)) return Effect.succeed([]);
-    return Effect.map(loadRows(tableQuery(table)), (rows) =>
+    return Effect.map(loadRows(selectTable(table), tableQuery(table)), (rows) =>
       mergeOverlay(table, rows.filter(isStoredRow).flatMap(withChangeTimes)),
     );
   }
@@ -244,12 +300,9 @@ export const createEvoluShardDb = (
     id: string,
   ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
     if (!isTable(table)) return Effect.succeed([]);
-    const query = asQuery(
-      callUntyped(evolu, "createQuery", (db: UntypedSelect) =>
-        db.selectFrom(table).selectAll().where("id", "=", id),
-      ),
-    );
-    return Effect.map(loadRows(query), (rows) =>
+    const select: Select = (db) =>
+      db.selectFrom(table).selectAll().where("id", "=", id);
+    return Effect.map(loadRows(select), (rows) =>
       mergeOverlay(
         table,
         rows.filter(isStoredRow).flatMap(withChangeTimes),
@@ -306,7 +359,10 @@ export const createEvoluShardDb = (
       ownerId: mutation.ownerId,
       onComplete: () => Deferred.doneUnsafe(completed, Effect.void),
     });
-    const entry = record(mutation, new Date().toISOString());
+    const entry = record(
+      mutation,
+      new Date(writeMillis(Date.now())).toISOString(),
+    );
     return Effect.succeed({
       mutation,
       entry,
@@ -350,18 +406,15 @@ export const createEvoluShardDb = (
 
   // `evolu_history` keys rows by the owner id's bytes, not its base64url text.
   const ownerUsage = (ownerId: OwnerId): Effect.Effect<OwnerUsage> => {
-    const query = asQuery(
-      callUntyped(evolu, "createQuery", (db: UntypedHistorySelect) =>
-        db
-          .selectFrom("evolu_history")
-          .select((eb) => [
-            eb.fn.count("timestamp").distinct().as("mutations"),
-            eb.fn.sum(eb.fn("length", ["value"])).as("bytes"),
-          ])
-          .where("ownerId", "=", ownerIdToOwnerIdBytes(ownerId)),
-      ),
-    );
-    return Effect.map(loadRows(query), (rows) => {
+    const select: Select = (db) =>
+      db
+        .selectFrom("evolu_history")
+        .select((eb) => [
+          eb.fn.count("timestamp").distinct().as("mutations"),
+          eb.fn.sum(eb.fn("length", ["value"])).as("bytes"),
+        ])
+        .where("ownerId", "=", ownerIdToOwnerIdBytes(ownerId));
+    return Effect.map(loadRows(select), (rows) => {
       const first = rows[0];
       const read = (column: string): number => Number(first?.[column] ?? 0);
       return { mutations: read("mutations"), bytes: read("bytes") };
@@ -378,20 +431,15 @@ export const createEvoluShardDb = (
     );
     if (reported.length === 0) return;
     barriers += 1;
-    const barrier = asQuery(
-      callUntyped(evolu, "createQuery", (db: UntypedSelect) =>
-        db
-          .selectFrom("shardPointer")
-          .selectAll()
-          .where("id", "=", `linksync-barrier-${barriers}`),
-      ),
-    );
+    const barrierId = `linksync-barrier-${barriers}`;
+    const barrier: Select = (db) =>
+      db.selectFrom("shardPointer").selectAll().where("id", "=", barrierId);
     const markReadable = () => {
       for (const ownerId of reported) readable.add(ownerId);
       for (const listener of syncListeners) listener();
     };
     absorbing = absorbing
-      .then(() => callUntyped(evolu, "loadQuery", barrier))
+      .then(() => Effect.runPromise(loadRows(barrier)))
       .then(markReadable, markReadable);
   };
   ownerSync.subscribe(absorbSyncedOwners);
@@ -431,9 +479,12 @@ interface UntypedHistorySelect {
   selectFrom: (table: "evolu_history") => {
     select: (
       build: (eb: UntypedExpressionBuilder) => ReadonlyArray<object>,
-    ) => { where: (column: string, op: "=", value: Uint8Array) => object };
+    ) => UntypedQuery;
   };
 }
+
+/** Builds a query on Evolu's untyped query builder. */
+type Select = (db: UntypedSelect & UntypedHistorySelect) => UntypedQuery;
 
 interface UntypedExpressionBuilder {
   readonly fn: {

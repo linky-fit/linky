@@ -141,7 +141,8 @@ export function ImageCropPreview({
       position="relative"
       width="100%"
       maxWidth="$qr"
-      aspectRatio={1}
+      // React Native's aspectRatio follows the unclamped width, past maxWidth.
+      height={viewport}
       alignSelf="center"
       overflow="hidden"
       borderRadius="$card"

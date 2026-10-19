@@ -34,6 +34,7 @@ import {
   watchNostrInbox,
 } from "./helpers/relay";
 import { topUp } from "./helpers/wallet";
+import { expectRoute, gotoRoute, waitForRoute } from "./helpers/routes";
 
 const ADDRESS_HOST = "pay.test";
 const TARGET_MINT_URL =
@@ -106,7 +107,7 @@ const boot = async (browser: Browser): Promise<Account> => {
   await stubFiatRates(page);
   await stubThirdPartyAssets(page);
   const inboxReady = watchNostrInbox(page, identity.npub);
-  await page.goto("/#wallet");
+  await gotoRoute(page, "wallet");
   await waitForNetworkReady(page);
   await inboxReady();
   return { context, identity, invoicedUsers, page };
@@ -131,9 +132,9 @@ const addContactByLightningAddress = async (
   address: string,
 ): Promise<string> => {
   const before = new Set((await liveContacts(page)).map((row) => row.id));
-  await page.goto("/#contacts");
+  await gotoRoute(page, "contacts");
   await page.locator("[data-guide='contact-add-button']").first().click();
-  await page.waitForURL(/#contact\/new$/);
+  await waitForRoute(page, "contact/new");
   const search = page.locator("[data-guide='contact-search-input']");
   await search.fill(address);
   await search.press("Enter");
@@ -172,7 +173,7 @@ const copyAddressAndWrite = async (
     name: "Mallory",
   });
   await sendDirectMessage(attacker.nsec, victim.identity.npub, "Hi, it's me");
-  await victim.page.goto("/#contacts");
+  await gotoRoute(victim.page, "contacts");
   await expect(unknownSenderCards(victim.page)).toHaveCount(unknownSenders, {
     timeout: 30_000,
   });
@@ -230,23 +231,26 @@ test("a copied address neither takes over a contact nor receives its payments, a
     });
 
     await test.step("Alice is paid over Nostr, never the attacker", async () => {
-      await victim.page.goto(`/#contact/${encodeURIComponent(aliceId)}/pay`);
+      await gotoRoute(
+        victim.page,
+        `contact/${encodeURIComponent(aliceId)}/pay`,
+      );
       await enterAmount(victim.page, PAYMENT_SAT);
       await victim.page.locator("[data-guide='pay-send']").click();
 
-      await alice.page.goto("/#wallet");
+      await gotoRoute(alice.page, "wallet");
       await expect
         .poll(() => readBalanceSat(alice.page), { timeout: 60_000 })
         .toBeGreaterThan(0);
-      await attacker.page.goto("/#wallet");
+      await gotoRoute(attacker.page, "wallet");
       expect(await readBalanceSat(attacker.page)).toBe(0);
     });
 
     await test.step("Bob is paid over Lightning", async () => {
-      await victim.page.goto(`/#contact/${encodeURIComponent(bobId)}/pay`);
+      await gotoRoute(victim.page, `contact/${encodeURIComponent(bobId)}/pay`);
       await enterAmount(victim.page, PAYMENT_SAT);
       await victim.page.locator("[data-guide='pay-send']").click();
-      await expect(victim.page).toHaveURL(/#payln\/bob%40pay\.test$/);
+      await expectRoute(victim.page, /^payln\/bob%40pay\.test$/);
       // Paying a chosen contact still names it.
       await expect(victim.page.getByText("Bob", { exact: true })).toBeVisible();
       await victim.page
@@ -254,7 +258,7 @@ test("a copied address neither takes over a contact nor receives its payments, a
         .click();
 
       await expect.poll(() => victim.invoicedUsers).toEqual(["bob"]);
-      await victim.page.goto("/#wallet");
+      await gotoRoute(victim.page, "wallet");
       await expect
         .poll(() => readBalanceSat(victim.page))
         .toBeLessThanOrEqual(FUNDING_SAT - 2 * PAYMENT_SAT);

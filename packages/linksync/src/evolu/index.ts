@@ -5,7 +5,10 @@ export {
   normalizeEvoluRelayUrl,
 } from "./evoluRelaySettings";
 export type { EvoluRelaySettings } from "./evoluRelaySettings";
-export { markAwaitingFirstHydration } from "./firstHydration";
+export {
+  isAwaitingFirstHydration,
+  markAwaitingFirstHydration,
+} from "./firstHydration";
 export type { KeyValueStorage } from "./keyValueStorage";
 export {
   createLinkyEvolu,

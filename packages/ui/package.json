@@ -32,7 +32,8 @@
     "react-native": ">=0.86 <0.88",
     "react-native-svg": ">=15.15.4 <16",
     "react-native-web": "~0.21.0",
-    "vite": ">=7"
+    "vite": ">=7",
+    "react-native-safe-area-context": "~5.7.0"
   },
   "peerDependenciesMeta": {
     "react-dom": {
@@ -60,6 +61,7 @@
     "react-native-web": "0.21.3",
     "typescript": "~5.9.3",
     "vite": "^7.2.4",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "react-native-safe-area-context": "~5.7.0"
   }
 }

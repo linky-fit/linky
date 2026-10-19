@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   # Pushes run everything: require-ci and Vercel need every check on the commit
-  # they ship. Anything outside apps/ counts as shared, and linky-app imports linky-site.
+  # they ship. Anything outside apps/ counts as shared, linky-app imports linky-site and expo imports linky-app.
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -41,7 +41,7 @@ jobs:
             changed=$(git diff --name-only "$BASE" HEAD)
             echo "$changed"
             grep -qv '^apps/' <<< "$changed" || shared=false
-            grep -qE '^apps/linky-(app|site)/' <<< "$changed" || linky_e2e=$shared
+            grep -qE '^apps/(linky-app|linky-site|expo)/' <<< "$changed" || linky_e2e=$shared
           fi
           echo "shared=$shared" >> "$GITHUB_OUTPUT"
           echo "linky-e2e=$linky_e2e" >> "$GITHUB_OUTPUT"
@@ -56,7 +56,7 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.3.9
+          bun-version: 1.3.14
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -75,13 +75,36 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.3.9
+          bun-version: 1.3.14
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
       - name: Run unit tests
         run: bun run test
+
+  # Hermes-compiles the iOS and Android bundles of apps/expo; Gradle and Xcode
+  # builds stay local.
+  expo-native-bundle:
+    needs: changes
+    if: needs.changes.outputs.linky-e2e == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Export native bundles
+        run: bun run --filter @linky-fit/expo export:native
 
   linkshu-integration:
     needs: changes
@@ -95,7 +118,7 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.3.9
+          bun-version: 1.3.14
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -139,7 +162,7 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.3.9
+          bun-version: 1.3.14
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -162,8 +185,22 @@ jobs:
   app-e2e:
     needs: changes
     if: needs.changes.outputs.linky-e2e == 'true'
+    # One suite, run against the Vite build and the apps/expo (Metro) build.
+    name: ${{ matrix.check }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { bundler: vite, routing: hash, check: app-e2e, cache: linky-app }
+          - { bundler: expo, routing: path, check: app-e2e-expo, cache: linky-app-expo }
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # The Expo build is not deployed yet; its leg reports without failing the
+    # run that releases wait for.
+    continue-on-error: ${{ matrix.bundler == 'expo' }}
+    env:
+      LINKY_E2E_WEB_BUNDLER: ${{ matrix.bundler }}
+      LINKY_E2E_ROUTING: ${{ matrix.routing }}
 
     steps:
       - name: Checkout
@@ -189,8 +226,8 @@ jobs:
             docker buildx bake -f docker-compose.dev.yml \
               --set 'evolu-relay.cache-from=type=gha,scope=evolu-relay' \
               --set 'evolu-relay.cache-to=type=gha,scope=evolu-relay,mode=max' \
-              --set 'linky-app.cache-from=type=gha,scope=linky-app' \
-              --set 'linky-app.cache-to=type=gha,scope=linky-app,mode=max' \
+              --set 'linky-app.cache-from=type=gha,scope=${{ matrix.cache }}' \
+              --set 'linky-app.cache-to=type=gha,scope=${{ matrix.cache }},mode=max' \
               --load &
             bake=$!
             status=0
@@ -202,7 +239,7 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.3.9
+          bun-version: 1.3.14
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -252,7 +289,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: app-e2e-test-results
+          name: ${{ matrix.check }}-test-results
           path: apps/linky-app/test-results/
           retention-days: 7
 
@@ -273,7 +310,7 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.3.9
+          bun-version: 1.3.14
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -311,7 +348,7 @@ jobs:
   # Skipped jobs count as passed, so a path-scoped run can still satisfy the ruleset.
   ci-ok:
     if: always()
-    needs: [changes, lint, unit-tests, linkshu-integration, npm-packages, app-e2e, site-e2e]
+    needs: [changes, lint, unit-tests, expo-native-bundle, linkshu-integration, npm-packages, app-e2e, site-e2e]
     runs-on: ubuntu-latest
 
     steps:

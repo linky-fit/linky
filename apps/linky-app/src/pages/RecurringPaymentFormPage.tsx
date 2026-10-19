@@ -47,6 +47,7 @@ import { RecurringContactAvatar } from "../components/RecurringContactAvatar";
 import { useAmountInputKeypad } from "../components/useAmountInputKeypad";
 import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey } from "../i18n";
+import { useCurrentRoutePath } from "../platform/navigation";
 import { normalizeLocale } from "../utils/formatting";
 import { formatMintHost } from "../utils/mint";
 import { nowSeconds } from "../utils/time";
@@ -75,10 +76,10 @@ interface FormInitial {
   repeatsPayment: boolean;
 }
 
-// `#wallet/recurring/new?contact=…&amount=…` from a contact page or a
+// `wallet/recurring/new?contact=…&amount=…` from a contact page or a
 // completed payment.
-const readPrefillFromHash = (): FormInitial => {
-  const query = (globalThis.location?.hash ?? "").split("?")[1] ?? "";
+const readPrefillFromRoutePath = (routePath: string): FormInitial => {
+  const query = routePath.split("?")[1] ?? "";
   const params = new URLSearchParams(query);
   const amount = Number.parseInt(params.get("amount") ?? "", 10);
   const contactId = params.get("contact")?.trim() ?? "";
@@ -107,8 +108,9 @@ export function RecurringPaymentFormPage({
   const order = editId
     ? (orders.find((candidate) => candidate.id === editId) ?? null)
     : null;
+  const routePath = useCurrentRoutePath();
   const initial = React.useMemo((): FormInitial | null => {
-    if (!editId) return readPrefillFromHash();
+    if (!editId) return readPrefillFromRoutePath(routePath);
     if (order === null) return null;
     const amountSat = recurringAmountSat(order.amount, fiatRates);
     return {

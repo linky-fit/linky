@@ -8,6 +8,7 @@ import { DisplayAmount } from "../components/DisplayAmount";
 import { WalletPendingReceives } from "../components/WalletPendingReceives";
 import { WalletWarning } from "../components/WalletWarning";
 import { navigateTo } from "../hooks/useRouting";
+import { guideTarget } from "../app/lib/guideTargets";
 
 interface WalletPageProps {
   openFeedbackContact: () => void;
@@ -39,7 +40,7 @@ const WalletAction = ({
     paddingVertical="$xl"
     disabled={disabled}
     onPress={onPress}
-    data-guide={dataGuide}
+    {...(dataGuide ? guideTarget(dataGuide) : {})}
   >
     {label}
   </Button>

@@ -207,29 +207,40 @@ export const useNpubMessageContactInfo = () => {
   );
 };
 
-/** The contacts a message can mention, with their groups and offered currencies. */
+interface MentionSource {
+  readonly archivedAtSec?: number | string | null | undefined;
+  readonly groupName?: string | null | undefined;
+  readonly groupNamesJson?: string | null | undefined;
+  readonly name?: string | null | undefined;
+  readonly npub?: string | null | undefined;
+}
+
+/** The named contacts with an npub a message can mention, with their groups and offered currencies. */
+export const mentionContacts = (
+  contacts: readonly MentionSource[],
+  statusByNpub: Readonly<Record<string, string | null>>,
+) =>
+  contacts.flatMap((contact) => {
+    const name = (contact.name ?? "").trim();
+    const npub = normalizeNpubIdentifier(contact.npub ?? "");
+    if (!name || !npub || isDeletedContact(contact)) return [];
+    const groupName = (contact.groupName ?? "").trim();
+    return [
+      {
+        name,
+        npub,
+        groupName: groupName || null,
+        groupNames: getContactGroups(contact),
+        statusNames: parseProfileGeneralStatus(statusByNpub[npub]).currencies,
+      },
+    ];
+  });
+
 export const useMentionContacts = () => {
   const contacts = useContacts();
   const statusByNpub = useNostrStatusByNpub();
   return React.useMemo(
-    () =>
-      contacts.flatMap((contact) => {
-        const name = (contact.name ?? "").trim();
-        const npub = normalizeNpubIdentifier(contact.npub ?? "");
-        if (!name || !npub) return [];
-        const groupName = (contact.groupName ?? "").trim();
-        const groupNames = getContactGroups(contact);
-        return [
-          {
-            name,
-            npub,
-            groupName: groupName || null,
-            groupNames,
-            statusNames: parseProfileGeneralStatus(statusByNpub[npub])
-              .currencies,
-          },
-        ];
-      }),
+    () => mentionContacts(contacts, statusByNpub),
     [contacts, statusByNpub],
   );
 };

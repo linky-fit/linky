@@ -13,3 +13,5 @@ coverage
 **/test-results
 **/playwright-report
 **/.inspector
+**/.expo
+apps/expo/public

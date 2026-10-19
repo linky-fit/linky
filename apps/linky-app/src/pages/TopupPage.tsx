@@ -9,6 +9,7 @@ import { PaymentNoteInput } from "../components/PaymentNoteInput";
 import { useAmountInputKeypad } from "../components/useAmountInputKeypad";
 import { navigateTo } from "../hooks/useRouting";
 import { useScanCommands } from "../app/hooks/shell/scan";
+import { guideTarget } from "../app/lib/guideTargets";
 
 export const TopupPage: FC = () => {
   const { pasteScanValue } = useScanCommands();
@@ -59,7 +60,7 @@ export const TopupPage: FC = () => {
           navigateTo({ route: "topupInvoice" });
         }}
         disabled={invalid}
-        data-guide="topup-show-invoice"
+        {...guideTarget("topup-show-invoice")}
       >
         {t("topupShowInvoice")}
       </Button>

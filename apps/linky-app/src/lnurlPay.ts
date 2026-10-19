@@ -1,5 +1,5 @@
 import * as lnurl from "@linky-fit/linkshu";
-import { isNativePlatform } from "./platform/runtime";
+import { apiUrl } from "./platform/runtime";
 export {
   LnurlTagMismatchError,
   getLnurlPayDisplayText,
@@ -16,10 +16,8 @@ export type {
   LnurlPayPreview,
 } from "@linky-fit/linkshu";
 const fallback: lnurl.LnurlFallback = async (url) => {
-  if (typeof window === "undefined") throw new Error("LNURL request failed");
-  const origin = isNativePlatform() ? "https://app.linky.fit" : "";
   const response = await fetch(
-    `${origin}/api/lnurlp?url=${encodeURIComponent(url)}`,
+    apiUrl(`/api/lnurlp?url=${encodeURIComponent(url)}`),
     { headers: { Accept: "application/json" } },
   );
   if (!response.ok) throw new Error(`HTTP ${response.status}`);

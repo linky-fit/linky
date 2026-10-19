@@ -1,20 +1,29 @@
-import { LoadingState, Stack, Text } from "@linky-fit/ui";
+import { Spinner, Stack, Text } from "@linky-fit/ui";
 import { useAppLanguage } from "../app/hooks/useAppLanguage";
 
-/** Full-screen wait while the one-time lane-to-shard migration copies local data. */
+/** Full-screen wait while the one-time lane-to-shard migration copies local data, laid out as the hydration screen. */
 export const MigratingDataScreen = () => {
   const { t } = useAppLanguage();
   return (
     <Stack
-      height="100%"
+      flex={1}
       justifyContent="center"
       alignItems="center"
+      gap="$xl"
       padding="$xl"
+      width="100%"
+      maxWidth="$sheetWidth"
+      alignSelf="center"
     >
-      <LoadingState label={t("migratingDataTitle")} />
-      <Text color="$colorMuted" textAlign="center">
-        {t("migratingDataBody")}
-      </Text>
+      <Spinner size="lg" accessibilityLabel={t("migratingDataTitle")} />
+      <Stack gap="$xs">
+        <Text variant="heading" textAlign="center">
+          {t("migratingDataTitle")}
+        </Text>
+        <Text color="$colorMuted" textAlign="center">
+          {t("migratingDataBody")}
+        </Text>
+      </Stack>
     </Stack>
   );
 };

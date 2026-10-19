@@ -99,9 +99,7 @@ export const contactMessagesAtom = Atom.keepAlive(
       );
       if (normalized) parsed.push(normalized);
     }
-    return dedupeNostrMessagesByPriority(parsed).sort(
-      (a, b) => a.createdAtSec - b.createdAtSec,
-    );
+    return dedupeNostrMessagesByPriority(parsed);
   }),
 );
 
@@ -120,7 +118,7 @@ export const localMessagesAtom = Atom.keepAlive(
       dedupeNostrMessagesByPriority([
         ...get(contactMessagesAtom),
         ...unknownSenderMessages,
-      ]).sort((a, b) => a.createdAtSec - b.createdAtSec),
+      ]),
     );
   }),
 );

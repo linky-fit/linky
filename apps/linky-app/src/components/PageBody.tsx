@@ -1,4 +1,4 @@
-import { Stack } from "@linky-fit/ui";
+import { PageScroll, Stack } from "@linky-fit/ui";
 import type { ComponentProps } from "react";
 
 const gutters = {
@@ -21,7 +21,7 @@ type PageBodyProps = ComponentProps<typeof Stack> & {
 
 /** A page's content inside the app gutter. */
 export const PageBody = ({ gutter = "page", ...props }: PageBodyProps) => (
-  <Stack testID="page-scroll" flex={1} minHeight={0} overflowY="auto">
+  <PageScroll testID="page-scroll">
     <Stack flexGrow={1} {...gutters[gutter]} {...props} />
-  </Stack>
+  </PageScroll>
 );

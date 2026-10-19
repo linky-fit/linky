@@ -20,6 +20,7 @@ import {
   safeLocalStorageSetJson,
   withLocalStorageLeaseLock,
 } from "../../utils/storage";
+import { onOnline } from "../../platform/appEvents";
 
 interface UseAnonymousPaymentTelemetryParams {
   appOwnerId: string | null;
@@ -137,18 +138,14 @@ export const useAnonymousPaymentTelemetry = ({
   React.useEffect(() => {
     if (!appOwnerId) return;
 
-    const handleOnline = () => {
-      void flushQueue();
-    };
-
-    const intervalId = window.setInterval(() => {
+    const intervalId = setInterval(() => {
       void flushQueue();
     }, PAYMENT_TELEMETRY_FLUSH_INTERVAL_MS);
 
-    window.addEventListener("online", handleOnline);
+    const unsubscribeOnline = onOnline(() => void flushQueue());
     return () => {
-      window.removeEventListener("online", handleOnline);
-      window.clearInterval(intervalId);
+      unsubscribeOnline();
+      clearInterval(intervalId);
     };
   }, [appOwnerId, flushQueue]);
 };

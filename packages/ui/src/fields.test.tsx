@@ -1,3 +1,4 @@
+import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render } from "../test/render";
 import { IconButton } from "./controls";
@@ -64,5 +65,36 @@ describe("TextField trailing", () => {
   it("renders a string as a suffix inside the field", async () => {
     const { frame } = await renderField("CZK");
     expect(frame?.textContent).toBe("CZK");
+  });
+});
+
+describe("TextField events", () => {
+  it("reports Enter through onSubmitEditing", async () => {
+    const onSubmitEditing = vi.fn();
+    const input = (
+      await render(
+        <TextField label="Search" onSubmitEditing={onSubmitEditing} />,
+      )
+    ).querySelector("input");
+    await act(async () => {
+      input?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      );
+    });
+    expect(onSubmitEditing).toHaveBeenCalledOnce();
+  });
+
+  it("offers no DOM event a native field cannot deliver", () => {
+    const fields = [
+      // @ts-expect-error iOS and Android fake key events without preventDefault; Enter is onSubmitEditing.
+      <TextField key="key" label="Search" onKeyDown={() => {}} />,
+      <TextField
+        key="change"
+        label="Search"
+        // @ts-expect-error a native change event has nothing but target.value.
+        onChange={(event) => event.preventDefault()}
+      />,
+    ];
+    expect(fields).toHaveLength(2);
   });
 });

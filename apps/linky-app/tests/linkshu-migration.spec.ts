@@ -43,6 +43,7 @@ import {
 } from "../../../packages/linkshu/tests/integration/helpers";
 import { createSeedIdentity, setSeedLoginStorage } from "./helpers/identity";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
+import { gotoRoute } from "./helpers/routes";
 
 /** VITE_MAIN_MINT_URL baked into the e2e image (docker-compose.dev.yml). */
 const MINT_URL = mintUrl;
@@ -271,7 +272,7 @@ test("legacy cashu storage migrates and the wallet keeps working", async ({
     });
 
     await test.step("first launch runs the migration", async () => {
-      await page.goto("/#wallet");
+      await gotoRoute(page, "wallet");
       await waitForNetworkReady(page);
       await expectNoBootErrorPanel(page, "M");
 
@@ -359,7 +360,7 @@ test("legacy cashu storage migrates and the wallet keeps working", async ({
       };
       page.on("request", onRequest);
 
-      await page.goto("/#advanced");
+      await gotoRoute(page, "advanced");
       const chooser = page.waitForEvent("filechooser");
       await page.getByRole("button", { name: "Import data" }).click();
       await (
@@ -381,14 +382,14 @@ test("legacy cashu storage migrates and the wallet keeps working", async ({
 
       // The row is trusted as-is: its proofs become available balance
       // without contacting the mint, exactly like the legacy table on load.
-      await page.goto("/#wallet");
+      await gotoRoute(page, "wallet");
       await expect
         .poll(() => readBalanceSat(page), { timeout: 60_000 })
         .toBe(before + LEGACY_ROW_SAT);
       page.off("request", onRequest);
       expect(swaps).toEqual([]);
 
-      await page.goto("/#wallet/tokens/proofs");
+      await gotoRoute(page, "wallet/tokens/proofs");
       await expect(page.getByLabel("Available", { exact: true })).toContainText(
         `Available · ${before + LEGACY_ROW_SAT} sat`,
       );

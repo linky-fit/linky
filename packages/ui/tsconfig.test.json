@@ -4,5 +4,5 @@
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo"
   },
   "include": ["src", "test", "vitest.setup.ts"],
-  "exclude": []
+  "exclude": ["src/**/*.native.ts", "src/**/*.native.tsx"]
 }

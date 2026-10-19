@@ -8,6 +8,7 @@ import type {
   Row,
   ShardDb,
 } from "./ShardDb";
+import { distinctMillis } from "./distinctMillis";
 
 export interface InMemoryShardDb<S extends DbSchema> extends ShardDb<S> {
   /** Owners currently opted into sync, for asserting the subscribe set. */
@@ -45,6 +46,8 @@ export const makeInMemoryShardDb = <S extends DbSchema>(
   const used = new Map<OwnerId, number>();
   const synced = new Set<OwnerId>();
   const syncListeners = new Set<() => void>();
+  // Stamps rows as the Evolu worker does.
+  const writeMillis = distinctMillis();
 
   const tableRows = (table: string): Map<string, Row<Columns>> => {
     const existing = tables.get(table);
@@ -121,8 +124,8 @@ export const makeInMemoryShardDb = <S extends DbSchema>(
     readCopies,
     mutate: (mutations) =>
       Effect.map(Clock.currentTimeMillis, (millis) => {
-        const nowIso = new Date(millis).toISOString();
-        for (const mutation of mutations) apply(mutation, nowIso);
+        for (const mutation of mutations)
+          apply(mutation, new Date(writeMillis(millis)).toISOString());
         for (const table of new Set(mutations.map((m) => m.table)))
           notify(table);
       }),

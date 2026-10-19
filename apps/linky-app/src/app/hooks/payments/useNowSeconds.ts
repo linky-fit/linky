@@ -7,8 +7,8 @@ export const useNowSeconds = (active: boolean): number => {
   React.useEffect(() => {
     if (!active) return;
     setNow(nowSeconds());
-    const interval = window.setInterval(() => setNow(nowSeconds()), 1000);
-    return () => window.clearInterval(interval);
+    const interval = setInterval(() => setNow(nowSeconds()), 1000);
+    return () => clearInterval(interval);
   }, [active]);
   return now;
 };

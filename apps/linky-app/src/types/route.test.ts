@@ -1,32 +1,31 @@
-// @vitest-environment jsdom
-import { keryxSubscriptionIdFor } from "@linky-fit/linksync";
-import { afterEach, describe, expect, it } from "vitest";
-import { parseRouteFromHash } from "./route";
+import {
+  CashuOperationId,
+  ContactId,
+  keryxSubscriptionIdFor,
+  RecurringPaymentId,
+} from "@linky-fit/linksync";
+import { describe, expect, it } from "vitest";
+import {
+  parseRoutePath,
+  routePathFor,
+  routePathFromLegacyHash,
+  type NavigationAction,
+} from "./route";
 import { parseNativeDeepLinkUrl } from "../utils/deepLinks";
 
-const replaceHash = (hash: string) => {
-  window.history.replaceState(
-    window.history.state,
-    "",
-    `${window.location.pathname}${window.location.search}${hash}`,
-  );
-};
-
-afterEach(() => {
-  replaceHash("");
-});
-
-describe("parseRouteFromHash", () => {
+describe("parseRoutePath", () => {
   it("parses the bank payment route with an optional edit suffix", () => {
     const payload = "SPD*1.0*ACC:CZ6508000000192000145399*AM:1.00*CC:CZK";
-    replaceHash(`#wallet/bank-payment/${encodeURIComponent(payload)}`);
-    expect(parseRouteFromHash()).toEqual({
+    expect(
+      parseRoutePath(`wallet/bank-payment/${encodeURIComponent(payload)}`),
+    ).toEqual({
       kind: "bankPayment",
       spdPayload: payload,
     });
 
-    replaceHash(`#wallet/bank-payment/${encodeURIComponent(payload)}/edit`);
-    expect(parseRouteFromHash()).toEqual({
+    expect(
+      parseRoutePath(`wallet/bank-payment/${encodeURIComponent(payload)}/edit`),
+    ).toEqual({
       kind: "bankPayment",
       spdPayload: payload,
       editing: true,
@@ -35,141 +34,290 @@ describe("parseRouteFromHash", () => {
 
   it("parses the Keryx companies, company, announcement and add company routes", () => {
     const id = keryxSubscriptionIdFor("https://acme.example");
-    replaceHash("#settings/keryx");
-    expect(parseRouteFromHash()).toEqual({ kind: "keryxCompanies" });
+    expect(parseRoutePath("settings/keryx")).toEqual({
+      kind: "keryxCompanies",
+    });
 
-    replaceHash("#settings/keryx/new");
-    expect(parseRouteFromHash()).toEqual({ kind: "keryxCompanyNew" });
+    expect(parseRoutePath("settings/keryx/new")).toEqual({
+      kind: "keryxCompanyNew",
+    });
 
-    replaceHash(`#settings/keryx/${id}`);
-    expect(parseRouteFromHash()).toEqual({ kind: "keryxCompany", id });
+    expect(parseRoutePath(`settings/keryx/${id}`)).toEqual({
+      kind: "keryxCompany",
+      id,
+    });
 
-    replaceHash(`#settings/keryx/${id}/${encodeURIComponent("news/launch")}`);
-    expect(parseRouteFromHash()).toEqual({
+    expect(
+      parseRoutePath(
+        `settings/keryx/${id}/${encodeURIComponent("news/launch")}`,
+      ),
+    ).toEqual({
       kind: "keryxAnnouncement",
       id,
       key: "news/launch",
     });
 
-    replaceHash("#settings/keryx/not-an-id");
-    expect(parseRouteFromHash()).toEqual({ kind: "wallet" });
+    expect(parseRoutePath("settings/keryx/not-an-id")).toEqual({
+      kind: "wallet",
+    });
   });
 
-  it("defaults to wallet when the url has no hash", () => {
-    replaceHash("");
-
-    expect(parseRouteFromHash()).toEqual({ kind: "wallet" });
+  it("defaults to wallet for an empty path", () => {
+    expect(parseRoutePath("")).toEqual({ kind: "wallet" });
   });
 
-  it("keeps explicit contacts hash on the contacts route", () => {
-    replaceHash("#");
-
-    expect(parseRouteFromHash()).toEqual({ kind: "contacts" });
-  });
-
-  it("supports the explicit contacts route hash", () => {
-    replaceHash("#contacts");
-
-    expect(parseRouteFromHash()).toEqual({ kind: "contacts" });
+  it("supports the explicit contacts route", () => {
+    expect(parseRoutePath("contacts")).toEqual({ kind: "contacts" });
   });
 
   it("parses settings and its language, appearance and units subpages", () => {
-    replaceHash("#settings");
-    expect(parseRouteFromHash()).toEqual({ kind: "settings" });
+    expect(parseRoutePath("settings")).toEqual({ kind: "settings" });
 
-    replaceHash("#settings/language");
-    expect(parseRouteFromHash()).toEqual({ kind: "settingsLanguage" });
+    expect(parseRoutePath("settings/language")).toEqual({
+      kind: "settingsLanguage",
+    });
 
-    replaceHash("#settings/appearance");
-    expect(parseRouteFromHash()).toEqual({ kind: "settingsAppearance" });
+    expect(parseRoutePath("settings/appearance")).toEqual({
+      kind: "settingsAppearance",
+    });
 
-    replaceHash("#settings/units");
-    expect(parseRouteFromHash()).toEqual({ kind: "settingsUnits" });
+    expect(parseRoutePath("settings/units")).toEqual({ kind: "settingsUnits" });
 
-    replaceHash("#settings/tutorial");
-    expect(parseRouteFromHash()).toEqual({ kind: "settingsTutorial" });
+    expect(parseRoutePath("settings/tutorial")).toEqual({
+      kind: "settingsTutorial",
+    });
 
-    replaceHash("#settings/blocked");
-    expect(parseRouteFromHash()).toEqual({ kind: "settingsBlocked" });
+    expect(parseRoutePath("settings/blocked")).toEqual({
+      kind: "settingsBlocked",
+    });
 
-    replaceHash("#settings/receive-method");
-    expect(parseRouteFromHash()).toEqual({ kind: "settingsReceiveMethod" });
+    expect(parseRoutePath("settings/receive-method")).toEqual({
+      kind: "settingsReceiveMethod",
+    });
 
-    replaceHash("#settings/master-keys");
-    expect(parseRouteFromHash()).toEqual({ kind: "settingsMasterKeys" });
+    expect(parseRoutePath("settings/master-keys")).toEqual({
+      kind: "settingsMasterKeys",
+    });
 
-    replaceHash("#settings/nostr-identity");
-    expect(parseRouteFromHash()).toEqual({ kind: "settingsNostrIdentity" });
+    expect(parseRoutePath("settings/nostr-identity")).toEqual({
+      kind: "settingsNostrIdentity",
+    });
 
-    replaceHash("#proxy");
-    expect(parseRouteFromHash()).toEqual({ kind: "proxyPayments" });
+    expect(parseRoutePath("proxy")).toEqual({ kind: "proxyPayments" });
 
-    replaceHash("#settings/proxy-payments");
-    expect(parseRouteFromHash()).toEqual({ kind: "proxyPayments" });
+    expect(parseRoutePath("settings/proxy-payments")).toEqual({
+      kind: "proxyPayments",
+    });
   });
 
   it("parses the manual bank payment entry before the payload routes", () => {
-    replaceHash("#wallet/bank-payment/new");
-    expect(parseRouteFromHash()).toEqual({ kind: "bankPaymentNew" });
+    expect(parseRoutePath("wallet/bank-payment/new")).toEqual({
+      kind: "bankPaymentNew",
+    });
 
-    replaceHash("#wallet/bank-payment/SPD*1.0*ACC:CZ65");
-    expect(parseRouteFromHash()).toEqual({
+    expect(parseRoutePath("wallet/bank-payment/SPD*1.0*ACC:CZ65")).toEqual({
       kind: "bankPayment",
       spdPayload: "SPD*1.0*ACC:CZ65",
     });
   });
 
   it("parses the in-app inspector route", () => {
-    replaceHash("#advanced/inspector");
-
-    expect(parseRouteFromHash()).toEqual({ kind: "advancedInspector" });
+    expect(parseRoutePath("advanced/inspector")).toEqual({
+      kind: "advancedInspector",
+    });
   });
 
   it("parses the in-app inspector timeline route", () => {
-    replaceHash("#advanced/inspector/timeline");
-
-    expect(parseRouteFromHash()).toEqual({ kind: "advancedInspectorTimeline" });
+    expect(parseRoutePath("advanced/inspector/timeline")).toEqual({
+      kind: "advancedInspectorTimeline",
+    });
   });
 
-  it("falls back to wallet for unknown hashes", () => {
-    replaceHash("#unknown-route");
-
-    expect(parseRouteFromHash()).toEqual({ kind: "wallet" });
+  it("falls back to wallet for unknown paths", () => {
+    expect(parseRoutePath("unknown-route")).toEqual({ kind: "wallet" });
   });
 
   it("parses the main tokens route", () => {
-    replaceHash("#wallet/tokens");
-
-    expect(parseRouteFromHash()).toEqual({ kind: "cashuTokens" });
+    expect(parseRoutePath("wallet/tokens")).toEqual({ kind: "cashuTokens" });
   });
 
   it("parses the token emit route", () => {
-    replaceHash("#wallet/token/emit");
-
-    expect(parseRouteFromHash()).toEqual({ kind: "cashuTokenEmit" });
+    expect(parseRoutePath("wallet/token/emit")).toEqual({
+      kind: "cashuTokenEmit",
+    });
   });
 
   it("parses the token import route", () => {
-    replaceHash("#wallet/token/new");
-
-    expect(parseRouteFromHash()).toEqual({ kind: "cashuTokenNew" });
+    expect(parseRoutePath("wallet/token/new")).toEqual({
+      kind: "cashuTokenNew",
+    });
   });
 
   it("keeps a proxy-payment offer from an unknown sender in message requests", () => {
     const unknownChatId = `unknown:${"a".repeat(64)}`;
-    replaceHash(
-      `#chat/${encodeURIComponent(unknownChatId)}/bank-payment-offer/offer-1`,
-    );
-
-    expect(parseRouteFromHash()).toEqual({
+    expect(
+      parseRoutePath(
+        `chat/${encodeURIComponent(unknownChatId)}/bank-payment-offer/offer-1`,
+      ),
+    ).toEqual({
       kind: "chat",
       id: unknownChatId,
     });
   });
   it("parses the manual payment route", () => {
-    replaceHash("#wallet/pay");
+    expect(parseRoutePath("wallet/pay")).toEqual({ kind: "manualPay" });
+  });
+});
 
-    expect(parseRouteFromHash()).toEqual({ kind: "manualPay" });
+const contactId = ContactId.orThrow("AgICAgICAgICAgICAgICAg");
+const keryxId = keryxSubscriptionIdFor("https://acme.example");
+
+const sampleActions: {
+  [Name in NavigationAction["route"]]: Extract<
+    NavigationAction,
+    { route: Name }
+  >;
+} = {
+  advanced: { route: "advanced" },
+  advancedAutoPayLimit: { route: "advancedAutoPayLimit" },
+  advancedInspector: { route: "advancedInspector" },
+  advancedInspectorTimeline: { route: "advancedInspectorTimeline" },
+  advancedPushDebug: { route: "advancedPushDebug" },
+  cashuTokenEmit: { route: "cashuTokenEmit" },
+  cashuToken: {
+    route: "cashuToken",
+    id: CashuOperationId.orThrow("AQEBAQEBAQEBAQEBAQEBAQ"),
+  },
+  cashuTokenNew: { route: "cashuTokenNew" },
+  cashuTokens: { route: "cashuTokens" },
+  cashuProofs: { route: "cashuProofs" },
+  chat: { route: "chat", id: contactId },
+  contact: { route: "contact", id: contactId },
+  contactEdit: { route: "contactEdit", id: contactId },
+  contactNew: { route: "contactNew" },
+  contactPay: { route: "contactPay", id: contactId },
+  contacts: { route: "contacts" },
+  evoluCurrentData: { route: "evoluCurrentData" },
+  evoluData: { route: "evoluData" },
+  evoluHistoryData: { route: "evoluHistoryData" },
+  evoluServer: { route: "evoluServer", id: "wss://evolu.example/a?b=c" },
+  evoluServerNew: { route: "evoluServerNew" },
+  chatStorage: { route: "chatStorage" },
+  evoluServers: { route: "evoluServers" },
+  lnAddressPay: { route: "lnAddressPay", lnAddress: "bob@pay.test" },
+  manualPay: { route: "manualPay" },
+  bankPayment: {
+    route: "bankPayment",
+    spdPayload: "SPD*1.0*ACC:CZ65/0800*AM:1.00",
+    editing: true,
+  },
+  bankPaymentNew: { route: "bankPaymentNew" },
+  bankPaymentOffer: {
+    route: "bankPaymentOffer",
+    chatId: contactId,
+    offerId: "offer/1",
+  },
+  mint: { route: "mint", mintUrl: "https://mint.example/path" },
+  mints: { route: "mints" },
+  mintNew: { route: "mintNew" },
+  nostrRelay: { route: "nostrRelay", id: "wss://relay.example/" },
+  nostrRelayNew: { route: "nostrRelayNew" },
+  nostrRelays: { route: "nostrRelays" },
+  profile: { route: "profile" },
+  profileEdit: { route: "profileEdit" },
+  settings: { route: "settings" },
+  settingsLanguage: { route: "settingsLanguage" },
+  settingsAppearance: { route: "settingsAppearance" },
+  settingsMasterKeys: { route: "settingsMasterKeys" },
+  settingsNostrIdentity: { route: "settingsNostrIdentity" },
+  keryxCompanies: { route: "keryxCompanies" },
+  keryxCompanyNew: { route: "keryxCompanyNew" },
+  keryxCompany: { route: "keryxCompany", id: keryxId },
+  keryxAnnouncement: {
+    route: "keryxAnnouncement",
+    id: keryxId,
+    key: "news/launch?x",
+  },
+  proxyPayments: { route: "proxyPayments" },
+  settingsUnits: { route: "settingsUnits" },
+  settingsTutorial: { route: "settingsTutorial" },
+  settingsBlocked: { route: "settingsBlocked" },
+  settingsReceiveMethod: { route: "settingsReceiveMethod" },
+  transactions: { route: "transactions" },
+  recurringPaymentNew: { route: "recurringPaymentNew" },
+  recurringPayment: {
+    route: "recurringPayment",
+    id: RecurringPaymentId.orThrow("AwMDAwMDAwMDAwMDAwMDAw"),
+  },
+  recurringPaymentEdit: {
+    route: "recurringPaymentEdit",
+    id: RecurringPaymentId.orThrow("AwMDAwMDAwMDAwMDAwMDAw"),
+  },
+  topup: { route: "topup" },
+  topupNoAmount: { route: "topupNoAmount" },
+  topupInvoice: { route: "topupInvoice" },
+  wallet: { route: "wallet" },
+};
+
+describe("routePathFor", () => {
+  it.each(Object.values(sampleActions))(
+    "$route reads back through parseRoutePath",
+    (action) => {
+      const { route, ...fields } = action;
+      expect(parseRoutePath(routePathFor(action))).toEqual({
+        kind: route,
+        ...fields,
+      });
+    },
+  );
+
+  it("carries the recurring payment prefill in the query", () => {
+    const path = routePathFor({
+      route: "recurringPaymentNew",
+      prefill: { contactId: "contact-1", amountSat: 10 },
+    });
+
+    expect(path).toBe("wallet/recurring/new?contact=contact-1&amount=10");
+    expect(parseRoutePath(path)).toEqual({ kind: "recurringPaymentNew" });
+  });
+});
+
+describe("routePathFromLegacyHash", () => {
+  it.each([
+    ["#contacts", "contacts"],
+    ["#wallet", "wallet"],
+    ["#wallet/transactions", "wallet/transactions"],
+    ["#proxy", "proxy"],
+    [`#chat/${contactId}`, `chat/${contactId}`],
+    [`#contact/${contactId}/pay`, `contact/${contactId}/pay`],
+    [
+      "#wallet/recurring/new?contact=c1&amount=10",
+      "wallet/recurring/new?contact=c1&amount=10",
+    ],
+  ])("redirects %s to %s", (hash, path) => {
+    expect(routePathFromLegacyHash(hash)).toBe(path);
+  });
+
+  it.each([
+    ["an add-contact link", "#add/npub1abc"],
+    ["a nostrconnect link", `#nostrconnect://${"b".repeat(64)}?secret=s3cr3t`],
+    ["an encoded nostrconnect link", "#nostrconnect%3A%2F%2Fabc%3Fsecret%3Ds"],
+    ["a linkauth link", "#linkauth?nonce=n&cb=https%3A%2F%2Fsite.example"],
+    ["a cashu protocol link", "#wallet?cashu=cashuAeyJ0b2tlbiI6W119"],
+    ["a notification open", "#contacts?notificationOpen=%7B%7D"],
+    [
+      "a route with a param it does not read",
+      "#wallet/recurring/new?contact=c1&cashu=cashuA",
+    ],
+    ["an unknown route", "#unknown"],
+    [
+      "a bank payment, whose path holds the SPAYD",
+      `#wallet/bank-payment/${encodeURIComponent("SPD*1.0*ACC:CZ6508000000192000145399*AM:1.00")}`,
+    ],
+    ["a route with an invalid id", "#contact/not-an-id"],
+    ["an empty hash", ""],
+  ])("leaves %s to its own handler", (_name, hash) => {
+    expect(routePathFromLegacyHash(hash)).toBeNull();
   });
 });
 

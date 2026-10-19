@@ -1,7 +1,7 @@
 import { useId, useState } from "react";
 import type { ComponentRef, ReactNode, Ref } from "react";
 import { Input, Label } from "tamagui";
-import type { InputProps } from "tamagui";
+import type { GetProps } from "tamagui";
 import { Row, Stack, Text } from "./layout";
 import { fieldStyle, fieldTrailing, textVariant } from "./styles";
 import { opacity, size } from "./tokens";
@@ -68,7 +68,29 @@ const fieldA11y = (
     borderColor: error || invalid ? "$danger" : "$transparent",
   }) as const;
 
-export interface TextFieldProps extends Omit<InputProps, "size"> {
+/** What a change hands the handler on every platform; iOS and Android get no DOM event, only this shape. */
+interface TextFieldChangeEvent {
+  readonly target: { readonly value: string };
+}
+
+/** Input props minus the DOM handlers Tamagui fakes on iOS and Android, without `preventDefault`; Enter is `onSubmitEditing` everywhere. */
+type FieldInputProps = Omit<
+  GetProps<typeof Input>,
+  | "size"
+  | "onChange"
+  | "onInput"
+  | "onBeforeInput"
+  | "onKeyDown"
+  | "onKeyUp"
+  | "onKeyPress"
+  | "onFocus"
+  | "onBlur"
+>;
+
+export interface TextFieldProps extends FieldInputProps {
+  onChange?: ((event: TextFieldChangeEvent) => void) | undefined;
+  onFocus?: (() => void) | undefined;
+  onBlur?: (() => void) | undefined;
   label: string;
   hideLabel?: boolean | undefined;
   hint?: string | undefined;

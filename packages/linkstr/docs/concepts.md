@@ -53,21 +53,21 @@ Each vertical guide has a **Wire format** section: kind, tags in order, content,
 
 Each is an effect `Schema` with a brand, so a plain `string` does not type-check where a `Pubkey` is expected.
 
-| Type             | Shape                                         | Make one                                                                |
-| ---------------- | --------------------------------------------- | ----------------------------------------------------------------------- |
-| `Pubkey`         | 64 hex, on the curve                          | `parsePubkey(str)`, `decodeNpub(str)`, `derivePubkey(key)`              |
-| `NostrSecretKey` | 32 bytes a public key derives from            | `decodeNsec(str)`                                                       |
-| `RumorId`        | 64 hex; identity of a message                 | from receipts and facts                                                 |
-| `WrapId`         | 64 hex; one signed wrap                       | from `WrapDelivery.wrapId`, push payloads                               |
-| `EventId`        | 64 hex; one signed plain event                | from `PlainEventReceipt.eventId`                                        |
-| `ClientId`       | non-empty trimmed string                      | `ClientId.make(localId)`                                                |
-| `RelayUrl`       | `wss://` url, or loopback `ws://` (see below) | `RelayUrl.make(str)` (throws) or `Schema.decodeUnknownOption(RelayUrl)` |
-| `UnixSeconds`    | positive integer                              | `UnixSeconds.make(n)`                                                   |
-| `Emoji`          | trimmed, 1–32 chars                           | `Emoji.make(str)`                                                       |
+| Type             | Shape                                      | Make one                                                                |
+| ---------------- | ------------------------------------------ | ----------------------------------------------------------------------- |
+| `Pubkey`         | 64 hex, on the curve                       | `parsePubkey(str)`, `decodeNpub(str)`, `derivePubkey(key)`              |
+| `NostrSecretKey` | 32 bytes a public key derives from         | `decodeNsec(str)`                                                       |
+| `RumorId`        | 64 hex; identity of a message              | from receipts and facts                                                 |
+| `WrapId`         | 64 hex; one signed wrap                    | from `WrapDelivery.wrapId`, push payloads                               |
+| `EventId`        | 64 hex; one signed plain event             | from `PlainEventReceipt.eventId`                                        |
+| `ClientId`       | non-empty trimmed string                   | `ClientId.make(localId)`                                                |
+| `RelayUrl`       | `wss://` url, or local `ws://` (see below) | `RelayUrl.make(str)` (throws) or `Schema.decodeUnknownOption(RelayUrl)` |
+| `UnixSeconds`    | positive integer                           | `UnixSeconds.make(n)`                                                   |
+| `Emoji`          | trimmed, 1–32 chars                        | `Emoji.make(str)`                                                       |
 
 `X.make(value)` validates and throws on failure; `Schema.is(X)` is a type guard; `Schema.decodeUnknownOption(X)` returns an `Option`. `Pubkey` and `NostrSecretKey` are validated cryptographically, not just by length, so revalidate stored strings with `Schema.is(Pubkey)` at the boundary rather than inside a send.
 
-`RelayUrl` accepts `wss://` urls with a host and without credentials or fragment, plus `ws://localhost`, `ws://127.0.0.1` and `ws://[::1]` for local development. Other `ws://` hosts are rejected. The default transport still refuses a loopback `ws://` url unless it was built with `allowInsecureLocalhost: true` (`runLinkstr` config, `makeNostrTransportSimplePool(options)`, `LinkstrConfig` in React, `watchPushInbox` config). `DEFAULT_NOSTR_RELAYS` is a plain string array; filter it through `Schema.is(RelayUrl)` before handing it to a config.
+`RelayUrl` accepts `wss://` urls with a host and without credentials or fragment, plus `ws://` urls on `localhost`, `127.0.0.1`, `[::1]` or a private-network IPv4 address (`10.x`, `172.16–31.x`, `192.168.x`) for local development, so a phone can reach a relay on the developer's machine. Other `ws://` hosts are rejected. The default transport still refuses every `ws://` url unless it was built with `allowInsecureLocalhost: true` (`runLinkstr` config, `makeNostrTransportSimplePool(options)`, `LinkstrConfig` in React, `watchPushInbox` config). `DEFAULT_NOSTR_RELAYS` is a plain string array; filter it through `Schema.is(RelayUrl)` before handing it to a config.
 
 ## Services and layers
 

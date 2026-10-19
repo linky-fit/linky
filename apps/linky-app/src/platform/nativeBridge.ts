@@ -14,6 +14,22 @@ import {
 import { isRecord } from "../utils/unknown";
 import { asNonEmptyString } from "../utils/validation";
 import { NonBlankString } from "../utils/schema";
+import {
+  BeaconPermissionState,
+  NATIVE_DEEP_LINK_EVENT,
+  NATIVE_NOTIFICATION_OPEN_EVENT,
+  NATIVE_PUSH_ACTION_EVENT,
+  NativeBeaconStatus,
+} from "./nativeBridgeShared";
+
+export {
+  BeaconPermissionState,
+  NATIVE_DEEP_LINK_EVENT,
+  NATIVE_NOTIFICATION_OPEN_EVENT,
+  NATIVE_PUSH_ACTION_EVENT,
+  NATIVE_RESUME_EVENT,
+  NativeBeaconStatus,
+} from "./nativeBridgeShared";
 
 type NativeNotificationPermissionState =
   | "denied"
@@ -152,11 +168,7 @@ interface AndroidNfcBridge {
   writeUri?: (url: string) => void;
 }
 
-export const NATIVE_DEEP_LINK_EVENT = "linky-native-deep-link";
 const NATIVE_NFC_WRITE_EVENT = "linky-native-nfc-write";
-export const NATIVE_NOTIFICATION_OPEN_EVENT = "linky-native-notification-open";
-export const NATIVE_PUSH_ACTION_EVENT = "linky-native-push-action";
-export const NATIVE_RESUME_EVENT = "linky-native-resume";
 
 type NativeNfcWriteStatus =
   | "armed"
@@ -349,6 +361,36 @@ export const removeAndroidStoredSecret = async (
 
   bridge.remove(key);
   return true;
+};
+
+/** Calls `onUrl` with each deep link URL the shell hands over while the app runs. */
+export const onNativeDeepLinkUrl = (
+  onUrl: (url: string) => void,
+): (() => void) => {
+  const onDeepLink = (event: Event) => {
+    if (!(event instanceof CustomEvent) || !isRecord(event.detail)) return;
+    const url: unknown = Reflect.get(event.detail, "url");
+    if (typeof url === "string") onUrl(url);
+  };
+  window.addEventListener(NATIVE_DEEP_LINK_EVENT, onDeepLink);
+  return () => window.removeEventListener(NATIVE_DEEP_LINK_EVENT, onDeepLink);
+};
+
+/** Calls `onDetail` with each notification the user opens or acts on while the app runs. */
+export const onNativeNotificationOpen = (
+  onDetail: (detail: object) => void,
+): (() => void) => {
+  const onOpen = (event: Event) => {
+    if (!(event instanceof CustomEvent)) return;
+    const detail: unknown = event.detail;
+    if (typeof detail === "object" && detail !== null) onDetail(detail);
+  };
+  window.addEventListener(NATIVE_NOTIFICATION_OPEN_EVENT, onOpen);
+  window.addEventListener(NATIVE_PUSH_ACTION_EVENT, onOpen);
+  return () => {
+    window.removeEventListener(NATIVE_NOTIFICATION_OPEN_EVENT, onOpen);
+    window.removeEventListener(NATIVE_PUSH_ACTION_EVENT, onOpen);
+  };
 };
 
 export const supportsNativeQrScan = (): boolean => {
@@ -913,23 +955,7 @@ export const consumePendingIosNativeDeepLinkUrl = async (): Promise<
   }
 };
 
-export const BeaconPermissionState = Schema.Literals([
-  "granted",
-  "denied",
-  "prompt",
-  "unsupported",
-]);
-export type BeaconPermissionState = typeof BeaconPermissionState.Type;
-
 export type NativeBeaconTrade = "buy" | "sell" | "none";
-
-export const NativeBeaconStatus = Schema.Struct({
-  running: Schema.Boolean,
-  bluetoothOn: Schema.Boolean,
-  advertising: Schema.Boolean,
-  error: Schema.NullOr(Schema.String),
-});
-export type NativeBeaconStatus = typeof NativeBeaconStatus.Type;
 
 const NativeBeaconSighting = Schema.Struct({
   pubkey: Pubkey,

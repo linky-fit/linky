@@ -15,6 +15,7 @@ import {
   SubmitButton,
   Text,
   TextField,
+  SafeAreaPad,
 } from "@linky-fit/ui";
 import type { IconName } from "@linky-fit/ui";
 import React from "react";
@@ -36,12 +37,15 @@ import {
   fillSlip39Words,
   SLIP39_WORD_COUNT,
 } from "../utils/slip39Input";
+import { useBackAction } from "../app/hooks/layout/useNativeBackHandler";
+import { useSecretsWriteFailure } from "../app/hooks/useSecretsWriteFailure";
 import { AvatarPhotoInput } from "./AvatarPhotoInput";
 import type { FilePickerHandle } from "../utils/pickFile";
 import { StickyTopBar } from "./StickyTopBar";
 import { SelfieCaptureModal } from "./SelfieCaptureModal";
 
 import type { Translate } from "../i18n";
+import { keepInputFocus } from "../utils/keepInputFocus";
 
 interface UnauthenticatedLayoutProps {
   confirmPendingOnboardingProfile: () => Promise<void>;
@@ -64,6 +68,8 @@ interface UnauthenticatedLayoutProps {
   setPendingOnboardingName: (value: string) => void;
   submitReturningSlip39: (inputOverride?: string) => Promise<void>;
   t: Translate;
+  /** Shows only the restore step, whose back button calls this; nothing can create an account. */
+  onLeaveRestore?: (() => void) | undefined;
 }
 
 const LANGUAGE_LABEL_KEYS = {
@@ -89,8 +95,6 @@ const formatTemplate = (template: string, vars: Record<string, string>) =>
   template.replace(/\{(\w+)\}/g, (_match, key: string) => vars[key] ?? "");
 
 // Keeps the word field focused (and the phone keyboard open) while tapping helpers.
-const keepInputFocus = (event: React.PointerEvent) => event.preventDefault();
-
 const SLIP39_WORD_INDEXES = Array.from(
   { length: SLIP39_WORD_COUNT },
   (_, index) => index,
@@ -126,11 +130,11 @@ const StepBody = ({ children }: { children: React.ReactNode }) => (
 
 /** Pins the step's main action to the screen bottom. */
 const StepActions = ({ children }: { children: React.ReactNode }) => (
-  <Stack
+  <SafeAreaPad
     position="sticky"
     bottom="$none"
     backgroundColor="$background"
-    data-safe-area="bottom"
+    edge="bottom"
   >
     <Stack
       gap="$sm"
@@ -142,7 +146,7 @@ const StepActions = ({ children }: { children: React.ReactNode }) => (
     >
       {children}
     </Stack>
-  </Stack>
+  </SafeAreaPad>
 );
 
 export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
@@ -166,7 +170,9 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
   setPendingOnboardingName,
   submitReturningSlip39,
   t,
+  onLeaveRestore,
 }) => {
+  const restoreOnly = onLeaveRestore !== undefined;
   const [pickerMenuIsOpen, setPickerMenuIsOpen] = React.useState(false);
   const colorModePreference = useColorModePreference();
   const colorModeLabel = `${t("appearance")}: ${t(
@@ -208,6 +214,35 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
     />
   );
 
+  const leaveReturnStep = () => {
+    setPickerMenuIsOpen(false);
+    if (onLeaveRestore) onLeaveRestore();
+    else setOnboardingStep(null);
+  };
+  const leaveProfileStage = () => {
+    setPickerMenuIsOpen(false);
+    if (profileStage === "picture") {
+      setProfileStage("name");
+      return;
+    }
+    setOnboardingStep(null);
+  };
+  const secretsWriteFailure = useSecretsWriteFailure();
+  useBackAction(
+    secretsWriteFailure.cancel ??
+      (pickerMenuIsOpen
+        ? () => setPickerMenuIsOpen(false)
+        : selfieCaptureIsOpen
+          ? closeSelfieCapture
+          : onboardingIsBusy
+            ? null
+            : onboardingStep?.kind === "returning"
+              ? leaveReturnStep
+              : onboardingStep?.kind === "profile"
+                ? leaveProfileStage
+                : null),
+  );
+
   React.useEffect(() => {
     if (onboardingStep?.kind !== "profile") {
       setProfileStage("name");
@@ -222,6 +257,11 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
     }
     setPickerMenuIsOpen(false);
   }, [onboardingStep]);
+
+  React.useEffect(() => {
+    if (restoreOnly && onboardingStep?.kind !== "returning")
+      openReturningOnboarding();
+  }, [restoreOnly, onboardingStep, openReturningOnboarding]);
 
   const renderPreparingStep = (
     step: Extract<OnboardingStep, { kind: "preparing" }>,
@@ -286,10 +326,7 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
     return (
       <Stack flexGrow={1}>
         <StickyTopBar
-          leading={backButton(() => {
-            setPickerMenuIsOpen(false);
-            setOnboardingStep(null);
-          })}
+          leading={backButton(leaveReturnStep)}
           trailing={menuButton()}
         />
 
@@ -530,26 +567,18 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
     );
   };
 
-  const renderProfilePicker = (profile: PendingOnboardingProfile) => {
-    const goBack = () => {
-      setPickerMenuIsOpen(false);
-      if (profileStage === "picture") {
-        setProfileStage("name");
-        return;
-      }
-      setOnboardingStep(null);
-    };
+  const renderProfilePicker = (profile: PendingOnboardingProfile) => (
+    <Stack flexGrow={1}>
+      <StickyTopBar
+        leading={backButton(leaveProfileStage)}
+        trailing={menuButton()}
+      />
 
-    return (
-      <Stack flexGrow={1}>
-        <StickyTopBar leading={backButton(goBack)} trailing={menuButton()} />
-
-        {profileStage === "name"
-          ? renderProfileNameStep(profile)
-          : renderProfilePictureStep(profile)}
-      </Stack>
-    );
-  };
+      {profileStage === "name"
+        ? renderProfileNameStep(profile)
+        : renderProfilePictureStep(profile)}
+    </Stack>
+  );
 
   const renderWelcome = (
     step: Extract<OnboardingStep, { kind: "preparing" }> | null,
@@ -632,11 +661,13 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
 
   return (
     <Stack gap="$md" flexGrow={1}>
-      {onboardingStep?.kind === "profile"
-        ? renderProfilePicker(onboardingStep)
-        : onboardingStep?.kind === "returning"
-          ? renderReturnStep(onboardingStep)
-          : renderWelcome(onboardingStep)}
+      {onboardingStep?.kind === "returning"
+        ? renderReturnStep(onboardingStep)
+        : restoreOnly
+          ? null
+          : onboardingStep?.kind === "profile"
+            ? renderProfilePicker(onboardingStep)
+            : renderWelcome(onboardingStep)}
 
       <Sheet
         open={pickerMenuIsOpen}

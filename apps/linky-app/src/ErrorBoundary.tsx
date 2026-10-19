@@ -9,6 +9,7 @@ import {
 } from "@linky-fit/ui";
 import React, { type ReactNode } from "react";
 import { getInitialLang, translations } from "./i18n";
+import { emitAppEvent } from "./platform/appEvents";
 import { getColorMode } from "./utils/colorMode";
 import {
   downloadBootDiagnostics,
@@ -60,11 +61,7 @@ export class ErrorBoundary extends React.Component<
                 </Button>
                 <Button
                   variant="secondary"
-                  onPress={() =>
-                    window.dispatchEvent(
-                      new Event("linky-clear-cache-and-reload"),
-                    )
-                  }
+                  onPress={() => emitAppEvent("linky-clear-cache-and-reload")}
                 >
                   {text.reloadApp}
                 </Button>

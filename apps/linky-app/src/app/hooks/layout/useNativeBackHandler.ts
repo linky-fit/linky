@@ -1,6 +1,6 @@
 import { useLatest } from "../../../hooks/useLatest";
 import React from "react";
-import { NATIVE_BACK_BUTTON_EVENT } from "../../../hooks/useRouting";
+import { onBackPress } from "../../../platform/appEvents";
 
 interface NativeBackTargets {
   closeScan: () => void;
@@ -31,9 +31,8 @@ export const resolveNativeBackAction = ({
 /**
  * Routes the Android hardware/gesture back button into in-app navigation.
  *
- * The shell dispatches a cancelable `linky-native-back-button` event and runs
- * its default action — closing the app — unless a listener calls
- * `preventDefault()`. We claim the press whenever something is layered over the
+ * The system runs its default action, closing the app, unless a handler
+ * claims the press. We claim it whenever something is layered over the
  * page to dismiss or there is a parent route to walk up to, and otherwise leave
  * it alone so back exits the app as it does in any other Android app.
  *
@@ -43,26 +42,26 @@ export const resolveNativeBackAction = ({
  * the user visited instead of moving up the hierarchy, and on a cold start from
  * a deep link or notification there is no in-app entry to return to at all.
  */
-export const useNativeBackHandler = (targets: NativeBackTargets) => {
-  const backAction = resolveNativeBackAction(targets);
+export const useNativeBackHandler = (targets: NativeBackTargets) =>
+  useBackAction(resolveNativeBackAction(targets));
 
+/**
+ * Hands each system back press to `action`; null leaves the press to the
+ * system, which closes the app.
+ */
+export const useBackAction = (action: (() => void) | null) => {
   // Keep the newest action in a ref so the listener registers only once and
   // never runs against a stale route or a dismissed overlay.
-  const backActionRef = useLatest(backAction);
+  const actionRef = useLatest(action);
 
-  React.useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const onNativeBack = (event: Event) => {
-      const action = backActionRef.current;
-      if (!action) return;
-
-      event.preventDefault();
-      action();
-    };
-
-    window.addEventListener(NATIVE_BACK_BUTTON_EVENT, onNativeBack);
-    return () =>
-      window.removeEventListener(NATIVE_BACK_BUTTON_EVENT, onNativeBack);
-  }, [backActionRef]);
+  React.useEffect(
+    () =>
+      onBackPress(() => {
+        const current = actionRef.current;
+        if (!current) return false;
+        current();
+        return true;
+      }),
+    [actionRef],
+  );
 };

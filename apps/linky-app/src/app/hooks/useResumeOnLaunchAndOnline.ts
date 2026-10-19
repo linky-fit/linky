@@ -1,4 +1,5 @@
 import React from "react";
+import { onOnline } from "../../platform/appEvents";
 
 /**
  * Runs `resume` once per function identity (a new instance arrives with each
@@ -16,9 +17,6 @@ export const useResumeOnLaunchAndOnline = (
       resumedForRef.current = resume;
       resume();
     }
-    window.addEventListener("online", resume);
-    return () => {
-      window.removeEventListener("online", resume);
-    };
+    return onOnline(resume);
   }, [resume]);
 };

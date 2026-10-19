@@ -2,6 +2,8 @@ import { reportAppLog } from "../../devtools/inspector/appLog";
 import {
   downloadFileInBrowser,
   isCancelledShareError,
+  type PhotoLibrarySave,
+  saveImageToPhotoLibrary,
   shareFileNatively,
 } from "../../platform/fileExport";
 import { isNativePlatform } from "../../platform/runtime";
@@ -44,24 +46,38 @@ export const sanitizeExportFileName = (
   return trimmedStem ? `${trimmedStem}${suffix}` : null;
 };
 
-const toPrivateImageFile = (blob: Blob, fileName?: string): File => {
+interface PrivateFileExport {
+  blob: Blob;
+  name: string;
+  type: string;
+}
+
+const toPrivateFileExport = (
+  blob: Blob,
+  fileName?: string,
+): PrivateFileExport => {
   const type = blob.type || "image/jpeg";
   const extension = EXTENSION_BY_IMAGE_TYPE[type] ?? "jpg";
   const baseName = type === PDF_FILE_TYPE ? "linky-document" : "linky-image";
   const safeName =
     fileName !== undefined ? sanitizeExportFileName(fileName, extension) : null;
-  return new File([blob], safeName ?? `${baseName}.${extension}`, { type });
+  return { blob, name: safeName ?? `${baseName}.${extension}`, type };
 };
 
-type ExportEvent = "Saved" | "Shared" | "ShareFailed";
+type ExportEvent =
+  | "Saved"
+  | "SavedToPhotos"
+  | "PhotosDenied"
+  | "Shared"
+  | "ShareFailed";
 
-const exportTag = (file: File, event: ExportEvent): string =>
+const exportTag = (file: PrivateFileExport, event: ExportEvent): string =>
   `${file.type === PDF_FILE_TYPE ? "ChatFile" : "ChatImage"}${event}`;
 
 const reportPrivateImageExport = (
   event: ExportEvent,
   summary: string,
-  file: File,
+  file: PrivateFileExport,
   links: PrivateImageExportLinks,
   error?: unknown,
 ): void => {
@@ -72,19 +88,19 @@ const reportPrivateImageExport = (
     payload: {
       fileName: file.name,
       fileType: file.type,
-      size: file.size,
+      size: file.blob.size,
       ...(error !== undefined ? { error } : {}),
     },
   });
 };
 
 const shareFileNativelyReported = async (
-  file: File,
+  file: PrivateFileExport,
   title: string,
   links: PrivateImageExportLinks,
 ): Promise<void> => {
   try {
-    await shareFileNatively({ blob: file, fileName: file.name, title });
+    await shareFileNatively({ blob: file.blob, fileName: file.name, title });
   } catch (error) {
     if (!isCancelledShareError(error)) {
       reportPrivateImageExport(
@@ -110,15 +126,49 @@ export const downloadPrivateImageBlob = (
   links: PrivateImageExportLinks = {},
   fileName?: string,
 ): void => {
-  const file = toPrivateImageFile(blob, fileName);
+  const file = toPrivateFileExport(blob, fileName);
   if (isNativePlatform()) {
     void shareFileNativelyReported(file, file.name, links).catch(
       () => undefined,
     );
     return;
   }
-  downloadFileInBrowser(file, file.name);
+  downloadFileInBrowser(file.blob, file.name);
   reportPrivateImageExport("Saved", "Chat file saved as a file", file, links);
+};
+
+/** Saves a chat image to the photo library where the platform has one, else as a file (`"downloaded"`). */
+export const savePrivateImageBlob = async (
+  blob: Blob,
+  links: PrivateImageExportLinks = {},
+  fileName?: string,
+): Promise<PhotoLibrarySave | "downloaded"> => {
+  const file = toPrivateFileExport(blob, fileName);
+  if (saveImageToPhotoLibrary === null || file.type === PDF_FILE_TYPE) {
+    downloadPrivateImageBlob(blob, links, fileName);
+    return "downloaded";
+  }
+  const result = await saveImageToPhotoLibrary({
+    blob: file.blob,
+    fileName: file.name,
+    title: file.name,
+  });
+  if (result === "saved") {
+    reportPrivateImageExport(
+      "SavedToPhotos",
+      "Chat image saved to the photo library",
+      file,
+      links,
+    );
+  } else {
+    reportPrivateImageExport(
+      "PhotosDenied",
+      "Saving a chat image stopped: photo library access was denied",
+      file,
+      links,
+    );
+  }
+  return result;
 };
 
 export const canSharePrivateImage = (): boolean =>
@@ -134,13 +184,13 @@ export const sharePrivateImageBlob = async (
     throw new Error("share-unavailable");
   }
 
-  const file = toPrivateImageFile(blob, fileName);
+  const file = toPrivateFileExport(blob, fileName);
   if (isNativePlatform()) {
     await shareFileNativelyReported(file, title, links);
     return;
   }
   const shareData: ShareData = {
-    files: [file],
+    files: [new File([blob], file.name, { type: file.type })],
     title,
   };
 

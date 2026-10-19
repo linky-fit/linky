@@ -21,7 +21,7 @@ Never import `nostr-tools` in consumer code; the codecs in [identity-and-keys.md
 
 1. Your `NostrSecretKey`: `decodeNsec("nsec1…")`.
 2. The peer's `Pubkey`: `parsePubkey(str)` accepts `npub1…` or 64-hex.
-3. `RelayUrl`s: `Schema.is(RelayUrl)` narrows a string; `RelayUrl.make(str)` throws on a bad one. `wss://` only, except loopback `ws://` for local development ([concepts.md](./concepts.md#branded-primitives)).
+3. `RelayUrl`s: `Schema.is(RelayUrl)` narrows a string; `RelayUrl.make(str)` throws on a bad one. `wss://` only, except loopback and private-network `ws://` for local development ([concepts.md](./concepts.md#branded-primitives)).
 
 Both decoders return `null` on bad input instead of throwing; check before building a config.
 
@@ -29,7 +29,7 @@ Both decoders return `null` on bad input instead of throwing; check before build
 
 Both take `secretKey`, `readRelays` and `writeRelays` (arrays of `RelayUrl`) and both accept optional `outboxStore` and `inboxCursorStore` layers (default: in-memory, so nothing survives a restart) and a `transport` layer (a test seam).
 
-**`runLinkstr(config, effect)`** is the one-shot Promise runner: it builds every service over the config, runs the effect, and closes the relay pool. Use it in scripts, service workers and tests. Two calls mean two pools. `writeRelays` defaults to `[]` for read-only consumers; `allowInsecureLocalhost: true` lets the default transport open loopback `ws://` relays.
+**`runLinkstr(config, effect)`** is the one-shot Promise runner: it builds every service over the config, runs the effect, and closes the relay pool. Use it in scripts, service workers and tests. Two calls mean two pools. `writeRelays` defaults to `[]` for read-only consumers; `allowInsecureLocalhost: true` lets the default transport open local `ws://` relays.
 
 **`linkstrServices(config)`** is the same composition as a `Layer`, for a runtime that outlives one call (a long-running process, a React app). `writeRelays` and `transport` are required; the usual transport is `NostrTransportSimplePool`, or `makeNostrTransportSimplePool({ allowInsecureLocalhost: true })` for a local relay. Decorate the transport first when you want observability ([diagnostics.md](./diagnostics.md)):
 
@@ -179,4 +179,4 @@ backfill OwnChatMessageConfirmed 9049fbe8…
 
 `Chat.sendText` wrapped the message twice, to the peer and to you, and the receipt reports both copies; `catchTags` turns the two delivery failures into strings, anything else rejects the promise. `WrapInbox.open` subscribed to kind 1059 for your pubkey inside a `Scope`; leaving `Effect.scoped` closes it. The first event is your own copy coming back, the own echo `OwnChatMessageConfirmed`, with the rumor id the receipt gave you. `backfill` means the relay served it from storage ([inbox.md](./inbox.md)).
 
-Point `RELAY` at a closed port and the lines become `no relay accepted anything; is RELAY up?` and `nothing arrived in 20 s`. A bad `NSEC` stops before any network call. `allowInsecureLocalhost` is only needed for a `ws://localhost` relay; leave it unset in production.
+Point `RELAY` at a closed port and the lines become `no relay accepted anything; is RELAY up?` and `nothing arrived in 20 s`. A bad `NSEC` stops before any network call. `allowInsecureLocalhost` is only needed for a local `ws://` relay; leave it unset in production.

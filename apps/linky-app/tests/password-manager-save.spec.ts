@@ -6,6 +6,7 @@ import { addContactByNpub } from "./helpers/contacts";
 import { watchAppErrors } from "./helpers/diagnostics";
 import { createSeedIdentity } from "./helpers/identity";
 import { stubFiatRates } from "./helpers/network";
+import { expectRoute, gotoRoute } from "./helpers/routes";
 
 // The unsupported result is covered by passwordManager.test.ts and MasterKeysPage.test.tsx.
 for (const { serviceWorkers, saveResult } of [
@@ -103,7 +104,7 @@ for (const { serviceWorkers, saveResult } of [
       };
       assertNoSeedRequests();
 
-      await page.goto("/#settings/master-keys");
+      await gotoRoute(page, "settings/master-keys");
       await page.getByRole("button", { name: "Save to passwords" }).click();
       await expect(
         page.getByText(
@@ -141,15 +142,15 @@ for (const { serviceWorkers, saveResult } of [
         ).toBeVisible();
 
         await page.reload();
-        await expect(page).toHaveURL(new RegExp(`#chat/${contactId}$`));
+        await expectRoute(page, `chat/${contactId}`);
         await expect(
           page.getByTestId("chat-bubble").filter({ hasText: message }),
         ).toBeVisible();
-        await page.goto("/#contacts");
+        await gotoRoute(page, "contacts");
         const contactCard = page.locator('[data-guide="contact-card"]');
         await expect(contactCard).toHaveCount(1);
         await contactCard.click();
-        await expect(page).toHaveURL(new RegExp(`#chat/${contactId}$`));
+        await expectRoute(page, `chat/${contactId}`);
         await expect(
           page.getByTestId("chat-bubble").filter({ hasText: message }),
         ).toBeVisible();

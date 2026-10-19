@@ -1,4 +1,4 @@
-import { Avatar, Stack, TabBar } from "@linky-fit/ui";
+import { Avatar, TabBar, SafeAreaPad } from "@linky-fit/ui";
 import type { NavItem } from "@linky-fit/ui";
 import React from "react";
 import { useAtomValue } from "@linky-fit/linkstr-react";
@@ -7,6 +7,7 @@ import { currentNpubAtom } from "../app/state/session/session";
 import { navigateTo } from "../hooks/useRouting";
 import type { Translate } from "../i18n";
 import { formatShortNpub } from "../utils/formatting";
+import { guideTargetRef } from "../app/lib/guideTargets";
 
 export type BottomTabKey =
   | "profile"
@@ -41,6 +42,7 @@ export function BottomTabBar({
       value: "profile",
       label: t("profile"),
       testID: "profile-qr-button",
+      ref: guideTargetRef("profile-qr-button"),
       leading: (
         <Avatar
           name={
@@ -52,24 +54,32 @@ export function BottomTabBar({
         />
       ),
     },
-    { value: "contacts", label: t("contactsTitle"), icon: "Users" },
+    {
+      value: "contacts",
+      label: t("contactsTitle"),
+      icon: "Users",
+      testID: "open-contacts",
+    },
     {
       value: "wallet",
       label: t("wallet"),
       icon: "Wallet",
       testID: "open-wallet",
+      ref: guideTargetRef("open-wallet"),
     },
     {
       value: "proxy",
       label: t("proxyPayments"),
       icon: "HandCoins",
       testID: "open-proxy",
+      ref: guideTargetRef("open-proxy"),
     },
     {
       value: "settings",
       label: t("settings"),
       icon: "Settings",
       testID: "open-menu",
+      ref: guideTargetRef("open-menu"),
     },
   ];
 
@@ -79,13 +89,13 @@ export function BottomTabBar({
   };
 
   return (
-    <Stack backgroundColor="$surface" data-safe-area="bottom">
+    <SafeAreaPad backgroundColor="$surface" edge="bottom">
       <TabBar
         accessibilityLabel={t("list")}
         items={items}
         value={activeTab}
         onValueChange={changeTab}
       />
-    </Stack>
+    </SafeAreaPad>
   );
 }

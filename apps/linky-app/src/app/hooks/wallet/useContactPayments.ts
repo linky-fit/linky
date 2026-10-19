@@ -142,6 +142,7 @@ export const useContactPayments = ({
             );
             return false;
           case "Busy":
+            setStatus(t("payWalletBusy"));
             return false;
         }
       },
@@ -172,9 +173,14 @@ export const useContactPayments = ({
 
   const paySelectedContact = React.useCallback(
     async (options?: { note?: string | null }) => {
-      if (walletOpRunning) return;
-      if (route.kind !== "contactPay") return;
-      if (!selectedContact) return;
+      if (walletOpRunning) {
+        setStatus(t("payWalletBusy"));
+        return;
+      }
+      if (route.kind !== "contactPay" || !selectedContact) {
+        setStatus(t("contactNotFound"));
+        return;
+      }
 
       const note = (options?.note ?? "").trim() || null;
       const amountSat = Number.parseInt(payAmount.trim(), 10);

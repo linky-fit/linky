@@ -1,4 +1,5 @@
 import {
+  Button,
   DocumentPages,
   FileAttachment,
   ImageAttachment,
@@ -10,6 +11,7 @@ import { useDivRef } from "../hooks/useDivRef";
 import { useLatest } from "../hooks/useLatest";
 import React from "react";
 import {
+  canRenderPdfPages,
   renderPdfPages,
   revokePdfPages,
   type RenderedPdfPage,
@@ -18,6 +20,7 @@ import {
   downloadPrivateImageBlob,
   sharePrivateImageBlob,
 } from "../app/lib/privateImageFile";
+import { onOnline } from "../platform/appEvents";
 import { isCancelledShareError } from "../platform/fileExport";
 import {
   decryptPrivateImageMessage,
@@ -56,6 +59,7 @@ export function PrivateFileBubble({
   );
   const [fileBlob, setFileBlob] = React.useState<Blob | null>(null);
   const [failed, setFailed] = React.useState(false);
+  const [loadAttempt, setLoadAttempt] = React.useState(0);
   const [preview, setPreview] = React.useState<RenderedPdfPage | null>(null);
   const [viewerOpen, setViewerOpen] = React.useState(false);
   const [viewerPages, setViewerPages] = React.useState<
@@ -116,7 +120,17 @@ export function PrivateFileBubble({
       cancelled = true;
       revokePdfPages(rendered);
     };
-  }, [payload, shouldLoad, onBlobChangeRef]);
+  }, [payload, shouldLoad, onBlobChangeRef, loadAttempt]);
+
+  const retryLoad = React.useCallback(
+    () => setLoadAttempt((attempt) => attempt + 1),
+    [],
+  );
+
+  React.useEffect(
+    () => (failed ? onOnline(retryLoad) : undefined),
+    [failed, retryLoad],
+  );
 
   React.useEffect(() => {
     if (!viewerOpen || !fileBlob) return;
@@ -145,7 +159,8 @@ export function PrivateFileBubble({
 
   const openViewer = () => {
     setViewerErrorText(null);
-    setViewerOpen(true);
+    if (canRenderPdfPages) setViewerOpen(true);
+    else void shareFile();
   };
 
   const closeViewer = () => {
@@ -176,9 +191,14 @@ export function PrivateFileBubble({
 
   if (failed) {
     return (
-      <Text variant="caption" color="$dangerText">
-        {t("chatPdfLoadFailed")}
-      </Text>
+      <Stack gap="$xxs" alignItems="flex-start">
+        <Text variant="caption" color="$dangerText">
+          {t("chatPdfLoadFailed")}
+        </Text>
+        <Button variant="ghost" size="sm" icon="RotateCw" onPress={retryLoad}>
+          {t("chatAttachmentRetry")}
+        </Button>
+      </Stack>
     );
   }
 

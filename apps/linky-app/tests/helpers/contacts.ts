@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { UNKNOWN_CONTACT_ID_PREFIX } from "../../src/utils/constants";
+import { gotoRoute, routePathOf, waitForRoute } from "./routes";
 
 /**
  * Add a contact by npub and return its local contact id.
@@ -12,7 +13,7 @@ export const addContactByNpub = async (
   page: Page,
   npub: string,
 ): Promise<string> => {
-  await page.goto("/#contacts");
+  await gotoRoute(page, "contacts");
   const addButton = page.locator("[data-guide='contact-add-button']").first();
   await expect(addButton).toBeVisible();
   // An unknown sender's card turns into the saved contact, so only saved cards count.
@@ -21,7 +22,7 @@ export const addContactByNpub = async (
   );
   const previousCount = await cards.count();
   await addButton.click();
-  await page.waitForURL(/#contact\/new$/, { timeout: 20_000 });
+  await waitForRoute(page, "contact/new", { timeout: 20_000 });
 
   const searchInput = page.locator("[data-guide='contact-search-input']");
   await expect(searchInput).toBeVisible();
@@ -31,13 +32,13 @@ export const addContactByNpub = async (
   await page.getByRole("button", { exact: true, name: "Add" }).click({
     timeout: 30_000,
   });
-  await page.waitForURL(/#(?:contacts)?$/, { timeout: 20_000 });
+  await waitForRoute(page, /^(?:contacts)?$/, { timeout: 20_000 });
 
   await expect(cards).toHaveCount(previousCount + 1, { timeout: 20_000 });
   await cards.first().click();
-  await page.waitForURL(/#chat\/[^/]+$/, { timeout: 20_000 });
+  await waitForRoute(page, /^chat\/[^/]+$/, { timeout: 20_000 });
 
-  const match = new URL(page.url()).hash.match(/^#chat\/([^/]+)$/);
+  const match = routePathOf(page).match(/^chat\/([^/]+)$/);
   if (!match?.[1]) {
     throw new Error(`Could not parse contact id from ${page.url()}`);
   }

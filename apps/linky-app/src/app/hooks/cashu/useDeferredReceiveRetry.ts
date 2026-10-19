@@ -154,7 +154,7 @@ export const useDeferredReceiveRetry = ({
     let delay = FIRST_RETRY_MS;
     let timer: number | undefined;
     const scheduleNext = (): void => {
-      timer = window.setTimeout(() => {
+      timer = setTimeout(() => {
         delay = Math.min(delay * 2, MAX_RETRY_MS);
         void resume().then(() => {
           if (!cancelled) scheduleNext();
@@ -164,7 +164,7 @@ export const useDeferredReceiveRetry = ({
     scheduleNext();
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
+      clearTimeout(timer);
     };
   }, [hasDeferred, resume]);
 };

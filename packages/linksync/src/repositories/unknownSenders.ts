@@ -71,6 +71,14 @@ const toMessageRow = (
   };
 };
 
+/** Stored order: a moved row is stamped anew, which orders messages of one second. */
+const byStoredOrder = (
+  a: UnknownSenderMessageRow,
+  b: UnknownSenderMessageRow,
+): number =>
+  (a.createdAtSec ?? 0) - (b.createdAtSec ?? 0) ||
+  a.createdAt.localeCompare(b.createdAt);
+
 /** Conversations with peers who are not contacts, kept apart from `messages` and forgotten sooner. */
 export const makeUnknownSendersRepository = (
   store: LinkyStore,
@@ -104,7 +112,7 @@ export const makeUnknownSendersRepository = (
         const { id: conversationId } =
           yield* conversations.ensureDirect(contactId);
         let moved = 0;
-        for (const row of rows) {
+        for (const row of [...rows].sort(byStoredOrder)) {
           const message = toMessageRow(row, conversationId);
           if (message === null) continue;
           yield* conversations.messages.insertIfAbsent(message);

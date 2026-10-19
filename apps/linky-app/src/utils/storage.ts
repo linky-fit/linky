@@ -109,6 +109,20 @@ export const safeSessionStorageClear = (): void => {
   }
 };
 
+export const safeSessionStorageEntries = (): Array<[string, string]> => {
+  try {
+    const entries: Array<[string, string]> = [];
+    for (let index = 0; index < sessionStorage.length; index += 1) {
+      const key = sessionStorage.key(index);
+      const value = key === null ? null : sessionStorage.getItem(key);
+      if (key !== null && value !== null) entries.push([key, value]);
+    }
+    return entries;
+  } catch {
+    return [];
+  }
+};
+
 export const safeLocalStorageKeys = (): string[] => {
   try {
     const keys: string[] = [];

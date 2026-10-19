@@ -30,6 +30,18 @@ interface PersistentInspectorLogLimits {
   maxSize: number;
 }
 
+export interface InspectorLogStorageMutation {
+  appendedRows: CollectedInspectorRow[];
+  deletedRows: CollectedInspectorRow[];
+}
+
+/** Where the collected rows persist between app starts. */
+export interface InspectorLogStorage {
+  apply: (mutation: InspectorLogStorageMutation) => Promise<void>;
+  clear: () => Promise<void>;
+  load: () => Promise<CollectedInspectorRow[]>;
+}
+
 export interface PersistentInspectorLogStats {
   oldestAt: number | null;
   rowCount: number;

@@ -392,6 +392,25 @@ export const cs = {
   evoluSyncedOwners: "Synchronizovaní owneři",
   migratingDataTitle: "Převádím data",
   migratingDataBody: "Chvíli to potrvá. Nezavírej aplikaci.",
+  hydrationTitle: "Stahuji tvoje data",
+  hydrationBody:
+    "Kontakty, zprávy a peněženka přicházejí z Evolu relaye. Nezavírej aplikaci.",
+  hydrationSlowBody:
+    "Trvá to dlouho. Evolu relay možná není dostupný; zkontroluj své Evolu relaye.",
+  hydrationProgress: "Synchronizováno {synced} z {total} částí",
+  hydrationOpenRelaySettings: "Evolu relaye",
+  secretsUnavailableTitle: "Klíče se nepodařilo načíst",
+  secretsUnavailableBody:
+    "Klíče z bezpečného úložiště tohoto zařízení se nepodařilo načíst, proto váš účet zůstal zavřený, aby byla vaše data v bezpečí. Zkuste to znovu, nebo účet obnovte záložními slovy.",
+  secretsUnavailableRetry: "Zkusit znovu",
+  secretsUnavailableContinue: "Obnovit záložními slovy",
+  secretsWriteFailedTitle: "Klíče se nepodařilo bezpečně uložit",
+  secretsWriteFailedBody:
+    "Bezpečné úložiště tohoto zařízení vaše klíče odmítlo. Linky je nikdy neukládá nikam méně bezpečně, takže zatím uložené nejsou. Zkuste to znovu. Pokud to stále selhává, nejdřív si opište záložní slova: obnovíte jimi účet na tomto i jakémkoli jiném zařízení.",
+  secretsWriteFailedWords: "Vaše záložní slova",
+  secretsWriteFailedRetry: "Zkusit znovu",
+  secretsWriteFailedAgain:
+    "Stále se je nepodařilo uložit. Zkuste to za chvíli nebo zařízení restartujte.",
   evoluNoDataYet: "Tady zatím nejsou uložená žádná data.",
   evoluData: "Data",
   evoluStorage: "Úložiště",
@@ -534,6 +553,7 @@ export const cs = {
   chatSeenShort: "přečteno",
   chatImageAttach: "Přidat obrázek nebo PDF",
   chatPdfDecrypting: "Dešifruji PDF…",
+  chatAttachmentRetry: "Zkusit znovu",
   chatPdfLoadFailed: "PDF se nepodařilo načíst.",
   chatPdfMessage: "PDF",
   chatPdfOpen: "Otevřít PDF",
@@ -549,6 +569,9 @@ export const cs = {
   chatImageOpen: "Otevřít obrázek",
   chatImageBackToChat: "Zpět do chatu",
   chatImageSave: "Uložit do fotek",
+  chatImageSaved: "Uloženo do fotek",
+  chatImageSaveDenied: "Linky nemá přístup k fotkám. Povol ho v Nastavení.",
+  chatImageSaveFailed: "Uložení do fotek se nepodařilo.",
   chatReplyAction: "Odpovědět",
   chatReactAction: "Reagovat",
   chatMoreEmojis: "Další emoji",
@@ -738,6 +761,7 @@ export const cs = {
   editContact: "Upravit kontakt",
   contactEditTitle: "Úprava kontaktu",
   contactPayTitle: "Platba na kontakt",
+  contactRequestTitle: "Požádat kontakt o platbu",
   messagesTitle: "Zprávy",
   newContact: "Přidat kontakt",
   close: "Zavřít",
@@ -1222,6 +1246,8 @@ export const cs = {
   payNetworkError: "Platbu nelze odeslat kvůli chybě sítě.",
   payApprovalChanged:
     "Schválení platby již není platné. Zkontrolujte příjemce a zaplaťte znovu.",
+  payWalletBusy:
+    "Peněženka právě vyřizuje jinou platbu, zkus to za chvíli znovu.",
   payFailed: "Platba se nepovedla",
   payPending:
     "Platba čeká na potvrzení mintem. Dokončí se sama, jakmile mint odpoví.",
@@ -1247,6 +1273,7 @@ export const cs = {
   // Locale-specific strings
   paid: "Zaplaceno",
   cashuTokenClaimed: "Token byl využit",
+  cashuTokenReceived: "Token byl přijat",
   cashuTokenClaimedWithAmount: "Tvůj token za {amount} byl využit",
   conversations: "Konverzace",
   proxyPayments: "Proxy platby",
@@ -1347,4 +1374,7 @@ export const cs = {
   keryxMediaUnavailable:
     "Soubor neodpovídá tomu, co firma podepsala, proto nebyl otevřen.",
   keryxNotFound: "Nenalezeno",
+  pickSourceTitle: "Přiložit z",
+  pickSourcePhotos: "Fotky",
+  pickSourceFiles: "Soubory",
 } as const;

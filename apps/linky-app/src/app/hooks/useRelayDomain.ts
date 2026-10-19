@@ -140,10 +140,10 @@ export const useRelayDomain = ({
   );
   React.useEffect(() => {
     if (!pendingRelayDeleteUrl) return;
-    const timeoutId = window.setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       setPendingRelayDeleteUrl(null);
     }, 5000);
-    return () => window.clearTimeout(timeoutId);
+    return () => clearTimeout(timeoutId);
   }, [pendingRelayDeleteUrl, setPendingRelayDeleteUrl]);
 
   const selectedRelayUrl = React.useMemo(() => {
@@ -265,7 +265,7 @@ export const useRelayDomain = ({
         if (cancelled) return;
         relayProfileSyncForNpubRef.current = null;
         if (publishing) {
-          retryTimeout = window.setTimeout(retrySync, 30_000);
+          retryTimeout = setTimeout(retrySync, 30_000);
         }
         reportAppLog({
           tag: "relayList.syncFailed",
@@ -278,7 +278,7 @@ export const useRelayDomain = ({
     void run();
     return () => {
       cancelled = true;
-      window.clearTimeout(retryTimeout);
+      clearTimeout(retryTimeout);
     };
   }, [
     cachePubkey,

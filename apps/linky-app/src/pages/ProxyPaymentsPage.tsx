@@ -34,6 +34,7 @@ import {
 } from "../nostrStatus";
 import { getPlatformTarget } from "../platform/runtime";
 import { currentNsecAtom } from "../app/state/session/session";
+import { guideTarget } from "../app/lib/guideTargets";
 const CURRENCY_LABEL_KEYS: Record<ProfileStatusCurrency, I18nKey> = {
   BRL: "proxyPaymentsProvideBrl",
   CZK: "proxyPaymentsProvideCzk",
@@ -188,7 +189,7 @@ export function NearbyBeaconSection({
       <Text variant="title" role="heading">
         {t("nearby")}
       </Text>
-      <Stack data-guide="beacon-switch">
+      <Stack {...guideTarget("beacon-switch")}>
         <ListRow
           icon="Radio"
           title={t("beacon")}
@@ -202,7 +203,7 @@ export function NearbyBeaconSection({
           }
         />
       </Stack>
-      <Stack gap="$xs" data-guide="beacon-trade">
+      <Stack gap="$xs" {...guideTarget("beacon-trade")}>
         <Text variant="label">{t("beaconTrade")}</Text>
         <SegmentedControl
           accessibilityLabel={t("beaconTrade")}
@@ -293,7 +294,7 @@ export function ProxyPaymentsPage(): React.ReactElement {
           flexDirection="column"
           paddingVertical="$xl"
           onPress={openWalletScan}
-          data-guide="proxy-scan"
+          {...guideTarget("proxy-scan")}
         >
           {t("proxyPaymentsScanBankQr")}
         </Button>
@@ -324,7 +325,7 @@ export function ProxyPaymentsPage(): React.ReactElement {
 
       <Divider />
 
-      <Stack gap="$sm" data-guide="proxy-earn">
+      <Stack gap="$sm" {...guideTarget("proxy-earn")}>
         <Text variant="title" role="heading">
           {t("proxyPaymentsEarnTitle")}
         </Text>

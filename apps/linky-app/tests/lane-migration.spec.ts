@@ -12,6 +12,7 @@ import {
 } from "./helpers/identity";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
 import { mintUrl } from "../../../packages/linkshu/tests/integration/helpers";
+import { gotoRoute } from "./helpers/routes";
 
 /**
  * The lanes are seeded through `window.__linkyE2E` (a VITE_E2E build hook)
@@ -94,7 +95,7 @@ const openDevice = async (
   await login(page);
   await stubFiatRates(page);
   await stubThirdPartyAssets(page);
-  await page.goto("/#wallet");
+  await gotoRoute(page, "wallet");
   await expect(page.getByLabel("Available balance")).toBeVisible({
     timeout: 60_000,
   });

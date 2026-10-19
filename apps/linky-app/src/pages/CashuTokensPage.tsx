@@ -85,8 +85,8 @@ export const CashuTokensPage = ({
 
   const [now, setNow] = useState(nowSeconds);
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(nowSeconds()), 60_000);
-    return () => window.clearInterval(timer);
+    const timer = setInterval(() => setNow(nowSeconds()), 60_000);
+    return () => clearInterval(timer);
   }, []);
   const transfers = useMemo(
     () => pendingTokenTransfers(cashuTransfers, cashuProofs),

@@ -1,4 +1,7 @@
-import { recoverMasterSecretFromSlip39Share } from "@linky-fit/identity";
+import {
+  deriveNostrSecretKeyFromMasterSecret,
+  recoverMasterSecretFromSlip39Share,
+} from "@linky-fit/identity";
 import { describe, expect, it, vi } from "vitest";
 import {
   deriveCashuBip85MnemonicFromSlip39,
@@ -13,6 +16,9 @@ vi.mock("@linky-fit/identity", async (importOriginal) => {
     ...actual,
     recoverMasterSecretFromSlip39Share: vi.fn(
       actual.recoverMasterSecretFromSlip39Share,
+    ),
+    deriveNostrSecretKeyFromMasterSecret: vi.fn(
+      actual.deriveNostrSecretKeyFromMasterSecret,
     ),
   };
 });
@@ -31,7 +37,7 @@ const deriveAll = (share: string) =>
   ]);
 
 describe("slip39Nostr", () => {
-  it("recovers the master secret once for every derivation from one share", async () => {
+  it("recovers the master secret and the Nostr key once per share", async () => {
     const [keys, appMnemonic, cashuMnemonic] = await deriveAll(SHARE);
     await deriveAll(SHARE);
 
@@ -44,7 +50,11 @@ describe("slip39Nostr", () => {
     expect(cashuMnemonic).toBe(
       "welcome trigger where when inflict token ready resist humble lift alert peanut cook place virus field banana smile oven hobby tail chair manage easily",
     );
+    expect(keys?.npub).toBe(
+      "npub1emlla45qgkxa0n6yj243m0uygv6332atrxckg7z5c4226lg3ke2qxdfpgk",
+    );
     expect(recoverMasterSecretFromSlip39Share).toHaveBeenCalledTimes(1);
+    expect(deriveNostrSecretKeyFromMasterSecret).toHaveBeenCalledTimes(1);
 
     const [otherKeys] = await deriveAll(OTHER_SHARE);
     expect(otherKeys?.nsec).not.toBe(keys?.nsec);

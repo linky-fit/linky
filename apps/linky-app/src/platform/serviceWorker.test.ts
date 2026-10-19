@@ -69,6 +69,20 @@ it.each([
   },
 );
 
+it("registers nothing in a dev build whose dev server serves no worker", async () => {
+  vi.doMock("./buildEnv", () => ({
+    isDevBuild: true,
+    devServiceWorkerUrl: null,
+  }));
+  vi.resetModules();
+  const fresh = await import("./serviceWorker");
+  const options = callbacks();
+  await fresh.registerServiceWorker(options)();
+  vi.doUnmock("./buildEnv");
+  expect(workbox.created).toEqual([]);
+  expect(options.onRegistered).not.toHaveBeenCalled();
+});
+
 it("reports the registration", async () => {
   const options = callbacks();
   registerServiceWorker(options);

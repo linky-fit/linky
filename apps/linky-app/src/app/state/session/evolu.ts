@@ -1,3 +1,4 @@
+import type { AppOwner } from "@linky-fit/linksync";
 import {
   createLinkyEvolu,
   makeEvoluRelaySettings,
@@ -30,6 +31,7 @@ export const evoluRelaySettingsAtom = Atom.keepAlive(
 export interface OpenedEvolu {
   readonly evolu: LinkyEvolu;
   readonly ownerSync: OwnerSync;
+  readonly appOwner: AppOwner | null;
   readonly hasEvoluRelay: boolean;
 }
 
