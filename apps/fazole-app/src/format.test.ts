@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CzkAmount } from "./domain";
-import { formatCzk, numberSeparators } from "./format";
+import { formatCzk, formatCzkWhole, numberSeparators } from "./format";
 
 // Intl separates digit groups with no-break spaces.
 const plain = (text: string) => text.replace(/\s/gu, " ");
@@ -12,6 +12,16 @@ describe("formatCzk", () => {
     [5, "0,05 Kč"],
   ])("formats %d", (amount, expected) => {
     expect(plain(formatCzk(CzkAmount.make(amount)))).toBe(expected);
+  });
+});
+
+describe("formatCzkWhole", () => {
+  it.each<[number, string]>([
+    [125050, "1 251 Kč"],
+    [20003, "200 Kč"],
+    [5, "0 Kč"],
+  ])("rounds %d to whole crowns", (amount, expected) => {
+    expect(plain(formatCzkWhole(CzkAmount.make(amount)))).toBe(expected);
   });
 });
 

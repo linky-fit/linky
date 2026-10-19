@@ -2,7 +2,7 @@ import { Amount, Button, Pressable, Stack } from "@linky-fit/ui";
 import { useState } from "react";
 import { copy } from "../copy";
 import { CzkAmount, satsToCzk, type Pledge, type ShopProfile } from "../domain";
-import { formatCzkValue, formatWhole } from "../format";
+import { formatCzkWholeValue, formatWhole } from "../format";
 import {
   useCzkRate,
   usePledgerName,
@@ -13,11 +13,10 @@ import { CashSheet } from "./CashSheet";
 import { Page } from "./Page";
 import { WithdrawSheet } from "./WithdrawSheet";
 
-/** The CZK value with the pledge still owed taken off, e.g. "-100" while nothing came in yet. */
+/** Whole crowns with the pledge still owed taken off, e.g. "-100" while nothing came in yet. */
 const netCzkValue = (czk: CzkAmount, owedCzk: CzkAmount): string => {
-  const net = czk - owedCzk;
-  const value = formatCzkValue(CzkAmount.make(Math.abs(net)));
-  return net < 0 ? `-${value}` : value;
+  const whole = Math.round((czk - owedCzk) / 100);
+  return whole < 0 ? `-${formatWhole(-whole)}` : formatWhole(whole);
 };
 
 export function WalletScreen({ shop }: { readonly shop: ShopProfile }) {
@@ -127,7 +126,7 @@ function PledgeButton({
       minHeight="$controlLg"
       onPress={onPress}
     >
-      {copy.wallet.pledgeButton(name, formatCzkValue(remainingCzk))}
+      {copy.wallet.pledgeButton(name, formatCzkWholeValue(remainingCzk))}
     </Button>
   );
 }

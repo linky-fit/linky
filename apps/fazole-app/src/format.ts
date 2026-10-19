@@ -14,6 +14,14 @@ export const formatCzkValue = (amount: CzkAmount): string =>
 export const formatCzk = (amount: CzkAmount): string =>
   copy.czkAmount(formatCzkValue(amount));
 
+/** Rounded to whole crowns, e.g. "1 251" for 1 250,50: the wallet shows no haléře. */
+export const formatCzkWholeValue = (amount: CzkAmount): string =>
+  formatWhole(Math.round(amount / 100));
+
+/** `1 251 Kč` for 1 250,50. */
+export const formatCzkWhole = (amount: CzkAmount): string =>
+  copy.czkAmount(formatCzkWholeValue(amount));
+
 const separatorOf = (type: "group" | "decimal") =>
   new Intl.NumberFormat(locale)
     .formatToParts(1000.5)
