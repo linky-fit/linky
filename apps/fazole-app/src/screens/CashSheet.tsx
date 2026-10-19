@@ -8,7 +8,7 @@ import {
   type CzkAmount,
   type Pledge,
 } from "../domain";
-import { formatCzk } from "../format";
+import { formatCzkWhole } from "../format";
 import type { ResolvedContact } from "../services/contacts";
 import {
   useAppServices,
@@ -241,10 +241,10 @@ function PledgeOffer({
       <Notice
         tone="info"
         icon="HandCoins"
-        title={copy.cash.offerTitle(formatCzk(amountCzk), name)}
+        title={copy.cash.offerTitle(formatCzkWhole(amountCzk), name)}
         description={copy.cash.offerDetail(
           name,
-          availableCzk === undefined ? null : formatCzk(availableCzk),
+          availableCzk === undefined ? null : formatCzkWhole(availableCzk),
         )}
       />
       <Stack gap="$sm">
@@ -276,7 +276,7 @@ function PledgeOpened({
     <Stack gap="$lg" testID="pledge-done">
       <Notice
         tone="accent"
-        title={copy.pledge.openedTitle(formatCzk(pledge.amountCzk), name)}
+        title={copy.pledge.openedTitle(formatCzkWhole(pledge.amountCzk), name)}
         description={copy.pledge.openedDetail}
       />
       <Button testID="pledge-close" onPress={onClose}>
@@ -303,9 +303,15 @@ function PledgeStatus({
         <DetailRows
           details={[
             { label: copy.pledge.to, value: name },
-            { label: copy.pledge.taken, value: formatCzk(pledge.amountCzk) },
-            { label: copy.pledge.repaid, value: formatCzk(repaid) },
-            { label: copy.pledge.remaining, value: formatCzk(remainingCzk) },
+            {
+              label: copy.pledge.taken,
+              value: formatCzkWhole(pledge.amountCzk),
+            },
+            { label: copy.pledge.repaid, value: formatCzkWhole(repaid) },
+            {
+              label: copy.pledge.remaining,
+              value: formatCzkWhole(remainingCzk),
+            },
           ]}
         />
       </Card>
