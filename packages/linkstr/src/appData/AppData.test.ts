@@ -1,9 +1,9 @@
-import { Effect, Exit, Layer, Stream } from "effect";
+import { Deferred, Effect, Exit, Fiber, Layer, Stream } from "effect";
 import type { Scope } from "effect";
 import { RelayUrl, UnixSeconds } from "../domain/primitives";
 import { signPlainEvent } from "../internal/plainEvent";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
-import type { NostrTransport } from "../services/NostrTransport";
+import { NostrTransport, RelayPublishResult } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
 import { makeIdentity, stubPlainTransport } from "../testing";
 import type { SignedPlainEvent } from "../testing";
@@ -93,6 +93,72 @@ describe("AppData.publish", () => {
       ],
       content: "attestation",
     });
+  });
+
+  it("orders rapid publications within each slot", async () => {
+    const published: Array<SignedPlainEvent> = [];
+    const exit = await runWith(
+      stubPlainTransport(published),
+      Effect.gen(function* () {
+        const appData = yield* AppData;
+        yield* Effect.all(
+          ["first", "second", "third"].map((content) =>
+            appData.publish(new AppDataDraft({ identifier, content })),
+          ),
+          { concurrency: "unbounded" },
+        );
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(published).toHaveLength(3);
+    expect(published[1]?.created_at).toBe((published[0]?.created_at ?? 0) + 1);
+    expect(published[2]?.created_at).toBe((published[1]?.created_at ?? 0) + 1);
+  });
+
+  it("does not hold one slot's publication behind another slot's", async () => {
+    const stalled = AppDataIdentifier.make("platitprosim:stalled");
+    const started = Effect.runSync(Deferred.make<void>());
+    const release = Effect.runSync(Deferred.make<void>());
+    const published: Array<string> = [];
+    const transport = Layer.succeed(NostrTransport, {
+      publish: (relays, event) =>
+        Effect.gen(function* () {
+          const d = event.tags[0]?.[1] ?? "";
+          if (d === stalled) {
+            yield* Deferred.succeed(started, undefined);
+            yield* Deferred.await(release);
+          }
+          published.push(d);
+          return relays.map(
+            (to) =>
+              new RelayPublishResult({
+                relay: to,
+                accepted: true,
+                detail: null,
+              }),
+          );
+        }),
+      subscribe: () => Effect.die("subscribe not under test"),
+      fetch: () => Effect.die("fetch not under test"),
+    });
+    const exit = await runWith(
+      transport,
+      Effect.gen(function* () {
+        const appData = yield* AppData;
+        const first = yield* Effect.forkChild(
+          appData.publish(
+            new AppDataDraft({ identifier: stalled, content: "a" }),
+          ),
+        );
+        yield* Deferred.await(started);
+        yield* appData.publish(new AppDataDraft({ identifier, content: "b" }));
+        expect(published).toEqual([identifier]);
+        yield* Deferred.succeed(release, undefined);
+        yield* Fiber.join(first);
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(published).toEqual([identifier, stalled]);
   });
 
   it("refuses a draft that brings its own d tag", () => {

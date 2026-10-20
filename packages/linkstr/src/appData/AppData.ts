@@ -7,6 +7,7 @@ import {
   Option,
   Queue,
   Result,
+  Semaphore,
   Stream,
 } from "effect";
 import type { Cause, Scope } from "effect";
@@ -16,7 +17,7 @@ import type {
   NoRelayAcceptedEvent,
 } from "../domain/errors";
 import { NoReadRelaysConfigured } from "../domain/errors";
-import type { RelayUrl } from "../domain/primitives";
+import type { RelayUrl, UnixSeconds } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import { inspectPlainOperation } from "../internal/inspectPlainOperation";
 import { deliverPlainEvent } from "../internal/plainDelivery";
@@ -34,7 +35,12 @@ import {
   matchesQuery,
   slotOf,
 } from "./codec";
-import type { AppDataDraft, AppDataEvent, AppDataQuery } from "./domain";
+import type {
+  AppDataDraft,
+  AppDataEvent,
+  AppDataIdentifier,
+  AppDataQuery,
+} from "./domain";
 
 const FETCH_PER_RELAY_TIMEOUT = Duration.seconds(5);
 const DEFAULT_RESUBSCRIBE_DELAY = Duration.seconds(5);
@@ -68,18 +74,40 @@ export class AppData extends Context.Service<AppData>()("linkstr/AppData", {
         : Effect.succeed(context.relayPolicy.readRelays),
     );
 
+    const publications = new Map<AppDataIdentifier, Semaphore.Semaphore>();
+    const publishedAt = new Map<AppDataIdentifier, UnixSeconds>();
+    const publicationsOf = (identifier: AppDataIdentifier) => {
+      const existing = publications.get(identifier);
+      if (existing !== undefined) return existing;
+      const created = Semaphore.makeUnsafe(1);
+      publications.set(identifier, created);
+      return created;
+    };
     const publish = (
       draft: AppDataDraft,
     ): Effect.Effect<PlainEventReceipt, NoRelayAcceptedEvent> =>
-      deliverPlainEvent(context, encodeAppDataEvent(draft)).pipe(
-        Effect.map((receipt) => ({
-          result: receipt,
-          eventIds: [receipt.eventId],
-        })),
-        inspectPlainOperation(inspector, "appData.publish", {
-          identifier: draft.identifier,
-          tags: draft.tags,
-        }),
+      publicationsOf(draft.identifier).withPermit(
+        Effect.suspend(() =>
+          deliverPlainEvent(
+            context,
+            encodeAppDataEvent(draft),
+            publishedAt.get(draft.identifier),
+          ),
+        ).pipe(
+          Effect.tap((receipt) =>
+            Effect.sync(() => {
+              publishedAt.set(draft.identifier, receipt.sentAt);
+            }),
+          ),
+          Effect.map((receipt) => ({
+            result: receipt,
+            eventIds: [receipt.eventId],
+          })),
+          inspectPlainOperation(inspector, "appData.publish", {
+            identifier: draft.identifier,
+            tags: draft.tags,
+          }),
+        ),
       );
 
     /** The newest event per author and `d` tag, newest first. */

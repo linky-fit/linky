@@ -184,6 +184,8 @@ const watchEmployees = (employees: ReadonlyArray<Pubkey>) =>
   });
 ```
 
+Within one runtime, publications to the same slot are serialized and dated after the previous successful publication, so saves in the same second replace one another reliably; publications to different slots do not wait for each other.
+
 `AppDataQuery` narrows by `authors`, `identifiers` (`#d`), `taggedPubkeys` (`#p`) and `since`; every given field must match. `fetch(query)` asks every read relay once (5 s each) and returns the newest event per author and `d` tag, newest first. `watch(query)` is a scoped stream over every read relay, stored events first, then live ones, resubscribing with backoff; per slot it only emits versions newer than one it already emitted. Both verify each event's signature and drop events the query did not ask for, whatever a relay sends. An `AppDataEvent` carries the decoded fields and the signed `event` itself, for embedding or re-verifying elsewhere.
 
 In React, the `publishAppData` and `fetchAppData` commands run `publish` and `fetch`.
