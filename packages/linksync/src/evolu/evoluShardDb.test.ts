@@ -232,6 +232,34 @@ describe("evolu shard db", () => {
     }
   });
 
+  it("reads omitted columns as null before a sparse write reaches the query", async () => {
+    const fake = fakeEvolu();
+    const db = createEvoluShardDb(fake.runtime, reportedOwnerSync().ownerSync);
+    await Effect.runPromise(
+      db.mutate([
+        {
+          kind: "upsert",
+          table: "onchainTransfer",
+          ownerId: testAppOwner().id,
+          row: { id: "transfer-1", amount: 100_000 },
+        },
+      ]),
+    );
+    for (const rows of [
+      await Effect.runPromise(db.readTable("onchainTransfer")),
+      await Effect.runPromise(db.readCopies("onchainTransfer", "transfer-1")),
+    ]) {
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        id: "transfer-1",
+        amount: 100_000,
+        createdAtSec: null,
+        cancelledAtSec: null,
+        refundAddress: null,
+      });
+    }
+  });
+
   it("serves its own tombstone from the overlay until the row reflects it", async () => {
     const fake = fakeEvolu();
     const db = createEvoluShardDb(fake.runtime, reportedOwnerSync().ownerSync);

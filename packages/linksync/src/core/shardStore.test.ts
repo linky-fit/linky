@@ -781,6 +781,27 @@ describe("shard store", () => {
     });
   });
 
+  it("subscribes restored pointers that arrive before the first watcher read", async () => {
+    const { db, store, appOwner } = toyStore();
+    run(store.reconcileSync());
+    run(
+      db.mutate([
+        {
+          kind: "upsert",
+          table: "shardPointer",
+          ownerId: appOwner.id,
+          row: { id: shardPointerId("notes"), scope: "notes", index: 2 },
+        },
+      ]),
+    );
+    const rotations: Array<{ scope: string; index: number }> = [];
+    const stop = store.followPointers((rotation) => rotations.push(rotation));
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(db.usedOwners()).toContain(store.shardOwner("notes", 2).id);
+    expect(rotations).toEqual([]);
+    stop();
+  });
+
   it("reports pointer changes and subscribes the new shard", async () => {
     const { db, store } = toyStore();
     const rotations: Array<{ scope: string; index: number }> = [];
