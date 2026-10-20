@@ -20,6 +20,7 @@ const placements = {
       padding: "$xl",
       width: "$sheetWidth",
       maxWidth: "100%",
+      borderWidth: 0,
       borderRadius: "$card",
       backgroundColor: "$surface",
       boxShadow: shadow.floating,
