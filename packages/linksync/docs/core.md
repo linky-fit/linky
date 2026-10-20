@@ -22,7 +22,7 @@ Reads and writes are `Effect`s. Errors are `ShardDbError` (the port rejected or 
 ## Lifecycle
 
 1. `reconcileSync()` right after creating the store. Sync uses the app owner plus every visible shard of every scope, and nothing else is subscribed.
-2. `followPointers(onRotated)` once, kept for the store's lifetime. A rotation on another device arrives as a pointer change, and this subscription is what subscribes the new shard here; it reports local rotations too.
+2. `followPointers(onRotated)` once, kept for the store's lifetime. It reconciles subscriptions on its first read and every pointer change, so restored pointers already present when it starts subscribe their shards too. Later pointer changes report local and remote rotations through `onRotated`.
 3. Hold every write the user did not ask for until the store is [hydrated](#hydration), and every write on a device that has never been hydrated with the account (`holdWritesUntilHydrated`).
 4. `repairPointers()` once, in the background: it waits for hydration and then for the relay ([pointer repair](#pointer-repair)).
 5. `forget(scope?)` only on an explicit user action. It narrows one scope, or every forgettable scope, to its newest window, notifies readers and unsubscribes the rest; it deletes only when the port can.

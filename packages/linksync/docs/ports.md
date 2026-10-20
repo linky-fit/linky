@@ -8,7 +8,7 @@ How the store talks to storage, what a new runtime must implement, and how a Lin
 
 Two contracts the type cannot express:
 
-- Read-after-write. The store chains a write and a read inside one operation (copy-on-write reads the current row, the wallet reads the inventory it just changed) and holds no cache, so `readTable` and `readCopies` (one row's copies by id) must return what `mutate` was given even when the database commits later.
+- Read-after-write. The store chains a write and a read inside one operation (copy-on-write reads the current row, the wallet reads the inventory it just changed) and holds no cache, so `readTable` and `readCopies` (one row's copies by id) must return what `mutate` was given even when the database commits later. Columns never written read as `null`, including in the Evolu adapter's local write overlay.
 - `deleteOwner` is `null` when the runtime cannot delete an owner; `forget` then only unsubscribes and hides the rows (`deleted: false`).
 - `isOwnerSynced(ownerId)` turns true once the owner finished a sync round with a relay since the database opened, and only when `readTable` already returns what that round brought; `subscribeOwnerSync` fires when more owners finish. The store's [hydration](./core.md#hydration) rests on it.
 

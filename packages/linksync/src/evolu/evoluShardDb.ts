@@ -15,7 +15,11 @@ import type {
   SystemColumns,
 } from "../core";
 import { ShardDbError } from "../core";
-import { LinkySchema, type LinkyDbSchema } from "../model/schema";
+import {
+  LinkySchema,
+  linkyTableColumns,
+  type LinkyDbSchema,
+} from "../model/schema";
 import type { OwnerSync } from "./ownerSync";
 
 /**
@@ -59,6 +63,8 @@ type LinkyTable = keyof LinkyDbSchema & string;
 const MAX_WRITE_COMPLETION_WAIT = Duration.seconds(10);
 
 const isTable = (table: string): table is LinkyTable => table in LinkySchema;
+const tableColumns: Readonly<Record<string, ReadonlyArray<string>>> =
+  linkyTableColumns;
 
 type StoredRow = Columns &
   Omit<SystemColumns, "createdAt" | "updatedAt"> & {
@@ -135,7 +141,11 @@ const reflects = (loaded: Row<Columns>, entry: OverlayEntry): boolean =>
 
 const asRow = (entry: OverlayEntry, previous?: Row<Columns>): Row<Columns> => {
   const { isDeleted, ...columns } = entry.columns;
+  const unset = Object.fromEntries(
+    (tableColumns[entry.table] ?? []).map((column) => [column, null]),
+  );
   return {
+    ...unset,
     ...previous,
     ...columns,
     ownerId: entry.ownerId,

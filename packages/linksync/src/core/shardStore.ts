@@ -820,13 +820,13 @@ export const createShardStore = <
   ): (() => void) => {
     const seen = new Map<string, number>();
     const check = Effect.gen(function* () {
+      yield* reconcileSync();
       for (const scope of scopeNames) {
         if (definition(scope).owner === "app") continue;
         const index = yield* activeIndex(scope);
         const previous = seen.get(scope);
         seen.set(scope, index);
         if (previous === undefined || previous === index) continue;
-        yield* reconcileSync();
         onRotated({ scope, index });
       }
     });
