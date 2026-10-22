@@ -29,6 +29,7 @@ A mobile-first PWA for contacts, private Nostr messaging and Lightning/Cashu pay
 - [`apps/native-shell`](./apps/native-shell/README.md): Android and iOS builds, signing, push setup
 - [`apps/desktop`](./apps/desktop/README.md): macOS desktop shell
 - [`apps/push`](./apps/push/README.md): Web Push and FCM service at `push.linky.fit`
+- [`apps/onchain-operator`](./apps/onchain-operator/README.md): the on-chain operator's console for on-chain transfers, deployed by hand to operator.twoballers.dev
 
 ## Fazole
 
@@ -85,10 +86,23 @@ Requirements: Bun and Docker (local Nostr relay, Evolu relay and FakeWallet Cash
 bun install
 bun run dev           # Docker stack, Linky app on :5173, push service on :8787
 bun run fazole:dev    # Fazole app on :5280; needs the Docker stack `bun run dev` starts
+bun run onchain-operator:dev  # on-chain operator console on :5295; also needs `bun run bitcoin:up`
 bun run test          # unit tests in every workspace
 bun run check-code    # typecheck, eslint --fix, prettier --write
 bun run test-changed  # unit tests in the workspaces this branch reaches
 bun run check-changed # check-code in the workspaces this branch reaches
+```
+
+Bitcoin regtest for on-chain transfers (Docker profile `bitcoin`, not started by `bun run dev` or the e2e stack): bitcoind RPC on `localhost:18443` (`linky`/`linky`), Esplora API on http://localhost:3002, block explorer on http://localhost:3003.
+
+```bash
+bun run bitcoin:up                            # start bitcoind, electrs and the explorer
+bun run bitcoin -- init                       # create the funded `dev` wallet (101 blocks)
+bun run bitcoin -- send <address> <btc>       # pay from `dev`, prints the txid
+bun run bitcoin -- mine <n> [address]         # mine blocks, waits until Esplora indexed them
+bun run bitcoin -- balance                    # also: newaddress [type], cli <bitcoin-cli args...>
+bun run bitcoin -- import-descriptor <wallet> <descriptor>  # e.g. the dev operator's BIP86 tprv
+bun run bitcoin:down                          # stop it; chain and wallets stay in Docker volumes
 ```
 
 End-to-end tests (Playwright against a Docker stack owned by the checkout, so worktrees can run them side by side):

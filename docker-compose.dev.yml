@@ -144,9 +144,101 @@ services:
       retries: 20
       start_period: 3s
 
+  # Bitcoin regtest for on-chain transfers: `bun run bitcoin:up`, then drive it
+  # with `bun run bitcoin -- <command>` (scripts/bitcoin-regtest.sh).
+  bitcoind:
+    profiles: ["bitcoin"]
+    image: ghcr.io/getumbrel/docker-bitcoind:v30.0
+    command:
+      - -regtest
+      - -server
+      - -txindex
+      - -fallbackfee=0.0002
+      - -rpcuser=linky
+      - -rpcpassword=linky
+      - -rpcbind=0.0.0.0
+      - -rpcallowip=0.0.0.0/0
+      - -printtoconsole
+      # Leaves initial block download right away despite the 2011 genesis.
+      - -maxtipage=2000000000
+    ports:
+      - "18443:18443"
+    volumes:
+      - bitcoind-data:/data/.bitcoin
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bitcoin-cli",
+          "-regtest",
+          "-rpcuser=linky",
+          "-rpcpassword=linky",
+          "getblockchaininfo",
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # Esplora HTTP API; the browser apps call it directly, hence CORS.
+  electrs:
+    profiles: ["bitcoin"]
+    image: ghcr.io/vulpemventures/electrs:a808b51d0d9301fa82390b985c57551966001f9b
+    command:
+      - --network=regtest
+      - --daemon-rpc-addr=bitcoind:18443
+      - --cookie=linky:linky
+      - --jsonrpc-import
+      - --db-dir=/data
+      - --http-addr=0.0.0.0:3002
+      - --electrum-rpc-addr=0.0.0.0:60401
+      - --cors=*
+    depends_on:
+      bitcoind:
+        condition: service_healthy
+    ports:
+      - "3002:3002"
+    volumes:
+      - electrs-data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bash",
+          "-c",
+          "exec 3<>/dev/tcp/127.0.0.1/3002 && printf 'GET /blocks/tip/height HTTP/1.0\\r\\n\\r\\n' >&3 && head -1 <&3 | grep -q ' 200 '",
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # Block explorer UI for tx links: http://localhost:3003/tx/<txid>
+  esplora:
+    profiles: ["bitcoin"]
+    image: ghcr.io/vulpemventures/esplora:beb2cff88d63bea6991a5a9a0b11b2a45d13ee6b
+    environment:
+      API_URL: http://localhost:3002
+    depends_on:
+      electrs:
+        condition: service_healthy
+    ports:
+      - "3003:5000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://127.0.0.1:5000/',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
 volumes:
   nostr-relay-data:
   evolu-relay-data:
   evolu-relay-quota-data:
   cashu-mint-data:
   cashu-mint-target-data:
+  bitcoind-data:
+  electrs-data:

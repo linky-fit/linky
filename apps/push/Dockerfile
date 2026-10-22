@@ -10,6 +10,7 @@ COPY apps/fazole-site/package.json apps/fazole-site/package.json
 COPY apps/linkshu-cli/package.json apps/linkshu-cli/package.json
 COPY apps/native-shell/package.json apps/native-shell/package.json
 COPY apps/push/package.json apps/push/package.json
+COPY apps/onchain-operator/package.json apps/onchain-operator/package.json
 COPY apps/linky-site/package.json apps/linky-site/package.json
 COPY apps/ui-book/package.json apps/ui-book/package.json
 COPY apps/linky-app/package.json apps/linky-app/package.json
