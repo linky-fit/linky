@@ -103,6 +103,15 @@ Insert `mintUrl`, `rail` and the initial `progress` with every new payment. `min
 
 The JSON columns hold the Keryx protocol package's Schemas, encoded with `Schema.fromJsonString`: `trustJson` a `CompanyTrust`, `identityJson` the acknowledged `CompanyIdentity`, `channelsJson` the subscribed public channel names and `privateFeedsJson` the private feeds' capability URLs. A feed's sync state (version, closed) is per device and not stored here, so a device refreshing from an old copy of the row cannot drop a feed another device added. This package stores the columns as given; decoding and verification belong to the Keryx package. `privateFeedsJson` holds capability URLs; keep it out of logs.
 
+## On-chain transfers
+
+`makeOnchainTransfersRepository(store)` over `onchainTransfer` in the `onchain` scope, which is never forgotten: one row per on-chain transfer, keyed by the `OnchainTransferId` the user created with the request. The user's account and the operator's each keep their own row of a transfer; `role` says which side the account is and `peerPubkey` is the other side. `all` returns `OnchainTransferRecord`s, whose creation time, role, peer, direction, amount and fee are present; a row still arriving column by column is skipped.
+
+- Requesting a transfer is the user's `insert` with the columns the request fixes: `direction`, `amount`, `feeBasisPoints`, and the payout address, refund choice or user payment request its direction needs. The operator stores a received request with `insertIfAbsent`, so a replayed request cannot overwrite a transfer in progress.
+- Everything after is `update`: `updateJson` with each newer update, `depositAddress` and `operatorPaymentRequest` once accepted, the operator's `addressIndex`, the user's `sentAtSec` and `cancelledAtSec`.
+
+`role`, `direction` and `updateJson` stay strings here; their values, the status rules and the update's JSON belong to `@linky-fit/onchain-transfer`, whose `encodeTransferUpdateColumn` and `decodeTransferUpdateColumn` write and read `updateJson`.
+
 ## Identity
 
 `makeIdentityRepository(store)` mirrors the active Nostr key in the `identity` scope (one fixed shard, never forgotten) so another device can adopt it. `set` upserts the one row `activeNostrIdentityId`; `current` is the newest row by `updatedAt`, or `null`. `switchedAtSec` is the cutoff after which older incoming events are ignored following a custom override. The row carries the `nsec`; keep it out of logs.

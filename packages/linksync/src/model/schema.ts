@@ -21,6 +21,7 @@ import {
   RecurringPaymentId,
   SettingId,
   ShardPointerId,
+  OnchainTransferId,
   TransactionId,
 } from "@linky-fit/domain";
 
@@ -265,6 +266,37 @@ export const LinkySchema = {
     privateFeedsJson: nullOr(NonEmptyString),
     pairedAtSec: PositiveInt,
   },
+  /** Onchain scope: one on-chain transfer, on the user's or the operator's account. */
+  onchainTransfer: {
+    id: OnchainTransferId,
+    createdAtSec: PositiveInt,
+    // "user" | "operator": which side of the transfer this account is.
+    role: NonEmptyString100,
+    // Hex pubkey of the other side: the operator for a user, the user for the operator.
+    peerPubkey: NonEmptyString100,
+    // "send" | "receive"
+    direction: NonEmptyString100,
+    // Sats the user gets; they send it plus the fee. Fixed at creation.
+    amount: PositiveInt,
+    // The fee the request was made at, in basis points.
+    feeBasisPoints: NonNegativeInt,
+    payoutAddress: nullOr(NonEmptyString1000),
+    refundAddress: nullOr(NonEmptyString1000),
+    // "1" when the user asked for a refund to the address they send from.
+    refundToSender: nullOr(SqliteBoolean),
+    // receive: the user's NUT-18 request the operator pays.
+    userPaymentRequest: nullOr(NonEmptyString1000),
+    // send: the operator's NUT-18 request the user pays.
+    operatorPaymentRequest: nullOr(NonEmptyString1000),
+    depositAddress: nullOr(NonEmptyString1000),
+    // Operator only: BIP86 receive index of depositAddress.
+    addressIndex: nullOr(NonNegativeInt),
+    // JSON of the latest OnchainTransferUpdate without paymentRequest, one column so sync never splits it.
+    updateJson: nullOr(NonEmptyString1000),
+    // User only.
+    sentAtSec: nullOr(PositiveInt),
+    cancelledAtSec: nullOr(PositiveInt),
+  },
 } satisfies EvoluSchema;
 
 /** The column value types of an Evolu schema, the shape the shard store reads and writes. */
@@ -292,6 +324,7 @@ export type CashuOperationRow = Row<LinkyDbSchema["cashuOperation"]>;
 export type TransactionRow = Row<LinkyDbSchema["transaction"]>;
 export type RecurringPaymentRow = Row<LinkyDbSchema["recurringPayment"]>;
 export type KeryxSubscriptionRow = Row<LinkyDbSchema["keryxSubscription"]>;
+export type OnchainTransferRow = Row<LinkyDbSchema["onchainTransfer"]>;
 
 const columnNames = <Table extends Record<string, unknown>>(
   table: Table,
@@ -313,4 +346,5 @@ export const linkyTableColumns: TableColumns<LinkyDbSchema> = {
   transaction: columnNames(LinkySchema.transaction),
   recurringPayment: columnNames(LinkySchema.recurringPayment),
   keryxSubscription: columnNames(LinkySchema.keryxSubscription),
+  onchainTransfer: columnNames(LinkySchema.onchainTransfer),
 };

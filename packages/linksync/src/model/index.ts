@@ -11,6 +11,7 @@ export type {
   LinkyTable,
   MessageRow,
   NostrIdentityRow,
+  OnchainTransferRow,
   ReactionRow,
   RecurringPaymentRow,
   SettingRow,
