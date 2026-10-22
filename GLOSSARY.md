@@ -221,7 +221,7 @@ An operation waiting for the mint's final answer, which any of the user's device
 _Avoid_: in-flight payment, stuck payment
 
 **Transaction**:
-An entry in the payment history the user sees; it is a view of the wallet's operations, not the source of truth.
+An entry in the payment history the user sees; it is a view of the wallet's operations and on-chain transfers, not the source of truth.
 _Avoid_: payment, operation, record
 
 **Lightning address**:
@@ -375,6 +375,56 @@ _Avoid_: message, post, notification
 **Suspended**:
 A company whose signing keys no longer chain to the pinned root; nothing it publishes is shown and the only offered action is removing it.
 _Avoid_: blocked, untrusted, compromised
+
+## On-chain transfers
+
+**On-chain transfer**:
+Moving bitcoin between the user's wallet and an on-chain bitcoin wallet, as an on-chain send or an on-chain receive; the on-chain operator completes each by hand within 24 hours of accepting it. The UI says "Send to on-chain wallet" and "Receive from on-chain wallet".
+_Avoid_: swap, on-chain swap, peg-in, peg-out, withdrawal
+
+**On-chain send**:
+An on-chain transfer out: the user pays the transfer amount plus the service fee in ecash, and the on-chain operator pays the transfer amount to the payout address.
+_Avoid_: send (that is a token), payout, withdrawal
+
+**On-chain receive**:
+An on-chain transfer in: the user sends the transfer amount plus the service fee to the deposit address, and the on-chain operator pays the transfer amount in ecash.
+_Avoid_: receive (that is a token), topup, deposit
+
+**On-chain operator**:
+The one person who completes on-chain transfers from the operator console; Linky knows them by a fixed npub. The UI never names them: their chat is the user's support chat and carries no transfer state.
+_Avoid_: swap operator, exchanger, admin, LSP
+
+**Waiting for details**:
+An on-chain transfer the on-chain operator has not accepted yet, so it has no payment request or deposit address; Linky notifies the user once it has.
+_Avoid_: waiting for the operator, pending approval
+
+**Transfer amount**:
+The sats the user gets from an on-chain transfer, one of the fixed amounts in the on-chain config; the user pays it plus the service fee.
+_Avoid_: swap amount, bucket, receive amount
+
+**Service fee**:
+The on-chain operator's percentage of the transfer amount, charged on top of it; the operator also pays the miner fee on payouts.
+_Avoid_: swap fee, commission, network fee
+
+**Deposit address**:
+The Taproot address, fresh for each on-chain receive, that the on-chain operator derives for the user to send to.
+_Avoid_: invoice, receive address
+
+**Short deposit**:
+An on-chain receive whose deposit address got less than the transfer amount plus the service fee; it cannot complete until enough arrives, and the on-chain operator refunds it otherwise.
+_Avoid_: underpayment, partial deposit
+
+**Payout address**:
+The user's bitcoin address an on-chain send pays.
+_Avoid_: withdrawal address
+
+**Refund address**:
+Where the on-chain operator returns an on-chain receive's coins if it cannot complete; the address the user sends from, unless they set a custom refund address.
+_Avoid_: return address
+
+**On-chain config**:
+The on-chain operator's public NIP-78 event with the service fee, the transfer amounts, the pause switch and the description.
+_Avoid_: swap config, swap settings, terms
 
 ## Sync and devices
 
