@@ -55,7 +55,7 @@ describe("needsPaymentRequestConfirmation", () => {
   ) =>
     needsPaymentRequestConfirmation({
       autoPayLimit: 100,
-      explicitTap: false,
+      approval: "scan",
       quote: direct(100),
       recipientDiffers: false,
       ...overrides,
@@ -67,13 +67,19 @@ describe("needsPaymentRequestConfirmation", () => {
   });
 
   it("lets a tap on a chat request's Pay skip the limit", () => {
-    expect(needs({ quote: direct(500), explicitTap: true })).toBe(false);
+    expect(needs({ quote: direct(500), approval: "tap" })).toBe(false);
+  });
+
+  it("always reviews a payment marked for review, whatever the limit", () => {
+    expect(
+      needs({ quote: direct(1), autoPayLimit: 1_000, approval: "review" }),
+    ).toBe(true);
   });
 
   it("always asks for an amount, another recipient or a new mint", () => {
-    expect(needs({ quote: null, explicitTap: true })).toBe(true);
-    expect(needs({ recipientDiffers: true, explicitTap: true })).toBe(true);
-    expect(needs({ quote: overLightning(true), explicitTap: true })).toBe(true);
+    expect(needs({ quote: null, approval: "tap" })).toBe(true);
+    expect(needs({ recipientDiffers: true, approval: "tap" })).toBe(true);
+    expect(needs({ quote: overLightning(true), approval: "tap" })).toBe(true);
     expect(needs({ quote: overLightning(false), autoPayLimit: 1_000 })).toBe(
       false,
     );
@@ -140,7 +146,7 @@ describe("useCashuPaymentRequestConfirmation", () => {
             request: request(amount),
             chat: null,
             recipientDiffers,
-            explicitTap: false,
+            approval: "scan",
           }),
         ),
     };
@@ -169,6 +175,27 @@ describe("useCashuPaymentRequestConfirmation", () => {
 
     expect(hook.pay).toHaveBeenCalledOnce();
     expect(hook.current().pendingCashuPaymentRequestConfirmation).toBeNull();
+  });
+
+  it("hands the payer's checks through the review, such as whether a transfer is still payable and marking it sent", async () => {
+    const hook = await setup();
+    const onPaid = vi.fn();
+    const isPaymentAuthorized = vi.fn(() => true);
+    await act(() =>
+      hook.current().reviewCashuPaymentRequest({
+        request: request(101),
+        chat: null,
+        recipientDiffers: false,
+        approval: "scan",
+        isPaymentAuthorized,
+        onPaid,
+      }),
+    );
+    await act(() => hook.current().confirmCashuPaymentRequest());
+
+    expect(hook.pay).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ isPaymentAuthorized, onPaid }),
+    );
   });
 
   it("never pays a cancelled request", async () => {

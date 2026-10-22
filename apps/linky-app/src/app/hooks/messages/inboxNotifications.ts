@@ -72,8 +72,9 @@ const notificationTitle = (
   );
 };
 
-const showVisibleToast = (
-  ctx: InboxNotificationsContext,
+/** A toast only while the app is in view; a hidden app gets the PWA notification instead. */
+export const showVisibleToast = (
+  ctx: Pick<InboxNotificationsContext, "pushToast">,
   message: string,
   options?: PushToastOptions,
 ): void => {

@@ -11,6 +11,8 @@ import {
   type LinkyScope,
   type LinkyStore,
   type MessageRow,
+  type OnchainTransferRecord,
+  type OnchainTransfersRepository,
   type NostrIdentityRow,
   type ReactionRow,
   type SettingKey,
@@ -42,6 +44,7 @@ import {
   inboxCursorsRepositoryAtom,
   keryxSubscriptionsRepositoryAtom,
   linkyStoreAtom,
+  onchainTransfersRepositoryAtom,
   recurringPaymentsRepositoryAtom,
   settingsRepositoryAtom,
   transactionsRepositoryAtom,
@@ -130,6 +133,13 @@ export const useKeryxSubscriptionsRepository =
 export const useKeryxSubscriptionRows =
   (): ReadonlyArray<KeryxSubscriptionRecord> =>
     useRepositoryRows(useKeryxSubscriptionsRepository());
+
+export const useOnchainTransfersRepository = (): OnchainTransfersRepository =>
+  useAtomSuspense(onchainTransfersRepositoryAtom).value;
+
+export const useOnchainTransferRecords =
+  (): ReadonlyArray<OnchainTransferRecord> =>
+    useRepositoryRows(useOnchainTransfersRepository());
 
 /** linkshu's stores over the cashu shards; the wallet runtime is built on it. */
 export const useWalletRepository = (): WalletRepository =>

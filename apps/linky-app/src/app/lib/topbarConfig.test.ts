@@ -91,6 +91,17 @@ describe("resolveBackAction", () => {
     );
   });
 
+  it("walks on-chain transfer pages back to where they open from", () => {
+    const id = createIdFromString<"OnchainTransfer">("transfer-1");
+    expect(
+      backHashFor({ kind: "onchainSend", payoutAddress: "", amount: null }),
+    ).toBe("#wallet");
+    expect(backHashFor({ kind: "onchainReceive" })).toBe("#wallet/topup");
+    expect(backHashFor({ kind: "onchainTransfer", id })).toBe(
+      "#wallet/transactions",
+    );
+  });
+
   it("walks wallet sub-pages back up one level at a time", () => {
     expect(backHashFor({ kind: "transactions" })).toBe("#wallet");
     expect(backHashFor({ kind: "topup" })).toBe("#wallet");
@@ -188,6 +199,7 @@ describe("buildTopbarRight", () => {
       hiddenTransactionsShown: false,
       isProfileEditing: false,
       openReceiveScan: vi.fn(),
+      pendingOnchainTransfers: null,
       t: (key: string) => key,
       toggleContactsFilter: vi.fn(),
       toggleHiddenTransactions: vi.fn(),
@@ -213,6 +225,35 @@ describe("buildTopbarRight", () => {
     ).toBeNull();
   });
 
+  it("marks unfinished on-chain transfers on the wallet with a dot that opens them", () => {
+    const open = vi.fn();
+    const args = {
+      chatEditContactId: null,
+      contactsFilterIsActive: false,
+      deleteEditedContact: vi.fn(),
+      hiddenTransactionsShown: false,
+      isProfileEditing: false,
+      openReceiveScan: vi.fn(),
+      pendingOnchainTransfers: null,
+      route: { kind: "wallet" } as const,
+      t: (key: string) => key,
+      toggleContactsFilter: vi.fn(),
+      toggleHiddenTransactions: vi.fn(),
+      openMenu: vi.fn(),
+    };
+    const button = buildTopbarRight({
+      ...args,
+      pendingOnchainTransfers: { label: "Pending", open },
+    });
+    button?.onClick();
+
+    expect(button).toMatchObject({ indicator: "warning", label: "Pending" });
+    expect(open).toHaveBeenCalledOnce();
+    expect(
+      buildTopbarRight({ ...args, pendingOnchainTransfers: null }),
+    ).toBeNull();
+  });
+
   it("deletes the edited contact from the contact edit page", () => {
     const deleteEditedContact = vi.fn();
     const button = buildTopbarRight({
@@ -222,6 +263,7 @@ describe("buildTopbarRight", () => {
       hiddenTransactionsShown: false,
       isProfileEditing: false,
       openReceiveScan: vi.fn(),
+      pendingOnchainTransfers: null,
       route: { kind: "contactEdit", id: contactId },
       t: (key) => key,
       toggleContactsFilter: vi.fn(),
@@ -245,6 +287,7 @@ describe("buildTopbarRight", () => {
       hiddenTransactionsShown: false,
       isProfileEditing: false,
       openReceiveScan,
+      pendingOnchainTransfers: null,
       route: { kind: "topup" },
       t: (key) => key,
       toggleContactsFilter: vi.fn(),
@@ -267,6 +310,7 @@ describe("buildTopbarRight", () => {
       hiddenTransactionsShown: false,
       isProfileEditing: false,
       openReceiveScan: vi.fn(),
+      pendingOnchainTransfers: null,
       route: { kind: "contacts" },
       t: (key) => key,
       toggleContactsFilter,
@@ -290,6 +334,7 @@ describe("buildTopbarRight", () => {
       hiddenTransactionsShown: true,
       isProfileEditing: false,
       openReceiveScan: vi.fn(),
+      pendingOnchainTransfers: null,
       route: { kind: "transactions" },
       t: (key) => key,
       toggleContactsFilter: vi.fn(),

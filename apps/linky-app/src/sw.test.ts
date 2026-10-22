@@ -1,12 +1,33 @@
 import { Context, Effect } from "effect";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
-import { encodeNsec } from "@linky-fit/linkstr";
+import {
+  AppMessageReceived,
+  encodeNpub,
+  encodeNsec,
+  RumorId,
+  UnixSeconds,
+} from "@linky-fit/linkstr";
+import { createId } from "@linky-fit/linksync";
+import { onchainTransferChannel } from "@linky-fit/onchain-transfer";
+import type { OnchainOperator } from "./app/lib/onchainOperator";
+import { onchainTransferUpdateFixture } from "./testUtils/onchainTransfers";
 
 const state = vi.hoisted(() => ({
-  fetchWrapEvent: vi.fn(() => Effect.succeed(null)),
+  fetchWrapEvent: vi.fn<() => Effect.Effect<unknown>>(() =>
+    Effect.succeed(null),
+  ),
   runConfig: vi.fn(),
   nsec: "",
+}));
+const operatorState = vi.hoisted((): { operator: OnchainOperator | null } => ({
+  operator: null,
+}));
+vi.mock("./app/lib/onchainOperator", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./app/lib/onchainOperator")>()),
+  get onchainOperator() {
+    return operatorState.operator;
+  },
 }));
 vi.mock("@linky-fit/linkstr", async (importOriginal) => {
   const original = await importOriginal<typeof import("@linky-fit/linkstr")>();
@@ -186,4 +207,47 @@ describe("notification relay routing", () => {
       }
     },
   );
+});
+
+describe("on-chain transfer pushes", () => {
+  it("tells what an update of the on-chain operator means, without naming the sender", async () => {
+    const operator = makeIdentity();
+    operatorState.operator = {
+      npub: encodeNpub(operator.pubkey),
+      pubkey: operator.pubkey,
+    };
+    const update = onchainTransferUpdateFixture(createId<"OnchainTransfer">(), {
+      revision: 3,
+      status: "completed",
+    });
+    state.fetchWrapEvent.mockReturnValueOnce(
+      Effect.succeed(
+        new AppMessageReceived({
+          messageId: RumorId.make("c".repeat(64)),
+          from: operator.pubkey,
+          app: onchainTransferChannel.app,
+          content: onchainTransferChannel.draft(recipient.pubkey, update)
+            .content,
+          clientId: null,
+          sentAt: UnixSeconds.make(1_700_000_000),
+        }),
+      ),
+    );
+
+    await dispatch("push", {
+      data: { json: () => ({ body: "Nová aktivita v Linky", data }) },
+    });
+
+    expect(showNotification).toHaveBeenCalledWith(
+      expect.not.stringContaining(operator.pubkey.slice(0, 10)),
+      expect.objectContaining({
+        body: "Your on-chain transaction is complete",
+        data: {
+          outerEventId: data.outerEventId,
+          recipientPubkey: data.recipientPubkey,
+        },
+      }),
+    );
+    operatorState.operator = null;
+  });
 });

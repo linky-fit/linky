@@ -28,6 +28,14 @@ export interface PendingCashuPaymentRequest {
   readonly recipientDiffers: boolean;
   /** The last entered amount no mint covers. */
   readonly insufficientAmount: number | null;
+  /** Shown instead of the payee's npub: the saved contact's name, else a name the caller knows. */
+  readonly recipientName?: string | undefined;
+  /** Shown instead of the request's description, e.g. what an on-chain send pays out and where. */
+  readonly summary?: string | undefined;
+  /** Runs once the request is paid instead of opening the payee's chat, e.g. to record an on-chain transfer as sent and stay on it. */
+  readonly onPaid?: (() => void) | undefined;
+  /** Whether the request may still be paid; checked before anything moves and again before the payload is sent. */
+  readonly isPaymentAuthorized?: (() => boolean) | undefined;
 }
 
 /** A payment request the user has to review, enter the amount of or agree to a new mint for. */

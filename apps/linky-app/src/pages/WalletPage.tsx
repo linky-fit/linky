@@ -1,7 +1,8 @@
-import { Button, Row, Stack } from "@linky-fit/ui";
+import { Button, Icon, Pill, Row, Stack } from "@linky-fit/ui";
 import type { IconName } from "@linky-fit/ui";
 import React from "react";
 import { useTranslation } from "../app/hooks/shell";
+import { usePendingOnchainTransfersLink } from "../app/hooks/useOnchainTransfers";
 import { useWalletBalance } from "../app/hooks/wallet/useWalletInventory";
 import { useWalletWarning } from "../app/hooks/wallet/useWalletWarning";
 import { DisplayAmount } from "../components/DisplayAmount";
@@ -50,6 +51,7 @@ export const WalletPage: React.FC<WalletPageProps> = React.memo(
     const { t } = useTranslation();
     const { cashuTotalBalance } = useWalletBalance();
     const { dismissWalletWarning, showWalletWarning } = useWalletWarning();
+    const pendingOnchainTransfers = usePendingOnchainTransfersLink();
     return (
       <Stack flex={1} gap="$lg">
         <WalletWarning
@@ -88,13 +90,24 @@ export const WalletPage: React.FC<WalletPageProps> = React.memo(
               dataGuide="wallet-send"
             />
           </Row>
-          <Button
-            variant="ghost"
-            size="sm"
-            onPress={() => navigateTo({ route: "transactions" })}
-          >
-            {t("showTransactions")}
-          </Button>
+          <Stack alignItems="center" gap="$sm">
+            <Button
+              variant="ghost"
+              size="sm"
+              onPress={() => navigateTo({ route: "transactions" })}
+            >
+              {t("showTransactions")}
+            </Button>
+            {pendingOnchainTransfers ? (
+              <Pill
+                tone="warning"
+                leading={<Icon name="Clock" size="sm" color="$warningText" />}
+                label={pendingOnchainTransfers.label}
+                onPress={pendingOnchainTransfers.open}
+                testID="wallet-pending-onchain"
+              />
+            ) : null}
+          </Stack>
         </Stack>
       </Stack>
     );

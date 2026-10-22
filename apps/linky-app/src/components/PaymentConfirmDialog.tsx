@@ -7,6 +7,8 @@ interface PaymentConfirmDialogProps {
   amountSat: number | null;
   /** Shown instead of converting `amountSat`, for a payment fixed in another unit. */
   amountParts?: DisplayAmountParts | undefined;
+  /** Shown under the amount, e.g. its fiat value beside exact sats. */
+  amountCaption?: string | undefined;
   cancelLabel: string;
   /** False keeps a tap outside the sheet from counting as Cancel. */
   closeOnBackdrop?: boolean;
@@ -38,6 +40,7 @@ const caption = (content: ReactNode, bold = false) =>
 export function PaymentConfirmDialog({
   amountSat,
   amountParts,
+  amountCaption,
   cancelLabel,
   closeOnBackdrop = true,
   confirmLabel,
@@ -96,6 +99,7 @@ export function PaymentConfirmDialog({
           <DisplayAmount
             amount={amountSat}
             parts={amountParts}
+            caption={amountCaption}
             accessibilityLabel={label}
           />
         )}

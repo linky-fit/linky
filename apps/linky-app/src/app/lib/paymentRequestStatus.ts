@@ -58,6 +58,37 @@ export const receivedSatByRequestId = (
   return received;
 };
 
+/** When the user paid each request id: the payment history's first successful payment naming it. */
+export type PaidAtSecByRequestId = ReadonlyMap<PaymentRequestId, number>;
+
+/** The columns of a payment history row that tell which request a payment paid. */
+interface PaymentRecord {
+  readonly createdAtSec: number;
+  readonly detailsJson: string | null;
+  readonly direction: string;
+  readonly status: string;
+}
+
+/** Reads each request id's first successful outgoing payment from the payment history. */
+export const paidAtSecByRequestId = (
+  records: readonly PaymentRecord[],
+): PaidAtSecByRequestId => {
+  const paid = new Map<PaymentRequestId, number>();
+  for (const record of records) {
+    if (record.direction !== "out" || record.status !== "ok") continue;
+    const requestId = readRequestIdFromDetails(
+      parseJsonValue(record.detailsJson),
+    );
+    if (requestId === null) continue;
+    const id = PaymentRequestId.make(requestId);
+    const earlier = paid.get(id);
+    if (earlier === undefined || record.createdAtSec < earlier) {
+      paid.set(id, record.createdAtSec);
+    }
+  }
+  return paid;
+};
+
 /** Whether the wallet received at least the requested amount for a request, or anything for an amountless one. */
 export const isRequestPaidInFull = (
   received: ReceivedSatByRequestId,

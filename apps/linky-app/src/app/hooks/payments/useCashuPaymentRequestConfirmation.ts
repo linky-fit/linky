@@ -20,25 +20,29 @@ export type UnpayableQuote = Exclude<
 >;
 
 /**
- * Whether the user reviews a request before it is paid. A tap on a chat
- * request's Pay is the approval itself, so only a scan is held to the
- * auto-pay limit, over everything that leaves the wallet.
+ * How the user started a payment: a tap on a chat request's Pay is the
+ * approval itself, a scan is held to the auto-pay limit over everything that
+ * leaves the wallet, and a payment marked `review` is always reviewed.
  */
+export type PaymentRequestApproval = "tap" | "scan" | "review";
+
+/** Whether the user reviews a request before it is paid. */
 export const needsPaymentRequestConfirmation = ({
   autoPayLimit,
-  explicitTap,
+  approval,
   quote,
   recipientDiffers,
 }: {
   readonly autoPayLimit: number;
-  readonly explicitTap: boolean;
+  readonly approval: PaymentRequestApproval;
   readonly quote: PaymentRequestQuote | null;
   readonly recipientDiffers: boolean;
 }): boolean =>
   quote === null ||
+  approval === "review" ||
   recipientDiffers ||
   (quote._tag === "Lightning" && quote.addsMint) ||
-  (!explicitTap && quote.amount + quote.fee > autoPayLimit);
+  (approval === "scan" && quote.amount + quote.fee > autoPayLimit);
 
 const isQuote = (
   outcome: QuotePaymentRequestOutcome,
@@ -72,11 +76,17 @@ export const useCashuPaymentRequestConfirmation = ({
     async (
       draft: Pick<
         PendingCashuPaymentRequest,
-        "chat" | "recipientDiffers" | "request"
-      > & { readonly explicitTap: boolean },
+        | "chat"
+        | "isPaymentAuthorized"
+        | "onPaid"
+        | "recipientDiffers"
+        | "recipientName"
+        | "request"
+        | "summary"
+      > & { readonly approval: PaymentRequestApproval },
     ) => {
       if (cashuIsBusy) return;
-      const { explicitTap, ...base } = draft;
+      const { approval, ...base } = draft;
       const amount = base.request.amount;
       if (amount === null) {
         setPending({ ...base, quote: null, insufficientAmount: null });
@@ -92,7 +102,7 @@ export const useCashuPaymentRequestConfirmation = ({
       if (
         needsPaymentRequestConfirmation({
           autoPayLimit,
-          explicitTap,
+          approval,
           quote: outcome,
           recipientDiffers: base.recipientDiffers,
         })

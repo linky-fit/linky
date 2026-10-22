@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { keryxSubscriptionIdFor } from "@linky-fit/linksync";
+import { createId, keryxSubscriptionIdFor } from "@linky-fit/linksync";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseRouteFromHash } from "./route";
 import { parseNativeDeepLinkUrl } from "../utils/deepLinks";
@@ -52,6 +52,32 @@ describe("parseRouteFromHash", () => {
     });
 
     replaceHash("#settings/keryx/not-an-id");
+    expect(parseRouteFromHash()).toEqual({ kind: "wallet" });
+  });
+
+  it("parses the on-chain send, receive and transfer routes", () => {
+    const id = createId<"OnchainTransfer">();
+    replaceHash("#wallet/onchain/send?address=bc1q&amount=100000");
+    expect(parseRouteFromHash()).toEqual({
+      kind: "onchainSend",
+      payoutAddress: "bc1q",
+      amount: 100_000,
+    });
+
+    replaceHash("#wallet/onchain/send?amount=0.5");
+    expect(parseRouteFromHash()).toEqual({
+      kind: "onchainSend",
+      payoutAddress: "",
+      amount: null,
+    });
+
+    replaceHash("#wallet/onchain/receive");
+    expect(parseRouteFromHash()).toEqual({ kind: "onchainReceive" });
+
+    replaceHash(`#wallet/onchain/${id}`);
+    expect(parseRouteFromHash()).toEqual({ kind: "onchainTransfer", id });
+
+    replaceHash("#wallet/onchain/not-an-id");
     expect(parseRouteFromHash()).toEqual({ kind: "wallet" });
   });
 

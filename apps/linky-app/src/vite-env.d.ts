@@ -12,6 +12,8 @@ interface ImportMetaEnv {
   readonly VITE_NPUB_CASH_DISABLED?: string;
   readonly VITE_PUSH_SERVER_URL?: string;
   readonly VITE_NOTIFICATION_SERVER_URL?: string;
+  /** The on-chain operator's npub; unset hides on-chain transfers. */
+  readonly VITE_ONCHAIN_OPERATOR_NPUB?: string;
   /** "1" installs the Playwright test hooks (`window.__linkyE2E`) in a production build. */
   readonly VITE_E2E?: string;
 }

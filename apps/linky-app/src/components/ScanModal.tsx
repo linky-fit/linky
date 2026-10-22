@@ -13,6 +13,7 @@ import {
 import type { IconName } from "@linky-fit/ui";
 import React from "react";
 import { useTranslation } from "../app/hooks/shell";
+import { useOnchainTransfersShown } from "../app/hooks/useOnchainTransfers";
 import {
   useScanCommands,
   useScanShortcuts,
@@ -44,6 +45,7 @@ export function ScanModal(): React.ReactElement {
     scanAllowsManualContact: showTypeAction,
   } = useScanView();
   const { t } = useTranslation();
+  const onchainTransfersShown = useOnchainTransfersShown();
   const isDesktopSplitView = useDesktopSplitView();
   // What the camera decodes is developer information; the progress of an
   // animation is not, so only the detail line waits for the inspector.
@@ -186,6 +188,17 @@ export function ScanModal(): React.ReactElement {
             icon="Keyboard"
             title={t("manualPayOpen")}
             onPress={onTypePayment}
+          />
+        ) : null}
+        {isSendScan && onchainTransfersShown ? (
+          <ListRow
+            icon="Bitcoin"
+            title={t("onchainSendTitle")}
+            onPress={() => {
+              closeScan();
+              navigateTo({ route: "onchainSend" });
+            }}
+            testID="scan-onchain-send"
           />
         ) : null}
         <Row gap="$sm">

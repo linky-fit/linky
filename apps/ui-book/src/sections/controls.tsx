@@ -49,6 +49,11 @@ export const controls: Section = {
           tooltip="Disabled icon"
         />
         <UI.IconButton icon="Plus" loading accessibilityLabel="Loading icon" />
+        <UI.IconButton
+          icon="Bitcoin"
+          indicator="warning"
+          accessibilityLabel="Pending on-chain transaction"
+        />
       </UI.Row>
     ),
     OptionTile: () => {

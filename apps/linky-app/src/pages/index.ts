@@ -37,6 +37,8 @@ export { MintsPage } from "./MintsPage";
 export { NostrRelayNewPage } from "./NostrRelayNewPage";
 export { NostrRelayPage } from "./NostrRelayPage";
 export { NostrRelaysPage } from "./NostrRelaysPage";
+export { OnchainTransferNewPage } from "./OnchainTransferNewPage";
+export { OnchainTransferPage } from "./OnchainTransferPage";
 export { ProfileRoute } from "./ProfilePage";
 export { ProxyPaymentsPage } from "./ProxyPaymentsPage";
 export { PushDebugPage } from "./PushDebugPage";

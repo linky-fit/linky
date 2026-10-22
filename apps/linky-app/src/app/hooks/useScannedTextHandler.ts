@@ -36,6 +36,7 @@ import {
   type CashuPaymentRequestMessageInfo,
 } from "../lib/paymentRequestMessage";
 import { isKeryxJoinUrl, offerKeryxJoin } from "../lib/keryxJoinOffer";
+import { onchainPayoutTarget } from "../lib/onchainTransfers";
 import { runWrite } from "../lib/storeWrite";
 import type { ContactRowLike } from "../types/appTypes";
 import type { Translate } from "../../i18n";
@@ -52,6 +53,8 @@ interface UseScannedTextHandlerParams<TContact extends ContactRowLike> {
   keryxEnabled: boolean;
   contactsRepository: Pick<ContactsRepository, "insert">;
   lightningInvoiceAutoPayLimit: number;
+  /** Whether a bitcoin address opens the on-chain send instead of being unsupported. */
+  onchainSendEnabled: boolean;
   onContactIdentifierScanned: ((identifier: string) => Promise<void>) | null;
   /** Opens the contact's page once the just-saved row is read back. */
   openSavedContact: (npub: string) => void;
@@ -89,6 +92,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
   keryxEnabled,
   contactsRepository,
   lightningInvoiceAutoPayLimit,
+  onchainSendEnabled,
   onContactIdentifierScanned,
   openSavedContact,
   payCashuPaymentRequest,
@@ -108,6 +112,23 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
     async (rawValue: string) => {
       const raw = rawValue.trim();
       if (!raw) return;
+
+      /** Opens the on-chain send for a bitcoin address; false when `text` names none. */
+      const openOnchainSend = (text: string): boolean => {
+        const target = onchainSendEnabled ? onchainPayoutTarget(text) : null;
+        if (target === null) return false;
+        if (scanEntryPoint === "receive") {
+          setStatus(t("scanReceiveUnsupportedPayment"));
+        } else {
+          navigateTo({
+            route: "onchainSend",
+            payoutAddress: target.address,
+            ...(target.amountSat === null ? {} : { amount: target.amountSat }),
+          });
+        }
+        closeScan();
+        return true;
+      };
 
       const parsedDeepLink = parseNativeDeepLinkUrl(raw);
       let scanText = (parsedDeepLink?.text ?? raw).trim();
@@ -150,6 +171,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
           },
         });
         if (!leg) {
+          if (openOnchainSend(scanText)) return;
           setStatus(t("scanUnsupportedBitcoinUri"));
           closeScan();
           return;
@@ -359,6 +381,8 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
         return;
       }
 
+      if (openOnchainSend(normalized)) return;
+
       setStatus(`${t("errorPrefix")}: ${t("scanUnsupported")}`);
       closeScan();
     },
@@ -371,6 +395,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
       keryxEnabled,
       contactsRepository,
       lightningInvoiceAutoPayLimit,
+      onchainSendEnabled,
       onContactIdentifierScanned,
       payLightningInvoiceWithCashu,
       requestLightningInvoiceConfirmation,

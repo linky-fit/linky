@@ -18,6 +18,9 @@ export const getDesktopRouteSection = (route: Route): DesktopRouteSection => {
     case "topup":
     case "topupNoAmount":
     case "topupInvoice":
+    case "onchainSend":
+    case "onchainReceive":
+    case "onchainTransfer":
     case "manualPay":
     case "bankPayment":
     case "lnAddressPay":
@@ -93,6 +96,7 @@ export const isDesktopSectionEntryRoute = (route: Route): boolean => {
     case "profile":
     case "transactions":
     case "topup":
+    case "onchainSend":
     case "manualPay":
     case "bankPayment":
     case "bankPaymentNew":

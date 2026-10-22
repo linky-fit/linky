@@ -1139,7 +1139,8 @@ export const cs = {
     "Pozor: tento požadavek posílá tokeny přes nezabezpečené spojení (http).",
   paymentRequestAddMint:
     "Zaplatit přes {mint}? Mincovna se přidá mezi tvoje mincovny.",
-  paymentRequestFees: "Včetně poplatků {amount} {unit}",
+  paymentRequestFees: "Plus poplatky až {fee}",
+  paymentRequestMaxTotal: "Celkem nejvýš {total}; nevyužité poplatky se vrátí",
   paymentRequestOtherRecipient:
     "Tato platba půjde na {recipient}, ne osobě z tohoto chatu.",
   paymentRequestEnterAmount: "Zadej částku",
@@ -1347,4 +1348,125 @@ export const cs = {
   keryxMediaUnavailable:
     "Soubor neodpovídá tomu, co firma podepsala, proto nebyl otevřen.",
   keryxNotFound: "Nenalezeno",
+  // On-chain transfers
+  onchainSendTitle: "Odeslat do on-chain peněženky",
+  onchainReceiveTitle: "Přijmout z on-chain peněženky",
+  onchainTransferTitle: "On-chain transakce",
+  onchainSendHistoryTitle: "Do on-chain peněženky",
+  onchainReceiveHistoryTitle: "Z on-chain peněženky",
+  onchainSendFixedAmounts:
+    "Do on-chain peněženky lze posílat jen pevně dané částky.",
+  onchainReceiveFixedAmounts:
+    "Z on-chain peněženky lze přijímat jen pevně dané částky.",
+  onchainTransferChooseAmount: "Částka",
+  onchainSendInsufficient: "Váš zůstatek nestačí na žádnou z částek.",
+  onchainSendAmountUnavailable: "Příjemce žádá {amount}",
+  onchainSendAmountUnavailableHint:
+    "Do on-chain peněženky lze posílat jen částky níže, proto si před odesláním jiné částky ověřte u příjemce, že ji přijme.",
+  onchainSendDifferentAmountChecked: "Jiná částka domluvena",
+  onchainTransferYouGet: "Dostanete",
+  onchainTransferServiceFee: "Poplatek za službu",
+  onchainSendYouPay: "Zaplatíte",
+  onchainReceiveYouSend: "Pošlete",
+  onchainSendPayoutAddress: "Bitcoinová adresa, kam peníze poslat",
+  onchainTransferAddressInvalid:
+    "Toto není platná bitcoinová adresa pro tuto síť.",
+  onchainReceiveRefundToSender: "Vrátit na adresu, ze které platíte",
+  onchainReceiveUseCustomRefund: "Použít jinou adresu",
+  onchainReceiveRefundHint:
+    "Pokud transakci nepůjde dokončit, vrátíme vám bitcoiny sem.",
+  onchainSendArrivalNotice:
+    "Do vaší bitcoinové peněženky dorazí do 24 hodin od zaplacení.",
+  onchainReceiveArrivalNotice:
+    "Na zůstatek dorazí do 24 hodin od potvrzení vaší platby.",
+  onchainTransferFeeNotice: "Účtujeme poplatek za službu {fee}.",
+  onchainTransferContactSupport: "Kontaktovat podporu",
+  onchainTransferContinue: "Pokračovat",
+  onchainTransferUnavailable: "On-chain transakce teď nejsou dostupné.",
+  onchainTransferPaused: "Teď to nejde. Zkuste to prosím později.",
+  onchainTransferUpdateRequired:
+    "Pro on-chain transakce aktualizujte Linky na verzi {version} nebo novější.",
+  onchainTransferRequestFailed: "Transakci se nepodařilo zahájit.",
+  onchainTransferRequestMismatch:
+    "Platební údaje neodpovídají této transakci, nic se nezaplatilo.",
+  onchainTransferNotFound: "Transakce nenalezena",
+  onchainTransferPhaseWaitingForDetails: "Čeká na podrobnosti",
+  onchainTransferPhaseReadyToSend: "Připraveno k odeslání",
+  onchainTransferPhaseSent: "Na cestě",
+  onchainTransferPhaseAwaitingDeposit: "Čeká na vaše bitcoiny",
+  onchainTransferPhaseDepositSeen: "Potvrzuje se",
+  onchainTransferPhaseWaitingForEcash: "Brzy dorazí",
+  onchainTransferPhaseCompleted: "Dokončeno",
+  onchainTransferPhaseDenied: "Zamítnuto",
+  onchainTransferPhaseCancelled: "Zrušeno",
+  onchainTransferPhaseRefunded: "Vráceno",
+  onchainTransferWaitingForDetailsHint:
+    "Zatím se žádné peníze nepohnuly. Připravujeme podrobnosti a jakmile budou hotové, pošleme vám upozornění.",
+  onchainSendReadyHint: "Vše je připravené. Odešlete peníze a transakce začne.",
+  onchainSendSentHint:
+    "Do vaší bitcoinové peněženky dorazí {amount} do 24 hodin od zaplacení. Síťový poplatek hradíme my.",
+  onchainReceiveAwaitingDepositHint:
+    "Pošlete ze své bitcoinové peněženky přesně {amount} na tuto adresu. Síťový poplatek vaší peněženky se platí zvlášť.",
+  onchainReceiveDepositSeenHint:
+    "Vaši platbu vidíme. Započítá se po {required} potvrzeních.",
+  onchainReceiveWaitingForEcashHint:
+    "Vaše platba je potvrzená. {amount} vám připíšeme na zůstatek do 24 hodin.",
+  onchainSendCompletedHint: "{amount} jsme poslali do vaší on-chain peněženky.",
+  onchainReceiveCompletedHint: "{amount} máte na zůstatku.",
+  onchainTransferDeniedHint:
+    "Tuto transakci nešlo provést. Nic jsme vám nestrhli.",
+  onchainTransferCancelledHint: "Tato transakce byla zrušena.",
+  onchainTransferRefundedHint: "Peníze jsme vám vrátili.",
+  onchainReceiveConfirmations: "{count}/{required} potvrzení",
+  onchainReceiveDepositQr: "QR kód bitcoinové platby",
+  onchainSendPay: "Odeslat {amount}",
+  onchainTransferPayoutAddress: "Cílová adresa",
+  onchainTransferDepositAddress: "Adresa pro platbu",
+  onchainTransferRefundAddress: "Adresa pro vrácení",
+  onchainTransferRefundToSender: "Adresa, ze které platíte",
+  onchainTransferConfirmationsLabel: "Potvrzení",
+  onchainTransferDepositTransaction: "Transakce platby",
+  onchainTransferPayoutTransaction: "Transakce odeslání",
+  onchainTransferRefundTransaction: "Transakce vrácení",
+  onchainTransferCancel: "Zrušit transakci",
+  onchainTransferCancelTitle: "Zrušit tuto transakci?",
+  onchainTransferCancelBody:
+    "Rušte ji jen tehdy, když jste na ni zatím neposlali žádné peníze.",
+  onchainTransferKeep: "Ponechat",
+  onchainTransferPendingOne: "Nevyřízená on-chain transakce",
+  onchainTransferPendingMany: "Nevyřízené on-chain transakce: {count}",
+  onchainTransfersInProgress: "Probíhá",
+  onchainSendReadyNotification:
+    "Připraveno: zaplaťte {total} a do vaší bitcoinové peněženky odešleme {amount}.",
+  onchainReceiveReadyNotification:
+    "Připraveno: pošlete {total} ze své bitcoinové peněženky.",
+  onchainSendCompletedNotification:
+    "{amount} odesláno do vaší on-chain peněženky",
+  onchainReceiveCompletedNotification:
+    "{amount} přijato z vaší on-chain peněženky",
+  onchainTransferDeniedNotification: "Vaše on-chain transakce byla zamítnuta",
+  onchainTransferRefundedNotification:
+    "Peníze z vaší on-chain transakce byly vráceny",
+  onchainReceiveRefundAddressField: "Bitcoinová adresa pro vrácení",
+  onchainReceiveCustodialWarning:
+    "Platíte ze směnárny nebo custodial peněženky? Zadejte adresu pro vrácení, kterou ovládáte.",
+  onchainSendNetworkFee: "Síťový poplatek hradíme my.",
+  onchainSendNetworkFeeAmount:
+    "Do vaší bitcoinové peněženky dorazí {amount}. Síťový poplatek hradíme my.",
+  onchainReceiveNetworkFee: "Síťový poplatek vaší peněženky se platí zvlášť.",
+  onchainReceiveNetworkFeeAmount:
+    "Pošlete přesně {total}; síťový poplatek vaší peněženky se platí zvlášť.",
+  onchainTransferPhaseShortDeposit: "Přišlo málo",
+  onchainReceiveShortDepositHint:
+    "Přišlo {received}, o {missing} méně než potřebných {total}, takže transakci nejde dokončit. Vrátíme vám je na adresu pro vrácení. S dotazy se obraťte na podporu.",
+  onchainTransferPaid: "Zaplaceno",
+  onchainTransferRefunded: "Vráceno",
+  onchainReceiveDeposited: "Vložené bitcoiny",
+  onchainReceiveAddedToBalance: "Přidáno do zůstatku",
+  onchainTransferNoMoneyMoved: "Žádné peníze se nepohnuly",
+  onchainSupportName: "Podpora Linky",
+  onchainSendConfirmSummary: "Odeslat {amount} na {address}",
+  onchainTransferOriginalTerms: "Původní podmínky",
+  onchainReceiveCopyPaymentDetails: "Kopírovat platební údaje",
+  onchainReceiveCopyAddress: "Kopírovat adresu",
 } as const;

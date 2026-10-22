@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
-import type { KeryxSubscriptionId } from "@linky-fit/linksync";
+import type {
+  KeryxSubscriptionId,
+  OnchainTransferId,
+} from "@linky-fit/linksync";
 import type { CashuOperationId, ContactId } from "../evolu";
 import {
   safeSessionStorageGet,
@@ -131,6 +134,10 @@ type NavigationAction =
   | { route: "recurringPayment"; id: string }
   | { route: "recurringPaymentEdit"; id: string }
   | { route: "topup" }
+  /** A scanned bitcoin address or BIP21 URI fills the payout address, and its amount picks the transfer amount. */
+  | { route: "onchainSend"; payoutAddress?: string; amount?: number }
+  | { route: "onchainReceive" }
+  | { route: "onchainTransfer"; id: OnchainTransferId }
   | { route: "topupNoAmount" }
   | { route: "topupInvoice" }
   | { route: "wallet" };
@@ -261,6 +268,22 @@ export const navigateTo = (action: NavigationAction): void => {
       break;
     case "topup":
       window.location.assign("#wallet/topup");
+      break;
+    case "onchainSend": {
+      const query = new URLSearchParams();
+      if (action.payoutAddress) query.set("address", action.payoutAddress);
+      if (action.amount) query.set("amount", String(action.amount));
+      const suffix = query.size > 0 ? `?${query.toString()}` : "";
+      window.location.assign(`#wallet/onchain/send${suffix}`);
+      break;
+    }
+    case "onchainReceive":
+      window.location.assign("#wallet/onchain/receive");
+      break;
+    case "onchainTransfer":
+      window.location.assign(
+        `#wallet/onchain/${encodeURIComponent(action.id)}`,
+      );
       break;
     case "topupNoAmount":
       window.location.assign("#wallet/topup/no-amount");

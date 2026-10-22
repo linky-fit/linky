@@ -1,4 +1,8 @@
-import type { ProfileMetadata } from "@linky-fit/linkstr";
+import type {
+  AppMessageReceived,
+  InboxDelivery,
+  ProfileMetadata,
+} from "@linky-fit/linkstr";
 import {
   ContactId,
   PositiveInt,
@@ -38,6 +42,7 @@ import { getBestNostrName } from "../../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import { setStoredPushContactNames } from "../../../utils/pushContactNamesStorage";
 import { contactsToRestore } from "../../lib/chatUnread";
+import { onchainOperator } from "../../lib/onchainOperator";
 import { NO_WRITE, runWrite, type WriteOutcome } from "../../lib/storeWrite";
 import {
   pendingUnknownContactAddAtom,
@@ -72,6 +77,8 @@ import { useSharedProfileLink } from "../contacts/useSharedProfileLink";
 import { statusFilterSummary } from "../contacts/useContactsList";
 import { useChatScroll } from "../messages/chatScroll";
 import { applyOutboxResult } from "../messages/outboxResults";
+import { applyOnchainTransferAppMessage } from "../messages/onchainTransferInbox";
+import { notifyOnchainTransferUpdate } from "../messages/onchainTransferNotifications";
 import type { PeerSeenWindow } from "../messages/seenReceiptInbox";
 import {
   useChatSend,
@@ -94,9 +101,11 @@ import {
 } from "../useLinkstrProfileSync";
 import {
   useAccountHydrated,
+  useOnchainTransfersRepository,
   useUnknownSendersRepository,
 } from "../useLinksync";
 import { useMessagesDomain } from "../useMessagesDomain";
+import { useOnchainTransfersShown } from "../useOnchainTransfers";
 import { usePushRegistrationLifecycle } from "../usePushRegistrationLifecycle";
 import { useRelayDomain } from "../useRelayDomain";
 import { useIdentityOwnersComposition } from "./useIdentityOwnersComposition";
@@ -658,10 +667,39 @@ export const useContactsMessagingComposition = ({
     [conversationsRepository],
   );
 
+  const onchainTransfersRepository = useOnchainTransfersRepository();
+  const onchainTransfersShown = useOnchainTransfersShown();
+  const onchainTransferNotificationsRef = useLatest(
+    onchainTransfersShown
+      ? {
+          formatDisplayedAmountText,
+          maybeShowPwaNotification,
+          pushToast,
+          route,
+          t,
+        }
+      : null,
+  );
+  const applyAppMessage = React.useCallback(
+    (event: AppMessageReceived, delivery: InboxDelivery) =>
+      applyOnchainTransferAppMessage(event, {
+        operator: onchainOperator?.pubkey ?? null,
+        transfers: onchainTransfersRepository,
+        onUpdated: (update, transfer) => {
+          const notifications = onchainTransferNotificationsRef.current;
+          if (delivery === "live" && notifications !== null) {
+            notifyOnchainTransferUpdate(update, transfer, notifications);
+          }
+        },
+      }),
+    [onchainTransferNotificationsRef, onchainTransfersRepository],
+  );
+
   const dispatchInboxEvent = useLinkstrInboxSync({
     advanceContactPeerSeen,
     appendLocalNostrMessage,
     appendLocalNostrReaction,
+    applyAppMessage,
     applyBankPaymentOfferSnapshot,
     contacts,
     currentNsec,

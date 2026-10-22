@@ -34,8 +34,11 @@ import {
   FloatingActionButton,
   floatingActionButtonClearance,
 } from "../components/FloatingActionButton";
+import { OnchainTransferHistoryRow } from "../components/OnchainTransfer";
 import { RecurringPaymentsList } from "../components/RecurringPaymentsList";
 import { useRecurringPaymentOrders } from "../app/hooks/payments/useRecurringPaymentOrders";
+import { useOnchainTransfers } from "../app/hooks/useOnchainTransfers";
+import { withOnchainTransfers } from "../app/lib/onchainTransferHistory";
 import { describeRecurringInterval } from "../app/lib/recurringPaymentDisplay";
 import { readRecurringRunRef } from "@linky-fit/recurring-payment";
 import { navigateTo } from "../hooks/useRouting";
@@ -416,21 +419,25 @@ export function TransactionsPage(): React.ReactElement {
     () => buildTransactionHistory(transactionRecords, cashuOperations),
     [cashuOperations, transactionRecords],
   );
-  const transactions = React.useMemo(
+  const onchainTransfers = useOnchainTransfers();
+  const { pending: pendingOnchainTransfers, entries } = React.useMemo(
     () =>
-      showHiddenTransactions
-        ? allTransactions
-        : allTransactions.filter((item) => item.hiddenReason === null),
-    [allTransactions, showHiddenTransactions],
+      withOnchainTransfers(
+        showHiddenTransactions
+          ? allTransactions
+          : allTransactions.filter((item) => item.hiddenReason === null),
+        onchainTransfers,
+      ),
+    [allTransactions, onchainTransfers, showHiddenTransactions],
   );
 
   const declinedRequestIds = React.useMemo(
     () => deriveDeclinedRequestIds(messageRows),
     [messageRows],
   );
-  const visibleTransactions = React.useMemo(
-    () => transactions.slice(0, visibleCount),
-    [transactions, visibleCount],
+  const visibleEntries = React.useMemo(
+    () => entries.slice(0, visibleCount),
+    [entries, visibleCount],
   );
 
   const buildTitle = React.useCallback(
@@ -717,34 +724,59 @@ export function TransactionsPage(): React.ReactElement {
           <RecurringPaymentsList />
         </Section>
       ) : null}
-      <Section title={hasScheduled ? t("recurringHistorySection") : undefined}>
-        {transactions.length === 0 ? (
+      {pendingOnchainTransfers.length > 0 ? (
+        <Section title={t("onchainTransfersInProgress")}>
+          <Stack gap="$xs">
+            {pendingOnchainTransfers.map((transfer) => (
+              <OnchainTransferHistoryRow
+                key={transfer.id}
+                transfer={transfer}
+              />
+            ))}
+          </Stack>
+        </Section>
+      ) : null}
+      <Section
+        title={
+          hasScheduled || pendingOnchainTransfers.length > 0
+            ? t("recurringHistorySection")
+            : undefined
+        }
+      >
+        {entries.length === 0 ? (
           <EmptyState title={t("paymentsHistoryEmpty")} />
         ) : (
           <>
             <Stack gap="$xs">
-              {visibleTransactions.map((item) => (
-                <TransactionCard
-                  buildDetailEntries={buildDetailEntries}
-                  buildProblemStatusPill={buildProblemStatusPill}
-                  buildTitle={buildTitle}
-                  contactsById={contactsById}
-                  copyText={copyText}
-                  formatAmountText={formatAmountText}
-                  formatDateText={formatDateText}
-                  getRequestStatus={getRequestStatus}
-                  isExpanded={expandedById[item.id] === true}
-                  item={item}
-                  key={item.id}
-                  nostrPictureByNpub={nostrPictureByNpub}
-                  onToggle={toggleExpanded}
-                  recurringIntervalById={recurringIntervalById}
-                  t={t}
-                  tokenByReferenceId={tokenByReferenceId}
-                />
-              ))}
+              {visibleEntries.map((entry) =>
+                entry.kind === "onchainTransfer" ? (
+                  <OnchainTransferHistoryRow
+                    key={entry.transfer.id}
+                    transfer={entry.transfer}
+                  />
+                ) : (
+                  <TransactionCard
+                    buildDetailEntries={buildDetailEntries}
+                    buildProblemStatusPill={buildProblemStatusPill}
+                    buildTitle={buildTitle}
+                    contactsById={contactsById}
+                    copyText={copyText}
+                    formatAmountText={formatAmountText}
+                    formatDateText={formatDateText}
+                    getRequestStatus={getRequestStatus}
+                    isExpanded={expandedById[entry.item.id] === true}
+                    item={entry.item}
+                    key={entry.item.id}
+                    nostrPictureByNpub={nostrPictureByNpub}
+                    onToggle={toggleExpanded}
+                    recurringIntervalById={recurringIntervalById}
+                    t={t}
+                    tokenByReferenceId={tokenByReferenceId}
+                  />
+                ),
+              )}
             </Stack>
-            {visibleCount < transactions.length ? (
+            {visibleCount < entries.length ? (
               <Button
                 variant="secondary"
                 onPress={() =>
