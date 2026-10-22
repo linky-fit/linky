@@ -58,6 +58,11 @@ export const linkyScopes = {
     rotation: rotation(220),
     forget: "never",
   }),
+  onchain: shardScope({
+    tables: ["onchainTransfer"],
+    rotation: rotation(220),
+    forget: "never",
+  }),
 };
 
 export type LinkyScopes = typeof linkyScopes;
