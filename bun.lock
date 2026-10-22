@@ -235,6 +235,44 @@
         "typescript": "~5.9.3",
       },
     },
+    "apps/onchain-operator": {
+      "name": "@linky-fit/onchain-operator",
+      "version": "0.1.0",
+      "dependencies": {
+        "@evolu/common": "7.4.1",
+        "@evolu/web": "2.4.0",
+        "@linky-fit/domain": "workspace:*",
+        "@linky-fit/identity": "workspace:*",
+        "@linky-fit/linkshu": "workspace:*",
+        "@linky-fit/linkstr": "workspace:*",
+        "@linky-fit/linksync": "workspace:*",
+        "@linky-fit/linky-site": "workspace:*",
+        "@linky-fit/onchain-transfer": "workspace:*",
+        "@linky-fit/ui": "workspace:*",
+        "@noble/hashes": "^2.0.1",
+        "core-js": "^3.50.0",
+        "effect": "^4.0.0",
+        "react": "^19.2.3",
+        "react-dom": "^19.2.3",
+        "react-native": "0.86.3",
+        "react-native-svg": "15.15.4",
+        "react-native-web": "0.21.3",
+      },
+      "devDependencies": {
+        "@evolu/sqlite-wasm": "2.2.4",
+        "@linky-fit/config": "workspace:*",
+        "@types/node": "^24.10.1",
+        "@types/react": "^19.0.0",
+        "@types/react-dom": "^19.0.0",
+        "@vitejs/plugin-react-swc": "^4.2.2",
+        "eslint": "^9.39.1",
+        "jsdom": "^28.1.0",
+        "prettier": "^3.4.2",
+        "typescript": "~5.9.3",
+        "vite": "^7.2.4",
+        "vitest": "^4.0.18",
+      },
+    },
     "apps/push": {
       "name": "@linky-fit/push",
       "version": "0.1.0",
@@ -1223,6 +1261,8 @@
     "@linky-fit/native-shell": ["@linky-fit/native-shell@workspace:apps/native-shell"],
 
     "@linky-fit/nostr-error-tracker": ["@linky-fit/nostr-error-tracker@workspace:tools/nostr-error-tracker"],
+
+    "@linky-fit/onchain-operator": ["@linky-fit/onchain-operator@workspace:apps/onchain-operator"],
 
     "@linky-fit/onchain-transfer": ["@linky-fit/onchain-transfer@workspace:packages/onchain-transfer"],
 
