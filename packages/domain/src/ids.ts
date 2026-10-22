@@ -32,6 +32,9 @@ export type RecurringPaymentId = typeof RecurringPaymentId.Type;
 export const KeryxSubscriptionId = id("KeryxSubscription");
 export type KeryxSubscriptionId = typeof KeryxSubscriptionId.Type;
 
+export const OnchainTransferId = id("OnchainTransfer");
+export type OnchainTransferId = typeof OnchainTransferId.Type;
+
 export const NostrIdentityId = id("NostrIdentity");
 export type NostrIdentityId = typeof NostrIdentityId.Type;
 
