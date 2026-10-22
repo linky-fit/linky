@@ -28,6 +28,21 @@ describe("desktopRouteSection", () => {
     ).toBe(false);
   });
 
+  it("keeps on-chain transfers in the wallet, entered from it by the send", () => {
+    const id = createIdFromString<"OnchainTransfer">("transfer-1");
+    expect(getDesktopRouteSection({ kind: "onchainTransfer", id })).toBe(
+      "wallet",
+    );
+    expect(
+      isDesktopSectionEntryRoute({
+        kind: "onchainSend",
+        payoutAddress: "",
+        amount: null,
+      }),
+    ).toBe(true);
+    expect(isDesktopSectionEntryRoute({ kind: "onchainReceive" })).toBe(false);
+  });
+
   it("only expands the section roots across the detail area", () => {
     expect(isDesktopSectionRoot({ kind: "contacts" })).toBe(true);
     expect(isDesktopSectionRoot({ kind: "wallet" })).toBe(true);

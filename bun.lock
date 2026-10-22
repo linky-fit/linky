@@ -127,6 +127,7 @@
         "@linky-fit/linkstr-react": "workspace:*",
         "@linky-fit/linksync": "workspace:*",
         "@linky-fit/linky-site": "workspace:*",
+        "@linky-fit/onchain-transfer": "workspace:*",
         "@linky-fit/proxy-payment": "workspace:*",
         "@linky-fit/recurring-payment": "workspace:*",
         "@linky-fit/ui": "workspace:*",

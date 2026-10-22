@@ -26,6 +26,7 @@ import type { ReplyContext } from "../../state/messages/chat";
 import { allowTestMintsAtom } from "../../state/session/settings";
 import type { PendingCashuPaymentRequest } from "../../state/shell/confirmations";
 import { defaultMintAtom } from "../../state/wallet/defaultMint";
+import type { OnchainTransferPaymentOptions } from "../../state/wallet/walletCommands";
 import {
   planPaymentRequestMint,
   sendFeeAllowance,
@@ -43,6 +44,7 @@ import { useOwnNprofile } from "../useOwnNprofile";
 import { useMintInfoByUrl, useTouchMintInfo } from "../mint/useMintInfo";
 import {
   useCashuPaymentRequestConfirmation,
+  type PaymentRequestApproval,
   type ReviewedCashuPaymentRequest,
   type UnpayableQuote,
 } from "../payments/useCashuPaymentRequestConfirmation";
@@ -140,15 +142,27 @@ export const useCashuPaymentRequests = ({
   const defaultMint = useAtomValue(defaultMintAtom);
   const { balances } = useWalletInventory();
 
+  /** The saved contact a request's nostr transport pays. */
+  const findContactFor = React.useCallback(
+    (request: CashuPaymentRequestMessageInfo): ContactRowLike | null => {
+      const requestPubkeyHex = normalizePubkeyHex(request.transportPubkeyHex);
+      if (!requestPubkeyHex) return null;
+      return (
+        contactsRef.current.find(
+          (contact) =>
+            decodeNpub(normalizeNpubIdentifier(contact.npub ?? "") ?? "") ===
+            requestPubkeyHex,
+        ) ?? null
+      );
+    },
+    [contactsRef],
+  );
+
   const ensureContactFor = React.useCallback(
     (request: CashuPaymentRequestMessageInfo): ContactRowLike | null => {
       const requestPubkeyHex = normalizePubkeyHex(request.transportPubkeyHex);
       if (!requestPubkeyHex) return null;
-      const existing = contacts.find(
-        (contact) =>
-          decodeNpub(normalizeNpubIdentifier(contact.npub ?? "") ?? "") ===
-          requestPubkeyHex,
-      );
+      const existing = findContactFor(request);
       if (existing?.id) return existing;
 
       const pubkey = parsePubkey(requestPubkeyHex);
@@ -158,7 +172,7 @@ export const useCashuPaymentRequests = ({
       if (saved.created) openSavedContact(saved.npub);
       return saved.contact;
     },
-    [contacts, openSavedContact, saveNpubContact],
+    [findContactFor, openSavedContact, saveNpubContact],
   );
 
   /** The incoming message that carried this request, to reply to. */
@@ -248,6 +262,8 @@ export const useCashuPaymentRequests = ({
   const pay = React.useCallback(
     async ({
       chat,
+      isPaymentAuthorized,
+      onPaid,
       quote: reviewedQuote,
       recipientDiffers,
       request,
@@ -283,20 +299,7 @@ export const useCashuPaymentRequests = ({
           quote: reviewedQuote,
           recipient,
           replyContext: requestMessage ? replyContextOf(requestMessage) : null,
-          ...(chat
-            ? {
-                isPaymentAuthorized: () =>
-                  isCurrentChatPaymentRequest(
-                    chat.message,
-                    request,
-                    chat.contact,
-                    latestMessages(),
-                    contactsRef.current.find(
-                      (contact) => contact.id === chat.contact.id,
-                    ) ?? null,
-                  ),
-              }
-            : {}),
+          ...(isPaymentAuthorized ? { isPaymentAuthorized } : {}),
         },
         {
           onSending: () =>
@@ -329,7 +332,8 @@ export const useCashuPaymentRequests = ({
             },
           );
           rememberFirstPayment();
-          if (outcome.contactId)
+          if (onPaid) onPaid();
+          else if (outcome.contactId)
             navigateTo({ route: "chat", id: outcome.contactId });
           return;
         }
@@ -377,12 +381,10 @@ export const useCashuPaymentRequests = ({
     },
     [
       commands,
-      contactsRef,
       dismissPaymentSending,
       ensureContactFor,
       findRequestMessage,
       formatDisplayedAmountParts,
-      latestMessages,
       rememberFirstPayment,
       setStatus,
       showPaidOverlay,
@@ -405,7 +407,11 @@ export const useCashuPaymentRequests = ({
     (
       request: CashuPaymentRequestMessageInfo,
       chat: PendingCashuPaymentRequest["chat"],
-      explicitTap: boolean,
+      approval: PaymentRequestApproval,
+      options: Pick<
+        PendingCashuPaymentRequest,
+        "isPaymentAuthorized" | "onPaid" | "recipientName" | "summary"
+      > = {},
     ) =>
       runExclusively(async () => {
         if (walletOpRunning) return;
@@ -438,15 +444,20 @@ export const useCashuPaymentRequests = ({
           chat !== null &&
           request.transportPubkeyHex !== null &&
           request.transportPubkeyHex !== decodeNpub(chat.contact.npub ?? "");
+        const recipientName =
+          (findContactFor(request)?.name ?? "").trim() || options.recipientName;
         await reviewCashuPaymentRequest({
           request,
           chat,
           recipientDiffers,
-          explicitTap,
+          approval,
+          ...options,
+          ...(recipientName ? { recipientName } : {}),
         });
       }),
     [
       currentNpub,
+      findContactFor,
       formatDisplayedAmountParts,
       reviewCashuPaymentRequest,
       runExclusively,
@@ -460,7 +471,16 @@ export const useCashuPaymentRequests = ({
   /** A scanned or pasted request; held to the auto-pay limit. */
   const payCashuPaymentRequest = React.useCallback(
     (request: CashuPaymentRequestMessageInfo) =>
-      startPayment(request, null, false),
+      startPayment(request, null, "scan"),
+    [startPayment],
+  );
+
+  /** The operator's request of an on-chain transfer; always reviewed, so the user sees the whole debit, fees included, before it moves. */
+  const payOnchainTransferPaymentRequest = React.useCallback(
+    (
+      request: CashuPaymentRequestMessageInfo,
+      options: OnchainTransferPaymentOptions,
+    ) => startPayment(request, null, "review", options),
     [startPayment],
   );
 
@@ -472,8 +492,8 @@ export const useCashuPaymentRequests = ({
       if (!selectedChatContact || selectedChatContact.isUnknownContact) return;
       if (!selectedContact) return;
       const chat = { message: { ...message }, contact: { ...selectedContact } };
-      if (
-        !isCurrentChatPaymentRequest(
+      const isPaymentAuthorized = () =>
+        isCurrentChatPaymentRequest(
           chat.message,
           request,
           chat.contact,
@@ -481,12 +501,12 @@ export const useCashuPaymentRequests = ({
           contactsRef.current.find(
             (contact) => contact.id === chat.contact.id,
           ) ?? null,
-        )
-      ) {
+        );
+      if (!isPaymentAuthorized()) {
         setStatus(t("paymentRequestChanged"));
         return;
       }
-      await startPayment({ ...request }, chat, true);
+      await startPayment({ ...request }, chat, "tap", { isPaymentAuthorized });
     },
     [
       contactsRef,
@@ -589,6 +609,7 @@ export const useCashuPaymentRequests = ({
     enterCashuPaymentRequestAmount,
     onPayChatPaymentRequest,
     payCashuPaymentRequest,
+    payOnchainTransferPaymentRequest,
     pendingCashuPaymentRequestConfirmation:
       confirmation.pendingCashuPaymentRequestConfirmation,
     requestSelectedContact,

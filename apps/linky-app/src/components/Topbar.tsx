@@ -36,6 +36,7 @@ const TopbarAction = ({
     icon={button.icon}
     accessibilityLabel={button.label}
     size="sm"
+    indicator={button.indicator}
     variant={button.isActive ? "secondary" : "ghost"}
     aria-pressed={button.isActive}
     onPress={button.onClick}

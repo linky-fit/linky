@@ -1,4 +1,4 @@
-import type { IconName } from "@linky-fit/ui";
+import type { IconName, Tone } from "@linky-fit/ui";
 import type { TransactionId } from "@linky-fit/linksync";
 import type { ContactId } from "../../evolu";
 import type { ContactWithChatState } from "../lib/contactChatState";
@@ -227,6 +227,8 @@ export interface ContactFormState {
 
 export interface TopbarButton {
   icon: IconName;
+  /** A dot on the button, e.g. for something waiting. */
+  indicator?: Tone;
   isActive?: boolean;
   label: string;
   onClick: () => void;

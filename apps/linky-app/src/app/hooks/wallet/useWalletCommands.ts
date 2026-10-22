@@ -1,7 +1,10 @@
 import { useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
 import type { CashuPaymentRequestMessageInfo } from "../../lib/paymentRequestMessage";
-import { walletCommandsAtom } from "../../state/wallet/walletCommands";
+import {
+  walletCommandsAtom,
+  type OnchainTransferPaymentOptions,
+} from "../../state/wallet/walletCommands";
 import type { LocalNostrMessage } from "../../types/appTypes";
 
 /** The wallet composition's payments, token recovery and payment confirmations. */
@@ -30,6 +33,10 @@ export const useWalletCommands = () => {
         message: LocalNostrMessage,
         request: CashuPaymentRequestMessageInfo,
       ) => commands?.read().payChatPaymentRequest(message, request),
+      payOnchainTransferPaymentRequest: async (
+        request: CashuPaymentRequestMessageInfo,
+        options: OnchainTransferPaymentOptions,
+      ) => commands?.read().payOnchainTransferPaymentRequest(request, options),
       payLightningAddressWithCashu: async (
         lnAddress: string,
         amountSat: number,

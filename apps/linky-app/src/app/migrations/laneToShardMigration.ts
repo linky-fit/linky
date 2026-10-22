@@ -251,6 +251,15 @@ const REQUIRED_COLUMNS: {
     "channelsJson",
     "pairedAtSec",
   ],
+  // Never ingested from a lane: no legacy version wrote on-chain transfers.
+  onchainTransfer: [
+    "createdAtSec",
+    "role",
+    "peerPubkey",
+    "direction",
+    "amount",
+    "feeBasisPoints",
+  ],
 };
 
 // The overload types the picked row against the package schema; the

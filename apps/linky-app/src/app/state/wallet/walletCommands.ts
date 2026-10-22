@@ -2,6 +2,15 @@ import type { CashuPaymentRequestMessageInfo } from "../../lib/paymentRequestMes
 import type { LocalNostrMessage } from "../../types/appTypes";
 import { ownerCommandsAtom } from "../shell/ownerCommands";
 
+/** What paying a transfer's request shows for review, checks while it runs and does once it is paid. */
+export interface OnchainTransferPaymentOptions {
+  readonly isPaymentAuthorized: () => boolean;
+  readonly onPaid: () => void;
+  /** The payee's name unless the user saved it as a contact. */
+  readonly recipientName: string;
+  readonly summary: string;
+}
+
 export interface WalletCommands {
   readonly payLightningInvoiceWithCashu: (invoice: string) => Promise<boolean>;
   readonly payLightningAddressWithCashu: (
@@ -20,6 +29,11 @@ export interface WalletCommands {
   readonly payChatPaymentRequest: (
     message: LocalNostrMessage,
     request: CashuPaymentRequestMessageInfo,
+  ) => Promise<void>;
+  /** Reviews and pays the operator's request of an on-chain transfer while `isPaymentAuthorized` holds; `onPaid` runs once it is paid. */
+  readonly payOnchainTransferPaymentRequest: (
+    request: CashuPaymentRequestMessageInfo,
+    options: OnchainTransferPaymentOptions,
   ) => Promise<void>;
   /** Pays the payer of a proxy offer whose bank transfer arrived. */
   readonly settleBankPaymentOffer: (

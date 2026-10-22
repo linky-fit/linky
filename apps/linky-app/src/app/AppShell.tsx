@@ -13,6 +13,7 @@ import { useToasts } from "../hooks/useToasts";
 import { useDisplayAmounts, useTranslation } from "./hooks/shell";
 import { useTokenContactSend } from "./hooks/wallet/useWalletTokens";
 import { BeaconController } from "./BeaconController";
+import { OnchainTransfersSync } from "./OnchainTransfersSync";
 import { useLaneToShardMigration } from "./migrations/useLaneToShardMigration";
 import { AppRouteContent } from "./routes/AppRouteContent";
 import { sessionAtom } from "./state/session/session";
@@ -81,6 +82,7 @@ const AuthenticatedAppShell = ({ currentNsec }: AuthenticatedAppShellProps) => {
       <ToastNotifications toasts={toasts} dismissToast={dismissToast} />
       <InstallPwaBanner t={t} />
       <BeaconController currentNsec={currentNsec} />
+      <OnchainTransfersSync />
 
       <AuthenticatedLayout>
         <AppRouteContent />

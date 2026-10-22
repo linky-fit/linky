@@ -1151,7 +1151,9 @@ export const de = {
     "Achtung: Diese Anforderung sendet die Token über eine unsichere (http) Verbindung.",
   paymentRequestAddMint:
     "Über {mint} bezahlen? Die Mint wird zu deinen Mints hinzugefügt.",
-  paymentRequestFees: "Inklusive {amount} {unit} Gebühren",
+  paymentRequestFees: "Zzgl. bis zu {fee} Gebühren",
+  paymentRequestMaxTotal:
+    "Insgesamt höchstens {total}; ungenutzte Gebühren kommen zurück",
   paymentRequestOtherRecipient:
     "Diese Zahlung geht an {recipient}, nicht an die Person in diesem Chat.",
   paymentRequestEnterAmount: "Betrag eingeben",
@@ -1358,4 +1360,131 @@ export const de = {
   keryxMediaUnavailable:
     "Die Datei stimmt nicht mit dem überein, was die Firma signiert hat, und wurde nicht geöffnet.",
   keryxNotFound: "Nicht gefunden",
+  // On-chain transfers
+  onchainSendTitle: "An On-Chain-Wallet senden",
+  onchainReceiveTitle: "Von On-Chain-Wallet empfangen",
+  onchainTransferTitle: "On-Chain-Transaktion",
+  onchainSendHistoryTitle: "An On-Chain-Wallet",
+  onchainReceiveHistoryTitle: "Von On-Chain-Wallet",
+  onchainSendFixedAmounts:
+    "An eine On-Chain-Wallet kannst du nur feste Beträge senden.",
+  onchainReceiveFixedAmounts:
+    "Von einer On-Chain-Wallet kannst du nur feste Beträge empfangen.",
+  onchainTransferChooseAmount: "Betrag",
+  onchainSendInsufficient: "Dein Guthaben reicht für keinen der Beträge.",
+  onchainSendAmountUnavailable: "Der Empfänger fordert {amount} an",
+  onchainSendAmountUnavailableHint:
+    "An eine On-Chain-Wallet kannst du nur die Beträge unten senden. Sprich dich deshalb mit dem Empfänger ab, bevor du einen anderen Betrag sendest.",
+  onchainSendDifferentAmountChecked: "Andere Summe vereinbart",
+  onchainTransferYouGet: "Du bekommst",
+  onchainTransferServiceFee: "Servicegebühr",
+  onchainSendYouPay: "Du zahlst",
+  onchainReceiveYouSend: "Du sendest",
+  onchainSendPayoutAddress: "Bitcoin-Adresse, an die gesendet wird",
+  onchainTransferAddressInvalid:
+    "Das ist keine gültige Bitcoin-Adresse für dieses Netzwerk.",
+  onchainReceiveRefundToSender: "An die sendende Adresse erstatten",
+  onchainReceiveUseCustomRefund: "Andere Adresse verwenden",
+  onchainReceiveRefundHint:
+    "Kann die Transaktion nicht abgeschlossen werden, gehen deine Bitcoin hierhin zurück.",
+  onchainSendArrivalNotice:
+    "Kommt innerhalb von 24 Stunden nach deiner Zahlung in deiner Bitcoin-Wallet an.",
+  onchainReceiveArrivalNotice:
+    "Kommt innerhalb von 24 Stunden nach der Bestätigung deiner Einzahlung in deinem Guthaben an.",
+  onchainTransferFeeNotice: "Es fällt eine Servicegebühr von {fee} an.",
+  onchainTransferContactSupport: "Support kontaktieren",
+  onchainTransferContinue: "Weiter",
+  onchainTransferUnavailable:
+    "On-Chain-Transaktionen sind gerade nicht verfügbar.",
+  onchainTransferPaused:
+    "Gerade nicht verfügbar. Bitte versuche es später noch einmal.",
+  onchainTransferUpdateRequired:
+    "Aktualisiere Linky auf Version {version} oder neuer, um On-Chain-Transaktionen zu nutzen.",
+  onchainTransferRequestFailed:
+    "Die Transaktion konnte nicht gestartet werden.",
+  onchainTransferRequestMismatch:
+    "Die Zahlungsdaten passen nicht zu dieser Transaktion, daher wurde nichts bezahlt.",
+  onchainTransferNotFound: "Transaktion nicht gefunden",
+  onchainTransferPhaseWaitingForDetails: "Warte auf Details",
+  onchainTransferPhaseReadyToSend: "Bereit zum Senden",
+  onchainTransferPhaseSent: "Unterwegs",
+  onchainTransferPhaseAwaitingDeposit: "Warte auf deine Bitcoin",
+  onchainTransferPhaseDepositSeen: "Wird bestätigt",
+  onchainTransferPhaseWaitingForEcash: "Kommt bald an",
+  onchainTransferPhaseCompleted: "Abgeschlossen",
+  onchainTransferPhaseDenied: "Abgelehnt",
+  onchainTransferPhaseCancelled: "Abgebrochen",
+  onchainTransferPhaseRefunded: "Erstattet",
+  onchainTransferWaitingForDetailsHint:
+    "Es wurde noch kein Geld bewegt. Wir bereiten die Details vor und benachrichtigen dich, sobald sie bereit sind.",
+  onchainSendReadyHint:
+    "Alles ist bereit. Sende das Geld, um die Transaktion zu starten.",
+  onchainSendSentHint:
+    "Deine Bitcoin-Wallet erhält {amount} innerhalb von 24 Stunden nach deiner Zahlung. Die Netzwerkgebühr übernehmen wir.",
+  onchainReceiveAwaitingDepositHint:
+    "Sende genau {amount} von deiner Bitcoin-Wallet an diese Adresse. Die Netzwerkgebühr deiner Wallet zahlst du separat.",
+  onchainReceiveDepositSeenHint:
+    "Wir sehen deine Zahlung. Sie zählt, sobald sie {required} Bestätigungen hat.",
+  onchainReceiveWaitingForEcashHint:
+    "Deine Einzahlung ist bestätigt. {amount} kommt innerhalb von 24 Stunden in deinem Guthaben an.",
+  onchainSendCompletedHint: "{amount} wurde an deine On-Chain-Wallet gesendet.",
+  onchainReceiveCompletedHint: "{amount} ist in deinem Guthaben.",
+  onchainTransferDeniedHint:
+    "Diese Transaktion war nicht möglich. Es wurde nichts berechnet.",
+  onchainTransferCancelledHint: "Diese Transaktion wurde abgebrochen.",
+  onchainTransferRefundedHint: "Dein Geld wurde zurückgesendet.",
+  onchainReceiveConfirmations: "{count}/{required} Bestätigungen",
+  onchainReceiveDepositQr: "QR-Code der Bitcoin-Zahlung",
+  onchainSendPay: "{amount} senden",
+  onchainTransferPayoutAddress: "Zieladresse",
+  onchainTransferDepositAddress: "Einzahlungsadresse",
+  onchainTransferRefundAddress: "Erstattungsadresse",
+  onchainTransferRefundToSender: "Die Adresse, von der du sendest",
+  onchainTransferConfirmationsLabel: "Bestätigungen",
+  onchainTransferDepositTransaction: "Einzahlungstransaktion",
+  onchainTransferPayoutTransaction: "Auszahlungstransaktion",
+  onchainTransferRefundTransaction: "Erstattungstransaktion",
+  onchainTransferCancel: "Transaktion abbrechen",
+  onchainTransferCancelTitle: "Diese Transaktion abbrechen?",
+  onchainTransferCancelBody:
+    "Brich nur ab, wenn du dafür noch kein Geld gesendet hast.",
+  onchainTransferKeep: "Behalten",
+  onchainTransferPendingOne: "Offene On-Chain-Transaktion",
+  onchainTransferPendingMany: "{count} offene On-Chain-Transaktionen",
+  onchainTransfersInProgress: "Läuft",
+  onchainSendReadyNotification:
+    "Bereit: Zahle {total}, um {amount} an deine Bitcoin-Wallet zu senden.",
+  onchainReceiveReadyNotification:
+    "Bereit: Sende {total} von deiner Bitcoin-Wallet.",
+  onchainSendCompletedNotification:
+    "{amount} an deine On-Chain-Wallet gesendet",
+  onchainReceiveCompletedNotification:
+    "{amount} von deiner On-Chain-Wallet empfangen",
+  onchainTransferDeniedNotification:
+    "Deine On-Chain-Transaktion wurde abgelehnt",
+  onchainTransferRefundedNotification:
+    "Deine On-Chain-Transaktion wurde erstattet",
+  onchainReceiveRefundAddressField: "Bitcoin-Adresse für Erstattungen",
+  onchainReceiveCustodialWarning:
+    "Sendest du von einer Börse oder einer Custodial-Wallet? Nutze eine Erstattungsadresse, die du kontrollierst.",
+  onchainSendNetworkFee: "Die Netzwerkgebühr übernehmen wir.",
+  onchainSendNetworkFeeAmount:
+    "Deine Bitcoin-Wallet erhält {amount}. Die Netzwerkgebühr übernehmen wir.",
+  onchainReceiveNetworkFee:
+    "Die Netzwerkgebühr deiner Wallet zahlst du separat.",
+  onchainReceiveNetworkFeeAmount:
+    "Sende genau {total}; die Netzwerkgebühr deiner Wallet zahlst du separat.",
+  onchainTransferPhaseShortDeposit: "Zu wenig erhalten",
+  onchainReceiveShortDepositHint:
+    "Wir haben {received} erhalten, {missing} weniger als die nötigen {total}, daher kann das nicht abgeschlossen werden. Es wird an deine Erstattungsadresse zurückgesendet. Bei Fragen kontaktiere den Support.",
+  onchainTransferPaid: "Bezahlt",
+  onchainTransferRefunded: "Erstattet",
+  onchainReceiveDeposited: "Eingezahlte Bitcoin",
+  onchainReceiveAddedToBalance: "Zum Guthaben hinzugefügt",
+  onchainTransferNoMoneyMoved: "Kein Geld bewegt",
+  onchainSupportName: "Linky-Support",
+  onchainSendConfirmSummary: "{amount} an {address} senden",
+  onchainTransferOriginalTerms: "Ursprüngliche Bedingungen",
+  onchainReceiveCopyPaymentDetails: "Zahlungsdetails kopieren",
+  onchainReceiveCopyAddress: "Adresse kopieren",
 } satisfies Record<keyof typeof cs, string>;

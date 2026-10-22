@@ -6,6 +6,8 @@ import type { I18nKey, Lang } from "../i18n";
 import {
   applyAmountInputKey,
   applyAmountInputKeyWithDraft,
+  formatDisplayAmountParts,
+  formatDisplayAmountText,
   type DisplayAmountParts,
   type DisplayCurrency,
   type FiatRates,
@@ -29,7 +31,8 @@ interface ShellHooksMockOptions {
 
 /**
  * The `app/hooks/shell` module for `vi.mock`: copy as its i18n keys and
- * amounts as `<n> sat` unless overridden. Pass functions that read
+ * amounts as `<n> sat` unless overridden; a `displayCurrency` formats them
+ * as the app does. Pass functions that read
  * test-local values lazily; the mock is built before the test module's own
  * constants.
  */
@@ -39,14 +42,22 @@ export const shellHooksMock = (
   const t = options.t ?? ((key: I18nKey) => key);
   const displayCurrency = options.displayCurrency ?? "sat";
   const fiatRates = options.fiatRates ?? null;
-  const amountOptions = { displayCurrency, fiatRates };
+  const amountOptions = {
+    displayCurrency,
+    fiatRates,
+    lang: options.lang ?? "en",
+  };
+  const formatsLikeApp = options.displayCurrency !== undefined;
   const formatDisplayedAmountParts =
     options.formatDisplayedAmountParts ??
-    ((amountSat: number) => ({
-      approxPrefix: "",
-      amountText: String(amountSat),
-      unitLabel: "sat",
-    }));
+    (formatsLikeApp
+      ? (amountSat: number) =>
+          formatDisplayAmountParts(amountSat, amountOptions)
+      : (amountSat: number) => ({
+          approxPrefix: "",
+          amountText: String(amountSat),
+          unitLabel: "sat",
+        }));
   const cycleDisplayCurrency = options.cycleDisplayCurrency ?? vi.fn();
   const setStatus = options.setStatus ?? vi.fn();
   const pushToast = options.pushToast ?? vi.fn();
@@ -79,7 +90,10 @@ export const shellHooksMock = (
     formatDisplayedAmountParts,
     formatDisplayedAmountText:
       options.formatDisplayedAmountText ??
-      ((amountSat: number) => `${amountSat} sat`),
+      (formatsLikeApp
+        ? (amountSat: number) =>
+            formatDisplayAmountText(amountSat, amountOptions)
+        : (amountSat: number) => `${amountSat} sat`),
   };
   return {
     useTranslation: () => ({ lang: options.lang ?? "en", t }),

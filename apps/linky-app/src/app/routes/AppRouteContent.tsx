@@ -53,6 +53,8 @@ import {
   NostrRelayNewPage,
   NostrRelayPage,
   NostrRelaysPage,
+  OnchainTransferNewPage,
+  OnchainTransferPage,
   ProfileRoute,
   ProxyPaymentsPage,
   PushDebugPage,
@@ -163,6 +165,18 @@ const RoutePage = (): React.ReactElement => {
       return <NostrRelayPage />;
     case "topup":
       return <TopupPage />;
+    case "onchainSend":
+      return (
+        <OnchainTransferNewPage
+          key={`${route.payoutAddress}:${route.amount}`}
+          direction="send"
+          prefill={route}
+        />
+      );
+    case "onchainReceive":
+      return <OnchainTransferNewPage direction="receive" prefill={null} />;
+    case "onchainTransfer":
+      return <OnchainTransferPage id={route.id} />;
     case "transactions":
       return <TransactionsPage />;
     case "recurringPaymentNew":

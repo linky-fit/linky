@@ -117,6 +117,7 @@ const render = async (writes: {
       advanceContactPeerSeen: () => NO_WRITE,
       appendLocalNostrMessage,
       appendLocalNostrReaction,
+      applyAppMessage: () => NO_WRITE,
       applyBankPaymentOfferSnapshot: () => [],
       contacts: [],
       currentNsec: nsecEncode(me.secretKey),

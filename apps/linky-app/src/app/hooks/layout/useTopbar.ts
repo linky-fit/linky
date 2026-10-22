@@ -28,6 +28,7 @@ import {
 import { useTranslation } from "../shell";
 import { useNavIntent } from "../shell/navIntents";
 import { useScanCommands } from "../shell/scan";
+import { usePendingOnchainTransfersLink } from "../useOnchainTransfers";
 import { useMainMenu } from "./useMainMenuState";
 
 const parseContactId = (value: unknown): ContactId | null => {
@@ -54,6 +55,7 @@ export const useTopbar = () => {
     profileDraftAtom,
     (draft) => draft.editing,
   );
+  const pendingOnchainTransfers = usePendingOnchainTransfersLink();
   const [hiddenTransactionsShown, setHiddenTransactionsShown] = useAtom(
     hiddenTransactionsShownAtom,
   );
@@ -80,6 +82,7 @@ export const useTopbar = () => {
     hiddenTransactionsShown,
     isProfileEditing,
     openReceiveScan,
+    pendingOnchainTransfers,
     route,
     t,
     toggleContactsFilter,

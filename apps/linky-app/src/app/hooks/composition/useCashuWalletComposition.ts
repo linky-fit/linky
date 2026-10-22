@@ -399,6 +399,8 @@ export const useCashuWalletComposition = ({
     confirmLnurlWithdraw: lnurlWithdraw.confirmLnurlWithdraw,
     confirmPaymentMintMelt: walletPayments.confirmPaymentMintMelt,
     payChatPaymentRequest: walletPayments.onPayChatPaymentRequest,
+    payOnchainTransferPaymentRequest:
+      walletPayments.payOnchainTransferPaymentRequest,
     payLightningAddressWithCashu: walletPayments.payLightningAddressWithCashu,
     payLightningInvoiceWithCashu: walletPayments.payLightningInvoiceWithCashu,
     paySelectedContact: walletPayments.paySelectedContact,

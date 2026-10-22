@@ -12,6 +12,7 @@ import {
   buildLinkyPaymentRequestDeclineMessage,
 } from "./paymentRequestMessage";
 import {
+  paidAtSecByRequestId,
   paymentRequestAnswersByRumorId,
   receivedSatByRequestId,
   requestIdFulfilledBy,
@@ -302,5 +303,39 @@ describe("receivedSatByRequestId", () => {
     expect(
       receivedSatByRequestId([receive("request-1", 21, overrides)]),
     ).toEqual(new Map());
+  });
+});
+
+describe("paidAtSecByRequestId", () => {
+  type PaymentRecord = Parameters<typeof paidAtSecByRequestId>[0][number];
+  const payment = (
+    requestId: string | null,
+    createdAtSec: number,
+    overrides: Partial<PaymentRecord> = {},
+  ): PaymentRecord => ({
+    createdAtSec,
+    detailsJson: requestId === null ? null : JSON.stringify({ requestId }),
+    direction: "out",
+    status: "ok",
+    ...overrides,
+  });
+
+  it("keeps when each request id was first paid", () => {
+    expect(
+      paidAtSecByRequestId([
+        payment("request-1", 20),
+        payment("request-1", 10),
+        payment(null, 5),
+      ]),
+    ).toEqual(new Map([[REQUEST_ID, 10]]));
+  });
+
+  it.each([
+    ["a failed payment", { status: "error" }],
+    ["a receive naming the request", { direction: "in" }],
+  ])("leaves out %s", (_, overrides) => {
+    expect(paidAtSecByRequestId([payment("request-1", 10, overrides)])).toEqual(
+      new Map(),
+    );
   });
 });

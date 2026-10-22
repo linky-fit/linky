@@ -1148,7 +1148,9 @@ export const pt = {
     "Aviso: este pedido envia os tokens por uma conexão insegura (http).",
   paymentRequestAddMint:
     "Pagar através de {mint}? Ela será adicionada às suas mints.",
-  paymentRequestFees: "Inclui {amount} {unit} em taxas",
+  paymentRequestFees: "Mais até {fee} em taxas",
+  paymentRequestMaxTotal:
+    "No máximo {total} no total; taxas não usadas voltam para você",
   paymentRequestOtherRecipient:
     "Este pagamento vai para {recipient}, não para a pessoa desta conversa.",
   paymentRequestEnterAmount: "Digite o valor",
@@ -1360,4 +1362,127 @@ export const pt = {
   keryxMediaUnavailable:
     "O arquivo não corresponde ao que a empresa assinou, por isso não foi aberto.",
   keryxNotFound: "Não encontrado",
+  // On-chain transfers
+  onchainSendTitle: "Enviar para carteira on-chain",
+  onchainReceiveTitle: "Receber de carteira on-chain",
+  onchainTransferTitle: "Transação on-chain",
+  onchainSendHistoryTitle: "Para carteira on-chain",
+  onchainReceiveHistoryTitle: "De carteira on-chain",
+  onchainSendFixedAmounts:
+    "Para uma carteira on-chain, você só pode enviar valores fixos.",
+  onchainReceiveFixedAmounts:
+    "De uma carteira on-chain, você só pode receber valores fixos.",
+  onchainTransferChooseAmount: "Valor",
+  onchainSendInsufficient:
+    "Seu saldo não é suficiente para nenhum dos valores.",
+  onchainSendAmountUnavailable: "O destinatário pede {amount}",
+  onchainSendAmountUnavailableHint:
+    "Para uma carteira on-chain, você só pode enviar os valores abaixo, então confirme com o destinatário antes de enviar um valor diferente.",
+  onchainSendDifferentAmountChecked: "Outro valor combinado",
+  onchainTransferYouGet: "Você recebe",
+  onchainTransferServiceFee: "Taxa de serviço",
+  onchainSendYouPay: "Você paga",
+  onchainReceiveYouSend: "Você envia",
+  onchainSendPayoutAddress: "Endereço bitcoin de destino",
+  onchainTransferAddressInvalid:
+    "Este não é um endereço bitcoin válido para esta rede.",
+  onchainReceiveRefundToSender: "Reembolsar ao endereço de envio",
+  onchainReceiveUseCustomRefund: "Usar outro endereço",
+  onchainReceiveRefundHint:
+    "Se a transação não puder ser concluída, seus bitcoins voltam para cá.",
+  onchainSendArrivalNotice:
+    "Chega à sua carteira bitcoin em até 24 horas depois que você pagar.",
+  onchainReceiveArrivalNotice:
+    "Chega ao seu saldo em até 24 horas depois que seu depósito for confirmado.",
+  onchainTransferFeeNotice: "Há uma taxa de serviço de {fee}.",
+  onchainTransferContactSupport: "Falar com o suporte",
+  onchainTransferContinue: "Continuar",
+  onchainTransferUnavailable:
+    "Transações on-chain não estão disponíveis agora.",
+  onchainTransferPaused: "Indisponível no momento. Tente novamente mais tarde.",
+  onchainTransferUpdateRequired:
+    "Atualize o Linky para a versão {version} ou mais recente para usar transações on-chain.",
+  onchainTransferRequestFailed: "Não foi possível iniciar a transação.",
+  onchainTransferRequestMismatch:
+    "Os dados de pagamento não correspondem a esta transação, então nada foi pago.",
+  onchainTransferNotFound: "Transação não encontrada",
+  onchainTransferPhaseWaitingForDetails: "Aguardando detalhes",
+  onchainTransferPhaseReadyToSend: "Pronto para enviar",
+  onchainTransferPhaseSent: "A caminho",
+  onchainTransferPhaseAwaitingDeposit: "Aguardando seus bitcoins",
+  onchainTransferPhaseDepositSeen: "Confirmando",
+  onchainTransferPhaseWaitingForEcash: "Chegando em breve",
+  onchainTransferPhaseCompleted: "Concluída",
+  onchainTransferPhaseDenied: "Recusada",
+  onchainTransferPhaseCancelled: "Cancelada",
+  onchainTransferPhaseRefunded: "Reembolsada",
+  onchainTransferWaitingForDetailsHint:
+    "Nenhum dinheiro foi movimentado ainda. Estamos preparando os detalhes e avisaremos você quando estiverem prontos.",
+  onchainSendReadyHint:
+    "Está tudo pronto. Envie o dinheiro para iniciar a transação.",
+  onchainSendSentHint:
+    "Sua carteira bitcoin recebe {amount} em até 24 horas depois do seu pagamento. Nós pagamos a taxa de rede.",
+  onchainReceiveAwaitingDepositHint:
+    "Envie exatamente {amount} da sua carteira bitcoin para este endereço. A taxa de rede da sua carteira é paga à parte.",
+  onchainReceiveDepositSeenHint:
+    "Vemos seu pagamento. Ele conta quando tiver {required} confirmações.",
+  onchainReceiveWaitingForEcashHint:
+    "Seu depósito foi confirmado. {amount} chega ao seu saldo em até 24 horas.",
+  onchainSendCompletedHint: "{amount} foi enviado para sua carteira on-chain.",
+  onchainReceiveCompletedHint: "{amount} está no seu saldo.",
+  onchainTransferDeniedHint:
+    "Não foi possível fazer esta transação. Nada foi cobrado.",
+  onchainTransferCancelledHint: "Esta transação foi cancelada.",
+  onchainTransferRefundedHint: "Seu dinheiro foi devolvido.",
+  onchainReceiveConfirmations: "{count}/{required} confirmações",
+  onchainReceiveDepositQr: "QR code do pagamento bitcoin",
+  onchainSendPay: "Enviar {amount}",
+  onchainTransferPayoutAddress: "Endereço de destino",
+  onchainTransferDepositAddress: "Endereço de depósito",
+  onchainTransferRefundAddress: "Endereço de reembolso",
+  onchainTransferRefundToSender: "O endereço de onde você envia",
+  onchainTransferConfirmationsLabel: "Confirmações",
+  onchainTransferDepositTransaction: "Transação de depósito",
+  onchainTransferPayoutTransaction: "Transação de envio",
+  onchainTransferRefundTransaction: "Transação de reembolso",
+  onchainTransferCancel: "Cancelar transação",
+  onchainTransferCancelTitle: "Cancelar esta transação?",
+  onchainTransferCancelBody:
+    "Cancele só se você ainda não enviou dinheiro para ela.",
+  onchainTransferKeep: "Manter",
+  onchainTransferPendingOne: "Transação on-chain pendente",
+  onchainTransferPendingMany: "{count} transações on-chain pendentes",
+  onchainTransfersInProgress: "Em andamento",
+  onchainSendReadyNotification:
+    "Pronto: pague {total} para enviar {amount} para sua carteira bitcoin.",
+  onchainReceiveReadyNotification:
+    "Pronto: envie {total} da sua carteira bitcoin.",
+  onchainSendCompletedNotification:
+    "{amount} enviado para sua carteira on-chain",
+  onchainReceiveCompletedNotification:
+    "{amount} recebido da sua carteira on-chain",
+  onchainTransferDeniedNotification: "Sua transação on-chain foi recusada",
+  onchainTransferRefundedNotification: "Sua transação on-chain foi reembolsada",
+  onchainReceiveRefundAddressField: "Endereço bitcoin para reembolsos",
+  onchainReceiveCustodialWarning:
+    "Enviando de uma corretora ou carteira custodial? Use um endereço de reembolso que você controla.",
+  onchainSendNetworkFee: "Nós pagamos a taxa de rede.",
+  onchainSendNetworkFeeAmount:
+    "Sua carteira bitcoin recebe {amount}. Nós pagamos a taxa de rede.",
+  onchainReceiveNetworkFee: "A taxa de rede da sua carteira é paga à parte.",
+  onchainReceiveNetworkFeeAmount:
+    "Envie exatamente {total}; a taxa de rede da sua carteira é paga à parte.",
+  onchainTransferPhaseShortDeposit: "Valor insuficiente",
+  onchainReceiveShortDepositHint:
+    "Recebemos {received}, {missing} a menos que os {total} necessários, então isto não pode ser concluído. O valor será reembolsado para seu endereço de reembolso. Fale com o suporte se tiver dúvidas.",
+  onchainTransferPaid: "Pago",
+  onchainTransferRefunded: "Reembolsado",
+  onchainReceiveDeposited: "Bitcoin depositado",
+  onchainReceiveAddedToBalance: "Adicionado ao saldo",
+  onchainTransferNoMoneyMoved: "Nenhum dinheiro movido",
+  onchainSupportName: "Suporte Linky",
+  onchainSendConfirmSummary: "Enviar {amount} para {address}",
+  onchainTransferOriginalTerms: "Termos originais",
+  onchainReceiveCopyPaymentDetails: "Copiar dados de pagamento",
+  onchainReceiveCopyAddress: "Copiar endereço",
 } satisfies Record<keyof typeof cs, string>;

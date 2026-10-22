@@ -2,6 +2,7 @@ import {
   CashuOperationId,
   ContactId,
   KeryxSubscriptionId,
+  OnchainTransferId,
   RecurringPaymentId,
 } from "@linky-fit/linksync";
 import { UNKNOWN_CONTACT_ID_PREFIX } from "../utils/constants";
@@ -61,6 +62,10 @@ export type Route =
   | { kind: "recurringPayment"; id: RecurringPaymentId }
   | { kind: "recurringPaymentEdit"; id: RecurringPaymentId }
   | { kind: "topup" }
+  /** A scanned bitcoin address or BIP21 URI fills the payout address and picks the amount. */
+  | { kind: "onchainSend"; payoutAddress: string; amount: number | null }
+  | { kind: "onchainReceive" }
+  | { kind: "onchainTransfer"; id: OnchainTransferId }
   | { kind: "topupNoAmount" }
   | { kind: "topupInvoice" }
   | { kind: "manualPay" }
@@ -169,6 +174,20 @@ export const parseRouteFromHash = (): Route => {
   if (hash === "#wallet/topup") return { kind: "topup" };
   if (hash === "#wallet/topup/no-amount") return { kind: "topupNoAmount" };
   if (hash === "#wallet/topup/invoice") return { kind: "topupInvoice" };
+  if (hash === "#wallet/onchain/send") {
+    const query = new URLSearchParams(rawHash.split("?")[1] ?? "");
+    const amount = Number(query.get("amount") ?? "");
+    return {
+      kind: "onchainSend",
+      payoutAddress: query.get("address")?.trim() ?? "",
+      amount: Number.isSafeInteger(amount) && amount > 0 ? amount : null,
+    };
+  }
+  if (hash === "#wallet/onchain/receive") return { kind: "onchainReceive" };
+  const transferId = OnchainTransferId.fromUnknown(
+    decodeHashSegment(hash, "#wallet/onchain/"),
+  );
+  if (transferId.ok) return { kind: "onchainTransfer", id: transferId.value };
   if (hash === "#wallet/pay") return { kind: "manualPay" };
   if (hash === "#wallet/bank-payment/new") return { kind: "bankPaymentNew" };
 

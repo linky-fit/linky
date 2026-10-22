@@ -1,8 +1,7 @@
 import { encodeNpub } from "@linky-fit/linkstr";
 import { Notice, Stack, Text, TextField } from "@linky-fit/ui";
 import React from "react";
-import { useDisplayAmounts } from "../app/hooks/shell";
-import { paymentCopy } from "../app/hooks/wallet/paymentUi";
+import { useExactAmountText } from "../app/hooks/useExactAmountText";
 import type { PendingCashuPaymentRequest } from "../app/state/shell/confirmations";
 import type { Translate } from "../i18n";
 import { formatShortNpub } from "../utils/formatting";
@@ -40,16 +39,25 @@ export function CashuPaymentRequestConfirmModal({
   onEnterAmount,
   t,
 }: CashuPaymentRequestConfirmModalProps) {
-  const { formatDisplayedAmountParts } = useDisplayAmounts();
+  const { exact, fiat, satParts } = useExactAmountText();
   const [amountText, setAmountText] = React.useState("");
-  const { insufficientAmount, quote, recipientDiffers, request } = confirmation;
+  const {
+    insufficientAmount,
+    quote,
+    recipientDiffers,
+    recipientName,
+    request,
+    summary,
+  } = confirmation;
+  const description = summary ?? request.description;
 
   const recipient =
-    request.transportPubkeyHex !== null
+    recipientName ||
+    (request.transportPubkeyHex !== null
       ? formatShortNpub(encodeNpub(request.transportPubkeyHex))
       : request.transportPostUrl !== null
         ? (hostOf(request.transportPostUrl) ?? request.transportPostUrl)
-        : null;
+        : null);
   const paymentMint =
     quote === null
       ? null
@@ -80,14 +88,17 @@ export function CashuPaymentRequestConfirmModal({
       {paymentMint
         ? caption(t("paymentRequestConfirmMint").replace("{mint}", paymentMint))
         : null}
-      {quote?._tag === "Lightning"
-        ? caption(
-            paymentCopy(
-              t("paymentRequestFees"),
-              formatDisplayedAmountParts(quote.fee),
+      {quote !== null && quote.fee > 0 ? (
+        <>
+          {caption(t("paymentRequestFees").replace("{fee}", exact(quote.fee)))}
+          {caption(
+            t("paymentRequestMaxTotal").replace(
+              "{total}",
+              exact(quote.amount + quote.fee),
             ),
-          )
-        : null}
+          )}
+        </>
+      ) : null}
       {quote?._tag === "Lightning" && quote.addsMint && paymentMint ? (
         <Notice
           tone="accent"
@@ -123,7 +134,7 @@ export function CashuPaymentRequestConfirmModal({
         label={t("paymentRequestConfirmTitle")}
         confirmLabel={t("continue")}
         cancelLabel={t("payCancel")}
-        description={request.description}
+        description={description}
         meta={meta}
         isBusy={cashuIsBusy}
         disabled={!validAmount || insufficient}
@@ -134,13 +145,16 @@ export function CashuPaymentRequestConfirmModal({
     );
   }
 
+  const amountFiat = fiat(quote.amount);
   return (
     <PaymentConfirmDialog
-      amountSat={quote.amount + quote.fee}
+      amountSat={quote.amount}
+      amountParts={amountFiat === null ? undefined : satParts(quote.amount)}
+      amountCaption={amountFiat ?? undefined}
       label={t("paymentRequestConfirmTitle")}
       confirmLabel={t("paySend")}
       cancelLabel={t("payCancel")}
-      description={request.description}
+      description={description}
       meta={meta}
       isBusy={cashuIsBusy}
       onClose={onClose}

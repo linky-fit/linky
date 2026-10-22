@@ -19,7 +19,11 @@ import {
   WrapId,
   WrapInbox,
 } from "@linky-fit/linkstr";
-import type { ChatMessageReceived, WrapInboxEvent } from "@linky-fit/linkstr";
+import type {
+  AppMessageReceived,
+  ChatMessageReceived,
+  WrapInboxEvent,
+} from "@linky-fit/linkstr";
 import { Effect, Schema } from "effect";
 import { createHandlerBoundToURL, precacheAndRoute } from "workbox-precaching";
 import { ExpirationPlugin } from "workbox-expiration";
@@ -27,6 +31,11 @@ import { NavigationRoute, registerRoute } from "workbox-routing";
 import { CacheFirst } from "workbox-strategies";
 import { normalizePubkeyHex } from "./app/hooks/messages/contactIdentity";
 import { bankPaymentOfferMessageText } from "@linky-fit/proxy-payment";
+import {
+  onchainOperator,
+  operatorTransferUpdate,
+} from "./app/lib/onchainOperator";
+import { getOnchainTransferUpdateCopyForLanguage } from "./app/lib/onchainTransferPushCopy";
 import { extractCashuTokenFromText } from "./app/lib/tokenText";
 import {
   getBankPaymentReimbursementCopyForLanguage,
@@ -71,7 +80,8 @@ interface DecryptedPushMessage {
   body: string;
   isCashu: boolean;
   isPaymentNotice: boolean;
-  senderPub: string;
+  /** Null keeps the sender out of the title and the tap, e.g. for on-chain transfer updates. */
+  senderPub: string | null;
 }
 
 function readPushNotificationData(value: unknown): PushNotificationData {
@@ -282,6 +292,22 @@ function buildChatPushMessage(
   };
 }
 
+function buildOnchainTransferPushMessage(
+  event: AppMessageReceived,
+): DecryptedPushMessage | null {
+  const update = operatorTransferUpdate(event, onchainOperator?.pubkey ?? null);
+  if (update === null) return null;
+  return {
+    body: getOnchainTransferUpdateCopyForLanguage(
+      self.navigator.language,
+      update,
+    ),
+    isCashu: false,
+    isPaymentNotice: false,
+    senderPub: null,
+  };
+}
+
 function buildDecryptedPushMessage(
   event: WrapInboxEvent,
 ): DecryptedPushMessage | null {
@@ -309,6 +335,8 @@ function buildDecryptedPushMessage(
       };
     case "ChatMessageReceived":
       return buildChatPushMessage(event);
+    case "AppMessageReceived":
+      return buildOnchainTransferPushMessage(event);
     // Own-copy confirmations, reactions and dropped wraps fall back to the
     // caller's generic notification, like every undecryptable push.
     default:
@@ -544,16 +572,15 @@ self.addEventListener("push", (event) => {
           ? truncateNotificationBody(envelope.body)
           : "");
       const notificationBody = decryptedMessage?.body ?? fallbackBody;
-      const senderContactName = decryptedMessage
-        ? await getStoredPushContactName(decryptedMessage.senderPub).catch(
-            () => null,
-          )
+      const senderPub = decryptedMessage?.senderPub ?? null;
+      const senderContactName = senderPub
+        ? await getStoredPushContactName(senderPub).catch(() => null)
         : null;
       const notificationTitle =
         reminderCopy?.title ??
         buildPushNotificationTitle({
           contactName: senderContactName,
-          senderPubkey: decryptedMessage?.senderPub,
+          senderPubkey: senderPub ?? undefined,
           recipientIdentifier:
             envelope.data?.recipientNpub ?? envelope.data?.recipientPubkey,
           title: envelope.title,
@@ -563,9 +590,7 @@ self.addEventListener("push", (event) => {
         body: notificationBody,
         data: {
           ...data,
-          ...(decryptedMessage
-            ? { senderPubkey: decryptedMessage.senderPub }
-            : {}),
+          ...(senderPub ? { senderPubkey: senderPub } : {}),
         },
         icon: "/pwa-192x192.png",
         requireInteraction: false,

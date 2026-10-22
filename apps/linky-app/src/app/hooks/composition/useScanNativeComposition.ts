@@ -37,6 +37,11 @@ import type { SiteLoginResult } from "../useSiteLogin";
 import { takeSiteLoginHashLink } from "../../../siteLogin";
 import { isAnimatedQrFrame } from "../../../utils/animatedQr";
 import { useExperimentalFeatures } from "../useExperimentalFeatures";
+import {
+  onchainOperator,
+  operatorTransferUpdate,
+} from "../../lib/onchainOperator";
+import { useOnchainTransfersShown } from "../useOnchainTransfers";
 import { useSetNavIntent } from "../shell/navIntents";
 import { useProvideOwnerCommands } from "../shell/ownerCommands";
 import { useGuideScannerDomain } from "../useGuideScannerDomain";
@@ -216,6 +221,7 @@ export const useScanNativeComposition = ({
   );
 
   const { experimentalFeatures } = useExperimentalFeatures();
+  const onchainSendEnabled = useOnchainTransfersShown();
   const openSavedContact = useSetNavIntent("openSavedContactNpub");
   const handleScannedText = useScannedTextHandler<(typeof contacts)[number]>({
     canPayCashuRequest,
@@ -226,6 +232,7 @@ export const useScanNativeComposition = ({
     extractCashuTokenFromText,
     keryxEnabled: experimentalFeatures,
     lightningInvoiceAutoPayLimit,
+    onchainSendEnabled,
     onContactIdentifierScanned:
       route.kind === "contactNew" ? handleContactIdentifierScanned : null,
     openSavedContact,
@@ -323,6 +330,17 @@ export const useScanNativeComposition = ({
 
         const event = fetched.value;
         void dispatchInboxEvent(event, "backfill");
+        const transferUpdate =
+          event._tag === "AppMessageReceived"
+            ? operatorTransferUpdate(event, onchainOperator?.pubkey ?? null)
+            : null;
+        if (transferUpdate !== null) {
+          navigateTo({
+            route: "onchainTransfer",
+            id: transferUpdate.transferId,
+          });
+          return true;
+        }
         const peerPubkey = inboxPeerPubkey(event);
         if (!peerPubkey) {
           return openedFromNotificationData;

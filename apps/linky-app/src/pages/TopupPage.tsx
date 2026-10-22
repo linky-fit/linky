@@ -3,6 +3,7 @@ import { Button, Row, Stack } from "@linky-fit/ui";
 import type { FC } from "react";
 import { useTranslation } from "../app/hooks/shell";
 import { useTopupInvoice } from "../app/hooks/topup/useTopupFlow";
+import { useOnchainTransfersShown } from "../app/hooks/useOnchainTransfers";
 import { currentNpubAtom } from "../app/state/session/session";
 import { AmountKeypad } from "../components/AmountKeypad";
 import { PaymentNoteInput } from "../components/PaymentNoteInput";
@@ -14,6 +15,7 @@ export const TopupPage: FC = () => {
   const { pasteScanValue } = useScanCommands();
   const { t } = useTranslation();
   const currentNpub = useAtomValue(currentNpubAtom);
+  const onchainTransfersShown = useOnchainTransfersShown();
   const {
     setTopupAmount,
     setTopupNote,
@@ -82,6 +84,16 @@ export const TopupPage: FC = () => {
           {t("paste")}
         </Button>
       </Row>
+      {onchainTransfersShown ? (
+        <Button
+          variant="secondary"
+          icon="Bitcoin"
+          onPress={() => navigateTo({ route: "onchainReceive" })}
+          testID="topup-onchain-receive"
+        >
+          {t("onchainReceiveTitle")}
+        </Button>
+      ) : null}
     </Stack>
   );
 };

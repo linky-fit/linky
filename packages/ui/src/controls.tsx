@@ -5,8 +5,9 @@ import { Icon } from "./icons";
 import type { IconName, IconSize } from "./icons";
 import { Row, Stack, Text } from "./layout";
 import { Spinner } from "./spinner";
-import { focusRing, tooltipProps } from "./styles";
-import { opacity, size as sizes } from "./tokens";
+import { focusRing, toneColors, tooltipProps } from "./styles";
+import type { Tone } from "./tokens";
+import { border, opacity, size as sizes } from "./tokens";
 
 export type PressableProps = GetProps<typeof TamaguiButton> & {
   /** A browser tooltip on the web; ignored on native. */
@@ -153,6 +154,8 @@ export interface IconButtonProps extends Omit<
   icon: IconName;
   accessibilityLabel: string;
   size?: "sm" | "md" | "lg" | undefined;
+  /** Shows a dot in the corner, e.g. for activity waiting behind the button; name it in `accessibilityLabel`. */
+  indicator?: Tone | undefined;
 }
 
 const iconButtonSizes = {
@@ -168,6 +171,7 @@ export function IconButton({
   size = "md",
   loading = false,
   disabled,
+  indicator,
   ...props
 }: IconButtonProps) {
   const colors = buttonVariants[variant];
@@ -176,6 +180,7 @@ export function IconButton({
   return (
     <Pressable
       aria-label={accessibilityLabel}
+      position="relative"
       justifyContent="center"
       width={dimensions.box}
       height={dimensions.box}
@@ -193,6 +198,20 @@ export function IconButton({
       ) : (
         <Icon name={icon} size={dimensions.icon} color={color} />
       )}
+      {indicator ? (
+        <View
+          position="absolute"
+          top={0}
+          right={0}
+          width="$dot"
+          height="$dot"
+          borderRadius="$pill"
+          borderWidth={border.emphasis}
+          borderColor="$background"
+          backgroundColor={toneColors[indicator].solid}
+          aria-hidden
+        />
+      ) : null}
     </Pressable>
   );
 }

@@ -15,13 +15,15 @@ import { CashuPaymentRequestConfirmModal } from "./CashuPaymentRequestConfirmMod
 const templates: Partial<Record<I18nKey, string>> = {
   paymentRequestAddMint: "add {mint}?",
   paymentRequestConfirmRecipient: "to {recipient}",
-  paymentRequestFees: "fees {amount} {unit}",
+  paymentRequestFees: "fees up to {fee}",
+  paymentRequestMaxTotal: "at most {total}",
   paymentRequestOtherRecipient: "other {recipient}",
 };
 const t = (key: I18nKey) => templates[key] ?? key;
 
 vi.mock("../app/hooks/shell", async () =>
   (await import("../testUtils/shellHooks")).shellHooksMock({
+    ...(await import("../testUtils/onchainTransfers")).EUR_DISPLAY,
     t: (key) => t(key),
   }),
 );
@@ -29,7 +31,7 @@ vi.mock("../app/hooks/shell", async () =>
 const payee = Pubkey.make(getPublicKey(createSecretKey(3)));
 
 const request: CashuPaymentRequestMessageInfo = {
-  amount: 100,
+  amount: 100_000,
   description: "coffee",
   encodedRequest: "creqA",
   lockTo: null,
@@ -99,18 +101,20 @@ afterEach(() => {
 });
 
 describe("CashuPaymentRequestConfirmModal", () => {
-  it("shows the amount with fees as one sum and pays on confirm", async () => {
+  it("shows the exact amount, the fees and the total as maximums, and pays on confirm", async () => {
     const view = await render(
       pending({
         _tag: "Direct",
-        amount: 100,
-        fee: 2,
+        amount: 100_000,
+        fee: 4,
         mint: MintUrl.make("https://target.example"),
         methodFee: 0,
       }),
     );
 
-    expect(view.dialogText()).toContain("102");
+    expect(view.dialogText()).toContain("100,000sat~100 EUR");
+    expect(view.dialogText()).toContain("fees up to 4 sat (~0 EUR)");
+    expect(view.dialogText()).toContain("at most 100,004 sat (~100 EUR)");
     expect(view.dialogText()).toContain(
       `to ${formatShortNpub(encodeNpub(payee))}`,
     );
@@ -120,22 +124,43 @@ describe("CashuPaymentRequestConfirmModal", () => {
     await view.unmount();
   });
 
-  it("shows the Lightning fee and asks before adding the target mint", async () => {
+  it("shows the Lightning fee reserve and asks before adding the target mint", async () => {
     const view = await render(
       pending({
         _tag: "Lightning",
-        amount: 100,
-        fee: 7,
+        amount: 100_000,
+        fee: 5_056,
         sourceMint: MintUrl.make("https://source.example"),
         targetMint: "https://target.example",
         addsMint: true,
-        moveAmount: 101,
+        moveAmount: 100_100,
       }),
     );
 
-    expect(view.dialogText()).toContain("107");
-    expect(view.dialogText()).toContain("fees 7 sat");
+    expect(view.dialogText()).toContain("fees up to 5,056 sat (~5 EUR)");
+    expect(view.dialogText()).toContain("at most 105,056 sat (~105 EUR)");
     expect(view.dialogText()).toContain("add target.example?");
+    await view.unmount();
+  });
+
+  it("names the payee and says what the payment does when the caller knows", async () => {
+    const view = await render(
+      pending(
+        {
+          _tag: "Direct",
+          amount: 100_000,
+          fee: 0,
+          mint: MintUrl.make("https://target.example"),
+          methodFee: 0,
+        },
+        { recipientName: "Linky support", summary: "Send 99 sat to bc1q" },
+      ),
+    );
+
+    expect(view.dialogText()).toContain("to Linky support");
+    expect(view.dialogText()).toContain("Send 99 sat to bc1q");
+    expect(view.dialogText()).not.toContain("coffee");
+    expect(view.dialogText()).not.toContain("fees up to");
     await view.unmount();
   });
 
@@ -144,7 +169,7 @@ describe("CashuPaymentRequestConfirmModal", () => {
       pending(
         {
           _tag: "Direct",
-          amount: 100,
+          amount: 100_000,
           fee: 0,
           mint: MintUrl.make("https://target.example"),
           methodFee: 0,

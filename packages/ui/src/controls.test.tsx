@@ -74,3 +74,24 @@ describe("tooltip", () => {
     expect(container.querySelector("button")?.title).toBe("Not enough funds");
   });
 });
+
+describe("IconButton indicator", () => {
+  it("adds a hidden dot and leaves the button's name to its label", async () => {
+    const hiddenParts = async (indicator?: "warning") => {
+      const button = (
+        await render(
+          <IconButton
+            icon="Bitcoin"
+            indicator={indicator}
+            accessibilityLabel="Pending on-chain transaction"
+          />,
+        )
+      ).querySelector("button");
+      expect(button?.getAttribute("aria-label")).toBe(
+        "Pending on-chain transaction",
+      );
+      return button?.querySelectorAll('[aria-hidden="true"]').length ?? 0;
+    };
+    expect((await hiddenParts("warning")) - (await hiddenParts())).toBe(1);
+  });
+});

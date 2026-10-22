@@ -48,12 +48,16 @@ const setup = async ({
   contacts = [],
   currentNpub = null,
   keryxEnabled = true,
+  onchainSendEnabled = true,
+  scanEntryPoint = null,
 }: {
   autoPayLimit?: number;
   canPayFromHeldMint?: boolean;
   contacts?: ScanParams["contacts"];
   currentNpub?: string | null;
   keryxEnabled?: boolean;
+  onchainSendEnabled?: boolean;
+  scanEntryPoint?: ScanParams["scanEntryPoint"];
 } = {}) => {
   const requestLnurlAuthConfirmation = vi.fn<(p: LnurlAuthPreview) => void>();
   const requestLnurlWithdrawConfirmation = vi.fn();
@@ -89,6 +93,7 @@ const setup = async ({
       extractCashuTokenFromText: () => null,
       keryxEnabled,
       lightningInvoiceAutoPayLimit: autoPayLimit,
+      onchainSendEnabled,
       onContactIdentifierScanned: null,
       openSavedContact: () => {},
       payCashuPaymentRequest,
@@ -100,7 +105,7 @@ const setup = async ({
       requestSiteLoginConfirmation,
       saveCashuFromText: async () => undefined,
       scanAcceptsBankPayment: false,
-      scanEntryPoint: null,
+      scanEntryPoint,
       setStatus,
       t: translateToKey,
     });
@@ -362,6 +367,52 @@ describe("scanned Cashu requests", () => {
     expect(scan.payCashuPaymentRequest).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({ amount: 500 }),
     );
+  });
+});
+
+describe("scanned bitcoin addresses", () => {
+  const ADDRESS = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
+
+  it.each([
+    [ADDRESS, `#wallet/onchain/send?address=${ADDRESS}`],
+    [
+      `bitcoin:${ADDRESS}?amount=0.001`,
+      `#wallet/onchain/send?address=${ADDRESS}&amount=100000`,
+    ],
+  ])("opens the on-chain send for %s", async (text, hash) => {
+    window.location.hash = "#wallet";
+    const scan = await setup({ scanEntryPoint: "send" });
+    await scan.handle(text);
+
+    expect(window.location.hash).toBe(hash);
+  });
+
+  it("pays a BIP21 URI's Lightning leg rather than its address", async () => {
+    const scan = await setup({ autoPayLimit: 1000 });
+    const invoice = lightningInvoice(500);
+    await scan.handle(`bitcoin:${ADDRESS}?lightning=${invoice}`);
+
+    expect(scan.payLightningInvoiceWithCashu).toHaveBeenCalledWith(invoice);
+  });
+
+  it("keeps an address unsupported while on-chain transfers are hidden", async () => {
+    window.location.hash = "#wallet";
+    const scan = await setup({ onchainSendEnabled: false });
+    await scan.handle(`bitcoin:${ADDRESS}`);
+
+    expect(scan.setStatus).toHaveBeenCalledWith("scanUnsupportedBitcoinUri");
+    expect(window.location.hash).toBe("#wallet");
+  });
+
+  it("does not pay out from the receive scanner", async () => {
+    window.location.hash = "#wallet/topup";
+    const scan = await setup({ scanEntryPoint: "receive" });
+    await scan.handle(ADDRESS);
+
+    expect(scan.setStatus).toHaveBeenCalledWith(
+      "scanReceiveUnsupportedPayment",
+    );
+    expect(window.location.hash).toBe("#wallet/topup");
   });
 });
 

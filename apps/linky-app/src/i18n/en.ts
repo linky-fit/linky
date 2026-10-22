@@ -1130,7 +1130,8 @@ export const en = {
   paymentRequestInsecureTransportWarning:
     "Warning: this request sends the tokens over an insecure (http) connection.",
   paymentRequestAddMint: "Pay through {mint}? It will be added to your mints.",
-  paymentRequestFees: "Includes {amount} {unit} in fees",
+  paymentRequestFees: "Plus up to {fee} in fees",
+  paymentRequestMaxTotal: "At most {total} in total; unused fees come back",
   paymentRequestOtherRecipient:
     "This payment goes to {recipient}, not to the person in this chat.",
   paymentRequestEnterAmount: "Enter the amount",
@@ -1340,4 +1341,125 @@ export const en = {
   keryxMediaUnavailable:
     "The file didn't match what the company signed, so it wasn't opened.",
   keryxNotFound: "Not found",
+  // On-chain transfers
+  onchainSendTitle: "Send to on-chain wallet",
+  onchainReceiveTitle: "Receive from on-chain wallet",
+  onchainTransferTitle: "On-chain transaction",
+  onchainSendHistoryTitle: "To on-chain wallet",
+  onchainReceiveHistoryTitle: "From on-chain wallet",
+  onchainSendFixedAmounts:
+    "You can send to an on-chain wallet only in fixed amounts.",
+  onchainReceiveFixedAmounts:
+    "You can receive from an on-chain wallet only in fixed amounts.",
+  onchainTransferChooseAmount: "Amount",
+  onchainSendInsufficient: "Your balance isn't enough for any of the amounts.",
+  onchainSendAmountUnavailable: "The recipient asks for {amount}",
+  onchainSendAmountUnavailableHint:
+    "On-chain sends are only possible in the amounts below, so check with the recipient before you send a different amount.",
+  onchainSendDifferentAmountChecked: "Different amount agreed",
+  onchainTransferYouGet: "You get",
+  onchainTransferServiceFee: "Service fee",
+  onchainSendYouPay: "You pay",
+  onchainReceiveYouSend: "You send",
+  onchainSendPayoutAddress: "Bitcoin address to send to",
+  onchainTransferAddressInvalid:
+    "This isn't a valid bitcoin address for this network.",
+  onchainReceiveRefundToSender: "Refund to the sending address",
+  onchainReceiveUseCustomRefund: "Use another address",
+  onchainReceiveRefundHint:
+    "If the transaction can't be completed, your bitcoin goes back here.",
+  onchainSendArrivalNotice:
+    "Arrives in your bitcoin wallet within 24 hours after you pay.",
+  onchainReceiveArrivalNotice:
+    "Arrives in your balance within 24 hours after your deposit is confirmed.",
+  onchainTransferFeeNotice: "There is a {fee} service fee.",
+  onchainTransferContactSupport: "Contact support",
+  onchainTransferContinue: "Continue",
+  onchainTransferUnavailable:
+    "On-chain transactions aren't available right now.",
+  onchainTransferPaused: "Not available right now. Please try again later.",
+  onchainTransferUpdateRequired:
+    "Update Linky to version {version} or newer to use on-chain transactions.",
+  onchainTransferRequestFailed: "The transaction couldn't be started.",
+  onchainTransferRequestMismatch:
+    "The payment details don't match this transaction, so nothing was paid.",
+  onchainTransferNotFound: "Transaction not found",
+  onchainTransferPhaseWaitingForDetails: "Waiting for details",
+  onchainTransferPhaseReadyToSend: "Ready to send",
+  onchainTransferPhaseSent: "On its way",
+  onchainTransferPhaseAwaitingDeposit: "Waiting for your bitcoin",
+  onchainTransferPhaseDepositSeen: "Confirming",
+  onchainTransferPhaseWaitingForEcash: "Arriving soon",
+  onchainTransferPhaseCompleted: "Completed",
+  onchainTransferPhaseDenied: "Declined",
+  onchainTransferPhaseCancelled: "Cancelled",
+  onchainTransferPhaseRefunded: "Refunded",
+  onchainTransferWaitingForDetailsHint:
+    "No money has moved yet. We're preparing the details and will notify you once they're ready.",
+  onchainSendReadyHint:
+    "Everything is ready. Send the money to start the transaction.",
+  onchainSendSentHint:
+    "Your bitcoin wallet receives {amount} within 24 hours after you paid. We cover the network fee.",
+  onchainReceiveAwaitingDepositHint:
+    "Send exactly {amount} from your bitcoin wallet to this address. Your wallet's network fee is paid separately.",
+  onchainReceiveDepositSeenHint:
+    "We see your payment. It counts once it has {required} confirmations.",
+  onchainReceiveWaitingForEcashHint:
+    "Your deposit is confirmed. {amount} arrives in your balance within 24 hours.",
+  onchainSendCompletedHint: "{amount} was sent to your on-chain wallet.",
+  onchainReceiveCompletedHint: "{amount} is in your balance.",
+  onchainTransferDeniedHint:
+    "This transaction couldn't be made. Nothing was charged.",
+  onchainTransferCancelledHint: "This transaction was cancelled.",
+  onchainTransferRefundedHint: "Your money was sent back.",
+  onchainReceiveConfirmations: "{count}/{required} confirmations",
+  onchainReceiveDepositQr: "Bitcoin payment QR code",
+  onchainSendPay: "Send {amount}",
+  onchainTransferPayoutAddress: "Payout address",
+  onchainTransferDepositAddress: "Deposit address",
+  onchainTransferRefundAddress: "Refund address",
+  onchainTransferRefundToSender: "The address you send from",
+  onchainTransferConfirmationsLabel: "Confirmations",
+  onchainTransferDepositTransaction: "Deposit transaction",
+  onchainTransferPayoutTransaction: "Payout transaction",
+  onchainTransferRefundTransaction: "Refund transaction",
+  onchainTransferCancel: "Cancel transaction",
+  onchainTransferCancelTitle: "Cancel this transaction?",
+  onchainTransferCancelBody:
+    "Only cancel if you haven't sent any money for it yet.",
+  onchainTransferKeep: "Keep it",
+  onchainTransferPendingOne: "Pending on-chain transaction",
+  onchainTransferPendingMany: "{count} pending on-chain transactions",
+  onchainTransfersInProgress: "In progress",
+  onchainSendReadyNotification:
+    "Ready: pay {total} to send {amount} to your bitcoin wallet.",
+  onchainReceiveReadyNotification:
+    "Ready: send {total} from your bitcoin wallet.",
+  onchainSendCompletedNotification: "{amount} sent to your on-chain wallet",
+  onchainReceiveCompletedNotification:
+    "{amount} received from your on-chain wallet",
+  onchainTransferDeniedNotification: "Your on-chain transaction was declined",
+  onchainTransferRefundedNotification: "Your on-chain transaction was refunded",
+  onchainReceiveRefundAddressField: "Bitcoin address for refunds",
+  onchainReceiveCustodialWarning:
+    "Sending from an exchange or custodial wallet? Use a refund address you control.",
+  onchainSendNetworkFee: "We cover the network fee.",
+  onchainSendNetworkFeeAmount:
+    "Your bitcoin wallet receives {amount}. We cover the network fee.",
+  onchainReceiveNetworkFee: "Your wallet's network fee is paid separately.",
+  onchainReceiveNetworkFeeAmount:
+    "Send exactly {total}; your wallet's network fee is paid separately.",
+  onchainTransferPhaseShortDeposit: "Not enough received",
+  onchainReceiveShortDepositHint:
+    "We received {received}, {missing} less than the {total} needed, so this can't complete. It will be refunded to your refund address. Contact support if you have questions.",
+  onchainTransferPaid: "Paid",
+  onchainTransferRefunded: "Refunded",
+  onchainReceiveDeposited: "Bitcoin deposited",
+  onchainReceiveAddedToBalance: "Added to balance",
+  onchainTransferNoMoneyMoved: "No money moved",
+  onchainSupportName: "Linky support",
+  onchainSendConfirmSummary: "Send {amount} to {address}",
+  onchainTransferOriginalTerms: "Original terms",
+  onchainReceiveCopyPaymentDetails: "Copy payment details",
+  onchainReceiveCopyAddress: "Copy address",
 } satisfies Record<keyof typeof cs, string>;

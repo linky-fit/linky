@@ -24,6 +24,8 @@ interface BuildTopbarRightArgs {
   hiddenTransactionsShown: boolean;
   isProfileEditing: boolean;
   openReceiveScan: () => void;
+  /** The wallet's link to unfinished on-chain transfers; null when none runs. */
+  pendingOnchainTransfers: { label: string; open: () => void } | null;
   route: Route;
   t: Translate;
   toggleContactsFilter: () => void;
@@ -106,16 +108,19 @@ export const resolveBackAction = (
     case "cashuTokens":
     case "cashuTokenEmit":
     case "topup":
+    case "onchainSend":
       return () => navigateTo({ route: "wallet" });
 
     case "recurringPaymentNew":
     case "recurringPayment":
+    case "onchainTransfer":
       return () => navigateTo({ route: "transactions" });
     case "recurringPaymentEdit":
       return () => navigateTo({ route: "recurringPayment", id: route.id });
 
     case "topupNoAmount":
     case "topupInvoice":
+    case "onchainReceive":
       return () => navigateTo({ route: "topup" });
 
     case "bankPaymentOffer": {
@@ -256,6 +261,9 @@ const SHOWS_MENU_BUTTON: Record<
   keryxCompanyNew: false,
   lnAddressPay: true,
   manualPay: false,
+  onchainReceive: false,
+  onchainSend: false,
+  onchainTransfer: false,
   mint: true,
   mintNew: false,
   mints: false,
@@ -289,6 +297,7 @@ export const buildTopbarRight = ({
   hiddenTransactionsShown,
   isProfileEditing,
   openReceiveScan,
+  pendingOnchainTransfers,
   route,
   t,
   toggleContactsFilter,
@@ -391,6 +400,15 @@ export const buildTopbarRight = ({
     };
   }
 
+  if (route.kind === "wallet" && pendingOnchainTransfers) {
+    return {
+      icon: "Bitcoin",
+      indicator: "warning",
+      label: pendingOnchainTransfers.label,
+      onClick: pendingOnchainTransfers.open,
+    };
+  }
+
   if (route.kind === "topup") {
     return {
       icon: "ScanLine",
@@ -443,6 +461,9 @@ const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
   nostrRelay: "nostrRelay",
   nostrRelayNew: "addRelay",
   nostrRelays: "nostrRelays",
+  onchainReceive: "onchainReceiveTitle",
+  onchainSend: "onchainSendTitle",
+  onchainTransfer: "onchainTransferTitle",
   profile: "profile",
   profileEdit: "profile",
   settings: "settings",

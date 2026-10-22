@@ -182,6 +182,16 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "An incoming edit tried to create or change a payment request. Payment requests are immutable; the sender must send a new request.",
   "paymentRequest.paymentLinked":
     "An incoming NUT-18 payment payload names the request id of a payment request the user sent in the same conversation, so its receive is recorded as that request's fulfillment. Fires when the auto-receive starts; the paymentRequest link is the request id, the rumor link the payment message.",
+  "onchainTransfer.requested":
+    "The user requested an on-chain transfer from the on-chain operator: the transfer row was stored and the OnchainTransferRequest app message queued on the outbox (rumor link). The onchainTransfer link is also the paymentRequest link, because the transfer id is the NUT-18 request id both sides use. The payload has the direction, amount, the service fee in basis points the user saw and the bitcoin network; addresses stay out.",
+  "onchainTransfer.cancelSent":
+    "The user cancelled a transfer before any funds moved: OnchainTransferCancel was queued for the on-chain operator and the transfer shows as cancelled from now on. The payload names the phase it was cancelled in.",
+  "onchainTransfer.updateReceived":
+    "An update from the on-chain operator moved one of the user's transfers to a newer revision and was stored. Only updates from the configured operator's pubkey, for a transfer held with that operator, and with a higher revision than the stored one are applied; inbox replays and older revisions write nothing and emit no row. A live update that makes the transfer ready, completed, declined or refunded also shows the user a toast or a PWA notification, unless that transfer is open.",
+  "onchainTransfer.supportOpened":
+    "The user tapped Contact support on an on-chain transfer screen. Linky saves the on-chain operator as a contact unless it is one and opens their chat, the user's support chat; opened false means saving the contact failed and the status line says why. The onchainTransfer link is missing when it came from the send or receive screen, before any transfer existed.",
+  "onchainTransfer.sendTapped":
+    "The user tapped Send on an accepted on-chain send. payable false means the operator's payment request does not name this transfer, its amount or the operator, and nothing was paid; otherwise the usual payment request flow (paymentRequest rows) pays it and the transfer is marked sent once paid.",
   "paymentRequest.paymentUnlinked":
     "An incoming NUT-18 payment payload names a request id the user sent no payment request with in that conversation (a topup QR, another wallet's request, or a copied id). It is still received, just not linked to a request. A bare token names no request and emits nothing.",
   "bankOffer.snapshotNotAuthorized":

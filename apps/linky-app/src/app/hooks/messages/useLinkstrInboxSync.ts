@@ -1,6 +1,7 @@
 import { reportAppLog } from "../../../devtools/inspector/appLog";
 import { identityFromNsec, UnixSeconds } from "@linky-fit/linkstr";
 import type {
+  AppMessageReceived,
   BankOfferInboxEvent,
   InboxDelivery,
   Pubkey,
@@ -76,6 +77,11 @@ interface UseLinkstrInboxSyncParams {
   advanceContactPeerSeen: SeenReceiptInboxContext["advanceContactPeerSeen"];
   appendLocalNostrMessage: AppendLocalNostrMessage;
   appendLocalNostrReaction: AppendLocalNostrReaction;
+  /** Applies a message of an app Linky talks to, such as the on-chain operator's. */
+  applyAppMessage: (
+    event: AppMessageReceived,
+    delivery: InboxDelivery,
+  ) => Promise<WriteOutcome>;
   applyBankPaymentOfferSnapshot: (
     event: BankOfferInboxEvent,
   ) => readonly AppliedBankPaymentOfferSnapshot[];
@@ -121,7 +127,7 @@ export type DispatchInboxEvent = (
 /**
  * The app's single wrap-inbox consumer: applies every typed linkstr inbox
  * event — chat messages, own-message confirmations, reactions, payment
- * notices, bank-offer snapshots — to local state, and fires interruptions
+ * notices, bank-offer snapshots, on-chain transfer updates — to local state, and fires interruptions
  * (toasts, PWA notifications) for live deliveries only.
  */
 export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
@@ -301,8 +307,8 @@ export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
         case "OwnSeenReceiptConfirmed":
           applyOwnSeenReceiptConfirmed(event, seenReceiptCtx);
           return NO_WRITE;
-        // Messages other apps define for themselves; Linky has none of its own.
         case "AppMessageReceived":
+          return paramsRef.current.applyAppMessage(event, delivery);
         case "WrapDropped":
           return NO_WRITE;
       }

@@ -16,3 +16,6 @@ export const envMainMintUrl = import.meta.env.VITE_MAIN_MINT_URL;
 export const envPushServerUrl = import.meta.env.VITE_PUSH_SERVER_URL;
 export const envNotificationServerUrl = import.meta.env
   .VITE_NOTIFICATION_SERVER_URL;
+/** The on-chain operator's npub; on-chain transfers stay hidden without one. */
+export const envOnchainOperatorNpub = import.meta.env
+  .VITE_ONCHAIN_OPERATOR_NPUB;
