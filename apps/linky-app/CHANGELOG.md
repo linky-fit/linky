@@ -17,14 +17,14 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - Selected text in a field is highlighted again.
 - The loading screen writes the L in one clean stroke.
 - The Lightning address field offers "Reserve address"; a bought address is saved right away and celebrated.
-- Experimental: send to and receive from an on-chain bitcoin wallet in fixed amounts, from Send and Receive. The wallet shows pending ones, and a notification says when one is ready or done.
+- Experimental: send to an on-chain bitcoin wallet in fixed amounts and receive from one in any amount up to a limit, from Send and Receive. The wallet shows pending ones, and a notification says when one is ready or done.
 
 ### cs-CZ
 
 - Označený text v poli je zase zvýrazněný.
 - Načítací obrazovka vypíše L jedním čistým tahem.
 - Pole Lightning adresa nabízí „Rezervovat adresu“; koupená adresa se uloží hned a oslaví.
-- Experimentální: posílání do on-chain bitcoinové peněženky a příjem z ní v pevných částkách, přes Odeslat a Přijmout. Peněženka ukáže rozpracované transakce a upozornění dá vědět, až budou připravené nebo hotové.
+- Experimentální: posílání do on-chain bitcoinové peněženky v pevných částkách a příjem z ní v libovolné částce do limitu, přes Odeslat a Přijmout. Peněženka ukáže rozpracované transakce a upozornění dá vědět, až budou připravené nebo hotové.
 
 ## [26.10.6] - 2026-10-15
 
