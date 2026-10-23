@@ -37,8 +37,6 @@ export interface Wallet {
   readonly receive: (
     text: string,
   ) => Promise<Result.Result<ReceiveReceipt, ReceiveError>>;
-  /** Whether `operationId` is a receive that finished, so its sats are in the wallet. */
-  readonly isReceived: (operationId: string) => Promise<boolean>;
   /**
    * A pending send of `amount` at the mint for a message to carry; with
    * `forRequest` it adds the fee the recipient pays to redeem it, as NUT-18 asks.
@@ -48,8 +46,6 @@ export interface Wallet {
     amount: number,
     forRequest: boolean,
   ) => Promise<Result.Result<SendReceipt, SendError>>;
-  /** Takes an undelivered send's token back into the balance; `false` when it has to be tried again. */
-  readonly returnSend: (operationId: string) => Promise<boolean>;
   /** Closes a send whose token reached its recipient. */
   readonly forgetSend: (operationId: string) => Promise<void>;
   readonly balances: () => Promise<WalletBalances>;
@@ -62,6 +58,7 @@ export interface Wallet {
   readonly issuedTokens: () => Promise<readonly TokenTransfer[]>;
   /** Asks the mints which issued tokens were claimed and closes those. */
   readonly checkClaims: () => Promise<void>;
+  /** Takes a send's token back into the balance, making any copy handed out worthless. */
   readonly takeBack: (operationId: OperationId) => Promise<TakeBackOutcome>;
   /** Prices paying `invoice` from the mint; touches no proof. */
   readonly priceMelt: (
@@ -106,17 +103,6 @@ export const createWallet = (
           }),
         ),
       ),
-    isReceived: async (operationId) =>
-      (
-        await runtime.runPromise(
-          Effect.flatMap(Tokens, (tokens) => tokens.transfers),
-        )
-      ).some(
-        (transfer) =>
-          transfer.id === operationId &&
-          transfer.kind === "receive" &&
-          transfer.status === "done",
-      ),
     send: (mint, amount, forRequest) =>
       run(
         Effect.flatMap(Send, (send) =>
@@ -130,20 +116,6 @@ export const createWallet = (
           ),
         ),
       ),
-    returnSend: async (operationId) => {
-      const returned = await run(
-        Effect.flatMap(Tokens, (tokens) =>
-          tokens.returnToWallet(OperationId.make(operationId)),
-        ),
-      );
-      if (Result.isFailure(returned)) {
-        console.warn(
-          "[onchain-operator] send not returned",
-          returned.failure._tag,
-        );
-      }
-      return Result.isSuccess(returned);
-    },
     forgetSend: async (operationId) => {
       await run(
         Effect.flatMap(Tokens, (tokens) =>

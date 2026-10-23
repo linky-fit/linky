@@ -41,7 +41,6 @@ const setup = () => {
     runtime,
     pubkey: identity.pubkey,
     relays: [relay],
-    outboxStore: OutboxStore.inMemory,
   });
   const profileContent = (): unknown =>
     JSON.parse(published.at(-1)?.content ?? "null");

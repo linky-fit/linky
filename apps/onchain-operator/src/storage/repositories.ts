@@ -1,11 +1,13 @@
 import {
   makeConversationsRepository,
+  makeOnchainTransferMessagesRepository,
   makeOnchainTransfersRepository,
   makeWalletRepository,
   tableRepository,
   type ConversationsRepository,
   type LinkyDbSchema,
   type LinkyStore,
+  type OnchainTransferMessagesRepository,
   type OnchainTransfersRepository,
   type TableRepository,
   type WalletRepository,
@@ -22,6 +24,8 @@ export interface Repositories {
   readonly wallet: WalletRepository;
   readonly conversations: ConversationsRepository;
   readonly transfers: OnchainTransfersRepository;
+  /** What users sent about their transfers, raw. */
+  readonly transferMessages: OnchainTransferMessagesRepository;
 }
 
 export const makeRepositories = (store: LinkyStore): Repositories => ({
@@ -30,6 +34,7 @@ export const makeRepositories = (store: LinkyStore): Repositories => ({
   wallet: makeWalletRepository(store),
   conversations: makeConversationsRepository(store),
   transfers: makeOnchainTransfersRepository(store),
+  transferMessages: makeOnchainTransferMessagesRepository(store),
 });
 
 /** Resolves once the store is hydrated; background writes wait for it, as linksync asks. */

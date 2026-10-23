@@ -7,7 +7,7 @@ import {
   useEffect,
   useSyncExternalStore,
 } from "react";
-import type { Chat } from "../domain/chat";
+import type { Chat, ReceivedTransferMessage } from "../domain/chat";
 import type { OperatorProfile } from "../domain/profile";
 import type { OperatorTransfer } from "../domain/transfer";
 import { shortNpub } from "../format";
@@ -50,6 +50,13 @@ export const useTransfers = (): readonly OperatorTransfer[] | null =>
 /** The chat with every user; `null` until read. */
 export const useChats = (): readonly Chat[] | null =>
   useLiveValue<readonly Chat[] | null>(useAppServices().live.chats, null);
+
+/** Every transfer message users sent, raw, oldest first; `null` until read. */
+export const useTransferLog = (): readonly ReceivedTransferMessage[] | null =>
+  useLiveValue<readonly ReceivedTransferMessage[] | null>(
+    useAppServices().live.transferLog,
+    null,
+  );
 
 /** The saved profile; `undefined` until read, `null` before the first save. */
 export const useProfile = (): OperatorProfile | null | undefined =>

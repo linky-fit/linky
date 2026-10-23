@@ -18,7 +18,7 @@ import {
   TextField,
   TopBar,
 } from "@linky-fit/ui";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { copy } from "../copy/en";
 import {
   ecashRefundAmount,
@@ -69,30 +69,6 @@ const useAction = () => {
 };
 
 type Action = ReturnType<typeof useAction>;
-
-const IN_FLIGHT_POLL_MS = 3_000;
-
-/** Whether ecash for the transfer is queued to go out, polled while its funds are received. */
-const useEcashInFlight = (transfer: OperatorTransfer, busy: string | null) => {
-  const { transfers } = useAppServices();
-  const [inFlight, setInFlight] = useState(false);
-  const watching = transferStatus(transfer) === "fundsReceived";
-  useEffect(() => {
-    if (!watching) return;
-    let mounted = true;
-    const check = () =>
-      void transfers.inFlight(transfer.id).then((queued) => {
-        if (mounted) setInFlight(queued);
-      });
-    check();
-    const timer = setInterval(check, IN_FLIGHT_POLL_MS);
-    return () => {
-      mounted = false;
-      clearInterval(timer);
-    };
-  }, [transfers, transfer.id, watching, busy]);
-  return watching && inFlight;
-};
 
 export function TransferDetailScreen({
   transferId,
@@ -321,7 +297,7 @@ function Steps({
   const { transfers } = useAppServices();
   const status = transferStatus(transfer);
   const received = ecashRefundAmount(transfer);
-  const inFlight = useEcashInFlight(transfer, action.busy);
+  const inFlight = status === "fundsReceived" && transfer.ecashSendId !== null;
   const steps: ReactNode[] = [];
 
   if (inFlight) {
@@ -331,6 +307,14 @@ function Steps({
         tone="info"
         icon="Send"
         title={copy.failure({ reason: "inFlight" })}
+        description={copy.transfer.ecashInFlightHint}
+        action={{
+          label: copy.transfer.takeBackEcash,
+          onPress: () =>
+            void action.run("takeBackEcash", () =>
+              transfers.takeBackEcash(transfer.id),
+            ),
+        }}
       />,
     );
   }

@@ -11,6 +11,7 @@ import {
   TokenAlreadyKnown,
 } from "@linky-fit/linkshu";
 import {
+  AppMessageReceived,
   encodeNprofile,
   OutboxJobFailed,
   OutboxJobId,
@@ -21,6 +22,7 @@ import {
 } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import {
+  makeOnchainTransferMessagesRepository,
   makeOnchainTransfersRepository,
   NonEmptyString1000,
   NonNegativeInt,
@@ -34,6 +36,7 @@ import {
 import { Effect, Result, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import type { OperatorProfile } from "../domain/profile";
+import { readTransferLog } from "../storage/transferLog";
 import { readTransfer } from "../storage/transfers";
 import type { WatcherAlert } from "../domain/watchers";
 import { createTransfers } from "./transfers";
@@ -71,16 +74,20 @@ const setup = (
   options: {
     readonly profile?: OperatorProfile | null;
     readonly wallet?: ReturnType<typeof fakeWallet>;
+    /** Another device's synced account; a fresh store when omitted. */
+    readonly store?: ReturnType<typeof testStore>;
   } = {},
 ) => {
-  const store = testStore();
+  const store = options.store ?? testStore();
   const repository = makeOnchainTransfersRepository(store);
+  const transferMessages = makeOnchainTransferMessagesRepository(store);
   const nostr = fakeNostr();
   const wallet = options.wallet ?? fakeWallet();
   const esplora = fakeEsplora();
   const alerts: WatcherAlert["_tag"][] = [];
   const transfers = createTransfers({
     transfers: repository,
+    transferMessages,
     nostr: nostr.nostr,
     wallet: wallet.wallet,
     esplora: esplora.esplora,
@@ -109,7 +116,9 @@ const setup = (
       );
   return {
     transfers,
+    store,
     repository,
+    transferMessages,
     nostr,
     wallet,
     esplora,
@@ -226,6 +235,26 @@ describe("transfer requests", () => {
       user,
       amount: 100_000,
     });
+  });
+});
+
+describe("transfer log", () => {
+  it("keeps every transfer message a user sent, raw and once, whether it decodes or not", async () => {
+    const { send, transferMessages, user, nostr } = setup();
+    const request = sendRequest();
+    await send(request);
+    const garbled = new AppMessageReceived({
+      ...transferMessageFrom(user, request),
+      content: '{"type":"request","amount":"lots"}',
+    });
+    await deliver(nostr.inbox, garbled);
+    await deliver(nostr.inbox, garbled);
+    const log = await Effect.runPromise(readTransferLog(transferMessages));
+    expect(log).toMatchObject([
+      { from: user, transferId: request.transferId },
+      { from: user, transferId: null, content: garbled.content },
+    ]);
+    expect(log[0]?.content).toContain(request.transferId);
   });
 });
 
@@ -406,20 +435,33 @@ describe("ecash in", () => {
     expect(updates().map((update) => update.status)).toEqual(["accepted"]);
   });
 
-  it("counts a replayed payment once and leaves a deferred one for the next session", async () => {
-    const done = fakeWallet(() =>
-      Result.fail(
-        new TokenAlreadyKnown({ operationId: OperationId.make("receive-1") }),
-      ),
-    );
-    done.done.add("receive-1");
-    const replayed = await acceptedSend(done);
-    await replayed.pay(101_000);
-    await replayed.pay(101_000);
-    expect(replayed.updates().map((update) => update.status)).toEqual([
-      "accepted",
+  it("pays one transfer with ecash, never again and never another one, and leaves a deferred one for the next session", async () => {
+    let known = false;
+    const wallet = fakeWallet(() => {
+      if (known)
+        return Result.fail(
+          new TokenAlreadyKnown({ operationId: OperationId.make("receive-1") }),
+        );
+      known = true;
+      return Result.succeed(receiveReceipt(101_000));
+    });
+    const context = setup({ wallet });
+    const [paid, other] = [sendRequest(), sendRequest()];
+    for (const request of [paid, other]) {
+      await context.send(request);
+      await context.transfers.accept(request.transferId);
+    }
+    for (const id of [paid.transferId, paid.transferId, other.transferId])
+      await deliver(
+        context.nostr.inbox,
+        chatTextFrom(context.user, nut18Payload(id, 101_000)),
+      );
+    expect((await context.stored(paid.transferId)).update?.status).toBe(
       "fundsReceived",
-    ]);
+    );
+    expect((await context.stored(other.transferId)).update?.status).toBe(
+      "accepted",
+    );
 
     const deferred = await acceptedSend(
       fakeWallet(() =>
@@ -448,24 +490,6 @@ describe("ecash in", () => {
     );
     expect(wallet.received).toHaveLength(1);
     expect(updates().map((update) => update.status)).toEqual(["accepted"]);
-
-    const done = fakeWallet(() =>
-      Result.fail(
-        new TokenAlreadyKnown({ operationId: OperationId.make("receive-1") }),
-      ),
-    );
-    done.done.add("receive-1");
-    const replayed = await acceptedSend(done);
-    await deliver(
-      replayed.nostr.inbox,
-      chatTextFrom(
-        replayed.user,
-        nut18Payload(replayed.request.transferId, 101_000, otherMint),
-      ),
-    );
-    expect(replayed.updates().map((update) => update.status)).toEqual([
-      "accepted",
-    ]);
   });
 
   it("receives ecash naming no transfer without touching any transfer", async () => {
@@ -707,7 +731,6 @@ describe("payouts", () => {
     const refund = "ff".repeat(32);
     esplora.state.byTxid.set(refund, txPaying(refund, "bcrt1qsender", 1));
     await transfers.sendEcash(request.transferId);
-    expect(await transfers.inFlight(request.transferId)).toBe(true);
     expect(
       await transfers.confirmRefund(request.transferId, "ff".repeat(32)),
     ).toEqual({
@@ -731,6 +754,96 @@ describe("payouts", () => {
     );
     expect(wallet.returned).toEqual(["send-1"]);
     expect(updates().at(-1)?.status).toBe("fundsReceived");
+  });
+
+  it("keeps another device from paying while the Cashu is on its way", async () => {
+    const first = await receivedDeposit();
+    const second = setup({ store: first.store });
+    expect(
+      await first.transfers.sendEcash(first.request.transferId),
+    ).toBeNull();
+    expect(await second.transfers.sendEcash(first.request.transferId)).toEqual({
+      reason: "inFlight",
+    });
+    const refund = "ff".repeat(32);
+    second.esplora.state.byTxid.set(
+      refund,
+      txPaying(refund, "bcrt1qsender", 1),
+    );
+    expect(
+      await second.transfers.confirmRefund(first.request.transferId, refund),
+    ).toEqual({ reason: "inFlight" });
+    expect(second.wallet.sent).toEqual([]);
+  });
+
+  it("takes back Cashu a gone device queued, so its late message completes nothing", async () => {
+    const first = await receivedDeposit();
+    const second = setup({
+      store: first.store,
+      wallet: fakeWallet(undefined, "other-send"),
+    });
+    const id = first.request.transferId;
+    await first.transfers.sendEcash(id);
+    expect(await second.transfers.takeBackEcash(id)).toBeNull();
+    expect(second.wallet.returned).toEqual(["send-1"]);
+    expect((await first.stored(id)).ecashSendId).toBeNull();
+
+    expect(await second.transfers.sendEcash(id)).toBeNull();
+    await settle(first.nostr, succeeded(first.nostr.tokens[0]?.ref ?? ""));
+    expect((await first.stored(id)).update?.status).toBe("fundsReceived");
+    expect(first.nostr.notices).toEqual([]);
+
+    await settle(second.nostr, succeeded(second.nostr.tokens[0]?.ref ?? ""));
+    expect((await first.stored(id)).update?.status).toBe("completed");
+  });
+
+  it("completes the transfer when the Cashu taken back was already claimed", async () => {
+    const { transfers, request, wallet, stored } = await receivedDeposit();
+    await transfers.sendEcash(request.transferId);
+    wallet.takeBackOutcome = "claimed";
+    expect(await transfers.takeBackEcash(request.transferId)).toBeNull();
+    expect(await stored(request.transferId)).toMatchObject({
+      ecashSendId: null,
+      update: { status: "completed" },
+    });
+  });
+
+  it("keeps the send while the mint cannot take back Cashu whose message failed", async () => {
+    const { transfers, request, nostr, wallet, stored } =
+      await receivedDeposit();
+    await transfers.sendEcash(request.transferId);
+    const failed = new OutboxJobFailed({
+      jobId: OutboxJobId.make("job"),
+      ref: OutboxRef.make(nostr.tokens[0]?.ref ?? ""),
+      reason: "unexpected-error",
+      detail: "",
+    });
+    wallet.takeBackOutcome = "mintUnreachable";
+    await expect(settle(nostr, failed)).rejects.toThrow();
+    expect((await stored(request.transferId)).ecashSendId).toBe("send-1");
+    wallet.takeBackOutcome = "returned";
+    await settle(nostr, failed);
+    expect((await stored(request.transferId)).ecashSendId).toBeNull();
+  });
+
+  it("completes the transfer when Cashu whose message failed was already claimed", async () => {
+    const { transfers, request, nostr, wallet, stored } =
+      await receivedDeposit();
+    await transfers.sendEcash(request.transferId);
+    wallet.takeBackOutcome = "claimed";
+    await settle(
+      nostr,
+      new OutboxJobFailed({
+        jobId: OutboxJobId.make("job"),
+        ref: OutboxRef.make(nostr.tokens[0]?.ref ?? ""),
+        reason: "unexpected-error",
+        detail: "",
+      }),
+    );
+    expect(await stored(request.transferId)).toMatchObject({
+      ecashSendId: null,
+      update: { status: "completed" },
+    });
   });
 
   it("refunds an on-chain receive by the transaction the operator pasted, with what it returned to the sender", async () => {

@@ -110,6 +110,9 @@ export const copy = {
     refundEcash: (amount: string) => `Refund ${amount} Cashu`,
     refundEcashHint:
       "Sends the received Cashu back to the user in the chat; the transfer ends refunded.",
+    ecashInFlightHint:
+      "It leaves from the device that sent it once that device reaches a relay. If that device is gone, take the Cashu back and send it again.",
+    takeBackEcash: "Take back",
     refundTitle: "Refund the deposit",
     refundDescription:
       "Pay the deposit back from your wallet, then paste the transaction id.",
@@ -180,6 +183,10 @@ export const copy = {
         return "The user's payment request names no Nostr transport.";
       case "sendFailed":
         return `The Cashu could not be sent (${failure.detail}).`;
+      case "takeBackFailed":
+        return failure.outcome === "mintUnreachable"
+          ? "The mint is not responding; try again."
+          : "The Cashu could not be taken back; try again.";
     }
   },
   actionFailed: "That did not work; try again.",
@@ -195,6 +202,14 @@ export const copy = {
     sending: "Sending",
     failed: "Not sent",
     sendFailed: "The message was not sent; try again.",
+    rawLog: "Show everything the user sent, raw",
+    showChat: "Show the chat",
+    rawLogEmpty: "The user has sent nothing yet.",
+    rawChatMessage: "Chat message",
+    rawTransferMessage: (transferId: string | null) =>
+      transferId === null
+        ? "Transfer message that does not decode"
+        : `Transfer message · ${transferId}`,
     ecash: (amount: string, forTransfer: boolean) =>
       forTransfer ? `Cashu ${amount} for a transfer` : `Cashu ${amount}`,
     foreignEcash: (amount: number, unit: string, mint: string) =>

@@ -3,6 +3,7 @@ import {
   decodePaymentRequest,
   encodeNostrPaymentRequest,
   encodePaymentRequestPayload,
+  OperationId,
   parseMintUrl,
   PaymentRequestId,
   type SendReceipt,
@@ -13,7 +14,10 @@ import {
   type Pubkey,
   type RelayUrl,
 } from "@linky-fit/linkstr";
-import type { OnchainTransfersRepository } from "@linky-fit/linksync";
+import type {
+  OnchainTransferMessagesRepository,
+  OnchainTransfersRepository,
+} from "@linky-fit/linksync";
 import {
   depositStatus,
   deriveDepositAddress,
@@ -27,8 +31,8 @@ import {
   type OnchainTransferRequest,
   type OnchainTransferUpdate,
 } from "@linky-fit/onchain-transfer";
-import { Effect, Option, Result } from "effect";
-import { messageContent, type MessageContent } from "../domain/chat";
+import { Effect, Option, Result, Schema } from "effect";
+import { messageContent } from "../domain/chat";
 import type { OperatorProfile } from "../domain/profile";
 import {
   checkPayout,
@@ -56,8 +60,10 @@ import {
   markUserCancelled,
   readTransfer,
   readTransfers,
+  saveEcashSend,
   saveUpdate,
 } from "../storage/transfers";
+import { logTransferMessage } from "../storage/transferLog";
 import type { Nostr } from "./nostr";
 import type { AlertWatchers } from "./watchers";
 import { exclusive } from "./serial";
@@ -76,6 +82,11 @@ export type TransferActionFailure =
   | { readonly reason: "txShort"; readonly paid: number }
   /** A payout or refund of this transfer is already on its way. */
   | { readonly reason: "inFlight" }
+  /** The Cashu on its way could not be taken back. */
+  | {
+      readonly reason: "takeBackFailed";
+      readonly outcome: "mintUnreachable" | "failed";
+    }
   /** The user's payment request names no Nostr transport to pay it over. */
   | { readonly reason: "noTransport" }
   | { readonly reason: "sendFailed"; readonly detail: string };
@@ -97,10 +108,13 @@ export interface Transfers {
   readonly refundEcash: (id: OnchainTransferId) => ActionResult;
   /** On-chain receive: records the transaction the operator returned the deposit with. */
   readonly confirmRefund: (id: OnchainTransferId, txid: string) => ActionResult;
+  /**
+   * Takes back the Cashu on its way for the transfer, as when the device that
+   * queued it is gone; a transfer whose user already claimed it moves on.
+   */
+  readonly takeBackEcash: (id: OnchainTransferId) => ActionResult;
   /** Reports what arrived at every watched deposit address. */
   readonly checkDeposits: () => Promise<void>;
-  /** Whether ecash for the transfer is queued to go out. */
-  readonly inFlight: (id: OnchainTransferId) => Promise<boolean>;
 }
 
 const UPDATE_REF = "transfer-update:";
@@ -113,8 +127,13 @@ const parseSendRef = (prefix: string, ref: string) => {
   const rest = ref.slice(prefix.length);
   const separator = rest.indexOf(":");
   const transferId = rest.slice(0, separator);
-  return separator > 0 && OnchainTransferId.is(transferId)
-    ? { transferId, operationId: rest.slice(separator + 1) }
+  const operationId = Option.getOrNull(
+    Schema.decodeUnknownOption(OperationId)(rest.slice(separator + 1)),
+  );
+  return separator > 0 &&
+    OnchainTransferId.is(transferId) &&
+    operationId !== null
+    ? { transferId, operationId }
     : null;
 };
 
@@ -135,6 +154,7 @@ const cleanReason = (reason: string): UpdateChanges => {
 
 export const createTransfers = ({
   transfers,
+  transferMessages,
   nostr,
   wallet,
   esplora,
@@ -144,6 +164,8 @@ export const createTransfers = ({
   whenHydrated,
 }: {
   readonly transfers: OnchainTransfersRepository;
+  /** Where every transfer message a user sent is kept raw. */
+  readonly transferMessages: OnchainTransferMessagesRepository;
   readonly nostr: Nostr;
   readonly wallet: Wallet;
   readonly esplora: EsploraClient;
@@ -245,10 +267,17 @@ export const createTransfers = ({
   };
 
   nostr.onInboxEvent(async (event) => {
-    if (event._tag !== "AppMessageReceived") return;
+    if (
+      event._tag !== "AppMessageReceived" ||
+      event.app !== onchainTransferChannel.app
+    )
+      return;
     const message = Option.getOrNull(onchainTransferChannel.decode(event));
-    if (message === null || message.type === "update") return;
     await whenHydrated();
+    await run(
+      logTransferMessage(transferMessages, event, message?.transferId ?? null),
+    );
+    if (message === null || message.type === "update") return;
     await serially(() =>
       message.type === "request"
         ? onRequest(message, event.from, event.sentAt)
@@ -258,12 +287,11 @@ export const createTransfers = ({
 
   /**
    * Receives the ecash; the transfer-mint sats it brought in, `null` when there
-   * are none to count (again). Ecash from another mint or unit is kept but pays no transfer.
+   * are none. Ecash from another mint or unit is kept but pays no transfer, and
+   * ecash the wallet already holds pays none again, whichever transfer the
+   * message names.
    */
-  const receive = async (
-    text: string,
-    content: Extract<MessageContent, { _tag: "ecash" }>,
-  ): Promise<number | null> => {
+  const receive = async (text: string): Promise<number | null> => {
     const received = await wallet.receive(text);
     if (Result.isSuccess(received))
       return isTransferEcash(received.success, config.mintUrl)
@@ -271,14 +299,7 @@ export const createTransfers = ({
         : null;
     // Unacknowledged, so the next session receives it again.
     if (isTransientReceiveError(received.failure)) throw received.failure;
-    if (received.failure._tag !== "TokenAlreadyKnown") return null;
-    // A replay after a reload between receiving and recording; its net amount is gone, so the face value stands in.
-    const { operationId } = received.failure;
-    return operationId !== null &&
-      isTransferEcash(content, config.mintUrl) &&
-      (await wallet.isReceived(operationId))
-      ? content.amount
-      : null;
+    return null;
   };
 
   /** Ecash naming an on-chain send pays it; any other ecash is just received. */
@@ -293,7 +314,7 @@ export const createTransfers = ({
     const content = text === null ? null : messageContent(text);
     if (text === null || content?._tag !== "ecash") return;
     await whenHydrated();
-    const sats = await receive(text, content);
+    const sats = await receive(text);
     const { requestId } = content;
     if (sats === null || requestId === null || !OnchainTransferId.is(requestId))
       return;
@@ -314,18 +335,40 @@ export const createTransfers = ({
     });
   });
 
-  const queuedFor = async (id: OnchainTransferId) =>
-    [...(await nostr.queuedRefs())].some(
-      (ref) =>
-        ref.startsWith(`${PAYOUT_REF}${id}:`) ||
-        ref.startsWith(`${REFUND_REF}${id}:`),
-    );
+  /** What the transfer becomes once its Cashu reached the user: a receive's payout completes it, a send's refund refunds it. */
+  const deliveredUpdate = (transfer: OperatorTransfer) =>
+    transfer.direction === "receive"
+      ? nextUpdate(transfer, "completed")
+      : nextUpdate(transfer, "refunded", {
+          refundAmount: ecashRefundAmount(transfer),
+        });
 
   /**
-   * Sends ecash for the transfer as a chat message under `ref`; the send stays
-   * pending until the outbox result closes it.
+   * Settles the transfer whose send `operationId` was taken back, if it is
+   * still that send: moved on when the user had already claimed the Cashu,
+   * payable again otherwise; call it within `serially`.
+   */
+  const settleTakenBack = async (
+    id: OnchainTransferId,
+    operationId: OperationId,
+    outcome: "returned" | "claimed",
+  ) => {
+    const transfer = await load(id);
+    if (transfer?.ecashSendId !== operationId) return;
+    if (outcome === "claimed") {
+      const update = deliveredUpdate(transfer);
+      if (update !== null) await publish(transfer, update);
+    }
+    await run(saveEcashSend(transfers, id, null));
+  };
+
+  /**
+   * Sends ecash for the transfer as a chat message under `ref`. The send is
+   * recorded on the transfer first, so no device sends again until its
+   * outbox result or a take-back clears it.
    */
   const sendEcashMessage = async (args: {
+    readonly transferId: OnchainTransferId;
     readonly amount: number;
     readonly forRequest: boolean;
     readonly message: (receipt: SendReceipt) => string;
@@ -339,6 +382,15 @@ export const createTransfers = ({
     if (Result.isFailure(sent))
       return { reason: "sendFailed", detail: sent.failure._tag };
     const receipt = sent.success;
+    const recorded = await run(
+      Effect.result(
+        saveEcashSend(transfers, args.transferId, receipt.operationId),
+      ),
+    );
+    if (Result.isFailure(recorded)) {
+      await wallet.takeBack(receipt.operationId);
+      return { reason: "sendFailed", detail: recorded.failure._tag };
+    }
     try {
       await nostr.sendToken(
         args.to,
@@ -349,43 +401,43 @@ export const createTransfers = ({
       return null;
     } catch (error) {
       console.warn("[onchain-operator] ecash not queued", error);
-      await wallet.returnSend(receipt.operationId);
+      if ((await wallet.takeBack(receipt.operationId)) === "returned")
+        await settleTakenBack(args.transferId, receipt.operationId, "returned");
       return { reason: "sendFailed", detail: "NotQueued" };
     }
   };
 
   /** Closes the send once its message left and moves the transfer on; a failed one goes back to the wallet. */
-  const settleEcashSend =
-    (
-      prefix: string,
-      status: OperatorTransferStatus,
-      changes: (transfer: OperatorTransfer) => UpdateChanges,
-    ) =>
-    async (result: OutboxResult) => {
-      const sent = parseSendRef(prefix, result.ref);
-      if (sent === null) return;
-      if (result._tag === "OutboxJobFailed") {
-        await wallet.returnSend(sent.operationId);
-        return;
-      }
-      await wallet.forgetSend(sent.operationId);
+  const settleEcashSend = (prefix: string) => async (result: OutboxResult) => {
+    const sent = parseSendRef(prefix, result.ref);
+    if (sent === null) return;
+    if (result._tag === "OutboxJobFailed") {
+      const outcome = await wallet.takeBack(sent.operationId);
+      // Unacknowledged, so the next session takes it back again.
+      if (outcome === "mintUnreachable") throw new Error("Mint unreachable");
       await whenHydrated();
+      if (outcome !== "failed")
+        await serially(() =>
+          settleTakenBack(sent.transferId, sent.operationId, outcome),
+        );
+      return;
+    }
+    await wallet.forgetSend(sent.operationId);
+    await whenHydrated();
+    const delivered = await serially(async () => {
       const transfer = await load(sent.transferId);
-      if (transfer === null) return;
-      await move(transfer.id, status, changes(transfer));
-      await nostr.sendPaymentNotice(transfer.user);
-    };
+      // Taken back on another device, so this message carried worthless Cashu.
+      if (transfer?.ecashSendId !== sent.operationId) return null;
+      const update = deliveredUpdate(transfer);
+      if (update !== null) await publish(transfer, update);
+      await run(saveEcashSend(transfers, transfer.id, null));
+      return transfer;
+    });
+    if (delivered !== null) await nostr.sendPaymentNotice(delivered.user);
+  };
 
-  nostr.onOutboxResult(
-    PAYOUT_REF,
-    settleEcashSend(PAYOUT_REF, "completed", () => ({})),
-  );
-  nostr.onOutboxResult(
-    REFUND_REF,
-    settleEcashSend(REFUND_REF, "refunded", (transfer) => ({
-      refundAmount: ecashRefundAmount(transfer),
-    })),
-  );
+  nostr.onOutboxResult(PAYOUT_REF, settleEcashSend(PAYOUT_REF));
+  nostr.onOutboxResult(REFUND_REF, settleEcashSend(REFUND_REF));
 
   let checking: Promise<void> | null = null;
   const checkDeposits = async () => {
@@ -452,7 +504,9 @@ export const createTransfers = ({
     changes: UpdateChanges,
   ): ActionResult =>
     serially(async () => {
-      if (await queuedFor(id)) return { reason: "inFlight" };
+      const transfer = await load(id);
+      if (transfer !== null && transfer.ecashSendId !== null)
+        return { reason: "inFlight" };
       if (
         isTxidOfAnotherTransfer(await run(readTransfers(transfers)), id, txid)
       )
@@ -469,7 +523,7 @@ export const createTransfers = ({
     if (transfer === null) return { reason: "unknownTransfer" };
     if (transfer.direction !== direction || transferStatus(transfer) !== status)
       return { reason: "notAllowed" };
-    return (await queuedFor(id)) ? { reason: "inFlight" } : transfer;
+    return transfer.ecashSendId === null ? transfer : { reason: "inFlight" };
   };
 
   return {
@@ -554,6 +608,7 @@ export const createTransfers = ({
         if (transport === null) return { reason: "noTransport" };
         const requestId = PaymentRequestId.make(transfer.id);
         return sendEcashMessage({
+          transferId: transfer.id,
           amount: transfer.amount,
           forRequest: true,
           message: (receipt) =>
@@ -574,6 +629,7 @@ export const createTransfers = ({
         const transfer = await ecashSendGuard(id, "send", "fundsReceived");
         if (!("id" in transfer)) return transfer;
         return sendEcashMessage({
+          transferId: transfer.id,
           amount: ecashRefundAmount(transfer),
           forRequest: false,
           message: (receipt) => receipt.tokenText,
@@ -608,7 +664,18 @@ export const createTransfers = ({
         ...(refundAmount === 0 ? {} : { refundAmount }),
       });
     },
-    inFlight: queuedFor,
+    takeBackEcash: (id) =>
+      serially(async () => {
+        const transfer = await load(id);
+        if (transfer === null) return { reason: "unknownTransfer" };
+        if (transfer.ecashSendId === null) return { reason: "notAllowed" };
+        const operationId = transfer.ecashSendId;
+        const outcome = await wallet.takeBack(operationId);
+        if (outcome === "mintUnreachable" || outcome === "failed")
+          return { reason: "takeBackFailed", outcome };
+        await settleTakenBack(id, operationId, outcome);
+        return null;
+      }),
     checkDeposits: () => {
       checking ??= checkDeposits().finally(() => {
         checking = null;

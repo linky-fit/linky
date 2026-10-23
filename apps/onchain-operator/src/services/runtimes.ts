@@ -22,7 +22,7 @@ export interface LinkstrRuntimeConfig {
   readonly allowInsecureLocalhostRelays: boolean;
   /** The relay connection; tests pass a fake. */
   readonly transport?: Layer.Layer<NostrTransport> | undefined;
-  /** Durable outbox jobs; `Nostr.queuedRefs` reads the same store. */
+  /** Durable outbox jobs. */
   readonly outboxStore: Layer.Layer<OutboxStore>;
   /** Durable inbox cursor; in memory when omitted. */
   readonly inboxCursorStore?: Layer.Layer<InboxCursorStore> | undefined;

@@ -6,6 +6,7 @@ import {
   chatTimeline,
   lastActivitySec,
   messageContent,
+  rawLog,
   type ChatMessage,
 } from "./chat";
 import type { OperatorTransfer } from "./transfer";
@@ -25,6 +26,7 @@ const transferAt = (createdAtSec: number): OperatorTransfer => ({
   operatorPaymentRequest: null,
   depositAddress: null,
   addressIndex: null,
+  ecashSendId: null,
   update: null,
   userCancelledAtSec: null,
 });
@@ -75,5 +77,41 @@ describe("chatTimeline", () => {
     const chat = { peer: user, messages: [messageAt(10)], unread: false };
     expect(lastActivitySec(chat, [transferAt(50)])).toBe(50);
     expect(lastActivitySec(chat, [])).toBe(10);
+  });
+});
+
+describe("rawLog", () => {
+  it("lists only what the user sent, chat and transfer messages, oldest first", () => {
+    const transferId = createId<"OnchainTransfer">();
+    const log = rawLog(
+      user,
+      [messageAt(30), { ...messageAt(10), direction: "out", id: "mine" }],
+      [
+        {
+          rumorId: "r-20",
+          from: user,
+          transferId,
+          content: '{"type":"request"}',
+          sentAtSec: 20,
+        },
+        {
+          rumorId: "r-5",
+          from: makeIdentity().pubkey,
+          transferId: null,
+          content: "someone else",
+          sentAtSec: 5,
+        },
+      ],
+    );
+    expect(log).toEqual([
+      {
+        _tag: "transfer",
+        id: "r-20",
+        atSec: 20,
+        transferId,
+        content: '{"type":"request"}',
+      },
+      { _tag: "chat", id: "m-30", atSec: 30, text: "hi" },
+    ]);
   });
 });

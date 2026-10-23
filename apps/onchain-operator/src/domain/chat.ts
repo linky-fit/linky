@@ -3,6 +3,7 @@ import {
   extractTokenText,
   parseTokenText,
 } from "@linky-fit/linkshu";
+import type { OnchainTransferId } from "@linky-fit/domain";
 import type { Pubkey } from "@linky-fit/linkstr";
 import type { OperatorTransfer } from "./transfer";
 
@@ -82,6 +83,66 @@ export const chatTimeline = (
   ]
     .sort((a, b) => a.atSec - b.atSec)
     .map(({ item }) => item);
+
+/** An on-chain transfer message a user sent, exactly as it arrived. */
+export interface ReceivedTransferMessage {
+  readonly rumorId: string;
+  readonly from: Pubkey;
+  /** `null` when the message does not decode. */
+  readonly transferId: OnchainTransferId | null;
+  readonly content: string;
+  readonly sentAtSec: number;
+}
+
+/** One thing a user sent, exactly as it arrived. */
+export type RawLogEntry =
+  | {
+      readonly _tag: "chat";
+      readonly id: string;
+      readonly atSec: number;
+      readonly text: string;
+    }
+  | {
+      readonly _tag: "transfer";
+      readonly id: string;
+      readonly atSec: number;
+      readonly transferId: OnchainTransferId | null;
+      readonly content: string;
+    };
+
+/** Everything `peer` sent, chat messages and transfer messages alike, oldest first. */
+export const rawLog = (
+  peer: Pubkey,
+  messages: readonly ChatMessage[],
+  transferMessages: readonly ReceivedTransferMessage[],
+): RawLogEntry[] =>
+  [
+    ...messages.flatMap((message): RawLogEntry[] =>
+      message.direction === "in"
+        ? [
+            {
+              _tag: "chat",
+              id: message.id,
+              atSec: message.createdAtSec,
+              text: message.text,
+            },
+          ]
+        : [],
+    ),
+    ...transferMessages.flatMap((message): RawLogEntry[] =>
+      message.from === peer
+        ? [
+            {
+              _tag: "transfer",
+              id: message.rumorId,
+              atSec: message.sentAtSec,
+              transferId: message.transferId,
+              content: message.content,
+            },
+          ]
+        : [],
+    ),
+  ].sort((a, b) => a.atSec - b.atSec);
 
 /** When anything last happened in the chat, for ordering the chat list. */
 export const lastActivitySec = (

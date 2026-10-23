@@ -1,4 +1,5 @@
 import type { OnchainTransferId } from "@linky-fit/domain";
+import type { OperationId } from "@linky-fit/linkshu";
 import type { Pubkey } from "@linky-fit/linkstr";
 import {
   isTerminalStatus,
@@ -31,6 +32,8 @@ export interface OperatorTransfer {
   readonly operatorPaymentRequest: string | null;
   readonly depositAddress: string | null;
   readonly addressIndex: number | null;
+  /** The wallet send carrying the transfer's Cashu while it is on its way, as any device of the operator sees it. */
+  readonly ecashSendId: OperationId | null;
   /** The newest update the operator sent; `null` before accepting or denying. */
   readonly update: OnchainTransferUpdate | null;
   /** When the user asked to cancel; a transfer whose funds moved stays open. */

@@ -17,7 +17,11 @@ import {
 } from "@linky-fit/onchain-transfer";
 import { Effect, type Layer } from "effect";
 import type { AppConfig } from "../config";
-import { messageContent, type Chat } from "../domain/chat";
+import {
+  messageContent,
+  type Chat,
+  type ReceivedTransferMessage,
+} from "../domain/chat";
 import {
   onchainConfigOf,
   type EditedProfile,
@@ -33,6 +37,7 @@ import {
   whenHydrated,
   type Repositories,
 } from "../storage/repositories";
+import { readTransferLog } from "../storage/transferLog";
 import { readTransfers } from "../storage/transfers";
 import { uploadToBlossom, type ImageFile } from "./blossom";
 import { createChats, type Chats } from "./chat";
@@ -64,6 +69,7 @@ export interface LiveSources {
   readonly profile: LiveSource<OperatorProfile | null>;
   readonly balances: LiveSource<WalletBalances>;
   readonly issuedTokens: LiveSource<readonly TokenTransfer[]>;
+  readonly transferLog: LiveSource<readonly ReceivedTransferMessage[]>;
 }
 
 /** Everything a signed-in screen uses: one linkstr and one linkshu runtime per launch. */
@@ -138,7 +144,6 @@ export const createAppServices = ({
     runtime: linkstr,
     pubkey: account.pubkey,
     relays: config.nostrRelays,
-    outboxStore: ports.outboxStore,
   });
   const wallet = createWallet(linkshu, account.secretKey);
   const lightning = createLightningPayments({ wallet });
@@ -166,6 +171,7 @@ export const createAppServices = ({
   });
   const transfers = createTransfers({
     transfers: repositories.transfers,
+    transferMessages: repositories.transferMessages,
     nostr,
     wallet,
     esplora: makeEsploraClient({
@@ -249,6 +255,10 @@ export const createAppServices = ({
       balances: {
         all: Effect.promise(wallet.balances),
         subscribe: repositories.wallet.subscribe,
+      },
+      transferLog: {
+        all: readTransferLog(repositories.transferMessages),
+        subscribe: repositories.transferMessages.subscribe,
       },
       issuedTokens: {
         all: Effect.promise(wallet.issuedTokens),
