@@ -55,8 +55,7 @@ vi.mock("../lib/onchainOperator", () => ({
 }));
 vi.mock("./shell", async () =>
   (await import("../../testUtils/shellHooks")).shellHooksMock({
-    t: (key) =>
-      key === "onchainSendConfirmSummary" ? "Send {amount} to {address}" : key,
+    t: (key) => (key === "onchainSendConfirmSummary" ? "Send {amount}" : key),
   }),
 );
 vi.mock("./useLinksync", () => ({
@@ -179,10 +178,10 @@ describe("useOnchainTransferCommands", () => {
 
     const [, callbacks] = payOnchainTransferPaymentRequest.mock.calls[0] ?? [];
     expect(callbacks?.isPaymentAuthorized()).toBe(true);
-    expect(callbacks?.recipientName).toBe("onchainSupportName");
-    expect(callbacks?.summary).toBe(
-      `Send 100000 sat to ${REGTEST_ADDRESS.slice(0, 9)}...${REGTEST_ADDRESS.slice(-8)}`,
+    expect(callbacks?.recipientName).toBe(
+      `${REGTEST_ADDRESS.slice(0, 9)}...${REGTEST_ADDRESS.slice(-8)}`,
     );
+    expect(callbacks?.summary).toBe("Send 100000 sat");
 
     await rendered.rerender(tree(false));
     for (const status of ["cancelled", "denied"] as const) {

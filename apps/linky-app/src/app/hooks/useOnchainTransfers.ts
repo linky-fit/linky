@@ -312,10 +312,11 @@ export const useOnchainTransferCommands = () => {
             (current) =>
               current.id === transfer.id && current.phase === "readyToSend",
           ),
-        recipientName: t("onchainSupportName"),
-        summary: t("onchainSendConfirmSummary")
-          .replace("{amount}", exact(transfer.amount))
-          .replace("{address}", formatMiddleDots(payoutAddress, 20)),
+        recipientName: formatMiddleDots(payoutAddress, 20),
+        summary: t("onchainSendConfirmSummary").replace(
+          "{amount}",
+          exact(transfer.amount),
+        ),
         onPaid: () => {
           void runWrite(
             transfers.update(transfer.id, {

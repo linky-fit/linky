@@ -28,7 +28,7 @@ export interface PendingCashuPaymentRequest {
   readonly recipientDiffers: boolean;
   /** The last entered amount no mint covers. */
   readonly insufficientAmount: number | null;
-  /** Shown instead of the payee's npub: the saved contact's name, else a name the caller knows. */
+  /** Shown instead of the payee's npub: a name the caller knows, else the saved contact's name. */
   readonly recipientName?: string | undefined;
   /** Shown instead of the request's description, e.g. what an on-chain send pays out and where. */
   readonly summary?: string | undefined;

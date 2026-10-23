@@ -1380,7 +1380,7 @@ export const pt = {
     "Para uma carteira on-chain, você só pode enviar os valores abaixo, então confirme com o destinatário antes de enviar um valor diferente.",
   onchainSendDifferentAmountChecked: "Outro valor combinado",
   onchainTransferYouGet: "Você recebe",
-  onchainTransferServiceFee: "Taxa de serviço",
+  onchainTransferServiceFee: "Taxa",
   onchainSendYouPay: "Você paga",
   onchainReceiveYouSend: "Você envia",
   onchainSendPayoutAddress: "Endereço bitcoin de destino",
@@ -1394,7 +1394,7 @@ export const pt = {
     "Chega à sua carteira bitcoin em até 24 horas depois que você pagar.",
   onchainReceiveArrivalNotice:
     "Chega ao seu saldo em até 24 horas depois que seu depósito for confirmado.",
-  onchainTransferFeeNotice: "Há uma taxa de serviço de {fee}.",
+  onchainTransferFeeNotice: "A taxa é de {fee}.",
   onchainTransferContactSupport: "Falar com o suporte",
   onchainTransferContinue: "Continuar",
   onchainTransferUnavailable:
@@ -1421,7 +1421,7 @@ export const pt = {
   onchainSendReadyHint:
     "Está tudo pronto. Envie o dinheiro para iniciar a transação.",
   onchainSendSentHint:
-    "Sua carteira bitcoin recebe {amount} em até 24 horas depois do seu pagamento. Nós pagamos a taxa de rede.",
+    "Sua carteira bitcoin recebe {amount} em até 24 horas depois do seu pagamento.",
   onchainReceiveAwaitingDepositHint:
     "Envie exatamente {amount} da sua carteira bitcoin para este endereço. A taxa de rede da sua carteira é paga à parte.",
   onchainReceiveDepositSeenHint:
@@ -1459,16 +1459,12 @@ export const pt = {
     "Pronto: envie {total} da sua carteira bitcoin.",
   onchainSendCompletedNotification:
     "{amount} enviado para sua carteira on-chain",
-  onchainReceiveCompletedNotification:
-    "{amount} recebido da sua carteira on-chain",
   onchainTransferDeniedNotification: "Sua transação on-chain foi recusada",
   onchainTransferRefundedNotification: "Sua transação on-chain foi reembolsada",
   onchainReceiveRefundAddressField: "Endereço bitcoin para reembolsos",
   onchainReceiveCustodialWarning:
     "Enviando de uma corretora ou carteira custodial? Use um endereço de reembolso que você controla.",
-  onchainSendNetworkFee: "Nós pagamos a taxa de rede.",
-  onchainSendNetworkFeeAmount:
-    "Sua carteira bitcoin recebe {amount}. Nós pagamos a taxa de rede.",
+  onchainSendArrivingAmount: "Sua carteira bitcoin recebe {amount}.",
   onchainReceiveNetworkFee: "A taxa de rede da sua carteira é paga à parte.",
   onchainReceiveNetworkFeeAmount:
     "Envie exatamente {total}; a taxa de rede da sua carteira é paga à parte.",
@@ -1480,8 +1476,7 @@ export const pt = {
   onchainReceiveDeposited: "Bitcoin depositado",
   onchainReceiveAddedToBalance: "Adicionado ao saldo",
   onchainTransferNoMoneyMoved: "Nenhum dinheiro movido",
-  onchainSupportName: "Suporte Linky",
-  onchainSendConfirmSummary: "Enviar {amount} para {address}",
+  onchainSendConfirmSummary: "Enviar {amount} para uma carteira bitcoin",
   onchainTransferOriginalTerms: "Termos originais",
   onchainReceiveCopyPaymentDetails: "Copiar dados de pagamento",
   onchainReceiveCopyAddress: "Copiar endereço",

@@ -37,6 +37,12 @@ describe("getOnchainTransferUpdateCopyForLanguage", () => {
     ).toBe("Deine On-Chain-Transaktion ist abgeschlossen");
     expect(
       getOnchainTransferUpdateCopyForLanguage(
+        "en",
+        update({ status: "completed", depositAddress: REGTEST_ADDRESS }),
+      ),
+    ).toBe("Your on-chain transaction was updated");
+    expect(
+      getOnchainTransferUpdateCopyForLanguage(
         "pt-BR",
         update({ status: "fundsSeen", confirmations: 1 }),
       ),

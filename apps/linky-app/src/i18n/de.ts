@@ -1377,7 +1377,7 @@ export const de = {
     "An eine On-Chain-Wallet kannst du nur die Beträge unten senden. Sprich dich deshalb mit dem Empfänger ab, bevor du einen anderen Betrag sendest.",
   onchainSendDifferentAmountChecked: "Andere Summe vereinbart",
   onchainTransferYouGet: "Du bekommst",
-  onchainTransferServiceFee: "Servicegebühr",
+  onchainTransferServiceFee: "Gebühr",
   onchainSendYouPay: "Du zahlst",
   onchainReceiveYouSend: "Du sendest",
   onchainSendPayoutAddress: "Bitcoin-Adresse, an die gesendet wird",
@@ -1391,7 +1391,7 @@ export const de = {
     "Kommt innerhalb von 24 Stunden nach deiner Zahlung in deiner Bitcoin-Wallet an.",
   onchainReceiveArrivalNotice:
     "Kommt innerhalb von 24 Stunden nach der Bestätigung deiner Einzahlung in deinem Guthaben an.",
-  onchainTransferFeeNotice: "Es fällt eine Servicegebühr von {fee} an.",
+  onchainTransferFeeNotice: "Die Gebühr beträgt {fee}.",
   onchainTransferContactSupport: "Support kontaktieren",
   onchainTransferContinue: "Weiter",
   onchainTransferUnavailable:
@@ -1420,7 +1420,7 @@ export const de = {
   onchainSendReadyHint:
     "Alles ist bereit. Sende das Geld, um die Transaktion zu starten.",
   onchainSendSentHint:
-    "Deine Bitcoin-Wallet erhält {amount} innerhalb von 24 Stunden nach deiner Zahlung. Die Netzwerkgebühr übernehmen wir.",
+    "Deine Bitcoin-Wallet erhält {amount} innerhalb von 24 Stunden nach deiner Zahlung.",
   onchainReceiveAwaitingDepositHint:
     "Sende genau {amount} von deiner Bitcoin-Wallet an diese Adresse. Die Netzwerkgebühr deiner Wallet zahlst du separat.",
   onchainReceiveDepositSeenHint:
@@ -1458,8 +1458,6 @@ export const de = {
     "Bereit: Sende {total} von deiner Bitcoin-Wallet.",
   onchainSendCompletedNotification:
     "{amount} an deine On-Chain-Wallet gesendet",
-  onchainReceiveCompletedNotification:
-    "{amount} von deiner On-Chain-Wallet empfangen",
   onchainTransferDeniedNotification:
     "Deine On-Chain-Transaktion wurde abgelehnt",
   onchainTransferRefundedNotification:
@@ -1467,9 +1465,7 @@ export const de = {
   onchainReceiveRefundAddressField: "Bitcoin-Adresse für Erstattungen",
   onchainReceiveCustodialWarning:
     "Sendest du von einer Börse oder einer Custodial-Wallet? Nutze eine Erstattungsadresse, die du kontrollierst.",
-  onchainSendNetworkFee: "Die Netzwerkgebühr übernehmen wir.",
-  onchainSendNetworkFeeAmount:
-    "Deine Bitcoin-Wallet erhält {amount}. Die Netzwerkgebühr übernehmen wir.",
+  onchainSendArrivingAmount: "Deine Bitcoin-Wallet erhält {amount}.",
   onchainReceiveNetworkFee:
     "Die Netzwerkgebühr deiner Wallet zahlst du separat.",
   onchainReceiveNetworkFeeAmount:
@@ -1482,8 +1478,7 @@ export const de = {
   onchainReceiveDeposited: "Eingezahlte Bitcoin",
   onchainReceiveAddedToBalance: "Zum Guthaben hinzugefügt",
   onchainTransferNoMoneyMoved: "Kein Geld bewegt",
-  onchainSupportName: "Linky-Support",
-  onchainSendConfirmSummary: "{amount} an {address} senden",
+  onchainSendConfirmSummary: "{amount} an eine Bitcoin-Wallet senden",
   onchainTransferOriginalTerms: "Ursprüngliche Bedingungen",
   onchainReceiveCopyPaymentDetails: "Zahlungsdetails kopieren",
   onchainReceiveCopyAddress: "Adresse kopieren",
