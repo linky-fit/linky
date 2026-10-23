@@ -1,13 +1,17 @@
 import {
+  NonEmptyString,
   NonEmptyString100,
   NonEmptyString1000,
   NonNegativeInt,
   PositiveInt,
 } from "@evolu/common";
-import { createId } from "@linky-fit/domain";
+import { createId, onchainTransferMessageIdFor } from "@linky-fit/domain";
 import { describe, expect, it } from "vitest";
 import { linkyStore, runNow } from "../testing/linky";
-import { makeOnchainTransfersRepository } from "./onchainTransfers";
+import {
+  makeOnchainTransferMessagesRepository,
+  makeOnchainTransfersRepository,
+} from "./onchainTransfers";
 
 const id = createId<"OnchainTransfer">();
 
@@ -66,5 +70,24 @@ describe("on-chain transfers repository", () => {
       updateJson,
       sentAtSec: 2_000,
     });
+  });
+
+  it("keeps a received message once, in the onchain scope", () => {
+    const { store } = linkyStore();
+    const messages = makeOnchainTransferMessagesRepository(store);
+    const rumorId = "cd".repeat(32);
+    const message = {
+      id: onchainTransferMessageIdFor(rumorId),
+      rumorId: NonEmptyString100.orThrow(rumorId),
+      peerPubkey: transfer.peerPubkey,
+      transferId: id,
+      content: NonEmptyString.orThrow('{"type":"request"}'),
+      sentAtSec: PositiveInt.orThrow(1_000),
+    };
+    expect(runNow(messages.insertIfAbsent(message))).toBe(true);
+    expect(runNow(messages.insertIfAbsent(message))).toBe(false);
+    expect(runNow(messages.all)).toMatchObject([
+      { rumorId, transferId: id, content: '{"type":"request"}' },
+    ]);
   });
 });

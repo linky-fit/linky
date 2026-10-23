@@ -108,9 +108,11 @@ The JSON columns hold the Keryx protocol package's Schemas, encoded with `Schema
 `makeOnchainTransfersRepository(store)` over `onchainTransfer` in the `onchain` scope, which is never forgotten: one row per on-chain transfer, keyed by the `OnchainTransferId` the user created with the request. The user's account and the operator's each keep their own row of a transfer; `role` says which side the account is and `peerPubkey` is the other side. `all` returns `OnchainTransferRecord`s, whose creation time, role, peer, direction, amount and fee are present; a row still arriving column by column is skipped.
 
 - Requesting a transfer is the user's `insert` with the columns the request fixes: `direction`, `amount`, `feeBasisPoints`, and the payout address, refund choice or user payment request its direction needs. The operator stores a received request with `insertIfAbsent`, so a replayed request cannot overwrite a transfer in progress.
-- Everything after is `update`: `updateJson` with each newer update, `depositAddress` and `operatorPaymentRequest` once accepted, the operator's `addressIndex`, the user's `sentAtSec` and `cancelledAtSec`.
+- Everything after is `update`: `updateJson` with each newer update, `depositAddress` and `operatorPaymentRequest` once accepted, the operator's `addressIndex` and `ecashSendId` (set while Cashu for the transfer is on its way, so every operator device sees it), the user's `sentAtSec` and `cancelledAtSec`.
 
 `role`, `direction` and `updateJson` stay strings here; their values, the status rules and the update's JSON belong to `@linky-fit/onchain-transfer`, whose `encodeTransferUpdateColumn` and `decodeTransferUpdateColumn` write and read `updateJson`.
+
+`makeOnchainTransferMessagesRepository(store)` over `onchainTransferMessage` in the same scope keeps, on the operator's account, every on-chain transfer message a user sent, with its content exactly as it arrived, so a dispute can be settled against what was sent. Store each with `insertIfAbsent` under `onchainTransferMessageIdFor(rumorId)`, so a replayed inbox or a second device lands on the same row; `transferId` is the transfer the message names, or `null` for one that does not decode.
 
 ## Identity
 

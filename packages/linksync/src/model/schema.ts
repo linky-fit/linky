@@ -22,6 +22,7 @@ import {
   SettingId,
   ShardPointerId,
   OnchainTransferId,
+  OnchainTransferMessageId,
   TransactionId,
 } from "@linky-fit/domain";
 
@@ -291,11 +292,26 @@ export const LinkySchema = {
     depositAddress: nullOr(NonEmptyString1000),
     // Operator only: BIP86 receive index of depositAddress.
     addressIndex: nullOr(NonNegativeInt),
+    // Operator only: the wallet send carrying the transfer's Cashu, from before its message is queued until it left or was taken back.
+    ecashSendId: nullOr(NonEmptyString100),
     // JSON of the latest OnchainTransferUpdate without paymentRequest, one column so sync never splits it.
     updateJson: nullOr(NonEmptyString1000),
     // User only.
     sentAtSec: nullOr(PositiveInt),
     cancelledAtSec: nullOr(PositiveInt),
+  },
+  /** Onchain scope, operator only: an on-chain transfer message a user sent, exactly as it arrived, the record to settle a dispute by. */
+  onchainTransferMessage: {
+    // `onchainTransferMessageIdFor(rumorId)`
+    id: OnchainTransferMessageId,
+    rumorId: NonEmptyString100,
+    // Hex pubkey of the sender.
+    peerPubkey: NonEmptyString100,
+    // The transfer the message names; null when it does not decode.
+    transferId: nullOr(OnchainTransferId),
+    // The rumor content as received, decodable or not.
+    content: NonEmptyString,
+    sentAtSec: PositiveInt,
   },
 } satisfies EvoluSchema;
 
@@ -325,6 +341,9 @@ export type TransactionRow = Row<LinkyDbSchema["transaction"]>;
 export type RecurringPaymentRow = Row<LinkyDbSchema["recurringPayment"]>;
 export type KeryxSubscriptionRow = Row<LinkyDbSchema["keryxSubscription"]>;
 export type OnchainTransferRow = Row<LinkyDbSchema["onchainTransfer"]>;
+export type OnchainTransferMessageRow = Row<
+  LinkyDbSchema["onchainTransferMessage"]
+>;
 
 const columnNames = <Table extends Record<string, unknown>>(
   table: Table,
@@ -347,4 +366,5 @@ export const linkyTableColumns: TableColumns<LinkyDbSchema> = {
   recurringPayment: columnNames(LinkySchema.recurringPayment),
   keryxSubscription: columnNames(LinkySchema.keryxSubscription),
   onchainTransfer: columnNames(LinkySchema.onchainTransfer),
+  onchainTransferMessage: columnNames(LinkySchema.onchainTransferMessage),
 };

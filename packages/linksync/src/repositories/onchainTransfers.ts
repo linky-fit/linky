@@ -40,3 +40,13 @@ export const makeOnchainTransfersRepository = (
     all: Effect.map(table.all, (rows) => rows.filter(isComplete)),
   };
 };
+
+export type OnchainTransferMessagesRepository = TableRepository<
+  LinkyDbSchema["onchainTransferMessage"]
+>;
+
+/** On-chain transfer messages the operator received, raw, in the same never-forgotten scope as the transfers. */
+export const makeOnchainTransferMessagesRepository = (
+  store: LinkyStore,
+): OnchainTransferMessagesRepository =>
+  tableRepository(store, "onchain", "onchainTransferMessage");
