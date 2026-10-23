@@ -24,6 +24,7 @@ const transferOf = (
   operatorPaymentRequest: null,
   depositAddress: null,
   addressIndex: null,
+  ecashSendId: null,
   update:
     status === null
       ? null

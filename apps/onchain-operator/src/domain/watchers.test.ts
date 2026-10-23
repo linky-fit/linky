@@ -20,6 +20,7 @@ const transfer: OperatorTransfer = {
   operatorPaymentRequest: null,
   depositAddress: null,
   addressIndex: null,
+  ecashSendId: null,
   update: null,
   userCancelledAtSec: null,
 };

@@ -1,4 +1,5 @@
 import type { OnchainTransferId } from "@linky-fit/domain";
+import { OperationId } from "@linky-fit/linkshu";
 import { Pubkey } from "@linky-fit/linkstr";
 import {
   NonEmptyString100,
@@ -19,7 +20,7 @@ import {
   type OnchainTransferRequest,
   type OnchainTransferUpdate,
 } from "@linky-fit/onchain-transfer";
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 import type { OperatorTransfer } from "../domain/transfer";
 
 const OPERATOR = "operator";
@@ -53,6 +54,9 @@ export const toOperatorTransfer = (
         operatorPaymentRequest: row.operatorPaymentRequest,
         depositAddress: row.depositAddress,
         addressIndex: row.addressIndex,
+        ecashSendId: Option.getOrNull(
+          Schema.decodeUnknownOption(OperationId)(row.ecashSendId),
+        ),
         update: decodeTransferUpdateColumn(row.updateJson),
         userCancelledAtSec: row.cancelledAtSec,
       }
@@ -142,3 +146,14 @@ export const markUserCancelled = (
   atSec: number,
 ): Effect.Effect<void, ShardDbError | RowNotFound> =>
   transfers.update(id, { cancelledAtSec: PositiveInt.orThrow(atSec) });
+
+/** Records the wallet send carrying the transfer's Cashu before its message is queued; `null` once it left or was taken back. */
+export const saveEcashSend = (
+  transfers: OnchainTransfersRepository,
+  id: OnchainTransferId,
+  operationId: OperationId | null,
+): Effect.Effect<void, ShardDbError | RowNotFound> =>
+  transfers.update(id, {
+    ecashSendId:
+      operationId === null ? null : NonEmptyString100.orThrow(operationId),
+  });

@@ -37,7 +37,7 @@ import {
 } from "@linky-fit/onchain-transfer";
 import { Effect, Option, Result, Schema } from "effect";
 import type { InboxHandler, Nostr, OutboxResultHandler } from "../nostr";
-import type { Wallet } from "../wallet";
+import type { TakeBackOutcome, Wallet } from "../wallet";
 
 export const testMint = "http://localhost:3338";
 
@@ -73,14 +73,12 @@ export const fakeNostr = () => {
   const appMessages: { draft: AppMessageDraft; ref: string }[] = [];
   const tokens: SentToken[] = [];
   const notices: Pubkey[] = [];
-  const queued = new Set<string>();
   let sends = 0;
   const nostr: Nostr = {
     pubkey: makeIdentity().pubkey,
     nprofile: "nprofile1test",
     sendToken: async (to, token, ref, relays = []) => {
       tokens.push({ to, token, ref, relays });
-      queued.add(ref);
       return enqueueReceipt((sends += 1), ref);
     },
     sendText: () => Promise.reject(new Error("fake nostr")),
@@ -94,7 +92,6 @@ export const fakeNostr = () => {
     sendPaymentNotice: async (to) => {
       notices.push(to);
     },
-    queuedRefs: () => Promise.resolve(new Set(queued)),
     onInboxEvent: (handler) => {
       inbox.push(handler);
       return () => {};
@@ -129,7 +126,6 @@ export const fakeNostr = () => {
     transferMessages,
     tokens,
     notices,
-    queued,
   };
 };
 
@@ -231,27 +227,23 @@ export const fakeWallet = (
   answer: (text: string) => Result.Result<ReceiveReceipt, ReceiveError> = (
     text,
   ) => Result.succeed(receiveReceipt(text.length)),
+  sendIdPrefix = "send",
 ) => {
   const received: string[] = [];
   const sent: { amount: number; forRequest: boolean }[] = [];
   const forgotten: string[] = [];
   const returned: string[] = [];
-  const done = new Set<string>();
   const wallet: Wallet = {
     receive: async (text) => {
       received.push(text);
       const result = answer(text);
-      if (Result.isSuccess(result)) done.add(result.success.operationId);
       return result;
     },
-    isReceived: async (operationId) => done.has(operationId),
     send: async (_mint, amount, forRequest) => {
       sent.push({ amount, forRequest });
-      return Result.succeed(sendReceipt(amount, `send-${sent.length}`));
-    },
-    returnSend: async (operationId) => {
-      returned.push(operationId);
-      return true;
+      return Result.succeed(
+        sendReceipt(amount, `${sendIdPrefix}-${sent.length}`),
+      );
     },
     forgetSend: async (operationId) => {
       forgotten.push(operationId);
@@ -260,12 +252,31 @@ export const fakeWallet = (
     issueToken: () => Promise.reject(new Error("fake wallet")),
     issuedTokens: () => Promise.reject(new Error("fake wallet")),
     checkClaims: () => Promise.reject(new Error("fake wallet")),
-    takeBack: () => Promise.reject(new Error("fake wallet")),
+    takeBack: async (operationId) => {
+      returned.push(operationId);
+      return fake.takeBackOutcome;
+    },
     priceMelt: () => Promise.reject(new Error("fake wallet")),
     melt: () => Promise.reject(new Error("fake wallet")),
     resumeMelts: () => Promise.reject(new Error("fake wallet")),
   };
-  return { wallet, received, sent, forgotten, returned, done };
+  const fake: {
+    readonly wallet: Wallet;
+    readonly received: string[];
+    readonly sent: { amount: number; forRequest: boolean }[];
+    readonly forgotten: string[];
+    readonly returned: string[];
+    /** What the next `takeBack` answers. */
+    takeBackOutcome: TakeBackOutcome;
+  } = {
+    wallet,
+    received,
+    sent,
+    forgotten,
+    returned,
+    takeBackOutcome: "returned",
+  };
+  return fake;
 };
 
 export const operationId = (value: string) => OperationId.make(value);

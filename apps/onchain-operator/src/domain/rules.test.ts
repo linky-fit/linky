@@ -167,6 +167,7 @@ const transferOf = (
   operatorPaymentRequest: null,
   depositAddress: payoutAddress,
   addressIndex: 0,
+  ecashSendId: null,
   update: null,
   userCancelledAtSec: null,
   ...overrides,

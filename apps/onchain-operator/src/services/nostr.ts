@@ -4,7 +4,6 @@ import {
   encodeNprofile,
   Outbox,
   OutboxRef,
-  OutboxStore,
   PaymentNoticeDraft,
   PaymentNotices,
   PaymentRequestPayloadText,
@@ -28,7 +27,7 @@ import type {
   RelayUrl,
   WrapInboxEvent,
 } from "@linky-fit/linkstr";
-import { Cause, Effect, Layer, Schema, Stream } from "effect";
+import { Cause, Effect, Schema, Stream } from "effect";
 import { nowSeconds } from "../utils/time";
 import type { LinkstrRuntime } from "./runtimes";
 
@@ -96,8 +95,6 @@ export interface Nostr {
   readonly publishAppData: (draft: AppDataDraft) => Promise<boolean>;
   /** Wakes the recipient's Linky after a token reached a relay; best effort. */
   readonly sendPaymentNotice: (to: Pubkey) => Promise<void>;
-  /** The refs of outbox jobs still stored, delivered or not. */
-  readonly queuedRefs: () => Promise<ReadonlySet<string>>;
   readonly onInboxEvent: (handler: InboxHandler) => () => void;
   /** Results of jobs whose ref starts with `refPrefix`. */
   readonly onOutboxResult: (
@@ -145,13 +142,10 @@ export const createNostr = ({
   runtime,
   pubkey,
   relays,
-  outboxStore,
 }: {
   readonly runtime: LinkstrRuntime;
   readonly pubkey: Pubkey;
   readonly relays: readonly RelayUrl[];
-  /** The outbox store the runtime was built with, read to tell which jobs are still queued. */
-  readonly outboxStore: Layer.Layer<OutboxStore>;
 }): Nostr => {
   const inboxHandlers = new Set<InboxHandler>();
   const outboxHandlers = new Set<{
@@ -290,13 +284,6 @@ export const createNostr = ({
           (error: unknown) =>
             console.warn("[onchain-operator] payment notice not sent", error),
         ),
-    queuedRefs: () =>
-      Effect.runPromise(
-        Effect.flatMap(OutboxStore, (store) => store.loadAll).pipe(
-          Effect.provide(outboxStore),
-          Effect.map((jobs) => new Set(jobs.map((job) => job.ref))),
-        ),
-      ),
     onInboxEvent: (handler) => subscribe(inboxHandlers, handler),
     onOutboxResult: (refPrefix, handler) =>
       subscribe(outboxHandlers, { refPrefix, handler }),

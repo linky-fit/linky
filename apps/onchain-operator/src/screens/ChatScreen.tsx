@@ -1,20 +1,32 @@
 import type { Pubkey } from "@linky-fit/linkstr";
 import {
+  CodeBlock,
   IconButton,
   MessageBubble,
   MessageComposerFrame,
   ScrollView,
   Stack,
+  Text,
   TextField,
   TopBar,
 } from "@linky-fit/ui";
 import { useEffect, useRef, useState, type ComponentRef } from "react";
 import { copy } from "../copy/en";
-import { chatTimeline, type ChatMessage } from "../domain/chat";
+import {
+  chatTimeline,
+  rawLog,
+  type ChatMessage,
+  type RawLogEntry,
+} from "../domain/chat";
 import { formatDateTime } from "../format";
 import { navigateTo } from "../platform/hashRoute";
 import { sectionRoute } from "../routing";
-import { useAppServices, useChats, useTransfers } from "../services/react";
+import {
+  useAppServices,
+  useChats,
+  useTransferLog,
+  useTransfers,
+} from "../services/react";
 import { messageText } from "./labels";
 import { WithTopBar } from "./Page";
 import { PeerSummary } from "./Peer";
@@ -26,12 +38,34 @@ const timeLabel = (message: ChatMessage) => {
   return `${time} · ${message.status === "pending" ? copy.chats.sending : copy.chats.failed}`;
 };
 
-/** The chat with one user: their messages and transfers in one timeline, and a composer. */
+/** Everything the user sent, word for word, to settle a dispute by. */
+function RawLog({ entries }: { readonly entries: readonly RawLogEntry[] }) {
+  if (entries.length === 0)
+    return <Text color="$colorMuted">{copy.chats.rawLogEmpty}</Text>;
+  return entries.map((entry) => (
+    <Stack key={entry.id} gap="$xs" testID="raw-log-entry">
+      <Text variant="caption" color="$colorMuted">
+        {`${formatDateTime(entry.atSec)} · ${
+          entry._tag === "chat"
+            ? copy.chats.rawChatMessage
+            : copy.chats.rawTransferMessage(entry.transferId)
+        }`}
+      </Text>
+      <CodeBlock>
+        {entry._tag === "chat" ? entry.text : entry.content}
+      </CodeBlock>
+    </Stack>
+  ));
+}
+
+/** The chat with one user: their messages and transfers in one timeline, and a composer; or everything they sent, raw. */
 export function ChatScreen({ peer }: { readonly peer: Pubkey }) {
   const { chats, config } = useAppServices();
   const chat = useChats()?.find((candidate) => candidate.peer === peer);
   const transfers =
     useTransfers()?.filter((transfer) => transfer.user === peer) ?? [];
+  const transferLog = useTransferLog() ?? [];
+  const [raw, setRaw] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -74,6 +108,14 @@ export function ChatScreen({ peer }: { readonly peer: Pubkey }) {
               onPress={() => navigateTo(sectionRoute("chats"))}
             />
           }
+          trailing={
+            <IconButton
+              testID="chat-raw-log"
+              icon={raw ? "MessageCircle" : "FileText"}
+              accessibilityLabel={raw ? copy.chats.showChat : copy.chats.rawLog}
+              onPress={() => setRaw((shown) => !shown)}
+            />
+          }
         />
       }
     >
@@ -95,20 +137,24 @@ export function ChatScreen({ peer }: { readonly peer: Pubkey }) {
           paddingHorizontal="$xl"
           paddingVertical="$md"
         >
-          {chatTimeline(chat?.messages ?? [], transfers).map((item) =>
-            item._tag === "transfer" ? (
-              <TransferCard key={item.transfer.id} transfer={item.transfer} />
-            ) : (
-              <MessageBubble
-                key={item.message.id}
-                direction={
-                  item.message.direction === "in" ? "incoming" : "outgoing"
-                }
-                time={timeLabel(item.message)}
-              >
-                {messageText(item.message.text, config.mintUrl)}
-              </MessageBubble>
-            ),
+          {raw ? (
+            <RawLog entries={rawLog(peer, chat?.messages ?? [], transferLog)} />
+          ) : (
+            chatTimeline(chat?.messages ?? [], transfers).map((item) =>
+              item._tag === "transfer" ? (
+                <TransferCard key={item.transfer.id} transfer={item.transfer} />
+              ) : (
+                <MessageBubble
+                  key={item.message.id}
+                  direction={
+                    item.message.direction === "in" ? "incoming" : "outgoing"
+                  }
+                  time={timeLabel(item.message)}
+                >
+                  {messageText(item.message.text, config.mintUrl)}
+                </MessageBubble>
+              ),
+            )
           )}
         </Stack>
       </ScrollView>
