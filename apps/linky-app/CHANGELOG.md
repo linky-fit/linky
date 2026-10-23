@@ -12,6 +12,8 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ## [Unreleased]
 
+## [26.10.7] - 2026-10-23
+
 ### en-US
 
 - Selected text in a field is highlighted again.
