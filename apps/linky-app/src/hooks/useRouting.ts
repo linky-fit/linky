@@ -136,7 +136,8 @@ type NavigationAction =
   | { route: "topup" }
   /** A scanned bitcoin address or BIP21 URI fills the payout address, and its amount picks the transfer amount. */
   | { route: "onchainSend"; payoutAddress?: string; amount?: number }
-  | { route: "onchainReceive" }
+  /** The amount the receive page holds starts the transfer. */
+  | { route: "onchainReceive"; amount?: number }
   | { route: "onchainTransfer"; id: OnchainTransferId }
   | { route: "topupNoAmount" }
   | { route: "topupInvoice" }
@@ -278,7 +279,9 @@ export const navigateTo = (action: NavigationAction): void => {
       break;
     }
     case "onchainReceive":
-      window.location.assign("#wallet/onchain/receive");
+      window.location.assign(
+        `#wallet/onchain/receive${action.amount ? `?amount=${action.amount}` : ""}`,
+      );
       break;
     case "onchainTransfer":
       window.location.assign(

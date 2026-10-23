@@ -5,7 +5,10 @@ import {
   NonEmptyString1000,
   type ShardDbError,
 } from "@linky-fit/linksync";
-import { ClientVersion } from "@linky-fit/onchain-transfer";
+import {
+  ClientVersion,
+  DEFAULT_MAX_RECEIVE_AMOUNT,
+} from "@linky-fit/onchain-transfer";
 import { Effect, Option, Schema } from "effect";
 import { DEFAULT_OPERATOR_NAME, type OperatorProfile } from "../domain/profile";
 import type { SettingsRepository } from "./repositories";
@@ -40,6 +43,10 @@ const ProfileJson = Schema.fromJsonString(
     ),
     paused: Schema.Boolean,
     amounts: Schema.NonEmptyArray(Schema.Int.check(Schema.isGreaterThan(0))),
+    // Absent in profiles saved before on-chain receives took any amount.
+    maxReceiveAmount: Schema.optionalKey(
+      Schema.Int.check(Schema.isGreaterThan(0)),
+    ),
     // Absent in profiles saved before the minimum, and while there is none.
     minClientVersion: Schema.optionalKey(ClientVersion),
   }),
@@ -63,6 +70,8 @@ export const readProfile = (
           (stored) => ({
             ...stored,
             name: stored.name ?? DEFAULT_OPERATOR_NAME,
+            maxReceiveAmount:
+              stored.maxReceiveAmount ?? DEFAULT_MAX_RECEIVE_AMOUNT,
             minClientVersion: stored.minClientVersion ?? null,
             description: description?.value ?? "",
             watchers: Option.getOrElse(
@@ -110,6 +119,7 @@ export const saveProfile = (
             feeBasisPoints: profile.feeBasisPoints,
             paused: profile.paused,
             amounts: profile.amounts,
+            maxReceiveAmount: profile.maxReceiveAmount,
             ...(profile.minClientVersion === null
               ? {}
               : { minClientVersion: profile.minClientVersion }),

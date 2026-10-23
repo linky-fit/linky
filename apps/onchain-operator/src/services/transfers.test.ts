@@ -65,6 +65,7 @@ const profile: OperatorProfile = {
   paused: false,
   description: "",
   amounts: [100_000, 250_000],
+  maxReceiveAmount: 300_000,
   minClientVersion: null,
   watchers: [],
   picture: null,

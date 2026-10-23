@@ -64,7 +64,7 @@ export type Route =
   | { kind: "topup" }
   /** A scanned bitcoin address or BIP21 URI fills the payout address and picks the amount. */
   | { kind: "onchainSend"; payoutAddress: string; amount: number | null }
-  | { kind: "onchainReceive" }
+  | { kind: "onchainReceive"; amount: number | null }
   | { kind: "onchainTransfer"; id: OnchainTransferId }
   | { kind: "topupNoAmount" }
   | { kind: "topupInvoice" }
@@ -174,16 +174,19 @@ export const parseRouteFromHash = (): Route => {
   if (hash === "#wallet/topup") return { kind: "topup" };
   if (hash === "#wallet/topup/no-amount") return { kind: "topupNoAmount" };
   if (hash === "#wallet/topup/invoice") return { kind: "topupInvoice" };
-  if (hash === "#wallet/onchain/send") {
+  if (hash === "#wallet/onchain/send" || hash === "#wallet/onchain/receive") {
     const query = new URLSearchParams(rawHash.split("?")[1] ?? "");
-    const amount = Number(query.get("amount") ?? "");
-    return {
-      kind: "onchainSend",
-      payoutAddress: query.get("address")?.trim() ?? "",
-      amount: Number.isSafeInteger(amount) && amount > 0 ? amount : null,
-    };
+    const amountQuery = Number(query.get("amount") ?? "");
+    const amount =
+      Number.isSafeInteger(amountQuery) && amountQuery > 0 ? amountQuery : null;
+    return hash === "#wallet/onchain/send"
+      ? {
+          kind: "onchainSend",
+          payoutAddress: query.get("address")?.trim() ?? "",
+          amount,
+        }
+      : { kind: "onchainReceive", amount };
   }
-  if (hash === "#wallet/onchain/receive") return { kind: "onchainReceive" };
   const transferId = OnchainTransferId.fromUnknown(
     decodeHashSegment(hash, "#wallet/onchain/"),
   );

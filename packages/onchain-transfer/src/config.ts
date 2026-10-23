@@ -1,6 +1,10 @@
 import { AppDataDraft, type AppDataEvent } from "@linky-fit/linkstr";
 import { Option, Schema } from "effect";
-import { BitcoinNetwork, ONCHAIN_CONFIG_IDENTIFIER } from "./constants";
+import {
+  BitcoinNetwork,
+  ONCHAIN_CONFIG_IDENTIFIER,
+  type OnchainTransferDirection,
+} from "./constants";
 import { BasisPoints, NonEmptyText, PositiveInt } from "./schema";
 
 /** A Linky version, CalVer `YY.M.MICRO`. */
@@ -15,8 +19,10 @@ export const OnchainConfig = Schema.Struct({
   /** No new transfers are accepted while paused. */
   paused: Schema.Boolean,
   description: Schema.String.check(Schema.isMaxLength(1000)),
-  /** The amounts in sats a transfer can be made for. */
+  /** The amounts in sats an on-chain send can be made for. */
   amounts: Schema.NonEmptyArray(PositiveInt),
+  /** The most sats an on-chain receive can be made for; any amount up to it is offered. */
+  maxReceiveAmount: PositiveInt,
   /** Ecash of every transfer is at this mint. */
   mintUrl: NonEmptyText(1000),
   network: BitcoinNetwork,
@@ -28,6 +34,18 @@ export const OnchainConfig = Schema.Struct({
 export type OnchainConfig = typeof OnchainConfig.Type;
 
 const OnchainConfigJson = Schema.fromJsonString(OnchainConfig);
+
+/** Whether a transfer of `amount` sats is offered: an on-chain send for one of the fixed amounts, an on-chain receive for any amount up to the maximum. */
+export const isOfferedAmount = (
+  terms: Pick<OnchainConfig, "amounts" | "maxReceiveAmount">,
+  direction: OnchainTransferDirection,
+  amount: number,
+): boolean =>
+  direction === "send"
+    ? terms.amounts.includes(amount)
+    : Number.isSafeInteger(amount) &&
+      amount > 0 &&
+      amount <= terms.maxReceiveAmount;
 
 /** The app data draft the operator publishes its config with. */
 export const onchainConfigDraft = (config: OnchainConfig): AppDataDraft =>

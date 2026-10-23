@@ -399,7 +399,7 @@ An on-chain transfer the on-chain operator has not accepted yet, so it has no pa
 _Avoid_: waiting for the operator, pending approval
 
 **Transfer amount**:
-The sats the user gets from an on-chain transfer, one of the fixed amounts in the on-chain config; the user pays it plus the service fee.
+The sats the user gets from an on-chain transfer: one of the fixed amounts in the on-chain config for an on-chain send, any amount up to the config's maximum for an on-chain receive; the user pays it plus the service fee.
 _Avoid_: swap amount, bucket, receive amount
 
 **Service fee**:

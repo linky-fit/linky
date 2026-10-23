@@ -18,6 +18,7 @@ const profile: OperatorProfile = {
   paused: true,
   description: "x".repeat(1000),
   amounts: [100_000],
+  maxReceiveAmount: 400_000,
   minClientVersion: "26.10.7",
   watchers: [makeIdentity().pubkey, makeIdentity().pubkey],
   picture: "https://blossom.primal.net/ab12.webp",
@@ -59,6 +60,7 @@ describe("profile setting", () => {
     expect(await Effect.runPromise(readProfile(settings))).toMatchObject({
       name: "Linky support",
       xpub: "tpub-key",
+      maxReceiveAmount: 1_000_000,
       minClientVersion: null,
       picture: null,
     });

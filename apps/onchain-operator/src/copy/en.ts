@@ -330,10 +330,14 @@ export const copy = {
     pausedHint: "New requests are denied while paused.",
     description: "Description for users",
     descriptionInvalid: "At most 1000 characters.",
-    amounts: "Amounts in sats",
+    amounts: "On-chain send amounts in sats",
     amountsHint:
-      "What the user gets, separated by commas; they send it plus the service fee.",
+      "What the user gets, separated by commas; they pay it plus the service fee.",
     amountsInvalid: "Positive whole numbers separated by commas.",
+    maxReceiveAmount: "Largest on-chain receive in sats",
+    maxReceiveAmountHint:
+      "Users receive any amount up to this; they send it plus the service fee.",
+    maxReceiveAmountInvalid: "A positive whole number.",
     minClientVersion: "Minimum Linky version",
     minClientVersionHint:
       "Linky versions older than this ask their users to update before transferring. Leave it empty for no minimum.",

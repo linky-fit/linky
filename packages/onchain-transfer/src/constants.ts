@@ -13,10 +13,13 @@ export const ONCHAIN_CONFIG_IDENTIFIER: AppDataIdentifier =
 /** A deposit counts as received once it has this many confirmations. */
 export const REQUIRED_CONFIRMATIONS = 2;
 
-/** The amounts in sats a transfer can be made for when the config names none. */
+/** The amounts in sats an on-chain send can be made for when the config names none. */
 export const DEFAULT_TRANSFER_AMOUNTS: readonly [number, ...number[]] = [
   100_000, 250_000, 500_000, 1_000_000,
 ];
+
+/** The most sats an on-chain receive can be made for when the config names none. */
+export const DEFAULT_MAX_RECEIVE_AMOUNT = 1_000_000;
 
 export const OnchainTransferDirection = Schema.Literals(["send", "receive"]);
 export type OnchainTransferDirection = typeof OnchainTransferDirection.Type;

@@ -1370,8 +1370,9 @@ export const pt = {
   onchainReceiveHistoryTitle: "De carteira on-chain",
   onchainSendFixedAmounts:
     "Para uma carteira on-chain, você só pode enviar valores fixos.",
-  onchainReceiveFixedAmounts:
-    "De uma carteira on-chain, você só pode receber valores fixos.",
+  onchainReceiveAnyAmount:
+    "De uma carteira on-chain, você pode receber qualquer valor até {max}.",
+  onchainReceiveAmountTooHigh: "Você pode receber no máximo {max}.",
   onchainTransferChooseAmount: "Valor",
   onchainSendInsufficient:
     "Seu saldo não é suficiente para nenhum dos valores.",

@@ -50,13 +50,12 @@ import {
 } from "../state/wallet/onchainConfig";
 import { onchainTransfersAtom } from "../state/wallet/onchainTransfers";
 import { useSaveNpubContact } from "./contacts/useSaveNpubContact";
-import { useSetStatus, useTranslation } from "./shell";
+import { useDisplayAmounts, useSetStatus, useTranslation } from "./shell";
 import {
   useOnchainTransferRecords,
   useOnchainTransfersRepository,
   useTransactionRecords,
 } from "./useLinksync";
-import { useExactAmountText } from "./useExactAmountText";
 import { useOwnNprofile } from "./useOwnNprofile";
 import { useWalletCommands } from "./wallet/useWalletCommands";
 
@@ -140,7 +139,7 @@ export const useOnchainTransferCommands = () => {
   const saveNpubContact = useSaveNpubContact();
   const ownNprofile = useOwnNprofile(useAtomValue(currentNpubAtom));
   const { payOnchainTransferPaymentRequest } = useWalletCommands();
-  const { exact } = useExactAmountText();
+  const { formatDisplayedAmountText } = useDisplayAmounts();
 
   const fail = React.useCallback(
     (detail: string) => setStatus(`${t("errorPrefix")}: ${detail}`),
@@ -315,7 +314,7 @@ export const useOnchainTransferCommands = () => {
         recipientName: formatMiddleDots(payoutAddress, 20),
         summary: t("onchainSendConfirmSummary").replace(
           "{amount}",
-          exact(transfer.amount),
+          formatDisplayedAmountText(transfer.amount),
         ),
         onPaid: () => {
           void runWrite(
@@ -329,8 +328,8 @@ export const useOnchainTransferCommands = () => {
       });
     },
     [
-      exact,
       fail,
+      formatDisplayedAmountText,
       payOnchainTransferPaymentRequest,
       registry,
       setStatus,

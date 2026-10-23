@@ -1,6 +1,7 @@
 import { decodePaymentRequest } from "@linky-fit/linkshu";
 import {
   canOperatorMove,
+  isOfferedAmount,
   paysAddress,
   REQUIRED_CONFIRMATIONS,
   isValidBitcoinAddress,
@@ -75,8 +76,10 @@ export const requestDenyReason = (args: {
   const { request, profile, network } = args;
   if (profile === null) return "The operator does not take transfers yet.";
   if (profile.paused) return "Transfers are paused.";
-  if (!profile.amounts.includes(request.amount))
-    return `${sats(request.amount)} is not one of the offered amounts.`;
+  if (!isOfferedAmount(profile, request.direction, request.amount))
+    return request.direction === "send"
+      ? `${sats(request.amount)} is not one of the offered amounts.`
+      : `The most you can receive is ${sats(profile.maxReceiveAmount)}.`;
   if (request.feeBasisPoints !== profile.feeBasisPoints)
     return `The fee is now ${profile.feeBasisPoints / 100} %; request the transfer again.`;
   if (

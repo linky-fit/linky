@@ -1,5 +1,6 @@
 import {
   ClientVersion,
+  DEFAULT_MAX_RECEIVE_AMOUNT,
   DEFAULT_TRANSFER_AMOUNTS,
   parseDepositXpub,
   type BitcoinNetwork,
@@ -18,7 +19,10 @@ export interface OperatorProfile {
   readonly feeBasisPoints: number;
   readonly paused: boolean;
   readonly description: string;
+  /** What an on-chain send can be made for. */
   readonly amounts: readonly [number, ...number[]];
+  /** The most an on-chain receive can be made for, any amount up to it. */
+  readonly maxReceiveAmount: number;
   /** The oldest Linky version that may make transfers; `null` for any. */
   readonly minClientVersion: string | null;
   /** Who hears in Linky about whatever waits for the operator. */
@@ -38,6 +42,7 @@ export interface ProfileForm {
   readonly paused: boolean;
   readonly description: string;
   readonly amounts: string;
+  readonly maxReceiveAmount: string;
   readonly minClientVersion: string;
   readonly watchers: string;
 }
@@ -49,6 +54,7 @@ export type ProfileFormErrors = Partial<
     | "feePercent"
     | "description"
     | "amounts"
+    | "maxReceiveAmount"
     | "minClientVersion"
     | "watchers",
     "invalid"
@@ -74,22 +80,26 @@ export const parseFeePercent = (text: string): number | null => {
   return basisPoints <= MAX_FEE_BASIS_POINTS ? basisPoints : null;
 };
 
+/** A positive whole number of sats, spaces and underscores ignored; `null` when it is not one. */
+export const parseSats = (text: string): number | null => {
+  const digits = text.replace(/[\s_]/gu, "");
+  return /^[1-9]\d*$/u.test(digits) && Number.isSafeInteger(Number(digits))
+    ? Number(digits)
+    : null;
+};
+
 /** Amounts in sats separated by commas, semicolons or line breaks; spaces inside a number are ignored. */
 export const parseAmounts = (
   text: string,
 ): readonly [number, ...number[]] | null => {
-  const parts = text
+  const amounts = text
     .split(/[,;\n]/u)
-    .map((part) => part.replace(/[\s_]/gu, ""))
-    .filter((part) => part !== "");
-  if (parts.length === 0 || parts.some((part) => !/^[1-9]\d*$/u.test(part)))
+    .filter((part) => part.trim() !== "")
+    .map(parseSats);
+  if (!amounts.every((amount): amount is number => amount !== null))
     return null;
-  const [first, ...rest] = [...new Set(parts.map(Number))].sort(
-    (a, b) => a - b,
-  );
-  return first === undefined || !Number.isSafeInteger(rest.at(-1) ?? first)
-    ? null
-    : [first, ...rest];
+  const [first, ...rest] = [...new Set(amounts)].sort((a, b) => a - b);
+  return first === undefined ? null : [first, ...rest];
 };
 
 /** A Linky version, `null` for no minimum; `undefined` when it is not one. */
@@ -111,6 +121,9 @@ export const profileForm = (profile: EditedProfile | null): ProfileForm => ({
   paused: profile?.paused ?? false,
   description: profile?.description ?? "",
   amounts: (profile?.amounts ?? DEFAULT_TRANSFER_AMOUNTS).join(", "),
+  maxReceiveAmount: String(
+    profile?.maxReceiveAmount ?? DEFAULT_MAX_RECEIVE_AMOUNT,
+  ),
   minClientVersion: profile?.minClientVersion ?? "",
   watchers: (profile?.watchers ?? []).map(encodeNpub).join("\n"),
 });
@@ -122,6 +135,7 @@ export const parseProfileForm = (
   const xpub = parseDepositXpub(form.xpub, network);
   const feeBasisPoints = parseFeePercent(form.feePercent);
   const amounts = parseAmounts(form.amounts);
+  const maxReceiveAmount = parseSats(form.maxReceiveAmount);
   const minClientVersion = parseMinClientVersion(form.minClientVersion);
   const watchers = parseWatchers(form.watchers);
   const name = form.name.trim();
@@ -133,6 +147,7 @@ export const parseProfileForm = (
     xpub === null ||
     feeBasisPoints === null ||
     amounts === null ||
+    maxReceiveAmount === null ||
     minClientVersion === undefined ||
     watchers === null ||
     !descriptionFits
@@ -142,6 +157,7 @@ export const parseProfileForm = (
       ...(xpub === null ? { xpub: "invalid" } : {}),
       ...(feeBasisPoints === null ? { feePercent: "invalid" } : {}),
       ...(amounts === null ? { amounts: "invalid" } : {}),
+      ...(maxReceiveAmount === null ? { maxReceiveAmount: "invalid" } : {}),
       ...(minClientVersion === undefined
         ? { minClientVersion: "invalid" }
         : {}),
@@ -156,6 +172,7 @@ export const parseProfileForm = (
     paused: form.paused,
     description,
     amounts,
+    maxReceiveAmount,
     minClientVersion,
     watchers,
   });
@@ -175,6 +192,7 @@ export const onchainConfigOf = (
   paused: profile.paused,
   description: profile.description,
   amounts: profile.amounts,
+  maxReceiveAmount: profile.maxReceiveAmount,
   mintUrl: config.mintUrl,
   network: config.network,
   explorerUrl: config.explorerUrl,

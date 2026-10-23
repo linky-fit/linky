@@ -62,16 +62,24 @@ const typeInto = async (input: HTMLElement | null, value: string) => {
   });
 };
 
+/** Presses keypad keys by their labels: digits, or the clear and delete keys' copy keys. */
+const pressKeys = async (container: HTMLElement, keys: readonly string[]) => {
+  for (const key of keys)
+    await press(container.querySelector(`button[aria-label="${key}"]`));
+};
+
 const renderForm = async ({
   direction = "send",
   config = onchainConfigFixture(),
   payableSat = 1_000_000,
   prefill = null,
+  receiveAmount = null,
 }: {
   direction?: "send" | "receive";
   config?: ReturnType<typeof onchainConfigFixture>;
   payableSat?: number;
   prefill?: OnchainSendPrefill | null;
+  receiveAmount?: number | null;
 } = {}) => {
   const onSubmit = vi
     .fn<(draft: NewOnchainTransferDraft) => Promise<boolean>>()
@@ -83,6 +91,7 @@ const renderForm = async ({
       config={config}
       payableSat={payableSat}
       prefill={prefill}
+      receiveAmount={receiveAmount}
       onSubmit={onSubmit}
       onContactSupport={onContactSupport}
     />,
@@ -100,7 +109,7 @@ describe("OnchainTransferForm", () => {
     document.body.innerHTML = "";
   });
 
-  it("offers the fixed amounts in the display unit and sats, and adds the service fee on top in exact sats", async () => {
+  it("offers the fixed amounts and the service fee on top of an on-chain send in the display unit only", async () => {
     const { amounts, container } = await renderForm({
       config: onchainConfigFixture({
         amounts: [100_000, 250_000],
@@ -109,20 +118,18 @@ describe("OnchainTransferForm", () => {
     });
     expect(container.textContent).toContain("onchainSendFixedAmounts");
     expect(amounts().map((row) => row.textContent)).toEqual([
-      expect.stringContaining("~100 EUR100,000 sat"),
-      expect.stringContaining("~250 EUR250,000 sat"),
+      "~100 EUR",
+      "~250 EUR",
     ]);
     expect(byTestId(container, "onchain-transfer-total")).toBeNull();
 
     await press(amounts()[1]);
+    expect(container.textContent).toContain("onchainTransferYouGet~250 EUR");
     expect(container.textContent).toContain(
-      "onchainTransferYouGet250,000 sat (~250 EUR)",
-    );
-    expect(container.textContent).toContain(
-      "onchainTransferServiceFee (1.5%)3,750 sat (~4 EUR)",
+      "onchainTransferServiceFee (1.5%)~4 EUR",
     );
     expect(byTestId(container, "onchain-transfer-total")?.textContent).toBe(
-      "onchainSendYouPay253,750 sat (~254 EUR)",
+      "onchainSendYouPay~254 EUR",
     );
     expect(container.textContent).toContain("onchainSendArrivingAmount");
   });
@@ -132,7 +139,7 @@ describe("OnchainTransferForm", () => {
     expect(
       amounts().map((row) => row.getAttribute("aria-disabled") === "true"),
     ).toEqual([false, true, true, true]);
-    expect(amounts()[1]?.textContent).toContain("250,000 sat");
+    expect(amounts()[1]?.textContent).toContain("~250 EUR");
     expect(amounts()[1]?.textContent).toContain("payInsufficient");
     expect(container.textContent).not.toContain("onchainSendInsufficient");
 
@@ -174,7 +181,7 @@ describe("OnchainTransferForm", () => {
     expect(
       amounts().some((row) => row.getAttribute("aria-selected") === "true"),
     ).toBe(false);
-    expect(container.textContent).toContain("asks for 123,000 sat (~123 EUR)");
+    expect(container.textContent).toContain("asks for ~123 EUR");
 
     await press(amounts()[0]);
     expect(submit()?.getAttribute("aria-disabled")).toBe("true");
@@ -194,7 +201,7 @@ describe("OnchainTransferForm", () => {
   });
 
   it("refunds an on-chain receive to the sender unless the user picks another address, both ways without losing it", async () => {
-    const { amounts, container, onSubmit, submit } = await renderForm({
+    const { container, onSubmit, submit } = await renderForm({
       direction: "receive",
     });
     const sender = () => byTestId(container, "onchain-transfer-refund-sender");
@@ -202,7 +209,7 @@ describe("OnchainTransferForm", () => {
     expect(sender()?.getAttribute("aria-selected")).toBe("true");
     expect(container.textContent).toContain("onchainReceiveCustodialWarning");
     expect(byTestId(container, "onchain-transfer-refundAddress")).toBeNull();
-    await press(amounts()[0]);
+    await pressKeys(container, ["1", "0", "0"]);
     expect(byTestId(container, "onchain-transfer-total")?.textContent).toBe(
       "onchainReceiveYouSend101,000 sat (~101 EUR)",
     );
@@ -229,6 +236,40 @@ describe("OnchainTransferForm", () => {
         refundAddress: REGTEST_ADDRESS,
         refundToSender: false,
       }),
+    );
+  });
+
+  it("takes any receive amount up to the operator's maximum on the keypad", async () => {
+    const { amounts, container, submit } = await renderForm({
+      direction: "receive",
+      config: onchainConfigFixture({ maxReceiveAmount: 300_000 }),
+    });
+    expect(amounts()).toEqual([]);
+    expect(container.textContent).toContain("onchainReceiveAnyAmount");
+    expect(submit()?.getAttribute("aria-disabled")).toBe("true");
+
+    await pressKeys(container, ["1", "2", "4"]);
+    expect(byTestId(container, "onchain-transfer-total")?.textContent).toBe(
+      "onchainReceiveYouSend125,240 sat (~125 EUR)",
+    );
+    expect(submit()?.getAttribute("aria-disabled")).not.toBe("true");
+
+    await pressKeys(container, ["clearForm", "3", "0", "1"]);
+    expect(container.textContent).toContain("onchainReceiveAmountTooHigh");
+    expect(submit()?.getAttribute("aria-disabled")).toBe("true");
+  });
+
+  it("starts a receive from the amount the receive page holds", async () => {
+    const { container, onSubmit, submit } = await renderForm({
+      direction: "receive",
+      receiveAmount: 150_000,
+    });
+    expect(byTestId(container, "onchain-transfer-total")?.textContent).toBe(
+      "onchainReceiveYouSend151,500 sat (~152 EUR)",
+    );
+    await press(submit());
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ direction: "receive", amount: 150_000 }),
     );
   });
 
