@@ -17,7 +17,7 @@ export type OnchainTransferNotificationsContext = Pick<
   "formatDisplayedAmountText" | "maybeShowPwaNotification" | "pushToast" | "t"
 > & { readonly route: Route };
 
-/** What an update means for the user: ready (what to pay or send, apart from what arrives), completed, declined or refunded; null for the steps in between. */
+/** What an update means for the user: ready (what to pay or send, apart from what arrives), a send completed, declined or refunded; null for the steps in between and a receive the operator calls completed, which only its own ecash completes. */
 export const onchainTransferNotice = (
   update: OnchainTransferUpdate,
   direction: OnchainTransferDirection,
@@ -36,11 +36,12 @@ export const onchainTransferNotice = (
         .replace("{total}", amountText(update.sendAmount))
         .replace("{amount}", amountText(amount));
     case "completed":
-      return t(
-        send
-          ? "onchainSendCompletedNotification"
-          : "onchainReceiveCompletedNotification",
-      ).replace("{amount}", amountText(amount));
+      return send
+        ? t("onchainSendCompletedNotification").replace(
+            "{amount}",
+            amountText(amount),
+          )
+        : null;
     case "denied":
       return t("onchainTransferDeniedNotification");
     case "refunded":

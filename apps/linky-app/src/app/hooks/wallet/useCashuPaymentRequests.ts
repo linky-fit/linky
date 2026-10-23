@@ -445,7 +445,7 @@ export const useCashuPaymentRequests = ({
           request.transportPubkeyHex !== null &&
           request.transportPubkeyHex !== decodeNpub(chat.contact.npub ?? "");
         const recipientName =
-          (findContactFor(request)?.name ?? "").trim() || options.recipientName;
+          options.recipientName || (findContactFor(request)?.name ?? "").trim();
         await reviewCashuPaymentRequest({
           request,
           chat,

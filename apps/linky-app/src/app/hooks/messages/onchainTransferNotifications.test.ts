@@ -42,9 +42,7 @@ describe("onchainTransferNotice", () => {
     expect(notice("completed", "send")).toBe(
       "onchainSendCompletedNotification {total} 100000 sat",
     );
-    expect(notice("completed", "receive")).toBe(
-      "onchainReceiveCompletedNotification {total} 100000 sat",
-    );
+    expect(notice("completed", "receive")).toBeNull();
     expect(notice("denied", "send")).toBe(
       "onchainTransferDeniedNotification {total} {amount}",
     );

@@ -74,7 +74,13 @@ describe("onchainTransferPhase of a receive", () => {
     expect(phase("receive", "accepted")).toBe("awaitingDeposit");
     expect(phase("receive", "fundsSeen")).toBe("depositSeen");
     expect(phase("receive", "fundsReceived")).toBe("waitingForEcash");
-    expect(phase("receive", "completed")).toBe("completed");
+    expect(phase("receive", "completed", { requestPaid: true })).toBe(
+      "completed",
+    );
+  });
+
+  it("waits for the ecash while only the operator says the transfer completed", () => {
+    expect(phase("receive", "completed")).toBe("waitingForEcash");
   });
 
   it("is a short deposit while less than the amount plus the fee arrived, confirmed or not", () => {

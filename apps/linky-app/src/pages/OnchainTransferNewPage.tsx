@@ -98,13 +98,10 @@ export function OnchainTransferForm({
     draft.amount === null
       ? null
       : amountWithServiceFee(draft.amount, feeBasisPoints);
-  const networkFeeNotice = send
+  const amountNotice = send
     ? draft.amount === null
-      ? t("onchainSendNetworkFee")
-      : t("onchainSendNetworkFeeAmount").replace(
-          "{amount}",
-          exact(draft.amount),
-        )
+      ? null
+      : t("onchainSendArrivingAmount").replace("{amount}", exact(draft.amount))
     : total === null
       ? t("onchainReceiveNetworkFee")
       : t("onchainReceiveNetworkFeeAmount").replace(
@@ -247,7 +244,12 @@ export function OnchainTransferForm({
         title={t(
           send ? "onchainSendArrivalNotice" : "onchainReceiveArrivalNotice",
         )}
-        description={`${networkFeeNotice} ${t("onchainTransferFeeNotice").replace("{fee}", feePercent)}`}
+        description={[
+          amountNotice,
+          t("onchainTransferFeeNotice").replace("{fee}", feePercent),
+        ]
+          .filter((sentence) => sentence !== null)
+          .join(" ")}
         action={{
           label: t("onchainTransferContactSupport"),
           onPress: onContactSupport,

@@ -79,6 +79,10 @@ export const getOnchainTransferUpdateCopyForLanguage = (
         .replace("{total}", sats(update.sendAmount))
         .replace("{amount}", sats(update.sendAmount - update.fee));
     case "completed":
+      // A receive completes only once its ecash arrives, not on the operator's word.
+      return update.depositAddress === undefined
+        ? copy.completed
+        : copy.updated;
     case "denied":
     case "refunded":
       return copy[update.status];

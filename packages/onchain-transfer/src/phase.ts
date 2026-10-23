@@ -71,7 +71,9 @@ const receivePhase = (
       return "awaitingDeposit";
     case "fundsSeen":
       return "depositSeen";
+    // The operator's `completed` alone credits nothing: only the receives naming the request complete it.
     case "fundsReceived":
+    case "completed":
       return "waitingForEcash";
     default:
       return status;

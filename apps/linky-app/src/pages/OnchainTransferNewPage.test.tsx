@@ -124,7 +124,7 @@ describe("OnchainTransferForm", () => {
     expect(byTestId(container, "onchain-transfer-total")?.textContent).toBe(
       "onchainSendYouPay253,750 sat (~254 EUR)",
     );
-    expect(container.textContent).toContain("onchainSendNetworkFeeAmount");
+    expect(container.textContent).toContain("onchainSendArrivingAmount");
   });
 
   it("offers only the amounts the balance pays, the service fee included", async () => {

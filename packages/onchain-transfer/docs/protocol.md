@@ -70,10 +70,10 @@ An update carries the whole state, not a change, numbered by `revision`: 1 for t
 | `fundsSeen`                       | `sent`                          | `depositSeen`       |
 | `fundsReceived`                   | `sent`                          | `waitingForEcash`   |
 | either, `receivedAmount` short    | `sent`                          | `shortDeposit`      |
-| `completed`                       | `completed`                     | `completed`         |
+| `completed`                       | `completed`                     | `waitingForEcash`   |
 | `denied`, `cancelled`, `refunded` | the same                        | the same            |
 
-For an on-chain receive, a paid request is `completed` whatever the update. A user cancel turns `waitingForDetails`, `readyToSend` and `awaitingDeposit` into `cancelled`, the phases `canUserCancel` allows; once funds moved it changes nothing.
+For an on-chain receive, a paid request is `completed` whatever the update, and only a paid request is: the operator's `completed` alone leaves it `waitingForEcash`, so Linky never shows sats as received before its own receives naming the request brought them in. A user cancel turns `waitingForDetails`, `readyToSend` and `awaitingDeposit` into `cancelled`, the phases `canUserCancel` allows; once funds moved it changes nothing.
 
 ## The stored update
 

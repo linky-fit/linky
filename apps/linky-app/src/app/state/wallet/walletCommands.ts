@@ -6,7 +6,7 @@ import { ownerCommandsAtom } from "../shell/ownerCommands";
 export interface OnchainTransferPaymentOptions {
   readonly isPaymentAuthorized: () => boolean;
   readonly onPaid: () => void;
-  /** The payee's name unless the user saved it as a contact. */
+  /** Shown as the payee, ahead of a saved contact's name. */
   readonly recipientName: string;
   readonly summary: string;
 }
