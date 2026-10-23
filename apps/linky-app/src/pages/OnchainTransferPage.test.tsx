@@ -92,22 +92,18 @@ describe("OnchainTransferDetail", () => {
     expect(onCancel).toHaveBeenCalledOnce();
   });
 
-  it("sends the amount plus the service fee of a ready on-chain send, in exact sats", async () => {
+  it("sends the amount plus the service fee of a ready on-chain send, in the display unit", async () => {
     const { container, onSend } = await renderDetail(
       onchainTransferViewFixture({ phase: "readyToSend" }),
     );
     expect(container.textContent).toContain(REGTEST_ADDRESS);
-    expect(container.textContent).toContain(
-      "onchainTransferYouGet100,000 sat (~100 EUR)",
-    );
-    expect(container.textContent).toContain(
-      "onchainTransferServiceFee1,000 sat (~1 EUR)",
-    );
+    expect(container.textContent).toContain("onchainTransferYouGet~100 EUR");
+    expect(container.textContent).toContain("onchainTransferServiceFee~1 EUR");
     expect(byTestId("onchain-transfer-total")?.textContent).toBe(
-      "onchainSendYouPay101,000 sat (~101 EUR)",
+      "onchainSendYouPay~101 EUR",
     );
     expect(byTestId("onchain-transfer-send")?.textContent).toBe(
-      "Send 101,000 sat (~101 EUR)",
+      "Send ~101 EUR",
     );
     await press(byTestId("onchain-transfer-send"));
     expect(onSend).toHaveBeenCalledOnce();
@@ -169,9 +165,7 @@ describe("OnchainTransferDetail", () => {
     const sent = await renderDetail(
       onchainTransferViewFixture({ phase: "sent" }),
     );
-    expect(sent.container.textContent).toContain(
-      "100,000 sat (~100 EUR) on its way",
-    );
+    expect(sent.container.textContent).toContain("~100 EUR on its way");
 
     document.body.innerHTML = "";
     const { container } = await renderDetail(
@@ -250,7 +244,7 @@ describe("OnchainTransferDetail", () => {
       "onchainReceiveDeposited101,000 sat (~101 EUR)",
     );
     expect(byTestId("onchain-transfer-credited")?.textContent).toBe(
-      "onchainReceiveAddedToBalance100,000 sat (~100 EUR)",
+      "onchainReceiveAddedToBalance~100 EUR",
     );
   });
 
@@ -266,10 +260,10 @@ describe("OnchainTransferDetail", () => {
       }),
     );
     expect(byTestId("onchain-transfer-received")?.textContent).toBe(
-      "onchainTransferPaid101,000 sat (~101 EUR)",
+      "onchainTransferPaid~101 EUR",
     );
     expect(byTestId("onchain-transfer-refunded")?.textContent).toBe(
-      "onchainTransferRefunded101,000 sat (~101 EUR)",
+      "onchainTransferRefunded~101 EUR",
     );
     expect(container.textContent).toContain("onchainTransferOriginalTerms");
   });

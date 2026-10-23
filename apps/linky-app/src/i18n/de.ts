@@ -1368,8 +1368,9 @@ export const de = {
   onchainReceiveHistoryTitle: "Von On-Chain-Wallet",
   onchainSendFixedAmounts:
     "An eine On-Chain-Wallet kannst du nur feste Beträge senden.",
-  onchainReceiveFixedAmounts:
-    "Von einer On-Chain-Wallet kannst du nur feste Beträge empfangen.",
+  onchainReceiveAnyAmount:
+    "Von einer On-Chain-Wallet kannst du jeden Betrag bis {max} empfangen.",
+  onchainReceiveAmountTooHigh: "Du kannst höchstens {max} empfangen.",
   onchainTransferChooseAmount: "Betrag",
   onchainSendInsufficient: "Dein Guthaben reicht für keinen der Beträge.",
   onchainSendAmountUnavailable: "Der Empfänger fordert {amount} an",

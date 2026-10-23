@@ -10,10 +10,12 @@ import { Option } from "effect";
 import {
   decodeOnchainConfig,
   isClientVersionSupported,
+  isOfferedAmount,
   onchainConfigDraft,
   type OnchainConfig,
 } from "./config";
 import {
+  DEFAULT_MAX_RECEIVE_AMOUNT,
   DEFAULT_TRANSFER_AMOUNTS,
   ONCHAIN_CONFIG_IDENTIFIER,
 } from "./constants";
@@ -24,6 +26,7 @@ const config: OnchainConfig = {
   paused: false,
   description: "Transfers within 24 hours.",
   amounts: DEFAULT_TRANSFER_AMOUNTS,
+  maxReceiveAmount: DEFAULT_MAX_RECEIVE_AMOUNT,
   mintUrl: "https://cashu.cz",
   network: "mainnet",
   explorerUrl: "https://mempool.space",
@@ -84,6 +87,10 @@ describe("on-chain config", () => {
     ["a fractional fee", JSON.stringify({ ...config, feeBasisPoints: 1.5 })],
     ["no amounts", JSON.stringify({ ...config, amounts: [] })],
     ["a zero amount", JSON.stringify({ ...config, amounts: [0] })],
+    [
+      "no receive maximum",
+      JSON.stringify({ ...config, maxReceiveAmount: undefined }),
+    ],
     ["an unknown network", JSON.stringify({ ...config, network: "liquid" })],
     [
       "a long description",
@@ -124,5 +131,26 @@ describe("minClientVersion", () => {
     expect(isClientVersionSupported(withMinimum, "26.10.6")).toBe(false);
     expect(isClientVersionSupported(withMinimum, "26.9.20")).toBe(false);
     expect(isClientVersionSupported(withMinimum, "test")).toBe(false);
+  });
+});
+
+describe("isOfferedAmount", () => {
+  const terms = {
+    amounts: [100_000, 250_000] as const,
+    maxReceiveAmount: 300_000,
+  };
+
+  it("offers an on-chain send only for the fixed amounts", () => {
+    expect(isOfferedAmount(terms, "send", 250_000)).toBe(true);
+    expect(isOfferedAmount(terms, "send", 120_000)).toBe(false);
+  });
+
+  it("offers an on-chain receive for any whole number of sats up to the maximum", () => {
+    expect(isOfferedAmount(terms, "receive", 1)).toBe(true);
+    expect(isOfferedAmount(terms, "receive", 123_456)).toBe(true);
+    expect(isOfferedAmount(terms, "receive", 300_000)).toBe(true);
+    expect(isOfferedAmount(terms, "receive", 300_001)).toBe(false);
+    expect(isOfferedAmount(terms, "receive", 0)).toBe(false);
+    expect(isOfferedAmount(terms, "receive", 1.5)).toBe(false);
   });
 });

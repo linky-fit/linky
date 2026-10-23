@@ -54,7 +54,7 @@ interface OnchainTransferAmountsProps {
   feePercent: string | null;
 }
 
-/** What the user gets, the service fee and what they pay, as on a receipt. */
+/** What the user gets, the service fee and what they pay, as on a receipt; in sats beside the display currency only for a receive, whose total the user sends on-chain. */
 export function OnchainTransferAmounts({
   title,
   direction,
@@ -65,22 +65,24 @@ export function OnchainTransferAmounts({
 }: OnchainTransferAmountsProps): React.ReactElement {
   const { t } = useTranslation();
   const { exact } = useExactAmountText();
+  const { formatDisplayedAmountText } = useDisplayAmounts();
+  const value = direction === "receive" ? exact : formatDisplayedAmountText;
   return (
     <Section title={title}>
-      <ListRow title={t("onchainTransferYouGet")} value={exact(amount)} />
+      <ListRow title={t("onchainTransferYouGet")} value={value(amount)} />
       <ListRow
         title={
           feePercent === null
             ? t("onchainTransferServiceFee")
             : `${t("onchainTransferServiceFee")} (${feePercent})`
         }
-        value={exact(fee)}
+        value={value(fee)}
       />
       <ListRow
         title={t(
           direction === "send" ? "onchainSendYouPay" : "onchainReceiveYouSend",
         )}
-        value={exact(total)}
+        value={value(total)}
         testID="onchain-transfer-total"
       />
     </Section>

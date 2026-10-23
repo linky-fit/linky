@@ -96,7 +96,9 @@ describe("resolveBackAction", () => {
     expect(
       backHashFor({ kind: "onchainSend", payoutAddress: "", amount: null }),
     ).toBe("#wallet");
-    expect(backHashFor({ kind: "onchainReceive" })).toBe("#wallet/topup");
+    expect(backHashFor({ kind: "onchainReceive", amount: null })).toBe(
+      "#wallet/topup",
+    );
     expect(backHashFor({ kind: "onchainTransfer", id })).toBe(
       "#wallet/transactions",
     );

@@ -44,6 +44,7 @@ const profile: OperatorProfile = {
   paused: false,
   description: "",
   amounts: [100_000, 250_000],
+  maxReceiveAmount: 300_000,
   minClientVersion: null,
   watchers: [],
   picture: null,
@@ -116,6 +117,19 @@ describe("requestDenyReason", () => {
     );
     expect(denyReason(send, { feeBasisPoints: 150 })).toMatch(
       /fee is now 1.5 %/u,
+    );
+  });
+
+  it("takes an on-chain receive of any amount up to the maximum", () => {
+    const receiveOf = (amount: number) => ({
+      ...receive,
+      amount,
+      paymentRequest: userRequest({ amount }),
+    });
+    expect(denyReason(receiveOf(123_456))).toBeNull();
+    expect(denyReason(receiveOf(300_000))).toBeNull();
+    expect(denyReason(receiveOf(300_001))).toMatch(
+      /most you can receive is 300000 sat/u,
     );
   });
 

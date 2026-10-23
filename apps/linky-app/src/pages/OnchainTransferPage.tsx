@@ -19,7 +19,11 @@ import {
 } from "@linky-fit/onchain-transfer";
 import type { OnchainTransferId } from "@linky-fit/linksync";
 import React from "react";
-import { useCopyText, useTranslation } from "../app/hooks/shell";
+import {
+  useCopyText,
+  useDisplayAmounts,
+  useTranslation,
+} from "../app/hooks/shell";
 import {
   useOnchainConfig,
   useOnchainTransferCommands,
@@ -50,15 +54,18 @@ interface OnchainTransferDetailProps {
   onSend: () => void;
 }
 
-type AmountText = ReturnType<typeof useExactAmountText>;
+/** On-chain amounts the user moves themselves in sats, everything else in the display currency. */
+type AmountText = ReturnType<typeof useExactAmountText> & {
+  readonly display: (amountSat: number) => string;
+};
 
 /** What the phase means for the user; the operator's reason replaces the hint of an ending it explains. */
 const phaseHint = (
   transfer: OnchainTransferView,
   t: Translate,
-  { btc, exact, sats }: AmountText,
+  { btc, display, exact, sats }: AmountText,
 ): string => {
-  const amount = exact(transfer.amount);
+  const amount = display(transfer.amount);
   const reason = transfer.update?.reason?.trim() || null;
   switch (transfer.phase) {
     case "waitingForDetails":
@@ -117,7 +124,10 @@ function MovedAmounts({
 }): React.ReactElement | null {
   const { t } = useTranslation();
   const { exact } = useExactAmountText();
+  const { formatDisplayedAmountText } = useDisplayAmounts();
   const { direction, phase, update } = transfer;
+  // A receive's deposit and refund moved on-chain; the rest is Cashu.
+  const onchain = direction === "receive" ? exact : formatDisplayedAmountText;
   const received = update?.receivedAmount;
   const refunded = phase === "refunded" ? update?.refundAmount : undefined;
   const credited =
@@ -139,21 +149,21 @@ function MovedAmounts({
               ? "onchainTransferPaid"
               : "onchainReceiveDeposited",
           )}
-          value={exact(received)}
+          value={onchain(received)}
           testID="onchain-transfer-received"
         />
       )}
       {refunded === undefined ? null : (
         <ListRow
           title={t("onchainTransferRefunded")}
-          value={exact(refunded)}
+          value={onchain(refunded)}
           testID="onchain-transfer-refunded"
         />
       )}
       {credited === undefined ? null : (
         <ListRow
           title={t("onchainReceiveAddedToBalance")}
-          value={exact(credited)}
+          value={formatDisplayedAmountText(credited)}
           testID="onchain-transfer-credited"
         />
       )}
@@ -275,7 +285,10 @@ function PhaseStatus({
   "transfer" | "canPay" | "sendBusy" | "onCopy" | "onSend"
 >): React.ReactElement {
   const { t } = useTranslation();
-  const amountText = useExactAmountText();
+  const amountText = {
+    ...useExactAmountText(),
+    display: useDisplayAmounts().formatDisplayedAmountText,
+  };
   const { phase, update } = transfer;
   const title =
     phase === "depositSeen"
@@ -301,7 +314,7 @@ function PhaseStatus({
           >
             {t("onchainSendPay").replace(
               "{amount}",
-              amountText.exact(transfer.sendAmount),
+              amountText.display(transfer.sendAmount),
             )}
           </Button>
           {canPay ? null : (

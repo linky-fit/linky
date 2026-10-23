@@ -1356,8 +1356,9 @@ export const cs = {
   onchainReceiveHistoryTitle: "Z on-chain peněženky",
   onchainSendFixedAmounts:
     "Do on-chain peněženky lze posílat jen pevně dané částky.",
-  onchainReceiveFixedAmounts:
-    "Z on-chain peněženky lze přijímat jen pevně dané částky.",
+  onchainReceiveAnyAmount:
+    "Z on-chain peněženky můžete přijmout libovolnou částku až do {max}.",
+  onchainReceiveAmountTooHigh: "Přijmout můžete nejvýše {max}.",
   onchainTransferChooseAmount: "Částka",
   onchainSendInsufficient: "Váš zůstatek nestačí na žádnou z částek.",
   onchainSendAmountUnavailable: "Příjemce žádá {amount}",

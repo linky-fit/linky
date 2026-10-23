@@ -201,6 +201,19 @@ function ProfileEditor({
         }
       />
       <TextField
+        label={copy.settings.maxReceiveAmount}
+        hint={copy.settings.maxReceiveAmountHint}
+        value={form.maxReceiveAmount}
+        inputMode="numeric"
+        trailing="sat"
+        onChangeText={(maxReceiveAmount) => edit({ maxReceiveAmount })}
+        error={
+          errors.maxReceiveAmount === undefined
+            ? undefined
+            : copy.settings.maxReceiveAmountInvalid
+        }
+      />
+      <TextField
         label={copy.settings.minClientVersion}
         hint={copy.settings.minClientVersionHint}
         value={form.minClientVersion}

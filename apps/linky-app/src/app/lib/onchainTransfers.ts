@@ -18,6 +18,7 @@ import {
   decodeOnchainConfig,
   decodeTransferUpdateColumn,
   encodeTransferUpdateColumn,
+  isOfferedAmount,
   isValidBitcoinAddress,
   newerTransferUpdate,
   serviceFee,
@@ -172,6 +173,8 @@ export interface NewOnchainTransferDraft {
 export type NewOnchainTransferProblem =
   | "paused"
   | "amountMissing"
+  /** receive: more than the operator takes. */
+  | "amountOverMax"
   | "payoutAddressMissing"
   | "payoutAddressInvalid"
   | "refundMissing"
@@ -183,9 +186,9 @@ export const newOnchainTransferProblem = (
   config: OnchainConfig,
 ): NewOnchainTransferProblem | null => {
   if (config.paused) return "paused";
-  if (draft.amount === null || !config.amounts.includes(draft.amount)) {
-    return "amountMissing";
-  }
+  if (draft.amount === null || draft.amount <= 0) return "amountMissing";
+  if (!isOfferedAmount(config, draft.direction, draft.amount))
+    return draft.direction === "send" ? "amountMissing" : "amountOverMax";
   if (draft.direction === "send") {
     const address = draft.payoutAddress.trim();
     if (address === "") return "payoutAddressMissing";

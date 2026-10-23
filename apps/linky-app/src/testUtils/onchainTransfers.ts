@@ -1,5 +1,6 @@
 import { createId, type OnchainTransferId } from "@linky-fit/linksync";
 import {
+  DEFAULT_MAX_RECEIVE_AMOUNT,
   DEFAULT_TRANSFER_AMOUNTS,
   type OnchainConfig,
   type OnchainTransferUpdate,
@@ -36,6 +37,7 @@ export const onchainConfigFixture = (
   paused: false,
   description: "Transfers by hand.",
   amounts: DEFAULT_TRANSFER_AMOUNTS,
+  maxReceiveAmount: DEFAULT_MAX_RECEIVE_AMOUNT,
   mintUrl: "https://mint.example",
   network: "regtest",
   explorerUrl: "https://explorer.example",

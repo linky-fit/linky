@@ -1349,8 +1349,9 @@ export const en = {
   onchainReceiveHistoryTitle: "From on-chain wallet",
   onchainSendFixedAmounts:
     "You can send to an on-chain wallet only in fixed amounts.",
-  onchainReceiveFixedAmounts:
-    "You can receive from an on-chain wallet only in fixed amounts.",
+  onchainReceiveAnyAmount:
+    "You can receive any amount up to {max} from an on-chain wallet.",
+  onchainReceiveAmountTooHigh: "The most you can receive is {max}.",
   onchainTransferChooseAmount: "Amount",
   onchainSendInsufficient: "Your balance isn't enough for any of the amounts.",
   onchainSendAmountUnavailable: "The recipient asks for {amount}",

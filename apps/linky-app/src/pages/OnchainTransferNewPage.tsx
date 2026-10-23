@@ -30,7 +30,9 @@ import {
   newOnchainTransferProblem,
   type NewOnchainTransferDraft,
 } from "../app/lib/onchainTransfers";
+import { AmountKeypad } from "../components/AmountKeypad";
 import { OnchainTransferAmounts } from "../components/OnchainTransfer";
+import { useAmountInputKeypad } from "../components/useAmountInputKeypad";
 import { useExactAmountText } from "../app/hooks/useExactAmountText";
 import { applyPwaUpdate } from "../utils/pwaUpdate";
 
@@ -46,6 +48,8 @@ interface OnchainTransferFormProps {
   /** The most an on-chain send can pay, moving funds between mints included. */
   payableSat: number;
   prefill: OnchainSendPrefill | null;
+  /** receive: the amount the receive page holds, to start from. */
+  receiveAmount?: number | null;
   /** Resolves once the request was handled; false keeps the form for another try. */
   onSubmit: (draft: NewOnchainTransferDraft) => Promise<boolean>;
   onContactSupport: () => void;
@@ -56,13 +60,13 @@ export function OnchainTransferForm({
   config,
   payableSat,
   prefill,
+  receiveAmount = null,
   onSubmit,
   onContactSupport,
 }: OnchainTransferFormProps): React.ReactElement {
   const { lang, t } = useTranslation();
-  const { displayCurrency, formatDisplayedAmountText: amountText } =
-    useDisplayAmounts();
-  const { btc, exact, sats } = useExactAmountText();
+  const { formatDisplayedAmountText: amountText } = useDisplayAmounts();
+  const { btc, sats } = useExactAmountText();
   const send = direction === "send";
   const { feeBasisPoints } = config;
   const affordable = (amount: number) =>
@@ -71,10 +75,13 @@ export function OnchainTransferForm({
     const amount = prefill?.amount ?? null;
     return {
       direction,
-      amount:
-        amount !== null && config.amounts.includes(amount) && affordable(amount)
+      amount: send
+        ? amount !== null &&
+          config.amounts.includes(amount) &&
+          affordable(amount)
           ? amount
-          : null,
+          : null
+        : receiveAmount,
       payoutAddress: prefill?.payoutAddress ?? "",
       refundAddress: "",
       refundToSender: true,
@@ -87,9 +94,19 @@ export function OnchainTransferForm({
       : null;
   const [differentAmountChecked, setDifferentAmountChecked] =
     React.useState(false);
+  const [receiveAmountSat, setReceiveAmountText] = React.useState(
+    receiveAmount === null ? "" : String(receiveAmount),
+  );
   const [busy, setBusy] = React.useState(false);
   const change = (patch: Partial<NewOnchainTransferDraft>) =>
     setDraft((previous) => ({ ...previous, ...patch }));
+  const receiveAmountInput = useAmountInputKeypad({
+    amount: receiveAmountSat,
+    onAmountChange: (amount) => {
+      setReceiveAmountText(amount);
+      change({ amount: Number.parseInt(amount, 10) || null });
+    },
+  });
   const problem = newOnchainTransferProblem(draft, config);
   const blocked =
     problem !== null || (unavailableAmount !== null && !differentAmountChecked);
@@ -101,7 +118,10 @@ export function OnchainTransferForm({
   const amountNotice = send
     ? draft.amount === null
       ? null
-      : t("onchainSendArrivingAmount").replace("{amount}", exact(draft.amount))
+      : t("onchainSendArrivingAmount").replace(
+          "{amount}",
+          amountText(draft.amount),
+        )
     : total === null
       ? t("onchainReceiveNetworkFee")
       : t("onchainReceiveNetworkFeeAmount").replace(
@@ -142,7 +162,12 @@ export function OnchainTransferForm({
   return (
     <Form onSubmit={submit}>
       <Text color="$colorSubtle">
-        {t(send ? "onchainSendFixedAmounts" : "onchainReceiveFixedAmounts")}
+        {send
+          ? t("onchainSendFixedAmounts")
+          : t("onchainReceiveAnyAmount").replace(
+              "{max}",
+              amountText(config.maxReceiveAmount),
+            )}
       </Text>
       {config.amounts.some(affordable) ? null : (
         <Notice tone="warning" title={t("onchainSendInsufficient")} />
@@ -153,7 +178,7 @@ export function OnchainTransferForm({
             tone="warning"
             title={t("onchainSendAmountUnavailable").replace(
               "{amount}",
-              exact(unavailableAmount),
+              amountText(unavailableAmount),
             )}
             description={t("onchainSendAmountUnavailableHint")}
           />
@@ -169,25 +194,17 @@ export function OnchainTransferForm({
           />
         </>
       )}
-      <Section title={t("onchainTransferChooseAmount")}>
-        {config.amounts.map((amount) => {
-          const lines = [
-            displayCurrency === "sat" ? null : sats(amount),
-            affordable(amount) ? null : t("payInsufficient"),
-          ].flatMap((line) => line ?? []);
-          return (
+      {send ? (
+        <Section title={t("onchainTransferChooseAmount")}>
+          {config.amounts.map((amount) => (
             <ListRow
               key={amount}
               title={amountText(amount)}
               description={
-                lines.length === 0 ? undefined : (
-                  <Stack>
-                    {lines.map((line) => (
-                      <Text key={line} variant="caption" color="$colorMuted">
-                        {line}
-                      </Text>
-                    ))}
-                  </Stack>
+                affordable(amount) ? undefined : (
+                  <Text variant="caption" color="$colorMuted">
+                    {t("payInsufficient")}
+                  </Text>
                 )
               }
               selected={draft.amount === amount}
@@ -196,9 +213,22 @@ export function OnchainTransferForm({
               onPress={() => change({ amount })}
               testID="onchain-transfer-amount"
             />
-          );
-        })}
-      </Section>
+          ))}
+        </Section>
+      ) : (
+        <>
+          <AmountKeypad amount={receiveAmountSat} input={receiveAmountInput} />
+          {problem === "amountOverMax" ? (
+            <Notice
+              tone="warning"
+              title={t("onchainReceiveAmountTooHigh").replace(
+                "{max}",
+                amountText(config.maxReceiveAmount),
+              )}
+            />
+          ) : null}
+        </>
+      )}
       {draft.amount === null || total === null ? null : (
         <OnchainTransferAmounts
           direction={direction}
@@ -269,9 +299,10 @@ export function OnchainTransferForm({
 export function OnchainTransferNewPage({
   direction,
   prefill,
+  receiveAmount = null,
 }: Pick<
   OnchainTransferFormProps,
-  "direction" | "prefill"
+  "direction" | "prefill" | "receiveAmount"
 >): React.ReactElement {
   const { t } = useTranslation();
   const shown = useOnchainTransfersShown();
@@ -327,6 +358,7 @@ export function OnchainTransferNewPage({
       config={config}
       payableSat={cashuBalanceAfterMelt}
       prefill={prefill}
+      receiveAmount={receiveAmount}
       onSubmit={(draft) => requestOnchainTransfer(draft, config)}
       onContactSupport={supportAction.onPress}
     />

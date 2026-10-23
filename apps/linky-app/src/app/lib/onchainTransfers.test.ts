@@ -263,6 +263,24 @@ describe("newOnchainTransferProblem", () => {
     ).toBe("payoutAddressMissing");
   });
 
+  it("takes a send only for a fixed amount and a receive for any amount up to the maximum", () => {
+    expect(
+      newOnchainTransferProblem({ ...send, amount: 123_456 }, config),
+    ).toBe("amountMissing");
+    expect(
+      newOnchainTransferProblem({ ...receive, amount: 123_456 }, config),
+    ).toBeNull();
+    expect(
+      newOnchainTransferProblem(
+        { ...receive, amount: config.maxReceiveAmount + 1 },
+        config,
+      ),
+    ).toBe("amountOverMax");
+    expect(
+      newOnchainTransferProblem({ ...receive, amount: null }, config),
+    ).toBe("amountMissing");
+  });
+
   it("needs a refund address or the refund to the sender for an on-chain receive", () => {
     const noRefund = { ...receive, refundToSender: false };
     expect(newOnchainTransferProblem(receive, config)).toBeNull();
