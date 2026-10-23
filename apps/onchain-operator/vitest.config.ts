@@ -23,6 +23,8 @@ export default defineConfig({
           name: "jsdom",
           include: ["src/**/*.test.tsx"],
           environment: "jsdom",
+          // CI runs every workspace's suite at once, which slows jsdom renders past the 5s default.
+          testTimeout: 15_000,
         },
       },
     ],
