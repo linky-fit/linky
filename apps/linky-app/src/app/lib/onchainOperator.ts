@@ -10,6 +10,7 @@ import {
 import { Option } from "effect";
 import { envOnchainOperatorNpub } from "../../platform/buildEnv";
 import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
+import { paymentRequestIdOfPayment } from "./paymentRequestMessage";
 
 export interface OnchainOperator {
   readonly npub: string;
@@ -40,3 +41,11 @@ export const operatorTransferUpdate = (
     ? message.value
     : null;
 };
+
+/**
+ * Whether chat content from or to the operator is the Cashu of an on-chain
+ * transfer: every one travels as a NUT-18 payment, which the transfer shows
+ * instead of the chat.
+ */
+export const isOnchainTransferPaymentContent = (content: string): boolean =>
+  paymentRequestIdOfPayment(content) !== null;

@@ -19,6 +19,11 @@ import {
 } from "../../hooks/messages/messageRows";
 import { storedReactionKey } from "../../hooks/messages/reactionInbox";
 import { isIdentityChangeMessageContent } from "../../lib/identityChangeMessage";
+import {
+  isOnchainTransferPaymentContent,
+  onchainOperator,
+} from "../../lib/onchainOperator";
+import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import type {
   LocalNostrMessage,
   LocalNostrReaction,
@@ -36,6 +41,46 @@ import {
 
 const NO_ROWS: ReadonlyArray<never> = [];
 const NO_MESSAGES: LocalNostrMessage[] = [];
+
+/** The contact ids the operator's chat is stored under: its saved contacts' and, before one is saved, the unknown sender's. */
+export const onchainOperatorChatIds = (
+  operator: typeof onchainOperator,
+  contacts: ReadonlyArray<{
+    readonly id: string;
+    readonly npub: string | null;
+  }>,
+): ReadonlySet<string> => {
+  if (operator === null) return new Set();
+  const ids = new Set(
+    contacts.flatMap((contact) =>
+      normalizeNpubIdentifier(contact.npub ?? "") === operator.npub
+        ? [contact.id]
+        : [],
+    ),
+  );
+  const unknownId = buildUnknownContactId(operator.pubkey);
+  if (unknownId !== null) ids.add(unknownId);
+  return ids;
+};
+
+/**
+ * Whether a message shows in the chat: the Cashu of an on-chain transfer with
+ * the operator shows on the transfer instead. Only what the chat displays is
+ * filtered; the wallet still claims it from the unfiltered messages.
+ */
+export const isShownInChat =
+  (operatorChatIds: ReadonlySet<string>) =>
+  (message: Pick<LocalNostrMessage, "contactId" | "content">): boolean =>
+    !operatorChatIds.has(message.contactId.trim()) ||
+    !isOnchainTransferPaymentContent(message.content);
+
+export const isShownInChatAtom = Atom.keepAlive(
+  Atom.readable((get) =>
+    isShownInChat(
+      onchainOperatorChatIds(onchainOperator, get(contactRowsAtom)),
+    ),
+  ),
+);
 
 const messageRowsResultAtom = liveAtom(
   conversationsRepositoryAtom,
@@ -196,6 +241,7 @@ export const messagesByContactAtom = Atom.keepAlive(
   Atom.readable((get): MessagesByContact => {
     const previous = Option.getOrUndefined(get.self<MessagesByContact>());
     const messages = get(localMessagesAtom);
+    const isShownInChat = get(isShownInChatAtom);
     const byContact = new Map<string, LocalNostrMessage[]>();
     const lastBy = new Map<string, LocalNostrMessage>();
 
@@ -207,7 +253,10 @@ export const messagesByContactAtom = Atom.keepAlive(
       if (list) list.push(message);
       else byContact.set(id, [message]);
 
-      if (!isIdentityChangeMessageContent(message.content)) {
+      if (
+        !isIdentityChangeMessageContent(message.content) &&
+        isShownInChat(message)
+      ) {
         lastBy.set(id, message);
       }
     }
@@ -237,9 +286,12 @@ const contactMessagesFamily = Atom.family((contactId: string) =>
 );
 
 const chatMessagesFamily = Atom.family((contactId: string) =>
-  Atom.readable((get) =>
-    dedupeChatMessages(get(contactMessagesFamily(contactId))),
-  ),
+  Atom.readable((get) => {
+    const isShownInChat = get(isShownInChatAtom);
+    return dedupeChatMessages(
+      get(contactMessagesFamily(contactId)).filter(isShownInChat),
+    );
+  }),
 );
 
 const noChatMessagesAtom = Atom.readable(() => NO_MESSAGES);

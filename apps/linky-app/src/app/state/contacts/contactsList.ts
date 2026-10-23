@@ -2,6 +2,7 @@ import { Atom } from "effect/reactivity";
 import { collectUnreadNewestIncomingByContactId } from "../../lib/chatUnread";
 import { bankPaymentOfferMessagesAtom } from "../messages/bankOffers";
 import {
+  isShownInChatAtom,
   localMessagesAtom,
   messagesVisibleSinceSecAtom,
 } from "../messages/readModel";
@@ -39,7 +40,10 @@ export const unreadByContactIdAtom = Atom.keepAlive(
       lastSeenAtSecByContactId.set(contactId, lastSeenAtSec);
     }
     return collectUnreadNewestIncomingByContactId(
-      [...get(localMessagesAtom), ...get(bankPaymentOfferMessagesAtom)],
+      [
+        ...get(localMessagesAtom).filter(get(isShownInChatAtom)),
+        ...get(bankPaymentOfferMessagesAtom),
+      ],
       lastSeenAtSecByContactId,
       get(messagesVisibleSinceSecAtom),
     );
