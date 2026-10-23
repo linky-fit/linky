@@ -35,6 +35,9 @@ export type KeryxSubscriptionId = typeof KeryxSubscriptionId.Type;
 export const OnchainTransferId = id("OnchainTransfer");
 export type OnchainTransferId = typeof OnchainTransferId.Type;
 
+export const OnchainTransferMessageId = id("OnchainTransferMessage");
+export type OnchainTransferMessageId = typeof OnchainTransferMessageId.Type;
+
 export const NostrIdentityId = id("NostrIdentity");
 export type NostrIdentityId = typeof NostrIdentityId.Type;
 
@@ -53,6 +56,14 @@ export const cashuProofIdFor = (secret: string): CashuProofId =>
 /** The operation id hashes linkshu's `operationKeyOf`. */
 export const cashuOperationIdFor = (operationKey: string): CashuOperationId =>
   createIdFromString<"CashuOperation">(operationKey);
+
+/** A replayed or synced on-chain transfer message lands on the row of its rumor. */
+export const onchainTransferMessageIdFor = (
+  rumorId: string,
+): OnchainTransferMessageId =>
+  createIdFromString<"OnchainTransferMessage">(
+    `onchainTransferMessage/${rumorId}`,
+  );
 
 /** A direct chat has one conversation per contact, derivable without a lookup. */
 export const directConversationIdFor = (contactId: ContactId): ConversationId =>

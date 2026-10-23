@@ -11,8 +11,12 @@ export type {
   KeryxSubscriptionsRepository,
 } from "./keryxSubscriptions";
 export type { InboxCursorsRepository } from "./inboxCursors";
-export { makeOnchainTransfersRepository } from "./onchainTransfers";
+export {
+  makeOnchainTransferMessagesRepository,
+  makeOnchainTransfersRepository,
+} from "./onchainTransfers";
 export type {
+  OnchainTransferMessagesRepository,
   OnchainTransferRecord,
   OnchainTransfersRepository,
 } from "./onchainTransfers";

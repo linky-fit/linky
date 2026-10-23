@@ -6,17 +6,17 @@ What the package stores, where, and how a row moves between shards.
 
 A scope is one kind of data with one storage policy. `meta` lives in the Evolu `AppOwner`, the only one; every other scope lives in `ShardOwner`s derived with `deriveShardOwner(appOwner, [scope, index])`. The registry is `linkyScopes`; this table renders it.
 
-| Scope            | Owner                                | Tables                                | Rotates                  | Forget        |
-| ---------------- | ------------------------------------ | ------------------------------------- | ------------------------ | ------------- |
-| `meta`           | `AppOwner`                           | `shardPointer`, `setting`             | no                       | never         |
-| `identity`       | `ShardOwner` `["identity", 0]`       | `nostrIdentity`                       | no                       | never         |
-| `contacts`       | `ShardOwner` `["contacts", n]`       | `contact`, `recurringPayment`         | 256 KiB or 220 mutations | never         |
-| `messages`       | `ShardOwner` `["messages", n]`       | `conversation`, `message`, `reaction` | 256 KiB or 160 mutations | keep newest 4 |
-| `unknownSenders` | `ShardOwner` `["unknownSenders", n]` | `unknownSenderMessage`                | 256 KiB or 160 mutations | keep newest 2 |
-| `cashu`          | `ShardOwner` `["cashu", n]`          | `cashuProof`, `cashuOperation`        | 256 KiB or 170 mutations | never         |
-| `transactions`   | `ShardOwner` `["transactions", n]`   | `transaction`                         | 256 KiB or 220 mutations | keep newest 4 |
-| `keryx`          | `ShardOwner` `["keryx", n]`          | `keryxSubscription`                   | 256 KiB or 220 mutations | never         |
-| `onchain`        | `ShardOwner` `["onchain", n]`        | `onchainTransfer`                     | 256 KiB or 220 mutations | never         |
+| Scope            | Owner                                | Tables                                      | Rotates                  | Forget        |
+| ---------------- | ------------------------------------ | ------------------------------------------- | ------------------------ | ------------- |
+| `meta`           | `AppOwner`                           | `shardPointer`, `setting`                   | no                       | never         |
+| `identity`       | `ShardOwner` `["identity", 0]`       | `nostrIdentity`                             | no                       | never         |
+| `contacts`       | `ShardOwner` `["contacts", n]`       | `contact`, `recurringPayment`               | 256 KiB or 220 mutations | never         |
+| `messages`       | `ShardOwner` `["messages", n]`       | `conversation`, `message`, `reaction`       | 256 KiB or 160 mutations | keep newest 4 |
+| `unknownSenders` | `ShardOwner` `["unknownSenders", n]` | `unknownSenderMessage`                      | 256 KiB or 160 mutations | keep newest 2 |
+| `cashu`          | `ShardOwner` `["cashu", n]`          | `cashuProof`, `cashuOperation`              | 256 KiB or 170 mutations | never         |
+| `transactions`   | `ShardOwner` `["transactions", n]`   | `transaction`                               | 256 KiB or 220 mutations | keep newest 4 |
+| `keryx`          | `ShardOwner` `["keryx", n]`          | `keryxSubscription`                         | 256 KiB or 220 mutations | never         |
+| `onchain`        | `ShardOwner` `["onchain", n]`        | `onchainTransfer`, `onchainTransferMessage` | 256 KiB or 220 mutations | never         |
 
 A shard rotates once its Evolu history holds `SHARD_MAX_BYTES` (256 KiB) of column values or the scope's mutation count, whichever comes first, with `SHARD_ROTATION_COOLDOWN_MS` (60 s) between rotations of one scope. The byte threshold is a quarter of the official Evolu relay's 1 MB per-owner quota, leaving room for encryption and per-row overhead. Rotation moves a pointer; nothing is copied.
 

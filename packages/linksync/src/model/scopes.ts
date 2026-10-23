@@ -59,7 +59,7 @@ export const linkyScopes = {
     forget: "never",
   }),
   onchain: shardScope({
-    tables: ["onchainTransfer"],
+    tables: ["onchainTransfer", "onchainTransferMessage"],
     rotation: rotation(220),
     forget: "never",
   }),
