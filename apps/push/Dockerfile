@@ -1,4 +1,4 @@
-FROM oven/bun:1.3.9-alpine AS build
+FROM oven/bun:1.4.4-alpine AS build
 
 WORKDIR /app
 
@@ -36,7 +36,7 @@ COPY packages/linkstr packages/linkstr
 
 RUN bun run --filter @linky-fit/push build
 
-FROM oven/bun:1.3.9-alpine AS runtime
+FROM oven/bun:1.4.4-alpine AS runtime
 
 WORKDIR /app
 
