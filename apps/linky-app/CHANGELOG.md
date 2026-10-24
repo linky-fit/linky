@@ -12,6 +12,16 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ## [Unreleased]
 
+## [26.10.8] - 2026-10-24
+
+### en-US
+
+- Experimental on-chain bitcoin transfers now show in the Android app too.
+
+### cs-CZ
+
+- Experimentální on-chain bitcoinové převody se teď zobrazí i v aplikaci pro Android.
+
 ## [26.10.7] - 2026-10-23
 
 ### en-US
