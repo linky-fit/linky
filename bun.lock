@@ -108,7 +108,7 @@
     },
     "apps/linky-app": {
       "name": "@linky-fit/linky-app",
-      "version": "26.10.7",
+      "version": "26.10.8",
       "dependencies": {
         "@capacitor/clipboard": "^7.0.0",
         "@capacitor/core": "^7.4.3",
