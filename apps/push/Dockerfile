@@ -32,6 +32,7 @@ COPY tools/nostr-error-tracker/package.json tools/nostr-error-tracker/package.js
 RUN bun install --frozen-lockfile
 
 COPY apps/push apps/push
+COPY packages/linkauth packages/linkauth
 COPY packages/linkstr packages/linkstr
 
 RUN bun run --filter @linky-fit/push build
