@@ -97,6 +97,8 @@ jobs:
           upload-key-password: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
 
       - name: Build Android release APK
+        env:
+          VITE_ONCHAIN_OPERATOR_NPUB: ${{ vars.ONCHAIN_OPERATOR_NPUB }}
         run: bun run native:apk:release
 
       - name: Build Android App Bundle
