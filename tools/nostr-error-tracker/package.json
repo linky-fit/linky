@@ -26,7 +26,7 @@
   },
   "devDependencies": {
     "@linky-fit/config": "workspace:*",
-    "@types/bun": "^1.3.2",
+    "@types/bun": "^1.4.4",
     "@types/node": "^24.10.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

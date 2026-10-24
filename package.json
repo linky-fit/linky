@@ -2,7 +2,7 @@
   "name": "linky",
   "private": true,
   "license": "0BSD",
-  "packageManager": "bun@1.3.9",
+  "packageManager": "bun@1.4.4",
   "workspaces": [
     "apps/*",
     "packages/*",
