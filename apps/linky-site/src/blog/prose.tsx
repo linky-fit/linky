@@ -1,10 +1,28 @@
-import { DeviceFrame, Image, Stack, Text } from "@linky-fit/ui";
-import type { ReactNode } from "react";
+import { DeviceFrame, Image, Row, Stack, Text } from "@linky-fit/ui";
+import { Children, type ReactNode } from "react";
+import { size } from "@linky-fit/ui/tokens";
+import "./prose.css";
 import type { Screen } from "../landing/copy";
 import { Phone } from "../landing/parts";
 
 export function Paragraph({ children }: { children: ReactNode }) {
   return <Text variant="body">{children}</Text>;
+}
+
+/** A term as the app shows it, such as a button label or a tab name, set off from the sentence by a soft fill. */
+export function Term({ children }: { children: string }) {
+  return (
+    <Text
+      render={<span />}
+      display="inline"
+      color="$colorStrong"
+      backgroundColor="$neutralSoft"
+      borderRadius="$sm"
+      paddingHorizontal="$xs"
+    >
+      {children}
+    </Text>
+  );
 }
 
 export function Heading({ children }: { children: string }) {
@@ -128,5 +146,56 @@ export function ScreenshotFigure({
         {caption}
       </Text>
     </Stack>
+  );
+}
+
+/** Figures side by side in equal columns, each caption wrapping under its own phone; they stack on narrow screens. */
+export function FigureRow({ children }: { children: ReactNode }) {
+  return (
+    <Row
+      flexWrap="wrap"
+      justifyContent="center"
+      alignItems="flex-start"
+      gap="$xl"
+    >
+      {Children.map(children, (child) => (
+        <Stack
+          flex={1}
+          flexBasis={size.qr}
+          minWidth="$qr"
+          maxWidth="$sheetWidth"
+        >
+          {child}
+        </Stack>
+      ))}
+    </Row>
+  );
+}
+
+/** A screenshot the paragraphs in `children` flow around, on the right unless `side` says left. */
+export function AsideFigure({
+  shot,
+  alt,
+  caption,
+  side = "right",
+  children,
+}: {
+  shot: AppScreenshot;
+  alt: string;
+  caption: string;
+  side?: "left" | "right";
+  children: ReactNode;
+}) {
+  return (
+    <div className="prose-aside">
+      <div
+        className={
+          side === "left" ? "prose-aside-figure is-left" : "prose-aside-figure"
+        }
+      >
+        <ScreenshotFigure shot={shot} alt={alt} caption={caption} />
+      </div>
+      {children}
+    </div>
   );
 }

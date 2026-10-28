@@ -1,0 +1,39 @@
+/* A figure the paragraphs flow around; on phones it stands above them instead. */
+.prose-aside {
+  display: block;
+}
+
+.prose-aside::after {
+  content: "";
+  display: block;
+  clear: both;
+}
+
+/* The paragraphs are inline text by default; as blocks they stack and wrap around the figure. */
+.prose-aside > :not(.prose-aside-figure) {
+  display: block;
+}
+
+.prose-aside > :not(.prose-aside-figure) + :not(.prose-aside-figure) {
+  margin-top: 16px;
+}
+
+.prose-aside-figure {
+  float: right;
+  width: 240px;
+  margin: 0 0 8px 32px;
+}
+
+.prose-aside-figure.is-left {
+  float: left;
+  margin: 0 32px 8px 0;
+}
+
+@media (max-width: 640px) {
+  .prose-aside-figure,
+  .prose-aside-figure.is-left {
+    float: none;
+    width: auto;
+    margin: 0;
+  }
+}
