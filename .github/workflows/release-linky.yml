@@ -20,7 +20,7 @@ jobs:
   resolve:
     # Pushes only: a pull request from a fork can name its branch hotfix/**.
     if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       checks: read
@@ -45,7 +45,7 @@ jobs:
   publish:
     needs: resolve
     if: needs.resolve.outputs.publish == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Every push to main starts this workflow, so only real releases queue here
     # and a no-op run can't replace a pending one.
     concurrency:
@@ -149,7 +149,7 @@ jobs:
   web-production:
     name: Ship the linky app to production
     needs: [resolve, publish]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Holds the release app's credentials and admits only main and linky-v* tags.
     environment: Production
     # Releases publish one at a time, so production moves in release order.
@@ -183,7 +183,7 @@ jobs:
   google-play:
     name: Publish to Google Play open testing
     needs: [resolve, publish]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     concurrency:
@@ -258,7 +258,7 @@ jobs:
     name: Render Zapstore screenshots
     needs: resolve
     if: needs.resolve.outputs.publish == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -295,7 +295,7 @@ jobs:
   zapstore:
     name: Publish to Zapstore
     needs: [resolve, publish, zapstore-screenshots]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: zapstore
     permissions:

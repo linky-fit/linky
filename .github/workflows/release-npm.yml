@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   ci-passed:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       checks: read
@@ -33,7 +33,7 @@ jobs:
 
   publish:
     needs: ci-passed
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Records each publish as a GitHub deployment, which the README badge shows.
     environment: npm
     strategy:

@@ -18,7 +18,7 @@ jobs:
   resolve:
     # Pushes only: a pull request from a fork can name its branch hotfix/**.
     if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       checks: read
@@ -41,7 +41,7 @@ jobs:
   publish:
     needs: resolve
     if: needs.resolve.outputs.publish == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     concurrency:
       group: release-fazole
       cancel-in-progress: false
@@ -80,7 +80,7 @@ jobs:
   web-production:
     name: Ship the fazole app to production
     needs: [resolve, publish]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Holds the release app's credentials and admits only main and fazole-v* tags.
     environment: Fazole production
     concurrency:

@@ -20,7 +20,7 @@ jobs:
   # Pushes run everything: require-ci and Vercel need every check on the commit
   # they ship. Anything outside apps/ counts as shared, and linky-app imports linky-site.
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       shared: ${{ steps.scope.outputs.shared }}
       linky-e2e: ${{ steps.scope.outputs.linky-e2e }}
@@ -47,7 +47,7 @@ jobs:
           echo "linky-e2e=$linky_e2e" >> "$GITHUB_OUTPUT"
 
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
@@ -66,7 +66,7 @@ jobs:
         run: bun run check-code && git diff --exit-code
 
   unit-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
@@ -86,7 +86,7 @@ jobs:
   linkshu-integration:
     needs: changes
     if: needs.changes.outputs.shared == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
@@ -113,7 +113,7 @@ jobs:
   npm-packages:
     needs: changes
     if: needs.changes.outputs.shared == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
@@ -162,7 +162,7 @@ jobs:
   app-e2e:
     needs: changes
     if: needs.changes.outputs.linky-e2e == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     steps:
@@ -259,7 +259,7 @@ jobs:
   site-e2e:
     needs: changes
     if: needs.changes.outputs.linky-e2e == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
 
     steps:
@@ -312,7 +312,7 @@ jobs:
   ci-ok:
     if: always()
     needs: [changes, lint, unit-tests, linkshu-integration, npm-packages, app-e2e, site-e2e]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Fail if a needed job failed
