@@ -1,6 +1,10 @@
 import { decodeNpub, type Pubkey } from "@linky-fit/linkstr";
 import { formatSats } from "../format";
-import { transferTerms, type OperatorTransfer } from "./transfer";
+import {
+  isAnyAmountReceive,
+  transferTerms,
+  type OperatorTransfer,
+} from "./transfer";
 
 export const MAX_WATCHERS = 10;
 const QUOTE_MAX_LENGTH = 200;
@@ -37,8 +41,13 @@ export const parseWatchers = (text: string): readonly Pubkey[] | null => {
     : unique.filter((pubkey) => pubkey !== null);
 };
 
-const transferLabel = (transfer: OperatorTransfer): string =>
-  `${transfer.direction === "send" ? "on-chain send" : "on-chain receive"} of ${formatSats(transferTerms(transfer).amount)}`;
+/** "send 100 000 sat onchain", or "receive onchain" while a receive of any amount has no deposit yet. */
+const transferLabel = (transfer: OperatorTransfer): string => {
+  const verb = transfer.direction === "send" ? "send" : "receive";
+  return isAnyAmountReceive(transfer) && transfer.update === null
+    ? `${verb} onchain`
+    : `${verb} ${formatSats(transferTerms(transfer).amount)} onchain`;
+};
 
 const quote = (text: string): string => {
   const trimmed = text.trim();
@@ -47,20 +56,20 @@ const quote = (text: string): string => {
     : trimmed;
 };
 
-/** The chat message watchers get; `name` is the user's profile name or short npub. */
-export const watcherAlertText = (alert: WatcherAlert, name: string): string => {
+/** The chat message watchers get; `npub` is the user's whole npub, so the watcher can find them. */
+export const watcherAlertText = (alert: WatcherAlert, npub: string): string => {
   switch (alert._tag) {
     case "requested":
-      return `On-chain operator: ${name} requests an ${transferLabel(alert.transfer)}. Accept or deny it in the operator console.`;
+      return `${npub} wants to ${transferLabel(alert.transfer)}`;
     case "payoutDue":
-      return `On-chain operator: ${name}'s Cashu arrived for an ${transferLabel(alert.transfer)}. Pay ${formatSats(transferTerms(alert.transfer).amount)} to their payout address.`;
+      return `${npub} paid to ${transferLabel(alert.transfer)}. Pay their address.`;
     case "ecashDue":
       return alert.receivedAmount < transferTerms(alert.transfer).sendAmount
-        ? `On-chain operator: the deposit for ${name}'s ${transferLabel(alert.transfer)} is confirmed but short (${formatSats(alert.receivedAmount)}). Settle it in the chat.`
-        : `On-chain operator: the deposit for ${name}'s ${transferLabel(alert.transfer)} is confirmed. Send them the Cashu.`;
+        ? `${npub} deposited ${formatSats(alert.receivedAmount)} to ${transferLabel(alert.transfer)}, less than the ${formatSats(transferTerms(alert.transfer).sendAmount)} due. Settle it in the chat.`
+        : `${npub} deposited to ${transferLabel(alert.transfer)}. Send them the Cashu.`;
     case "cancelledAfterFunds":
-      return `On-chain operator: ${name} wants to cancel an ${transferLabel(alert.transfer)} whose funds already moved. Settle it in the chat.`;
+      return `${npub} no longer wants to ${transferLabel(alert.transfer)}, but the funds moved. Settle it in the chat.`;
     case "message":
-      return `On-chain operator: ${name} wrote: "${quote(alert.text)}"`;
+      return `${npub} wrote: "${quote(alert.text)}"`;
   }
 };

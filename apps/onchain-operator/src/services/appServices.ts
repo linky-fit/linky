@@ -28,7 +28,6 @@ import {
   type OperatorProfile,
 } from "../domain/profile";
 import type { OperatorTransfer } from "../domain/transfer";
-import { shortNpub } from "../format";
 import type { Account } from "../storage/account";
 import { readChats } from "../storage/chat";
 import { readProfile, saveProfile } from "../storage/profile";
@@ -159,11 +158,7 @@ export const createAppServices = ({
   const loadProfile = () =>
     Effect.runPromise(readProfile(repositories.settings));
   const peerProfiles = createPeerProfiles(nostr.fetchProfiles);
-  const alertWatchers = createWatcherAlerts({
-    nostr,
-    loadProfile,
-    nameOf: (pubkey) => peerProfiles.get(pubkey)?.name ?? shortNpub(pubkey),
-  });
+  const alertWatchers = createWatcherAlerts({ nostr, loadProfile });
   const chats = createChats({
     conversations: repositories.conversations,
     nostr,
