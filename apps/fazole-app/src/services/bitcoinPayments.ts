@@ -76,8 +76,8 @@ export const createBitcoinPayments = ({
   readonly nostr: Nostr;
   readonly wallet: Wallet;
   readonly czkPerBtc: () => Promise<number | null>;
-  /** The mint new requests are payable at. */
-  readonly mintUrl: string;
+  /** The mint new requests are payable at, as set when the request starts. */
+  readonly mintUrl: () => Promise<string>;
   /** The invoice description, where the mint allows one. */
   readonly shopName: () => Promise<string | null>;
   /** Resolves once background writes may run. */
@@ -176,7 +176,7 @@ export const createBitcoinPayments = ({
     if (payment === null || payment.bitcoin?.quoteId) return null;
     const rate = await czkPerBtc();
     if (rate === null) return { reason: "rate-unavailable" };
-    const mint = parseMintUrl(mintUrl);
+    const mint = parseMintUrl(await mintUrl());
     if (mint === null) return { reason: "mint-unreachable" };
     const sats = czkToSats(payment.amountCzk, rate);
     const minimum = minimumBitcoinSats(await wallet.inputFeePpk(mint));

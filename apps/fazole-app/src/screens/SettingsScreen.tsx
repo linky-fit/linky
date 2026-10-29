@@ -10,21 +10,26 @@ import {
   StatusDot,
   Switch,
   Text,
+  TextField,
 } from "@linky-fit/ui";
 import { useState } from "react";
 import { copy } from "../copy";
 import { formatCzechIban, isMonetaIban, type ShopProfile } from "../domain";
+import { formatWhole } from "../format";
 import { navigateTo } from "../platform/hashRoute";
 import { language, LANGUAGE_NAMES } from "../platform/language";
 import {
   useAppServices,
   useBitcoinQrMode,
   useDevice,
+  useMintUrl,
   useMonetaConnection,
   useOfferTips,
   useSupportChat,
+  useWalletBalance,
 } from "../services/react";
 import { BITCOIN_QR_MODES } from "../storage/bitcoinQrSetting";
+import { offeredMints, parseMintUrlInput } from "../storage/mintSetting";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { LanguageDialog } from "./LanguageDialog";
 import { MonetaDialog } from "./MonetaDialog";
@@ -38,6 +43,7 @@ type OpenDialog =
   | "shop"
   | "moneta"
   | "bitcoinQr"
+  | "mint"
   | "seed"
   | "reset"
   | "language";
@@ -73,6 +79,7 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
   const { config, saveOfferTips, saveBitcoinQrMode } = useAppServices();
   const offerTips = useOfferTips() ?? true;
   const bitcoinQrMode = useBitcoinQrMode() ?? "universal";
+  const mintUrl = useMintUrl() ?? config.mintUrl;
   const supportUnread = useSupportChat()?.unread ?? false;
   const connection = useMonetaConnection() ?? null;
   // The bank confirms payments only for a MONETA account; a token for another account no longer counts.
@@ -127,6 +134,13 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
             value={copy.settings.bitcoinQrModes[bitcoinQrMode]}
             onPress={() => setDialog("bitcoinQr")}
           />
+          <ListRow
+            testID="settings-mint"
+            icon="Bitcoin"
+            title={copy.settings.mint}
+            value={hostOf(mintUrl)}
+            onPress={() => setDialog("mint")}
+          />
         </Card>
       </Section>
       <Section title={copy.settings.help}>
@@ -155,11 +169,6 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
             title={copy.settings.language}
             value={LANGUAGE_NAMES[language]}
             onPress={() => setDialog("language")}
-          />
-          <ListRow
-            icon="Bitcoin"
-            title={copy.settings.mint}
-            value={hostOf(config.mintUrl)}
           />
         </Card>
       </Section>
@@ -233,6 +242,9 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
           />
         ))}
       </Dialog>
+      {dialog === "mint" ? (
+        <MintDialog mintUrl={mintUrl} onClose={close} />
+      ) : null}
       <Dialog
         open={dialog === "seed"}
         onOpenChange={(open) => (open ? undefined : close())}
@@ -253,6 +265,88 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
         onConfirm={device.resetDevice}
       />
     </Page>
+  );
+}
+
+/** The mints new payments can be minted at: the offered ones to pick from, or one by its address. */
+function MintDialog({
+  mintUrl,
+  onClose,
+}: {
+  readonly mintUrl: string;
+  readonly onClose: () => void;
+}) {
+  const { config, saveMintUrl } = useAppServices();
+  const balances = useWalletBalance();
+  const [address, setAddress] = useState("");
+  const [invalid, setInvalid] = useState(false);
+  const fundedMints =
+    balances?.perMint
+      .filter((balance) => balance.amount > 0)
+      .map((balance) => balance.mint) ?? [];
+  const satsAt = (mint: string) =>
+    balances?.perMint.find((balance) => balance.mint === mint)?.amount ?? 0;
+  const pick = (mint: string) => {
+    void saveMintUrl(mint);
+    onClose();
+  };
+  const add = () => {
+    const mint = parseMintUrlInput(address);
+    if (mint === null) {
+      setInvalid(true);
+      return;
+    }
+    pick(mint);
+  };
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => (open ? undefined : onClose())}
+      title={copy.settings.mint}
+      closeLabel={copy.close}
+      testID="mint-dialog"
+    >
+      {offeredMints({
+        defaultMintUrl: config.mintUrl,
+        selectedMintUrl: mintUrl,
+        fundedMints,
+      }).map((mint) => (
+        <ListRow
+          key={mint}
+          testID={`mint-row-${hostOf(mint)}`}
+          title={hostOf(mint)}
+          value={
+            satsAt(mint) > 0 ? `${formatWhole(satsAt(mint))} sat` : undefined
+          }
+          selected={mint === mintUrl}
+          chevron={false}
+          onPress={() => pick(mint)}
+        />
+      ))}
+      <TextField
+        testID="mint-url"
+        label={copy.settings.mintUrl}
+        value={address}
+        placeholder="https://…"
+        autoCapitalize="none"
+        autoCorrect={false}
+        spellCheck={false}
+        onChangeText={(value) => {
+          setAddress(value);
+          setInvalid(false);
+        }}
+        error={invalid ? copy.settings.mintUrlInvalid : undefined}
+      />
+      <Button
+        testID="mint-add"
+        variant="secondary"
+        icon="CirclePlus"
+        disabled={address.trim() === ""}
+        onPress={add}
+      >
+        {copy.settings.mintAdd}
+      </Button>
+    </Dialog>
   );
 }
 

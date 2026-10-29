@@ -36,6 +36,7 @@ import {
   saveBitcoinQrMode,
   type BitcoinQrMode,
 } from "../storage/bitcoinQrSetting";
+import { readMintUrl, saveMintUrl } from "../storage/mintSetting";
 import { readFazoleRecords, type FazoleRecords } from "../storage/transactions";
 import { createBankPayments, type BankPayments } from "./bankPayments";
 import {
@@ -110,6 +111,8 @@ export interface LiveSources {
   readonly bitcoinQrMode: LiveSource<BitcoinQrMode>;
   /** The MONETA connection; `null` while the shop has none. */
   readonly moneta: LiveSource<MonetaConnection | null>;
+  /** The mint new payments are minted at. */
+  readonly mintUrl: LiveSource<string>;
   readonly records: LiveSource<FazoleRecords>;
   readonly balances: LiveSource<WalletBalances>;
   /** The open pledge; `null` while the merchant owes nobody. */
@@ -129,6 +132,8 @@ export interface AppServices {
   readonly shop: Shop;
   readonly saveOfferTips: (offer: boolean) => Promise<void>;
   readonly saveBitcoinQrMode: (mode: BitcoinQrMode) => Promise<void>;
+  /** Picks the mint new payments are minted at; sats already held elsewhere stay there. */
+  readonly saveMintUrl: (mintUrl: string) => Promise<void>;
   readonly payments: Payments;
   /** Confirms bank QR payments through MONETA's API. */
   readonly bankPayments: BankPayments;
@@ -201,12 +206,13 @@ export const createAppServices = ({
   );
   const rates = createRates(ports.fetchRates);
   const loadShop = () => Effect.runPromise(readShop(repositories.settings));
+  const mintUrl = readMintUrl(repositories.settings, config.mintUrl);
   const bitcoinPayments = createBitcoinPayments({
     ledger,
     nostr,
     wallet,
     czkPerBtc: rates.czkPerBtc,
-    mintUrl: config.mintUrl,
+    mintUrl: () => Effect.runPromise(mintUrl),
     shopName: async () => (await loadShop())?.name ?? null,
     whenHydrated: hydrated,
   });
@@ -280,6 +286,8 @@ export const createAppServices = ({
       Effect.runPromise(saveOfferTips(repositories.settings, offer)),
     saveBitcoinQrMode: (mode) =>
       Effect.runPromise(saveBitcoinQrMode(repositories.settings, mode)),
+    saveMintUrl: (url) =>
+      Effect.runPromise(saveMintUrl(repositories.settings, url)),
     payments: {
       create: ledger.createPayment,
       requestBitcoin: bitcoinPayments.request,
@@ -337,6 +345,7 @@ export const createAppServices = ({
         all: monetaConnection,
         subscribe: repositories.settings.subscribe,
       },
+      mintUrl: { all: mintUrl, subscribe: repositories.settings.subscribe },
       records: {
         all: readFazoleRecords(repositories.transactions),
         subscribe: repositories.transactions.subscribe,

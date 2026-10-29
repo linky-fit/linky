@@ -143,7 +143,7 @@ const paymentsOf = (
     nostr: fake.nostr,
     wallet,
     czkPerBtc,
-    mintUrl,
+    mintUrl: async () => mintUrl,
     shopName: async () => "Kavárna",
     whenHydrated: async () => {},
   });

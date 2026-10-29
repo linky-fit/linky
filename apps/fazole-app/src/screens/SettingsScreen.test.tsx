@@ -12,6 +12,7 @@ import {
   testConfig,
   testStore,
 } from "../services/testing/fakes";
+import { readMintUrl } from "../storage/mintSetting";
 import { readMonetaConnection } from "../storage/monetaSetting";
 import { fakeDevice } from "../testing/fakeDevice";
 import { byTestId, render, typeInto } from "../testing/render";
@@ -29,11 +30,12 @@ const ibanOf = (account: string) => {
   return czechAccountToIban(parsed.success);
 };
 const monetaIban = ibanOf("2000145399/0600");
-const monetaShop = { name: "Kavárna U Lípy", iban: monetaIban, picture: null };
+const shop = { name: "Kavárna U Lípy", iban: null, picture: null };
+const monetaShop = { ...shop, iban: monetaIban };
 const token = "token-".padEnd(40, "x");
 const running: AppServices[] = [];
 
-/** A signed-in device whose bank relay answers every call with `bank`. */
+/** A signed-in device over in-memory stores whose config names the recommended production mint and whose bank relay answers every call with `bank`. */
 const signedInDevice = (
   bank: (url: string, authorization: string) => Response = () =>
     new Response(
@@ -46,7 +48,7 @@ const signedInDevice = (
   const services = createAppServices({
     account: testAccount(),
     store: testStore(),
-    config: testConfig,
+    config: { ...testConfig, mintUrl: "https://cashu.cz" },
     ports: {
       outboxStore: sharedOutboxStore(),
       keyValueStore: Layer.succeed(KeyValueStore, makeInMemoryKeyValueStore()),
@@ -166,5 +168,61 @@ describe("the MONETA connection", () => {
     await expect
       .poll(() => document.body.querySelector('[data-testid="moneta-dialog"]'))
       .not.toBeNull();
+  });
+});
+
+const storedMint = (services: AppServices) =>
+  Effect.runPromise(
+    readMintUrl(services.repositories.settings, services.config.mintUrl),
+  );
+
+describe("the mint setting", () => {
+  it("shows the mint's host and lists the recommended mints with the current one selected", async () => {
+    const { device } = signedInDevice();
+    const container = await render(<SettingsScreen shop={shop} />, device);
+    await expect
+      .poll(() => byTestId(container, "settings-mint").textContent)
+      .toContain("cashu.cz");
+    await click(container, "settings-mint");
+    // The dialog renders in a portal, outside the screen's container.
+    const dialog = byTestId(document.body, "mint-dialog");
+    expect(dialog.textContent).toContain("mint.minibits.cash");
+    expect(
+      byTestId(dialog, "mint-row-cashu.cz").getAttribute("aria-selected"),
+    ).toBe("true");
+    expect(
+      byTestId(dialog, "mint-row-kashu.me").getAttribute("aria-selected"),
+    ).not.toBe("true");
+  });
+
+  it("saves the picked mint and closes", async () => {
+    const { device, services } = signedInDevice();
+    const container = await render(<SettingsScreen shop={shop} />, device);
+    await click(container, "settings-mint");
+    await click(document.body, "mint-row-kashu.me");
+    await expect.poll(() => storedMint(services)).toBe("https://kashu.me");
+    expect(document.body.querySelector('[data-testid="mint-dialog"]')).toBe(
+      null,
+    );
+    await expect
+      .poll(() => byTestId(container, "settings-mint").textContent)
+      .toContain("kashu.me");
+  });
+
+  it("adds a mint by its address, and refuses what is not one", async () => {
+    const { device, services } = signedInDevice();
+    const container = await render(<SettingsScreen shop={shop} />, device);
+    await click(container, "settings-mint");
+    const dialog = byTestId(document.body, "mint-dialog");
+    await typeInto(byTestId(dialog, "mint-url"), "not a mint");
+    await click(dialog, "mint-add");
+    expect(dialog.textContent).toContain(copy.settings.mintUrlInvalid);
+    expect(await storedMint(services)).toBe("https://cashu.cz");
+
+    await typeInto(byTestId(dialog, "mint-url"), "mint.example.org");
+    await click(dialog, "mint-add");
+    await expect
+      .poll(() => storedMint(services))
+      .toBe("https://mint.example.org");
   });
 });

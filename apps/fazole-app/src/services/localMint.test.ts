@@ -150,7 +150,7 @@ describe.runIf(mintAnswers)("the terminal at the local mint", () => {
         nostr: fake.nostr,
         wallet,
         czkPerBtc: async () => czkPerBtc,
-        mintUrl: mint,
+        mintUrl: async () => mint,
         shopName: async () => "Kavárna",
         whenHydrated: async () => {},
       });
