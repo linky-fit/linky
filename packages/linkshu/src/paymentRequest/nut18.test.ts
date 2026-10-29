@@ -44,6 +44,18 @@ describe("encodeNostrPaymentRequest", () => {
     );
     expect(decoded).toMatchObject({ id: "pay-1", description: null });
   });
+
+  it("leaves the amount out when the payer picks it", () => {
+    const decoded = decodePaymentRequest(
+      encodeNostrPaymentRequest({
+        amount: null,
+        mintUrls: ["https://mint.example"],
+        recipientNprofile: nprofile,
+        requestId: PaymentRequestId.make("pay-2"),
+      }),
+    );
+    expect(decoded).toMatchObject({ id: "pay-2", amount: null });
+  });
 });
 
 describe("decodePaymentRequest", () => {

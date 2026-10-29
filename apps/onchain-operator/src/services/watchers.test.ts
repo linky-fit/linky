@@ -13,6 +13,7 @@ const profileWith = (watchers: readonly Pubkey[]): OperatorProfile => ({
   description: "",
   amounts: [100_000],
   maxReceiveAmount: 1_000_000,
+  minReceiveAmount: 100_000,
   minClientVersion: null,
   watchers,
   picture: null,

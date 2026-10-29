@@ -12,7 +12,11 @@ import {
   type OnchainTransfersRepository,
   type OnchainTransferId,
 } from "@linky-fit/linksync";
-import type { AppDataEvent, Pubkey } from "@linky-fit/linkstr";
+import {
+  encodeNprofile,
+  type AppDataEvent,
+  type Pubkey,
+} from "@linky-fit/linkstr";
 import {
   canonicalBitcoinAddress,
   decodeOnchainConfig,
@@ -33,8 +37,8 @@ import {
 } from "@linky-fit/onchain-transfer";
 import { Option, Schema } from "effect";
 import {
+  buildCashuPaymentRequestMessage,
   parseCashuPaymentRequestMessage,
-  type CashuPaymentRequestMessageInfo,
 } from "./paymentRequestMessage";
 import {
   isRequestPaidInFull,
@@ -47,7 +51,7 @@ export interface OnchainTransferView {
   readonly id: OnchainTransferId;
   readonly createdAtSec: number;
   readonly direction: OnchainTransferDirection;
-  /** Sats the user gets. */
+  /** Sats the user gets: what the newest update's terms leave after the fee, the request's amount before any update. */
   readonly amount: number;
   /** The fee the operator locked, or the one the request was made at until it answers. */
   readonly fee: number;
@@ -56,10 +60,10 @@ export interface OnchainTransferView {
   readonly phase: OnchainTransferPhase;
   readonly update: OnchainTransferUpdate | null;
   readonly payoutAddress: string | null;
-  readonly refundAddress: string | null;
-  readonly refundToSender: boolean;
   readonly depositAddress: string | null;
   readonly operatorPaymentRequest: string | null;
+  /** receive: for whatever the user deposits within the operator's limits; the deposit sets the amounts, which mean nothing before it. */
+  readonly anyAmount: boolean;
 }
 
 const isOnchainTransferDirection = Schema.is(OnchainTransferDirection);
@@ -83,20 +87,33 @@ export interface OnchainTransferPaymentHistory {
   readonly received: ReceivedSatByRequestId;
 }
 
-/** Whether the request the user made for an on-chain receive received its own amount. */
+/** Whether the request the user made for an on-chain receive received its own amount, or `termsAmount`, what the deposit's terms give, when it names none. */
 const isUserRequestPaid = (
   userPaymentRequest: string | null,
   received: ReceivedSatByRequestId,
+  termsAmount: number,
 ): boolean => {
   if (userPaymentRequest === null) return false;
   const request = parseCashuPaymentRequestMessage(userPaymentRequest);
   return (
     request !== null &&
     request.requestId !== null &&
-    request.amount !== null &&
-    isRequestPaidInFull(received, request.requestId, request.amount)
+    isRequestPaidInFull(
+      received,
+      request.requestId,
+      request.amount ?? termsAmount,
+    )
   );
 };
+
+/** A receive whose own payment request names no amount leaves the amount to the deposit. */
+const isAnyAmountReceive = (
+  direction: OnchainTransferDirection,
+  userPaymentRequest: string | null,
+): boolean =>
+  direction === "receive" &&
+  userPaymentRequest !== null &&
+  parseCashuPaymentRequestMessage(userPaymentRequest)?.amount === null;
 
 /** The view of a transfer this account requested from `operator`; null for any other row. */
 export const onchainTransferView = (
@@ -112,11 +129,12 @@ export const onchainTransferView = (
   const sendAmount =
     update?.sendAmount ??
     amountWithServiceFee(record.amount, record.feeBasisPoints);
+  const amount = update === null ? record.amount : sendAmount - fee;
   return {
     id: record.id,
     createdAtSec: record.createdAtSec,
     direction,
-    amount: record.amount,
+    amount,
     fee,
     sendAmount,
     phase: onchainTransferPhase({
@@ -130,14 +148,13 @@ export const onchainTransferView = (
         null,
       requestPaid:
         direction === "receive" &&
-        isUserRequestPaid(record.userPaymentRequest, history.received),
+        isUserRequestPaid(record.userPaymentRequest, history.received, amount),
     }),
     update,
     payoutAddress: record.payoutAddress,
-    refundAddress: record.refundAddress,
-    refundToSender: record.refundToSender === sqliteTrue,
     depositAddress: record.depositAddress,
     operatorPaymentRequest: record.operatorPaymentRequest,
+    anyAmount: isAnyAmountReceive(direction, record.userPaymentRequest),
   };
 };
 
@@ -162,23 +179,39 @@ export const unfinishedOnchainTransfers = (
       (a, b) => b.createdAtSec - a.createdAtSec || b.id.localeCompare(a.id),
     );
 
+/** The newest receive of any amount still waiting for a deposit, whose address the receive screen shows again; null when none. */
+export const openOnchainReceive = (
+  transfers: readonly OnchainTransferView[],
+): OnchainTransferView | null =>
+  unfinishedOnchainTransfers(transfers).find(
+    (transfer) =>
+      transfer.direction === "receive" &&
+      transfer.anyAmount &&
+      (transfer.phase === "waitingForDetails" ||
+        transfer.phase === "awaitingDeposit"),
+  ) ?? null;
+
+/** send: whether the user still owes the operator the payment. */
+export const isOnchainSendUnpaid = (
+  transfer: Pick<OnchainTransferView, "direction" | "phase">,
+): boolean =>
+  transfer.direction === "send" &&
+  (transfer.phase === "waitingForDetails" || transfer.phase === "readyToSend");
+
 export interface NewOnchainTransferDraft {
   readonly direction: OnchainTransferDirection;
+  /** send: one of the config's amounts; receive: null, for any amount. */
   readonly amount: number | null;
   readonly payoutAddress: string;
-  readonly refundAddress: string;
-  readonly refundToSender: boolean;
 }
 
 export type NewOnchainTransferProblem =
   | "paused"
   | "amountMissing"
-  /** receive: more than the operator takes. */
-  | "amountOverMax"
+  /** receive: the operator takes no receive of any amount. */
+  | "anyAmountUnavailable"
   | "payoutAddressMissing"
-  | "payoutAddressInvalid"
-  | "refundMissing"
-  | "refundAddressInvalid";
+  | "payoutAddressInvalid";
 
 /** Why the draft cannot be requested under `config` yet; null when it can. */
 export const newOnchainTransferProblem = (
@@ -186,22 +219,18 @@ export const newOnchainTransferProblem = (
   config: OnchainConfig,
 ): NewOnchainTransferProblem | null => {
   if (config.paused) return "paused";
-  if (draft.amount === null || draft.amount <= 0) return "amountMissing";
-  if (!isOfferedAmount(config, draft.direction, draft.amount))
-    return draft.direction === "send" ? "amountMissing" : "amountOverMax";
-  if (draft.direction === "send") {
-    const address = draft.payoutAddress.trim();
-    if (address === "") return "payoutAddressMissing";
-    return isValidBitcoinAddress(address, config.network)
+  if (draft.direction === "receive") {
+    return isOfferedAmount(config, "receive", null)
       ? null
-      : "payoutAddressInvalid";
+      : "anyAmountUnavailable";
   }
-  if (draft.refundToSender) return null;
-  const refundAddress = draft.refundAddress.trim();
-  if (refundAddress === "") return "refundMissing";
-  return isValidBitcoinAddress(refundAddress, config.network)
+  if (draft.amount === null || !isOfferedAmount(config, "send", draft.amount))
+    return "amountMissing";
+  const address = draft.payoutAddress.trim();
+  if (address === "") return "payoutAddressMissing";
+  return isValidBitcoinAddress(address, config.network)
     ? null
-    : "refundAddressInvalid";
+    : "payoutAddressInvalid";
 };
 
 export interface PlannedOnchainTransfer {
@@ -218,8 +247,9 @@ const textColumn = (value: string | null): NonEmptyString1000 | null => {
 
 /**
  * The request message and the row of a valid draft (see `newOnchainTransferProblem`).
- * An on-chain receive needs the user's payment request for the amount;
- * null when the parts do not fit the message or the row.
+ * An on-chain receive needs the user's payment request, one naming no amount;
+ * its row holds the config's minimum until the deposit sets the terms.
+ * Null when the parts do not fit the message or the row.
  */
 export const planOnchainTransfer = ({
   draft,
@@ -236,26 +266,23 @@ export const planOnchainTransfer = ({
   readonly operator: Pubkey;
   readonly userPaymentRequest: string | null;
 }): PlannedOnchainTransfer | null => {
-  if (draft.amount === null) return null;
   const send = draft.direction === "send";
+  const rowAmount = send ? draft.amount : (config.minReceiveAmount ?? null);
+  if (rowAmount === null) return null;
   // The operator's chain watcher matches addresses as Esplora reports them; "" fails the request schema.
-  const canonical = (address: string) =>
-    canonicalBitcoinAddress(address.trim(), config.network) ?? "";
-  const payoutAddress = canonical(draft.payoutAddress);
-  const refundAddress = canonical(draft.refundAddress);
+  const payoutAddress =
+    canonicalBitcoinAddress(draft.payoutAddress.trim(), config.network) ?? "";
   const request: OnchainTransferRequest = {
     v: 1,
     type: "request",
     transferId: id,
     direction: draft.direction,
-    amount: draft.amount,
+    ...(draft.amount === null ? {} : { amount: draft.amount }),
     feeBasisPoints: config.feeBasisPoints,
     ...(send
       ? { payoutAddress }
       : {
-          refund: draft.refundToSender
-            ? { to: "sender" }
-            : { to: "address", address: refundAddress },
+          refund: { to: "sender" },
           ...(userPaymentRequest === null
             ? {}
             : { paymentRequest: userPaymentRequest }),
@@ -263,12 +290,10 @@ export const planOnchainTransfer = ({
   };
   if (!isOnchainTransferRequest(request)) return null;
   const createdAtSec = PositiveInt.from(nowSec);
-  const amount = PositiveInt.from(draft.amount);
+  const amount = PositiveInt.from(rowAmount);
   const feeBasisPoints = NonNegativeInt.from(config.feeBasisPoints);
   if (!createdAtSec.ok || !amount.ok || !feeBasisPoints.ok) return null;
   const payout = send ? textColumn(payoutAddress) : null;
-  const refund =
-    send || draft.refundToSender ? null : textColumn(refundAddress);
   const userRequest = send ? null : textColumn(userPaymentRequest);
   return {
     request,
@@ -281,8 +306,7 @@ export const planOnchainTransfer = ({
       amount: amount.value,
       feeBasisPoints: feeBasisPoints.value,
       ...(payout === null ? {} : { payoutAddress: payout }),
-      ...(refund === null ? {} : { refundAddress: refund }),
-      ...(!send && draft.refundToSender ? { refundToSender: sqliteTrue } : {}),
+      ...(send ? {} : { refundToSender: sqliteTrue }),
       ...(userRequest === null ? {} : { userPaymentRequest: userRequest }),
     },
   };
@@ -335,16 +359,23 @@ export const newestOnchainConfig = (
   return null;
 };
 
-/** Whether the operator's request asks for exactly this transfer: its id, its amount plus the fee, paid to the operator. */
-export const isOperatorRequestFor = (
-  request: CashuPaymentRequestMessageInfo,
+/**
+ * The NUT-18 request Linky pays for an on-chain send, built here so the
+ * payment leaves right after the request: the amount plus the fee at the
+ * config's mint, to the operator over Nostr, with the transfer id as the
+ * request id, which is how the operator matches the ecash to the transfer.
+ */
+export const onchainSendPaymentRequest = (
   transfer: Pick<OnchainTransferView, "id" | "sendAmount">,
+  mintUrl: string,
   operator: Pubkey,
-): boolean =>
-  sameText(request.requestId, transfer.id) &&
-  request.amount === transfer.sendAmount &&
-  request.preferredTransport === "nostr" &&
-  request.transportPubkeyHex === operator;
+): string =>
+  buildCashuPaymentRequestMessage({
+    amount: transfer.sendAmount,
+    mintUrls: [mintUrl],
+    recipientNprofile: encodeNprofile(operator, []),
+    requestId: PaymentRequestId.make(transfer.id),
+  });
 
 /** Signet addresses are testnet's. */
 const ADDRESS_NETWORKS: readonly BitcoinNetwork[] = [

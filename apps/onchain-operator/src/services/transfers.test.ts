@@ -39,7 +39,7 @@ import type { OperatorProfile } from "../domain/profile";
 import { readTransferLog } from "../storage/transferLog";
 import { readTransfer } from "../storage/transfers";
 import type { WatcherAlert } from "../domain/watchers";
-import { createTransfers } from "./transfers";
+import { createTransfers, type EarlyEcashStore } from "./transfers";
 import {
   chatTextFrom,
   deliver,
@@ -66,6 +66,7 @@ const profile: OperatorProfile = {
   description: "",
   amounts: [100_000, 250_000],
   maxReceiveAmount: 300_000,
+  minReceiveAmount: 100_000,
   minClientVersion: null,
   watchers: [],
   picture: null,
@@ -86,6 +87,12 @@ const setup = (
   const wallet = options.wallet ?? fakeWallet();
   const esplora = fakeEsplora();
   const alerts: WatcherAlert["_tag"][] = [];
+  const early = new Map<string, number>();
+  const earlyEcash: EarlyEcashStore = {
+    get: (id) => early.get(id) ?? null,
+    set: (id, sats) => void early.set(id, sats),
+    remove: (id) => void early.delete(id),
+  };
   const transfers = createTransfers({
     transfers: repository,
     transferMessages,
@@ -98,6 +105,7 @@ const setup = (
     alertWatchers: async (alert) => {
       alerts.push(alert._tag);
     },
+    earlyEcash,
     whenHydrated: () => Promise.resolve(),
   });
   const user = makeIdentity().pubkey;
@@ -128,6 +136,7 @@ const setup = (
     stored,
     updates,
     alerts,
+    early,
   };
 };
 
@@ -146,16 +155,17 @@ const sendRequest = (
 const receiveRequest = (
   user: Pubkey,
   transferId = createId<"OnchainTransfer">(),
+  amount: number | null = 100_000,
 ): OnchainTransferRequest => ({
   v: 1,
   type: "request",
   transferId,
   direction: "receive",
-  amount: 100_000,
+  ...(amount === null ? {} : { amount }),
   feeBasisPoints: 100,
   refund: { to: "sender" },
   paymentRequest: encodeNostrPaymentRequest({
-    amount: 100_000,
+    amount,
     mintUrls: [testMint],
     recipientNprofile: encodeNprofile(user, ["ws://localhost:7777"]),
     requestId: PaymentRequestId.make(transferId),
@@ -190,27 +200,82 @@ const settle = async (
 };
 
 describe("transfer requests", () => {
-  it("stores a request for the operator to decide and answers nothing yet", async () => {
+  it("accepts an on-chain receive on arrival with a fresh deposit address, once, without alerting the watchers", async () => {
     const { send, stored, updates, user, alerts } = setup();
-    const request = sendRequest();
+    const request = receiveRequest(user);
+    await send(request);
+    await send(request);
+    expect(alerts).toEqual([]);
+    const address = deriveDepositAddress({
+      xpub: tpub,
+      index: 0,
+      network: "regtest",
+    });
+    expect(await stored(request.transferId)).toMatchObject({
+      user,
+      direction: "receive",
+      amount: 100_000,
+      refund: { to: "sender" },
+      addressIndex: 0,
+      depositAddress: address,
+      update: { revision: 1, status: "accepted", depositAddress: address },
+    });
+    expect(updates()).toHaveLength(1);
+  });
+
+  it("leaves an on-chain receive it could not give an address to waiting for the operator, and alerts the watchers", async () => {
+    const { transfers, send, stored, updates, user, alerts, esplora } = setup();
+    esplora.state.offline = true;
+    const request = receiveRequest(user);
     await send(request);
     await send(request);
     expect(alerts).toEqual(["requested"]);
+    expect((await stored(request.transferId)).update).toBeNull();
+    expect(updates()).toEqual([]);
+    esplora.state.offline = false;
+    expect(await transfers.accept(request.transferId)).toBeNull();
+    expect(updates().map((update) => update.status)).toEqual(["accepted"]);
+  });
+
+  it("accepts an on-chain send on arrival, once, without alerting the watchers", async () => {
+    const { send, stored, updates, user, alerts, nostr } = setup();
+    const request = sendRequest();
+    await send(request);
+    await send(request);
+    expect(alerts).toEqual([]);
     expect(await stored(request.transferId)).toMatchObject({
       user,
       direction: "send",
       amount: 100_000,
       payoutAddress,
-      update: null,
+      update: { revision: 1, status: "accepted" },
     });
-    expect(updates()).toEqual([]);
+    const [accepted] = updates();
+    expect(updates()).toHaveLength(1);
+    expect(decodePaymentRequest(accepted?.paymentRequest ?? "")).toMatchObject({
+      amount: 101_000,
+      id: request.transferId,
+      mints: [testMint],
+      transports: [{ type: "nostr", target: nostr.nostr.nprofile }],
+    });
+    expect((await stored(request.transferId)).operatorPaymentRequest).toBe(
+      accepted?.paymentRequest,
+    );
+  });
+
+  it("accepts an on-chain send it would rather not take all the same, to refund it", async () => {
+    const { send, updates } = setup({
+      profile: { ...profile, paused: true },
+    });
+    await send({ ...sendRequest(), amount: 123_456 });
+    expect(updates().map((update) => update.status)).toEqual(["accepted"]);
   });
 
   it("denies a request it cannot take, once, with the reason", async () => {
-    const { send, stored, updates, alerts } = setup({
+    const { send, stored, updates, alerts, user } = setup({
       profile: { ...profile, paused: true },
     });
-    const request = sendRequest();
+    const request = receiveRequest(user);
     await send(request);
     await send(request);
     expect(alerts).toEqual([]);
@@ -225,6 +290,27 @@ describe("transfer requests", () => {
       }),
     ]);
     expect((await stored(request.transferId)).update?.status).toBe("denied");
+  });
+
+  it("stores an on-chain receive of any amount at the smallest receive, until its deposit sets the terms", async () => {
+    const { send, stored, user } = setup({
+      profile: { ...profile, minReceiveAmount: 50_000 },
+    });
+    const request = receiveRequest(user, undefined, null);
+    await send(request);
+    expect(await stored(request.transferId)).toMatchObject({
+      amount: 50_000,
+      update: { status: "accepted", fee: 500, sendAmount: 50_500 },
+    });
+
+    const fixed = setup({ profile: { ...profile, minReceiveAmount: 50_000 } });
+    const open = { ...receiveRequest(fixed.user) };
+    delete open.amount;
+    await fixed.send(open);
+    expect(fixed.updates().at(-1)).toMatchObject({
+      status: "denied",
+      reason: "The payment request must leave the amount open.",
+    });
   });
 
   it("keeps the first request of a transfer id, whoever sends it again", async () => {
@@ -261,8 +347,9 @@ describe("transfer log", () => {
 
 describe("cancelling", () => {
   it("cancels a request its user withdrew before it was accepted", async () => {
-    const { send, stored, updates } = setup();
-    const request = sendRequest();
+    const { send, stored, updates, user, esplora } = setup();
+    esplora.state.offline = true;
+    const request = receiveRequest(user);
     await send(request);
     await send({ v: 1, type: "cancel", transferId: request.transferId });
     expect(updates().at(-1)).toMatchObject({
@@ -275,10 +362,9 @@ describe("cancelling", () => {
   });
 
   it("cancels an accepted transfer and ignores a cancel from anyone else", async () => {
-    const { transfers, send, updates } = setup();
+    const { send, updates } = setup();
     const request = sendRequest();
     await send(request);
-    await transfers.accept(request.transferId);
     await send(
       { v: 1, type: "cancel", transferId: request.transferId },
       makeIdentity().pubkey,
@@ -295,7 +381,6 @@ describe("cancelling", () => {
     const { transfers, send, stored, updates, esplora, user, alerts } = setup();
     const request = receiveRequest(user);
     await send(request);
-    await transfers.accept(request.transferId);
     const address = (await stored(request.transferId)).depositAddress ?? "";
     esplora.state.byAddress.set(address, [
       txPaying("aa".repeat(32), address, 100_000),
@@ -303,7 +388,7 @@ describe("cancelling", () => {
     await transfers.checkDeposits();
     await send({ v: 1, type: "cancel", transferId: request.transferId });
     await send({ v: 1, type: "cancel", transferId: request.transferId });
-    expect(alerts).toEqual(["requested", "cancelledAfterFunds"]);
+    expect(alerts).toEqual(["cancelledAfterFunds"]);
     expect(updates().map((update) => update.status)).toEqual([
       "accepted",
       "fundsSeen",
@@ -315,23 +400,10 @@ describe("cancelling", () => {
 });
 
 describe("accepting", () => {
-  it("asks the user to pay the amount plus the fee at the mint, to the operator, by transfer id", async () => {
-    const { transfers, send, stored, updates, nostr } = setup();
+  it("accepts an on-chain send only once, by hand when the arrival could not", async () => {
+    const { transfers, send, stored, nostr } = setup();
     const request = sendRequest();
     await send(request);
-    expect(await transfers.accept(request.transferId)).toBeNull();
-    const [accepted] = updates();
-    expect(accepted).toMatchObject({ revision: 1, status: "accepted" });
-    const paymentRequest = decodePaymentRequest(accepted?.paymentRequest ?? "");
-    expect(paymentRequest).toMatchObject({
-      amount: 101_000,
-      id: request.transferId,
-      mints: [testMint],
-      transports: [{ type: "nostr", target: nostr.nostr.nprofile }],
-    });
-    expect((await stored(request.transferId)).operatorPaymentRequest).toBe(
-      accepted?.paymentRequest,
-    );
     expect(nostr.appMessages[0]?.draft.to).toBe(
       (await stored(request.transferId)).user,
     );
@@ -341,13 +413,11 @@ describe("accepting", () => {
   });
 
   it("gives every on-chain receive the next deposit address", async () => {
-    const { transfers, send, stored, updates, user } = setup();
+    const { send, stored, updates, user } = setup();
     const first = receiveRequest(user);
     const second = receiveRequest(user);
     await send(first);
     await send(second);
-    await transfers.accept(first.transferId);
-    await transfers.accept(second.transferId);
     const address = (index: number) =>
       deriveDepositAddress({ xpub: tpub, index, network: "regtest" });
     expect(await stored(first.transferId)).toMatchObject({
@@ -374,13 +444,13 @@ describe("accepting", () => {
     const first = receiveRequest(user);
     const second = receiveRequest(user);
     await send(first);
-    await send(second);
-    expect(await transfers.accept(first.transferId)).toBeNull();
     expect(await stored(first.transferId)).toMatchObject({
       addressIndex: 1,
       depositAddress: address(1),
     });
     esplora.state.offline = true;
+    await send(second);
+    expect((await stored(second.transferId)).update).toBeNull();
     expect(await transfers.accept(second.transferId)).toEqual({
       reason: "addressUnchecked",
     });
@@ -388,11 +458,13 @@ describe("accepting", () => {
   });
 
   it("needs a key of the network to accept an on-chain receive", async () => {
-    const { transfers, send, user } = setup({
+    const { transfers, send, user, alerts, stored } = setup({
       profile: { ...profile, xpub: "xpub-of-another-network" },
     });
     const request = receiveRequest(user);
     await send(request);
+    expect(alerts).toEqual(["requested"]);
+    expect((await stored(request.transferId)).update).toBeNull();
     expect(await transfers.accept(request.transferId)).toEqual({
       reason: "noProfile",
     });
@@ -404,7 +476,6 @@ describe("ecash in", () => {
     const context = setup(wallet === undefined ? {} : { wallet });
     const request = sendRequest();
     await context.send(request);
-    await context.transfers.accept(request.transferId);
     const pay = (amount: number) =>
       deliver(
         context.nostr.inbox,
@@ -419,7 +490,7 @@ describe("ecash in", () => {
     );
     await pay(101_000);
     expect(wallet.received).toHaveLength(1);
-    expect(alerts).toEqual(["requested", "payoutDue"]);
+    expect(alerts).toEqual(["payoutDue"]);
     expect(updates().at(-1)).toMatchObject({
       revision: 2,
       status: "fundsReceived",
@@ -448,10 +519,7 @@ describe("ecash in", () => {
     });
     const context = setup({ wallet });
     const [paid, other] = [sendRequest(), sendRequest()];
-    for (const request of [paid, other]) {
-      await context.send(request);
-      await context.transfers.accept(request.transferId);
-    }
+    for (const request of [paid, other]) await context.send(request);
     for (const id of [paid.transferId, paid.transferId, other.transferId])
       await deliver(
         context.nostr.inbox,
@@ -494,13 +562,51 @@ describe("ecash in", () => {
   });
 
   it("receives ecash naming no transfer without touching any transfer", async () => {
-    const { nostr, user, updates, wallet } = await acceptedSend();
+    const { nostr, user, updates, wallet, early } = await acceptedSend();
     await deliver(
       nostr.inbox,
       chatTextFrom(user, nut18Payload("other", 101_000)),
     );
     expect(wallet.received).toHaveLength(1);
     expect(updates()).toHaveLength(1);
+    expect(early.size).toBe(0);
+  });
+
+  it("keeps ecash that beat its request, and reports the funds once the send is accepted", async () => {
+    const wallet = fakeWallet(() => Result.succeed(receiveReceipt(101_000)));
+    const { send, nostr, user, updates, alerts, early, transfers } = setup({
+      wallet,
+    });
+    const request = sendRequest();
+    await deliver(
+      nostr.inbox,
+      chatTextFrom(user, nut18Payload(request.transferId, 101_000)),
+    );
+    expect(early.get(request.transferId)).toBe(101_000);
+    expect(updates()).toEqual([]);
+
+    await send(request);
+    expect(updates().map((update) => update.status)).toEqual([
+      "accepted",
+      "fundsReceived",
+    ]);
+    expect(updates().at(-1)?.receivedAmount).toBe(101_000);
+    expect(alerts).toEqual(["payoutDue"]);
+    expect(early.size).toBe(0);
+    expect(transfers.earlyEcash(request.transferId)).toBeNull();
+  });
+
+  it("keeps early ecash short of the amount plus the fee for the operator to settle", async () => {
+    const wallet = fakeWallet(() => Result.succeed(receiveReceipt(50_000)));
+    const { send, nostr, user, updates, transfers } = setup({ wallet });
+    const request = sendRequest();
+    await deliver(
+      nostr.inbox,
+      chatTextFrom(user, nut18Payload(request.transferId, 50_000)),
+    );
+    await send(request);
+    expect(updates().map((update) => update.status)).toEqual(["accepted"]);
+    expect(transfers.earlyEcash(request.transferId)).toBe(50_000);
   });
 });
 
@@ -509,7 +615,6 @@ describe("deposit watcher", () => {
     const { transfers, send, stored, updates, esplora, user, alerts } = setup();
     const request = receiveRequest(user);
     await send(request);
-    await transfers.accept(request.transferId);
     const address = (await stored(request.transferId)).depositAddress ?? "";
     const txid = "bb".repeat(32);
 
@@ -537,11 +642,65 @@ describe("deposit watcher", () => {
       { status: "fundsSeen", confirmations: 1, revision: 3 },
       { status: "fundsReceived", confirmations: 2, revision: 4 },
     ]);
-    expect(alerts).toEqual(["requested", "ecashDue"]);
+    expect(alerts).toEqual(["ecashDue"]);
     expect(updates().at(-1)).toMatchObject({
       txid,
       receivedAmount: 101_000,
       depositAddress: address,
+    });
+  });
+
+  it("prices the deposit of an on-chain receive of any amount and pays what it bought", async () => {
+    const context = setup({
+      profile: { ...profile, minReceiveAmount: 100_000 },
+    });
+    const { transfers, send, stored, updates, esplora, user, wallet } = context;
+    const request = receiveRequest(user, undefined, null);
+    await send(request);
+    expect(updates().at(-1)).toMatchObject({
+      status: "accepted",
+      fee: 1_000,
+      sendAmount: 101_000,
+    });
+    const address = (await stored(request.transferId)).depositAddress ?? "";
+    esplora.state.byAddress.set(address, [
+      txPaying("bb".repeat(32), address, 150_000),
+    ]);
+    await transfers.checkDeposits();
+    expect(updates().at(-1)).toMatchObject({
+      status: "fundsSeen",
+      receivedAmount: 150_000,
+      fee: 1_486,
+      sendAmount: 150_000,
+    });
+    esplora.state.byAddress.set(address, [
+      txPaying("bb".repeat(32), address, 150_000, 99),
+    ]);
+    await transfers.checkDeposits();
+    expect(updates().at(-1)).toMatchObject({
+      status: "fundsReceived",
+      fee: 1_486,
+      sendAmount: 150_000,
+    });
+    expect(await transfers.sendEcash(request.transferId)).toBeNull();
+    expect(wallet.sent).toEqual([{ amount: 148_514, forRequest: true }]);
+  });
+
+  it("keeps a deposit short of the smallest receive seen on a receive of any amount", async () => {
+    const { transfers, send, stored, updates, esplora, user } = setup();
+    const request = receiveRequest(user, undefined, null);
+    await send(request);
+    const address = (await stored(request.transferId)).depositAddress ?? "";
+    esplora.state.byAddress.set(address, [
+      txPaying("bb".repeat(32), address, 90_000, 99),
+    ]);
+    esplora.state.tipHeight = 101;
+    await transfers.checkDeposits();
+    expect(updates().at(-1)).toMatchObject({
+      status: "fundsSeen",
+      receivedAmount: 90_000,
+      fee: 1_000,
+      sendAmount: 101_000,
     });
   });
 
@@ -552,8 +711,6 @@ describe("deposit watcher", () => {
     const second = receiveRequest(user);
     await send(first);
     await send(second);
-    await transfers.accept(first.transferId);
-    await transfers.accept(second.transferId);
     const address = (await stored(first.transferId)).depositAddress ?? "";
     // What syncs when two devices accepted before seeing each other.
     await Effect.runPromise(
@@ -581,7 +738,6 @@ describe("payouts", () => {
     });
     const request = sendRequest();
     await send(request);
-    await transfers.accept(request.transferId);
     await deliver(
       nostr.inbox,
       chatTextFrom(user, nut18Payload(request.transferId, 101_000)),
@@ -612,7 +768,6 @@ describe("payouts", () => {
   const fundedSend = async (context: ReturnType<typeof setup>) => {
     const request = sendRequest();
     await context.send(request);
-    await context.transfers.accept(request.transferId);
     await deliver(
       context.nostr.inbox,
       chatTextFrom(context.user, nut18Payload(request.transferId, 101_000)),
@@ -667,7 +822,6 @@ describe("payouts", () => {
     const context = setup();
     const request = receiveRequest(context.user);
     await context.send(request);
-    await context.transfers.accept(request.transferId);
     const address =
       (await context.stored(request.transferId)).depositAddress ?? "";
     context.esplora.state.byAddress.set(address, [
@@ -705,7 +859,6 @@ describe("payouts", () => {
     const context = setup();
     const request = receiveRequest(context.user);
     await context.send(request);
-    await context.transfers.accept(request.transferId);
     const address =
       (await context.stored(request.transferId)).depositAddress ?? "";
     context.esplora.state.byAddress.set(address, [
@@ -720,7 +873,7 @@ describe("payouts", () => {
       receivedAmount: 100_000,
     });
     expect(context.updates()).toHaveLength(2);
-    expect(context.alerts).toEqual(["requested", "ecashDue"]);
+    expect(context.alerts).toEqual(["ecashDue"]);
     expect(await context.transfers.sendEcash(request.transferId)).toEqual({
       reason: "notAllowed",
     });
@@ -878,7 +1031,6 @@ describe("payouts", () => {
     const { transfers, send, nostr, user, updates } = setup({ wallet });
     const request = sendRequest();
     await send(request);
-    await transfers.accept(request.transferId);
     await deliver(
       nostr.inbox,
       chatTextFrom(user, nut18Payload(request.transferId, 101_000)),

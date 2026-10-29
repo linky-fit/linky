@@ -19,6 +19,7 @@ const profile: OperatorProfile = {
   description: "x".repeat(1000),
   amounts: [100_000],
   maxReceiveAmount: 400_000,
+  minReceiveAmount: 100_000,
   minClientVersion: "26.10.7",
   watchers: [makeIdentity().pubkey, makeIdentity().pubkey],
   picture: "https://blossom.primal.net/ab12.webp",
@@ -41,7 +42,7 @@ describe("profile setting", () => {
     expect(await Effect.runPromise(readProfile(settings))).toEqual(emptied);
   });
 
-  it("names a profile saved before the operator had a name, a picture or a minimum Linky version", async () => {
+  it("names a profile saved before the operator had a name, a picture, receive limits or a minimum Linky version", async () => {
     const settings = tableRepository(testStore(), "meta", "setting");
     await Effect.runPromise(
       settings.insert({
@@ -60,7 +61,8 @@ describe("profile setting", () => {
     expect(await Effect.runPromise(readProfile(settings))).toMatchObject({
       name: "Linky support",
       xpub: "tpub-key",
-      maxReceiveAmount: 1_000_000,
+      maxReceiveAmount: 2_000_000,
+      minReceiveAmount: 100_000,
       minClientVersion: null,
       picture: null,
     });

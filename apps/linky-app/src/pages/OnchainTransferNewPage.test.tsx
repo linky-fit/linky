@@ -1,45 +1,65 @@
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { NewOnchainTransferDraft } from "../app/lib/onchainTransfers";
+import type {
+  NewOnchainTransferDraft,
+  OnchainTransferView,
+} from "../app/lib/onchainTransfers";
 import type { OnchainConfigState } from "../app/state/wallet/onchainConfig";
 import {
   MAINNET_ADDRESS,
   REGTEST_ADDRESS,
   onchainConfigFixture,
+  onchainTransferViewFixture,
 } from "../testUtils/onchainTransfers";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import {
-  OnchainTransferForm,
+  OnchainReceiveIntro,
+  OnchainSendForm,
   OnchainTransferNewPage,
   type OnchainSendPrefill,
 } from "./OnchainTransferNewPage";
 
-const page = vi.hoisted((): { shown: boolean; config: OnchainConfigState } => ({
-  shown: true,
-  config: { status: "loading" },
-}));
+const page = vi.hoisted(
+  (): {
+    shown: boolean;
+    config: OnchainConfigState;
+    transfers: readonly OnchainTransferView[];
+    requestOnchainTransfer: ReturnType<typeof vi.fn>;
+    navigateTo: ReturnType<typeof vi.fn>;
+  } => ({
+    shown: true,
+    config: { status: "loading" },
+    transfers: [],
+    requestOnchainTransfer: vi.fn(),
+    navigateTo: vi.fn(),
+  }),
+);
 
 vi.mock("../app/hooks/shell", async () =>
   (await import("../testUtils/shellHooks")).shellHooksMock({
-    ...(await import("../testUtils/onchainTransfers")).EUR_DISPLAY,
     t: (key) =>
       new Map([
-        ["onchainTransferFeeNotice", "fee {fee}"],
+        ["onchainSendArrivingAmount", "arrives {amount}"],
+        ["onchainSendMinimum", "at least {min}"],
         ["onchainSendAmountUnavailable", "asks for {amount}"],
+        ["onchainReceiveIntroRange", "from {min} to {max}"],
+        ["onchainReceiveIntroFee", "fee {fee}"],
       ]).get(key) ?? key,
   }),
 );
 vi.mock("../app/hooks/useOnchainTransfers", () => ({
   useOnchainConfig: () => page.config,
   useOnchainTransfersShown: () => page.shown,
+  useOnchainTransfers: () => page.transfers,
   useOnchainTransferCommands: () => ({
     contactSupport: vi.fn(),
-    requestOnchainTransfer: vi.fn(),
+    requestOnchainTransfer: page.requestOnchainTransfer,
   }),
 }));
 vi.mock("../app/hooks/wallet/useWalletInventory", () => ({
   useWalletBalance: () => ({ cashuBalanceAfterMelt: 1_000_000 }),
 }));
+vi.mock("../hooks/useRouting", () => ({ navigateTo: page.navigateTo }));
 
 const byTestId = (container: HTMLElement, id: string) =>
   container.querySelector<HTMLElement>(`[data-testid="${id}"]`);
@@ -62,99 +82,79 @@ const typeInto = async (input: HTMLElement | null, value: string) => {
   });
 };
 
-/** Presses keypad keys by their labels: digits, or the clear and delete keys' copy keys. */
-const pressKeys = async (container: HTMLElement, keys: readonly string[]) => {
-  for (const key of keys)
-    await press(container.querySelector(`button[aria-label="${key}"]`));
-};
-
-const renderForm = async ({
-  direction = "send",
+const renderSendForm = async ({
   config = onchainConfigFixture(),
   payableSat = 1_000_000,
   prefill = null,
-  receiveAmount = null,
 }: {
-  direction?: "send" | "receive";
   config?: ReturnType<typeof onchainConfigFixture>;
   payableSat?: number;
   prefill?: OnchainSendPrefill | null;
-  receiveAmount?: number | null;
 } = {}) => {
   const onSubmit = vi
     .fn<(draft: NewOnchainTransferDraft) => Promise<boolean>>()
     .mockResolvedValue(true);
-  const onContactSupport = vi.fn();
   const { container } = await renderIntoDocument(
-    <OnchainTransferForm
-      direction={direction}
+    <OnchainSendForm
       config={config}
       payableSat={payableSat}
       prefill={prefill}
-      receiveAmount={receiveAmount}
       onSubmit={onSubmit}
-      onContactSupport={onContactSupport}
     />,
   );
-  const amounts = () =>
-    Array.from(
-      container.querySelectorAll('[data-testid="onchain-transfer-amount"]'),
-    );
+  const amount = () => byTestId(container, "onchain-transfer-amount");
+  const arriving = () => byTestId(container, "onchain-transfer-arriving");
+  const up = () => byTestId(container, "onchain-transfer-amount-up");
+  const down = () => byTestId(container, "onchain-transfer-amount-down");
   const submit = () => byTestId(container, "onchain-transfer-continue");
-  return { amounts, container, onContactSupport, onSubmit, submit };
+  const disabled = (element: HTMLElement | null) =>
+    element?.getAttribute("aria-disabled") === "true";
+  return { amount, arriving, container, disabled, down, onSubmit, submit, up };
 };
 
-describe("OnchainTransferForm", () => {
+describe("OnchainSendForm", () => {
   afterEach(() => {
     document.body.innerHTML = "";
   });
 
-  it("offers the fixed amounts and the service fee on top of an on-chain send in the display unit only", async () => {
-    const { amounts, container } = await renderForm({
-      config: onchainConfigFixture({
-        amounts: [100_000, 250_000],
-        feeBasisPoints: 150,
-      }),
-    });
-    expect(container.textContent).toContain("onchainSendFixedAmounts");
-    expect(amounts().map((row) => row.textContent)).toEqual([
-      "~100 EUR",
-      "~250 EUR",
-    ]);
+  it("shows the largest amount the balance pays, fee included, and steps it among the operator's amounts", async () => {
+    const { amount, arriving, container, disabled, down, up } =
+      await renderSendForm();
+    expect(container.textContent).toContain("onchainSendArrivalNotice");
+    // 1,000,000 sat plus 1 % is out of reach; 500,000 plus 1 % is the most.
+    expect(amount()?.textContent).toContain("505000");
+    expect(arriving()?.textContent).toBe("arrives 500000 sat");
+    expect(disabled(up())).toBe(true);
+    expect(disabled(down())).toBe(false);
     expect(byTestId(container, "onchain-transfer-total")).toBeNull();
 
-    await press(amounts()[1]);
-    expect(container.textContent).toContain("onchainTransferYouGet~250 EUR");
-    expect(container.textContent).toContain(
-      "onchainTransferServiceFee (1.5%)~4 EUR",
-    );
-    expect(byTestId(container, "onchain-transfer-total")?.textContent).toBe(
-      "onchainSendYouPay~254 EUR",
-    );
-    expect(container.textContent).toContain("onchainSendArrivingAmount");
+    await press(down());
+    expect(amount()?.textContent).toContain("252500");
+    expect(arriving()?.textContent).toBe("arrives 250000 sat");
+    await press(down());
+    expect(amount()?.textContent).toContain("101000");
+    expect(disabled(down())).toBe(true);
+    await press(up());
+    expect(amount()?.textContent).toContain("252500");
   });
 
-  it("offers only the amounts the balance pays, the service fee included", async () => {
-    const { amounts, container } = await renderForm({ payableSat: 101_000 });
-    expect(
-      amounts().map((row) => row.getAttribute("aria-disabled") === "true"),
-    ).toEqual([false, true, true, true]);
-    expect(amounts()[1]?.textContent).toContain("~250 EUR");
-    expect(amounts()[1]?.textContent).toContain("payInsufficient");
-    expect(container.textContent).not.toContain("onchainSendInsufficient");
-
-    document.body.innerHTML = "";
-    const poor = await renderForm({ payableSat: 100_999 });
-    expect(poor.container.textContent).toContain("onchainSendInsufficient");
-  });
-
-  it("starts an on-chain send to a scanned address of the config's network", async () => {
-    const { amounts, container, onSubmit, submit } = await renderForm({
-      prefill: { payoutAddress: MAINNET_ADDRESS, amount: 250_000 },
+  it("tells the least a send takes when the balance pays no amount", async () => {
+    const { amount, container, disabled, submit } = await renderSendForm({
+      payableSat: 100_999,
     });
-    expect(amounts()[1]?.getAttribute("aria-selected")).toBe("true");
+    expect(amount()).toBeNull();
+    expect(container.textContent).toContain("at least 101000 sat");
+    expect(disabled(submit())).toBe(true);
+  });
+
+  it("sends a scanned amount to a scanned address of the config's network", async () => {
+    const { amount, container, disabled, onSubmit, submit } =
+      await renderSendForm({
+        prefill: { payoutAddress: MAINNET_ADDRESS, amount: 250_000 },
+      });
+    expect(amount()?.textContent).toContain("252500");
     expect(container.textContent).toContain("onchainTransferAddressInvalid");
-    expect(submit()?.getAttribute("aria-disabled")).toBe("true");
+    expect(disabled(submit())).toBe(true);
 
     await typeInto(
       byTestId(container, "onchain-transfer-payoutAddress"),
@@ -168,124 +168,76 @@ describe("OnchainTransferForm", () => {
       direction: "send",
       amount: 250_000,
       payoutAddress: REGTEST_ADDRESS,
-      refundAddress: "",
-      refundToSender: true,
     });
+    expect(disabled(submit())).toBe(true);
   });
 
-  it("warns about a scanned amount that is not a fixed one and continues only once the user confirms checking with the recipient", async () => {
-    const { amounts, container, onSubmit, submit } = await renderForm({
-      prefill: { payoutAddress: REGTEST_ADDRESS, amount: 123_000 },
-    });
+  it("warns about a scanned amount the send cannot be made for and continues only once the user confirms checking with the recipient", async () => {
+    const { amount, container, disabled, onSubmit, submit } =
+      await renderSendForm({
+        prefill: { payoutAddress: REGTEST_ADDRESS, amount: 123_000 },
+      });
     const confirm = () => container.querySelector('[role="switch"]');
-    expect(
-      amounts().some((row) => row.getAttribute("aria-selected") === "true"),
-    ).toBe(false);
-    expect(container.textContent).toContain("asks for ~123 EUR");
+    expect(container.textContent).toContain("asks for 123000 sat");
+    expect(amount()?.textContent).toContain("505000");
+    expect(disabled(submit())).toBe(true);
 
-    await press(amounts()[0]);
-    expect(submit()?.getAttribute("aria-disabled")).toBe("true");
     await press(confirm());
     expect(confirm()?.getAttribute("aria-checked")).toBe("true");
     await press(submit());
     expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({ amount: 100_000 }),
+      expect.objectContaining({ amount: 500_000 }),
     );
 
     document.body.innerHTML = "";
-    const fixed = await renderForm({
+    const fixed = await renderSendForm({
       prefill: { payoutAddress: REGTEST_ADDRESS, amount: 100_000 },
     });
     expect(fixed.container.textContent).not.toContain("asks for");
-    expect(fixed.submit()?.getAttribute("aria-disabled")).not.toBe("true");
+    expect(fixed.amount()?.textContent).toContain("101000");
+    expect(fixed.disabled(fixed.submit())).toBe(false);
+  });
+});
+
+describe("OnchainReceiveIntro", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
   });
 
-  it("refunds an on-chain receive to the sender unless the user picks another address, both ways without losing it", async () => {
-    const { container, onSubmit, submit } = await renderForm({
-      direction: "receive",
-    });
-    const sender = () => byTestId(container, "onchain-transfer-refund-sender");
-    const custom = () => byTestId(container, "onchain-transfer-custom-refund");
-    expect(sender()?.getAttribute("aria-selected")).toBe("true");
-    expect(container.textContent).toContain("onchainReceiveCustodialWarning");
-    expect(byTestId(container, "onchain-transfer-refundAddress")).toBeNull();
-    await pressKeys(container, ["1", "0", "0"]);
-    expect(byTestId(container, "onchain-transfer-total")?.textContent).toBe(
-      "onchainReceiveYouSend101,000 sat (~101 EUR)",
+  it("explains the wait, the limits, the fee and the refund before showing the address", async () => {
+    const onShowAddress = vi.fn();
+    const { container } = await renderIntoDocument(
+      <OnchainReceiveIntro
+        config={onchainConfigFixture({
+          minReceiveAmount: 100_000,
+          maxReceiveAmount: 2_000_000,
+          feeBasisPoints: 150,
+        })}
+        busy={false}
+        onShowAddress={onShowAddress}
+      />,
     );
-
-    await press(custom());
-    expect(submit()?.getAttribute("aria-disabled")).toBe("true");
-    await typeInto(
-      byTestId(container, "onchain-transfer-refundAddress"),
-      REGTEST_ADDRESS,
+    expect(container.textContent).toContain("onchainReceiveIntroSettlement");
+    expect(container.textContent).toContain(
+      "from 100,000 sat to 2,000,000 sat",
     );
-    await press(sender());
-    expect(byTestId(container, "onchain-transfer-refundAddress")).toBeNull();
-    expect(submit()?.getAttribute("aria-disabled")).not.toBe("true");
-    await press(custom());
-    const refundField = byTestId(container, "onchain-transfer-refundAddress");
-    expect(refundField instanceof HTMLInputElement && refundField.value).toBe(
-      REGTEST_ADDRESS,
-    );
-    await press(submit());
-    expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        direction: "receive",
-        amount: 100_000,
-        refundAddress: REGTEST_ADDRESS,
-        refundToSender: false,
-      }),
-    );
+    expect(container.textContent).toContain("fee 1.5%");
+    expect(container.textContent).toContain("onchainReceiveIntroRefund");
+    expect(container.textContent).not.toContain("onchainTransferRefundAddress");
+    await press(byTestId(container, "onchain-receive-show-address"));
+    expect(onShowAddress).toHaveBeenCalledOnce();
   });
 
-  it("takes any receive amount up to the operator's maximum on the keypad", async () => {
-    const { amounts, container, submit } = await renderForm({
-      direction: "receive",
-      config: onchainConfigFixture({ maxReceiveAmount: 300_000 }),
-    });
-    expect(amounts()).toEqual([]);
-    expect(container.textContent).toContain("onchainReceiveAnyAmount");
-    expect(submit()?.getAttribute("aria-disabled")).toBe("true");
-
-    await pressKeys(container, ["1", "2", "4"]);
-    expect(byTestId(container, "onchain-transfer-total")?.textContent).toBe(
-      "onchainReceiveYouSend125,240 sat (~125 EUR)",
+  it("is unavailable under an operator taking no receive of any amount", async () => {
+    const { container } = await renderIntoDocument(
+      <OnchainReceiveIntro
+        config={onchainConfigFixture({ minReceiveAmount: undefined })}
+        busy={false}
+        onShowAddress={vi.fn()}
+      />,
     );
-    expect(submit()?.getAttribute("aria-disabled")).not.toBe("true");
-
-    await pressKeys(container, ["clearForm", "3", "0", "1"]);
-    expect(container.textContent).toContain("onchainReceiveAmountTooHigh");
-    expect(submit()?.getAttribute("aria-disabled")).toBe("true");
-  });
-
-  it("starts a receive from the amount the receive page holds", async () => {
-    const { container, onSubmit, submit } = await renderForm({
-      direction: "receive",
-      receiveAmount: 150_000,
-    });
-    expect(byTestId(container, "onchain-transfer-total")?.textContent).toBe(
-      "onchainReceiveYouSend151,500 sat (~152 EUR)",
-    );
-    await press(submit());
-    expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({ direction: "receive", amount: 150_000 }),
-    );
-  });
-
-  it("says how long it takes and what it costs before confirming, with a way to support", async () => {
-    const { container, onContactSupport } = await renderForm({
-      direction: "receive",
-    });
-    expect(container.textContent).toContain("onchainReceiveArrivalNotice");
-    expect(container.textContent).toContain("onchainReceiveNetworkFee");
-    expect(container.textContent).toContain("fee 1%");
-    await press(
-      Array.from(container.querySelectorAll("button")).find(
-        (button) => button.textContent === "onchainTransferContactSupport",
-      ),
-    );
-    expect(onContactSupport).toHaveBeenCalledOnce();
+    expect(container.textContent).toContain("onchainTransferUnavailable");
+    expect(byTestId(container, "onchain-receive-show-address")).toBeNull();
   });
 });
 
@@ -293,6 +245,9 @@ describe("OnchainTransferNewPage", () => {
   beforeEach(() => {
     vi.stubGlobal("__APP_VERSION__", "26.10.1");
     page.shown = true;
+    page.transfers = [];
+    page.requestOnchainTransfer.mockReset();
+    page.navigateTo.mockReset();
   });
   afterEach(() => {
     document.body.innerHTML = "";
@@ -336,5 +291,37 @@ describe("OnchainTransferNewPage", () => {
     for (const action of actions)
       expect(container.textContent).toContain(action);
     expect(byTestId(container, "onchain-transfer-amount")).toBeNull();
+  });
+
+  it("requests a receive of any amount, or opens the one still waiting for its deposit", async () => {
+    page.config = { status: "ready", config: onchainConfigFixture() };
+    page.requestOnchainTransfer.mockResolvedValue(true);
+    const { container } = await renderIntoDocument(
+      <OnchainTransferNewPage direction="receive" prefill={null} />,
+    );
+    await press(byTestId(container, "onchain-receive-show-address"));
+    expect(page.requestOnchainTransfer).toHaveBeenCalledWith(
+      { direction: "receive", amount: null, payoutAddress: "" },
+      onchainConfigFixture(),
+    );
+
+    document.body.innerHTML = "";
+    const open = onchainTransferViewFixture({
+      direction: "receive",
+      anyAmount: true,
+      phase: "awaitingDeposit",
+      depositAddress: REGTEST_ADDRESS,
+    });
+    page.transfers = [open];
+    page.requestOnchainTransfer.mockClear();
+    const again = await renderIntoDocument(
+      <OnchainTransferNewPage direction="receive" prefill={null} />,
+    );
+    await press(byTestId(again.container, "onchain-receive-show-address"));
+    expect(page.requestOnchainTransfer).not.toHaveBeenCalled();
+    expect(page.navigateTo).toHaveBeenCalledWith({
+      route: "onchainTransfer",
+      id: open.id,
+    });
   });
 });

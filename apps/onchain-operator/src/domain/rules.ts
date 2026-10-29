@@ -1,6 +1,8 @@
 import { decodePaymentRequest } from "@linky-fit/linkshu";
 import {
+  amountWithServiceFee,
   canOperatorMove,
+  depositTerms,
   isOfferedAmount,
   paysAddress,
   REQUIRED_CONFIRMATIONS,
@@ -17,6 +19,7 @@ import {
 import { Effect, Struct } from "effect";
 import type { OperatorProfile } from "./profile";
 import {
+  isAnyAmountReceive,
   isOpen,
   transferStatus,
   transferTerms,
@@ -37,9 +40,21 @@ export const isTransferEcash = (
 
 const sats = (amount: number) => `${amount} sat`;
 
+/** The fields of a request its denial is decided by. */
+type RequestTerms = Pick<
+  OnchainTransferRequest,
+  | "transferId"
+  | "direction"
+  | "amount"
+  | "feeBasisPoints"
+  | "payoutAddress"
+  | "refund"
+  | "paymentRequest"
+>;
+
 /** Why the user's payment request cannot be paid as the transfer's payout; `null` when it can. */
 const paymentRequestProblem = (
-  request: OnchainTransferRequest,
+  request: RequestTerms,
   paymentRequest: string,
   mintUrl: string,
 ): string | null => {
@@ -48,7 +63,12 @@ const paymentRequestProblem = (
   const requestId: string | null = decoded.id;
   if (requestId !== request.transferId)
     return "The payment request does not name this transfer.";
-  if (decoded.amount !== request.amount || (decoded.unit ?? "sat") !== "sat")
+  if ((decoded.unit ?? "sat") !== "sat")
+    return "The payment request must ask for sats.";
+  if (request.amount === undefined) {
+    if (decoded.amount !== null)
+      return "The payment request must leave the amount open.";
+  } else if (decoded.amount !== request.amount)
     return `The payment request must ask for ${sats(request.amount)}.`;
   if (
     !decoded.mints.some(
@@ -68,7 +88,7 @@ const paymentRequestProblem = (
  * when the operator decides by hand.
  */
 export const requestDenyReason = (args: {
-  readonly request: OnchainTransferRequest;
+  readonly request: RequestTerms;
   readonly profile: OperatorProfile | null;
   readonly network: BitcoinNetwork;
   readonly mintUrl: string;
@@ -76,10 +96,13 @@ export const requestDenyReason = (args: {
   const { request, profile, network } = args;
   if (profile === null) return "The operator does not take transfers yet.";
   if (profile.paused) return "Transfers are paused.";
-  if (!isOfferedAmount(profile, request.direction, request.amount))
-    return request.direction === "send"
-      ? `${sats(request.amount)} is not one of the offered amounts.`
-      : `The most you can receive is ${sats(profile.maxReceiveAmount)}.`;
+  const amount = request.amount ?? null;
+  if (!isOfferedAmount(profile, request.direction, amount))
+    return amount === null
+      ? "Receives of any amount are not offered."
+      : request.direction === "send"
+        ? `${sats(amount)} is not one of the offered amounts.`
+        : `The most you can receive is ${sats(profile.maxReceiveAmount)}.`;
   if (request.feeBasisPoints !== profile.feeBasisPoints)
     return `The fee is now ${profile.feeBasisPoints / 100} %; request the transfer again.`;
   if (
@@ -96,6 +119,35 @@ export const requestDenyReason = (args: {
     ? null
     : paymentRequestProblem(request, request.paymentRequest, args.mintUrl);
 };
+
+/**
+ * Why an accepted on-chain send would have been denied had sends still been
+ * decided by hand: they are accepted on arrival, because the user's Cashu is
+ * already on its way, so the operator refunds it instead. `null` for a send
+ * the operator can take and for every receive.
+ */
+export const transferConcern = (
+  transfer: OperatorTransfer,
+  args: {
+    readonly profile: OperatorProfile | null;
+    readonly network: BitcoinNetwork;
+    readonly mintUrl: string;
+  },
+): string | null =>
+  transfer.direction !== "send" || transferStatus(transfer) === null
+    ? null
+    : requestDenyReason({
+        ...args,
+        request: {
+          transferId: transfer.id,
+          direction: "send",
+          amount: transfer.amount,
+          feeBasisPoints: transfer.feeBasisPoints,
+          ...(transfer.payoutAddress === null
+            ? {}
+            : { payoutAddress: transfer.payoutAddress }),
+        },
+      });
 
 /** The BIP86 receive index of the next deposit address: one past the highest used, from 0. */
 export const nextAddressIndex = (
@@ -129,10 +181,12 @@ export const firstUnusedAddressIndex = (
     return null;
   });
 
-/** What a new update may set besides its status. */
+/** What a new update may set besides its status; `fee` and `sendAmount` only as a deposit sets them on a receive of any amount. */
 export type UpdateChanges = Partial<
   Pick<
     OnchainTransferUpdate,
+    | "fee"
+    | "sendAmount"
     | "depositAddress"
     | "paymentRequest"
     | "txid"
@@ -169,29 +223,44 @@ export const nextUpdate = (
     transferId: transfer.id,
     revision: (transfer.update?.revision ?? 0) + 1,
     status,
-    ...transferTerms(transfer),
+    ...Struct.omit(transferTerms(transfer), ["amount"]),
+    ...(changes.fee === undefined ? {} : { fee: changes.fee }),
+    ...(changes.sendAmount === undefined
+      ? {}
+      : { sendAmount: changes.sendAmount }),
   };
 };
 
-/** The deposit fields an update reports. */
+/** The deposit fields an update reports; `fee` and `sendAmount` once a deposit set the terms of a receive of any amount. */
 export interface DepositProgress {
   readonly status: "fundsSeen" | "fundsReceived";
   readonly txid: string;
   readonly confirmations: number;
   readonly receivedAmount: number;
+  readonly fee?: number;
+  readonly sendAmount?: number;
+}
+
+/** The limits of a receive of any amount, from the profile. */
+export interface ReceiveLimits {
+  readonly minReceiveAmount: number;
+  readonly maxReceiveAmount: number;
 }
 
 /**
  * What the deposit watcher reports for an on-chain receive: `fundsSeen`
  * whenever the deposit changed, `fundsReceived` once at least the amount plus
  * the fee has the required confirmations; a short deposit stays `fundsSeen`
- * for the operator to refund. Confirmations count up to the required ones
- * only, so a confirmed short deposit is not reported again every block;
- * `null` while nothing new is there to report.
+ * for the operator to refund. On a receive of any amount the deposit sets the
+ * terms (`depositTerms` under `limits`), which the progress carries, and the
+ * minimum with its fee is what it must reach. Confirmations count up to the
+ * required ones only, so a confirmed short deposit is not reported again every
+ * block; `null` while nothing new is there to report.
  */
 export const depositProgress = (
   transfer: OperatorTransfer,
   deposit: DepositStatus,
+  limits: ReceiveLimits | null = null,
 ): DepositProgress | null => {
   const current = transferStatus(transfer);
   const [txid] = deposit.txids;
@@ -202,23 +271,41 @@ export const depositProgress = (
     deposit.receivedSat === 0
   )
     return null;
+  const anyAmount = isAnyAmountReceive(transfer);
+  if (anyAmount && limits === null) return null;
+  const terms =
+    anyAmount && limits !== null
+      ? depositTerms({
+          received: deposit.receivedSat,
+          feeBasisPoints: transfer.feeBasisPoints,
+          ...limits,
+        })
+      : null;
+  const needed =
+    anyAmount && limits !== null
+      ? amountWithServiceFee(limits.minReceiveAmount, transfer.feeBasisPoints)
+      : transferTerms(transfer).sendAmount;
   const confirmations = Math.min(deposit.confirmations, REQUIRED_CONFIRMATIONS);
   const progress: DepositProgress = {
     status:
-      confirmations === REQUIRED_CONFIRMATIONS &&
-      deposit.receivedSat >= transferTerms(transfer).sendAmount
+      confirmations === REQUIRED_CONFIRMATIONS && deposit.receivedSat >= needed
         ? "fundsReceived"
         : "fundsSeen",
     txid,
     confirmations,
     receivedAmount: deposit.receivedSat,
+    ...(terms === null ? {} : { fee: terms.fee, sendAmount: terms.sendAmount }),
   };
+  const update = transfer.update;
   const unchanged =
     current === "fundsSeen" &&
+    update !== null &&
     progress.status === "fundsSeen" &&
-    transfer.update?.txid === progress.txid &&
-    transfer.update.confirmations === progress.confirmations &&
-    transfer.update.receivedAmount === progress.receivedAmount;
+    update.txid === progress.txid &&
+    update.confirmations === progress.confirmations &&
+    update.receivedAmount === progress.receivedAmount &&
+    (terms === null ||
+      (update.fee === terms.fee && update.sendAmount === terms.sendAmount));
   return unchanged ? null : progress;
 };
 

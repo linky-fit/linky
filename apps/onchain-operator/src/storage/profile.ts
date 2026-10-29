@@ -8,6 +8,7 @@ import {
 import {
   ClientVersion,
   DEFAULT_MAX_RECEIVE_AMOUNT,
+  DEFAULT_MIN_RECEIVE_AMOUNT,
 } from "@linky-fit/onchain-transfer";
 import { Effect, Option, Schema } from "effect";
 import { DEFAULT_OPERATOR_NAME, type OperatorProfile } from "../domain/profile";
@@ -47,6 +48,10 @@ const ProfileJson = Schema.fromJsonString(
     maxReceiveAmount: Schema.optionalKey(
       Schema.Int.check(Schema.isGreaterThan(0)),
     ),
+    // Absent in profiles saved before on-chain receives of any amount.
+    minReceiveAmount: Schema.optionalKey(
+      Schema.Int.check(Schema.isGreaterThan(0)),
+    ),
     // Absent in profiles saved before the minimum, and while there is none.
     minClientVersion: Schema.optionalKey(ClientVersion),
   }),
@@ -72,6 +77,8 @@ export const readProfile = (
             name: stored.name ?? DEFAULT_OPERATOR_NAME,
             maxReceiveAmount:
               stored.maxReceiveAmount ?? DEFAULT_MAX_RECEIVE_AMOUNT,
+            minReceiveAmount:
+              stored.minReceiveAmount ?? DEFAULT_MIN_RECEIVE_AMOUNT,
             minClientVersion: stored.minClientVersion ?? null,
             description: description?.value ?? "",
             watchers: Option.getOrElse(
@@ -120,6 +127,7 @@ export const saveProfile = (
             paused: profile.paused,
             amounts: profile.amounts,
             maxReceiveAmount: profile.maxReceiveAmount,
+            minReceiveAmount: profile.minReceiveAmount,
             ...(profile.minClientVersion === null
               ? {}
               : { minClientVersion: profile.minClientVersion }),

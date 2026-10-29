@@ -29,12 +29,13 @@ export type OnchainTransferRefund = typeof OnchainTransferRefund.Type;
 
 const hasDirectionFields = (request: {
   readonly direction: OnchainTransferDirection;
+  readonly amount?: number;
   readonly payoutAddress?: string;
   readonly refund?: OnchainTransferRefund;
   readonly paymentRequest?: string;
 }): boolean =>
   request.direction === "send"
-    ? request.payoutAddress !== undefined
+    ? request.amount !== undefined && request.payoutAddress !== undefined
     : request.refund !== undefined && request.paymentRequest !== undefined;
 
 /** User to operator: asks for a transfer at the fee the user saw. */
@@ -43,8 +44,12 @@ export const OnchainTransferRequest = Schema.Struct({
   type: Schema.Literal("request"),
   transferId: OnchainTransferIdString,
   direction: OnchainTransferDirection,
-  /** Sats the user gets; they send it plus the fee. */
-  amount: PositiveInt,
+  /**
+   * Sats the user gets; they send it plus the fee. Absent only on an on-chain
+   * receive of any amount, whose deposit sets it (`depositTerms`); its
+   * `paymentRequest` names no amount either.
+   */
+  amount: Schema.optionalKey(PositiveInt),
   feeBasisPoints: BasisPoints,
   /** send: where the operator pays. */
   payoutAddress: Schema.optionalKey(BitcoinAddressText),
@@ -54,7 +59,8 @@ export const OnchainTransferRequest = Schema.Struct({
   paymentRequest: Schema.optionalKey(PaymentRequestText),
 }).check(
   Schema.makeFilter(hasDirectionFields, {
-    expected: "payoutAddress for send, refund and paymentRequest for receive",
+    expected:
+      "amount and payoutAddress for send, refund and paymentRequest for receive",
   }),
 );
 export type OnchainTransferRequest = typeof OnchainTransferRequest.Type;
@@ -75,9 +81,9 @@ export const OnchainTransferUpdate = Schema.Struct({
   /** Strictly increasing per transfer; the highest one received wins. */
   revision: PositiveInt,
   status: OperatorTransferStatus,
-  /** Locked when the operator accepted. */
+  /** Locked when the operator accepted; on a receive of any amount the minimum's until the deposit sets them. */
   fee: NonNegativeInt,
-  /** The amount plus the fee: what the user sends. */
+  /** The amount plus the fee: what the user sends. `sendAmount - fee` is what the user gets. */
   sendAmount: PositiveInt,
   /** receive, from `accepted` on. */
   depositAddress: Schema.optionalKey(BitcoinAddressText),

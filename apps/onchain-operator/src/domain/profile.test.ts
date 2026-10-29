@@ -77,11 +77,29 @@ describe("parseProfileForm", () => {
         paused: false,
         description: "Hi",
         amounts: [100_000, 250_000, 500_000, 1_000_000],
-        maxReceiveAmount: 1_000_000,
+        maxReceiveAmount: 2_000_000,
+        minReceiveAmount: 100_000,
         minClientVersion: null,
         watchers: [],
       }),
     );
+  });
+
+  it("keeps the smallest receive at most the largest", () => {
+    expect(
+      parseProfileForm(
+        { ...form, minReceiveAmount: "300000", maxReceiveAmount: "300000" },
+        "regtest",
+      ),
+    ).toMatchObject(
+      Result.succeed({ minReceiveAmount: 300_000, maxReceiveAmount: 300_000 }),
+    );
+    expect(
+      parseProfileForm(
+        { ...form, minReceiveAmount: "300001", maxReceiveAmount: "300000" },
+        "regtest",
+      ),
+    ).toEqual(Result.fail({ minReceiveAmount: "invalid" }));
   });
 
   it("names every invalid field", () => {
@@ -95,6 +113,7 @@ describe("parseProfileForm", () => {
           description: "a".repeat(1001),
           amounts: "",
           maxReceiveAmount: "0",
+          minReceiveAmount: "x",
           minClientVersion: "26.10",
           watchers: "npub1nope",
         },
@@ -108,6 +127,7 @@ describe("parseProfileForm", () => {
         description: "invalid",
         amounts: "invalid",
         maxReceiveAmount: "invalid",
+        minReceiveAmount: "invalid",
         minClientVersion: "invalid",
         watchers: "invalid",
       }),
@@ -140,7 +160,8 @@ describe("parseProfileForm", () => {
       paused: false,
       description: "Hi",
       amounts: [100_000, 250_000, 500_000, 1_000_000],
-      maxReceiveAmount: 1_000_000,
+      maxReceiveAmount: 2_000_000,
+      minReceiveAmount: 100_000,
       mintUrl: "https://cashu.cz",
       network: "regtest",
       explorerUrl: "http://localhost:3003",

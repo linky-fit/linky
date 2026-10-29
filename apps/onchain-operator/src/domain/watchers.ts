@@ -38,7 +38,7 @@ export const parseWatchers = (text: string): readonly Pubkey[] | null => {
 };
 
 const transferLabel = (transfer: OperatorTransfer): string =>
-  `${transfer.direction === "send" ? "on-chain send" : "on-chain receive"} of ${formatSats(transfer.amount)}`;
+  `${transfer.direction === "send" ? "on-chain send" : "on-chain receive"} of ${formatSats(transferTerms(transfer).amount)}`;
 
 const quote = (text: string): string => {
   const trimmed = text.trim();
@@ -53,7 +53,7 @@ export const watcherAlertText = (alert: WatcherAlert, name: string): string => {
     case "requested":
       return `On-chain operator: ${name} requests an ${transferLabel(alert.transfer)}. Accept or deny it in the operator console.`;
     case "payoutDue":
-      return `On-chain operator: ${name}'s Cashu arrived for an ${transferLabel(alert.transfer)}. Pay ${formatSats(alert.transfer.amount)} to their payout address.`;
+      return `On-chain operator: ${name}'s Cashu arrived for an ${transferLabel(alert.transfer)}. Pay ${formatSats(transferTerms(alert.transfer).amount)} to their payout address.`;
     case "ecashDue":
       return alert.receivedAmount < transferTerms(alert.transfer).sendAmount
         ? `On-chain operator: the deposit for ${name}'s ${transferLabel(alert.transfer)} is confirmed but short (${formatSats(alert.receivedAmount)}). Settle it in the chat.`

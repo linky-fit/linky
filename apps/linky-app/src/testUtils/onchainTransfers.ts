@@ -1,6 +1,7 @@
 import { createId, type OnchainTransferId } from "@linky-fit/linksync";
 import {
   DEFAULT_MAX_RECEIVE_AMOUNT,
+  DEFAULT_MIN_RECEIVE_AMOUNT,
   DEFAULT_TRANSFER_AMOUNTS,
   type OnchainConfig,
   type OnchainTransferUpdate,
@@ -29,20 +30,31 @@ export const EUR_DISPLAY: {
   },
 };
 
+/** The config of an operator at 1 % on regtest; `minReceiveAmount: undefined` is one taking no receive of any amount. */
 export const onchainConfigFixture = (
-  overrides: Partial<OnchainConfig> = {},
-): OnchainConfig => ({
-  v: 1,
-  feeBasisPoints: 100,
-  paused: false,
-  description: "Transfers by hand.",
-  amounts: DEFAULT_TRANSFER_AMOUNTS,
-  maxReceiveAmount: DEFAULT_MAX_RECEIVE_AMOUNT,
-  mintUrl: "https://mint.example",
-  network: "regtest",
-  explorerUrl: "https://explorer.example",
-  ...overrides,
-});
+  overrides: Partial<Omit<OnchainConfig, "minReceiveAmount">> & {
+    readonly minReceiveAmount?: number | undefined;
+  } = {},
+): OnchainConfig => {
+  const { minReceiveAmount, ...rest } = overrides;
+  const min =
+    "minReceiveAmount" in overrides
+      ? minReceiveAmount
+      : DEFAULT_MIN_RECEIVE_AMOUNT;
+  return {
+    v: 1,
+    feeBasisPoints: 100,
+    paused: false,
+    description: "Transfers by hand.",
+    amounts: DEFAULT_TRANSFER_AMOUNTS,
+    maxReceiveAmount: DEFAULT_MAX_RECEIVE_AMOUNT,
+    ...(min === undefined ? {} : { minReceiveAmount: min }),
+    mintUrl: "https://mint.example",
+    network: "regtest",
+    explorerUrl: "https://explorer.example",
+    ...rest,
+  };
+};
 
 export const onchainTransferUpdateFixture = (
   transferId: OnchainTransferId,
@@ -70,9 +82,8 @@ export const onchainTransferViewFixture = (
   phase: "waitingForDetails",
   update: null,
   payoutAddress: REGTEST_ADDRESS,
-  refundAddress: null,
-  refundToSender: false,
   depositAddress: null,
   operatorPaymentRequest: null,
+  anyAmount: false,
   ...overrides,
 });

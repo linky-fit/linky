@@ -24,8 +24,10 @@ import {
   ecashRefundAmount,
   receivedMismatch,
   sharedDepositAddresses,
+  transferConcern,
 } from "../domain/rules";
 import {
+  isAnyAmountReceive,
   transferStatus,
   transferTerms,
   type OperatorTransfer,
@@ -34,7 +36,7 @@ import { encodeNpub } from "@linky-fit/linkstr";
 import { formatDateTime, formatSats } from "../format";
 import { navigateTo } from "../platform/hashRoute";
 import { chatRoute, sectionRoute } from "../routing";
-import { useAppServices, useTransfers } from "../services/react";
+import { useAppServices, useProfile, useTransfers } from "../services/react";
 import type { TransferActionFailure } from "../services/transfers";
 import { Page, WithTopBar } from "./Page";
 import { TransferField } from "./TransferField";
@@ -118,9 +120,13 @@ function TransferDetail({
   readonly sharedAddress: boolean;
 }) {
   const { config } = useAppServices();
+  const profile = useProfile() ?? null;
   const action = useAction();
-  const { fee, sendAmount } = transferTerms(transfer);
+  const { amount, fee, sendAmount } = transferTerms(transfer);
   const update = transfer.update;
+  // Before the deposit, a receive of any amount holds the minimum's terms, not what the user gets.
+  const depositPending =
+    isAnyAmountReceive(transfer) && update?.receivedAmount === undefined;
   const txUrl = (txid: string) => explorerTxUrl(config.explorerUrl, txid);
   return (
     <Stack gap="$lg">
@@ -139,7 +145,14 @@ function TransferDetail({
         />
         <TransferField
           label={copy.transfer.receive}
-          value={formatSats(transfer.amount)}
+          value={
+            depositPending && profile !== null
+              ? copy.transfer.anyAmount(
+                  formatSats(profile.minReceiveAmount),
+                  formatSats(profile.maxReceiveAmount),
+                )
+              : formatSats(amount)
+          }
         />
         <TransferField
           label={copy.transfer.requestedAt}
@@ -225,7 +238,11 @@ function TransferDetail({
           <TransferField label={copy.transfer.reason} value={update.reason} />
         )}
       </Card>
-      <Warnings transfer={transfer} sharedAddress={sharedAddress} />
+      <Warnings
+        transfer={transfer}
+        sharedAddress={sharedAddress}
+        concern={transferConcern(transfer, { ...config, profile })}
+      />
       <Steps transfer={transfer} action={action} />
       {action.error === null ? null : (
         <Notice tone="danger" icon="CircleAlert" title={action.error} />
@@ -237,16 +254,44 @@ function TransferDetail({
 function Warnings({
   transfer,
   sharedAddress,
+  concern,
 }: {
   readonly transfer: OperatorTransfer;
   readonly sharedAddress: boolean;
+  /** Why the send would have been denied; sends are accepted on arrival and refunded instead. */
+  readonly concern: string | null;
 }) {
+  const { transfers } = useAppServices();
   const mismatch = receivedMismatch(transfer);
   const received = formatSats(transfer.update?.receivedAmount ?? 0);
   const sendAmount = formatSats(transferTerms(transfer).sendAmount);
   const status = transferStatus(transfer);
+  const earlyEcash =
+    transfer.direction === "send" && status === "accepted"
+      ? transfers.earlyEcash(transfer.id)
+      : null;
   return (
     <>
+      {concern === null ? null : (
+        <Notice
+          tone="warning"
+          icon="TriangleAlert"
+          title={copy.transfer.concern(
+            concern,
+            status === "fundsReceived" || status === "refunded",
+          )}
+        />
+      )}
+      {earlyEcash === null ? null : (
+        <Notice
+          tone="info"
+          icon="Coins"
+          title={copy.transfer.earlyEcashShort(
+            formatSats(earlyEcash),
+            sendAmount,
+          )}
+        />
+      )}
       {sharedAddress ? (
         <Notice
           tone="danger"
@@ -351,11 +396,16 @@ function Steps({
       <Card key="payout" gap="$md" outlined>
         <Text variant="title">{copy.transfer.payoutTitle}</Text>
         <Text color="$colorMuted">
-          {copy.transfer.payoutDescription(formatSats(transfer.amount))}
+          {copy.transfer.payoutDescription(
+            formatSats(transferTerms(transfer).amount),
+          )}
         </Text>
         <Stack alignItems="center">
           <QRCode
-            value={bitcoinPaymentUri(transfer.payoutAddress, transfer.amount)}
+            value={bitcoinPaymentUri(
+              transfer.payoutAddress,
+              transferTerms(transfer).amount,
+            )}
             accessibilityLabel={copy.transfer.payoutQr}
           />
         </Stack>
@@ -425,7 +475,7 @@ function Steps({
             void action.run("sendEcash", () => transfers.sendEcash(transfer.id))
           }
         >
-          {copy.transfer.sendEcash(formatSats(transfer.amount))}
+          {copy.transfer.sendEcash(formatSats(transferTerms(transfer).amount))}
         </Button>
         <Text variant="caption" color="$colorMuted">
           {copy.transfer.sendEcashHint}

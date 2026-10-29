@@ -214,6 +214,19 @@ function ProfileEditor({
         }
       />
       <TextField
+        label={copy.settings.minReceiveAmount}
+        hint={copy.settings.minReceiveAmountHint}
+        value={form.minReceiveAmount}
+        inputMode="numeric"
+        trailing="sat"
+        onChangeText={(minReceiveAmount) => edit({ minReceiveAmount })}
+        error={
+          errors.minReceiveAmount === undefined
+            ? undefined
+            : copy.settings.minReceiveAmountInvalid
+        }
+      />
+      <TextField
         label={copy.settings.minClientVersion}
         hint={copy.settings.minClientVersionHint}
         value={form.minClientVersion}

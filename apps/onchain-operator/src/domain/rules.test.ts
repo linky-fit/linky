@@ -28,6 +28,7 @@ import {
   refundPaid,
   requestDenyReason,
   sharedDepositAddresses,
+  transferConcern,
 } from "./rules";
 import type { OperatorTransfer } from "./transfer";
 
@@ -45,18 +46,19 @@ const profile: OperatorProfile = {
   description: "",
   amounts: [100_000, 250_000],
   maxReceiveAmount: 300_000,
+  minReceiveAmount: 100_000,
   minClientVersion: null,
   watchers: [],
   picture: null,
 };
 
 const userRequest = (args: {
-  readonly amount?: number;
+  readonly amount?: number | null;
   readonly id?: string;
   readonly mints?: readonly string[];
 }) =>
   encodeNostrPaymentRequest({
-    amount: args.amount ?? 100_000,
+    amount: args.amount === undefined ? 100_000 : args.amount,
     mintUrls: args.mints ?? [mint],
     recipientNprofile: encodeNprofile(user, []),
     requestId: PaymentRequestId.make(args.id ?? transferId),
@@ -133,6 +135,33 @@ describe("requestDenyReason", () => {
     );
   });
 
+  it("takes an on-chain receive of any amount only under a smallest receive, with an open payment request", () => {
+    const anyAmount: OnchainTransferRequest = {
+      v: 1,
+      type: "request",
+      transferId,
+      direction: "receive",
+      feeBasisPoints: 100,
+      refund: { to: "sender" },
+      paymentRequest: userRequest({ amount: null }),
+    };
+    expect(denyReason(anyAmount, { minReceiveAmount: 50_000 })).toBeNull();
+    expect(
+      denyReason(
+        { ...anyAmount, paymentRequest: userRequest({}) },
+        {
+          minReceiveAmount: 50_000,
+        },
+      ),
+    ).toMatch(/leave the amount open/u);
+    expect(
+      denyReason(
+        { ...anyAmount, amount: 100_000 },
+        { minReceiveAmount: 50_000 },
+      ),
+    ).toMatch(/must ask for 100000 sat/u);
+  });
+
   it("denies addresses of another network", () => {
     const mainnet = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
     expect(denyReason({ ...send, payoutAddress: mainnet })).toMatch(
@@ -198,6 +227,42 @@ const updateOf = (
   fee: 1_000,
   sendAmount: 101_000,
   ...overrides,
+});
+
+describe("transferConcern", () => {
+  const args = { profile, network: "regtest" as const, mintUrl: mint };
+  const acceptedSend = (overrides: Partial<OperatorTransfer> = {}) =>
+    transferOf({
+      direction: "send",
+      payoutAddress,
+      refund: null,
+      depositAddress: null,
+      update: updateOf({ status: "accepted" }),
+      ...overrides,
+    });
+
+  it("names why an accepted send would have been denied, for the operator to refund it", () => {
+    expect(transferConcern(acceptedSend(), args)).toBeNull();
+    expect(transferConcern(acceptedSend({ amount: 123_456 }), args)).toMatch(
+      /not one of the offered amounts/u,
+    );
+    expect(
+      transferConcern(acceptedSend(), {
+        ...args,
+        profile: { ...profile, paused: true },
+      }),
+    ).toMatch(/paused/u);
+    expect(transferConcern(acceptedSend({ feeBasisPoints: 50 }), args)).toMatch(
+      /fee is now 1 %/u,
+    );
+  });
+
+  it("concerns no receive and no send still waiting", () => {
+    expect(transferConcern(transferOf({ amount: 123_456 }), args)).toBeNull();
+    expect(
+      transferConcern(acceptedSend({ amount: 123_456, update: null }), args),
+    ).toBeNull();
+  });
 });
 
 describe("nextAddressIndex", () => {
@@ -306,6 +371,21 @@ describe("nextUpdate", () => {
     expect(next).not.toHaveProperty("reason");
   });
 
+  it("takes the terms a deposit set over the locked ones", () => {
+    const transfer = transferOf({ update: updateOf({ status: "accepted" }) });
+    expect(
+      nextUpdate(transfer, "fundsSeen", {
+        receivedAmount: 150_000,
+        fee: 1_486,
+        sendAmount: 150_000,
+      }),
+    ).toMatchObject({ fee: 1_486, sendAmount: 150_000 });
+    expect(nextUpdate(transfer, "fundsSeen", {})).toMatchObject({
+      fee: 1_000,
+      sendAmount: 101_000,
+    });
+  });
+
   it("refuses a move the status rules forbid", () => {
     expect(nextUpdate(transferOf(), "completed")).toBeNull();
     expect(
@@ -408,6 +488,58 @@ describe("depositProgress", () => {
     ).toBe(false);
   });
 
+  describe("of an on-chain receive of any amount", () => {
+    const limits = { minReceiveAmount: 100_000, maxReceiveAmount: 300_000 };
+    const anyAmount = transferOf({
+      userPaymentRequest: userRequest({ amount: null }),
+      update: updateOf({ status: "accepted" }),
+    });
+
+    it("prices the deposit and needs the smallest receive with its fee", () => {
+      expect(depositProgress(anyAmount, deposit(2, 150_000), limits)).toEqual({
+        status: "fundsReceived",
+        txid: "cd".repeat(32),
+        confirmations: 2,
+        receivedAmount: 150_000,
+        fee: 1_486,
+        sendAmount: 150_000,
+      });
+      expect(
+        depositProgress(anyAmount, deposit(2, 400_000), limits),
+      ).toMatchObject({
+        status: "fundsReceived",
+        fee: 3_000,
+        sendAmount: 303_000,
+      });
+      expect(depositProgress(anyAmount, deposit(2, 100_999), limits)).toEqual({
+        status: "fundsSeen",
+        txid: "cd".repeat(32),
+        confirmations: 2,
+        receivedAmount: 100_999,
+      });
+    });
+
+    it("repeats the deposit when its terms changed, and reports nothing without the limits", () => {
+      const seen = transferOf({
+        ...anyAmount,
+        update: updateOf({
+          status: "fundsSeen",
+          txid: "cd".repeat(32),
+          confirmations: 1,
+          receivedAmount: 150_000,
+          fee: 1_486,
+          sendAmount: 150_000,
+        }),
+      });
+      expect(depositProgress(seen, deposit(1, 150_000), limits)).toBeNull();
+      expect(depositProgress(seen, deposit(1, 160_000), limits)).toMatchObject({
+        receivedAmount: 160_000,
+        sendAmount: 160_000,
+      });
+      expect(depositProgress(anyAmount, deposit(2, 150_000))).toBeNull();
+    });
+  });
+
   it("ignores on-chain sends and transfers past the deposit", () => {
     expect(
       depositProgress(
@@ -432,6 +564,22 @@ describe("receivedMismatch", () => {
     expect(received(100_000)).toBe("short");
     expect(received(101_000)).toBe("exact");
     expect(received(101_001)).toBe("extra");
+  });
+
+  it("compares a deposit of any amount with the terms it set", () => {
+    const priced = (receivedAmount: number, sendAmount: number) =>
+      receivedMismatch(
+        transferOf({
+          update: updateOf({
+            status: "fundsReceived",
+            receivedAmount,
+            fee: sendAmount - 148_514,
+            sendAmount,
+          }),
+        }),
+      );
+    expect(priced(150_000, 150_000)).toBe("exact");
+    expect(priced(400_000, 303_000)).toBe("extra");
   });
   const terminalStatuses: readonly OnchainTransferUpdate["status"][] = [
     "refunded",

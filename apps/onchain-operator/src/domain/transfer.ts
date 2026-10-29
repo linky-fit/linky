@@ -1,5 +1,5 @@
 import type { OnchainTransferId } from "@linky-fit/domain";
-import type { OperationId } from "@linky-fit/linkshu";
+import { decodePaymentRequest, type OperationId } from "@linky-fit/linkshu";
 import type { Pubkey } from "@linky-fit/linkstr";
 import {
   isTerminalStatus,
@@ -50,19 +50,41 @@ export const isOpen = (transfer: OperatorTransfer): boolean => {
   return status === null || !isTerminalStatus(status);
 };
 
-/** The fee and what the user sends: locked by the first update, from the requested fee before. */
-export const transferTerms = (
-  transfer: OperatorTransfer,
-): { readonly fee: number; readonly sendAmount: number } =>
+/** The terms of a transfer: what the user gets, the fee and what they send. */
+export interface TransferTerms {
+  /** Sats the user gets. */
+  readonly amount: number;
+  readonly fee: number;
+  /** The amount plus the fee. */
+  readonly sendAmount: number;
+}
+
+/**
+ * The terms: from the requested fee before the first update, locked by it
+ * after, and on a receive of any amount set by the deposit from `fundsSeen`
+ * on (`sendAmount - fee` is what the user gets).
+ */
+export const transferTerms = (transfer: OperatorTransfer): TransferTerms =>
   transfer.update === null
     ? {
+        amount: transfer.amount,
         fee: serviceFee(transfer.amount, transfer.feeBasisPoints),
         sendAmount: amountWithServiceFee(
           transfer.amount,
           transfer.feeBasisPoints,
         ),
       }
-    : { fee: transfer.update.fee, sendAmount: transfer.update.sendAmount };
+    : {
+        amount: transfer.update.sendAmount - transfer.update.fee,
+        fee: transfer.update.fee,
+        sendAmount: transfer.update.sendAmount,
+      };
+
+/** An on-chain receive whose user left the amount to the deposit: its payment request names none. */
+export const isAnyAmountReceive = (transfer: OperatorTransfer): boolean =>
+  transfer.direction === "receive" &&
+  transfer.userPaymentRequest !== null &&
+  decodePaymentRequest(transfer.userPaymentRequest)?.amount === null;
 
 /** Open transfers first, the oldest on top since it waits longest; then the rest, newest first. */
 export const sortTransfers = (

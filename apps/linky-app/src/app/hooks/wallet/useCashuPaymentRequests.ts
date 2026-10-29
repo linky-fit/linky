@@ -471,12 +471,12 @@ export const useCashuPaymentRequests = ({
     [startPayment],
   );
 
-  /** The operator's request of an on-chain transfer; always reviewed, so the user sees the whole debit, fees included, before it moves. */
+  /** The operator's payment for an on-chain send; the send screen showed the whole debit, so the tap there is the approval. */
   const payOnchainTransferPaymentRequest = React.useCallback(
     (
       request: CashuPaymentRequestMessageInfo,
       options: OnchainTransferPaymentOptions,
-    ) => startPayment(request, null, "review", options),
+    ) => startPayment(request, null, "tap", options),
     [startPayment],
   );
 

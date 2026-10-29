@@ -72,16 +72,7 @@ describe("parseRouteFromHash", () => {
     });
 
     replaceHash("#wallet/onchain/receive");
-    expect(parseRouteFromHash()).toEqual({
-      kind: "onchainReceive",
-      amount: null,
-    });
-
-    replaceHash("#wallet/onchain/receive?amount=150000");
-    expect(parseRouteFromHash()).toEqual({
-      kind: "onchainReceive",
-      amount: 150_000,
-    });
+    expect(parseRouteFromHash()).toEqual({ kind: "onchainReceive" });
 
     replaceHash(`#wallet/onchain/${id}`);
     expect(parseRouteFromHash()).toEqual({ kind: "onchainTransfer", id });

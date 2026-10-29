@@ -20,11 +20,11 @@ export type UnpayableQuote = Exclude<
 >;
 
 /**
- * How the user started a payment: a tap on a chat request's Pay is the
- * approval itself, a scan is held to the auto-pay limit over everything that
- * leaves the wallet, and a payment marked `review` is always reviewed.
+ * How the user started a payment: a tap on a request's Pay is the approval
+ * itself, a scan is held to the auto-pay limit over everything that leaves
+ * the wallet.
  */
-export type PaymentRequestApproval = "tap" | "scan" | "review";
+export type PaymentRequestApproval = "tap" | "scan";
 
 /** Whether the user reviews a request before it is paid. */
 export const needsPaymentRequestConfirmation = ({
@@ -39,7 +39,6 @@ export const needsPaymentRequestConfirmation = ({
   readonly recipientDiffers: boolean;
 }): boolean =>
   quote === null ||
-  approval === "review" ||
   recipientDiffers ||
   (quote._tag === "Lightning" && quote.addsMint) ||
   (approval === "scan" && quote.amount + quote.fee > autoPayLimit);

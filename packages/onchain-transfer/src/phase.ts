@@ -8,7 +8,10 @@ export type OnchainTransferPhase =
   | "readyToSend"
   | "sent"
   | "awaitingDeposit"
+  /** receive: the deposit is in the mempool. */
   | "depositSeen"
+  /** receive: the deposit has a confirmation, short of the required ones. */
+  | "depositConfirming"
   /** receive: less than the amount plus the fee arrived, so it cannot complete. */
   | "shortDeposit"
   | "waitingForEcash"
@@ -22,7 +25,7 @@ export interface OnchainTransferPhaseInput {
   /** The newest update from the operator, if any arrived. */
   readonly update: OnchainTransferUpdate | null;
   readonly userCancelledAtSec: number | null;
-  /** send: when the user paid the operator's request. */
+  /** send: when the user paid the operator, which they do right after requesting. */
   readonly sentAtSec: number | null;
   /** receive: the user's request has received its amount. */
   readonly requestPaid: boolean;
@@ -40,7 +43,7 @@ const sendPhase = (
 ): OnchainTransferPhase => {
   switch (status) {
     case null:
-      return "waitingForDetails";
+      return sent ? "sent" : "waitingForDetails";
     case "accepted":
       return sent ? "sent" : "readyToSend";
     case "fundsSeen":
@@ -70,7 +73,9 @@ const receivePhase = (
     case "accepted":
       return "awaitingDeposit";
     case "fundsSeen":
-      return "depositSeen";
+      return (update?.confirmations ?? 0) > 0
+        ? "depositConfirming"
+        : "depositSeen";
     // The operator's `completed` alone credits nothing: only the receives naming the request complete it.
     case "fundsReceived":
     case "completed":

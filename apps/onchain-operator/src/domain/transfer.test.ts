@@ -3,6 +3,12 @@ import { makeIdentity } from "@linky-fit/linkstr/testing";
 import type { OperatorTransferStatus } from "@linky-fit/onchain-transfer";
 import { describe, expect, it } from "vitest";
 import {
+  encodeNostrPaymentRequest,
+  PaymentRequestId,
+} from "@linky-fit/linkshu";
+import { encodeNprofile } from "@linky-fit/linkstr";
+import {
+  isAnyAmountReceive,
   sortTransfers,
   transferTerms,
   type OperatorTransfer,
@@ -58,12 +64,54 @@ describe("sortTransfers", () => {
 describe("transferTerms", () => {
   it("takes the requested fee until an update locked it", () => {
     expect(transferTerms(transferOf(1, null))).toEqual({
+      amount: 100_000,
       fee: 2_500,
       sendAmount: 102_500,
     });
     expect(transferTerms(transferOf(1, "accepted"))).toEqual({
+      amount: 100_000,
       fee: 1_000,
       sendAmount: 101_000,
     });
+  });
+
+  it("reads what the user gets from the update, as a deposit may have set it", () => {
+    const transfer = transferOf(1, "fundsSeen");
+    expect(
+      transferTerms({
+        ...transfer,
+        update:
+          transfer.update === null
+            ? null
+            : { ...transfer.update, fee: 1_486, sendAmount: 150_000 },
+      }),
+    ).toEqual({ amount: 148_514, fee: 1_486, sendAmount: 150_000 });
+  });
+});
+
+describe("isAnyAmountReceive", () => {
+  const request = (amount: number | null) =>
+    encodeNostrPaymentRequest({
+      amount,
+      mintUrls: ["http://localhost:3338"],
+      recipientNprofile: encodeNprofile(makeIdentity().pubkey, []),
+      requestId: PaymentRequestId.make("req"),
+    });
+
+  it("is a receive whose payment request leaves the amount open", () => {
+    const receive = { ...transferOf(1, null), direction: "receive" as const };
+    expect(
+      isAnyAmountReceive({ ...receive, userPaymentRequest: request(null) }),
+    ).toBe(true);
+    expect(
+      isAnyAmountReceive({ ...receive, userPaymentRequest: request(100_000) }),
+    ).toBe(false);
+    expect(isAnyAmountReceive(receive)).toBe(false);
+    expect(
+      isAnyAmountReceive({
+        ...transferOf(1, null),
+        userPaymentRequest: request(null),
+      }),
+    ).toBe(false);
   });
 });

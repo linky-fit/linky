@@ -19,6 +19,7 @@ import type {
   OnchainTransfersRepository,
 } from "@linky-fit/linksync";
 import {
+  DEFAULT_MIN_RECEIVE_AMOUNT,
   depositStatus,
   deriveDepositAddress,
   isTerminalStatus,
@@ -51,6 +52,7 @@ import {
   type UpdateChanges,
 } from "../domain/rules";
 import {
+  isAnyAmountReceive,
   transferStatus,
   transferTerms,
   type OperatorTransfer,
@@ -93,6 +95,54 @@ export type TransferActionFailure =
 
 type ActionResult = Promise<TransferActionFailure | null>;
 
+/**
+ * Sats of transfer-mint ecash that named an on-chain send before the operator
+ * had accepted it (Linky pays right after requesting, so the Cashu may even
+ * beat the request). Kept on the device that received it until the send is
+ * accepted and the funds reported.
+ */
+export interface EarlyEcashStore {
+  readonly get: (id: OnchainTransferId) => number | null;
+  readonly set: (id: OnchainTransferId, sats: number) => void;
+  readonly remove: (id: OnchainTransferId) => void;
+}
+
+/** An `EarlyEcashStore` over a key-value store, as one JSON map under `key`. */
+export const makeEarlyEcashStore = (
+  kv: {
+    readonly getItem: (key: string) => string | null;
+    readonly setItem: (key: string, value: string) => void;
+  },
+  key = "onchain-operator.earlyEcash",
+): EarlyEcashStore => {
+  const read = (): Record<string, number> => {
+    try {
+      const parsed: unknown = JSON.parse(kv.getItem(key) ?? "{}");
+      return typeof parsed === "object" && parsed !== null
+        ? Object.fromEntries(
+            Object.entries(parsed).filter(
+              (entry): entry is [string, number] =>
+                typeof entry[1] === "number",
+            ),
+          )
+        : {};
+    } catch {
+      return {};
+    }
+  };
+  const write = (map: Record<string, number>) =>
+    kv.setItem(key, JSON.stringify(map));
+  return {
+    get: (id) => read()[id] ?? null,
+    set: (id, sats) => write({ ...read(), [id]: sats }),
+    remove: (id) => {
+      const map = read();
+      delete map[id];
+      write(map);
+    },
+  };
+};
+
 /** The on-chain operator's side of every on-chain transfer. */
 export interface Transfers {
   /** Accepts a request: a payment request for an on-chain send, a fresh deposit address for an on-chain receive. */
@@ -115,6 +165,8 @@ export interface Transfers {
   readonly takeBackEcash: (id: OnchainTransferId) => ActionResult;
   /** Reports what arrived at every watched deposit address. */
   readonly checkDeposits: () => Promise<void>;
+  /** Sats that arrived for the send on this device before it was accepted, short of what it needs; `null` when none wait. */
+  readonly earlyEcash: (id: OnchainTransferId) => number | null;
 }
 
 const UPDATE_REF = "transfer-update:";
@@ -161,6 +213,7 @@ export const createTransfers = ({
   config,
   loadProfile,
   alertWatchers,
+  earlyEcash,
   whenHydrated,
 }: {
   readonly transfers: OnchainTransfersRepository;
@@ -175,6 +228,7 @@ export const createTransfers = ({
   };
   readonly loadProfile: () => Promise<OperatorProfile | null>;
   readonly alertWatchers: AlertWatchers;
+  readonly earlyEcash: EarlyEcashStore;
   /** Resolves once background writes may run. */
   readonly whenHydrated: () => Promise<void>;
 }): Transfers => {
@@ -216,25 +270,112 @@ export const createTransfers = ({
     changes: UpdateChanges = {},
   ): ActionResult => serially(() => moveNow(id, status, changes));
 
+  /** Reports the ecash that arrived for the send before it was accepted, once it covers the amount plus the fee. */
+  const settleEarlyEcash = async (id: OnchainTransferId) => {
+    const sats = earlyEcash.get(id);
+    const transfer = await load(id);
+    if (
+      sats === null ||
+      transfer?.direction !== "send" ||
+      transferStatus(transfer) !== "accepted" ||
+      sats < transferTerms(transfer).sendAmount
+    )
+      return;
+    const update = nextUpdate(transfer, "fundsReceived", {
+      receivedAmount: sats,
+    });
+    if (update === null) return;
+    await publish(transfer, update);
+    earlyEcash.remove(id);
+    void alertWatchers({ _tag: "payoutDue", transfer });
+  };
+
+  /** Accepts the transfer: a payment request for an on-chain send, a fresh deposit address for an on-chain receive; call it within `serially`. */
+  const acceptNow = async (transfer: OperatorTransfer): ActionResult => {
+    if (transferStatus(transfer) !== null) return { reason: "notAllowed" };
+    if (transfer.direction === "send") {
+      const paymentRequest = encodeNostrPaymentRequest({
+        amount: transferTerms(transfer).sendAmount,
+        mintUrls: [config.mintUrl],
+        recipientNprofile: nostr.nprofile,
+        requestId: PaymentRequestId.make(transfer.id),
+      });
+      const update = nextUpdate(transfer, "accepted", { paymentRequest });
+      if (update === null) return { reason: "notAllowed" };
+      await publish(transfer, update, {
+        operatorPaymentRequest: paymentRequest,
+      });
+      await settleEarlyEcash(transfer.id);
+      return null;
+    }
+    const profile = await loadProfile();
+    const xpub =
+      profile === null ? null : parseDepositXpub(profile.xpub, config.network);
+    if (xpub === null) return { reason: "noProfile" };
+    const addressAt = (index: number) =>
+      deriveDepositAddress({ xpub, index, network: config.network });
+    const scanned = await run(
+      Effect.result(
+        firstUnusedAddressIndex(
+          nextAddressIndex(await run(readTransfers(transfers))),
+          addressAt,
+          esplora,
+        ),
+      ),
+    );
+    if (Result.isFailure(scanned) || scanned.success === null)
+      return { reason: "addressUnchecked" };
+    const addressIndex = scanned.success;
+    const depositAddress = addressAt(addressIndex);
+    const update = nextUpdate(transfer, "accepted", { depositAddress });
+    if (update === null) return { reason: "notAllowed" };
+    await publish(transfer, update, { depositAddress, addressIndex });
+    return null;
+  };
+
+  /**
+   * Stores the request and accepts it on arrival: an on-chain send always,
+   * since the user's Cashu is already on its way (one the operator would
+   * rather not take is flagged in the console for a refund); an on-chain
+   * receive once it passes the deny rules, so Linky shows the deposit address
+   * right away. A receive the console could not give an address to (no key,
+   * Esplora silent) waits for the operator as before.
+   */
   const onRequest = async (
     request: OnchainTransferRequest,
     from: Pubkey,
     sentAtSec: number,
   ) => {
+    const profile = await loadProfile();
     const inserted = await run(
-      insertRequest(transfers, request, from, sentAtSec),
+      insertRequest(
+        transfers,
+        request,
+        from,
+        sentAtSec,
+        profile?.minReceiveAmount ?? DEFAULT_MIN_RECEIVE_AMOUNT,
+      ),
     );
     const transfer = await load(request.transferId);
     // Someone else's request for a known id, or one already answered.
     if (transfer === null || transfer.user !== from || transfer.update !== null)
       return;
+    if (transfer.direction === "send") {
+      const failure = await acceptNow(transfer);
+      if (failure !== null)
+        console.warn("[onchain-operator] send not accepted", failure);
+      return;
+    }
     const reason = requestDenyReason({
       request,
-      profile: await loadProfile(),
+      profile,
       network: config.network,
       mintUrl: config.mintUrl,
     });
     if (reason === null) {
+      const failure = await acceptNow(transfer);
+      if (failure === null) return;
+      console.warn("[onchain-operator] receive not accepted", failure);
       if (inserted) void alertWatchers({ _tag: "requested", transfer });
       return;
     }
@@ -302,7 +443,7 @@ export const createTransfers = ({
     return null;
   };
 
-  /** Ecash naming an on-chain send pays it; any other ecash is just received. */
+  /** Ecash naming an on-chain send pays it, kept aside until the send is accepted; any other ecash is just received. */
   nostr.onInboxEvent(async (event) => {
     if (event._tag !== "ChatMessageReceived" || event.editOf !== null) return;
     const text =
@@ -320,8 +461,13 @@ export const createTransfers = ({
       return;
     await serially(async () => {
       const transfer = await load(requestId);
+      if (transfer !== null && transfer.direction !== "send") return;
+      // Linky pays right after requesting, so the Cashu may beat the request or the accept.
+      if (transfer === null || transferStatus(transfer) === null) {
+        earlyEcash.set(requestId, (earlyEcash.get(requestId) ?? 0) + sats);
+        return;
+      }
       if (
-        transfer?.direction !== "send" ||
         transferStatus(transfer) !== "accepted" ||
         sats < transferTerms(transfer).sendAmount
       )
@@ -455,6 +601,14 @@ export const createTransfers = ({
         : [];
     });
     if (watched.length === 0) return;
+    const profile = await loadProfile();
+    const limits =
+      profile === null
+        ? null
+        : {
+            minReceiveAmount: profile.minReceiveAmount,
+            maxReceiveAmount: profile.maxReceiveAmount,
+          };
     const tip = await run(Effect.result(esplora.tipHeight()));
     if (Result.isFailure(tip)) {
       console.warn("[onchain-operator] tip height unavailable", tip.failure);
@@ -471,6 +625,8 @@ export const createTransfers = ({
         );
         continue;
       }
+      // A receive of any amount needs the limits to price its deposit.
+      if (limits === null && isAnyAmountReceive(transfer)) continue;
       const progress = depositProgress(
         transfer,
         depositStatus({
@@ -478,6 +634,7 @@ export const createTransfers = ({
           transactions: transactions.success,
           tipHeight: tip.success,
         }),
+        limits,
       );
       if (progress !== null) {
         const { status, ...changes } = progress;
@@ -531,46 +688,7 @@ export const createTransfers = ({
       serially(async () => {
         const transfer = await load(id);
         if (transfer === null) return { reason: "unknownTransfer" };
-        if (transferStatus(transfer) !== null) return { reason: "notAllowed" };
-        if (transfer.direction === "send") {
-          const paymentRequest = encodeNostrPaymentRequest({
-            amount: transferTerms(transfer).sendAmount,
-            mintUrls: [config.mintUrl],
-            recipientNprofile: nostr.nprofile,
-            requestId: PaymentRequestId.make(transfer.id),
-          });
-          const update = nextUpdate(transfer, "accepted", { paymentRequest });
-          if (update === null) return { reason: "notAllowed" };
-          await publish(transfer, update, {
-            operatorPaymentRequest: paymentRequest,
-          });
-          return null;
-        }
-        const profile = await loadProfile();
-        const xpub =
-          profile === null
-            ? null
-            : parseDepositXpub(profile.xpub, config.network);
-        if (xpub === null) return { reason: "noProfile" };
-        const addressAt = (index: number) =>
-          deriveDepositAddress({ xpub, index, network: config.network });
-        const scanned = await run(
-          Effect.result(
-            firstUnusedAddressIndex(
-              nextAddressIndex(await run(readTransfers(transfers))),
-              addressAt,
-              esplora,
-            ),
-          ),
-        );
-        if (Result.isFailure(scanned) || scanned.success === null)
-          return { reason: "addressUnchecked" };
-        const addressIndex = scanned.success;
-        const depositAddress = addressAt(addressIndex);
-        const update = nextUpdate(transfer, "accepted", { depositAddress });
-        if (update === null) return { reason: "notAllowed" };
-        await publish(transfer, update, { depositAddress, addressIndex });
-        return null;
+        return acceptNow(transfer);
       }),
     deny: (id, reason) => move(id, "denied", cleanReason(reason)),
     cancel: (id, reason) => move(id, "cancelled", cleanReason(reason)),
@@ -590,7 +708,7 @@ export const createTransfers = ({
       const payout = checkPayout(
         tx.success,
         transfer.payoutAddress,
-        transfer.amount,
+        transferTerms(transfer).amount,
       );
       if (!payout.ok) return { reason: "txShort", paid: payout.paid };
       return settleByTxid(id, "completed", txid, { txid });
@@ -609,7 +727,7 @@ export const createTransfers = ({
         const requestId = PaymentRequestId.make(transfer.id);
         return sendEcashMessage({
           transferId: transfer.id,
-          amount: transfer.amount,
+          amount: transferTerms(transfer).amount,
           forRequest: true,
           message: (receipt) =>
             encodePaymentRequestPayload({
@@ -682,5 +800,6 @@ export const createTransfers = ({
       });
       return checking;
     },
+    earlyEcash: (id) => earlyEcash.get(id),
   };
 };

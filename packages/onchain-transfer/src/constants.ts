@@ -18,8 +18,11 @@ export const DEFAULT_TRANSFER_AMOUNTS: readonly [number, ...number[]] = [
   100_000, 250_000, 500_000, 1_000_000,
 ];
 
+/** The least sats an on-chain receive is made for when the operator names no minimum. */
+export const DEFAULT_MIN_RECEIVE_AMOUNT = 100_000;
+
 /** The most sats an on-chain receive can be made for when the config names none. */
-export const DEFAULT_MAX_RECEIVE_AMOUNT = 1_000_000;
+export const DEFAULT_MAX_RECEIVE_AMOUNT = 2_000_000;
 
 export const OnchainTransferDirection = Schema.Literals(["send", "receive"]);
 export type OnchainTransferDirection = typeof OnchainTransferDirection.Type;

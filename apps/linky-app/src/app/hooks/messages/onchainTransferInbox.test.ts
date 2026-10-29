@@ -50,13 +50,7 @@ const setup = (peer: Pubkey = operator) => {
   const transfers = makeOnchainTransfersRepository(makeTestLinkyStore().store);
   const id = createId<"OnchainTransfer">();
   const planned = planOnchainTransfer({
-    draft: {
-      direction: "receive",
-      amount: 100_000,
-      payoutAddress: "",
-      refundAddress: "",
-      refundToSender: true,
-    },
+    draft: { direction: "receive", amount: null, payoutAddress: "" },
     config: onchainConfigFixture(),
     id,
     nowSec: 1_700_000_000,

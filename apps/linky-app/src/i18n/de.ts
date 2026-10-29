@@ -1,4 +1,8 @@
 import type { cs } from "./cs";
+  walletEarlyWarningTitle: "Glückwunsch",
+  walletEarlyWarningBody:
+    "Du gehörst zu den ersten Linky-Nutzern. Diese Wallet ist experimentell und kann Fehler enthalten. Verwende zunächst nur kleine Beträge.",
+  walletHardwareSupportAction: "Feedback geben",
 
 export const de = {
   appTitle: "Linky",
@@ -795,10 +799,6 @@ export const de = {
   errorPrefix: "Fehler",
   wallet: "Wallet",
 
-  walletEarlyWarningTitle: "Glückwunsch",
-  walletEarlyWarningBody:
-    "Du gehörst zu den ersten Linky-Nutzern. Diese Wallet ist experimentell und kann Fehler enthalten. Verwende zunächst nur kleine Beträge.",
-  walletHardwareSupportAction: "Feedback geben",
   topup: "Aufladen",
   topupTitle: "Konto aufladen",
   topupShowInvoice: "Aufladerechnung anzeigen",
@@ -1359,13 +1359,6 @@ export const de = {
   onchainTransferTitle: "On-Chain-Transaktion",
   onchainSendHistoryTitle: "An On-Chain-Wallet",
   onchainReceiveHistoryTitle: "Von On-Chain-Wallet",
-  onchainSendFixedAmounts:
-    "An eine On-Chain-Wallet kannst du nur feste Beträge senden.",
-  onchainReceiveAnyAmount:
-    "Von einer On-Chain-Wallet kannst du jeden Betrag bis {max} empfangen.",
-  onchainReceiveAmountTooHigh: "Du kannst höchstens {max} empfangen.",
-  onchainTransferChooseAmount: "Betrag",
-  onchainSendInsufficient: "Dein Guthaben reicht für keinen der Beträge.",
   onchainSendAmountUnavailable: "Der Empfänger fordert {amount} an",
   onchainSendAmountUnavailableHint:
     "An eine On-Chain-Wallet kannst du nur die Beträge unten senden. Sprich dich deshalb mit dem Empfänger ab, bevor du einen anderen Betrag sendest.",
@@ -1377,17 +1370,9 @@ export const de = {
   onchainSendPayoutAddress: "Bitcoin-Adresse, an die gesendet wird",
   onchainTransferAddressInvalid:
     "Das ist keine gültige Bitcoin-Adresse für dieses Netzwerk.",
-  onchainReceiveRefundToSender: "An die sendende Adresse erstatten",
-  onchainReceiveUseCustomRefund: "Andere Adresse verwenden",
-  onchainReceiveRefundHint:
-    "Kann die Transaktion nicht abgeschlossen werden, gehen deine Bitcoin hierhin zurück.",
   onchainSendArrivalNotice:
-    "Kommt innerhalb von 24 Stunden nach deiner Zahlung in deiner Bitcoin-Wallet an.",
-  onchainReceiveArrivalNotice:
-    "Kommt innerhalb von 24 Stunden nach der Bestätigung deiner Einzahlung in deinem Guthaben an.",
-  onchainTransferFeeNotice: "Die Gebühr beträgt {fee}.",
+    "Kommt innerhalb von 24 Stunden in deiner Bitcoin-Wallet an.",
   onchainTransferContactSupport: "Support kontaktieren",
-  onchainTransferContinue: "Weiter",
   onchainTransferUnavailable:
     "On-Chain-Transaktionen sind gerade nicht verfügbar.",
   onchainTransferPaused:
@@ -1396,15 +1381,13 @@ export const de = {
     "Aktualisiere Linky auf Version {version} oder neuer, um On-Chain-Transaktionen zu nutzen.",
   onchainTransferRequestFailed:
     "Die Transaktion konnte nicht gestartet werden.",
-  onchainTransferRequestMismatch:
-    "Die Zahlungsdaten passen nicht zu dieser Transaktion, daher wurde nichts bezahlt.",
   onchainTransferNotFound: "Transaktion nicht gefunden",
   onchainTransferPhaseWaitingForDetails: "Warte auf Details",
   onchainTransferPhaseReadyToSend: "Bereit zum Senden",
   onchainTransferPhaseSent: "Unterwegs",
   onchainTransferPhaseAwaitingDeposit: "Warte auf deine Bitcoin",
-  onchainTransferPhaseDepositSeen: "Wird bestätigt",
-  onchainTransferPhaseWaitingForEcash: "Kommt bald an",
+  onchainTransferPhaseDepositSeen: "Gesehen",
+  onchainTransferPhaseWaitingForEcash: "Bestätigt",
   onchainTransferPhaseCompleted: "Abgeschlossen",
   onchainTransferPhaseDenied: "Abgelehnt",
   onchainTransferPhaseCancelled: "Abgebrochen",
@@ -1418,7 +1401,7 @@ export const de = {
   onchainReceiveAwaitingDepositHint:
     "Sende genau {amount} von deiner Bitcoin-Wallet an diese Adresse. Die Netzwerkgebühr deiner Wallet zahlst du separat.",
   onchainReceiveDepositSeenHint:
-    "Wir sehen deine Zahlung. Sie zählt, sobald sie {required} Bestätigungen hat.",
+    "Wir sehen deine Bitcoin unterwegs. Sie zählen, sobald sie bestätigt sind.",
   onchainReceiveWaitingForEcashHint:
     "Deine Einzahlung ist bestätigt. {amount} kommt innerhalb von 24 Stunden in deinem Guthaben an.",
   onchainSendCompletedHint: "{amount} wurde an deine On-Chain-Wallet gesendet.",
@@ -1427,14 +1410,10 @@ export const de = {
     "Diese Transaktion war nicht möglich. Es wurde nichts berechnet.",
   onchainTransferCancelledHint: "Diese Transaktion wurde abgebrochen.",
   onchainTransferRefundedHint: "Dein Geld wurde zurückgesendet.",
-  onchainReceiveConfirmations: "{count}/{required} Bestätigungen",
   onchainReceiveDepositQr: "QR-Code der Bitcoin-Zahlung",
   onchainSendPay: "{amount} senden",
   onchainTransferPayoutAddress: "Zieladresse",
   onchainTransferDepositAddress: "Einzahlungsadresse",
-  onchainTransferRefundAddress: "Erstattungsadresse",
-  onchainTransferRefundToSender: "Die Adresse, von der du sendest",
-  onchainTransferConfirmationsLabel: "Bestätigungen",
   onchainTransferDepositTransaction: "Einzahlungstransaktion",
   onchainTransferPayoutTransaction: "Auszahlungstransaktion",
   onchainTransferRefundTransaction: "Erstattungstransaktion",
@@ -1448,25 +1427,17 @@ export const de = {
   onchainTransfersInProgress: "Läuft",
   onchainSendReadyNotification:
     "Bereit: Zahle {total}, um {amount} an deine Bitcoin-Wallet zu senden.",
-  onchainReceiveReadyNotification:
-    "Bereit: Sende {total} von deiner Bitcoin-Wallet.",
+  onchainReceiveReadyNotification: "Deine Einzahlungsadresse ist bereit.",
   onchainSendCompletedNotification:
     "{amount} an deine On-Chain-Wallet gesendet",
   onchainTransferDeniedNotification:
     "Deine On-Chain-Transaktion wurde abgelehnt",
   onchainTransferRefundedNotification:
     "Deine On-Chain-Transaktion wurde erstattet",
-  onchainReceiveRefundAddressField: "Bitcoin-Adresse für Erstattungen",
-  onchainReceiveCustodialWarning:
-    "Sendest du von einer Börse oder einer Custodial-Wallet? Nutze eine Erstattungsadresse, die du kontrollierst.",
   onchainSendArrivingAmount: "Deine Bitcoin-Wallet erhält {amount}.",
-  onchainReceiveNetworkFee:
-    "Die Netzwerkgebühr deiner Wallet zahlst du separat.",
-  onchainReceiveNetworkFeeAmount:
-    "Sende genau {total}; die Netzwerkgebühr deiner Wallet zahlst du separat.",
   onchainTransferPhaseShortDeposit: "Zu wenig erhalten",
   onchainReceiveShortDepositHint:
-    "Wir haben {received} erhalten, {missing} weniger als die nötigen {total}, daher kann das nicht abgeschlossen werden. Es wird an deine Erstattungsadresse zurückgesendet. Bei Fragen kontaktiere den Support.",
+    "Wir haben {received} erhalten, {missing} weniger als die nötigen {total}, daher kann das nicht abgeschlossen werden. Deine Bitcoin werden zurückgesendet. Bei Fragen kontaktiere den Support.",
   onchainTransferPaid: "Bezahlt",
   onchainTransferRefunded: "Erstattet",
   onchainReceiveDeposited: "Eingezahlte Bitcoin",
@@ -1476,4 +1447,26 @@ export const de = {
   onchainTransferOriginalTerms: "Ursprüngliche Bedingungen",
   onchainReceiveCopyPaymentDetails: "Zahlungsdetails kopieren",
   onchainReceiveCopyAddress: "Adresse kopieren",
+  onchainSendMinimum:
+    "Für das Senden an eine Bitcoin-Adresse brauchst du mindestens {min}.",
+  onchainSendSubmit: "Senden",
+  onchainSendLowerAmount: "Kleinerer Betrag",
+  onchainSendHigherAmount: "Größerer Betrag",
+  onchainSendUnpaidHint:
+    "Deine Zahlung ist noch nicht raus. Sende sie, um die Transaktion zu starten.",
+  onchainSendPayingHint: "Deine Zahlung ist auf dem Weg zu uns.",
+  onchainReceiveIntroSettlement:
+    "Die Abwicklung kann bis zu 24 Stunden dauern.",
+  onchainReceiveIntroRange: "Sende mindestens {min} und höchstens {max}.",
+  onchainReceiveIntroFee: "Die Gebühr beträgt {fee}.",
+  onchainReceiveIntroRefund:
+    "Lehnen wir die Einzahlung ab, geht sie an die Adresse zurück, von der sie kam.",
+  onchainReceiveShowAddress: "Adresse anzeigen",
+  onchainReceiveAnyAmountHint:
+    "Sende Bitcoin von deiner Wallet an diese Adresse.",
+  onchainReceiveAnyAmountLimitsHint:
+    "Sende mindestens {min} und höchstens {max} von deiner Wallet an diese Adresse.",
+  onchainTransferPhaseDepositConfirming: "In Bearbeitung",
+  onchainReceiveDepositConfirmingHint:
+    "Deine Einzahlung hat die erste Bestätigung. Noch eine, dann zählt sie.",
 } satisfies Record<keyof typeof cs, string>;

@@ -64,7 +64,7 @@ export type Route =
   | { kind: "topup" }
   /** A scanned bitcoin address or BIP21 URI fills the payout address and picks the amount. */
   | { kind: "onchainSend"; payoutAddress: string; amount: number | null }
-  | { kind: "onchainReceive"; amount: number | null }
+  | { kind: "onchainReceive" }
   | { kind: "onchainTransfer"; id: OnchainTransferId }
   | { kind: "topupNoAmount" }
   | { kind: "topupInvoice" }
@@ -185,7 +185,7 @@ export const parseRouteFromHash = (): Route => {
           payoutAddress: query.get("address")?.trim() ?? "",
           amount,
         }
-      : { kind: "onchainReceive", amount };
+      : { kind: "onchainReceive" };
   }
   const transferId = OnchainTransferId.fromUnknown(
     decodeHashSegment(hash, "#wallet/onchain/"),

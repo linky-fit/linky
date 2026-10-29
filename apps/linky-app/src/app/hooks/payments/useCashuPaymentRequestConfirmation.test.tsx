@@ -70,12 +70,6 @@ describe("needsPaymentRequestConfirmation", () => {
     expect(needs({ quote: direct(500), approval: "tap" })).toBe(false);
   });
 
-  it("always reviews a payment marked for review, whatever the limit", () => {
-    expect(
-      needs({ quote: direct(1), autoPayLimit: 1_000, approval: "review" }),
-    ).toBe(true);
-  });
-
   it("always asks for an amount, another recipient or a new mint", () => {
     expect(needs({ quote: null, approval: "tap" })).toBe(true);
     expect(needs({ recipientDiffers: true, approval: "tap" })).toBe(true);

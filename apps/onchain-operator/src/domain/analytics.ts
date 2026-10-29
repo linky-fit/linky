@@ -59,10 +59,10 @@ const addTransfer = (
   totals: FlowTotals,
   transfer: OperatorTransfer,
 ): FlowTotals => {
-  const { fee, sendAmount } = transferTerms(transfer);
+  const { amount, fee, sendAmount } = transferTerms(transfer);
   return {
     count: totals.count + 1,
-    amount: totals.amount + transfer.amount,
+    amount: totals.amount + amount,
     sent: totals.sent + sendAmount,
     fees: totals.fees + fee,
   };

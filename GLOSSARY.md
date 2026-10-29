@@ -383,11 +383,11 @@ Moving bitcoin between the user's wallet and an on-chain bitcoin wallet, as an o
 _Avoid_: swap, on-chain swap, peg-in, peg-out, withdrawal
 
 **On-chain send**:
-An on-chain transfer out: the user pays the transfer amount plus the service fee in ecash, and the on-chain operator pays the transfer amount to the payout address.
+An on-chain transfer out: the user pays the transfer amount plus the service fee in ecash the moment they request it, and the on-chain operator pays the transfer amount to the payout address, or returns the ecash when it will not take the transfer.
 _Avoid_: send (that is a token), payout, withdrawal
 
 **On-chain receive**:
-An on-chain transfer in: the user sends the transfer amount plus the service fee to the deposit address, and the on-chain operator pays the transfer amount in ecash.
+An on-chain transfer in: the user sends bitcoin within the operator's limits to the deposit address, the deposit sets the transfer amount (the deposit minus the service fee), and the on-chain operator pays it in ecash. Linky shows the deposit as seen, processing (one confirmation) or confirmed (two), never as a count. An older Linky asked for an exact amount instead; the operator still takes those.
 _Avoid_: receive (that is a token), topup, deposit
 
 **On-chain operator**:

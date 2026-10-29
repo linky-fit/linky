@@ -55,16 +55,26 @@ describe("onchainTransferNotice", () => {
 });
 
 describe("notifyOnchainTransferUpdate", () => {
-  const notify = (route: Route) => {
+  const notify = (
+    route: Route,
+    {
+      status = "completed",
+      sentAtSec = null,
+    }: {
+      status?: OperatorTransferStatus;
+      sentAtSec?: number | null;
+    } = {},
+  ) => {
     const id = createId<"OnchainTransfer">();
     const pushToast =
       vi.fn<(message: string, options?: PushToastOptions) => void>();
     const maybeShowPwaNotification = vi.fn(async () => {});
     notifyOnchainTransferUpdate(
-      onchainTransferUpdateFixture(id, { status: "completed" }),
+      onchainTransferUpdateFixture(id, { status }),
       {
         direction: NonEmptyString100.orThrow("send"),
         amount: PositiveInt.orThrow(100_000),
+        sentAtSec: sentAtSec === null ? null : PositiveInt.orThrow(sentAtSec),
       },
       {
         formatDisplayedAmountText: amountText,
@@ -89,6 +99,16 @@ describe("notifyOnchainTransferUpdate", () => {
       "onchainSendCompletedNotification",
       `onchain_${id}`,
     );
+  });
+
+  it("keeps quiet about accepting a send the user already paid", () => {
+    const paid = notify(
+      { kind: "wallet" },
+      { status: "accepted", sentAtSec: 1 },
+    );
+    expect(paid.pushToast).not.toHaveBeenCalled();
+    const unpaid = notify({ kind: "wallet" }, { status: "accepted" });
+    expect(unpaid.pushToast).toHaveBeenCalledOnce();
   });
 
   it("stays quiet while the transfer is open", () => {
