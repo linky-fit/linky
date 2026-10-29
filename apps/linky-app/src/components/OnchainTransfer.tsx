@@ -52,6 +52,8 @@ interface OnchainTransferAmountsProps {
   total: number;
   /** The service fee as a percentage, e.g. "1 %"; null when not known. */
   feePercent: string | null;
+  /** Leaves out what the user sends, e.g. once the deposit itself is listed. */
+  showTotal?: boolean | undefined;
 }
 
 /** What the user gets, the service fee and what they pay, as on a receipt; in sats beside the display currency only for a receive, whose total the user sends on-chain. */
@@ -62,6 +64,7 @@ export function OnchainTransferAmounts({
   fee,
   total,
   feePercent,
+  showTotal = true,
 }: OnchainTransferAmountsProps): React.ReactElement {
   const { t } = useTranslation();
   const { exact } = useExactAmountText();
@@ -78,13 +81,17 @@ export function OnchainTransferAmounts({
         }
         value={value(fee)}
       />
-      <ListRow
-        title={t(
-          direction === "send" ? "onchainSendYouPay" : "onchainReceiveYouSend",
-        )}
-        value={value(total)}
-        testID="onchain-transfer-total"
-      />
+      {showTotal ? (
+        <ListRow
+          title={t(
+            direction === "send"
+              ? "onchainSendYouPay"
+              : "onchainReceiveYouSend",
+          )}
+          value={value(total)}
+          testID="onchain-transfer-total"
+        />
+      ) : null}
     </Section>
   );
 }

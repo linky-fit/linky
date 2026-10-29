@@ -78,12 +78,17 @@ export const readTransfer = (
     (all) => all.find((transfer) => transfer.id === id) ?? null,
   );
 
-/** Stores a request from `user` once per transfer id; `false` when the transfer was already stored. */
+/**
+ * Stores a request from `user` once per transfer id; `false` when the transfer
+ * was already stored. A receive of any amount, which names none, is stored at
+ * `fallbackAmount`, the smallest receive, until its deposit sets the terms.
+ */
 export const insertRequest = (
   transfers: OnchainTransfersRepository,
   request: OnchainTransferRequest,
   user: Pubkey,
   receivedAtSec: number,
+  fallbackAmount: number,
 ): Effect.Effect<boolean, ShardDbError> =>
   transfers.insertIfAbsent({
     id: request.transferId,
@@ -91,7 +96,7 @@ export const insertRequest = (
     role: NonEmptyString100.orThrow(OPERATOR),
     peerPubkey: NonEmptyString100.orThrow(user),
     direction: NonEmptyString100.orThrow(request.direction),
-    amount: PositiveInt.orThrow(request.amount),
+    amount: PositiveInt.orThrow(request.amount ?? fallbackAmount),
     feeBasisPoints: NonNegativeInt.orThrow(request.feeBasisPoints),
     ...(request.payoutAddress === undefined
       ? {}

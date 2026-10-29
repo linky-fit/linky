@@ -40,9 +40,7 @@ describe("desktopRouteSection", () => {
         amount: null,
       }),
     ).toBe(true);
-    expect(
-      isDesktopSectionEntryRoute({ kind: "onchainReceive", amount: null }),
-    ).toBe(false);
+    expect(isDesktopSectionEntryRoute({ kind: "onchainReceive" })).toBe(false);
   });
 
   it("only expands the section roots across the detail area", () => {

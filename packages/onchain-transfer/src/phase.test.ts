@@ -11,6 +11,7 @@ import type { OperatorTransferStatus } from "./status";
 const update = (
   status: OperatorTransferStatus,
   receivedAmount?: number,
+  confirmations?: number,
 ): OnchainTransferUpdate => ({
   v: 1,
   type: "update",
@@ -20,6 +21,7 @@ const update = (
   fee: 1_000,
   sendAmount: 101_000,
   ...(receivedAmount === undefined ? {} : { receivedAmount }),
+  ...(confirmations === undefined ? {} : { confirmations }),
 });
 
 const phase = (
@@ -30,19 +32,24 @@ const phase = (
     readonly sent?: boolean;
     readonly requestPaid?: boolean;
     readonly receivedAmount?: number;
+    readonly confirmations?: number;
   } = {},
 ): OnchainTransferPhase =>
   onchainTransferPhase({
     direction,
-    update: status === null ? null : update(status, options.receivedAmount),
+    update:
+      status === null
+        ? null
+        : update(status, options.receivedAmount, options.confirmations),
     userCancelledAtSec: options.cancelled === true ? 1_000 : null,
     sentAtSec: options.sent === true ? 900 : null,
     requestPaid: options.requestPaid ?? false,
   });
 
 describe("onchainTransferPhase of a send", () => {
-  it("waits for the operator before any update", () => {
+  it("waits for the operator before any update, unless the user already paid", () => {
     expect(phase("send", null)).toBe("waitingForDetails");
+    expect(phase("send", null, { sent: true })).toBe("sent");
   });
 
   it("is ready to send once accepted, and sent once paid", () => {
@@ -60,6 +67,7 @@ describe("onchainTransferPhase of a send", () => {
 
   it("is cancelled by the user only while nothing was sent", () => {
     expect(phase("send", null, { cancelled: true })).toBe("cancelled");
+    expect(phase("send", null, { cancelled: true, sent: true })).toBe("sent");
     expect(phase("send", "accepted", { cancelled: true })).toBe("cancelled");
     expect(phase("send", "accepted", { cancelled: true, sent: true })).toBe(
       "sent",
@@ -73,6 +81,12 @@ describe("onchainTransferPhase of a receive", () => {
     expect(phase("receive", null)).toBe("waitingForDetails");
     expect(phase("receive", "accepted")).toBe("awaitingDeposit");
     expect(phase("receive", "fundsSeen")).toBe("depositSeen");
+    expect(phase("receive", "fundsSeen", { confirmations: 0 })).toBe(
+      "depositSeen",
+    );
+    expect(phase("receive", "fundsSeen", { confirmations: 1 })).toBe(
+      "depositConfirming",
+    );
     expect(phase("receive", "fundsReceived")).toBe("waitingForEcash");
     expect(phase("receive", "completed", { requestPaid: true })).toBe(
       "completed",
@@ -135,6 +149,7 @@ describe("canUserCancel", () => {
     "sent",
     "awaitingDeposit",
     "depositSeen",
+    "depositConfirming",
     "shortDeposit",
     "waitingForEcash",
     "completed",

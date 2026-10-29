@@ -45,7 +45,11 @@ import { createNostr, type Nostr } from "./nostr";
 import { makeLinkshuRuntime, makeLinkstrRuntime } from "./runtimes";
 import { createPeerProfiles, type PeerProfiles } from "./peerProfiles";
 import { createWatcherAlerts } from "./watchers";
-import { createTransfers, type Transfers } from "./transfers";
+import {
+  createTransfers,
+  makeEarlyEcashStore,
+  type Transfers,
+} from "./transfers";
 import { createWallet, type Wallet } from "./wallet";
 import {
   createLightningPayments,
@@ -99,6 +103,11 @@ export interface ServicePorts {
   readonly transport?: Layer.Layer<NostrTransport> | undefined;
   /** The `fetch` the Esplora client calls. */
   readonly esploraFetch: EsploraFetch;
+  /** Device-local storage of the Cashu that arrived for a send before it was accepted. */
+  readonly earlyEcashKv: {
+    readonly getItem: (key: string) => string | null;
+    readonly setItem: (key: string, value: string) => void;
+  };
   /** The `fetch` profile pictures are uploaded with. */
   readonly blossomFetch: typeof fetch;
   /** Subscribes to the window getting the focus back. */
@@ -181,6 +190,7 @@ export const createAppServices = ({
     config,
     loadProfile,
     alertWatchers,
+    earlyEcash: makeEarlyEcashStore(ports.earlyEcashKv),
     whenHydrated: hydrated,
   });
   const publishProfile = async (profile: OperatorProfile) => {

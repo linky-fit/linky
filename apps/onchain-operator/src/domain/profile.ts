@@ -1,6 +1,7 @@
 import {
   ClientVersion,
   DEFAULT_MAX_RECEIVE_AMOUNT,
+  DEFAULT_MIN_RECEIVE_AMOUNT,
   DEFAULT_TRANSFER_AMOUNTS,
   parseDepositXpub,
   type BitcoinNetwork,
@@ -23,6 +24,8 @@ export interface OperatorProfile {
   readonly amounts: readonly [number, ...number[]];
   /** The most an on-chain receive can be made for, any amount up to it. */
   readonly maxReceiveAmount: number;
+  /** The least a receive of any amount is made for; the user deposits between it and the most, the fee on top. */
+  readonly minReceiveAmount: number;
   /** The oldest Linky version that may make transfers; `null` for any. */
   readonly minClientVersion: string | null;
   /** Who hears in Linky about whatever waits for the operator. */
@@ -43,6 +46,7 @@ export interface ProfileForm {
   readonly description: string;
   readonly amounts: string;
   readonly maxReceiveAmount: string;
+  readonly minReceiveAmount: string;
   readonly minClientVersion: string;
   readonly watchers: string;
 }
@@ -55,6 +59,7 @@ export type ProfileFormErrors = Partial<
     | "description"
     | "amounts"
     | "maxReceiveAmount"
+    | "minReceiveAmount"
     | "minClientVersion"
     | "watchers",
     "invalid"
@@ -124,6 +129,9 @@ export const profileForm = (profile: EditedProfile | null): ProfileForm => ({
   maxReceiveAmount: String(
     profile?.maxReceiveAmount ?? DEFAULT_MAX_RECEIVE_AMOUNT,
   ),
+  minReceiveAmount: String(
+    profile?.minReceiveAmount ?? DEFAULT_MIN_RECEIVE_AMOUNT,
+  ),
   minClientVersion: profile?.minClientVersion ?? "",
   watchers: (profile?.watchers ?? []).map(encodeNpub).join("\n"),
 });
@@ -136,6 +144,10 @@ export const parseProfileForm = (
   const feeBasisPoints = parseFeePercent(form.feePercent);
   const amounts = parseAmounts(form.amounts);
   const maxReceiveAmount = parseSats(form.maxReceiveAmount);
+  const minReceiveAmount = parseSats(form.minReceiveAmount);
+  const minReceiveFits =
+    minReceiveAmount !== null &&
+    (maxReceiveAmount === null || minReceiveAmount <= maxReceiveAmount);
   const minClientVersion = parseMinClientVersion(form.minClientVersion);
   const watchers = parseWatchers(form.watchers);
   const name = form.name.trim();
@@ -148,6 +160,7 @@ export const parseProfileForm = (
     feeBasisPoints === null ||
     amounts === null ||
     maxReceiveAmount === null ||
+    !minReceiveFits ||
     minClientVersion === undefined ||
     watchers === null ||
     !descriptionFits
@@ -158,6 +171,7 @@ export const parseProfileForm = (
       ...(feeBasisPoints === null ? { feePercent: "invalid" } : {}),
       ...(amounts === null ? { amounts: "invalid" } : {}),
       ...(maxReceiveAmount === null ? { maxReceiveAmount: "invalid" } : {}),
+      ...(minReceiveFits ? {} : { minReceiveAmount: "invalid" }),
       ...(minClientVersion === undefined
         ? { minClientVersion: "invalid" }
         : {}),
@@ -173,6 +187,7 @@ export const parseProfileForm = (
     description,
     amounts,
     maxReceiveAmount,
+    minReceiveAmount,
     minClientVersion,
     watchers,
   });
@@ -193,6 +208,7 @@ export const onchainConfigOf = (
   description: profile.description,
   amounts: profile.amounts,
   maxReceiveAmount: profile.maxReceiveAmount,
+  minReceiveAmount: profile.minReceiveAmount,
   mintUrl: config.mintUrl,
   network: config.network,
   explorerUrl: config.explorerUrl,

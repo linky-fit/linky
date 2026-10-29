@@ -6,13 +6,14 @@ import {
 } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { createId } from "@linky-fit/domain";
-import { Option } from "effect";
+import { Option, Struct } from "effect";
 import {
   decodeTransferUpdateColumn,
   encodeTransferUpdateColumn,
   newerTransferUpdate,
   onchainTransferChannel,
   type OnchainTransferMessage,
+  type OnchainTransferRequest,
   type OnchainTransferUpdate,
 } from "./messages";
 
@@ -21,7 +22,7 @@ const txid = "a".repeat(64);
 const user = makeIdentity();
 const operator = makeIdentity();
 
-const sendRequest: OnchainTransferMessage = {
+const sendRequest: OnchainTransferRequest = {
   v: 1,
   type: "request",
   transferId,
@@ -31,7 +32,7 @@ const sendRequest: OnchainTransferMessage = {
   payoutAddress: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
 };
 
-const receiveRequest: OnchainTransferMessage = {
+const receiveRequest: OnchainTransferRequest = {
   v: 1,
   type: "request",
   transferId,
@@ -78,6 +79,10 @@ describe("transfer messages", () => {
       "a request refunding to an address",
       { ...receiveRequest, refund: { to: "address", address: "bc1qtest" } },
     ],
+    [
+      "a receive request of any amount",
+      Struct.omit(receiveRequest, ["amount"]),
+    ],
     ["a cancel", { v: 1, type: "cancel", transferId }],
     [
       "a full update",
@@ -117,6 +122,10 @@ describe("transfer messages", () => {
       JSON.stringify({ ...sendRequest, transferId: "x" }),
     ],
     ["a zero amount", JSON.stringify({ ...sendRequest, amount: 0 })],
+    [
+      "a send without an amount",
+      JSON.stringify(Struct.omit(sendRequest, ["amount"])),
+    ],
     ["a fractional amount", JSON.stringify({ ...sendRequest, amount: 1.5 })],
     [
       "fee basis points above 10000",

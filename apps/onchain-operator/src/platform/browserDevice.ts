@@ -16,6 +16,7 @@ export const createBrowserDevice = (config: AppConfig): Device =>
       ...linkstrStores(account.pubkey),
       keyValueStore: localStorageKeyValueStore,
       esploraFetch: (url) => fetch(url),
+      earlyEcashKv: localStorageKv,
       blossomFetch: (input, init) => fetch(input, init),
       onFocus,
     }),

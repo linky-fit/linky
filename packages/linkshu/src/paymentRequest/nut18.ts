@@ -78,8 +78,8 @@ const paymentRequestIdOrNull = (
 };
 
 export interface NostrPaymentRequestArgs {
-  /** Sats requested. */
-  readonly amount: number;
+  /** Sats requested; null leaves the amount to the payer. */
+  readonly amount: number | null;
   readonly mintUrls: ReadonlyArray<string>;
   /** Where the payer sends the token, as a NIP-17 message. */
   readonly recipientNprofile: string;
@@ -99,7 +99,7 @@ export const encodeNostrPaymentRequest = (
 ): string => {
   const description = trimmedOrNull(args.description);
   const payload: Payload = {
-    a: args.amount,
+    ...(args.amount === null ? {} : { a: args.amount }),
     u: "sat",
     s: true,
     m: [...new Set(args.mintUrls.flatMap((mint) => trimmedOrNull(mint) ?? []))],

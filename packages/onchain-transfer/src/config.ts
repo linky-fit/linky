@@ -23,6 +23,12 @@ export const OnchainConfig = Schema.Struct({
   amounts: Schema.NonEmptyArray(PositiveInt),
   /** The most sats an on-chain receive can be made for; any amount up to it is offered. */
   maxReceiveAmount: PositiveInt,
+  /**
+   * The least sats an on-chain receive of any amount is made for. Only an
+   * operator naming it takes a receive without an amount, whose deposit sets
+   * the terms (see `depositTerms`).
+   */
+  minReceiveAmount: Schema.optionalKey(PositiveInt),
   /** Ecash of every transfer is at this mint. */
   mintUrl: NonEmptyText(1000),
   network: BitcoinNetwork,
@@ -35,17 +41,28 @@ export type OnchainConfig = typeof OnchainConfig.Type;
 
 const OnchainConfigJson = Schema.fromJsonString(OnchainConfig);
 
-/** Whether a transfer of `amount` sats is offered: an on-chain send for one of the fixed amounts, an on-chain receive for any amount up to the maximum. */
+/**
+ * Whether a transfer of `amount` sats is offered: an on-chain send for one of
+ * the fixed amounts, an on-chain receive for any amount up to the maximum, and
+ * an on-chain receive without an amount (`null`) only under a minimum.
+ */
 export const isOfferedAmount = (
-  terms: Pick<OnchainConfig, "amounts" | "maxReceiveAmount">,
+  terms: Pick<
+    OnchainConfig,
+    "amounts" | "maxReceiveAmount" | "minReceiveAmount"
+  >,
   direction: OnchainTransferDirection,
-  amount: number,
-): boolean =>
-  direction === "send"
-    ? terms.amounts.includes(amount)
-    : Number.isSafeInteger(amount) &&
-      amount > 0 &&
-      amount <= terms.maxReceiveAmount;
+  amount: number | null,
+): boolean => {
+  if (direction === "send")
+    return amount !== null && terms.amounts.includes(amount);
+  if (amount === null) return terms.minReceiveAmount !== undefined;
+  return (
+    Number.isSafeInteger(amount) &&
+    amount > 0 &&
+    amount <= terms.maxReceiveAmount
+  );
+};
 
 /** The app data draft the operator publishes its config with. */
 export const onchainConfigDraft = (config: OnchainConfig): AppDataDraft =>

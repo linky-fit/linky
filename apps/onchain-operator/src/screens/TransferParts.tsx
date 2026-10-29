@@ -10,7 +10,7 @@ import {
 import type { Tone } from "@linky-fit/ui";
 import type { OperatorTransferStatus } from "@linky-fit/onchain-transfer";
 import { copy } from "../copy/en";
-import type { OperatorTransfer } from "../domain/transfer";
+import { transferTerms, type OperatorTransfer } from "../domain/transfer";
 import { formatDateTime, formatSats } from "../format";
 import { statusKey, transferTitle } from "./labels";
 import { navigateTo } from "../platform/hashRoute";
@@ -75,7 +75,7 @@ export function TransferCard({
         <StatusPill transfer={transfer} />
       </Row>
       <Text variant="caption" color="$colorMuted">
-        {`${copy.transfer.receive}: ${formatSats(transfer.amount)} · ${formatDateTime(transfer.createdAtSec)}`}
+        {`${copy.transfer.receive}: ${formatSats(transferTerms(transfer).amount)} · ${formatDateTime(transfer.createdAtSec)}`}
       </Text>
       <Button
         size="sm"

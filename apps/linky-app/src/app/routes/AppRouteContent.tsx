@@ -174,14 +174,7 @@ const RoutePage = (): React.ReactElement => {
         />
       );
     case "onchainReceive":
-      return (
-        <OnchainTransferNewPage
-          key={route.amount}
-          direction="receive"
-          prefill={null}
-          receiveAmount={route.amount}
-        />
-      );
+      return <OnchainTransferNewPage direction="receive" prefill={null} />;
     case "onchainTransfer":
       return <OnchainTransferPage id={route.id} />;
     case "transactions":

@@ -13,6 +13,7 @@ import {
   useLinkstrCommands,
 } from "@linky-fit/linkstr-react";
 import {
+  amountWithServiceFee,
   canUserCancel,
   onchainTransferChannel,
   type OnchainConfig,
@@ -26,8 +27,9 @@ import { formatMiddleDots } from "../../utils/formatting";
 import { nowSeconds } from "../../utils/time";
 import { onchainOperator } from "../lib/onchainOperator";
 import {
-  isOperatorRequestFor,
+  isOnchainSendUnpaid,
   newOnchainTransferProblem,
+  onchainSendPaymentRequest,
   onchainTransferView,
   planOnchainTransfer,
   unfinishedOnchainTransfers,
@@ -179,13 +181,79 @@ export const useOnchainTransferCommands = () => {
     [saveNpubContact],
   );
 
-  /** Stores the transfer, sends the request and opens the transfer; false when nothing was requested. */
+  /**
+   * Pays the operator for an on-chain send: the amount plus the fee as a
+   * NUT-18 payment naming the transfer, from the usual payment flow, which
+   * reviews it only when a mint has to be added. `onPaid` records the time.
+   */
+  const payOnchainSend = React.useCallback(
+    (
+      transfer: Pick<
+        OnchainTransferView,
+        "id" | "amount" | "sendAmount" | "payoutAddress"
+      >,
+      config: OnchainConfig,
+    ): void => {
+      if (onchainOperator === null || transfer.payoutAddress === null) return;
+      const request = parseCashuPaymentRequestMessage(
+        onchainSendPaymentRequest(
+          transfer,
+          config.mintUrl,
+          onchainOperator.pubkey,
+        ),
+      );
+      if (request === null) {
+        setStatus(t("onchainTransferRequestFailed"));
+        return;
+      }
+      reportAppLog({
+        tag: "onchainTransfer.sendTapped",
+        summary: `Paying the on-chain operator ${transfer.sendAmount} sat for the transfer`,
+        links: { onchainTransfer: transfer.id, paymentRequest: transfer.id },
+        payload: { amount: transfer.sendAmount },
+      });
+      void payOnchainTransferPaymentRequest(request, {
+        // The operator may deny or the user cancel while the payment is reviewed or in flight; a transfer the atom does not hold yet was just stored.
+        isPaymentAuthorized: () => {
+          const current = (registry.get(onchainTransfersAtom) ?? []).find(
+            (candidate) => candidate.id === transfer.id,
+          );
+          return current === undefined || isOnchainSendUnpaid(current);
+        },
+        recipientName: formatMiddleDots(transfer.payoutAddress, 20),
+        summary: t("onchainSendConfirmSummary").replace(
+          "{amount}",
+          formatDisplayedAmountText(transfer.amount),
+        ),
+        onPaid: () => {
+          void runWrite(
+            transfers.update(transfer.id, {
+              sentAtSec: PositiveInt.orThrow(nowSeconds()),
+            }),
+          ).then((outcome) => {
+            if (!outcome.ok) fail(outcome.error);
+          });
+        },
+      });
+    },
+    [
+      fail,
+      formatDisplayedAmountText,
+      payOnchainTransferPaymentRequest,
+      registry,
+      setStatus,
+      transfers,
+      t,
+    ],
+  );
+
+  /** Stores the transfer, sends the request, pays a send right away and opens the transfer; false when nothing was requested. */
   const requestOnchainTransfer = React.useCallback(
     async (
       draft: NewOnchainTransferDraft,
       config: OnchainConfig,
     ): Promise<boolean> => {
-      if (onchainOperator === null || draft.amount === null) return false;
+      if (onchainOperator === null) return false;
       if (newOnchainTransferProblem(draft, config) !== null) return false;
       const operator = onchainOperator.pubkey;
       const id = createId<"OnchainTransfer">();
@@ -195,8 +263,9 @@ export const useOnchainTransferCommands = () => {
           setStatus(t("profileMissingNpub"));
           return false;
         }
+        // No amount: the deposit sets it.
         userPaymentRequest = buildCashuPaymentRequestMessage({
-          amount: draft.amount,
+          amount: null,
           mintUrls: [config.mintUrl],
           recipientNprofile: ownNprofile,
           requestId: PaymentRequestId.make(id),
@@ -229,25 +298,36 @@ export const useOnchainTransferCommands = () => {
       }
       reportAppLog({
         tag: "onchainTransfer.requested",
-        summary: `Requested an on-chain ${draft.direction} of ${draft.amount} sat`,
+        summary:
+          draft.amount === null
+            ? "Requested an on-chain receive of any amount"
+            : `Requested an on-chain ${draft.direction} of ${draft.amount} sat`,
         links: { onchainTransfer: id, paymentRequest: id, rumor: rumorId },
         payload: {
           direction: draft.direction,
           amount: draft.amount,
           feeBasisPoints: config.feeBasisPoints,
           network: config.network,
-          refund:
-            draft.direction === "receive"
-              ? draft.refundToSender
-                ? "sender"
-                : "address"
-              : null,
         },
       });
+      if (draft.direction === "send" && draft.amount !== null) {
+        payOnchainSend(
+          {
+            id,
+            amount: draft.amount,
+            sendAmount: amountWithServiceFee(
+              draft.amount,
+              config.feeBasisPoints,
+            ),
+            payoutAddress: planned.request.payoutAddress ?? null,
+          },
+          config,
+        );
+      }
       navigateTo({ route: "onchainTransfer", id });
       return true;
     },
-    [fail, ownNprofile, send, setStatus, transfers, t],
+    [fail, ownNprofile, payOnchainSend, send, setStatus, transfers, t],
   );
 
   const cancelOnchainTransfer = React.useCallback(
@@ -279,63 +359,13 @@ export const useOnchainTransferCommands = () => {
     [fail, send, transfers],
   );
 
-  /** Pays the operator's request of an on-chain send through the usual payment request flow. */
+  /** Pays an on-chain send the user still owes, e.g. one whose payment did not go through right after requesting. */
   const sendOnchainTransferPayment = React.useCallback(
-    (transfer: OnchainTransferView): void => {
-      if (onchainOperator === null) return;
-      const request =
-        transfer.operatorPaymentRequest === null
-          ? null
-          : parseCashuPaymentRequestMessage(transfer.operatorPaymentRequest);
-      const payoutAddress = transfer.payoutAddress;
-      const payable =
-        request !== null &&
-        payoutAddress !== null &&
-        isOperatorRequestFor(request, transfer, onchainOperator.pubkey);
-      reportAppLog({
-        tag: "onchainTransfer.sendTapped",
-        summary: payable
-          ? `Paying the on-chain operator ${transfer.sendAmount} sat for the transfer`
-          : "The operator's payment request does not match the transfer; nothing was paid",
-        links: { onchainTransfer: transfer.id, paymentRequest: transfer.id },
-        payload: { amount: transfer.sendAmount, payable },
-      });
-      if (!payable) {
-        setStatus(t("onchainTransferRequestMismatch"));
-        return;
-      }
-      void payOnchainTransferPaymentRequest(request, {
-        // The operator may cancel or deny the transfer while the payment is reviewed or in flight, whichever screen is open by then.
-        isPaymentAuthorized: () =>
-          (registry.get(onchainTransfersAtom) ?? []).some(
-            (current) =>
-              current.id === transfer.id && current.phase === "readyToSend",
-          ),
-        recipientName: formatMiddleDots(payoutAddress, 20),
-        summary: t("onchainSendConfirmSummary").replace(
-          "{amount}",
-          formatDisplayedAmountText(transfer.amount),
-        ),
-        onPaid: () => {
-          void runWrite(
-            transfers.update(transfer.id, {
-              sentAtSec: PositiveInt.orThrow(nowSeconds()),
-            }),
-          ).then((outcome) => {
-            if (!outcome.ok) fail(outcome.error);
-          });
-        },
-      });
+    (transfer: OnchainTransferView, config: OnchainConfig): void => {
+      if (!isOnchainSendUnpaid(transfer)) return;
+      payOnchainSend(transfer, config);
     },
-    [
-      fail,
-      formatDisplayedAmountText,
-      payOnchainTransferPaymentRequest,
-      registry,
-      setStatus,
-      transfers,
-      t,
-    ],
+    [payOnchainSend],
   );
 
   return {

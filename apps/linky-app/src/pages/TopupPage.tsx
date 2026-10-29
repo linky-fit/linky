@@ -88,12 +88,7 @@ export const TopupPage: FC = () => {
         <Button
           variant="secondary"
           icon="Bitcoin"
-          onPress={() =>
-            navigateTo({
-              route: "onchainReceive",
-              ...(amountSat > 0 ? { amount: amountSat } : {}),
-            })
-          }
+          onPress={() => navigateTo({ route: "onchainReceive" })}
           testID="topup-onchain-receive"
         >
           {t("onchainReceiveTitle")}

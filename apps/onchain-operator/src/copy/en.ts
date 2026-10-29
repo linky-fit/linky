@@ -62,6 +62,8 @@ export const copy = {
     amount: "User sends",
     fee: "Service fee",
     receive: "User gets",
+    anyAmount: (min: string, max: string) =>
+      `Any amount from ${min} to ${max}, set by the deposit`,
     user: "User",
     userNpub: "User npub",
     openChat: "Open chat",
@@ -94,7 +96,12 @@ export const copy = {
     deny: "Deny",
     cancel: "Cancel transfer",
     reasonField: "Reason for the user (optional)",
-    waitingForEcash: "Waiting for the user to pay your payment request.",
+    waitingForEcash:
+      "Waiting for the user's Cashu, which Linky sends right after requesting.",
+    concern: (reason: string, arrived: boolean) =>
+      `This request would have been denied: ${reason} ${arrived ? "Refund the Cashu." : "Refund the Cashu once it arrives."}`,
+    earlyEcashShort: (arrived: string, needed: string) =>
+      `${arrived} arrived for this transfer, less than ${needed}. Settle it in the chat.`,
     waitingForDeposit:
       "Watching the deposit address; it is checked every 20 seconds.",
     checkNow: "Check now",
@@ -338,6 +345,11 @@ export const copy = {
     maxReceiveAmountHint:
       "Users receive any amount up to this; they send it plus the service fee.",
     maxReceiveAmountInvalid: "A positive whole number.",
+    minReceiveAmount: "Smallest on-chain receive in sats",
+    minReceiveAmountHint:
+      "A receive of any amount takes a deposit between this and the largest, the service fee on top; what arrives sets what the user gets.",
+    minReceiveAmountInvalid:
+      "A positive whole number, at most the largest on-chain receive.",
     minClientVersion: "Minimum Linky version",
     minClientVersionHint:
       "Linky versions older than this ask their users to update before transferring. Leave it empty for no minimum.",

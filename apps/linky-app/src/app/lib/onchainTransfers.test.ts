@@ -1,4 +1,7 @@
-import { PaymentRequestId } from "@linky-fit/linkshu/payment-request";
+import {
+  decodePaymentRequest,
+  PaymentRequestId,
+} from "@linky-fit/linkshu/payment-request";
 import {
   createId,
   makeOnchainTransfersRepository,
@@ -33,20 +36,19 @@ import {
   onchainTransferViewFixture,
 } from "../../testUtils/onchainTransfers";
 import {
-  isOperatorRequestFor,
   newestOnchainConfig,
   newOnchainTransferProblem,
+  onchainSendPaymentRequest,
   onchainTransferView,
+  openOnchainReceive,
   planOnchainTransfer,
   onchainPayoutTarget,
   onchainTransferUpdatePatch,
   unfinishedOnchainTransfers,
   type NewOnchainTransferDraft,
+  type OnchainTransferView,
 } from "./onchainTransfers";
-import {
-  buildCashuPaymentRequestMessage,
-  type CashuPaymentRequestMessageInfo,
-} from "./paymentRequestMessage";
+import { buildCashuPaymentRequestMessage } from "./paymentRequestMessage";
 
 const operator = makeIdentity().pubkey;
 const config = onchainConfigFixture();
@@ -56,14 +58,11 @@ const send: NewOnchainTransferDraft = {
   direction: "send",
   amount: 100_000,
   payoutAddress: REGTEST_ADDRESS,
-  refundAddress: "",
-  refundToSender: false,
 };
 const receive: NewOnchainTransferDraft = {
-  ...send,
   direction: "receive",
+  amount: null,
   payoutAddress: "",
-  refundToSender: true,
 };
 
 type OnchainTransferIdOf = ReturnType<typeof createId<"OnchainTransfer">>;
@@ -75,7 +74,7 @@ const userNprofile = nip19.nprofileEncode({
 
 interface StoredOnchainTransferOptions {
   readonly update?: (id: OnchainTransferIdOf) => OnchainTransferUpdate;
-  /** The amount of the user's own request, for an on-chain receive. */
+  /** The amount of the user's own request, for an on-chain receive of a fixed amount; none leaves it to the deposit. */
   readonly requestAmount?: number;
   readonly received?: number;
   readonly sentAtSec?: number;
@@ -101,7 +100,7 @@ const storedOnchainTransfer = (
     userPaymentRequest:
       draft.direction === "receive"
         ? buildCashuPaymentRequestMessage({
-            amount: options.requestAmount ?? 100_000,
+            amount: options.requestAmount ?? null,
             mintUrls: [config.mintUrl],
             recipientNprofile: userNprofile,
             requestId: PaymentRequestId.make(id),
@@ -150,7 +149,8 @@ describe("onchainTransferView", () => {
     });
   });
 
-  it("is ready to send once accepted, and sent once the user paid", () => {
+  it("is sent once the user paid, accepted or not, and ready to send once accepted unpaid", () => {
+    expect(storedOnchainTransfer(send, { sentAtSec: NOW })?.phase).toBe("sent");
     expect(storedOnchainTransfer(send, { update: accepted })?.phase).toBe(
       "readyToSend",
     );
@@ -165,33 +165,63 @@ describe("onchainTransferView", () => {
     ).toBe("sent");
   });
 
-  it("completes an on-chain receive once the request named by the transfer id received its amount", () => {
+  it("holds a receive of any amount at the config's minimum until the deposit sets the terms", () => {
+    expect(storedOnchainTransfer(receive)).toMatchObject({
+      phase: "waitingForDetails",
+      anyAmount: true,
+      amount: 100_000,
+      fee: 1_000,
+      sendAmount: 101_000,
+    });
+    const deposited = storedOnchainTransfer(receive, {
+      update: (id) =>
+        onchainTransferUpdateFixture(id, {
+          status: "fundsSeen",
+          fee: 1_486,
+          sendAmount: 150_000,
+          receivedAmount: 150_000,
+        }),
+    });
+    expect(deposited).toMatchObject({
+      phase: "depositSeen",
+      amount: 148_514,
+      fee: 1_486,
+      sendAmount: 150_000,
+    });
+  });
+
+  it("completes an on-chain receive once the request named by the transfer id received what the terms give", () => {
     const update = (id: OnchainTransferIdOf) =>
-      onchainTransferUpdateFixture(id, { status: "fundsReceived" });
+      onchainTransferUpdateFixture(id, {
+        status: "fundsReceived",
+        fee: 1_486,
+        sendAmount: 150_000,
+        receivedAmount: 150_000,
+      });
     expect(storedOnchainTransfer(receive, { update })?.phase).toBe(
       "waitingForEcash",
     );
     expect(
-      storedOnchainTransfer(receive, { update, received: 99_999 })?.phase,
+      storedOnchainTransfer(receive, { update, received: 148_513 })?.phase,
     ).toBe("waitingForEcash");
     expect(
-      storedOnchainTransfer(receive, { update, received: 100_000 })?.phase,
+      storedOnchainTransfer(receive, { update, received: 148_514 })?.phase,
     ).toBe("completed");
   });
 
-  it("completes an on-chain receive only at the amount of the user's own request, whatever the operator reports", () => {
+  it("completes a receive of a fixed amount only at the amount of the user's own request", () => {
     const update = (id: OnchainTransferIdOf) =>
       onchainTransferUpdateFixture(id, {
         status: "fundsReceived",
+        fee: 0,
         sendAmount: 1,
       });
-    expect(
-      storedOnchainTransfer(receive, {
-        update,
-        requestAmount: 100_000,
-        received: 1,
-      })?.phase,
-    ).toBe("waitingForEcash");
+    const fixed = storedOnchainTransfer(receive, {
+      update,
+      requestAmount: 100_000,
+      received: 1,
+    });
+    expect(fixed).toMatchObject({ phase: "waitingForEcash", anyAmount: false });
   });
 
   it("shows a cancel the user sent before funds moved, and the locked fee of the update", () => {
@@ -231,6 +261,26 @@ describe("unfinishedOnchainTransfers", () => {
   });
 });
 
+describe("openOnchainReceive", () => {
+  const waiting = (overrides: Partial<OnchainTransferView>) =>
+    onchainTransferViewFixture({
+      direction: "receive",
+      anyAmount: true,
+      phase: "awaitingDeposit",
+      ...overrides,
+    });
+
+  it("finds the newest receive of any amount still waiting for its deposit", () => {
+    const older = waiting({ createdAtSec: 1, phase: "waitingForDetails" });
+    const newer = waiting({ createdAtSec: 2 });
+    const seen = waiting({ createdAtSec: 3, phase: "depositSeen" });
+    const fixed = waiting({ createdAtSec: 4, anyAmount: false });
+    const send = onchainTransferViewFixture({ createdAtSec: 5 });
+    expect(openOnchainReceive([older, seen, fixed, send, newer])).toBe(newer);
+    expect(openOnchainReceive([seen, fixed, send])).toBeNull();
+  });
+});
+
 describe("onchainPayoutTarget", () => {
   it("reads a bare address or a BIP21 URI's address and amount on any network", () => {
     expect(onchainPayoutTarget(` ${MAINNET_ADDRESS} `)).toEqual({
@@ -263,46 +313,10 @@ describe("newOnchainTransferProblem", () => {
     ).toBe("payoutAddressMissing");
   });
 
-  it("takes a send only for a fixed amount and a receive for any amount up to the maximum", () => {
+  it("takes a send only for one of the config's amounts and nothing while paused", () => {
     expect(
       newOnchainTransferProblem({ ...send, amount: 123_456 }, config),
     ).toBe("amountMissing");
-    expect(
-      newOnchainTransferProblem({ ...receive, amount: 123_456 }, config),
-    ).toBeNull();
-    expect(
-      newOnchainTransferProblem(
-        { ...receive, amount: config.maxReceiveAmount + 1 },
-        config,
-      ),
-    ).toBe("amountOverMax");
-    expect(
-      newOnchainTransferProblem({ ...receive, amount: null }, config),
-    ).toBe("amountMissing");
-  });
-
-  it("needs a refund address or the refund to the sender for an on-chain receive", () => {
-    const noRefund = { ...receive, refundToSender: false };
-    expect(newOnchainTransferProblem(receive, config)).toBeNull();
-    expect(newOnchainTransferProblem(noRefund, config)).toBe("refundMissing");
-    expect(
-      newOnchainTransferProblem(
-        { ...noRefund, refundAddress: MAINNET_ADDRESS },
-        config,
-      ),
-    ).toBe("refundAddressInvalid");
-    expect(
-      newOnchainTransferProblem(
-        { ...noRefund, refundAddress: REGTEST_ADDRESS },
-        config,
-      ),
-    ).toBeNull();
-  });
-
-  it("takes only the config's amounts and nothing while paused", () => {
-    expect(newOnchainTransferProblem({ ...send, amount: 123 }, config)).toBe(
-      "amountMissing",
-    );
     expect(newOnchainTransferProblem({ ...send, amount: null }, config)).toBe(
       "amountMissing",
     );
@@ -310,29 +324,22 @@ describe("newOnchainTransferProblem", () => {
       newOnchainTransferProblem(send, onchainConfigFixture({ paused: true })),
     ).toBe("paused");
   });
+
+  it("takes a receive of any amount only from an operator naming a minimum", () => {
+    expect(newOnchainTransferProblem(receive, config)).toBeNull();
+    expect(
+      newOnchainTransferProblem(
+        receive,
+        onchainConfigFixture({ minReceiveAmount: undefined }),
+      ),
+    ).toBe("anyAmountUnavailable");
+  });
 });
 
 describe("planOnchainTransfer", () => {
   const id = createId<"OnchainTransfer">();
 
-  it("stores and sends addresses as Esplora reports them, a bech32 one in lowercase", () => {
-    const planned = planOnchainTransfer({
-      draft: {
-        ...receive,
-        refundToSender: false,
-        refundAddress: REGTEST_ADDRESS.toUpperCase(),
-      },
-      config,
-      id,
-      nowSec: NOW,
-      operator,
-      userPaymentRequest: "creqAtest",
-    });
-    expect(planned?.request.refund).toEqual({
-      to: "address",
-      address: REGTEST_ADDRESS,
-    });
-    expect(planned?.row).toMatchObject({ refundAddress: REGTEST_ADDRESS });
+  it("stores and sends the payout address as Esplora reports it, a bech32 one in lowercase", () => {
     expect(
       planOnchainTransfer({
         draft: { ...send, payoutAddress: REGTEST_ADDRESS.toUpperCase() },
@@ -375,7 +382,7 @@ describe("planOnchainTransfer", () => {
     });
   });
 
-  it("requests an on-chain receive with the refund choice and the user's payment request", () => {
+  it("requests an on-chain receive of any amount, refunded to the sender, holding the minimum until the deposit", () => {
     const planned = planOnchainTransfer({
       draft: receive,
       config,
@@ -384,37 +391,29 @@ describe("planOnchainTransfer", () => {
       operator,
       userPaymentRequest: "creqAtest",
     });
-    expect(planned?.request).toMatchObject({
+    expect(planned?.request).toEqual({
+      v: 1,
+      type: "request",
+      transferId: id,
+      direction: "receive",
+      feeBasisPoints: 100,
       refund: { to: "sender" },
       paymentRequest: "creqAtest",
     });
-    expect(planned?.row).toMatchObject({
+    expect(planned?.row).toEqual({
+      id,
+      createdAtSec: NOW,
+      role: "user",
+      peerPubkey: operator,
+      direction: "receive",
+      amount: 100_000,
+      feeBasisPoints: 100,
       refundToSender: sqliteTrue,
       userPaymentRequest: "creqAtest",
     });
-    expect(planned?.row).not.toHaveProperty("refundAddress");
-
-    const toAddress = planOnchainTransfer({
-      draft: {
-        ...receive,
-        refundToSender: false,
-        refundAddress: REGTEST_ADDRESS,
-      },
-      config,
-      id,
-      nowSec: NOW,
-      operator,
-      userPaymentRequest: "creqAtest",
-    });
-    expect(toAddress?.request.refund).toEqual({
-      to: "address",
-      address: REGTEST_ADDRESS,
-    });
-    expect(toAddress?.row).toMatchObject({ refundAddress: REGTEST_ADDRESS });
-    expect(toAddress?.row).not.toHaveProperty("refundToSender");
   });
 
-  it("refuses an on-chain receive without the user's payment request", () => {
+  it("refuses an on-chain receive without the user's payment request or a minimum to hold", () => {
     expect(
       planOnchainTransfer({
         draft: receive,
@@ -423,6 +422,16 @@ describe("planOnchainTransfer", () => {
         nowSec: NOW,
         operator,
         userPaymentRequest: null,
+      }),
+    ).toBeNull();
+    expect(
+      planOnchainTransfer({
+        draft: receive,
+        config: onchainConfigFixture({ minReceiveAmount: undefined }),
+        id,
+        nowSec: NOW,
+        operator,
+        userPaymentRequest: "creqAtest",
       }),
     ).toBeNull();
   });
@@ -539,50 +548,23 @@ describe("newestOnchainConfig", () => {
   });
 });
 
-describe("isOperatorRequestFor", () => {
-  const transfer = onchainTransferViewFixture();
-  const request = (
-    overrides: Partial<CashuPaymentRequestMessageInfo>,
-  ): CashuPaymentRequestMessageInfo => ({
-    amount: transfer.sendAmount,
-    description: null,
-    encodedRequest: "creqA",
-    mintUrls: ["https://mint.example"],
-    mintsAdvisory: false,
-    outsideMintFee: 0,
-    preferredTransport: "nostr",
-    lockTo: null,
-    requestId: PaymentRequestId.make(transfer.id),
-    transportNprofile: null,
-    transportPostUrl: null,
-    transportPubkeyHex: operator,
-    transportRelays: [],
-    unit: "sat",
-    ...overrides,
-  });
-
-  it("pays only a request naming the transfer, its amount plus the fee and the operator", () => {
-    expect(isOperatorRequestFor(request({}), transfer, operator)).toBe(true);
-    expect(
-      isOperatorRequestFor(
-        request({ amount: transfer.amount }),
-        transfer,
-        operator,
-      ),
-    ).toBe(false);
-    expect(
-      isOperatorRequestFor(
-        request({ requestId: PaymentRequestId.make("other") }),
-        transfer,
-        operator,
-      ),
-    ).toBe(false);
-    expect(
-      isOperatorRequestFor(
-        request({ transportPubkeyHex: makeIdentity().pubkey }),
-        transfer,
-        operator,
-      ),
-    ).toBe(false);
+describe("onchainSendPaymentRequest", () => {
+  it("asks for the amount plus the fee at the config's mint, to the operator, under the transfer id", () => {
+    const transfer = onchainTransferViewFixture();
+    const decoded = decodePaymentRequest(
+      onchainSendPaymentRequest(transfer, config.mintUrl, operator),
+    );
+    expect(decoded).toMatchObject({
+      amount: 101_000,
+      unit: "sat",
+      mints: [config.mintUrl],
+      id: transfer.id,
+    });
+    expect(decoded?.transports).toEqual([
+      expect.objectContaining({
+        type: "nostr",
+        target: nip19.nprofileEncode({ pubkey: operator, relays: [] }),
+      }),
+    ]);
   });
 });

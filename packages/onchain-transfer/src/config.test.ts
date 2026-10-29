@@ -145,6 +145,14 @@ describe("isOfferedAmount", () => {
     expect(isOfferedAmount(terms, "send", 120_000)).toBe(false);
   });
 
+  it("offers an on-chain receive without an amount only under a minimum", () => {
+    expect(isOfferedAmount(terms, "receive", null)).toBe(false);
+    expect(
+      isOfferedAmount({ ...terms, minReceiveAmount: 100_000 }, "receive", null),
+    ).toBe(true);
+    expect(isOfferedAmount(terms, "send", null)).toBe(false);
+  });
+
   it("offers an on-chain receive for any whole number of sats up to the maximum", () => {
     expect(isOfferedAmount(terms, "receive", 1)).toBe(true);
     expect(isOfferedAmount(terms, "receive", 123_456)).toBe(true);

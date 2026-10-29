@@ -30,7 +30,7 @@ export interface WalletCommands {
     message: LocalNostrMessage,
     request: CashuPaymentRequestMessageInfo,
   ) => Promise<void>;
-  /** Reviews and pays the operator's request of an on-chain transfer while `isPaymentAuthorized` holds; `onPaid` runs once it is paid. */
+  /** Pays the operator for an on-chain send while `isPaymentAuthorized` holds; `onPaid` runs once it is paid. */
   readonly payOnchainTransferPaymentRequest: (
     request: CashuPaymentRequestMessageInfo,
     options: OnchainTransferPaymentOptions,

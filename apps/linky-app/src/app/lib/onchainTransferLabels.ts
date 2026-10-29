@@ -28,12 +28,13 @@ export const ONCHAIN_TRANSFER_HISTORY_TITLE_KEYS: Record<
 /**
  * The sats the payment history shows for a transfer: the agreed debit or
  * credit unless it ended otherwise, then what came back or arrived; null when
- * that is not known, as for an ending before any money moved.
+ * that is not known, as for an ending before any money moved or a receive of
+ * any amount before its deposit.
  */
 export const onchainTransferHistoryAmount = (
   transfer: Pick<
     OnchainTransferView,
-    "amount" | "direction" | "phase" | "sendAmount" | "update"
+    "amount" | "anyAmount" | "direction" | "phase" | "sendAmount" | "update"
   >,
 ): number | null => {
   switch (transfer.phase) {
@@ -44,8 +45,9 @@ export const onchainTransferHistoryAmount = (
         transfer.update?.refundAmount ?? transfer.update?.receivedAmount ?? null
       );
     default:
-      return transfer.direction === "send"
-        ? transfer.sendAmount
+      if (transfer.direction === "send") return transfer.sendAmount;
+      return transfer.anyAmount && transfer.update?.receivedAmount === undefined
+        ? null
         : transfer.amount;
   }
 };
@@ -67,6 +69,7 @@ export const ONCHAIN_TRANSFER_PHASE_LABEL_KEYS: Record<
   sent: "onchainTransferPhaseSent",
   awaitingDeposit: "onchainTransferPhaseAwaitingDeposit",
   depositSeen: "onchainTransferPhaseDepositSeen",
+  depositConfirming: "onchainTransferPhaseDepositConfirming",
   shortDeposit: "onchainTransferPhaseShortDeposit",
   waitingForEcash: "onchainTransferPhaseWaitingForEcash",
   completed: "onchainTransferPhaseCompleted",
@@ -83,6 +86,7 @@ export const ONCHAIN_TRANSFER_PHASE_TONES: Record<OnchainTransferPhase, Tone> =
     sent: "info",
     awaitingDeposit: "warning",
     depositSeen: "info",
+    depositConfirming: "info",
     shortDeposit: "danger",
     waitingForEcash: "info",
     completed: "accent",

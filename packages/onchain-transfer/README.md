@@ -5,7 +5,7 @@ The on-chain transfer domain: a Linky user moves bitcoin between their ecash at 
 - **Messages** (`messages.ts`) — the `OnchainTransferRequest`, `OnchainTransferCancel` and `OnchainTransferUpdate` schemas, the `onchainTransferChannel` they travel on, which update wins, and the stored `updateJson` column.
 - **Statuses** (`status.ts`) — the operator's statuses and which move from which.
 - **Phases** (`phase.ts`) — what Linky shows for a transfer, and when the user may still cancel it.
-- **Fees** (`fees.ts`) — the service fee in basis points, charged on top of the transfer amount.
+- **Fees** (`fees.ts`) — the service fee in basis points, charged on top of the transfer amount, and the terms a deposit sets on a receive of any amount.
 - **Config** (`config.ts`) — the operator's public NIP-78 on-chain config.
 - **Bitcoin** (`bitcoin.ts`) — BIP86 deposit addresses, address validation per network, BIP21 URIs and explorer links.
 - **Esplora** (`esplora.ts`) — a client for the Esplora HTTP API and the deposit status of an address.

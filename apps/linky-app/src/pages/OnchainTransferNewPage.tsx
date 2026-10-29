@@ -1,19 +1,22 @@
 import {
+  Button,
   Form,
+  Icon,
+  IconButton,
   ListRow,
   LoadingState,
   Notice,
-  Section,
+  Row,
   Stack,
   SubmitButton,
   Switch,
   Text,
   TextField,
+  type IconName,
 } from "@linky-fit/ui";
 import {
   amountWithServiceFee,
   isClientVersionSupported,
-  serviceFee,
   type OnchainConfig,
   type OnchainTransferDirection,
 } from "@linky-fit/onchain-transfer";
@@ -22,18 +25,19 @@ import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import {
   useOnchainConfig,
   useOnchainTransferCommands,
+  useOnchainTransfers,
   useOnchainTransfersShown,
 } from "../app/hooks/useOnchainTransfers";
 import { useWalletBalance } from "../app/hooks/wallet/useWalletInventory";
 import { formatServiceFeePercent } from "../app/lib/onchainTransferLabels";
 import {
   newOnchainTransferProblem,
+  openOnchainReceive,
   type NewOnchainTransferDraft,
 } from "../app/lib/onchainTransfers";
-import { AmountKeypad } from "../components/AmountKeypad";
-import { OnchainTransferAmounts } from "../components/OnchainTransfer";
-import { useAmountInputKeypad } from "../components/useAmountInputKeypad";
+import { DisplayAmount } from "../components/DisplayAmount";
 import { useExactAmountText } from "../app/hooks/useExactAmountText";
+import { navigateTo } from "../hooks/useRouting";
 import { applyPwaUpdate } from "../utils/pwaUpdate";
 
 /** A scanned payout address and amount for an on-chain send. */
@@ -42,92 +46,57 @@ export interface OnchainSendPrefill {
   readonly amount: number | null;
 }
 
-interface OnchainTransferFormProps {
-  direction: OnchainTransferDirection;
+interface OnchainSendFormProps {
   config: OnchainConfig;
   /** The most an on-chain send can pay, moving funds between mints included. */
   payableSat: number;
   prefill: OnchainSendPrefill | null;
-  /** receive: the amount the receive page holds, to start from. */
-  receiveAmount?: number | null;
   /** Resolves once the request was handled; false keeps the form for another try. */
   onSubmit: (draft: NewOnchainTransferDraft) => Promise<boolean>;
-  onContactSupport: () => void;
 }
 
-export function OnchainTransferForm({
-  direction,
+/** The payout address and one amount: the largest the balance pays, stepped down or up among the operator's amounts. */
+export function OnchainSendForm({
   config,
   payableSat,
   prefill,
-  receiveAmount = null,
   onSubmit,
-  onContactSupport,
-}: OnchainTransferFormProps): React.ReactElement {
-  const { lang, t } = useTranslation();
+}: OnchainSendFormProps): React.ReactElement {
+  const { t } = useTranslation();
   const { formatDisplayedAmountText: amountText } = useDisplayAmounts();
-  const { btc, sats } = useExactAmountText();
-  const send = direction === "send";
   const { feeBasisPoints } = config;
-  const affordable = (amount: number) =>
-    !send || amountWithServiceFee(amount, feeBasisPoints) <= payableSat;
-  const [draft, setDraft] = React.useState<NewOnchainTransferDraft>(() => {
-    const amount = prefill?.amount ?? null;
-    return {
-      direction,
-      amount: send
-        ? amount !== null &&
-          config.amounts.includes(amount) &&
-          affordable(amount)
-          ? amount
-          : null
-        : receiveAmount,
-      payoutAddress: prefill?.payoutAddress ?? "",
-      refundAddress: "",
-      refundToSender: true,
-    };
-  });
+  const total = (amount: number) =>
+    amountWithServiceFee(amount, feeBasisPoints);
+  const amounts = [...config.amounts].sort((a, b) => a - b);
+  const affordable = amounts.filter((amount) => total(amount) <= payableSat);
   const scannedAmount = prefill?.amount ?? null;
-  const unavailableAmount =
-    send && scannedAmount !== null && !config.amounts.includes(scannedAmount)
+  const [amount, setAmount] = React.useState<number | null>(() =>
+    scannedAmount !== null && affordable.includes(scannedAmount)
       ? scannedAmount
-      : null;
+      : (affordable.at(-1) ?? null),
+  );
+  const [payoutAddress, setPayoutAddress] = React.useState(
+    prefill?.payoutAddress ?? "",
+  );
+  // The recipient asked for an amount the send cannot be made for; the user confirms they agreed on another.
+  const unavailableAmount =
+    scannedAmount !== null && scannedAmount !== amount ? scannedAmount : null;
   const [differentAmountChecked, setDifferentAmountChecked] =
     React.useState(false);
-  const [receiveAmountSat, setReceiveAmountText] = React.useState(
-    receiveAmount === null ? "" : String(receiveAmount),
-  );
   const [busy, setBusy] = React.useState(false);
-  const change = (patch: Partial<NewOnchainTransferDraft>) =>
-    setDraft((previous) => ({ ...previous, ...patch }));
-  const receiveAmountInput = useAmountInputKeypad({
-    amount: receiveAmountSat,
-    onAmountChange: (amount) => {
-      setReceiveAmountText(amount);
-      change({ amount: Number.parseInt(amount, 10) || null });
-    },
-  });
+  const draft: NewOnchainTransferDraft = {
+    direction: "send",
+    amount,
+    payoutAddress,
+  };
   const problem = newOnchainTransferProblem(draft, config);
   const blocked =
     problem !== null || (unavailableAmount !== null && !differentAmountChecked);
-  const feePercent = formatServiceFeePercent(feeBasisPoints, lang);
-  const total =
-    draft.amount === null
-      ? null
-      : amountWithServiceFee(draft.amount, feeBasisPoints);
-  const amountNotice = send
-    ? draft.amount === null
-      ? null
-      : t("onchainSendArrivingAmount").replace(
-          "{amount}",
-          amountText(draft.amount),
-        )
-    : total === null
-      ? t("onchainReceiveNetworkFee")
-      : t("onchainReceiveNetworkFeeAmount").replace(
-          "{total}",
-          `${sats(total)} (${btc(total)})`,
-        );
+  const index = amount === null ? -1 : affordable.indexOf(amount);
+  const step = (delta: -1 | 1) => {
+    const next = affordable[index + delta];
+    if (next !== undefined) setAmount(next);
+  };
 
   const submit = () => {
     if (blocked || busy) return;
@@ -137,41 +106,9 @@ export function OnchainTransferForm({
     });
   };
 
-  const addressField = (
-    field: "payoutAddress" | "refundAddress",
-    label: string,
-    hint?: string,
-  ) => (
-    <TextField
-      label={label}
-      hint={hint}
-      value={draft[field]}
-      onChangeText={(value) => change({ [field]: value })}
-      autoCapitalize="none"
-      autoCorrect={false}
-      spellCheck={false}
-      error={
-        problem === "payoutAddressInvalid" || problem === "refundAddressInvalid"
-          ? t("onchainTransferAddressInvalid")
-          : undefined
-      }
-      testID={`onchain-transfer-${field}`}
-    />
-  );
-
   return (
     <Form onSubmit={submit}>
-      <Text color="$colorSubtle">
-        {send
-          ? t("onchainSendFixedAmounts")
-          : t("onchainReceiveAnyAmount").replace(
-              "{max}",
-              amountText(config.maxReceiveAmount),
-            )}
-      </Text>
-      {config.amounts.some(affordable) ? null : (
-        <Notice tone="warning" title={t("onchainSendInsufficient")} />
-      )}
+      <Text color="$colorSubtle">{t("onchainSendArrivalNotice")}</Text>
       {unavailableAmount === null ? null : (
         <>
           <Notice
@@ -194,122 +131,149 @@ export function OnchainTransferForm({
           />
         </>
       )}
-      {send ? (
-        <Section title={t("onchainTransferChooseAmount")}>
-          {config.amounts.map((amount) => (
-            <ListRow
-              key={amount}
-              title={amountText(amount)}
-              description={
-                affordable(amount) ? undefined : (
-                  <Text variant="caption" color="$colorMuted">
-                    {t("payInsufficient")}
-                  </Text>
-                )
-              }
-              selected={draft.amount === amount}
-              disabled={!affordable(amount)}
-              chevron={false}
-              onPress={() => change({ amount })}
+      {amount === null ? (
+        <Notice
+          tone="warning"
+          title={t("onchainSendMinimum").replace(
+            "{min}",
+            amountText(total(amounts[0] ?? 0)),
+          )}
+        />
+      ) : (
+        <Stack alignItems="center" gap="$xs" paddingVertical="$lg">
+          <Row alignItems="center" gap="$lg">
+            <IconButton
+              icon="Minus"
+              variant="secondary"
+              accessibilityLabel={t("onchainSendLowerAmount")}
+              disabled={index <= 0}
+              onPress={() => step(-1)}
+              testID="onchain-transfer-amount-down"
+            />
+            <DisplayAmount
+              amount={total(amount)}
+              size="lg"
               testID="onchain-transfer-amount"
             />
-          ))}
-        </Section>
-      ) : (
-        <>
-          <AmountKeypad amount={receiveAmountSat} input={receiveAmountInput} />
-          {problem === "amountOverMax" ? (
-            <Notice
-              tone="warning"
-              title={t("onchainReceiveAmountTooHigh").replace(
-                "{max}",
-                amountText(config.maxReceiveAmount),
-              )}
+            <IconButton
+              icon="Plus"
+              variant="secondary"
+              accessibilityLabel={t("onchainSendHigherAmount")}
+              disabled={index >= affordable.length - 1}
+              onPress={() => step(1)}
+              testID="onchain-transfer-amount-up"
             />
-          ) : null}
-        </>
+          </Row>
+          <Text
+            variant="caption"
+            color="$colorMuted"
+            testID="onchain-transfer-arriving"
+          >
+            {t("onchainSendArrivingAmount").replace(
+              "{amount}",
+              amountText(amount),
+            )}
+          </Text>
+        </Stack>
       )}
-      {draft.amount === null || total === null ? null : (
-        <OnchainTransferAmounts
-          direction={direction}
-          amount={draft.amount}
-          fee={serviceFee(draft.amount, feeBasisPoints)}
-          total={total}
-          feePercent={feePercent}
-        />
-      )}
-      {send ? (
-        addressField("payoutAddress", t("onchainSendPayoutAddress"))
-      ) : (
-        <Section title={t("onchainTransferRefundAddress")}>
-          <ListRow
-            title={t("onchainReceiveRefundToSender")}
-            selected={draft.refundToSender}
-            chevron={false}
-            onPress={() => change({ refundToSender: true })}
-            testID="onchain-transfer-refund-sender"
-          />
-          <ListRow
-            title={t("onchainReceiveUseCustomRefund")}
-            selected={!draft.refundToSender}
-            chevron={false}
-            onPress={() => change({ refundToSender: false })}
-            testID="onchain-transfer-custom-refund"
-          />
-          {draft.refundToSender ? (
-            <Text variant="caption" color="$colorMuted">
-              {t("onchainReceiveCustodialWarning")}
-            </Text>
-          ) : (
-            addressField(
-              "refundAddress",
-              t("onchainReceiveRefundAddressField"),
-              t("onchainReceiveRefundHint"),
-            )
-          )}
-        </Section>
-      )}
-      <Notice
-        tone="info"
-        title={t(
-          send ? "onchainSendArrivalNotice" : "onchainReceiveArrivalNotice",
-        )}
-        description={[
-          amountNotice,
-          t("onchainTransferFeeNotice").replace("{fee}", feePercent),
-        ]
-          .filter((sentence) => sentence !== null)
-          .join(" ")}
-        action={{
-          label: t("onchainTransferContactSupport"),
-          onPress: onContactSupport,
-        }}
+      <TextField
+        label={t("onchainSendPayoutAddress")}
+        value={payoutAddress}
+        onChangeText={setPayoutAddress}
+        autoCapitalize="none"
+        autoCorrect={false}
+        spellCheck={false}
+        error={
+          problem === "payoutAddressInvalid"
+            ? t("onchainTransferAddressInvalid")
+            : undefined
+        }
+        testID="onchain-transfer-payoutAddress"
       />
       <SubmitButton
         disabled={blocked}
         loading={busy}
         testID="onchain-transfer-continue"
       >
-        {t("onchainTransferContinue")}
+        {t("onchainSendSubmit")}
       </SubmitButton>
     </Form>
+  );
+}
+
+interface OnchainReceiveIntroProps {
+  config: OnchainConfig;
+  busy: boolean;
+  /** Shows the deposit address: an open one, or a fresh one from the operator. */
+  onShowAddress: () => void;
+}
+
+/** What to know before depositing: how long it takes, the limits, the fee and where a refused deposit goes. */
+export function OnchainReceiveIntro({
+  config,
+  busy,
+  onShowAddress,
+}: OnchainReceiveIntroProps): React.ReactElement {
+  const { lang, t } = useTranslation();
+  const { sats } = useExactAmountText();
+  const min = config.minReceiveAmount;
+  if (min === undefined) {
+    return <Notice tone="warning" title={t("onchainTransferUnavailable")} />;
+  }
+  const points: ReadonlyArray<[IconName, string]> = [
+    ["Clock", t("onchainReceiveIntroSettlement")],
+    [
+      "Bitcoin",
+      t("onchainReceiveIntroRange")
+        .replace("{min}", sats(min))
+        .replace("{max}", sats(config.maxReceiveAmount)),
+    ],
+    [
+      "Coins",
+      t("onchainReceiveIntroFee").replace(
+        "{fee}",
+        formatServiceFeePercent(config.feeBasisPoints, lang),
+      ),
+    ],
+    ["ArrowDownToLine", t("onchainReceiveIntroRefund")],
+  ];
+  return (
+    <Stack gap="$lg">
+      <Stack gap="$lg" paddingVertical="$md">
+        {points.map(([icon, text]) => (
+          <Row key={icon} gap="$md" alignItems="flex-start">
+            <Icon name={icon} color="$colorMuted" />
+            <Text flex={1}>{text}</Text>
+          </Row>
+        ))}
+      </Stack>
+      <Button
+        icon="QrCode"
+        loading={busy}
+        onPress={onShowAddress}
+        testID="onchain-receive-show-address"
+      >
+        {t("onchainReceiveShowAddress")}
+      </Button>
+    </Stack>
   );
 }
 
 export function OnchainTransferNewPage({
   direction,
   prefill,
-  receiveAmount = null,
-}: Pick<
-  OnchainTransferFormProps,
-  "direction" | "prefill" | "receiveAmount"
->): React.ReactElement {
+}: {
+  direction: OnchainTransferDirection;
+  prefill: OnchainSendPrefill | null;
+}): React.ReactElement {
   const { t } = useTranslation();
   const shown = useOnchainTransfersShown();
   const configState = useOnchainConfig();
+  const transfers = useOnchainTransfers();
   const { cashuBalanceAfterMelt } = useWalletBalance();
   const { contactSupport, requestOnchainTransfer } =
     useOnchainTransferCommands();
+  const [busy, setBusy] = React.useState(false);
   if (!shown || configState.status === "unavailable") {
     return <Notice tone="warning" title={t("onchainTransferUnavailable")} />;
   }
@@ -352,15 +316,37 @@ export function OnchainTransferNewPage({
       />
     );
   }
+  if (direction === "send") {
+    return (
+      <OnchainSendForm
+        config={config}
+        payableSat={cashuBalanceAfterMelt}
+        prefill={prefill}
+        onSubmit={(draft) => requestOnchainTransfer(draft, config)}
+      />
+    );
+  }
+  const showAddress = () => {
+    if (busy) return;
+    // The address stays the same until something arrives at it.
+    const open = openOnchainReceive(transfers);
+    if (open !== null) {
+      navigateTo({ route: "onchainTransfer", id: open.id });
+      return;
+    }
+    setBusy(true);
+    void requestOnchainTransfer(
+      { direction: "receive", amount: null, payoutAddress: "" },
+      config,
+    ).then((requested) => {
+      if (!requested) setBusy(false);
+    });
+  };
   return (
-    <OnchainTransferForm
-      direction={direction}
+    <OnchainReceiveIntro
       config={config}
-      payableSat={cashuBalanceAfterMelt}
-      prefill={prefill}
-      receiveAmount={receiveAmount}
-      onSubmit={(draft) => requestOnchainTransfer(draft, config)}
-      onContactSupport={supportAction.onPress}
+      busy={busy}
+      onShowAddress={showAddress}
     />
   );
 }
