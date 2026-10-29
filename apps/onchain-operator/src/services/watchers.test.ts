@@ -1,4 +1,4 @@
-import type { Pubkey } from "@linky-fit/linkstr";
+import { encodeNpub, type Pubkey } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { describe, expect, it } from "vitest";
 import type { OperatorProfile } from "../domain/profile";
@@ -35,13 +35,12 @@ describe("createWatcherAlerts", () => {
         },
       },
       loadProfile: async () => profileWith([first, second]),
-      nameOf: () => "Alice",
     });
 
     await alert({ _tag: "message", from: user, text: "Hi" });
 
     expect(sent.map(({ to }) => to)).toEqual([first, second]);
-    expect(sent[0]?.text).toBe('On-chain operator: Alice wrote: "Hi"');
+    expect(sent[0]?.text).toBe(`${encodeNpub(user)} wrote: "Hi"`);
     expect(sent.every(({ ref }) => ref.startsWith("watcher:"))).toBe(true);
   });
 
@@ -56,7 +55,6 @@ describe("createWatcherAlerts", () => {
         },
       },
       loadProfile: async () => profileWith([watcher, other]),
-      nameOf: () => "Watcher",
     })({ _tag: "message", from: watcher, text: "On it." });
     expect(sent).toEqual([]);
   });
@@ -73,12 +71,10 @@ describe("createWatcherAlerts", () => {
     await createWatcherAlerts({
       nostr,
       loadProfile: async () => null,
-      nameOf: () => "Alice",
     })({ _tag: "message", from: user, text: "Hi" });
     await createWatcherAlerts({
       nostr,
       loadProfile: async () => profileWith([]),
-      nameOf: () => "Alice",
     })({ _tag: "message", from: user, text: "Hi" });
     expect(sends).toBe(0);
   });

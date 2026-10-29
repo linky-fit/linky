@@ -1,5 +1,9 @@
 import { createId } from "@linky-fit/domain";
-import { encodeNpub } from "@linky-fit/linkstr";
+import {
+  encodeNostrPaymentRequest,
+  PaymentRequestId,
+} from "@linky-fit/linkshu";
+import { encodeNprofile, encodeNpub } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { describe, expect, it } from "vitest";
 import type { OperatorTransfer } from "./transfer";
@@ -48,26 +52,52 @@ describe("parseWatchers", () => {
 });
 
 describe("watcherAlertText", () => {
-  it("says what waits for the operator", () => {
-    expect(watcherAlertText({ _tag: "requested", transfer }, "Alice")).toBe(
-      "On-chain operator: Alice requests an on-chain send of 100 000 sat. Accept or deny it in the operator console.",
+  it("says what waits for the operator, after the user's whole npub", () => {
+    const npub = encodeNpub(user);
+    expect(watcherAlertText({ _tag: "requested", transfer }, npub)).toBe(
+      `${npub} wants to send 100 000 sat onchain`,
     );
-    expect(
-      watcherAlertText({ _tag: "payoutDue", transfer }, "Alice"),
-    ).toContain("Pay 100 000 sat");
+    expect(watcherAlertText({ _tag: "payoutDue", transfer }, npub)).toBe(
+      `${npub} paid to send 100 000 sat onchain. Pay their address.`,
+    );
     const receive: OperatorTransfer = { ...transfer, direction: "receive" };
     expect(
       watcherAlertText(
         { _tag: "ecashDue", transfer: receive, receivedAmount: 101_000 },
-        "Alice",
+        npub,
       ),
-    ).toContain("Send them the Cashu.");
+    ).toBe(
+      `${npub} deposited to receive 100 000 sat onchain. Send them the Cashu.`,
+    );
     expect(
       watcherAlertText(
         { _tag: "ecashDue", transfer: receive, receivedAmount: 100_000 },
-        "Alice",
+        npub,
       ),
-    ).toContain("short (100 000 sat)");
+    ).toBe(
+      `${npub} deposited 100 000 sat to receive 100 000 sat onchain, less than the 101 000 sat due. Settle it in the chat.`,
+    );
+    expect(
+      watcherAlertText({ _tag: "cancelledAfterFunds", transfer }, npub),
+    ).toBe(
+      `${npub} no longer wants to send 100 000 sat onchain, but the funds moved. Settle it in the chat.`,
+    );
+  });
+
+  it("names no amount for a receive of any amount without its deposit", () => {
+    const anyAmount: OperatorTransfer = {
+      ...transfer,
+      direction: "receive",
+      userPaymentRequest: encodeNostrPaymentRequest({
+        amount: null,
+        mintUrls: ["https://mint.example"],
+        recipientNprofile: encodeNprofile(user, []),
+        requestId: PaymentRequestId.make(transfer.id),
+      }),
+    };
+    expect(
+      watcherAlertText({ _tag: "requested", transfer: anyAmount }, "npub1x"),
+    ).toBe("npub1x wants to receive onchain");
   });
 
   it("quotes a long message in part", () => {
@@ -75,6 +105,6 @@ describe("watcherAlertText", () => {
       { _tag: "message", from: user, text: ` ${"a".repeat(300)} ` },
       "Alice",
     );
-    expect(text).toBe(`On-chain operator: Alice wrote: "${"a".repeat(200)}…"`);
+    expect(text).toBe(`Alice wrote: "${"a".repeat(200)}…"`);
   });
 });
