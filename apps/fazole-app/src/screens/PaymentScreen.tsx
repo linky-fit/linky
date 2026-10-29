@@ -12,7 +12,6 @@ import {
   SegmentedControl,
   Spinner,
   Stack,
-  SuccessOverlay,
   Text,
   TopBar,
 } from "@linky-fit/ui";
@@ -25,24 +24,22 @@ import {
   type Payment,
   type ShopProfile,
 } from "../domain";
-import { formatCzkValue, shortNpub } from "../format";
+import { formatCzkValue } from "../format";
 import { copyText } from "../platform/clipboard";
 import { navigateTo } from "../platform/hashRoute";
 import type { BitcoinRequestFailure } from "../services/bitcoinPayments";
 import {
   useAppServices,
   useBitcoinQrMode,
-  usePayerProfile,
   usePayment,
 } from "../services/react";
+import { showPaidBanner } from "../shell/paidBanner";
 import { DetailRows } from "./DetailRows";
 import { Page, WithTopBar } from "./Page";
 import { statusTones } from "./paymentLabels";
 
 const toTerminal = () => navigateTo("terminal");
 
-/** How long the paid confirmation stays before the terminal returns. */
-const PAID_DISMISS_MS = 3_000;
 const COPIED_MS = 2_000;
 
 type Leg = "bank" | "bitcoin";
@@ -99,38 +96,22 @@ function PaymentBody({
   readonly payment: Payment;
   readonly shop: ShopProfile;
 }) {
-  // The confirmation celebrates a payment that settles while it is on screen.
+  // A payment that settles while it is on screen returns to the terminal at once, announced by the banner there.
   const [openedSettled] = useState(payment.status !== "pending");
   const celebrating = payment.status === "paid" && !openedSettled;
-  const payer = usePayerProfile(payment.payerPubkey);
   useEffect(() => {
     if (!celebrating) return;
-    const timer = setTimeout(toTerminal, PAID_DISMISS_MS);
-    return () => clearTimeout(timer);
-  }, [celebrating]);
+    showPaidBanner({
+      key: payment.id,
+      title: copy.payment.paidTitle,
+      amount: formatCzkValue(payment.amountCzk),
+      unit: copy.czk,
+      payerPubkey: payment.payerPubkey,
+    });
+    toTerminal();
+  }, [celebrating, payment.amountCzk, payment.id, payment.payerPubkey]);
 
-  if (celebrating) {
-    return (
-      <Page>
-        <SuccessOverlay
-          title={copy.payment.paidTitle}
-          amount={formatCzkValue(payment.amountCzk)}
-          unit={copy.czk}
-          direction="in"
-          avatar={
-            payment.payerPubkey === null
-              ? undefined
-              : {
-                  // The overlay prints the name under the avatar and takes its initials from it.
-                  name: payer?.name ?? shortNpub(payment.payerPubkey),
-                  uri: payer?.picture ?? undefined,
-                }
-          }
-          onDismiss={toTerminal}
-        />
-      </Page>
-    );
-  }
+  if (celebrating) return null;
   return payment.status === "pending" ? (
     <OpenPayment payment={payment} shop={shop} />
   ) : (

@@ -5,12 +5,10 @@ import {
   Keypad,
   Notice,
   Stack,
-  Toast,
-  ToastStack,
   TopBar,
   useMedia,
 } from "@linky-fit/ui";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { copy } from "../copy";
 import {
   canRequestPayment,
@@ -19,18 +17,17 @@ import {
   keypadAmount,
   pressKeypadKey,
   withTip,
-  type DirectTransfer,
   type TipChoice,
 } from "../domain";
-import { formatCzk, formatWhole, numberSeparators } from "../format";
+import { formatCzkValue, formatWhole, numberSeparators } from "../format";
 import { navigateTo } from "../platform/hashRoute";
 import { paymentRoute } from "../routing";
 import {
   useAppServices,
   useDirectTransfers,
   useOfferTips,
-  usePayerName,
 } from "../services/react";
+import { showPaidBanner } from "../shell/paidBanner";
 import { nowSeconds } from "../utils/time";
 import { TipStep } from "./TipStep";
 
@@ -132,53 +129,28 @@ export function TerminalScreen() {
   );
 }
 
-const NOTICE_MS = 6_000;
-
-/** Tells the merchant about a direct transfer that arrives while the terminal is open, for a few seconds. */
+/** Announces a direct transfer that arrives while the terminal is open, in the payment banner. */
 function DirectTransferNotice() {
   const [openedAtSec] = useState(nowSeconds);
   const [newest] = useDirectTransfers();
-  const [dismissedId, setDismissedId] = useState<string | null>(null);
-  const fresh =
-    newest !== undefined &&
-    newest.receivedAtSec >= openedAtSec &&
-    newest.id !== dismissedId
-      ? newest
-      : null;
-  const freshId = fresh?.id ?? null;
+  const announcedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (freshId === null) return;
-    const timer = setTimeout(() => setDismissedId(freshId), NOTICE_MS);
-    return () => clearTimeout(timer);
-  }, [freshId]);
-  return fresh === null ? null : (
-    <ToastStack>
-      <DirectTransferToast
-        transfer={fresh}
-        onPress={() => setDismissedId(fresh.id)}
-      />
-    </ToastStack>
-  );
-}
-
-function DirectTransferToast({
-  transfer,
-  onPress,
-}: {
-  readonly transfer: DirectTransfer;
-  readonly onPress: () => void;
-}) {
-  const payer = usePayerName(transfer.payerPubkey);
-  const czk = directTransferCzk(transfer);
-  return (
-    <Toast
-      title={copy.terminal.directReceived(
-        payer,
-        czk === null
-          ? copy.satAmount(formatWhole(transfer.sats))
-          : formatCzk(czk),
-      )}
-      onPress={onPress}
-    />
-  );
+    if (
+      newest === undefined ||
+      newest.receivedAtSec < openedAtSec ||
+      announcedRef.current === newest.id
+    ) {
+      return;
+    }
+    announcedRef.current = newest.id;
+    const czk = directTransferCzk(newest);
+    showPaidBanner({
+      key: newest.id,
+      title: copy.terminal.directReceived,
+      amount: czk === null ? formatWhole(newest.sats) : formatCzkValue(czk),
+      unit: czk === null ? copy.sat : copy.czk,
+      payerPubkey: newest.payerPubkey,
+    });
+  }, [newest, openedAtSec]);
+  return null;
 }

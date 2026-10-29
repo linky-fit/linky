@@ -83,8 +83,7 @@ export const cs = {
     keypadDelete: "Smazat",
     request: "Potvrdit",
     failed: "Platbu se nepodařilo vytvořit. Zkuste to znovu.",
-    directReceived: (name: string, amount: string) =>
-      `Přímá platba od ${name}: ${amount}`,
+    directReceived: "Přímá platba",
   },
 
   tips: {

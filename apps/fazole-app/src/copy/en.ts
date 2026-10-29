@@ -86,8 +86,7 @@ export const en: Copy = {
     keypadDelete: "Delete",
     request: "Confirm",
     failed: "The payment could not be created. Try again.",
-    directReceived: (name: string, amount: string) =>
-      `Direct payment from ${name}: ${amount}`,
+    directReceived: "Direct payment",
   },
 
   tips: {
