@@ -7,7 +7,7 @@ import { Icon } from "./icons";
 import type { IconName } from "./icons";
 import { Row, Stack, Text } from "./layout";
 import { tooltipProps } from "./styles";
-import { border, enterScale, shadow, size as sizes, space } from "./tokens";
+import { enterScale, shadow, size as sizes, space } from "./tokens";
 
 export type KeypadKey =
   | "0"
@@ -166,6 +166,47 @@ export function QRCode({
   );
 }
 
+/** A ring of surface around the colored circle, as a fill: the badge reads as sitting on the figure without a border. */
+const badgeSizes = {
+  sm: { ring: "$iconLg", dot: "$icon" },
+  lg: { ring: "$controlSm", dot: "$iconLg" },
+} as const;
+
+function DirectionBadge({
+  direction,
+  size,
+}: {
+  direction: "in" | "out";
+  size: keyof typeof badgeSizes;
+}) {
+  const { ring, dot } = badgeSizes[size];
+  return (
+    <View
+      width={ring}
+      height={ring}
+      borderRadius="$pill"
+      backgroundColor="$surface"
+      alignItems="center"
+      justifyContent="center"
+    >
+      <View
+        width={dot}
+        height={dot}
+        borderRadius="$pill"
+        backgroundColor={direction === "out" ? "$warning" : "$accent"}
+        alignItems="center"
+        justifyContent="center"
+      >
+        <Icon
+          name={direction === "out" ? "ArrowUp" : "ArrowDown"}
+          size="sm"
+          color="$colorStrong"
+        />
+      </View>
+    </View>
+  );
+}
+
 export interface SuccessOverlayProps {
   title: string;
   amount?: string | undefined;
@@ -230,8 +271,6 @@ export function SuccessOverlay({
               width="$hero"
               height="$hero"
               borderRadius="$pill"
-              borderWidth={border.emphasis}
-              borderColor={pending ? "$borderColor" : "$accent"}
               backgroundColor={pending ? "$neutralSoft" : "$accentSoft"}
               alignItems="center"
               justifyContent="center"
@@ -269,14 +308,6 @@ export function SuccessOverlay({
               position="absolute"
               right={0}
               bottom={0}
-              width="$controlSm"
-              height="$controlSm"
-              borderRadius="$pill"
-              borderWidth={border.focus}
-              borderColor="$surface"
-              backgroundColor={direction === "out" ? "$warning" : "$accent"}
-              alignItems="center"
-              justifyContent="center"
               transition="slow"
               enterStyle={{
                 opacity: 0,
@@ -284,11 +315,7 @@ export function SuccessOverlay({
                 y: direction === "out" ? space.lg : -space.xxxl,
               }}
             >
-              <Icon
-                name={direction === "out" ? "ArrowUp" : "ArrowDown"}
-                size="sm"
-                color="$colorStrong"
-              />
+              <DirectionBadge direction={direction} size="lg" />
             </View>
           ) : null}
         </View>
@@ -316,4 +343,153 @@ export function SuccessOverlay({
     </Pressable>
   );
   return contained ? overlay : <Portal zIndex="$overlay">{overlay}</Portal>;
+}
+
+export interface PaymentBannerProps {
+  title: string;
+  amount?: string | undefined;
+  /** Shown after the amount, e.g. "sat". */
+  unit?: string | undefined;
+  /** The other party: their avatar replaces the status mark and their name sits under the title. */
+  avatar?: { name: string; uri?: string | undefined } | undefined;
+  /** Which way the money goes, as an arrow badge on the figure. */
+  direction?: "in" | "out" | undefined;
+  /** The payment is still in flight: a spinner waits where the direction arrow appears once it settles. */
+  pending?: boolean | undefined;
+  /** Renders in place, at the top of the nearest positioned parent, instead of portaling over the whole app. */
+  contained?: boolean | undefined;
+  /** Closes the banner on press; a pending banner cannot be dismissed. */
+  onDismiss?: (() => void) | undefined;
+}
+
+/**
+ * A payment's progress as a card at the top edge: sending, sent or
+ * received, with the other party and the amount. Nothing dims the screen
+ * and the banner takes only its own touches, so whatever the user was doing
+ * goes on underneath.
+ */
+export function PaymentBanner({
+  title,
+  amount,
+  unit,
+  avatar,
+  direction,
+  pending = false,
+  contained = false,
+  onDismiss,
+}: PaymentBannerProps) {
+  const dismiss = pending ? undefined : onDismiss;
+  const Frame = dismiss ? Pressable : Row;
+  const banner = (
+    <View
+      position="absolute"
+      top={0}
+      left={0}
+      right={0}
+      zIndex="$overlay"
+      alignItems="center"
+      padding="$md"
+      pointerEvents="box-none"
+      data-safe-area="top"
+    >
+      <Frame
+        role="status"
+        aria-live="assertive"
+        cursor={dismiss ? "pointer" : "default"}
+        pointerEvents="auto"
+        onPress={dismiss}
+        width="100%"
+        maxWidth="$sheetWidth"
+        gap="$md"
+        alignItems="center"
+        paddingVertical="$md"
+        paddingHorizontal="$lg"
+        borderRadius="$card"
+        backgroundColor="$surface"
+        boxShadow={shadow.floating}
+        transition="slow"
+        enterStyle={{ opacity: 0, y: -space.huge }}
+      >
+        <View position="relative">
+          {avatar ? (
+            <Avatar name={avatar.name} uri={avatar.uri} size="md" raised />
+          ) : (
+            <View
+              width="$avatar"
+              height="$avatar"
+              borderRadius="$pill"
+              backgroundColor={pending ? "$neutralSoft" : "$accentSoft"}
+              alignItems="center"
+              justifyContent="center"
+            >
+              {pending ? (
+                <Icon
+                  name={direction === "in" ? "ArrowDown" : "ArrowUp"}
+                  size="lg"
+                  color="$warning"
+                />
+              ) : (
+                <Icon name="Check" size="lg" color="$accent" />
+              )}
+            </View>
+          )}
+          {/* Keyed so the badges never share an instance: `transition` adds hooks. */}
+          {pending ? (
+            <View
+              key="pending"
+              position="absolute"
+              right={-space.xs}
+              bottom={-space.xs}
+              width="$iconLg"
+              height="$iconLg"
+              borderRadius="$pill"
+              backgroundColor="$surface"
+              alignItems="center"
+              justifyContent="center"
+            >
+              <Spinner />
+            </View>
+          ) : direction ? (
+            <View
+              key={direction}
+              position="absolute"
+              right={-space.xs}
+              bottom={-space.xs}
+              transition="slow"
+              enterStyle={{ opacity: 0, scale: enterScale.pop }}
+            >
+              <DirectionBadge direction={direction} size="sm" />
+            </View>
+          ) : null}
+        </View>
+        <Stack flex={1} gap="$none">
+          <Text variant="label" numberOfLines={2}>
+            {title}
+          </Text>
+          {avatar?.name ? (
+            <Text variant="caption" color="$colorMuted" numberOfLines={1}>
+              {avatar.name}
+            </Text>
+          ) : null}
+        </Stack>
+        {amount ? (
+          <Row gap="$xs" alignItems="baseline" flexShrink={0}>
+            <Text
+              variant="title"
+              color="$colorStrong"
+              fontVariant={["tabular-nums"]}
+            >
+              {amount}
+            </Text>
+            {unit ? (
+              <Text variant="caption" color="$colorMuted">
+                {unit}
+              </Text>
+            ) : null}
+          </Row>
+        ) : null}
+      </Frame>
+    </View>
+  );
+  return contained ? banner : <Portal zIndex="$overlay">{banner}</Portal>;
 }

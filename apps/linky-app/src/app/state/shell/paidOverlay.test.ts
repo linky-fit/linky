@@ -43,4 +43,19 @@ describe("paid overlay", () => {
     vi.advanceTimersByTime(2000);
     expect(overlay()).toBeNull();
   });
+
+  it("closes a settled confirmation on dismiss, never a payment in flight", () => {
+    vi.useFakeTimers();
+    const { commands, overlay } = setup();
+
+    commands.showPaymentSending(sending);
+    commands.dismissPaid();
+    expect(overlay()?.phase).toBe("sending");
+
+    commands.showPaid("paidSent", sending);
+    commands.dismissPaid();
+    expect(overlay()).toBeNull();
+    vi.advanceTimersByTime(2000);
+    expect(overlay()).toBeNull();
+  });
 });

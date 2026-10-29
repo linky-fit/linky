@@ -83,6 +83,75 @@ export const overlays: Section = {
         </UI.Stack>
       );
     },
+    PaymentBanner: () => {
+      const [open, setOpen] = useState<
+        "sending" | "sent" | "received" | "plain" | null
+      >(null);
+      const close = () => setOpen(null);
+      return (
+        <UI.Stack>
+          <UI.Row flexWrap="wrap">
+            <UI.Button onPress={() => setOpen("sending")}>Sending</UI.Button>
+            <UI.Button variant="secondary" onPress={() => setOpen("sent")}>
+              Sent
+            </UI.Button>
+            <UI.Button variant="secondary" onPress={() => setOpen("received")}>
+              Received
+            </UI.Button>
+            <UI.Button variant="secondary" onPress={() => setOpen("plain")}>
+              Without a party
+            </UI.Button>
+          </UI.Row>
+          <UI.Card
+            outlined
+            position="relative"
+            height="$column"
+            overflow="hidden"
+            alignItems="center"
+            justifyContent="flex-end"
+          >
+            <UI.Text color="$colorMuted">Positioned parent</UI.Text>
+            {open === "sending" ? (
+              <UI.PaymentBanner
+                contained
+                title="Sending…"
+                amount="2,100"
+                unit="sat"
+                avatar={{ name: "Alex Rivers", uri: sampleImage }}
+                direction="out"
+                pending
+              />
+            ) : open === "sent" ? (
+              <UI.PaymentBanner
+                contained
+                title="Sent"
+                amount="2,100"
+                unit="sat"
+                avatar={{ name: "Alex Rivers", uri: sampleImage }}
+                direction="out"
+                onDismiss={close}
+              />
+            ) : open === "received" ? (
+              <UI.PaymentBanner
+                contained
+                title="Received"
+                amount="2,100"
+                unit="sat"
+                avatar={{ name: "Alex Rivers", uri: sampleImage }}
+                direction="in"
+                onDismiss={close}
+              />
+            ) : open === "plain" ? (
+              <UI.PaymentBanner
+                contained
+                title="Topped up 21,000 sat."
+                onDismiss={close}
+              />
+            ) : null}
+          </UI.Card>
+        </UI.Stack>
+      );
+    },
     SuccessOverlay: () => {
       const [open, setOpen] = useState<
         "success" | "received" | "sending" | "contained" | null

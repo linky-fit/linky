@@ -129,10 +129,11 @@ export type {
 } from "./navigation";
 
 // Payments
-export { Keypad, QRCode, SuccessOverlay } from "./payments";
+export { Keypad, PaymentBanner, QRCode, SuccessOverlay } from "./payments";
 export type {
   KeypadKey,
   KeypadProps,
+  PaymentBannerProps,
   QRCodeProps,
   SuccessOverlayProps,
 } from "./payments";

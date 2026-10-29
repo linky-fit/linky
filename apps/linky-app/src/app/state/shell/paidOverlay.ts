@@ -20,6 +20,8 @@ export interface PaidOverlayCommands {
     title: string,
     details: PaidOverlayDetails | null,
   ) => void;
+  /** Closes a `done` confirmation before its time runs out; a `sending` one stays. */
+  readonly dismissPaid: () => void;
 }
 
 const PAID_OVERLAY_DURATION_MS = 2000;
@@ -47,6 +49,11 @@ const makePaidOverlayCommands = (
       registry.update(paidOverlayAtom, (current) =>
         current?.phase === "sending" ? null : current,
       ),
+    dismissPaid: () => {
+      if (registry.get(paidOverlayAtom)?.phase !== "done") return;
+      clearTimer();
+      registry.set(paidOverlayAtom, null);
+    },
     showPaid: (title, details) => {
       clearTimer();
       registry.set(paidOverlayAtom, { details, phase: "done", title });
