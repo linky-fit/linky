@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { formatShortLightningAddress, formatTimeAgo } from "./formatting";
+import {
+  formatShortLightningAddress,
+  formatTimeAgo,
+  groupAddress,
+} from "./formatting";
 
 describe("formatShortLightningAddress", () => {
   it("shortens npub local parts while preserving the lightning domain", () => {
@@ -45,5 +49,12 @@ describe("formatTimeAgo", () => {
   it("shows nothing for a missing timestamp", () => {
     expect(formatTimeAgo(0, "en")).toBe("");
     expect(formatTimeAgo(Number.NaN, "en")).toBe("");
+  });
+});
+
+describe("groupAddress", () => {
+  it("splits an address into groups of four, the last one shorter", () => {
+    expect(groupAddress("bc1q5089abcf3t4")).toBe("bc1q 5089 abcf 3t4");
+    expect(groupAddress("bc1q")).toBe("bc1q");
   });
 });

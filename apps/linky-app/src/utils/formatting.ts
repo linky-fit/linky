@@ -53,6 +53,10 @@ export const formatShortLightningAddress = (value: string): string => {
   return `${localPart.slice(0, 10)}...${domainPart}`;
 };
 
+/** "bc1q 5089 … f3t4": an address in groups of four, to read along with a wallet. */
+export const groupAddress = (address: string): string =>
+  address.match(/.{1,4}/gu)?.join(" ") ?? address;
+
 export const formatMiddleDots = (value: string, maxLen: number): string => {
   const trimmed = value.trim();
   if (!trimmed) return "";

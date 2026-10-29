@@ -1381,8 +1381,6 @@ export const cs = {
     "Do vaší bitcoinové peněženky dorazí {amount} do 24 hodin od zaplacení.",
   onchainReceiveAwaitingDepositHint:
     "Pošlete ze své bitcoinové peněženky přesně {amount} na tuto adresu. Síťový poplatek vaší peněženky se platí zvlášť.",
-  onchainReceiveDepositSeenHint:
-    "Vaše bitcoiny vidíme na cestě. Započítají se, jakmile budou potvrzené.",
   onchainReceiveWaitingForEcashHint:
     "Vaše platba je potvrzená. {amount} vám připíšeme na zůstatek do 24 hodin.",
   onchainSendCompletedHint: "{amount} jsme poslali do vaší on-chain peněženky.",
@@ -1394,10 +1392,6 @@ export const cs = {
   onchainReceiveDepositQr: "QR kód bitcoinové platby",
   onchainSendPay: "Odeslat {amount}",
   onchainTransferPayoutAddress: "Cílová adresa",
-  onchainTransferDepositAddress: "Adresa pro platbu",
-  onchainTransferDepositTransaction: "Transakce platby",
-  onchainTransferPayoutTransaction: "Transakce odeslání",
-  onchainTransferRefundTransaction: "Transakce vrácení",
   onchainTransferCancel: "Zrušit transakci",
   onchainTransferCancelTitle: "Zrušit tuto transakci?",
   onchainTransferCancelBody:
@@ -1414,7 +1408,6 @@ export const cs = {
   onchainTransferDeniedNotification: "Vaše on-chain transakce byla zamítnuta",
   onchainTransferRefundedNotification:
     "Peníze z vaší on-chain transakce byly vráceny",
-  onchainSendArrivingAmount: "Do vaší bitcoinové peněženky dorazí {amount}.",
   onchainTransferPhaseShortDeposit: "Přišlo málo",
   onchainReceiveShortDepositHint:
     "Přišlo {received}, o {missing} méně než potřebných {total}, takže transakci nejde dokončit. Bitcoiny vám vrátíme. S dotazy se obraťte na podporu.",
@@ -1425,27 +1418,22 @@ export const cs = {
   onchainTransferNoMoneyMoved: "Žádné peníze se nepohnuly",
   onchainSendConfirmSummary: "Odeslat {amount} do bitcoinové peněženky",
   onchainTransferOriginalTerms: "Původní podmínky",
-  onchainReceiveCopyPaymentDetails: "Kopírovat platební údaje",
-  onchainReceiveCopyAddress: "Kopírovat adresu",
   onchainSendMinimum:
     "Pro platbu na bitcoinovou adresu je potřeba alespoň {min}.",
   onchainSendSubmit: "Odeslat",
+  onchainSendFeeCaption: "+ {fee} poplatek",
+  onchainTransferViewTransaction: "Zobrazit transakci v prohlížeči",
+  onchainTransferViewRefund: "Zobrazit vrácení v prohlížeči",
   onchainSendLowerAmount: "Nižší částka",
   onchainSendHigherAmount: "Vyšší částka",
   onchainSendUnpaidHint:
     "Vaše platba zatím neodešla. Odešlete ji a transakce začne.",
   onchainSendPayingHint: "Vaše platba je na cestě k nám.",
   onchainReceiveIntroSettlement: "Vypořádání může trvat až 24 hodin.",
-  onchainReceiveIntroRange: "Pošlete nejméně {min} a nejvýše {max}.",
+  onchainReceiveIntroRange: "Pošlete {min} až {max}.",
   onchainReceiveIntroFee: "Poplatek je {fee}.",
   onchainReceiveIntroRefund:
     "Pokud platbu odmítneme, vrátíme ji na adresu, ze které přišla.",
   onchainReceiveShowAddress: "Zobrazit adresu",
-  onchainReceiveAnyAmountHint:
-    "Pošlete bitcoiny ze své peněženky na tuto adresu.",
-  onchainReceiveAnyAmountLimitsHint:
-    "Pošlete ze své peněženky nejméně {min} a nejvýše {max} na tuto adresu.",
   onchainTransferPhaseDepositConfirming: "Zpracovává se",
-  onchainReceiveDepositConfirmingHint:
-    "Vaše platba má první potvrzení. Ještě jedno a započítá se.",
 } as const;

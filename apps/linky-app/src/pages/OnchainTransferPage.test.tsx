@@ -1,6 +1,6 @@
 import { bitcoinPaymentUri } from "@linky-fit/onchain-transfer";
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OnchainTransferView } from "../app/lib/onchainTransfers";
 import {
   REGTEST_ADDRESS,
@@ -9,12 +9,12 @@ import {
   TXID,
 } from "../testUtils/onchainTransfers";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
+import { groupAddress } from "../utils/formatting";
 import { OnchainTransferDetail } from "./OnchainTransferPage";
 
 const COPY: Partial<Record<string, string>> = {
   onchainSendPay: "Send {amount}",
   onchainReceiveAwaitingDepositHint: "Deposit {amount}",
-  onchainReceiveAnyAmountLimitsHint: "Deposit between {min} and {max}",
   onchainSendSentHint: "{amount} on its way",
   onchainReceiveShortDepositHint:
     "Got {received}, missing {missing} of {total}",
@@ -53,7 +53,6 @@ const renderDetail = async (
     <OnchainTransferDetail
       transfer={transfer}
       explorerUrl="https://explorer.example"
-      receiveLimits={{ min: 100_000, max: 2_000_000 }}
       canPay={canPay}
       sendBusy={sendBusy}
       {...handlers}
@@ -62,18 +61,29 @@ const renderDetail = async (
   return { container, ...handlers };
 };
 
-const txLinks = (container: HTMLElement) =>
-  Array.from(container.querySelectorAll("a")).map((link) =>
-    link.getAttribute("href"),
-  );
+const openWindow = vi.fn<typeof window.open>(() => null);
+
+/** The explorer pages the transaction rows open, by pressing each of them. */
+const txLinks = async (container: HTMLElement) => {
+  openWindow.mockClear();
+  for (const row of Array.from(
+    container.querySelectorAll('[data-testid="onchain-transfer-tx"]'),
+  ))
+    await press(row);
+  return openWindow.mock.calls.map(([url]) => url);
+};
 
 const updated = (
   overrides: Parameters<typeof onchainTransferUpdateFixture>[1],
 ) => onchainTransferUpdateFixture(onchainTransferViewFixture().id, overrides);
 
 describe("OnchainTransferDetail", () => {
+  beforeEach(() => {
+    vi.stubGlobal("open", openWindow);
+  });
   afterEach(() => {
     document.body.innerHTML = "";
+    vi.unstubAllGlobals();
   });
 
   it("waits for the deposit address and cancels only once the user confirms", async () => {
@@ -144,7 +154,7 @@ describe("OnchainTransferDetail", () => {
     expect(byTestId("onchain-transfer-cancel")).toBeNull();
   });
 
-  it("shows the bare deposit address of a receive of any amount with the limits, and nothing about amounts or refunds", async () => {
+  it("shows a receive of any amount as the bare deposit address in groups of four, with no status, amounts, support or refunds", async () => {
     const { container, onCopy } = await renderDetail(
       onchainTransferViewFixture({
         direction: "receive",
@@ -154,15 +164,17 @@ describe("OnchainTransferDetail", () => {
         depositAddress: REGTEST_ADDRESS,
       }),
     );
-    expect(container.textContent).toContain(
-      "Deposit between 100,000 sat and 2,000,000 sat",
+    expect(container.textContent).toContain(groupAddress(REGTEST_ADDRESS));
+    expect(container.textContent).not.toContain(
+      "onchainTransferPhaseAwaitingDeposit",
     );
-    expect(byTestId("onchain-transfer-total")).toBeNull();
-    expect(byTestId("onchain-transfer-copy-payment")).toBeNull();
+    expect(container.textContent).not.toContain("onchainTransferYouGet");
     expect(container.textContent).not.toContain("onchainTransferRefund");
+    expect(byTestId("onchain-transfer-support")).toBeNull();
+    expect(byTestId("onchain-transfer-copy-address")).toBeNull();
     await press(byTestId("onchain-transfer-deposit-qr"));
     expect(onCopy).toHaveBeenLastCalledWith(REGTEST_ADDRESS);
-    await press(byTestId("onchain-transfer-copy-address"));
+    await press(byTestId("onchain-transfer-deposit-address"));
     expect(onCopy).toHaveBeenLastCalledWith(REGTEST_ADDRESS);
     expect(byTestId("onchain-transfer-cancel")).not.toBeNull();
   });
@@ -181,53 +193,70 @@ describe("OnchainTransferDetail", () => {
     const paymentUri = bitcoinPaymentUri(REGTEST_ADDRESS, 101_000);
     await press(byTestId("onchain-transfer-deposit-qr"));
     expect(onCopy).toHaveBeenLastCalledWith(paymentUri);
-    await press(byTestId("onchain-transfer-copy-payment"));
-    expect(onCopy).toHaveBeenLastCalledWith(paymentUri);
-    await press(byTestId("onchain-transfer-copy-address"));
+    await press(byTestId("onchain-transfer-deposit-address"));
     expect(onCopy).toHaveBeenLastCalledWith(REGTEST_ADDRESS);
     expect(byTestId("onchain-transfer-cancel")).not.toBeNull();
   });
 
-  it("names the deposit seen, then processing, never a count of confirmations, and links it with no way to cancel", async () => {
+  it("names the deposit seen, then processing, with only what the user gets and a link to the transaction; no address, support or cancel", async () => {
+    const deposit = {
+      direction: "receive",
+      anyAmount: true,
+      depositAddress: REGTEST_ADDRESS,
+    } as const;
     const seen = await renderDetail(
       onchainTransferViewFixture({
-        direction: "receive",
+        ...deposit,
         phase: "depositSeen",
-        depositAddress: REGTEST_ADDRESS,
-        update: updated({ status: "fundsSeen", txid: TXID, confirmations: 0 }),
+        update: updated({
+          status: "fundsSeen",
+          txid: TXID,
+          confirmations: 0,
+          receivedAmount: 101_000,
+        }),
       }),
     );
     expect(seen.container.textContent).toContain(
       "onchainTransferPhaseDepositSeen",
     );
-    expect(seen.container.textContent).toContain(
-      "onchainTransferDepositAddress",
+    expect(seen.container.textContent).not.toContain(REGTEST_ADDRESS);
+    expect(seen.container.textContent).not.toContain(
+      groupAddress(REGTEST_ADDRESS),
     );
-    expect(txLinks(seen.container)).toEqual([
+    expect(seen.container.textContent).toContain(
+      "onchainTransferViewTransaction",
+    );
+    expect(await txLinks(seen.container)).toEqual([
       `https://explorer.example/tx/${TXID}`,
     ]);
     expect(byTestId("onchain-transfer-cancel")).toBeNull();
     expect(byTestId("onchain-transfer-deposit-qr")).toBeNull();
+    expect(byTestId("onchain-transfer-support")).toBeNull();
 
     document.body.innerHTML = "";
     const { container } = await renderDetail(
       onchainTransferViewFixture({
-        direction: "receive",
+        ...deposit,
         phase: "depositConfirming",
-        depositAddress: REGTEST_ADDRESS,
-        update: updated({ status: "fundsSeen", txid: TXID, confirmations: 1 }),
+        update: updated({
+          status: "fundsSeen",
+          txid: TXID,
+          confirmations: 1,
+          receivedAmount: 101_000,
+        }),
       }),
     );
     expect(container.textContent).toContain(
       "onchainTransferPhaseDepositConfirming",
     );
+    // The status is the label alone; the amount is what arrives, the fee having been explained before the address.
+    expect(container.textContent).not.toMatch(/Hint/u);
     expect(container.textContent).toContain(
-      "onchainReceiveDepositConfirmingHint",
+      "onchainTransferYouGet100,000 sat (~100 EUR)",
     );
+    expect(container.textContent).not.toContain("onchainTransferServiceFee");
+    expect(byTestId("onchain-transfer-received")).toBeNull();
     expect(container.textContent).not.toContain("1/2");
-    expect(container.textContent).not.toContain(
-      "onchainTransferConfirmationsLabel",
-    );
   });
 
   it("tells a sent on-chain send what arrives, then links its payout", async () => {
@@ -244,8 +273,10 @@ describe("OnchainTransferDetail", () => {
       }),
     );
     expect(container.textContent).toContain("onchainSendCompletedHint");
-    expect(container.textContent).toContain("onchainTransferPayoutTransaction");
-    expect(txLinks(container)).toEqual([`https://explorer.example/tx/${TXID}`]);
+    expect(container.textContent).toContain("onchainTransferViewTransaction");
+    expect(await txLinks(container)).toEqual([
+      `https://explorer.example/tx/${TXID}`,
+    ]);
   });
 
   it("shows why it was declined, and links a refund", async () => {
@@ -269,7 +300,10 @@ describe("OnchainTransferDetail", () => {
     expect(refunded.container.textContent).toContain(
       "onchainTransferRefundedHint",
     );
-    expect(txLinks(refunded.container)).toEqual([
+    expect(refunded.container.textContent).toContain(
+      "onchainTransferViewRefund",
+    );
+    expect(await txLinks(refunded.container)).toEqual([
       `https://explorer.example/tx/${TXID}`,
     ]);
     await press(byTestId("onchain-transfer-support"));
@@ -301,7 +335,7 @@ describe("OnchainTransferDetail", () => {
     expect(byTestId("onchain-transfer-cancel")).toBeNull();
   });
 
-  it("tells a completed on-chain receive's deposit apart from what reached the balance", async () => {
+  it("shows a completed on-chain receive as what reached the balance, not the deposit again", async () => {
     await renderDetail(
       onchainTransferViewFixture({
         direction: "receive",
@@ -309,9 +343,7 @@ describe("OnchainTransferDetail", () => {
         update: updated({ status: "completed", receivedAmount: 101_000 }),
       }),
     );
-    expect(byTestId("onchain-transfer-received")?.textContent).toBe(
-      "onchainReceiveDeposited101,000 sat (~101 EUR)",
-    );
+    expect(byTestId("onchain-transfer-received")).toBeNull();
     expect(byTestId("onchain-transfer-credited")?.textContent).toBe(
       "onchainReceiveAddedToBalance~100 EUR",
     );

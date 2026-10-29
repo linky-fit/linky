@@ -36,7 +36,6 @@ import {
   type NewOnchainTransferDraft,
 } from "../app/lib/onchainTransfers";
 import { DisplayAmount } from "../components/DisplayAmount";
-import { useExactAmountText } from "../app/hooks/useExactAmountText";
 import { navigateTo } from "../hooks/useRouting";
 import { applyPwaUpdate } from "../utils/pwaUpdate";
 
@@ -55,7 +54,7 @@ interface OnchainSendFormProps {
   onSubmit: (draft: NewOnchainTransferDraft) => Promise<boolean>;
 }
 
-/** The payout address and one amount: the largest the balance pays, stepped down or up among the operator's amounts. */
+/** The payout address and one amount: the largest the balance pays with the fee on top, stepped down or up among the operator's amounts. */
 export function OnchainSendForm({
   config,
   payableSat,
@@ -151,7 +150,7 @@ export function OnchainSendForm({
               testID="onchain-transfer-amount-down"
             />
             <DisplayAmount
-              amount={total(amount)}
+              amount={amount}
               size="lg"
               testID="onchain-transfer-amount"
             />
@@ -167,11 +166,11 @@ export function OnchainSendForm({
           <Text
             variant="caption"
             color="$colorMuted"
-            testID="onchain-transfer-arriving"
+            testID="onchain-transfer-fee"
           >
-            {t("onchainSendArrivingAmount").replace(
-              "{amount}",
-              amountText(amount),
+            {t("onchainSendFeeCaption").replace(
+              "{fee}",
+              amountText(total(amount) - amount),
             )}
           </Text>
         </Stack>
@@ -215,7 +214,7 @@ export function OnchainReceiveIntro({
   onShowAddress,
 }: OnchainReceiveIntroProps): React.ReactElement {
   const { lang, t } = useTranslation();
-  const { sats } = useExactAmountText();
+  const { formatDisplayedAmountText: amountText } = useDisplayAmounts();
   const min = config.minReceiveAmount;
   if (min === undefined) {
     return <Notice tone="warning" title={t("onchainTransferUnavailable")} />;
@@ -225,8 +224,8 @@ export function OnchainReceiveIntro({
     [
       "Bitcoin",
       t("onchainReceiveIntroRange")
-        .replace("{min}", sats(min))
-        .replace("{max}", sats(config.maxReceiveAmount)),
+        .replace("{min}", amountText(min))
+        .replace("{max}", amountText(config.maxReceiveAmount)),
     ],
     [
       "Coins",

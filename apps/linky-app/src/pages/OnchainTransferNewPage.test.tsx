@@ -39,7 +39,7 @@ vi.mock("../app/hooks/shell", async () =>
   (await import("../testUtils/shellHooks")).shellHooksMock({
     t: (key) =>
       new Map([
-        ["onchainSendArrivingAmount", "arrives {amount}"],
+        ["onchainSendFeeCaption", "+ {fee} fee"],
         ["onchainSendMinimum", "at least {min}"],
         ["onchainSendAmountUnavailable", "asks for {amount}"],
         ["onchainReceiveIntroRange", "from {min} to {max}"],
@@ -103,13 +103,13 @@ const renderSendForm = async ({
     />,
   );
   const amount = () => byTestId(container, "onchain-transfer-amount");
-  const arriving = () => byTestId(container, "onchain-transfer-arriving");
+  const fee = () => byTestId(container, "onchain-transfer-fee");
   const up = () => byTestId(container, "onchain-transfer-amount-up");
   const down = () => byTestId(container, "onchain-transfer-amount-down");
   const submit = () => byTestId(container, "onchain-transfer-continue");
   const disabled = (element: HTMLElement | null) =>
     element?.getAttribute("aria-disabled") === "true";
-  return { amount, arriving, container, disabled, down, onSubmit, submit, up };
+  return { amount, container, disabled, down, fee, onSubmit, submit, up };
 };
 
 describe("OnchainSendForm", () => {
@@ -117,25 +117,25 @@ describe("OnchainSendForm", () => {
     document.body.innerHTML = "";
   });
 
-  it("shows the largest amount the balance pays, fee included, and steps it among the operator's amounts", async () => {
-    const { amount, arriving, container, disabled, down, up } =
+  it("shows the largest amount the balance pays with the fee on top, and steps it among the operator's amounts", async () => {
+    const { amount, container, disabled, down, fee, up } =
       await renderSendForm();
     expect(container.textContent).toContain("onchainSendArrivalNotice");
     // 1,000,000 sat plus 1 % is out of reach; 500,000 plus 1 % is the most.
-    expect(amount()?.textContent).toContain("505000");
-    expect(arriving()?.textContent).toBe("arrives 500000 sat");
+    expect(amount()?.textContent).toContain("500000");
+    expect(fee()?.textContent).toBe("+ 5000 sat fee");
     expect(disabled(up())).toBe(true);
     expect(disabled(down())).toBe(false);
     expect(byTestId(container, "onchain-transfer-total")).toBeNull();
 
     await press(down());
-    expect(amount()?.textContent).toContain("252500");
-    expect(arriving()?.textContent).toBe("arrives 250000 sat");
+    expect(amount()?.textContent).toContain("250000");
+    expect(fee()?.textContent).toBe("+ 2500 sat fee");
     await press(down());
-    expect(amount()?.textContent).toContain("101000");
+    expect(amount()?.textContent).toContain("100000");
     expect(disabled(down())).toBe(true);
     await press(up());
-    expect(amount()?.textContent).toContain("252500");
+    expect(amount()?.textContent).toContain("250000");
   });
 
   it("tells the least a send takes when the balance pays no amount", async () => {
@@ -152,7 +152,7 @@ describe("OnchainSendForm", () => {
       await renderSendForm({
         prefill: { payoutAddress: MAINNET_ADDRESS, amount: 250_000 },
       });
-    expect(amount()?.textContent).toContain("252500");
+    expect(amount()?.textContent).toContain("250000");
     expect(container.textContent).toContain("onchainTransferAddressInvalid");
     expect(disabled(submit())).toBe(true);
 
@@ -179,7 +179,7 @@ describe("OnchainSendForm", () => {
       });
     const confirm = () => container.querySelector('[role="switch"]');
     expect(container.textContent).toContain("asks for 123000 sat");
-    expect(amount()?.textContent).toContain("505000");
+    expect(amount()?.textContent).toContain("500000");
     expect(disabled(submit())).toBe(true);
 
     await press(confirm());
@@ -194,7 +194,7 @@ describe("OnchainSendForm", () => {
       prefill: { payoutAddress: REGTEST_ADDRESS, amount: 100_000 },
     });
     expect(fixed.container.textContent).not.toContain("asks for");
-    expect(fixed.amount()?.textContent).toContain("101000");
+    expect(fixed.amount()?.textContent).toContain("100000");
     expect(fixed.disabled(fixed.submit())).toBe(false);
   });
 });
@@ -204,7 +204,7 @@ describe("OnchainReceiveIntro", () => {
     document.body.innerHTML = "";
   });
 
-  it("explains the wait, the limits, the fee and the refund before showing the address", async () => {
+  it("explains the wait, the limits in the display unit, the fee and the refund before showing the address", async () => {
     const onShowAddress = vi.fn();
     const { container } = await renderIntoDocument(
       <OnchainReceiveIntro
@@ -218,9 +218,8 @@ describe("OnchainReceiveIntro", () => {
       />,
     );
     expect(container.textContent).toContain("onchainReceiveIntroSettlement");
-    expect(container.textContent).toContain(
-      "from 100,000 sat to 2,000,000 sat",
-    );
+    // The shell mock's display unit writes amounts as "<n> sat"; exact sats would read "100,000 sat".
+    expect(container.textContent).toContain("from 100000 sat to 2000000 sat");
     expect(container.textContent).toContain("fee 1.5%");
     expect(container.textContent).toContain("onchainReceiveIntroRefund");
     expect(container.textContent).not.toContain("onchainTransferRefundAddress");

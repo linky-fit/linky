@@ -1375,8 +1375,6 @@ export const en = {
     "Your bitcoin wallet receives {amount} within 24 hours after you paid.",
   onchainReceiveAwaitingDepositHint:
     "Send exactly {amount} from your bitcoin wallet to this address. Your wallet's network fee is paid separately.",
-  onchainReceiveDepositSeenHint:
-    "We see your bitcoin on its way. It counts once it's confirmed.",
   onchainReceiveWaitingForEcashHint:
     "Your deposit is confirmed. {amount} arrives in your balance within 24 hours.",
   onchainSendCompletedHint: "{amount} was sent to your on-chain wallet.",
@@ -1388,10 +1386,6 @@ export const en = {
   onchainReceiveDepositQr: "Bitcoin payment QR code",
   onchainSendPay: "Send {amount}",
   onchainTransferPayoutAddress: "Payout address",
-  onchainTransferDepositAddress: "Deposit address",
-  onchainTransferDepositTransaction: "Deposit transaction",
-  onchainTransferPayoutTransaction: "Payout transaction",
-  onchainTransferRefundTransaction: "Refund transaction",
   onchainTransferCancel: "Cancel transaction",
   onchainTransferCancelTitle: "Cancel this transaction?",
   onchainTransferCancelBody:
@@ -1406,7 +1400,6 @@ export const en = {
   onchainSendCompletedNotification: "{amount} sent to your on-chain wallet",
   onchainTransferDeniedNotification: "Your on-chain transaction was declined",
   onchainTransferRefundedNotification: "Your on-chain transaction was refunded",
-  onchainSendArrivingAmount: "Your bitcoin wallet receives {amount}.",
   onchainTransferPhaseShortDeposit: "Not enough received",
   onchainReceiveShortDepositHint:
     "We received {received}, {missing} less than the {total} needed, so this can't complete. Your bitcoin will be sent back. Contact support if you have questions.",
@@ -1417,25 +1410,21 @@ export const en = {
   onchainTransferNoMoneyMoved: "No money moved",
   onchainSendConfirmSummary: "Send {amount} to a bitcoin wallet",
   onchainTransferOriginalTerms: "Original terms",
-  onchainReceiveCopyPaymentDetails: "Copy payment details",
-  onchainReceiveCopyAddress: "Copy address",
   onchainSendMinimum: "Sending to a bitcoin address takes at least {min}.",
   onchainSendSubmit: "Send",
+  onchainSendFeeCaption: "+ {fee} fee",
+  onchainTransferViewTransaction: "View transaction in browser",
+  onchainTransferViewRefund: "View refund in browser",
   onchainSendLowerAmount: "Lower amount",
   onchainSendHigherAmount: "Higher amount",
   onchainSendUnpaidHint:
     "Your payment hasn't gone out yet. Send it to start the transaction.",
   onchainSendPayingHint: "Your payment is on its way to us.",
   onchainReceiveIntroSettlement: "Settling can take up to 24 hours.",
-  onchainReceiveIntroRange: "Send at least {min} and at most {max}.",
+  onchainReceiveIntroRange: "Send between {min} and {max}.",
   onchainReceiveIntroFee: "The fee is {fee}.",
   onchainReceiveIntroRefund:
     "If we decline the deposit, it goes back to the address it came from.",
   onchainReceiveShowAddress: "Show address",
-  onchainReceiveAnyAmountHint: "Send bitcoin from your wallet to this address.",
-  onchainReceiveAnyAmountLimitsHint:
-    "Send at least {min} and at most {max} from your wallet to this address.",
   onchainTransferPhaseDepositConfirming: "Processing",
-  onchainReceiveDepositConfirmingHint:
-    "Your deposit has its first confirmation. One more and it counts.",
 } satisfies Record<keyof typeof cs, string>;

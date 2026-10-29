@@ -52,6 +52,8 @@ interface OnchainTransferAmountsProps {
   total: number;
   /** The service fee as a percentage, e.g. "1 %"; null when not known. */
   feePercent: string | null;
+  /** Leaves out the fee, e.g. once it was explained and the deposit set the terms. */
+  showFee?: boolean | undefined;
   /** Leaves out what the user sends, e.g. once the deposit itself is listed. */
   showTotal?: boolean | undefined;
 }
@@ -64,6 +66,7 @@ export function OnchainTransferAmounts({
   fee,
   total,
   feePercent,
+  showFee = true,
   showTotal = true,
 }: OnchainTransferAmountsProps): React.ReactElement {
   const { t } = useTranslation();
@@ -73,14 +76,16 @@ export function OnchainTransferAmounts({
   return (
     <Section title={title}>
       <ListRow title={t("onchainTransferYouGet")} value={value(amount)} />
-      <ListRow
-        title={
-          feePercent === null
-            ? t("onchainTransferServiceFee")
-            : `${t("onchainTransferServiceFee")} (${feePercent})`
-        }
-        value={value(fee)}
-      />
+      {showFee ? (
+        <ListRow
+          title={
+            feePercent === null
+              ? t("onchainTransferServiceFee")
+              : `${t("onchainTransferServiceFee")} (${feePercent})`
+          }
+          value={value(fee)}
+        />
+      ) : null}
       {showTotal ? (
         <ListRow
           title={t(

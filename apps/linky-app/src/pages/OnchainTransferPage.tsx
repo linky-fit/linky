@@ -2,20 +2,18 @@ import {
   Button,
   Dialog,
   EmptyState,
-  Icon,
   ListRow,
   Notice,
+  Pressable,
   QRCode,
   Section,
   Stack,
   Text,
-  TextLink,
 } from "@linky-fit/ui";
 import {
   bitcoinPaymentUri,
   canUserCancel,
   explorerTxUrl,
-  type OnchainConfig,
 } from "@linky-fit/onchain-transfer";
 import type { OnchainTransferId } from "@linky-fit/linksync";
 import React from "react";
@@ -42,20 +40,13 @@ import {
 import { OnchainTransferAmounts } from "../components/OnchainTransfer";
 import { useExactAmountText } from "../app/hooks/useExactAmountText";
 import type { Translate } from "../i18n";
-import { formatMiddleDots } from "../utils/formatting";
-
-/** The least and the most a receive of any amount is made for, from the config. */
-export interface OnchainReceiveLimits {
-  readonly min: number;
-  readonly max: number;
-}
+import { openInBrowser } from "../platform/textShare";
+import { groupAddress } from "../utils/formatting";
 
 interface OnchainTransferDetailProps {
   transfer: OnchainTransferView;
   /** The config's explorer; null while the config is not known. */
   explorerUrl: string | null;
-  /** The config's receive limits; null while the config is not known. */
-  receiveLimits: OnchainReceiveLimits | null;
   /** Whether the wallet can pay an on-chain send's total, moving funds between mints included. */
   canPay: boolean;
   sendBusy: boolean;
@@ -70,14 +61,13 @@ type AmountText = ReturnType<typeof useExactAmountText> & {
   readonly display: (amountSat: number) => string;
 };
 
-/** What the phase means for the user; the operator's reason replaces the hint of an ending it explains. */
+/** What the phase means for the user, if the label alone does not say; the operator's reason replaces the hint of an ending it explains. */
 const phaseHint = (
   transfer: OnchainTransferView,
-  limits: OnchainReceiveLimits | null,
   sendBusy: boolean,
   t: Translate,
   { btc, display, exact, sats }: AmountText,
-): string => {
+): string | null => {
   const amount = display(transfer.amount);
   const reason = transfer.update?.reason?.trim() || null;
   switch (transfer.phase) {
@@ -90,20 +80,14 @@ const phaseHint = (
     case "sent":
       return t("onchainSendSentHint").replace("{amount}", amount);
     case "awaitingDeposit":
-      if (!transfer.anyAmount)
-        return t("onchainReceiveAwaitingDepositHint").replace(
-          "{amount}",
-          `${sats(transfer.sendAmount)} (${btc(transfer.sendAmount)})`,
-        );
-      return limits === null
-        ? t("onchainReceiveAnyAmountHint")
-        : t("onchainReceiveAnyAmountLimitsHint")
-            .replace("{min}", sats(limits.min))
-            .replace("{max}", sats(limits.max));
+      return t("onchainReceiveAwaitingDepositHint").replace(
+        "{amount}",
+        `${sats(transfer.sendAmount)} (${btc(transfer.sendAmount)})`,
+      );
+    // The deposit is being processed; what that takes was told before the address.
     case "depositSeen":
-      return t("onchainReceiveDepositSeenHint");
     case "depositConfirming":
-      return t("onchainReceiveDepositConfirmingHint");
+      return null;
     case "shortDeposit": {
       const received = transfer.update?.receivedAmount ?? 0;
       return t("onchainReceiveShortDepositHint")
@@ -136,7 +120,11 @@ const UNSUCCESSFUL_PHASES: ReadonlySet<OnchainTransferView["phase"]> = new Set([
   "shortDeposit",
 ]);
 
-/** What actually moved: what the operator got, what came back and, for a completed receive, what reached the balance. */
+/** Phases of a receive going as planned, where nothing but the status and the amount helps the user. */
+const RECEIVE_IN_PROGRESS_PHASES: ReadonlySet<OnchainTransferView["phase"]> =
+  new Set(["awaitingDeposit", "depositSeen", "depositConfirming"]);
+
+/** What actually moved: what the operator got where it differs from the terms, what came back and, for a completed receive, what reached the balance. */
 function MovedAmounts({
   transfer,
 }: {
@@ -148,7 +136,11 @@ function MovedAmounts({
   const { direction, phase, update } = transfer;
   // A receive's deposit and refund moved on-chain; the rest is Cashu.
   const onchain = direction === "receive" ? exact : formatDisplayedAmountText;
-  const received = update?.receivedAmount;
+  // A receive's deposit is what the user gets plus the fee, so it is only news when it fell short or came back.
+  const received =
+    direction === "send" || UNSUCCESSFUL_PHASES.has(phase)
+      ? update?.receivedAmount
+      : undefined;
   const refunded = phase === "refunded" ? update?.refundAmount : undefined;
   const credited =
     direction === "receive" && phase === "completed"
@@ -191,7 +183,8 @@ function MovedAmounts({
   );
 }
 
-function TransactionRow({
+/** Opens the transaction in the config's explorer, in the browser. */
+function ExplorerLink({
   explorerUrl,
   label,
   txid,
@@ -200,20 +193,14 @@ function TransactionRow({
   label: string;
   txid: string | undefined;
 }): React.ReactElement | null {
-  if (txid === undefined) return null;
-  const shortTxid = formatMiddleDots(txid, 20);
+  if (txid === undefined || explorerUrl === null) return null;
+  const url = explorerTxUrl(explorerUrl, txid);
   return (
     <ListRow
+      icon="ArrowUpRight"
       title={label}
-      description={
-        explorerUrl === null ? (
-          <Text mono>{shortTxid}</Text>
-        ) : (
-          <TextLink href={explorerTxUrl(explorerUrl, txid)}>
-            {shortTxid}
-          </TextLink>
-        )
-      }
+      chevron={false}
+      onPress={() => openInBrowser(url)}
       testID="onchain-transfer-tx"
     />
   );
@@ -236,14 +223,13 @@ function AddressRow({
           {address}
         </Text>
       }
-      trailing={<Icon name="Copy" size="sm" color="$colorMuted" />}
       chevron={false}
       onPress={() => onCopy(address)}
     />
   );
 }
 
-/** The deposit address as a QR code: bare for a receive of any amount, with the exact sats a fixed one must match. */
+/** The deposit address as a QR code and in groups of four, both copying it; a fixed amount's QR asks for the exact sats. */
 function DepositInstructions({
   address,
   amount,
@@ -266,48 +252,28 @@ function DepositInstructions({
         onPress={() => onCopy(qrValue)}
         testID="onchain-transfer-deposit-qr"
       />
-      <Stack alignSelf="stretch" gap="$sm">
-        <ListRow
-          title={t("onchainTransferDepositAddress")}
-          description={
-            <Text mono userSelect="text">
-              {address}
-            </Text>
-          }
-        />
-        {amount === null ? null : (
-          <Button
-            variant="secondary"
-            icon="Copy"
-            onPress={() => onCopy(qrValue)}
-            testID="onchain-transfer-copy-payment"
-          >
-            {t("onchainReceiveCopyPaymentDetails")}
-          </Button>
-        )}
-        <Button
-          variant="secondary"
-          icon="Copy"
-          onPress={() => onCopy(address)}
-          testID="onchain-transfer-copy-address"
-        >
-          {t("onchainReceiveCopyAddress")}
-        </Button>
-      </Stack>
+      <Pressable
+        aria-label={t("copy")}
+        onPress={() => onCopy(address)}
+        testID="onchain-transfer-deposit-address"
+      >
+        <Text mono textAlign="center" userSelect="text">
+          {groupAddress(address)}
+        </Text>
+      </Pressable>
     </Stack>
   );
 }
 
 function PhaseStatus({
   transfer,
-  receiveLimits,
   canPay,
   sendBusy,
   onCopy,
   onSend,
 }: Pick<
   OnchainTransferDetailProps,
-  "transfer" | "receiveLimits" | "canPay" | "sendBusy" | "onCopy" | "onSend"
+  "transfer" | "canPay" | "sendBusy" | "onCopy" | "onSend"
 >): React.ReactElement {
   const { t } = useTranslation();
   const amountText = {
@@ -315,19 +281,18 @@ function PhaseStatus({
     display: useDisplayAmounts().formatDisplayedAmountText,
   };
   const { phase } = transfer;
+  const hint = phaseHint(transfer, sendBusy, t, amountText);
+  // The address of a receive of any amount speaks for itself; what to send was told before it.
+  const addressOnly = phase === "awaitingDeposit" && transfer.anyAmount;
   return (
     <Stack gap="$md">
-      <Notice
-        tone={ONCHAIN_TRANSFER_PHASE_TONES[phase]}
-        title={t(ONCHAIN_TRANSFER_PHASE_LABEL_KEYS[phase])}
-        description={phaseHint(
-          transfer,
-          receiveLimits,
-          sendBusy,
-          t,
-          amountText,
-        )}
-      />
+      {addressOnly ? null : (
+        <Notice
+          tone={ONCHAIN_TRANSFER_PHASE_TONES[phase]}
+          title={t(ONCHAIN_TRANSFER_PHASE_LABEL_KEYS[phase])}
+          description={hint ?? undefined}
+        />
+      )}
       {isOnchainSendUnpaid(transfer) ? (
         <Stack gap="$xs">
           <Button
@@ -381,6 +346,7 @@ export function OnchainTransferDetail(
   // A receive of any amount has no terms until its deposit set them.
   const termsKnown =
     !transfer.anyAmount || update?.receivedAmount !== undefined;
+  const inProgressReceive = !send && RECEIVE_IN_PROGRESS_PHASES.has(phase);
   return (
     <Stack gap="$lg">
       <Text variant="title">{t(ONCHAIN_TRANSFER_TITLE_KEYS[direction])}</Text>
@@ -398,41 +364,30 @@ export function OnchainTransferDetail(
           fee={transfer.fee}
           total={transfer.sendAmount}
           feePercent={null}
+          // The fee was explained before the address; the deposit itself was the total.
+          showFee={!transfer.anyAmount}
           showTotal={!transfer.anyAmount}
         />
       ) : null}
-      <Section>
-        {send && transfer.payoutAddress !== null ? (
+      {send && transfer.payoutAddress !== null ? (
+        <Section>
           <AddressRow
             label={t("onchainTransferPayoutAddress")}
             address={transfer.payoutAddress}
             onCopy={onCopy}
           />
-        ) : null}
-        {!send &&
-        transfer.depositAddress !== null &&
-        phase !== "awaitingDeposit" ? (
-          <AddressRow
-            label={t("onchainTransferDepositAddress")}
-            address={transfer.depositAddress}
-            onCopy={onCopy}
-          />
-        ) : null}
-        <TransactionRow
-          explorerUrl={explorerUrl}
-          label={t(
-            send
-              ? "onchainTransferPayoutTransaction"
-              : "onchainTransferDepositTransaction",
-          )}
-          txid={update?.txid}
-        />
-        <TransactionRow
-          explorerUrl={explorerUrl}
-          label={t("onchainTransferRefundTransaction")}
-          txid={update?.refundTxid}
-        />
-      </Section>
+        </Section>
+      ) : null}
+      <ExplorerLink
+        explorerUrl={explorerUrl}
+        label={t("onchainTransferViewTransaction")}
+        txid={update?.txid}
+      />
+      <ExplorerLink
+        explorerUrl={explorerUrl}
+        label={t("onchainTransferViewRefund")}
+        txid={update?.refundTxid}
+      />
       {canCancel ? (
         <Button
           variant="secondary"
@@ -443,12 +398,14 @@ export function OnchainTransferDetail(
           {t("onchainTransferCancel")}
         </Button>
       ) : null}
-      <ListRow
-        icon="MessageCircle"
-        title={t("onchainTransferContactSupport")}
-        onPress={onContactSupport}
-        testID="onchain-transfer-support"
-      />
+      {inProgressReceive ? null : (
+        <ListRow
+          icon="MessageCircle"
+          title={t("onchainTransferContactSupport")}
+          onPress={onContactSupport}
+          testID="onchain-transfer-support"
+        />
+      )}
       {confirmingCancel ? (
         <Dialog
           open
@@ -483,11 +440,6 @@ export function OnchainTransferDetail(
   );
 }
 
-const receiveLimitsOf = (config: OnchainConfig): OnchainReceiveLimits | null =>
-  config.minReceiveAmount === undefined
-    ? null
-    : { min: config.minReceiveAmount, max: config.maxReceiveAmount };
-
 export function OnchainTransferPage({
   id,
 }: {
@@ -509,7 +461,6 @@ export function OnchainTransferPage({
     <OnchainTransferDetail
       transfer={transfer}
       explorerUrl={config?.explorerUrl ?? null}
-      receiveLimits={config === null ? null : receiveLimitsOf(config)}
       canPay={transfer.sendAmount <= cashuBalanceAfterMelt}
       sendBusy={cashuIsBusy}
       onCancel={() => void cancelOnchainTransfer(transfer)}
