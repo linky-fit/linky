@@ -1,4 +1,4 @@
-import { Button, Icon, Pill, Row, Stack } from "@linky-fit/ui";
+import { Button, Row, Stack, StatusDot, Text } from "@linky-fit/ui";
 import type { IconName } from "@linky-fit/ui";
 import React from "react";
 import { useTranslation } from "../app/hooks/shell";
@@ -90,24 +90,24 @@ export const WalletPage: React.FC<WalletPageProps> = React.memo(
               dataGuide="wallet-send"
             />
           </Row>
-          <Stack alignItems="center" gap="$sm">
-            <Button
-              variant="ghost"
-              size="sm"
-              onPress={() => navigateTo({ route: "transactions" })}
-            >
-              {t("showTransactions")}
-            </Button>
-            {pendingOnchainTransfers ? (
-              <Pill
-                tone="warning"
-                leading={<Icon name="Clock" size="sm" color="$warningText" />}
-                label={pendingOnchainTransfers.label}
-                onPress={pendingOnchainTransfers.open}
-                testID="wallet-pending-onchain"
-              />
-            ) : null}
-          </Stack>
+          <Button
+            variant="ghost"
+            size="sm"
+            onPress={() => navigateTo({ route: "transactions" })}
+          >
+            <Row alignItems="center" gap="$sm">
+              <Text variant="caption" bold textAlign="center" numberOfLines={1}>
+                {t("showTransactions")}
+              </Text>
+              {pendingOnchainTransfers ? (
+                <StatusDot
+                  tone="warning"
+                  accessibilityLabel={pendingOnchainTransfers.label}
+                  testID="wallet-pending-onchain"
+                />
+              ) : null}
+            </Row>
+          </Button>
         </Stack>
       </Stack>
     );

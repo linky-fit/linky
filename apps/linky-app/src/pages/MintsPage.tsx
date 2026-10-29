@@ -1,4 +1,4 @@
-import { Card, Divider, Progress, Row, Stack, Text } from "@linky-fit/ui";
+import { Divider, Progress, Row, Stack, Text } from "@linky-fit/ui";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import { useMintIcons } from "../app/hooks/mint/useMintInfo";
 import { useAllowTestMints } from "../app/hooks/useAllowTestMints";
@@ -85,7 +85,7 @@ export function MintsPage() {
     const holding = renderHolding(normalized);
 
     return (
-      <Card key={mint} testID="mint-choice" outlined>
+      <Stack key={mint} testID="mint-choice" gap="$sm" paddingBottom="$sm">
         <MintButton
           mint={mint}
           getMintIconUrl={getMintIconUrl}
@@ -96,7 +96,7 @@ export function MintsPage() {
         />
         {holding}
         {isSelected ? <MintFees mint={normalized} /> : null}
-      </Card>
+      </Stack>
     );
   };
 

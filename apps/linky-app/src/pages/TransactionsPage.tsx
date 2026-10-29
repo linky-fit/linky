@@ -238,8 +238,12 @@ const TransactionCardView = ({
           <Avatar
             name={contact?.name || title}
             uri={contact ? (pictureUrl ?? undefined) : undefined}
-            fallback={
-              contact ? undefined : item.category === "lightning" ? "⚡️" : "🥜"
+            icon={
+              contact
+                ? undefined
+                : item.category === "lightning"
+                  ? "Zap"
+                  : "Bean"
             }
           />
         }
