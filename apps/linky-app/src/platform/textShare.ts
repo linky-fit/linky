@@ -46,8 +46,11 @@ export const shareTextNatively = async (
   return "unavailable";
 };
 
-/** Opens a mail, SMS or WhatsApp link outside the app. */
-export const openShareUrl = (url: string): void => {
+/** Opens a web page outside the app, e.g. a transaction in a block explorer. */
+export const openInBrowser = (url: string): void => {
   if (typeof window === "undefined") return;
   window.open(url, "_blank", "noopener,noreferrer");
 };
+
+/** Opens a mail, SMS or WhatsApp link outside the app. */
+export const openShareUrl = openInBrowser;

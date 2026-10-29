@@ -1395,8 +1395,6 @@ export const pt = {
     "Sua carteira bitcoin recebe {amount} em até 24 horas depois do seu pagamento.",
   onchainReceiveAwaitingDepositHint:
     "Envie exatamente {amount} da sua carteira bitcoin para este endereço. A taxa de rede da sua carteira é paga à parte.",
-  onchainReceiveDepositSeenHint:
-    "Vemos seus bitcoins a caminho. Eles contam quando forem confirmados.",
   onchainReceiveWaitingForEcashHint:
     "Seu depósito foi confirmado. {amount} chega ao seu saldo em até 24 horas.",
   onchainSendCompletedHint: "{amount} foi enviado para sua carteira on-chain.",
@@ -1408,10 +1406,6 @@ export const pt = {
   onchainReceiveDepositQr: "QR code do pagamento bitcoin",
   onchainSendPay: "Enviar {amount}",
   onchainTransferPayoutAddress: "Endereço de destino",
-  onchainTransferDepositAddress: "Endereço de depósito",
-  onchainTransferDepositTransaction: "Transação de depósito",
-  onchainTransferPayoutTransaction: "Transação de envio",
-  onchainTransferRefundTransaction: "Transação de reembolso",
   onchainTransferCancel: "Cancelar transação",
   onchainTransferCancelTitle: "Cancelar esta transação?",
   onchainTransferCancelBody:
@@ -1427,7 +1421,6 @@ export const pt = {
     "{amount} enviado para sua carteira on-chain",
   onchainTransferDeniedNotification: "Sua transação on-chain foi recusada",
   onchainTransferRefundedNotification: "Sua transação on-chain foi reembolsada",
-  onchainSendArrivingAmount: "Sua carteira bitcoin recebe {amount}.",
   onchainTransferPhaseShortDeposit: "Valor insuficiente",
   onchainReceiveShortDepositHint:
     "Recebemos {received}, {missing} a menos que os {total} necessários, então isto não pode ser concluído. Seus bitcoins serão devolvidos. Fale com o suporte se tiver dúvidas.",
@@ -1438,26 +1431,21 @@ export const pt = {
   onchainTransferNoMoneyMoved: "Nenhum dinheiro movido",
   onchainSendConfirmSummary: "Enviar {amount} para uma carteira bitcoin",
   onchainTransferOriginalTerms: "Termos originais",
-  onchainReceiveCopyPaymentDetails: "Copiar dados de pagamento",
-  onchainReceiveCopyAddress: "Copiar endereço",
   onchainSendMinimum: "Enviar para um endereço bitcoin exige pelo menos {min}.",
   onchainSendSubmit: "Enviar",
+  onchainSendFeeCaption: "+ {fee} de taxa",
+  onchainTransferViewTransaction: "Ver transação no navegador",
+  onchainTransferViewRefund: "Ver reembolso no navegador",
   onchainSendLowerAmount: "Valor menor",
   onchainSendHigherAmount: "Valor maior",
   onchainSendUnpaidHint:
     "Seu pagamento ainda não saiu. Envie-o para iniciar a transação.",
   onchainSendPayingHint: "Seu pagamento está a caminho.",
   onchainReceiveIntroSettlement: "A liquidação pode levar até 24 horas.",
-  onchainReceiveIntroRange: "Envie no mínimo {min} e no máximo {max}.",
+  onchainReceiveIntroRange: "Envie entre {min} e {max}.",
   onchainReceiveIntroFee: "A taxa é de {fee}.",
   onchainReceiveIntroRefund:
     "Se recusarmos o depósito, ele volta para o endereço de onde veio.",
   onchainReceiveShowAddress: "Mostrar endereço",
-  onchainReceiveAnyAmountHint:
-    "Envie bitcoins da sua carteira para este endereço.",
-  onchainReceiveAnyAmountLimitsHint:
-    "Envie no mínimo {min} e no máximo {max} da sua carteira para este endereço.",
   onchainTransferPhaseDepositConfirming: "Processando",
-  onchainReceiveDepositConfirmingHint:
-    "Seu depósito tem a primeira confirmação. Mais uma e ele conta.",
 } satisfies Record<keyof typeof cs, string>;
