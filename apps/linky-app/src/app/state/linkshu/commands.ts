@@ -50,6 +50,7 @@ import type {
   LegacyIngestReport,
   LegacyTokenRow,
   LightningFeeProbeResult,
+  MeltCost,
   MeltError,
   MeltReceipt,
   MeltResumeResult,
@@ -124,6 +125,11 @@ interface MeltCashuInvoiceArgs {
 export type MeltCashuInvoice = (
   args: MeltCashuInvoiceArgs,
 ) => Promise<Result.Result<MeltReceipt, MeltError>>;
+
+/** linkshu `Melt.quote` then `Melt.cost`: the most paying the invoice from `mint` can take; nothing moves. */
+export type QuoteCashuMelt = (
+  args: MeltCashuInvoiceArgs,
+) => Promise<Result.Result<MeltCost, MeltError>>;
 
 export interface CashuEnvelopeRef {
   readonly mint: string;
@@ -440,6 +446,16 @@ const makeLinkshuCommands = (run: LinkshuRun) => {
       }),
     );
 
+  const quoteCashuMelt: QuoteCashuMelt = ({ invoice, mint }) =>
+    runResult(
+      Effect.suspend(() => {
+        const draft = decodeMeltDraft({ invoice, mint });
+        return Effect.flatMap(Melt, (melt) =>
+          Effect.flatMap(melt.quote(draft), (quote) => melt.cost(quote)),
+        );
+      }),
+    );
+
   const resumePendingCashuMelts: ResumePendingCashuMelts = () =>
     run(Effect.flatMap(Melt, (melt) => melt.resumePending));
 
@@ -714,6 +730,7 @@ const makeLinkshuCommands = (run: LinkshuRun) => {
     fetchMintInfo,
     meltCashuInvoice,
     probeLightningFee,
+    quoteCashuMelt,
     readWalletBalances,
     receiveCashuToken,
     restoreCashuTokens,

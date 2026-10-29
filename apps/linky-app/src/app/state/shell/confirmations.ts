@@ -7,12 +7,26 @@ import { Atom } from "effect/reactivity";
 import type { PendingSiteLogin } from "../../../siteLogin";
 import type { CashuPaymentRequestMessageInfo } from "../../lib/paymentRequestMessage";
 import type { ContactRowLike, LocalNostrMessage } from "../../types/appTypes";
-import type { PaymentRequestQuote } from "../wallet/payments";
+import type {
+  PaymentRequestQuote,
+  QuoteLightningInvoiceOutcome,
+} from "../wallet/payments";
 import { ownerCommandsAtom } from "./ownerCommands";
 
 /** A scanned invoice above the auto-pay limit, waiting for the user to pay it. */
 export const pendingLightningInvoiceAtom = Atom.keepAlive(
   Atom.make<LightningInvoicePreview | null>(null),
+);
+
+export interface LightningInvoiceQuoteState {
+  readonly invoice: string;
+  /** `pending` while the mint is asked. */
+  readonly outcome: "pending" | QuoteLightningInvoiceOutcome;
+}
+
+/** The fee estimate of the invoice waiting in `pendingLightningInvoiceAtom`. */
+export const lightningInvoiceQuoteAtom = Atom.keepAlive(
+  Atom.make<LightningInvoiceQuoteState | null>(null),
 );
 
 export interface PendingCashuPaymentRequest {

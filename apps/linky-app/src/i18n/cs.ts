@@ -1212,6 +1212,8 @@ export const cs = {
   payMissingLn: "Chybí lightning adresa.",
   payInvalidAmount: "Neplatná částka",
   payInsufficient: "Nemáte dostatek Cashu tokenů.",
+  payFeeEstimating: "Odhadujeme poplatek…",
+  payLightningFeeHint: "Poplatek za Lightning asi {fee}",
   lightningInvoiceConfirmUnknownAmount: "Neznámá částka",
   payNetworkError: "Platbu nelze odeslat kvůli chybě sítě.",
   payApprovalChanged:

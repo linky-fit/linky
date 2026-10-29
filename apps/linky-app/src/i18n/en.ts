@@ -1203,6 +1203,8 @@ export const en = {
   payMissingLn: "Missing lightning address.",
   payInvalidAmount: "Invalid amount",
   payInsufficient: "Not enough Cashu tokens.",
+  payFeeEstimating: "Estimating the fee…",
+  payLightningFeeHint: "Lightning fee about {fee}",
   lightningInvoiceConfirmUnknownAmount: "Unknown amount",
   payNetworkError: "Unable to send due to a network error.",
   payApprovalChanged:

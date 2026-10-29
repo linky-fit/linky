@@ -1,6 +1,4 @@
-import type { LightningFeeProbeResult } from "@linky-fit/linkshu";
 import { Stack, ListRow } from "@linky-fit/ui";
-import { Result } from "effect";
 import React from "react";
 import { useTranslation } from "../app/hooks/shell";
 import { useLinkshuCommands } from "../app/hooks/composition/useLinkshuComposition";
@@ -8,13 +6,9 @@ import {
   useMintInfoByUrl,
   useRefreshMintInfo,
 } from "../app/hooks/mint/useMintInfo";
-import type { ProbeLightningFee } from "../app/hooks/composition/useLinkshuComposition";
 import { getMintFeePpk } from "../app/hooks/mint/mintInfoHelpers";
-import {
-  isTestMintUrl,
-  normalizeMintUrl,
-  PRODUCTION_MINTS,
-} from "../utils/mint";
+import { useLightningFeeProbe } from "../app/hooks/mint/useLightningFeeProbe";
+import { normalizeMintUrl } from "../utils/mint";
 import { formatDisplayAmountText } from "../utils/displayAmounts";
 import { nowSeconds } from "../utils/time";
 
@@ -22,13 +16,6 @@ import { nowSeconds } from "../utils/time";
 const TYPICAL_PAYMENT_PROOF_COUNT = 6;
 
 const FEE_INFO_RETRY_SEC = 60;
-
-// A failed probe is not retried on every navigation; successes persist for a
-// day inside linkshu FeeProbe's own cache, which the probe call reads first.
-const FAILED_PROBE_RETRY_MS = 10 * 60 * 1000;
-const failedProbeAtByMint = new Map<string, number>();
-
-type LightningFeeState = LightningFeeProbeResult | "failed" | "pending";
 
 // Fees are a few sats, which a fiat display unit would round to zero.
 const formatSat = (amountSat: number, lang: string) =>
@@ -46,13 +33,6 @@ const formatCashuFee = (ppk: number, lang: string): string => {
 const formatPercent = (percent: number): string =>
   `~${percent.toFixed(1).replace(/\.0$/, "")} %`;
 
-// The probe invoice must come from a real Lightning-backed mint (a dev
-// FakeWallet invoice cannot be quoted), so this ignores the env presets.
-const pickProbeMint = (mintUrl: string): string | null =>
-  PRODUCTION_MINTS.map(normalizeMintUrl).find(
-    (candidate) => candidate !== mintUrl,
-  ) ?? null;
-
 /** Fetches the mint's info once its keyset fee is unknown, at most once a minute. */
 const useKeysetFeePpk = (mintUrl: string): number | null => {
   const mintInfoByUrl = useMintInfoByUrl();
@@ -68,49 +48,6 @@ const useKeysetFeePpk = (mintUrl: string): number | null => {
   }, [checkedAtSec, mintUrl, ppk, refreshMintInfo]);
 
   return ppk;
-};
-
-const useLightningFeeProbe = (
-  probeLightningFee: ProbeLightningFee | null,
-  mintUrl: string,
-): LightningFeeState => {
-  const [byMint, setByMint] = React.useState<Record<string, LightningFeeState>>(
-    {},
-  );
-
-  React.useEffect(() => {
-    if (probeLightningFee === null) return;
-    if (byMint[mintUrl]) return;
-    const failedAt = failedProbeAtByMint.get(mintUrl);
-    if (
-      failedAt !== undefined &&
-      Date.now() - failedAt < FAILED_PROBE_RETRY_MS
-    ) {
-      setByMint((prev) => ({ ...prev, [mintUrl]: "failed" }));
-      return;
-    }
-    const probeMint = isTestMintUrl(mintUrl) ? null : pickProbeMint(mintUrl);
-    if (!probeMint) {
-      setByMint((prev) => ({ ...prev, [mintUrl]: "failed" }));
-      return;
-    }
-    setByMint((prev) => ({ ...prev, [mintUrl]: "pending" }));
-    void probeLightningFee({ mint: mintUrl, probeMint })
-      .then((outcome) => {
-        if (Result.isSuccess(outcome)) {
-          setByMint((prev) => ({ ...prev, [mintUrl]: outcome.success }));
-          return;
-        }
-        failedProbeAtByMint.set(mintUrl, Date.now());
-        setByMint((prev) => ({ ...prev, [mintUrl]: "failed" }));
-      })
-      .catch(() => {
-        failedProbeAtByMint.set(mintUrl, Date.now());
-        setByMint((prev) => ({ ...prev, [mintUrl]: "failed" }));
-      });
-  }, [byMint, mintUrl, probeLightningFee]);
-
-  return byMint[mintUrl] ?? "pending";
 };
 
 interface MintFeesProps {

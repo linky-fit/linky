@@ -1223,6 +1223,8 @@ export const de = {
   payMissingLn: "Lightning-Adresse fehlt.",
   payInvalidAmount: "Ungültiger Betrag",
   payInsufficient: "Nicht genügend Cashu-Token.",
+  payFeeEstimating: "Gebühr wird geschätzt…",
+  payLightningFeeHint: "Lightning-Gebühr etwa {fee}",
   lightningInvoiceConfirmUnknownAmount: "Unbekannter Betrag",
   payNetworkError: "Senden wegen eines Netzwerkfehlers nicht möglich.",
   payApprovalChanged:

@@ -6,6 +6,7 @@ import {
   useKnownLnAddressPayContact,
   useLnAddressPayDraft,
 } from "../app/hooks/wallet/usePaymentDrafts";
+import { LightningFeeHint } from "../components/LightningFeeHint";
 import { LnurlPayPreviewNotices } from "../components/LnurlPayPreviewNotices";
 import { PaymentAmountPanel } from "../components/PaymentAmountPanel";
 import {
@@ -142,12 +143,15 @@ export const LnAddressPayPage: FC<LnAddressPayPageProps> = ({
           : undefined
       }
       notices={
-        <LnurlPayPreviewNotices
-          error={previewError}
-          loading={previewLoading}
-          preview={preview}
-          t={t}
-        />
+        <>
+          <LnurlPayPreviewNotices
+            error={previewError}
+            loading={previewLoading}
+            preview={preview}
+            t={t}
+          />
+          {amountSat > 0 ? <LightningFeeHint amountSat={amountSat} /> : null}
+        </>
       }
       onAmountChange={setLnAddressPayAmount}
       onSubmit={() => {

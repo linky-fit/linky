@@ -22,6 +22,7 @@ import {
 import { payWithCashuEnabledAtom } from "../app/state/wallet/prefs";
 import type { Route } from "../types/route";
 import { LnurlPayPreviewNotices } from "../components/LnurlPayPreviewNotices";
+import { LightningFeeHint } from "../components/LightningFeeHint";
 import { PaymentAmountPanel } from "../components/PaymentAmountPanel";
 import type { ContactId } from "../evolu";
 import {
@@ -215,6 +216,10 @@ export const ContactPayPage: FC<ContactPayPageProps> = ({
               preview={lnurlPreview.preview}
               t={t}
             />
+          )}
+
+          {lightningActive && validAmount > 0 && (
+            <LightningFeeHint amountSat={validAmount} />
           )}
         </>
       }

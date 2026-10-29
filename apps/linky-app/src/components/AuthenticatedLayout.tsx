@@ -12,6 +12,7 @@ import { useWalletBalance } from "../app/hooks/wallet/useWalletInventory";
 import { contactNewPrefillAtom } from "../app/state/contacts/contactForm";
 import { currentNpubAtom } from "../app/state/session/session";
 import {
+  lightningInvoiceQuoteAtom,
   lnurlAuthBusyAtom,
   lnurlAuthDoneAtom,
   lnurlWithdrawBusyAtom,
@@ -69,6 +70,7 @@ export function AuthenticatedLayout({
   );
   const setContactNewPrefill = useAtomSet(contactNewPrefillAtom);
   const pendingLightningInvoice = useAtomValue(pendingLightningInvoiceAtom);
+  const lightningInvoiceQuote = useAtomValue(lightningInvoiceQuoteAtom);
   const pendingCashuPaymentRequest = useAtomValue(
     pendingCashuPaymentRequestAtom,
   );
@@ -134,6 +136,11 @@ export function AuthenticatedLayout({
           confirmation={pendingLightningInvoice}
           onClose={wallet.closeLightningInvoiceConfirmation}
           onConfirm={wallet.confirmLightningInvoicePayment}
+          quote={
+            lightningInvoiceQuote?.invoice === pendingLightningInvoice.invoice
+              ? lightningInvoiceQuote.outcome
+              : null
+          }
           t={t}
         />
       ) : null}

@@ -7,13 +7,19 @@ import {
   PaymentPending,
   QuoteId,
 } from "@linky-fit/linkshu";
+import { useAtomValue } from "@linky-fit/linkstr-react";
 import { act, useEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
+import {
+  lightningInvoiceQuoteAtom,
+  type LightningInvoiceQuoteState,
+} from "../../state/shell/confirmations";
 import type {
   PayInvoiceOutcome,
   PayLightningAddressOutcome,
   PaymentsCommands,
+  QuoteLightningInvoiceOutcome,
 } from "../../state/wallet/payments";
 import type { Route } from "../../../types/route";
 import { useLightningPayments } from "./useLightningPayments";
@@ -52,13 +58,21 @@ const commandsAnswering = ({
     lightningAddress: "alice@example.com",
     successAction: null,
   },
+  quote = {
+    _tag: "Quoted",
+    amount: 40,
+    fee: 3,
+    mint: MintUrl.make("https://mint.example"),
+  },
 }: {
   invoice?: PayInvoiceOutcome;
   address?: PayLightningAddressOutcome;
+  quote?: QuoteLightningInvoiceOutcome;
 }) => {
   commandsRef.current = {
     fundsFor: vi.fn(),
     payContact: vi.fn(),
+    quoteLightningInvoice: vi.fn(async () => quote),
     payLightningAddress: vi.fn(async (_args, options) => {
       options?.onSending?.();
       return address;
@@ -84,7 +98,9 @@ const render = async (routeKind: Route["kind"] = "manualPay") => {
   const hook: { current: ReturnType<typeof useLightningPayments> | null } = {
     current: null,
   };
+  const quotes: Array<LightningInvoiceQuoteState | null> = [];
   const Probe = () => {
+    quotes.push(useAtomValue(lightningInvoiceQuoteAtom));
     const payments = useLightningPayments({
       ...ui,
       formatDisplayedAmountParts: (amount) => ({
@@ -105,7 +121,7 @@ const render = async (routeKind: Route["kind"] = "manualPay") => {
     if (hook.current === null) throw new Error("hook not rendered");
     return hook.current;
   };
-  return { ...ui, current, view };
+  return { ...ui, current, quotes, view };
 };
 
 afterEach(() => {
@@ -114,6 +130,43 @@ afterEach(() => {
 });
 
 describe("useLightningPayments", () => {
+  it("prices an invoice waiting for confirmation and drops the estimate with it", async () => {
+    commandsAnswering({});
+    const ui = await render();
+    const preview = {
+      invoice: "lnbc-mock",
+      amountSat: 40,
+      description: null,
+      expiresAtSec: null,
+    };
+
+    await act(async () => {
+      ui.current().setPendingLightningInvoiceConfirmation(preview);
+    });
+    expect(commandsRef.current?.quoteLightningInvoice).toHaveBeenCalledWith(
+      "lnbc-mock",
+    );
+    expect(ui.quotes).toContainEqual({
+      invoice: "lnbc-mock",
+      outcome: "pending",
+    });
+    expect(ui.quotes.at(-1)).toEqual({
+      invoice: "lnbc-mock",
+      outcome: {
+        _tag: "Quoted",
+        amount: 40,
+        fee: 3,
+        mint: "https://mint.example",
+      },
+    });
+
+    await act(async () => {
+      ui.current().closeLightningInvoiceConfirmation();
+    });
+    expect(ui.quotes.at(-1)).toBeNull();
+    await ui.view.unmount();
+  });
+
   it("shows a paid invoice and returns to the wallet from manual pay", async () => {
     commandsAnswering({});
     const ui = await render();
