@@ -342,6 +342,7 @@ export const useCashuWalletComposition = ({
     contacts,
     currentNpub,
     currentNsec,
+    dismissPaymentSending,
     envelopes: cashuEnvelopes,
     fiatRates,
     formatDisplayedAmountParts,
@@ -350,6 +351,7 @@ export const useCashuWalletComposition = ({
     mintBalances: walletBalances.perMint,
     pushToast,
     showPaidOverlay,
+    showPaymentSending,
     t,
     walletReady: sendCashuToken !== null && meltCashuInvoice !== null,
   });

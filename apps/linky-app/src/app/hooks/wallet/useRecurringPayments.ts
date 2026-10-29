@@ -25,6 +25,7 @@ import {
 } from "../useLinksync";
 
 interface UseRecurringPaymentsParams {
+  dismissPaymentSending: () => void;
   chat: Pick<
     ChatWrites,
     "appendLocalNostrMessage" | "updateLocalNostrMessage"
@@ -46,6 +47,7 @@ interface UseRecurringPaymentsParams {
   mintBalances: PlanSendMintArgs["balances"];
   pushToast: (message: string) => void;
   showPaidOverlay: (title: string, details: PaidOverlayDetails) => void;
+  showPaymentSending: (details: PaidOverlayDetails) => void;
   t: Translate;
   /** The wallet can pay; reminders for due payments wait for it. */
   walletReady: boolean;
@@ -60,6 +62,7 @@ export const useRecurringPayments = ({
   contacts,
   currentNpub,
   currentNsec,
+  dismissPaymentSending,
   envelopes,
   fiatRates,
   formatDisplayedAmountParts,
@@ -68,6 +71,7 @@ export const useRecurringPayments = ({
   mintBalances,
   pushToast,
   showPaidOverlay,
+  showPaymentSending,
   t,
   walletReady,
 }: UseRecurringPaymentsParams) => {
@@ -79,6 +83,7 @@ export const useRecurringPayments = ({
   });
   const scheduler = useRecurringPaymentsScheduler({
     contacts,
+    dismissPaymentSending,
     envelopes,
     fiatRates,
     formatDisplayedAmountParts,
@@ -90,6 +95,7 @@ export const useRecurringPayments = ({
     repository,
     sendTokenMessage,
     showPaidOverlay,
+    showPaymentSending,
     t,
   });
   useProvideOwnerCommands(recurringSchedulerAtom, scheduler);

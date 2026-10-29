@@ -43,7 +43,6 @@ import { SiteLoginModal } from "./SiteLoginModal";
 import { PaidOverlay } from "./PaidOverlay";
 import { PaymentMintMeltConfirmModal } from "./PaymentMintMeltConfirmModal";
 import { ProfileShareOverlay } from "./ProfileShareOverlay";
-import { RecurringPaymentDueModal } from "./RecurringPaymentDueModal";
 import { SaveContactPromptModal } from "./SaveContactPromptModal";
 import { ScanModal } from "./ScanModal";
 import { ShareOptionsModal } from "./ShareOptionsModal";
@@ -240,8 +239,6 @@ export function AuthenticatedLayout({
           t={t}
         />
       ) : null}
-
-      {!paidOverlay.paidOverlayIsOpen ? <RecurringPaymentDueModal /> : null}
     </>
   );
 }

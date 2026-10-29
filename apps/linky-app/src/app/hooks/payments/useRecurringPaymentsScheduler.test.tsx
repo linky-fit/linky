@@ -27,7 +27,6 @@ import {
   type RecurringPaymentsRepository,
 } from "@linky-fit/linksync";
 import {
-  RECURRING_CONFIRM_SEC,
   RECURRING_RUN_RETRY_DELAY_SEC,
   readRecurringPaymentOrder,
   recurringEnvelopeKey,
@@ -45,7 +44,6 @@ import {
   recurringPaymentIdFor,
 } from "../../../testUtils/recurringOrders";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
-import { recurringPaymentUpdate } from "../../lib/recurringPaymentStore";
 import type { ContactRowLike } from "../../types/appTypes";
 import type { CashuEnvelopes } from "../composition/useLinkshuComposition";
 import { useRecurringPaymentsScheduler } from "./useRecurringPaymentsScheduler";
@@ -233,6 +231,7 @@ const makeParams = (
   overrides: Partial<Params> = {},
 ): Params => ({
   contacts: [nostrContact, lightningContact],
+  dismissPaymentSending: vi.fn(),
   envelopes: makeEnvelopes(),
   fiatRates: null,
   formatDisplayedAmountParts: (amountSat) => ({
@@ -248,12 +247,9 @@ const makeParams = (
   repository,
   sendTokenMessage: vi.fn(async () => ({ status: "sent" as const })),
   showPaidOverlay: vi.fn(),
+  showPaymentSending: vi.fn(),
   t: (key) => key,
-  dependencies: {
-    // Background by default: the countdown is a separate scenario.
-    isVisible: () => false,
-    nowSec: () => NOW,
-  },
+  dependencies: { nowSec: () => NOW },
   ...overrides,
 });
 
@@ -347,10 +343,7 @@ const deferred = <A,>() => {
 describe("useRecurringPaymentsScheduler", () => {
   it("pays nothing before the due time and pays on the first pass at it", async () => {
     let now = DUE - 1;
-    const view = await mount(
-      {},
-      { dependencies: { isVisible: () => false, nowSec: () => now } },
-    );
+    const view = await mount({}, { dependencies: { nowSec: () => now } });
     expect(view.envelopes().open).not.toHaveBeenCalled();
     expect(view.params.maybeShowPwaNotification).not.toHaveBeenCalled();
 
@@ -400,7 +393,6 @@ describe("useRecurringPaymentsScheduler", () => {
       amountSat: 100,
       contact: { name: "Alice", npub: "npub1alice" },
     });
-    expect(view.scheduler().dueConfirmation).toBeNull();
     await view.unmount();
   });
 
@@ -711,7 +703,6 @@ describe("useRecurringPaymentsScheduler", () => {
       },
       {
         dependencies: {
-          isVisible: () => false,
           nowSec: () => now,
         },
         envelopes: makeEnvelopes(fakeMint(), {
@@ -840,7 +831,6 @@ describe("useRecurringPaymentsScheduler", () => {
       { amount: 500 },
       {
         dependencies: {
-          isVisible: () => false,
           nowSec: () => now,
         },
         mintBalances: [],
@@ -1000,248 +990,38 @@ describe("useRecurringPaymentsScheduler", () => {
     await view.unmount();
   });
 
-  describe("while Linky is visible", () => {
-    const visible = {
-      isVisible: () => true,
-      nowSec: () => NOW,
-    };
+  it("shows the run going out and replaces it with the paid confirmation", async () => {
+    const view = await mount();
 
-    it("shows the countdown instead of paying", async () => {
-      const view = await mount(
-        {},
-        {
-          dependencies: visible,
-        },
-      );
-
-      expect(view.envelopes().open).not.toHaveBeenCalled();
-      expect(view.scheduler().dueConfirmation).toEqual({
-        orderId: ORDER_ID,
-        runIndex: 0,
-        dueAtSec: DUE,
-        amountSat: 100,
-        sendAtSec: NOW + RECURRING_CONFIRM_SEC,
-      });
-      expect(view.row()).toMatchObject({ lastRunStatus: null });
-
-      // Another pass keeps the running countdown instead of restarting it.
-      await view.runNow();
-      expect(view.scheduler().dueConfirmation?.sendAtSec).toBe(
-        NOW + RECURRING_CONFIRM_SEC,
-      );
-      await view.unmount();
+    expect(view.params.showPaymentSending).toHaveBeenCalledExactlyOnceWith({
+      direction: "out",
+      amountSat: 100,
+      contact: { name: "Alice", npub: "npub1alice" },
     });
-
-    it("pays when the user confirms", async () => {
-      const view = await mount(
-        {},
-        {
-          dependencies: visible,
-        },
-      );
-      await act(async () => {
-        await view.scheduler().confirmDueNow();
-      });
-      await settle();
-
-      expect(view.envelopes().open).toHaveBeenCalledTimes(1);
-      expect(view.row()).toMatchObject({ lastRunStatus: "paid", runCount: 1 });
-      expect(view.scheduler().dueConfirmation).toBeNull();
-      await view.unmount();
-    });
-
-    it("tells the user when another context holds the envelope on confirm", async () => {
-      const view = await mount(
-        {},
-        {
-          dependencies: visible,
-          envelopes: heldEnvelopes(),
-        },
-      );
-      await act(async () => {
-        await view.scheduler().confirmDueNow();
-      });
-      await settle();
-
-      expect(view.params.pushToast).toHaveBeenCalledWith("recurringWalletBusy");
-      expect(view.row()).toMatchObject({ lastRunStatus: null, runCount: 0 });
-      await view.unmount();
-    });
-
-    it("pays a run whose envelope the mint already signed without a countdown", async () => {
-      const view = await mount(
-        { amount: 500 },
-        {
-          dependencies: visible,
-          envelopes: makeEnvelopes(fakeMint({ 0: "spent" })),
-          mintBalances: [],
-        },
-      );
-
-      expect(view.scheduler().dueConfirmation).toBeNull();
-      expect(view.row()).toMatchObject({ lastRunStatus: "paid", runCount: 1 });
-      await view.unmount();
-    });
-
-    it("does not count down again for a run already in delivery", async () => {
-      const view = await mount(
-        {},
-        {
-          dependencies: visible,
-          sendTokenMessage: vi.fn(async () => ({ status: "queued" as const })),
-        },
-      );
-      await act(async () => {
-        await view.scheduler().confirmDueNow();
-      });
-      await settle();
-      expect(view.row()).toMatchObject({ lastRunStatus: null, runCount: 0 });
-
-      await view.setParams({
-        sendTokenMessage: vi.fn(async () => ({ status: "sent" as const })),
-      });
-      await view.runNow();
-
-      expect(view.scheduler().dueConfirmation).toBeNull();
-      expect(view.row()).toMatchObject({ lastRunStatus: "paid", runCount: 1 });
-      await view.unmount();
-    });
-
-    it("pays the run the countdown showed, also after another tab paid it", async () => {
-      const mint = fakeMint();
-      const view = await mount(
-        {},
-        {
-          dependencies: visible,
-          envelopes: makeEnvelopes(mint),
-        },
-      );
-      expect(view.scheduler().dueConfirmation).toMatchObject({ runIndex: 0 });
-      mint.set(keyOf(0), "spent");
-      Effect.runSync(
-        view.repository.update(ORDER_ID, {
-          progress: progressColumn(1, DUE + 6 * HOUR),
-        }),
-      );
-      await act(async () => {
-        await view.scheduler().confirmDueNow();
-      });
-      await settle();
-
-      expect(opened(view)).toEqual([keyOf(0)]);
-      expect(view.envelopes().send).not.toHaveBeenCalled();
-      expect(view.row()).toMatchObject({
-        nextDueAtSec: DUE + 6 * HOUR,
-        runCount: 1,
-      });
-      await view.unmount();
-    });
-
-    it("skips the period when the user cancels", async () => {
-      const view = await mount(
-        {},
-        {
-          dependencies: visible,
-        },
-      );
-      await act(async () => {
-        await view.scheduler().cancelDue();
-      });
-      await settle();
-
-      expect(view.envelopes().open).not.toHaveBeenCalled();
-      expect(view.row()).toMatchObject({
-        lastRunAtSec: NOW,
-        lastRunStatus: "skipped",
-        nextDueAtSec: DUE + 6 * HOUR,
-        runCount: 0,
-      });
-      expect(view.params.pushToast).toHaveBeenCalledWith(
-        "recurringCancelledToast",
-      );
-      expect(view.params.maybeShowPwaNotification).not.toHaveBeenCalledWith(
-        "recurringPaymentTitle",
-        expect.stringMatching(/^recurringSkipped/),
-        expect.anything(),
-      );
-      expect(view.scheduler().dueConfirmation).toBeNull();
-      await view.unmount();
-    });
-
-    it("counts a run another device paid meanwhile as paid instead of skipping it on cancel", async () => {
-      const mint = fakeMint();
-      const view = await mount(
-        {},
-        {
-          dependencies: visible,
-          envelopes: makeEnvelopes(mint),
-        },
-      );
-      mint.set(keyOf(0), "spent");
-      await act(async () => {
-        await view.scheduler().cancelDue();
-      });
-      await settle();
-
-      expect(view.envelopes().send).not.toHaveBeenCalled();
-      expect(view.row()).toMatchObject({
-        lastRunStatus: "paid",
-        nextDueAtSec: DUE + 6 * HOUR,
-        runCount: 1,
-      });
-      expect(view.params.pushToast).toHaveBeenCalledWith(
-        "recurringCancelTooLate",
-      );
-      expect(view.params.pushToast).not.toHaveBeenCalledWith(
-        "recurringCancelledToast",
-      );
-      await view.unmount();
-    });
+    expect(view.params.showPaidOverlay).toHaveBeenCalledOnce();
+    expect(view.params.dismissPaymentSending).toHaveBeenCalledOnce();
+    const callOrder = (fn: (...args: never[]) => unknown) =>
+      vi.mocked(fn).mock.invocationCallOrder[0] ?? 0;
+    expect(callOrder(view.params.showPaidOverlay)).toBeGreaterThan(
+      callOrder(view.params.showPaymentSending),
+    );
+    expect(callOrder(view.params.dismissPaymentSending)).toBeGreaterThan(
+      callOrder(view.params.showPaidOverlay),
+    );
+    await view.unmount();
   });
 
-  it("does not skip the next period when the countdown's run was delivered elsewhere", async () => {
-    // Another device sent the token and counted the run; the contact has
-    // not redeemed it yet, so the envelope is still unspent.
-    const mint = fakeMint();
+  it("closes the sending banner when the run ends without paying", async () => {
     const view = await mount(
       {},
       {
-        dependencies: {
-          isVisible: () => true,
-          nowSec: () => NOW,
-        },
-        envelopes: makeEnvelopes(mint),
+        sendTokenMessage: vi.fn(async () => ({ status: "queued" as const })),
       },
     );
-    mint.set(keyOf(0), "unspent");
-    Effect.runSync(
-      view.repository.update(
-        ORDER_ID,
-        recurringPaymentUpdate({
-          lastRunStatus: "paid",
-          progress: recurringProgressColumn({
-            runCount: 1,
-            nextDueAtSec: DUE + 6 * HOUR,
-          }),
-        }),
-      ),
-    );
-    await act(async () => {
-      await view.scheduler().cancelDue();
-    });
-    await settle();
 
-    expect(view.row()).toMatchObject({
-      lastRunStatus: "paid",
-      nextDueAtSec: DUE + 6 * HOUR,
-      runCount: 1,
-    });
-    expect(view.params.pushToast).toHaveBeenCalledWith(
-      "recurringCancelTooLate",
-    );
-    expect(view.params.pushToast).not.toHaveBeenCalledWith(
-      "recurringCancelledToast",
-    );
+    expect(view.params.showPaymentSending).toHaveBeenCalledOnce();
+    expect(view.params.showPaidOverlay).not.toHaveBeenCalled();
+    expect(view.params.dismissPaymentSending).toHaveBeenCalledOnce();
     await view.unmount();
   });
 
@@ -1268,7 +1048,6 @@ describe("useRecurringPaymentsScheduler", () => {
       let now = NOW;
       const view = await mount(later, {
         dependencies: {
-          isVisible: () => false,
           nowSec: () => now,
         },
         envelopes: makeEnvelopes(fakeMint(), {
@@ -1389,7 +1168,6 @@ describe("useRecurringPaymentsScheduler", () => {
       const view = await mount(later, {
         contacts: [lightningContact],
         dependencies: {
-          isVisible: () => false,
           nowSec: () => now,
         },
         envelopes: makeEnvelopes(fakeMint({ 0: "unspent" })),
@@ -1429,7 +1207,6 @@ describe("useRecurringPaymentsScheduler", () => {
       const view = await mount(later, {
         contacts: [lightningContact],
         dependencies: {
-          isVisible: () => false,
           nowSec: () => now,
         },
         envelopes: makeEnvelopes(fakeMint({ 0: "mixed" })),

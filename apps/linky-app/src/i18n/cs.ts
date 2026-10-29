@@ -48,23 +48,17 @@ export const cs = {
     "Platba {amount} {unit} pro {name} byla přeskočena: opakovaně se nezdařila.",
   recurringSkippedRecipientBody:
     "Platba {amount} {unit} byla přeskočena: příjemci nelze zaplatit.",
-  recurringDueTitle: "Plánovaná platba",
-  recurringDueCancel: "Zrušit tuto platbu",
-  recurringCancelledToast: "Platba zrušena. Další proběhne v dalším termínu.",
   recurringWaitingForFunds:
     "Na pravidelnou platbu teď nemáte na {mint} dost prostředků. Zkusím to znovu.",
   recurringWaitingForRates:
     "Chybí kurz pro přepočet pravidelné platby na saty. Zkusím to znovu.",
   recurringRecipientUnavailable:
     "Pravidelnou platbu nelze odeslat: kontakt nemá npub ani Lightning adresu.",
-  recurringWalletBusy:
-    "Peněženka je zrovna zaneprázdněná, zkuste to za chvíli.",
   recurringRunFailedToast: "Pravidelná platba se nezdařila. Zkusím to znovu.",
   recurringNeedsAttention:
     "Část prostředků vyhrazených na {mint} pro pravidelnou platbu byla utracena jinde. Smažte pravidelnou platbu a zbytek se vrátí do zůstatku.",
   recurringNeedsAttentionCashu:
     "Část tokenu, který pravidelná platba vyhradila na {mint}, byla utracena jinde. Smažte pravidelnou platbu, aby se zastavila.",
-  recurringCancelTooLate: "Tato platba už odešla a nejde ji zrušit.",
   recurringDeletedTokenSentBody:
     "{amount} {unit} pro {name} odesláno: smazaná pravidelná platba je už měla vyhrazené.",
   recurringDeletedTokenKeptBody:
@@ -107,10 +101,9 @@ export const cs = {
   recurringStatusPaused: "pozastaveno",
   recurringPause: "Pozastavit",
   recurringResume: "Obnovit",
-  recurringRunNow: "Zaplatit",
   recurringNotFound: "Pravidelná platba nenalezena.",
   recurringOnlyWhileOpen:
-    "Platbu odešle kterékoli vaše zařízení, na kterém běží Linky, i na pozadí. Pokud ji žádné neodešle do minuty po splatnosti, dostanete připomínku, abyste Linky otevřeli; při otevřené aplikaci uvidíte odpočet a můžete platbu odeslat hned nebo zrušit.",
+    "Platbu odešle kterékoli vaše zařízení, na kterém běží Linky, i na pozadí. Pokud ji žádné neodešle do minuty po splatnosti, dostanete připomínku, abyste Linky otevřeli; při otevřené aplikaci uvidíte, jak platba odchází.",
   recurringRepeatAction: "Opakovat pravidelně",
   showTransactions: "Ukázat transakce",
   feedback: "Zpětná vazba",
