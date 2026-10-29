@@ -88,14 +88,13 @@ export const useContactPayments = ({
           (contact.lnAddress ?? "").trim() ||
           t("appTitle");
         const overlayContact = paidOverlayContact(contact);
-        const outcome = await commands.payContact(args, {
-          onSending: () =>
-            showPaymentSending({
-              direction: "out",
-              amountSat,
-              contact: overlayContact,
-            }),
+        // On screen before the wallet is even asked, so the user sees the payment start at once.
+        showPaymentSending({
+          direction: "out",
+          amountSat,
+          contact: overlayContact,
         });
+        const outcome = await commands.payContact(args);
         dismissPaymentSending();
         switch (outcome._tag) {
           case "Sent":

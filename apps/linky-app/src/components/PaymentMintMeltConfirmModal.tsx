@@ -1,7 +1,7 @@
-import { Button, Dialog } from "@linky-fit/ui";
 import React from "react";
 import type { Translate } from "../i18n";
 import { formatMintHost } from "../utils/mint";
+import { PaymentConfirmDialog } from "./PaymentConfirmDialog";
 
 interface PaymentMintMeltConfirmModalProps {
   fromMint: string;
@@ -12,6 +12,7 @@ interface PaymentMintMeltConfirmModalProps {
   toMint: string;
 }
 
+/** Asks to move funds to the main mint first, in the same dialog every payment confirms in. */
 export function PaymentMintMeltConfirmModal({
   fromMint,
   isBusy,
@@ -21,25 +22,18 @@ export function PaymentMintMeltConfirmModal({
   toMint,
 }: PaymentMintMeltConfirmModalProps): React.ReactElement {
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-      title={t("cashuPaymentMeltTitle")}
+    <PaymentConfirmDialog
+      amountSat={null}
+      unknownAmountLabel={t("cashuPaymentMeltTitle")}
+      label={t("cashuPaymentMeltTitle")}
+      confirmLabel={t("cashuPaymentMeltConfirm")}
+      cancelLabel={t("payCancel")}
       description={t("cashuPaymentMeltBody")
         .replace("{fromMint}", formatMintHost(fromMint))
         .replace("{toMint}", formatMintHost(toMint))}
-      actions={
-        <>
-          <Button loading={isBusy} onPress={() => void onConfirm()}>
-            {t("cashuPaymentMeltConfirm")}
-          </Button>
-          <Button variant="secondary" disabled={isBusy} onPress={onClose}>
-            {t("payCancel")}
-          </Button>
-        </>
-      }
+      isBusy={isBusy}
+      onClose={onClose}
+      onConfirm={onConfirm}
     />
   );
 }

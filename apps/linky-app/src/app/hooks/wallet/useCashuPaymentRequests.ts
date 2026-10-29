@@ -293,23 +293,19 @@ export const useCashuPaymentRequests = ({
             : null;
       const overlayContact = paidOverlayContact(recipient);
 
-      const outcome = await commands.payPaymentRequest(
-        {
-          request,
-          quote: reviewedQuote,
-          recipient,
-          replyContext: requestMessage ? replyContextOf(requestMessage) : null,
-          ...(isPaymentAuthorized ? { isPaymentAuthorized } : {}),
-        },
-        {
-          onSending: () =>
-            showPaymentSending({
-              direction: "out",
-              amountSat: reviewedQuote.amount,
-              contact: overlayContact,
-            }),
-        },
-      );
+      // On screen before the wallet is even asked, so the user sees the payment start at once.
+      showPaymentSending({
+        direction: "out",
+        amountSat: reviewedQuote.amount,
+        contact: overlayContact,
+      });
+      const outcome = await commands.payPaymentRequest({
+        request,
+        quote: reviewedQuote,
+        recipient,
+        replyContext: requestMessage ? replyContextOf(requestMessage) : null,
+        ...(isPaymentAuthorized ? { isPaymentAuthorized } : {}),
+      });
       dismissPaymentSending();
 
       switch (outcome._tag) {
