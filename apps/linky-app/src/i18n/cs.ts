@@ -792,10 +792,6 @@ export const cs = {
   wallet: "Peněženka",
   walletReceive: "Přijmout",
   walletSend: "Odeslat",
-  walletEarlyWarningTitle: "Gratulujeme",
-  walletEarlyWarningBody:
-    "Nastřádali jste větší množství bitcoinu a mohla by se vám hodit podpora hardwarové peněženky. Dejte nám vědět, pokud o ni máte zájem.",
-  walletHardwareSupportAction: "Napsat nám",
 
   topup: "Dobít",
   topupTitle: "Dobít účet",

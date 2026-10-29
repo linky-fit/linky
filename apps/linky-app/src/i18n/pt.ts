@@ -797,10 +797,6 @@ export const pt = {
   errorPrefix: "Erro",
 
   wallet: "Carteira",
-  walletEarlyWarningTitle: "Parabéns",
-  walletEarlyWarningBody:
-    "Você acumulou uma quantia grande de bitcoin e pode se beneficiar do suporte a carteiras de hardware. Mande seu feedback se tiver interesse.",
-  walletHardwareSupportAction: "Enviar feedback",
   topup: "Recarga",
   topupTitle: "Recarregar sua conta",
   topupShowInvoice: "Mostrar fatura de recarga",

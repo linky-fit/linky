@@ -1,8 +1,4 @@
 import type { cs } from "./cs";
-  walletEarlyWarningTitle: "Glückwunsch",
-  walletEarlyWarningBody:
-    "Du gehörst zu den ersten Linky-Nutzern. Diese Wallet ist experimentell und kann Fehler enthalten. Verwende zunächst nur kleine Beträge.",
-  walletHardwareSupportAction: "Feedback geben",
 
 export const de = {
   appTitle: "Linky",

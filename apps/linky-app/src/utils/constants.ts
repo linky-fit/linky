@@ -58,9 +58,6 @@ export const PENDING_DEEP_LINK_TEXT_STORAGE_KEY =
 export const PENDING_SHARED_PROFILE_NPUB_STORAGE_KEY =
   "linky.pending_shared_profile_npub";
 
-export const WALLET_WARNING_BALANCE_THRESHOLD_SAT = 500_000;
-export const WALLET_WARNING_DISMISSED_STORAGE_KEY =
-  "linky.wallet_hardware_support_banner_dismissed.v1";
 export const LIGHTNING_INVOICE_AUTO_PAY_LIMIT_SAT = 10_000;
 
 export const LOCAL_PAYMENT_EVENTS_STORAGE_KEY_PREFIX =
