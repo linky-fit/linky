@@ -1,7 +1,9 @@
+import type { OnchainTransferDirection } from "@linky-fit/onchain-transfer";
 import type { ContactId } from "../../evolu";
 import { navigateTo, returnFromBankPaymentOffer } from "../../hooks/useRouting";
 import type { Route } from "../../types/route";
 import { setBankPaymentOfferMinimized } from "./bankPaymentOfferStorage";
+import { ONCHAIN_TRANSFER_TITLE_KEYS } from "./onchainTransferLabels";
 import type { TopbarButton } from "../types/appTypes";
 import type { I18nKey, Translate } from "../../i18n";
 
@@ -114,6 +116,7 @@ export const resolveBackAction = (
     case "recurringPaymentNew":
     case "recurringPayment":
     case "onchainTransfer":
+    case "transaction":
       return () => navigateTo({ route: "transactions" });
     case "recurringPaymentEdit":
       return () => navigateTo({ route: "recurringPayment", id: route.id });
@@ -284,6 +287,7 @@ const SHOWS_MENU_BUTTON: Record<
   topupInvoice: false,
   topupNoAmount: false,
   transactions: false,
+  transaction: false,
   recurringPaymentNew: false,
   recurringPayment: false,
   recurringPaymentEdit: false,
@@ -480,11 +484,19 @@ const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
   topupInvoice: "topupInvoiceTitle",
   topupNoAmount: "topupNoAmountTitle",
   transactions: "transactionsTitle",
+  transaction: "transactionTitle",
   recurringPaymentNew: "recurringPaymentNewTitle",
   recurringPayment: "recurringPaymentTitle",
   recurringPaymentEdit: "recurringPaymentEditTitle",
   wallet: "wallet",
 };
 
-export const buildTopbarTitle = (route: Route, t: Translate): string =>
-  t(TOPBAR_TITLE_KEY[route.kind]);
+/** The title of the route; an on-chain transfer is titled by its direction once that is known. */
+export const buildTopbarTitle = (
+  route: Route,
+  t: Translate,
+  onchainTransferDirection: OnchainTransferDirection | null = null,
+): string =>
+  route.kind === "onchainTransfer" && onchainTransferDirection !== null
+    ? t(ONCHAIN_TRANSFER_TITLE_KEYS[onchainTransferDirection])
+    : t(TOPBAR_TITLE_KEY[route.kind]);

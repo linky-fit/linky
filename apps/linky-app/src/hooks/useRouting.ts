@@ -127,6 +127,7 @@ type NavigationAction =
   | { route: "settingsBlocked" }
   | { route: "settingsReceiveMethod" }
   | { route: "transactions" }
+  | { route: "transaction"; id: string }
   | {
       route: "recurringPaymentNew";
       prefill?: { amountSat?: number; contactId?: string };
@@ -245,6 +246,11 @@ export const navigateTo = (action: NavigationAction): void => {
       break;
     case "transactions":
       window.location.assign("#wallet/transactions");
+      break;
+    case "transaction":
+      window.location.assign(
+        `#wallet/transactions/${encodeURIComponent(action.id)}`,
+      );
       break;
     case "recurringPaymentNew": {
       const query = new URLSearchParams();

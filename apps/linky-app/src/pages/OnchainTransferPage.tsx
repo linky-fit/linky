@@ -31,13 +31,11 @@ import { useWalletBalance } from "../app/hooks/wallet/useWalletInventory";
 import {
   ONCHAIN_TRANSFER_PHASE_LABEL_KEYS,
   ONCHAIN_TRANSFER_PHASE_TONES,
-  ONCHAIN_TRANSFER_TITLE_KEYS,
 } from "../app/lib/onchainTransferLabels";
 import {
   isOnchainSendUnpaid,
   type OnchainTransferView,
 } from "../app/lib/onchainTransfers";
-import { OnchainTransferAmounts } from "../components/OnchainTransfer";
 import { useExactAmountText } from "../app/hooks/useExactAmountText";
 import type { Translate } from "../i18n";
 import { openInBrowser } from "../platform/textShare";
@@ -119,10 +117,6 @@ const UNSUCCESSFUL_PHASES: ReadonlySet<OnchainTransferView["phase"]> = new Set([
   "refunded",
   "shortDeposit",
 ]);
-
-/** Phases of a receive going as planned, where nothing but the status and the amount helps the user. */
-const RECEIVE_IN_PROGRESS_PHASES: ReadonlySet<OnchainTransferView["phase"]> =
-  new Set(["awaitingDeposit", "depositSeen", "depositConfirming"]);
 
 /** What actually moved: what the operator got where it differs from the terms, what came back and, for a completed receive, what reached the balance. */
 function MovedAmounts({
@@ -206,26 +200,28 @@ function ExplorerLink({
   );
 }
 
-function AddressRow({
-  label,
+/** An address in groups of four, copied by a press. */
+function CopyableAddress({
   address,
   onCopy,
+  testID,
 }: {
-  label: string;
   address: string;
   onCopy: (text: string) => void;
+  testID: string;
 }): React.ReactElement {
+  const { t } = useTranslation();
   return (
-    <ListRow
-      title={label}
-      description={
-        <Text mono userSelect="text">
-          {address}
-        </Text>
-      }
-      chevron={false}
+    <Pressable
+      aria-label={t("copy")}
+      alignSelf="center"
       onPress={() => onCopy(address)}
-    />
+      testID={testID}
+    >
+      <Text mono textAlign="center" userSelect="text">
+        {groupAddress(address)}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -252,15 +248,11 @@ function DepositInstructions({
         onPress={() => onCopy(qrValue)}
         testID="onchain-transfer-deposit-qr"
       />
-      <Pressable
-        aria-label={t("copy")}
-        onPress={() => onCopy(address)}
+      <CopyableAddress
+        address={address}
+        onCopy={onCopy}
         testID="onchain-transfer-deposit-address"
-      >
-        <Text mono textAlign="center" userSelect="text">
-          {groupAddress(address)}
-        </Text>
-      </Pressable>
+      />
     </Stack>
   );
 }
@@ -337,6 +329,8 @@ export function OnchainTransferDetail(
     onCopy,
   } = props;
   const { t } = useTranslation();
+  const { exact } = useExactAmountText();
+  const { formatDisplayedAmountText } = useDisplayAmounts();
   const [confirmingCancel, setConfirmingCancel] = React.useState(false);
   const { direction, phase, update } = transfer;
   const send = direction === "send";
@@ -346,37 +340,34 @@ export function OnchainTransferDetail(
   // A receive of any amount has no terms until its deposit set them.
   const termsKnown =
     !transfer.anyAmount || update?.receivedAmount !== undefined;
-  const inProgressReceive = !send && RECEIVE_IN_PROGRESS_PHASES.has(phase);
+  // What the user gets, in sats beside the display currency for a receive, whose deposit was on-chain.
+  const amountText = send ? formatDisplayedAmountText : exact;
   return (
     <Stack gap="$lg">
-      <Text variant="title">{t(ONCHAIN_TRANSFER_TITLE_KEYS[direction])}</Text>
       <PhaseStatus {...props} />
       <MovedAmounts transfer={transfer} />
       {termsKnown ? (
-        <OnchainTransferAmounts
+        // The fee was explained before the transfer; only what arrives matters now.
+        <Section
           title={
             UNSUCCESSFUL_PHASES.has(phase)
               ? t("onchainTransferOriginalTerms")
               : undefined
           }
-          direction={direction}
-          amount={transfer.amount}
-          fee={transfer.fee}
-          total={transfer.sendAmount}
-          feePercent={null}
-          // The fee was explained before the address; the deposit itself was the total.
-          showFee={!transfer.anyAmount}
-          showTotal={!transfer.anyAmount}
-        />
-      ) : null}
-      {send && transfer.payoutAddress !== null ? (
-        <Section>
-          <AddressRow
-            label={t("onchainTransferPayoutAddress")}
-            address={transfer.payoutAddress}
-            onCopy={onCopy}
+        >
+          <ListRow
+            title={t("onchainTransferYouGet")}
+            value={amountText(transfer.amount)}
+            testID="onchain-transfer-amount"
           />
         </Section>
+      ) : null}
+      {send && transfer.payoutAddress !== null ? (
+        <CopyableAddress
+          address={transfer.payoutAddress}
+          onCopy={onCopy}
+          testID="onchain-transfer-payout-address"
+        />
       ) : null}
       <ExplorerLink
         explorerUrl={explorerUrl}
@@ -398,14 +389,14 @@ export function OnchainTransferDetail(
           {t("onchainTransferCancel")}
         </Button>
       ) : null}
-      {inProgressReceive ? null : (
+      {UNSUCCESSFUL_PHASES.has(phase) ? (
         <ListRow
           icon="MessageCircle"
           title={t("onchainTransferContactSupport")}
           onPress={onContactSupport}
           testID="onchain-transfer-support"
         />
-      )}
+      ) : null}
       {confirmingCancel ? (
         <Dialog
           open

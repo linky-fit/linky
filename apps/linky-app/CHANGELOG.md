@@ -15,7 +15,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 ### en-US
 
 - On-chain sends show one amount, stepped down or up, with the fee below it, and go out the moment you tap Send; on-chain receives explain the terms, then show one address in groups of four, and once the bitcoin arrives only the status, what you get and a link to the transaction.
-- Lightning and Cashu payments in the history carry icons instead of emoji, a pending on-chain transaction shows as a dot next to "Show transactions", and the mint list lost its frames.
+- Every payment in the history opens on its own page instead of unfolding in the list, and the rows carry no chevrons. Lightning and Cashu payments carry icons instead of emoji, a pending on-chain transaction shows as a green dot next to "Show transactions", an ecash receipt reads "Received at your address", and the mint list lost its frames.
 - The hardware wallet banner is gone.
 - Payments report their progress in a small banner at the top of the screen instead of covering it, so you can keep typing while a payment is sent or arrives.
 - Recurring payments go out at their due time without a countdown.
@@ -24,7 +24,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 ### cs-CZ
 
 - On-chain odeslání ukazuje jednu částku, kterou lze snížit či zvýšit, s poplatkem pod ní, a odejde hned po klepnutí na Odeslat; on-chain příjem vysvětlí podmínky, pak ukáže jednu adresu po čtyřech znacích a po příchodu bitcoinů už jen stav, co dostanete a odkaz na transakci.
-- Platby přes Lightning a Cashu mají v historii ikony místo emoji, nevyřízená on-chain transakce se ukazuje tečkou u „Zobrazit transakce“ a seznam mincoven přišel o rámečky.
+- Každá platba v historii se otevře na vlastní stránce místo rozbalení v seznamu a řádky nemají šipky. Platby přes Lightning a Cashu mají ikony místo emoji, nevyřízená on-chain transakce se ukazuje zelenou tečkou u „Zobrazit transakce“, přijatý ecash se jmenuje „Přijato na adresu“ a seznam mincoven přišel o rámečky.
 - Zmizel banner o hardwarové peněžence.
 - Platby hlásí průběh v malém proužku nahoře místo překrytí celé obrazovky, takže můžete dál psát, zatímco platba odchází nebo přichází.
 - Pravidelné platby odcházejí v termínu bez odpočtu.

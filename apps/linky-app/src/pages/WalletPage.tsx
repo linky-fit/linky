@@ -91,7 +91,7 @@ export const WalletPage: React.FC<WalletPageProps> = React.memo(
               </Text>
               {pendingOnchainTransfers ? (
                 <StatusDot
-                  tone="warning"
+                  tone="accent"
                   accessibilityLabel={pendingOnchainTransfers.label}
                   testID="wallet-pending-onchain"
                 />

@@ -99,8 +99,8 @@ describe("OnchainTransferDetail", () => {
     );
     expect(byTestId("onchain-transfer-send")).toBeNull();
     expect(byTestId("onchain-transfer-phase")).toBeNull();
-    expect(byTestId("onchain-transfer-total")).toBeNull();
-    expect(byTestId("onchain-transfer-support")).not.toBeNull();
+    expect(byTestId("onchain-transfer-amount")).toBeNull();
+    expect(byTestId("onchain-transfer-support")).toBeNull();
 
     await press(byTestId("onchain-transfer-cancel"));
     expect(onCancel).not.toHaveBeenCalled();
@@ -124,16 +124,19 @@ describe("OnchainTransferDetail", () => {
     expect(byTestId("onchain-transfer-cancel")).toBeNull();
   });
 
-  it("sends the amount plus the service fee of a ready on-chain send, in the display unit", async () => {
-    const { container, onSend } = await renderDetail(
+  it("shows a ready on-chain send as what arrives, in the display unit, and the payout address in groups of four, and sends the total", async () => {
+    const { container, onCopy, onSend } = await renderDetail(
       onchainTransferViewFixture({ phase: "readyToSend" }),
     );
-    expect(container.textContent).toContain(REGTEST_ADDRESS);
-    expect(container.textContent).toContain("onchainTransferYouGet~100 EUR");
-    expect(container.textContent).toContain("onchainTransferServiceFee~1 EUR");
-    expect(byTestId("onchain-transfer-total")?.textContent).toBe(
-      "onchainSendYouPay~101 EUR",
+    expect(byTestId("onchain-transfer-amount")?.textContent).toBe(
+      "onchainTransferYouGet~100 EUR",
     );
+    expect(container.textContent).not.toContain("onchainTransferServiceFee");
+    expect(container.textContent).not.toContain("onchainSendYouPay");
+    expect(container.textContent).toContain(groupAddress(REGTEST_ADDRESS));
+    await press(byTestId("onchain-transfer-payout-address"));
+    expect(onCopy).toHaveBeenLastCalledWith(REGTEST_ADDRESS);
+    expect(byTestId("onchain-transfer-support")).toBeNull();
     expect(byTestId("onchain-transfer-send")?.textContent).toBe(
       "Send ~101 EUR",
     );
@@ -251,10 +254,9 @@ describe("OnchainTransferDetail", () => {
     );
     // The status is the label alone; the amount is what arrives, the fee having been explained before the address.
     expect(container.textContent).not.toMatch(/Hint/u);
-    expect(container.textContent).toContain(
+    expect(byTestId("onchain-transfer-amount")?.textContent).toBe(
       "onchainTransferYouGet100,000 sat (~100 EUR)",
     );
-    expect(container.textContent).not.toContain("onchainTransferServiceFee");
     expect(byTestId("onchain-transfer-received")).toBeNull();
     expect(container.textContent).not.toContain("1/2");
   });
@@ -333,6 +335,7 @@ describe("OnchainTransferDetail", () => {
     expect(container.textContent).toContain("onchainTransferOriginalTerms");
     expect(byTestId("onchain-transfer-refunded")).toBeNull();
     expect(byTestId("onchain-transfer-cancel")).toBeNull();
+    expect(byTestId("onchain-transfer-support")).not.toBeNull();
   });
 
   it("shows a completed on-chain receive as what reached the balance, not the deposit again", async () => {
