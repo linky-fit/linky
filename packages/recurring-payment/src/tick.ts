@@ -3,12 +3,6 @@ import { recurringAmountSat, type FiatRatesPerBtc } from "./amount";
 import { recurringEnvelopeKey, type RecurringPaymentOrder } from "./order";
 import { decideRecurringRun, nextDueAfter } from "./schedule";
 
-/**
- * Countdown shown in the app before a due payment goes out, with pay-now and
- * cancel. Only when the app is visible; in the background the payment is sent
- * at its due time without it.
- */
-export const RECURRING_CONFIRM_SEC = 10;
 /** Pause between attempts of a run whose last attempt failed. */
 export const RECURRING_RUN_RETRY_DELAY_SEC = 10 * 60;
 

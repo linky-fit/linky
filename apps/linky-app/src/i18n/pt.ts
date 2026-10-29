@@ -51,26 +51,18 @@ export const pt = {
     "Pagamento de {amount} {unit} a {name} pulado: o pagamento continuou falhando.",
   recurringSkippedRecipientBody:
     "Pagamento de {amount} {unit} pulado: não é possível pagar ao destinatário.",
-  recurringDueTitle: "Pagamento agendado",
-  recurringDueCancel: "Cancelar este pagamento",
-  recurringCancelledToast:
-    "Pagamento cancelado. O próximo sai na data seguinte.",
   recurringWaitingForFunds:
     "Fundos insuficientes em {mint} para um pagamento recorrente agora. Vamos tentar de novo.",
   recurringWaitingForRates:
     "Sem cotação para converter o pagamento recorrente em sats. Vamos tentar de novo.",
   recurringRecipientUnavailable:
     "O pagamento recorrente não pode ser enviado: o contato não tem npub nem endereço Lightning.",
-  recurringWalletBusy:
-    "A carteira está ocupada agora, tente de novo em instantes.",
   recurringRunFailedToast:
     "O pagamento recorrente falhou. Vamos tentar de novo.",
   recurringNeedsAttention:
     "Parte dos fundos reservados em {mint} para um pagamento recorrente foi gasta em outro lugar. Exclua o pagamento recorrente para devolver o restante ao seu saldo.",
   recurringNeedsAttentionCashu:
     "Parte do token que um pagamento recorrente reservou em {mint} foi gasta em outro lugar. Exclua o pagamento recorrente para interrompê-lo.",
-  recurringCancelTooLate:
-    "Este pagamento já saiu e não pode mais ser cancelado.",
   recurringDeletedTokenSentBody:
     "{amount} {unit} enviados a {name}: um pagamento recorrente excluído já tinha reservado esse valor para o contato.",
   recurringDeletedTokenKeptBody:
@@ -114,10 +106,9 @@ export const pt = {
   recurringStatusPaused: "pausado",
   recurringPause: "Pausar",
   recurringResume: "Retomar",
-  recurringRunNow: "Pagar",
   recurringNotFound: "Pagamento recorrente não encontrado.",
   recurringOnlyWhileOpen:
-    "Qualquer aparelho seu com o Linky em execução envia o pagamento, também em segundo plano. Se nenhum o enviar até um minuto após o vencimento, você recebe um lembrete para abrir o Linky; com o aplicativo aberto, vê uma contagem regressiva e pode pagar na hora ou cancelar.",
+    "Qualquer aparelho seu com o Linky em execução envia o pagamento, também em segundo plano. Se nenhum o enviar até um minuto após o vencimento, você recebe um lembrete para abrir o Linky; com o aplicativo aberto, vê o pagamento sair.",
   recurringRepeatAction: "Repetir regularmente",
   showTransactions: "Mostrar transações",
   feedback: "Feedback",

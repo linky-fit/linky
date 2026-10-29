@@ -49,26 +49,18 @@ export const de = {
     "{amount} {unit} an {name} übersprungen: Die Zahlung ist wiederholt fehlgeschlagen.",
   recurringSkippedRecipientBody:
     "{amount} {unit} übersprungen: Der Empfänger kann nicht bezahlt werden.",
-  recurringDueTitle: "Geplante Zahlung",
-  recurringDueCancel: "Diese Zahlung abbrechen",
-  recurringCancelledToast:
-    "Zahlung abgebrochen. Die nächste folgt zum nächsten Termin.",
   recurringWaitingForFunds:
     "Für eine wiederkehrende Zahlung reicht das Guthaben bei {mint} gerade nicht. Es wird erneut versucht.",
   recurringWaitingForRates:
     "Kein Wechselkurs, um die wiederkehrende Zahlung in Sats umzurechnen. Es wird erneut versucht.",
   recurringRecipientUnavailable:
     "Die wiederkehrende Zahlung kann nicht gesendet werden: Der Kontakt hat weder npub noch Lightning-Adresse.",
-  recurringWalletBusy:
-    "Die Wallet ist gerade beschäftigt, versuche es gleich noch einmal.",
   recurringRunFailedToast:
     "Die wiederkehrende Zahlung ist fehlgeschlagen. Es wird erneut versucht.",
   recurringNeedsAttention:
     "Ein Teil des bei {mint} für eine wiederkehrende Zahlung zurückgelegten Guthabens wurde anderweitig ausgegeben. Lösche die wiederkehrende Zahlung, um den Rest deinem Guthaben zurückzugeben.",
   recurringNeedsAttentionCashu:
     "Ein Teil des Tokens, den eine wiederkehrende Zahlung bei {mint} zurückgelegt hat, wurde anderweitig ausgegeben. Lösche die wiederkehrende Zahlung, um sie zu stoppen.",
-  recurringCancelTooLate:
-    "Diese Zahlung ist bereits unterwegs und kann nicht mehr abgebrochen werden.",
   recurringDeletedTokenSentBody:
     "{amount} {unit} an {name} gesendet: eine gelöschte wiederkehrende Zahlung hatte sie bereits zurückgelegt.",
   recurringDeletedTokenKeptBody:
@@ -114,10 +106,9 @@ export const de = {
   recurringStatusPaused: "pausiert",
   recurringPause: "Pausieren",
   recurringResume: "Fortsetzen",
-  recurringRunNow: "Zahlen",
   recurringNotFound: "Wiederkehrende Zahlung nicht gefunden.",
   recurringOnlyWhileOpen:
-    "Jedes deiner Geräte, auf dem Linky läuft, sendet die Zahlung, auch im Hintergrund. Hat es eine Minute nach Fälligkeit keines gesendet, erinnern wir dich, Linky zu öffnen; bei geöffneter App siehst du einen Countdown und kannst sofort zahlen oder abbrechen.",
+    "Jedes deiner Geräte, auf dem Linky läuft, sendet die Zahlung, auch im Hintergrund. Hat es eine Minute nach Fälligkeit keines gesendet, erinnern wir dich, Linky zu öffnen; bei geöffneter App siehst du, wie die Zahlung rausgeht.",
   recurringRepeatAction: "Regelmäßig wiederholen",
   showTransactions: "Transaktionen anzeigen",
   feedback: "Feedback",

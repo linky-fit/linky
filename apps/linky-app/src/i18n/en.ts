@@ -49,24 +49,17 @@ export const en = {
     "Skipped {amount} {unit} to {name}: the payment kept failing.",
   recurringSkippedRecipientBody:
     "Skipped {amount} {unit}: the recipient cannot be paid.",
-  recurringDueTitle: "Scheduled payment",
-  recurringDueCancel: "Cancel this payment",
-  recurringCancelledToast:
-    "Payment cancelled. The next one goes out on its next date.",
   recurringWaitingForFunds:
     "Not enough funds at {mint} for a recurring payment right now. It will be retried.",
   recurringWaitingForRates:
     "No exchange rate to convert the recurring payment to sats. It will be retried.",
   recurringRecipientUnavailable:
     "The recurring payment cannot be sent: the contact has no npub or Lightning address.",
-  recurringWalletBusy: "The wallet is busy right now, try again in a moment.",
   recurringRunFailedToast: "The recurring payment failed. It will be retried.",
   recurringNeedsAttention:
     "Part of the funds set aside at {mint} for a recurring payment were spent elsewhere. Delete the recurring payment to return the rest to your balance.",
   recurringNeedsAttentionCashu:
     "Part of the token a recurring payment set aside at {mint} was spent elsewhere. Delete the recurring payment to stop it.",
-  recurringCancelTooLate:
-    "This payment already went out and can no longer be cancelled.",
   recurringDeletedTokenSentBody:
     "Sent {amount} {unit} to {name}: a deleted recurring payment had already set it aside for them.",
   recurringDeletedTokenKeptBody:
@@ -110,10 +103,9 @@ export const en = {
   recurringStatusPaused: "paused",
   recurringPause: "Pause",
   recurringResume: "Resume",
-  recurringRunNow: "Pay",
   recurringNotFound: "Recurring payment not found.",
   recurringOnlyWhileOpen:
-    "Any of your devices running Linky sends the payment, also in the background. If none has sent it a minute after it is due, you get a reminder to open Linky; with the app open you see a countdown and can pay right away or cancel.",
+    "Any of your devices running Linky sends the payment, also in the background. If none has sent it a minute after it is due, you get a reminder to open Linky; with the app open you see the payment go out.",
   recurringRepeatAction: "Repeat regularly",
   showTransactions: "Show transactions",
   feedback: "Feedback",

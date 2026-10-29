@@ -5,7 +5,6 @@ import {
   addLightningContact,
   dateTimeLocal,
   detailValue,
-  dueDialog,
   enterAmount,
   expectPaidHistory,
   expectReceived,
@@ -18,10 +17,10 @@ import {
   nowSec,
   openForm,
   ORDER_SAT,
+  payDue,
   readOrder,
   saveOrder,
   serveLightningAddress,
-  showCountdown,
   test,
   triggerSchedulerPass,
   waitUntil,
@@ -33,7 +32,7 @@ test.use({ actionTimeout: 20_000 });
 
 const DAY_SEC = 24 * 3600;
 
-test("the countdown's Cancel skips a period and its Pay consumes the next, linked from history", async ({
+test("a due payment goes out at once and is linked from history", async ({
   bootAccount,
 }) => {
   const a = await bootAccount("A");
@@ -46,16 +45,7 @@ test("the countdown's Cancel skips a period and its Pay consumes the next, linke
     });
   await expect(detailValue(a.page, "Paid from")).toHaveText(MINT_HOST);
   expect((await readOrder(a.page)).rail).toBe("cashu");
-  await test.step("Cancel this payment skips the period without paying", async () => {
-    await showCountdown(a.page);
-    const due = (await readOrder(a.page)).nextDueAtSec;
-    await dueDialog(a.page)
-      .getByRole("button", { name: "Cancel this payment", exact: true })
-      .click();
-    await expect(dueDialog(a.page)).toBeHidden();
-    await expect(detailValue(a.page, "Last payment")).toContainText("skipped");
-    expect(await readOrder(a.page)).toMatchObject({ runCount: 0 });
-    expect((await readOrder(a.page)).nextDueAtSec).toBeGreaterThan(due);
+  await test.step("nothing is paid before the due time", async () => {
     await a.page.goto("/#wallet/transactions");
     await expect(a.page.getByTestId("recurring-order-card")).toHaveCount(1);
     await expect(a.page.getByTestId("transaction-recurring-pill")).toHaveCount(
@@ -65,14 +55,8 @@ test("the countdown's Cancel skips a period and its Pay consumes the next, linke
     expect(await readBalanceSat(a.page)).toBe(FUNDING_SAT);
     expect(await readBalanceSat(b.page)).toBe(0);
   });
-  await test.step("the next countdown's Pay sends the sats after mint fees", async () => {
-    await showCountdown(a.page);
-    await dueDialog(a.page)
-      .getByRole("button", { name: "Pay", exact: true })
-      .click();
-    await expect(
-      a.page.getByRole("status").filter({ hasText: /Sent\s*10\s*sat/ }),
-    ).toBeVisible({ timeout: 60_000 });
+  await test.step("the due payment sends the sats after mint fees", async () => {
+    await payDue(a.page);
     await expectReceived(b.page);
     await expectPaidHistory(a.page, hash);
   });
@@ -89,7 +73,7 @@ test("the countdown's Cancel skips a period and its Pay consumes the next, linke
   });
 });
 
-test("an expired countdown pays and its note reaches the contact and both histories", async ({
+test("a due payment carries its note to the contact and both histories", async ({
   bootAccount,
 }) => {
   const note = "Rent for October";
@@ -102,17 +86,15 @@ test("an expired countdown pays and its note reaches the contact and both histor
   });
   const hash = await saveOrder(a.page);
   await expect(detailValue(a.page, "Note")).toHaveText(note);
-  await test.step("let the countdown run out", async () => {
-    await showCountdown(a.page);
-    const appearedAt = Date.now();
+  await test.step("the due payment goes out on the next pass", async () => {
+    await makeDue(a.page);
+    await triggerSchedulerPass(a.page);
     await expect
       .poll(async () => (await readOrder(a.page)).runCount, {
-        timeout: 15_000,
+        timeout: 60_000,
         intervals: [200],
       })
       .toBe(1);
-    expect(Date.now() - appearedAt).toBeGreaterThanOrEqual(8_000);
-    expect(Date.now() - appearedAt).toBeLessThan(15_000);
     await expectReceived(b.page);
     await expectPaidHistory(a.page, hash);
   });
@@ -161,9 +143,7 @@ test("an overdue payment goes out right after the app launches", async ({
   });
 });
 
-test("a run paid from the countdown and a background device at once goes out once", async ({
-  bootAccount,
-}) => {
+test("a run two devices pay at once goes out once", async ({ bootAccount }) => {
   const a = await bootAccount("A");
   const b = await bootAccount("B");
   const a2 = await bootAccount("A2", { identity: a.identity, hidden: true });
@@ -177,9 +157,8 @@ test("a run paid from the countdown and a background device at once goes out onc
   });
   const hash = await saveOrder(a.page);
   await expect(a2.page.getByTestId("recurring-order-card")).toHaveCount(1);
-  await test.step("A presses Pay while the hidden A2 runs its own pass", async () => {
-    await showCountdown(a.page);
-    const due = (await readOrder(a.page)).nextDueAtSec;
+  await test.step("the visible A and the hidden A2 run a pass at once", async () => {
+    const due = await makeDue(a.page);
     await expect
       .poll(async () => (await readOrder(a2.page)).nextDueAtSec, {
         timeout: 60_000,
@@ -187,9 +166,7 @@ test("a run paid from the countdown and a background device at once goes out onc
       })
       .toBe(due);
     await Promise.all([
-      dueDialog(a.page)
-        .getByRole("button", { name: "Pay", exact: true })
-        .click(),
+      triggerSchedulerPass(a.page),
       triggerSchedulerPass(a2.page),
     ]);
   });
@@ -202,7 +179,6 @@ test("a run paid from the countdown and a background device at once goes out onc
         })
         .toBe(1);
     }
-    await expect(dueDialog(a.page)).toBeHidden();
     for (const device of [a, a2]) await expectPaidHistory(device.page, hash);
     await a.page.goto("/#wallet");
     await a2.page.goto("/#wallet");
@@ -233,16 +209,8 @@ test("a contact with only a Lightning address is paid by melting the envelope", 
   });
   const hash = await saveOrder(a.page);
   expect((await readOrder(a.page)).rail).toBe("lightning");
-  await test.step("the countdown's Pay pays the contact's invoice once", async () => {
-    await showCountdown(a.page);
-    await dueDialog(a.page)
-      .getByRole("button", { name: "Pay", exact: true })
-      .click();
-    await expect(
-      a.page
-        .getByRole("status")
-        .filter({ hasText: new RegExp(`Sent\\s*${ORDER_SAT}\\s*sat`) }),
-    ).toBeVisible({ timeout: 60_000 });
+  await test.step("the due run pays the contact's invoice once", async () => {
+    await payDue(a.page);
     expect(quoteIds).toHaveLength(1);
     expect(await invoicePaid(request, quoteIds[0] ?? "")).toBe(true);
     await expectPaidHistory(a.page, hash);

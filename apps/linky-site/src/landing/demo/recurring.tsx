@@ -349,7 +349,7 @@ function FormScene({ at, typed }: { at: At; typed: number }) {
           <Text variant="caption" color="$colorMuted">
             Any of your devices running Linky sends the payment, also in the
             background. You are notified a minute ahead; with the app open you
-            see a countdown and can pay right away or cancel.
+            see the payment go out.
           </Text>
           <Tap on={tap("tapSave")}>
             <Button

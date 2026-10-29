@@ -312,17 +312,15 @@ export const waitUntil = async (epochSec: number): Promise<void> => {
     .toBeGreaterThanOrEqual(epochSec * 1000);
 };
 
-export const dueDialog = (page: Page) =>
-  page.getByRole("dialog", { name: "Scheduled payment", exact: true });
-
-/** Makes the payment due now and waits for the visible app's countdown. */
-export const showCountdown = async (page: Page): Promise<void> => {
+/** Makes the payment due now, runs a pass and waits for the banner to report it sent. */
+export const payDue = async (page: Page, sats = ORDER_SAT): Promise<void> => {
   await makeDue(page);
   await triggerSchedulerPass(page);
-  await expect(dueDialog(page)).toBeVisible();
   await expect(
-    dueDialog(page).getByTestId("recurring-due-interval"),
-  ).toHaveText("daily");
+    page
+      .getByRole("status")
+      .filter({ hasText: new RegExp(`Sent\\s*${sats}\\s*sat`) }),
+  ).toBeVisible({ timeout: 60_000 });
 };
 
 const IncomingRow = Schema.Struct({
