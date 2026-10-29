@@ -9,8 +9,8 @@ import {
   Row,
   SegmentedControl,
   Spinner,
+  PaymentBanner,
   Stack,
-  SuccessOverlay,
   Text,
   TopBar,
 } from "@linky-fit/ui";
@@ -220,7 +220,7 @@ export function PaymentMock({
     <DemoScreen
       overlay={
         payment.status === "paid" ? (
-          <SuccessOverlay
+          <PaymentBanner
             contained
             title={t.payment.paidTitle}
             amount={formatCrowns(payment.amountHalere)}

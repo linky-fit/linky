@@ -38,6 +38,7 @@ import {
   useSession,
   useShopProfile,
 } from "../services/react";
+import { PaidBannerHost } from "./PaidBannerHost";
 
 const sectionIcons: Record<Section, NavItem<Section>["icon"]> = {
   terminal: "QrCode",
@@ -89,7 +90,12 @@ function SignedIn() {
         : hydrated
           ? "noShop"
           : "syncing";
-  return <Routed state={state} shop={shop ?? null} />;
+  return (
+    <>
+      <PaidBannerHost />
+      <Routed state={state} shop={shop ?? null} />
+    </>
+  );
 }
 
 function Routed({

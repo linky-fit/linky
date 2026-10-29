@@ -10,6 +10,14 @@ Každá vydaná verze musí obsahovat nejprve `en-US` a potom `cs-CZ`.
 
 ## [Unreleased]
 
+### en-US
+
+- A payment that arrives shows as a small banner at the top of the terminal instead of covering the screen, so the next charge can start right away; a direct transfer is announced the same way.
+
+### cs-CZ
+
+- Příchozí platba se ukáže jako malý proužek nahoře na terminálu místo překrytí celé obrazovky, takže další účtování může začít hned; přímý převod se hlásí stejně.
+
 ## [26.10.3] - 2026-10-19
 
 ### en-US
