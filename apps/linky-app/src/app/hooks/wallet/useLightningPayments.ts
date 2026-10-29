@@ -1,16 +1,19 @@
 import { getLightningInvoicePreview } from "@linky-fit/linkshu";
-import { useAtom } from "@linky-fit/linkstr-react";
+import { useAtom, useAtomSet } from "@linky-fit/linkstr-react";
 import React from "react";
 import type { Translate } from "../../../i18n";
 import { getLnurlPayDisplayText } from "../../../lnurlPay";
 import { navigateTo } from "../../../hooks/useRouting";
 import type { Route } from "../../../types/route";
+import { getUnknownErrorMessage } from "../../../utils/unknown";
+import type { QuoteLightningInvoiceOutcome } from "../../state/wallet/payments";
 import type { DisplayAmountParts } from "../../../utils/displayAmounts";
 import {
   paidOverlayContact,
   type PaidOverlayDetails,
 } from "../../lib/paidOverlay";
 import {
+  lightningInvoiceQuoteAtom,
   pendingLightningInvoiceAtom,
   postPaySaveContactAtom,
 } from "../../state/shell/confirmations";
@@ -55,8 +58,35 @@ export const useLightningPayments = ({
   const [postPaySaveContact, setPostPaySaveContact] = useAtom(
     postPaySaveContactAtom,
   );
+  const setInvoiceQuote = useAtomSet(lightningInvoiceQuoteAtom);
 
   const { knownLnAddressPayContact } = useKnownLnAddressPayContact(routeKind);
+
+  // The fee estimate of the invoice waiting for confirmation; a stale answer is dropped.
+  React.useEffect(() => {
+    const pending = pendingLightningInvoiceConfirmation;
+    if (pending === null || pending.amountSat === null || commands === null) {
+      setInvoiceQuote(null);
+      return;
+    }
+    const { invoice } = pending;
+    let current = true;
+    setInvoiceQuote({ invoice, outcome: "pending" });
+    void commands
+      .quoteLightningInvoice(invoice)
+      .catch(
+        (error: unknown): QuoteLightningInvoiceOutcome => ({
+          _tag: "Failed",
+          detail: getUnknownErrorMessage(error, "quote failed"),
+        }),
+      )
+      .then((outcome) => {
+        if (current) setInvoiceQuote({ invoice, outcome });
+      });
+    return () => {
+      current = false;
+    };
+  }, [commands, pendingLightningInvoiceConfirmation, setInvoiceQuote]);
 
   const payLightningInvoiceWithCashu = React.useCallback(
     async (invoice: string): Promise<boolean> => {
@@ -64,14 +94,13 @@ export const useLightningPayments = ({
         setStatus(`${t("errorPrefix")}: ${NOT_READY}`);
         return false;
       }
-      const outcome = await commands.payLightningInvoice(invoice, {
-        onSending: () =>
-          showPaymentSending({
-            direction: "out",
-            amountSat:
-              getLightningInvoicePreview(invoice.trim())?.amountSat ?? null,
-          }),
+      // On screen before the wallet is even asked, so the user sees the payment start at once.
+      showPaymentSending({
+        direction: "out",
+        amountSat:
+          getLightningInvoicePreview(invoice.trim())?.amountSat ?? null,
       });
+      const outcome = await commands.payLightningInvoice(invoice);
       dismissPaymentSending();
       switch (outcome._tag) {
         case "Paid": {
@@ -129,17 +158,17 @@ export const useLightningPayments = ({
         return;
       }
       const contact = knownLnAddressPayContact;
-      const outcome = await commands.payLightningAddress(
-        { lnAddress, amountSat, contact, comment: comment ?? null },
-        {
-          onSending: () =>
-            showPaymentSending({
-              direction: "out",
-              amountSat,
-              contact: paidOverlayContact(contact),
-            }),
-        },
-      );
+      showPaymentSending({
+        direction: "out",
+        amountSat,
+        contact: paidOverlayContact(contact),
+      });
+      const outcome = await commands.payLightningAddress({
+        lnAddress,
+        amountSat,
+        contact,
+        comment: comment ?? null,
+      });
       dismissPaymentSending();
       switch (outcome._tag) {
         case "Paid": {

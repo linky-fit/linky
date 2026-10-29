@@ -1220,6 +1220,8 @@ export const pt = {
   payMissingLn: "Endereço lightning ausente.",
   payInvalidAmount: "Valor inválido",
   payInsufficient: "Tokens Cashu insuficientes.",
+  payFeeEstimating: "Estimando a taxa…",
+  payLightningFeeHint: "Taxa Lightning de cerca de {fee}",
   lightningInvoiceConfirmUnknownAmount: "Valor desconhecido",
   payNetworkError: "Não foi possível enviar devido a um erro de rede.",
   payApprovalChanged:

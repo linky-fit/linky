@@ -6,6 +6,8 @@ import {
   CurrencyUnit,
   LockingUnsupported,
   InsufficientFunds,
+  MeltCost,
+  MeltQuote,
   MeltReceipt,
   MintInfo,
   MintRejected,
@@ -88,6 +90,19 @@ const meltReceipt = (paidAmount: number) =>
     feeReserve: NonNegativeAmount.make(2),
     feePaid: NonNegativeAmount.make(1),
     changeAmount: NonNegativeAmount.make(1),
+  });
+
+const meltCost = (amount: number, feeReserve: number, inputFee: number) =>
+  new MeltCost({
+    quote: new MeltQuote({
+      quoteId: QuoteId.make("quote-1"),
+      mint: MintUrl.make(MINT_URL),
+      amount: Amount.make(amount),
+      feeReserve: NonNegativeAmount.make(feeReserve),
+      expiresAt: null,
+    }),
+    inputFee: NonNegativeAmount.make(inputFee),
+    maxTotal: Amount.make(amount + feeReserve + inputFee),
   });
 
 const pending = (amount: number) =>
@@ -245,6 +260,7 @@ const setup = ({
     | "estimateAutoswapCashu"
     | "fetchMintInfo"
     | "meltCashuInvoice"
+    | "quoteCashuMelt"
     | "sendCashuToken"
   >
 > = {}) => {
@@ -267,6 +283,10 @@ const setup = ({
     meltCashuInvoice: vi.fn<PaymentsDeps["linkshu"]["meltCashuInvoice"]>(
       overrides.meltCashuInvoice ??
         (async () => Result.succeed(meltReceipt(40))),
+    ),
+    quoteCashuMelt: vi.fn<PaymentsDeps["linkshu"]["quoteCashuMelt"]>(
+      overrides.quoteCashuMelt ??
+        (async () => Result.succeed(meltCost(40, 2, 1))),
     ),
     readWalletBalances: vi.fn(async () => walletBalancesOf(balances)),
     sendCashuToken: vi.fn<PaymentsDeps["linkshu"]["sendCashuToken"]>(
@@ -358,6 +378,56 @@ describe("fundsFor", () => {
   it("is insufficient when no move covers it", async () => {
     const { commands } = setup({ balances: { [MINT_URL]: 50, [FOREIGN]: 80 } });
     expect(await commands.fundsFor(200)).toEqual({ _tag: "Insufficient" });
+  });
+});
+
+describe("quoteLightningInvoice", () => {
+  it("prices the invoice at the mint that would pay it, as the most it can cost", async () => {
+    const { commands, linkshu } = setup();
+    const invoice = makeLightningInvoice("400n");
+
+    expect(await commands.quoteLightningInvoice(` ${invoice} `)).toEqual({
+      _tag: "Quoted",
+      amount: 40,
+      fee: 3,
+      mint: MINT_URL,
+    });
+    expect(linkshu.quoteCashuMelt).toHaveBeenCalledWith({
+      invoice,
+      mint: MINT_URL,
+    });
+  });
+
+  it("asks no mint for an amountless invoice or without funds", async () => {
+    const { commands, linkshu } = setup();
+    expect(await commands.quoteLightningInvoice("lnbc-mock")).toEqual({
+      _tag: "Invalid",
+    });
+    const broke = setup({ balances: {} });
+    expect(
+      await broke.commands.quoteLightningInvoice(makeLightningInvoice("400n")),
+    ).toEqual({ _tag: "Insufficient" });
+    expect(linkshu.quoteCashuMelt).not.toHaveBeenCalled();
+    expect(broke.linkshu.quoteCashuMelt).not.toHaveBeenCalled();
+  });
+
+  it("reports an unreachable mint as a network error and a rejection with its detail", async () => {
+    const offline = setup({
+      quoteCashuMelt: async () => Result.fail(unreachable()),
+    });
+    expect(
+      await offline.commands.quoteLightningInvoice(
+        makeLightningInvoice("400n"),
+      ),
+    ).toEqual({ _tag: "NetworkError" });
+    const rejecting = setup({
+      quoteCashuMelt: async () => Result.fail(rejected()),
+    });
+    expect(
+      await rejecting.commands.quoteLightningInvoice(
+        makeLightningInvoice("400n"),
+      ),
+    ).toMatchObject({ _tag: "Failed" });
   });
 });
 

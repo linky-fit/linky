@@ -55,6 +55,7 @@ const commandsPaying = (outcome: PayContactOutcome) => {
     payLightningAddress: vi.fn(),
     payLightningInvoice: vi.fn(),
     payPaymentRequest: vi.fn(),
+    quoteLightningInvoice: vi.fn(),
     quotePaymentRequest: vi.fn(),
   };
   return payContact;

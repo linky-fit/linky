@@ -55,6 +55,7 @@ export const useLinkshuComposition = () => {
     fetchMintInfo: commands?.fetchMintInfo ?? null,
     meltCashuInvoice: commands?.meltCashuInvoice ?? null,
     probeLightningFee: commands?.probeLightningFee ?? null,
+    quoteCashuMelt: commands?.quoteCashuMelt ?? null,
     receiveCashuToken: commands?.receiveCashuToken ?? null,
     restoreCashuTokens: commands?.restoreCashuTokens ?? null,
     reclaimCashuTokens: commands?.reclaimCashuTokens ?? null,

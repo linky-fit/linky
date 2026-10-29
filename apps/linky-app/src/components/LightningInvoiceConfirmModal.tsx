@@ -1,6 +1,9 @@
-import React from "react";
-import type { Translate } from "../i18n";
 import type { LightningInvoicePreview } from "@linky-fit/linkshu";
+import { Stack, Text } from "@linky-fit/ui";
+import React from "react";
+import { useExactAmountText } from "../app/hooks/useExactAmountText";
+import type { LightningInvoiceQuoteState } from "../app/state/shell/confirmations";
+import type { Translate } from "../i18n";
 import { PaymentConfirmDialog } from "./PaymentConfirmDialog";
 
 interface LightningInvoiceConfirmModalProps {
@@ -9,6 +12,8 @@ interface LightningInvoiceConfirmModalProps {
   confirmation: LightningInvoicePreview;
   onClose: () => void;
   onConfirm: () => Promise<void>;
+  /** The fee estimate for `confirmation`; null before it was asked for. */
+  quote: LightningInvoiceQuoteState["outcome"] | null;
   t: Translate;
 }
 
@@ -33,14 +38,22 @@ const formatRemainingLifetime = (
   return `${seconds}s`;
 };
 
+const caption = (text: string, key: string) => (
+  <Text key={key} variant="caption" bold color="$colorMuted" textAlign="center">
+    {text}
+  </Text>
+);
+
 export function LightningInvoiceConfirmModal({
   cashuBalance,
   cashuIsBusy,
   confirmation,
   onClose,
   onConfirm,
+  quote,
   t,
 }: LightningInvoiceConfirmModalProps): React.ReactElement {
+  const { exact } = useExactAmountText();
   const [nowMs, setNowMs] = React.useState(() => Date.now());
 
   React.useEffect(() => {
@@ -63,6 +76,29 @@ export function LightningInvoiceConfirmModal({
   const insufficientBalance =
     confirmation.amountSat !== null && confirmation.amountSat > cashuBalance;
 
+  const feeLines =
+    quote === null
+      ? []
+      : quote === "pending"
+        ? [caption(t("payFeeEstimating"), "fee")]
+        : quote._tag === "Quoted"
+          ? [
+              caption(
+                t("paymentRequestFees").replace("{fee}", exact(quote.fee)),
+                "fee",
+              ),
+              caption(
+                t("paymentRequestMaxTotal").replace(
+                  "{total}",
+                  exact(quote.amount + quote.fee),
+                ),
+                "total",
+              ),
+            ]
+          : quote._tag === "Failed" || quote._tag === "NetworkError"
+            ? [caption(t("mintMoveEstimateFailed"), "fee")]
+            : [];
+
   return (
     <PaymentConfirmDialog
       amountSat={confirmation.amountSat}
@@ -70,7 +106,12 @@ export function LightningInvoiceConfirmModal({
       confirmLabel={t("paySend")}
       cancelLabel={t("payCancel")}
       description={confirmation.description}
-      meta={expiresLabel}
+      meta={
+        <Stack alignItems="center" gap="$xxs">
+          {expiresLabel ? caption(expiresLabel, "expires") : null}
+          {feeLines}
+        </Stack>
+      }
       unknownAmountLabel={t("lightningInvoiceConfirmUnknownAmount")}
       isBusy={cashuIsBusy}
       disabled={insufficientBalance}

@@ -230,6 +230,21 @@ export type PayPaymentRequestOutcome =
   | NetworkFailure
   | Busy;
 
+export interface LightningInvoiceQuote {
+  readonly _tag: "Quoted";
+  readonly amount: number;
+  /** The most the payment can cost beyond `amount`: the Lightning fee reserve and cashu input fees; unused reserve comes back. */
+  readonly fee: number;
+  readonly mint: MintUrl;
+}
+
+export type QuoteLightningInvoiceOutcome =
+  | LightningInvoiceQuote
+  | { readonly _tag: "Invalid" }
+  | { readonly _tag: "Insufficient" }
+  | Failed
+  | NetworkFailure;
+
 interface SendingOptions {
   /** Runs once the payment leaves the wallet's checks, before any mint call. */
   readonly onSending?: () => void;
@@ -242,6 +257,10 @@ export interface PaymentsCommands {
     invoice: string,
     options?: SendingOptions,
   ) => Promise<PayInvoiceOutcome>;
+  /** Prices an invoice at the mint that would pay it; nothing moves. */
+  readonly quoteLightningInvoice: (
+    invoice: string,
+  ) => Promise<QuoteLightningInvoiceOutcome>;
   readonly payLightningAddress: (
     args: {
       readonly lnAddress: string;
@@ -286,6 +305,7 @@ export interface PaymentsDeps {
     | "estimateAutoswapCashu"
     | "fetchMintInfo"
     | "meltCashuInvoice"
+    | "quoteCashuMelt"
     | "readWalletBalances"
     | "sendCashuToken"
   >;
@@ -948,6 +968,40 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
       : quoteFailed(lastError);
   };
 
+  const quoteLightningInvoice: PaymentsCommands["quoteLightningInvoice"] =
+    async (invoice) => {
+      const normalized = invoice.trim();
+      const amountSat = getLightningInvoicePreview(normalized)?.amountSat;
+      if (amountSat === undefined || amountSat === null) {
+        return { _tag: "Invalid" };
+      }
+      if (!deps.isOnline()) return NETWORK_FAILURE;
+      const mint = sendMint(await balances(), amountSat);
+      if (mint === null) return { _tag: "Insufficient" };
+      try {
+        const outcome = await linkshu.quoteCashuMelt({
+          invoice: normalized,
+          mint,
+        });
+        if (Result.isFailure(outcome)) {
+          return isNetworkFailure(outcome.failure)
+            ? NETWORK_FAILURE
+            : { _tag: "Failed", detail: describeError(outcome.failure) };
+        }
+        const { maxTotal, quote } = outcome.success;
+        return {
+          _tag: "Quoted",
+          amount: quote.amount,
+          fee: maxTotal - quote.amount,
+          mint,
+        };
+      } catch (error) {
+        return isNetworkFailure(error)
+          ? NETWORK_FAILURE
+          : { _tag: "Failed", detail: describeError(error) };
+      }
+    };
+
   const quotePaymentRequest: PaymentsCommands["quotePaymentRequest"] = async (
     request,
     amountSat,
@@ -1294,6 +1348,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
     payContact,
     payLightningAddress,
     payLightningInvoice,
+    quoteLightningInvoice,
     payPaymentRequest,
     quotePaymentRequest,
   };
