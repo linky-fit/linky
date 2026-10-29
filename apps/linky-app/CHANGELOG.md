@@ -15,6 +15,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 ### en-US
 
 - On-chain sends show one amount, stepped down or up, and go out the moment you tap Send; on-chain receives explain the terms, then show one address for any amount within the limits.
+- Lightning and Cashu payments in the history carry icons instead of emoji, a pending on-chain transaction shows as a dot next to "Show transactions", and the mint list lost its frames.
 - Payments report their progress in a small banner at the top of the screen instead of covering it, so you can keep typing while a payment is sent or arrives.
 - Recurring payments go out at their due time without a countdown.
 - Paying a Lightning invoice shows the fee estimate before you confirm, and Lightning address payments show it under the amount.
@@ -22,6 +23,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 ### cs-CZ
 
 - On-chain odeslání ukazuje jednu částku, kterou lze snížit či zvýšit, a odejde hned po klepnutí na Odeslat; on-chain příjem vysvětlí podmínky a pak ukáže jednu adresu pro libovolnou částku v mezích.
+- Platby přes Lightning a Cashu mají v historii ikony místo emoji, nevyřízená on-chain transakce se ukazuje tečkou u „Zobrazit transakce“ a seznam mincoven přišel o rámečky.
 - Platby hlásí průběh v malém proužku nahoře místo překrytí celé obrazovky, takže můžete dál psát, zatímco platba odchází nebo přichází.
 - Pravidelné platby odcházejí v termínu bez odpočtu.
 - Platba Lightning faktury ukáže odhad poplatku před potvrzením a platby na Lightning adresu ho ukážou pod částkou.

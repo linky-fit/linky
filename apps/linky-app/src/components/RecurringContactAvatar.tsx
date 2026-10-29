@@ -10,7 +10,7 @@ interface RecurringContactAvatarProps {
   size?: AvatarSize | undefined;
 }
 
-/** Contact picture, generated avatar, or a lightning glyph for LN-only contacts. */
+/** Contact picture, generated avatar, or a lightning icon for LN-only contacts. */
 export const RecurringContactAvatar: FC<RecurringContactAvatarProps> = ({
   contact,
   size,
@@ -24,7 +24,7 @@ export const RecurringContactAvatar: FC<RecurringContactAvatarProps> = ({
     <Avatar
       name={contact?.name ?? ""}
       uri={pictureUrl ?? undefined}
-      fallback={npub ? undefined : "⚡️"}
+      icon={npub ? undefined : "Zap"}
       size={size}
     />
   );

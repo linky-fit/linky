@@ -169,13 +169,19 @@ export function AvatarGroup({
 export interface StatusDotProps {
   tone: Tone;
   accessibilityLabel: string;
+  testID?: string | undefined;
 }
 
-export function StatusDot({ tone, accessibilityLabel }: StatusDotProps) {
+export function StatusDot({
+  tone,
+  accessibilityLabel,
+  testID,
+}: StatusDotProps) {
   return (
     <View
       role="img"
       aria-label={accessibilityLabel}
+      testID={testID}
       width="$dot"
       height="$dot"
       flexShrink={0}
