@@ -6,6 +6,7 @@ import { setBankPaymentOfferMinimized } from "./bankPaymentOfferStorage";
 import {
   buildTopbar,
   buildTopbarRight,
+  buildTopbarTitle,
   resolveBackAction,
   type BackActionContext,
 } from "./topbarConfig";
@@ -364,6 +365,29 @@ describe("resolveBackAction for bank payment editing", () => {
     ).toBe("#wallet/bank-payment/SPD*1.0");
     expect(backHashFor({ kind: "bankPayment", spdPayload: "SPD*1.0" })).toBe(
       "#wallet",
+    );
+  });
+});
+
+describe("buildTopbarTitle", () => {
+  const t = (key: string) => key;
+
+  it("titles an on-chain transfer by its direction once known, and a transaction as a payment", () => {
+    const id = createIdFromString<"OnchainTransfer">("transfer-1");
+    expect(buildTopbarTitle({ kind: "onchainTransfer", id }, t)).toBe(
+      "onchainTransferTitle",
+    );
+    expect(buildTopbarTitle({ kind: "onchainTransfer", id }, t, "send")).toBe(
+      "onchainSendTitle",
+    );
+    expect(
+      buildTopbarTitle({ kind: "onchainTransfer", id }, t, "receive"),
+    ).toBe("onchainReceiveTitle");
+    expect(buildTopbarTitle({ kind: "transaction", id: "tx-1" }, t)).toBe(
+      "transactionTitle",
+    );
+    expect(backHashFor({ kind: "transaction", id: "tx-1" })).toBe(
+      "#wallet/transactions",
     );
   });
 });

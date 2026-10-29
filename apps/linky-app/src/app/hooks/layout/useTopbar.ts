@@ -28,7 +28,10 @@ import {
 import { useTranslation } from "../shell";
 import { useNavIntent } from "../shell/navIntents";
 import { useScanCommands } from "../shell/scan";
-import { usePendingOnchainTransfersLink } from "../useOnchainTransfers";
+import {
+  useOnchainTransfers,
+  usePendingOnchainTransfersLink,
+} from "../useOnchainTransfers";
 import { useMainMenu } from "./useMainMenuState";
 
 const parseContactId = (value: unknown): ContactId | null => {
@@ -56,6 +59,12 @@ export const useTopbar = () => {
     (draft) => draft.editing,
   );
   const pendingOnchainTransfers = usePendingOnchainTransfersLink();
+  const onchainTransfers = useOnchainTransfers();
+  const onchainTransferDirection =
+    route.kind === "onchainTransfer"
+      ? (onchainTransfers.find((transfer) => transfer.id === route.id)
+          ?.direction ?? null)
+      : null;
   const [hiddenTransactionsShown, setHiddenTransactionsShown] = useAtom(
     hiddenTransactionsShownAtom,
   );
@@ -107,6 +116,9 @@ export const useTopbar = () => {
     chatTopbarContact,
     topbar,
     topbarRight,
-    topbarTitle: React.useMemo(() => buildTopbarTitle(route, t), [route, t]),
+    topbarTitle: React.useMemo(
+      () => buildTopbarTitle(route, t, onchainTransferDirection),
+      [onchainTransferDirection, route, t],
+    ),
   };
 };

@@ -81,6 +81,14 @@ describe("parseRouteFromHash", () => {
     expect(parseRouteFromHash()).toEqual({ kind: "wallet" });
   });
 
+  it("opens one transaction of the history by its id", () => {
+    replaceHash("#wallet/transactions");
+    expect(parseRouteFromHash()).toEqual({ kind: "transactions" });
+
+    replaceHash("#wallet/transactions/tx%3A1");
+    expect(parseRouteFromHash()).toEqual({ kind: "transaction", id: "tx:1" });
+  });
+
   it("defaults to wallet when the url has no hash", () => {
     replaceHash("");
 
