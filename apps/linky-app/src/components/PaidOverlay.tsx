@@ -1,5 +1,5 @@
 import { useAtomValue } from "@linky-fit/linkstr-react";
-import { SuccessOverlay } from "@linky-fit/ui";
+import { PaymentBanner } from "@linky-fit/ui";
 import React from "react";
 import { useNostrPictureByNpub } from "../app/hooks/contacts/useProfileCache";
 import { useDisplayAmounts } from "../app/hooks/shell";
@@ -8,6 +8,7 @@ import type {
   PaidOverlayPhase,
 } from "../app/lib/paidOverlay";
 import { contactsAtom } from "../app/state/contacts/readModel";
+import { paidOverlayCommandsAtom } from "../app/state/shell/paidOverlay";
 import { deriveDefaultProfile } from "../derivedProfile";
 import type { Translate } from "../i18n";
 
@@ -18,7 +19,10 @@ interface PaidOverlayProps {
   t: Translate;
 }
 
-/** The confirmation a settled payment ends on, sent or received. */
+/**
+ * A payment's progress and the confirmation it ends on, sent or received,
+ * as a banner at the top of the screen that leaves the rest usable.
+ */
 export function PaidOverlay({
   details,
   paidOverlayTitle,
@@ -26,6 +30,7 @@ export function PaidOverlay({
   t,
 }: PaidOverlayProps): React.ReactElement {
   const { formatDisplayedAmountParts } = useDisplayAmounts();
+  const { dismissPaid } = useAtomValue(paidOverlayCommandsAtom);
   const nostrPictureByNpub = useNostrPictureByNpub();
   const contacts = useAtomValue(contactsAtom);
   const contact = details?.contact ?? null;
@@ -52,7 +57,7 @@ export function PaidOverlay({
         : t("paidHeadlineReceived");
 
   return (
-    <SuccessOverlay
+    <PaymentBanner
       title={headline}
       amount={amount ? `${amount.approxPrefix}${amount.amountText}` : undefined}
       unit={amount?.unitLabel}
@@ -61,6 +66,7 @@ export function PaidOverlay({
       }
       direction={direction ?? undefined}
       pending={isSending}
+      onDismiss={dismissPaid}
     />
   );
 }
