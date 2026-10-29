@@ -17,13 +17,17 @@ interface LightningInvoiceConfirmModalProps {
   t: Translate;
 }
 
+/** An invoice with more time left than this expires nobody's attention; the countdown shows under it. */
+const EXPIRY_SHOWN_UNDER_SEC = 5 * 60;
+
 const formatRemainingLifetime = (
   remainingSeconds: number | null,
 ): string | null => {
   if (
     !Number.isFinite(remainingSeconds) ||
     remainingSeconds === null ||
-    remainingSeconds < 0
+    remainingSeconds < 0 ||
+    remainingSeconds >= EXPIRY_SHOWN_UNDER_SEC
   ) {
     return null;
   }
@@ -86,13 +90,6 @@ export function LightningInvoiceConfirmModal({
               caption(
                 t("paymentRequestFees").replace("{fee}", exact(quote.fee)),
                 "fee",
-              ),
-              caption(
-                t("paymentRequestMaxTotal").replace(
-                  "{total}",
-                  exact(quote.amount + quote.fee),
-                ),
-                "total",
               ),
             ]
           : quote._tag === "Failed" || quote._tag === "NetworkError"

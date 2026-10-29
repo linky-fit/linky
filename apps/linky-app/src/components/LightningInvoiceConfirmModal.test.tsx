@@ -9,7 +9,6 @@ const templates: Partial<Record<I18nKey, string>> = {
   mintMoveEstimateFailed: "fee estimate failed",
   payFeeEstimating: "estimating the fee",
   paymentRequestFees: "fees up to {fee}",
-  paymentRequestMaxTotal: "at most {total}",
 };
 const t = (key: I18nKey) => templates[key] ?? key;
 
@@ -26,12 +25,15 @@ const confirmation = {
   expiresAtSec: null,
 };
 
-const render = async (quote: LightningInvoiceQuoteState["outcome"] | null) => {
+const render = async (
+  quote: LightningInvoiceQuoteState["outcome"] | null,
+  expiresAtSec: number | null = null,
+) => {
   const rendered = await renderIntoDocument(
     <LightningInvoiceConfirmModal
       cashuBalance={21_000}
       cashuIsBusy={false}
-      confirmation={confirmation}
+      confirmation={{ ...confirmation, expiresAtSec }}
       onClose={vi.fn()}
       onConfirm={vi.fn(async () => {})}
       quote={quote}
@@ -48,7 +50,7 @@ afterEach(() => {
 });
 
 describe("LightningInvoiceConfirmModal", () => {
-  it("shows the fee and the total as maximums once the invoice is priced", async () => {
+  it("shows the fee as a maximum once the invoice is priced", async () => {
     const view = await render({
       _tag: "Quoted",
       amount: 5_000,
@@ -56,8 +58,19 @@ describe("LightningInvoiceConfirmModal", () => {
       mint: MintUrl.make("https://mint.example"),
     });
     expect(view.dialogText()).toContain("fees up to 52 sat");
-    expect(view.dialogText()).toContain("at most 5052 sat");
+    expect(view.dialogText()).not.toContain("5052");
     await view.unmount();
+  });
+
+  it("counts the invoice down only once it expires within five minutes", async () => {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const later = await render(null, nowSec + 30 * 60);
+    expect(later.dialogText()).not.toMatch(/\d+m \d+s/);
+    await later.unmount();
+
+    const soon = await render(null, nowSec + 2 * 60);
+    expect(soon.dialogText()).toMatch(/1m \d+s/);
+    await soon.unmount();
   });
 
   it("says the fee is being estimated, and when the estimate failed", async () => {
