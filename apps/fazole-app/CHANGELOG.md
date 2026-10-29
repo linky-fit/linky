@@ -20,6 +20,7 @@ Každá vydaná verze musí obsahovat nejprve `en-US` a potom `cs-CZ`.
 - Every screen starts below the phone's status bar and notch, so the terminal's menu button and the other top bars are no longer hidden under them on phones with a cut-out.
 - History, Wallet and Settings name themselves in a small centered top bar, like the payment screen, instead of a large heading.
 - The app is called Fazole, without the ".fit": on the welcome screen, in the installed app's name and in the update notice.
+- Settings pick the mint new payments are minted at, from the recommended ones or by its address.
 
 ### cs-CZ
 
@@ -29,6 +30,7 @@ Každá vydaná verze musí obsahovat nejprve `en-US` a potom `cs-CZ`.
 - Každá obrazovka začíná pod stavovou lištou a výřezem displeje, takže tlačítko menu na terminálu ani ostatní horní lišty už na telefonech s výřezem nezůstávají schované pod nimi.
 - Historie, Peněženka a Nastavení mají název v malé vycentrované horní liště jako obrazovka platby místo velkého nadpisu.
 - Aplikace se jmenuje Fazole, bez koncovky „.fit“: na úvodní obrazovce, v názvu nainstalované aplikace i v upozornění na novou verzi.
+- V nastavení lze vybrat mincovnu, u které se razí nové platby, z doporučených nebo zadáním adresy.
 
 ## [26.10.3] - 2026-10-19
 

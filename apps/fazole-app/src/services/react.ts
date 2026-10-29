@@ -80,6 +80,9 @@ export const useMonetaConnection = (): MonetaConnection | null | undefined =>
     useAppServices().live.moneta,
     undefined,
   );
+/** The mint new payments are minted at; `undefined` until read. */
+export const useMintUrl = (): string | undefined =>
+  useLiveValue<string | undefined>(useAppServices().live.mintUrl, undefined);
 
 /** The payer's Nostr profile once a relay answers; `null` before, without one, or for no payer. */
 export const usePayerProfile = (pubkey: Pubkey | null): PayerProfile | null => {
