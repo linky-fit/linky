@@ -2,7 +2,6 @@ import {
   LIGHTNING_INVOICE_AUTO_PAY_LIMIT_STORAGE_KEY,
   PAY_WITH_CASHU_STORAGE_KEY,
   RECEIVE_METHOD_STORAGE_KEY,
-  WALLET_WARNING_DISMISSED_STORAGE_KEY,
 } from "../../../utils/constants";
 import {
   getInitialLightningInvoiceAutoPayLimit,
@@ -23,13 +22,6 @@ export const payWithCashuEnabledAtom = kvSeededAtom(
   getInitialPayWithCashuEnabled,
   (kv, enabled) => kv.setItem(PAY_WITH_CASHU_STORAGE_KEY, enabled ? "1" : "0"),
   { persistSeed: true },
-);
-
-/** The large-balance warning was dismissed on this device. */
-export const walletWarningDismissedAtom = kvSeededAtom(
-  (kv) => kv.getItem(WALLET_WARNING_DISMISSED_STORAGE_KEY) === "1",
-  (kv, dismissed) =>
-    kv.setItem(WALLET_WARNING_DISMISSED_STORAGE_KEY, dismissed ? "1" : "0"),
 );
 
 /** Invoices and payment requests up to this amount are paid without asking. */

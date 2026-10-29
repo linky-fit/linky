@@ -786,10 +786,6 @@ export const en = {
   errorPrefix: "Error",
 
   wallet: "Wallet",
-  walletEarlyWarningTitle: "Congratulations",
-  walletEarlyWarningBody:
-    "You have stacked big amount of bitcoin and might benefit from hardware wallet support. Give us feedback if you are interested.",
-  walletHardwareSupportAction: "Give feedback",
   topup: "Top-up",
   topupTitle: "Top-up your account",
   topupShowInvoice: "Show top-up invoice",

@@ -4,14 +4,11 @@ import React from "react";
 import { useTranslation } from "../app/hooks/shell";
 import { usePendingOnchainTransfersLink } from "../app/hooks/useOnchainTransfers";
 import { useWalletBalance } from "../app/hooks/wallet/useWalletInventory";
-import { useWalletWarning } from "../app/hooks/wallet/useWalletWarning";
 import { DisplayAmount } from "../components/DisplayAmount";
 import { WalletPendingReceives } from "../components/WalletPendingReceives";
-import { WalletWarning } from "../components/WalletWarning";
 import { navigateTo } from "../hooks/useRouting";
 
 interface WalletPageProps {
-  openFeedbackContact: () => void;
   openScan: () => void;
   scanIsOpen: boolean;
 }
@@ -47,19 +44,12 @@ const WalletAction = ({
 );
 
 export const WalletPage: React.FC<WalletPageProps> = React.memo(
-  ({ openFeedbackContact, openScan, scanIsOpen }) => {
+  ({ openScan, scanIsOpen }) => {
     const { t } = useTranslation();
     const { cashuTotalBalance } = useWalletBalance();
-    const { dismissWalletWarning, showWalletWarning } = useWalletWarning();
     const pendingOnchainTransfers = usePendingOnchainTransfersLink();
     return (
       <Stack flex={1} gap="$lg">
-        <WalletWarning
-          dismissed={!showWalletWarning}
-          onContactSupport={openFeedbackContact}
-          onDismiss={dismissWalletWarning}
-          t={t}
-        />
         <Stack
           flex={1}
           justifyContent="center"

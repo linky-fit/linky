@@ -32,7 +32,6 @@ import { useMintIcons } from "../hooks/mint/useMintInfo";
 import { useTranslation } from "../hooks/shell";
 import { useScanCommands, useScanIsOpen } from "../hooks/shell/scan";
 import { useActiveBankPaymentOfferContacts } from "../hooks/useBankPaymentOffers";
-import { useOpenFeedbackContact } from "../hooks/useFeedbackContact";
 import { useCashuTokenMessageInfo } from "../hooks/wallet/useWalletInventory";
 import { useTokenContactSend } from "../hooks/wallet/useWalletTokens";
 import {
@@ -297,14 +296,7 @@ export const DesktopContactsPane = (): React.ReactElement => (
 );
 
 export const WalletPane = (): React.ReactElement => {
-  const openFeedbackContact = useOpenFeedbackContact();
   const { openWalletScan } = useScanCommands();
   const scanIsOpen = useScanIsOpen();
-  return (
-    <WalletPage
-      openFeedbackContact={openFeedbackContact}
-      openScan={openWalletScan}
-      scanIsOpen={scanIsOpen}
-    />
-  );
+  return <WalletPage openScan={openWalletScan} scanIsOpen={scanIsOpen} />;
 };
