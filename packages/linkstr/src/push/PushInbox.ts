@@ -1,4 +1,5 @@
 import {
+  Array as Arr,
   Cause,
   Context,
   Duration,
@@ -6,6 +7,7 @@ import {
   Filter,
   Layer,
   Option,
+  Order,
   Queue,
   Result,
   Stream,
@@ -13,7 +15,7 @@ import {
 import type { Scope } from "effect";
 import type { Filter as NostrFilter } from "nostr-tools";
 import { NoReadRelaysConfigured } from "../domain/errors";
-import type { RelayUrl } from "../domain/primitives";
+import type { Pubkey, RelayUrl } from "../domain/primitives";
 import type { InboxDelivery } from "../inbox/events";
 import { resubscribeForever } from "../internal/resubscribe";
 import { nowSeconds } from "../internal/time";
@@ -46,6 +48,15 @@ export type PushRelayStatusEvent =
     };
 
 export interface PushInboxOptions {
+  /**
+   * The pubkeys to watch, as the current set followed by every change. Each
+   * change resubscribes every relay; while the set is empty no REQ is open.
+   */
+  readonly recipients: Stream.Stream<ReadonlyArray<Pubkey>>;
+  /**
+   * How far `since` reaches back. Relays match live wraps against it too, so it
+   * must cover NIP-59's randomized `created_at` (up to two days in the past).
+   */
   readonly lookback: Duration.Duration;
   readonly refreshInterval?: Duration.Duration;
   readonly resubscribeDelay?: Duration.Duration;
@@ -61,12 +72,17 @@ interface RawArrival {
 const GIFT_WRAP_KIND = 1059;
 const DEFAULT_REFRESH_INTERVAL = Duration.minutes(10);
 const DEFAULT_RESUBSCRIBE_DELAY = Duration.seconds(5);
+// ~17 KB per REQ: well under the common 64–128 KiB websocket message caps, and
+// strfry's default 20 REQs per connection still fit 5,000 recipients.
+const RECIPIENTS_PER_REQ = 250;
 
 /**
  * Identity-free kind-1059 watcher for push infrastructure. It owns one honest
- * subscription per relay, reconnects with a fresh rolling lookback, validates
+ * subscription per relay for the given recipients, split into REQs of
+ * `RECIPIENTS_PER_REQ`, reconnects with a fresh rolling lookback, validates
  * outer events, and dedupes authenticated live wraps across relays. Backfill
- * arrivals are re-emitted per copy for the consumer to suppress.
+ * (at most the newest stored wrap per REQ) is re-emitted per copy for the
+ * consumer to suppress.
  */
 export class PushInbox extends Context.Service<PushInbox>()(
   "linkstr/PushInbox",
@@ -93,17 +109,18 @@ export class PushInbox extends Context.Service<PushInbox>()(
             options.refreshInterval ?? DEFAULT_REFRESH_INTERVAL;
           const resubscribeDelay =
             options.resubscribeDelay ?? DEFAULT_RESUBSCRIBE_DELAY;
+          const lookbackSeconds = Math.floor(
+            Duration.toMillis(options.lookback) / 1000,
+          );
 
-          const subscribe = (relay: RelayUrl) =>
+          const subscribe = (
+            relay: RelayUrl,
+            recipients: ReadonlyArray<Pubkey>,
+          ) =>
             Effect.gen(function* () {
-              const lookbackSeconds = Math.floor(
-                Duration.toMillis(options.lookback) / 1000,
-              );
-              const filter: NostrFilter = {
-                kinds: [GIFT_WRAP_KIND],
-                since: Math.max((yield* nowSeconds) - lookbackSeconds, 0),
-              };
-              let eoseSeen = false;
+              const since = Math.max((yield* nowSeconds) - lookbackSeconds, 0);
+              const chunks = Arr.chunksOf(recipients, RECIPIENTS_PER_REQ);
+              let chunksBeforeEose = chunks.length;
               const reportAttemptEnded = (reason: string) =>
                 Effect.sync(() =>
                   options.onRelayStatus?.({
@@ -112,10 +129,17 @@ export class PushInbox extends Context.Service<PushInbox>()(
                     reason,
                   }),
                 );
-              // Relays can drop a long-lived REQ without closing the socket, so
-              // periodic refresh is the only way to detect a deaf subscription.
-              yield* transport
-                .subscribe(
+              const subscribeChunk = (chunk: ReadonlyArray<Pubkey>) => {
+                // Backfill is never notified, so the relay sends at most its
+                // newest stored wrap; some relays read `limit: 0` as no limit.
+                const filter: NostrFilter = {
+                  kinds: [GIFT_WRAP_KIND],
+                  "#p": [...chunk],
+                  since,
+                  limit: 1,
+                };
+                let eoseSeen = false;
+                return transport.subscribe(
                   relay,
                   filter,
                   (raw) => {
@@ -129,27 +153,52 @@ export class PushInbox extends Context.Service<PushInbox>()(
                     onEose: () => {
                       if (eoseSeen) return;
                       eoseSeen = true;
-                      options.onRelayStatus?.({ type: "eose", relay });
+                      chunksBeforeEose -= 1;
+                      if (chunksBeforeEose === 0) {
+                        options.onRelayStatus?.({ type: "eose", relay });
+                      }
                     },
                   },
-                )
-                .pipe(
-                  Effect.tap(reportAttemptEnded),
-                  Effect.tapError((failure) =>
-                    reportAttemptEnded(failure.detail ?? "relay unreachable"),
-                  ),
-                  Effect.asVoid,
-                  Effect.timeoutOrElse({
-                    duration: refreshInterval,
-                    orElse: () => Effect.void,
-                  }),
                 );
+              };
+              // Relays can drop a long-lived REQ without closing the socket, so
+              // periodic refresh is the only way to detect a deaf subscription.
+              yield* Effect.raceAllFirst(chunks.map(subscribeChunk)).pipe(
+                Effect.tap(reportAttemptEnded),
+                Effect.tapError((failure) =>
+                  reportAttemptEnded(failure.detail ?? "relay unreachable"),
+                ),
+                Effect.asVoid,
+                Effect.timeoutOrElse({
+                  duration: refreshInterval,
+                  orElse: () => Effect.void,
+                }),
+              );
             });
 
-          yield* Effect.forEach(relays, (relay) =>
-            Effect.forkScoped(
-              resubscribeForever(subscribe(relay), resubscribeDelay),
+          const watchRelays = (recipients: ReadonlyArray<Pubkey>) =>
+            recipients.length === 0
+              ? Effect.never
+              : Effect.forEach(
+                  relays,
+                  (relay) =>
+                    resubscribeForever(
+                      subscribe(relay, recipients),
+                      resubscribeDelay,
+                    ),
+                  { concurrency: "unbounded", discard: true },
+                );
+
+          yield* options.recipients.pipe(
+            Stream.map((recipients) =>
+              Arr.sort(Arr.dedupe(recipients), Order.String),
             ),
+            Stream.changesWith((a, b) => a.join() === b.join()),
+            Stream.switchMap((recipients) =>
+              Stream.fromEffect(watchRelays(recipients)),
+            ),
+            Stream.runDrain,
+            Effect.forkScoped,
           );
 
           const processRaw = ({

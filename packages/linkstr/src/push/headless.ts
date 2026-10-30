@@ -1,5 +1,14 @@
-import { Cause, Duration, Effect, Exit, Fiber, Layer, Stream } from "effect";
-import type { RelayUrl } from "../domain/primitives";
+import {
+  Cause,
+  Duration,
+  Effect,
+  Exit,
+  Fiber,
+  Layer,
+  Stream,
+  SubscriptionRef,
+} from "effect";
+import type { Pubkey, RelayUrl } from "../domain/primitives";
 import type { NostrTransport } from "../services/NostrTransport";
 import { makeNostrTransportSimplePool } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
@@ -13,6 +22,8 @@ import { PushInbox } from "./PushInbox";
 export interface PushInboxConfig {
   readonly allowInsecureLocalhost?: boolean | undefined;
   readonly readRelays: ReadonlyArray<RelayUrl>;
+  /** The initial recipients; replace them with `setRecipients`. */
+  readonly recipients: ReadonlyArray<Pubkey>;
   readonly lookbackSeconds: number;
   readonly transport?: Layer.Layer<NostrTransport> | undefined;
   readonly refreshInterval?: Duration.Duration | undefined;
@@ -23,6 +34,8 @@ export interface PushInboxConfig {
 }
 
 export interface PushInboxSubscription {
+  /** Resubscribes every relay when the set differs from the current one. */
+  readonly setRecipients: (recipients: ReadonlyArray<Pubkey>) => void;
   readonly close: () => Promise<void>;
 }
 
@@ -31,9 +44,11 @@ export const watchPushInbox = (
   config: PushInboxConfig,
   onWrap: (event: DeliveredPushWrap) => void,
 ): PushInboxSubscription => {
+  const recipients = Effect.runSync(SubscriptionRef.make(config.recipients));
   const program = Effect.gen(function* () {
     const inbox = yield* PushInbox;
     const events = yield* inbox.open({
+      recipients: SubscriptionRef.changes(recipients),
       lookback: Duration.seconds(config.lookbackSeconds),
       ...(config.refreshInterval === undefined
         ? {}
@@ -77,6 +92,8 @@ export const watchPushInbox = (
     }
   });
   return {
+    setRecipients: (next) =>
+      Effect.runSync(SubscriptionRef.set(recipients, next)),
     close: () => Effect.runPromise(Fiber.interrupt(fiber).pipe(Effect.asVoid)),
   };
 };

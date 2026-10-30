@@ -394,6 +394,21 @@ export class PushStorage {
     );
   }
 
+  /** Every pubkey with a web or native subscription, sorted. */
+  getSubscribedPubkeys(): string[] {
+    return this.db
+      .query<{ pubkey: string }, []>(
+        `
+          SELECT pubkey FROM ${WEB_TABLES.association}
+          UNION
+          SELECT pubkey FROM ${NATIVE_TABLES.association}
+          ORDER BY pubkey
+        `,
+      )
+      .all()
+      .map((row) => row.pubkey);
+  }
+
   /**
    * Replaces the pubkey's whole reminder set: the client sends every upcoming
    * due time it knows, so a paid, paused, edited or deleted payment simply
