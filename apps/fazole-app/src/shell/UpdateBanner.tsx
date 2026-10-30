@@ -9,7 +9,7 @@ export function UpdateBanner() {
   useEffect(() => subscribeNeedRefresh(setNeedRefresh), []);
   if (!needRefresh) return null;
   return (
-    <Stack gap="$none" backgroundColor="$accent" data-safe-area="top">
+    <Stack gap="$none" backgroundColor="$accent">
       <Notice
         solid
         title={copy.update.available}
