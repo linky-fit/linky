@@ -6,10 +6,11 @@ export interface SpdPayment {
   readonly iban: CzechIban;
   readonly amount: CzkAmount;
   readonly variableSymbol?: VariableSymbol | undefined;
-  readonly message?: string | undefined;
+  /** Shown by the payer's bank as the recipient's name, e.g. the shop's. */
+  readonly recipientName?: string | undefined;
 }
 
-const MSG_MAX_LENGTH = 60;
+const RN_MAX_LENGTH = 35;
 
 // SPD reserves `*` as the field separator and `%` for escapes; `+` is escaped
 // like the ČBA reference implementation does.
@@ -20,7 +21,7 @@ const SPD_ESCAPES: Readonly<Record<string, string>> = {
 };
 
 /** Diacritics are folded to ASCII because many banking apps mangle UTF-8. */
-const toSpdMessage = (text: string): string => {
+const toSpdText = (text: string, maxLength: number): string => {
   const ascii = text
     .normalize("NFD")
     .replace(/\p{M}/gu, "")
@@ -29,7 +30,7 @@ const toSpdMessage = (text: string): string => {
   let result = "";
   for (const char of ascii) {
     const encoded = SPD_ESCAPES[char] ?? char;
-    if (result.length + encoded.length > MSG_MAX_LENGTH) break;
+    if (result.length + encoded.length > maxLength) break;
     result += encoded;
   }
   return result.trimEnd();
@@ -39,19 +40,21 @@ const formatSpdAmount = (amount: CzkAmount): string =>
   `${Math.floor(amount / 100)}.${String(amount % 100).padStart(2, "0")}`;
 
 /**
- * The Czech "QR platba" text: `SPD*1.0*ACC:<IBAN>*AM:<amount>*CC:CZK*PT:IP*X-VS:<vs>*MSG:<text>`.
- * `PT:IP` asks the payer's bank for an instant payment so the shop sees the money while the customer waits.
+ * The Czech "QR platba" text: `SPD*1.0*ACC:<IBAN>*AM:<amount>*CC:CZK*RN:<name>*X-VS:<vs>*PT:IP`,
+ * the fields in the order of the standard's own example. `PT:IP` asks the
+ * payer's bank for an instant payment so the shop sees the money while the
+ * customer waits.
  */
 export const buildSpd = (payment: SpdPayment): string => {
-  const message = toSpdMessage(payment.message ?? "");
+  const recipientName = toSpdText(payment.recipientName ?? "", RN_MAX_LENGTH);
   return [
     "SPD",
     "1.0",
     `ACC:${payment.iban}`,
     `AM:${formatSpdAmount(payment.amount)}`,
     "CC:CZK",
-    "PT:IP",
+    ...(recipientName ? [`RN:${recipientName}`] : []),
     ...(payment.variableSymbol ? [`X-VS:${payment.variableSymbol}`] : []),
-    ...(message ? [`MSG:${message}`] : []),
+    "PT:IP",
   ].join("*");
 };
