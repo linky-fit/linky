@@ -151,6 +151,8 @@ export const shadow = {
 export const fontFamily = {
   body: "Manrope, system-ui, sans-serif",
   mono: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+  /** A pen note on a page, e.g. a site's "try it"; the app that uses it loads Caveat. */
+  handwriting: "Caveat, cursive",
 };
 
 export const fontWeight = {
