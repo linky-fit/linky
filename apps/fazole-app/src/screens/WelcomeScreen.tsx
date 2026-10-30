@@ -2,7 +2,6 @@ import {
   Button,
   IconButton,
   Image,
-  Row,
   space,
   Stack,
   Text,
@@ -51,14 +50,9 @@ export function WelcomeScreen() {
             aria-hidden
           />
           <Stack alignItems="center" gap="$sm">
-            <Row gap="$none">
-              <Text variant="display" color="$colorStrong">
-                fazole
-              </Text>
-              <Text variant="display" color="$accent">
-                .fit
-              </Text>
-            </Row>
+            <Text variant="display" color="$colorStrong">
+              Fazole
+            </Text>
             <Text color="$colorMuted" textAlign="center">
               {copy.appTagline}
             </Text>

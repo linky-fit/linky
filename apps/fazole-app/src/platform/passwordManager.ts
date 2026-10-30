@@ -40,6 +40,6 @@ export const saveRecoverySeedToPasswordManager = (
 ): Promise<PasswordManagerSaveResult> =>
   saveToPasswordManager({
     id: `fazole.fit:${account.npub}`,
-    name: shopName ?? "fazole.fit",
+    name: shopName ?? "Fazole",
     password: account.recoverySeed,
   });

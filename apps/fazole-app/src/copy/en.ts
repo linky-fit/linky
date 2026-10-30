@@ -68,7 +68,7 @@ export const en: Copy = {
   },
 
   update: {
-    available: "A new version of fazole.fit is available",
+    available: "A new version of Fazole is available",
     apply: "Update",
   },
 

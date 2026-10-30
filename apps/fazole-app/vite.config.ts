@@ -97,8 +97,8 @@ export default defineConfig({
         rollupFormat: "es",
       },
       manifest: {
-        name: "fazole.fit",
-        short_name: "fazole.fit",
+        name: "Fazole",
+        short_name: "Fazole",
         description: "Platební terminál pro české obchodníky",
         lang: "cs",
         id: "/",
