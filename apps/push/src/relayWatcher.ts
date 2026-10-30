@@ -1,12 +1,17 @@
-import { encodeNpub, RelayUrl, watchPushInbox } from "@linky-fit/linkstr";
+import {
+  encodeNpub,
+  isPubkey,
+  RelayUrl,
+  watchPushInbox,
+} from "@linky-fit/linkstr";
 import type {
   DeliveredPushWrap,
   PushInboxSubscription,
 } from "@linky-fit/linkstr";
 
 import {
-  CATCH_UP_LOOKBACK_SECONDS,
   SEEN_EVENT_RETENTION_MARGIN_MS,
+  WRAP_LOOKBACK_SECONDS,
 } from "./config";
 import { PushStorage } from "./storage";
 import type {
@@ -32,11 +37,15 @@ interface RelayWatcherOptions {
   pushDelivery: PushDelivery;
 }
 
+const RECIPIENT_SYNC_INTERVAL_MS = 10_000;
+
 export class RelayWatcher {
   private readonly relayUrls: ReadonlyArray<RelayUrl>;
   private readonly storage: PushStorage;
   private readonly pushDelivery: PushDelivery;
   private subscription: PushInboxSubscription | null = null;
+  private recipientSync: ReturnType<typeof setInterval> | null = null;
+  private recipientsKey = "";
 
   constructor(options: RelayWatcherOptions) {
     this.relayUrls = options.relayUrls.map((url) => RelayUrl.make(url));
@@ -47,14 +56,15 @@ export class RelayWatcher {
   start(): void {
     if (this.subscription !== null) return;
     console.info(
-      `[push] opening linkstr relay watcher with ${CATCH_UP_LOOKBACK_SECONDS}s lookback`,
+      `[push] opening linkstr relay watcher with ${WRAP_LOOKBACK_SECONDS}s lookback`,
     );
     this.subscription = watchPushInbox(
       {
         readRelays: this.relayUrls,
+        recipients: [],
         allowInsecureLocalhost:
           process.env.PUSH_ALLOW_INSECURE_LOCALHOST_RELAYS === "1",
-        lookbackSeconds: CATCH_UP_LOOKBACK_SECONDS,
+        lookbackSeconds: WRAP_LOOKBACK_SECONDS,
         onInvalidWrap: (failure) =>
           console.warn(`[push] invalid push wrap failure=${failure}`),
         onRelayStatus: (event) => {
@@ -73,17 +83,36 @@ export class RelayWatcher {
       },
       (event) => void this.handleDelivered(event),
     );
+    this.syncRecipients();
+    // Subscribe and unsubscribe requests and dead endpoints dropped on delivery
+    // all change storage, so polling it covers every path.
+    this.recipientSync = setInterval(
+      () => this.syncRecipients(),
+      RECIPIENT_SYNC_INTERVAL_MS,
+    );
   }
 
   async stop(): Promise<void> {
+    if (this.recipientSync !== null) clearInterval(this.recipientSync);
+    this.recipientSync = null;
     await this.subscription?.close();
     this.subscription = null;
+    this.recipientsKey = "";
+  }
+
+  syncRecipients(): void {
+    const pubkeys = this.storage.getSubscribedPubkeys();
+    const key = pubkeys.join();
+    if (this.subscription === null || key === this.recipientsKey) return;
+    this.recipientsKey = key;
+    console.info(`[push] watching wraps for ${pubkeys.length} pubkeys`);
+    this.subscription.setRecipients(pubkeys.filter(isPubkey));
   }
 
   pruneSeen(nowMs: number): void {
     this.storage.pruneSeenEvents(
       nowMs,
-      CATCH_UP_LOOKBACK_SECONDS * 1000 + SEEN_EVENT_RETENTION_MARGIN_MS,
+      WRAP_LOOKBACK_SECONDS * 1000 + SEEN_EVENT_RETENTION_MARGIN_MS,
     );
   }
 

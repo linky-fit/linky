@@ -311,6 +311,35 @@ describe("PushStorage native subscriptions", () => {
   });
 });
 
+describe("PushStorage subscribed pubkeys", () => {
+  it("lists each pubkey with a web or native subscription once, sorted", () => {
+    withStorage((storage) => {
+      expect(storage.getSubscribedPubkeys()).toEqual([]);
+      storage.registerNativeSubscription({
+        ...registerDefaults,
+        device: nativeDevice("token-b"),
+        recipientPubkeys: [pubkeyB, pubkeyA],
+      });
+      storage.registerSubscription({
+        ...registerDefaults,
+        subscription: webSubscription("https://push/a"),
+        recipientPubkeys: [pubkeyA],
+      });
+
+      expect(storage.getSubscribedPubkeys()).toEqual([pubkeyA, pubkeyB]);
+
+      storage.unregisterNativeSubscriptionPubkeys({
+        token: "token-b",
+        recipientPubkeys: [pubkeyA, pubkeyB],
+        consumedChallengeNonces: [],
+        nowMs,
+      });
+
+      expect(storage.getSubscribedPubkeys()).toEqual([pubkeyA]);
+    });
+  });
+});
+
 describe("PushStorage challenges", () => {
   it("issues challenges that are consumed exactly once by a registration", () => {
     withStorage((storage) => {
