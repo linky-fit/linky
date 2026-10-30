@@ -2,8 +2,10 @@ import {
   Array as Arr,
   Cause,
   Context,
+  Deferred,
   Duration,
   Effect,
+  Fiber,
   Filter,
   Layer,
   Option,
@@ -50,7 +52,8 @@ export type PushRelayStatusEvent =
 export interface PushInboxOptions {
   /**
    * The pubkeys to watch, as the current set followed by every change. Each
-   * change resubscribes every relay; while the set is empty no REQ is open.
+   * change resubscribes every relay, keeping the old REQs open until the new
+   * ones caught up; while the set is empty no REQ is open.
    */
   readonly recipients: Stream.Stream<ReadonlyArray<Pubkey>>;
   /**
@@ -73,7 +76,8 @@ const GIFT_WRAP_KIND = 1059;
 const DEFAULT_REFRESH_INTERVAL = Duration.minutes(10);
 const DEFAULT_RESUBSCRIBE_DELAY = Duration.seconds(5);
 // ~17 KB per REQ: well under the common 64–128 KiB websocket message caps, and
-// strfry's default 20 REQs per connection still fit 5,000 recipients.
+// strfry's default 20 REQs per connection still fit 2,500 recipients while a
+// recipient change briefly keeps the old and new REQs open together.
 const RECIPIENTS_PER_REQ = 250;
 
 /**
@@ -116,6 +120,7 @@ export class PushInbox extends Context.Service<PushInbox>()(
           const subscribe = (
             relay: RelayUrl,
             recipients: ReadonlyArray<Pubkey>,
+            settled: Deferred.Deferred<void>,
           ) =>
             Effect.gen(function* () {
               const since = Math.max((yield* nowSeconds) - lookbackSeconds, 0);
@@ -156,6 +161,7 @@ export class PushInbox extends Context.Service<PushInbox>()(
                       chunksBeforeEose -= 1;
                       if (chunksBeforeEose === 0) {
                         options.onRelayStatus?.({ type: "eose", relay });
+                        Deferred.doneUnsafe(settled, Effect.void);
                       }
                     },
                   },
@@ -174,30 +180,54 @@ export class PushInbox extends Context.Service<PushInbox>()(
                   orElse: () => Effect.void,
                 }),
               );
+            }).pipe(Effect.ensuring(Deferred.succeed(settled, undefined)));
+
+          // Make-before-break: a relay's previous REQs stay open until the new
+          // ones caught up, ended or were replaced, so no live wrap slips between.
+          const watchRelay = (
+            relay: RelayUrl,
+            recipients: ReadonlyArray<Pubkey>,
+            previous: Fiber.Fiber<never> | undefined,
+          ) =>
+            Effect.gen(function* () {
+              const settled = yield* Deferred.make<void>();
+              const fiber = yield* Effect.forkScoped(
+                resubscribeForever(
+                  subscribe(relay, recipients, settled),
+                  resubscribeDelay,
+                ),
+              );
+              if (previous !== undefined) {
+                yield* Effect.raceFirst(
+                  Deferred.await(settled),
+                  Fiber.await(fiber),
+                ).pipe(
+                  Effect.andThen(Fiber.interrupt(previous)),
+                  Effect.forkScoped,
+                );
+              }
+              return fiber;
             });
 
-          const watchRelays = (recipients: ReadonlyArray<Pubkey>) =>
-            recipients.length === 0
-              ? Effect.never
-              : Effect.forEach(
-                  relays,
-                  (relay) =>
-                    resubscribeForever(
-                      subscribe(relay, recipients),
-                      resubscribeDelay,
-                    ),
-                  { concurrency: "unbounded", discard: true },
-                );
-
+          let watching: ReadonlyArray<Fiber.Fiber<never>> = [];
           yield* options.recipients.pipe(
             Stream.map((recipients) =>
               Arr.sort(Arr.dedupe(recipients), Order.String),
             ),
             Stream.changesWith((a, b) => a.join() === b.join()),
-            Stream.switchMap((recipients) =>
-              Stream.fromEffect(watchRelays(recipients)),
+            Stream.runForEach((recipients) =>
+              Effect.gen(function* () {
+                const previous = watching;
+                if (recipients.length === 0) {
+                  watching = [];
+                  yield* Fiber.interruptAll(previous);
+                  return;
+                }
+                watching = yield* Effect.forEach(relays, (relay, index) =>
+                  watchRelay(relay, recipients, previous[index]),
+                );
+              }),
             ),
-            Stream.runDrain,
             Effect.forkScoped,
           );
 

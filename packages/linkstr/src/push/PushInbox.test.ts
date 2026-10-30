@@ -171,7 +171,7 @@ describe("PushInbox", () => {
     }).pipe(Effect.scoped, Effect.provide(layer), Effect.runPromise);
   });
 
-  it("opens no REQ without recipients and follows recipient changes", async () => {
+  it("opens no REQ without recipients and hands recipient changes over without a gap", async () => {
     const relay = RelayUrl.make("wss://recipients-relay.test");
     const fake = new FakeRelay();
     const pool = poolFor(new Map([[relay, fake]]));
@@ -187,6 +187,7 @@ describe("PushInbox", () => {
       Pubkey.make(getPublicKey(generateSecretKey())),
     );
     const relayStatuses: Array<PushRelayStatusEvent> = [];
+    const collected: Array<DeliveredPushWrap> = [];
 
     await Effect.gen(function* () {
       const recipients = yield* SubscriptionRef.make<ReadonlyArray<Pubkey>>([]);
@@ -197,7 +198,11 @@ describe("PushInbox", () => {
         resubscribeDelay: Duration.millis(10),
         onRelayStatus: (event) => relayStatuses.push(event),
       });
-      yield* Effect.forkScoped(Stream.runDrain(events));
+      yield* Effect.forkScoped(
+        Stream.runForEach(events, (event) =>
+          Effect.sync(() => collected.push(event)),
+        ),
+      );
       yield* Effect.sleep(Duration.millis(20));
       expect(fake.subscriptions).toHaveLength(0);
 
@@ -220,10 +225,23 @@ describe("PushInbox", () => {
 
       yield* SubscriptionRef.set(recipients, [recipient]);
       yield* eventually(() => fake.subscriptions.length === 3);
-      expect(fake.subscriptions.slice(0, 2).every(({ closed }) => closed)).toBe(
-        true,
-      );
       expect(fake.subscriptions[2]?.filters[0]?.["#p"]).toEqual([recipient]);
+      expect(fake.subscriptions.some(({ closed }) => closed)).toBe(false);
+
+      const duringHandover = pushWrap("during handover");
+      fake.emit(duringHandover);
+      yield* eventually(() =>
+        collected.some(
+          ({ delivery, wrap }) =>
+            delivery === "live" && wrap.wrapId === duringHandover.id,
+        ),
+      );
+
+      fake.eose();
+      yield* eventually(() =>
+        fake.subscriptions.slice(0, 2).every(({ closed }) => closed),
+      );
+      expect(fake.subscriptions[2]?.closed).toBe(false);
 
       yield* SubscriptionRef.set(recipients, []);
       yield* eventually(() => fake.subscriptions[2]?.closed === true);
@@ -402,10 +420,13 @@ describe("PushInbox", () => {
       await Effect.runPromise(
         eventually(() => fake.subscriptions.length === 2),
       );
-
-      expect(fake.subscriptions[0]?.closed).toBe(true);
       expect(fake.subscriptions[1]?.filters[0]?.["#p"]).toEqual(
         [recipient, other].sort(),
+      );
+
+      fake.eose();
+      await Effect.runPromise(
+        eventually(() => fake.subscriptions[0]?.closed === true),
       );
     } finally {
       await subscription.close();
