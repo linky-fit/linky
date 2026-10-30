@@ -65,7 +65,7 @@ export const cs = {
   },
 
   update: {
-    available: "Je k dispozici nová verze fazole.fit",
+    available: "Je k dispozici nová verze Fazole",
     apply: "Aktualizovat",
   },
 
