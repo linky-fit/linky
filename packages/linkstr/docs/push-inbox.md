@@ -8,7 +8,7 @@ Senders opt a wrap into push by adding a `["linky", "push"]` tag to the recipien
 
 ## Recipients
 
-The inbox asks relays only for wraps addressed to the recipients you pass, split into REQs of 250 pubkeys each. That tells every read relay which pubkeys have push enabled. Each change to the set resubscribes every relay; while the set is empty no REQ is open.
+The inbox asks relays only for wraps addressed to the recipients you pass, split into REQs of 250 pubkeys each. That tells every read relay which pubkeys have push enabled. Each change to the set resubscribes every relay without a gap: a relay's old REQs stay open until its new ones reach EOSE or end, so a wrap arriving during the switch still comes through live. While the set is empty no REQ is open.
 
 ## `watchPushInbox`
 
