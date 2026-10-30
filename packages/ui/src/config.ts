@@ -47,6 +47,11 @@ const mono = createFont({
   }),
 });
 
+const handwriting = createFont({
+  ...fontScale,
+  family: Platform.select({ web: fontFamily.handwriting, default: "cursive" }),
+});
+
 export const config = createTamagui({
   tokens: createTokens({
     color: { transparent: "transparent" },
@@ -56,7 +61,7 @@ export const config = createTamagui({
     zIndex: withDefault(zIndex, zIndex.base),
   }),
   themes,
-  fonts: { body, mono },
+  fonts: { body, mono, handwriting },
   animations,
   media: {
     compact: { maxWidth: breakpoint.wide - 1 },
