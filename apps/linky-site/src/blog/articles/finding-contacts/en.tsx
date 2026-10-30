@@ -128,10 +128,9 @@ export function Body() {
       </Paragraph>
       <Paragraph>
         You turn the beacon on in the <Term>Proxy payments</Term> tab, in the{" "}
-        <Term>Nearby</Term> section. For now it is an experimental feature of
-        the Android app, so you first enable it in <Term>Settings</Term> under{" "}
-        <Term>Debug</Term>. It needs Bluetooth and shows a notification while it
-        runs, so you know you are broadcasting.
+        <Term>Nearby</Term> section. It is available in the Android app. It
+        needs Bluetooth and shows a notification while it runs, so you know you
+        are broadcasting.
       </Paragraph>
       <FigureRow>
         <ScreenshotFigure

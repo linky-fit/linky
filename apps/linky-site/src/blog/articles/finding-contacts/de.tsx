@@ -134,11 +134,9 @@ export function Body() {
       </Paragraph>
       <Paragraph>
         Den Beacon schalten Sie im Tab <Term>Proxy-Zahlungen</Term> im Abschnitt{" "}
-        <Term>In der Nähe</Term> ein. Vorerst ist das eine experimentelle
-        Funktion der Android-App, deshalb müssen Sie sie zuerst in den{" "}
-        <Term>Einstellungen</Term> im Abschnitt <Term>Debug</Term> freischalten.
-        Sie braucht Bluetooth und zeigt, solange sie läuft, eine
-        Benachrichtigung, damit Sie wissen, dass Sie senden.
+        <Term>In der Nähe</Term> ein. Er ist in der Android-App verfügbar. Er
+        braucht Bluetooth und zeigt, solange er läuft, eine Benachrichtigung,
+        damit Sie wissen, dass Sie senden.
       </Paragraph>
       <FigureRow>
         <ScreenshotFigure

@@ -19,7 +19,6 @@ import {
   type BeaconSnapshot,
   type NearbyContact,
 } from "../lib/beaconStore";
-import { useExperimentalFeatures } from "./useExperimentalFeatures";
 
 const useBeaconSnapshot = <A>(select: (snapshot: BeaconSnapshot) => A): A =>
   React.useSyncExternalStore(subscribeBeacon, () =>
@@ -28,12 +27,9 @@ const useBeaconSnapshot = <A>(select: (snapshot: BeaconSnapshot) => A): A =>
 
 const selectPermission = (snapshot: BeaconSnapshot) => snapshot.permission;
 
-/** Experimental features on and a native shell whose device can advertise; the web reports `unsupported`. */
-export const useBeaconSupport = (): boolean => {
-  const { experimentalFeatures } = useExperimentalFeatures();
-  const permission = useBeaconSnapshot(selectPermission);
-  return experimentalFeatures && permission !== "unsupported";
-};
+/** A native shell whose device can advertise; the web reports `unsupported`. */
+export const useBeaconSupport = (): boolean =>
+  useBeaconSnapshot(selectPermission) !== "unsupported";
 
 const setEnabled = async (enabled: boolean): Promise<void> => {
   setBeaconEnabled(enabled);

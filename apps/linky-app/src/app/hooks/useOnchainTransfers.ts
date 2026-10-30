@@ -82,7 +82,7 @@ export const useOnchainTransfersSync = (): void => {
   React.useEffect(() => () => setTransfers(null), [setTransfers]);
 };
 
-/** Whether on-chain transfers show: experimental features are on and an on-chain operator is configured. */
+/** Whether on-chain transfers show: an on-chain operator is configured. */
 export const useOnchainTransfersShown = (): boolean =>
   useAtomValue(onchainTransfersAtom, (transfers) => transfers !== null);
 
