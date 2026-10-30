@@ -13,6 +13,10 @@ const allText = (value: unknown): string[] =>
 describe("the site copy", () => {
   const text = allText(copy).join("\n");
 
+  it("has every string in both languages", () => {
+    expect(Object.keys(copy)).toEqual(["cs", "en"]);
+  });
+
   it("claims no team features, which this version does not have", () => {
     expect(text).not.toMatch(/zaměstnan|tým|obsluh/iu);
   });

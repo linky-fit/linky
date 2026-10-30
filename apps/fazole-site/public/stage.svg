@@ -1,15 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 820" aria-hidden="true">
   <style>@media (prefers-reduced-motion: reduce) { * { animation: none !important; } }</style>
-  <g stroke="#ffffff" stroke-opacity="0.22" stroke-width="1" stroke-dasharray="2 5" vector-effect="non-scaling-stroke" fill="none">
-    <line x1="13" y1="80" x2="50" y2="46" vector-effect="non-scaling-stroke"/>
-    <line x1="88" y1="38" x2="50" y2="46" vector-effect="non-scaling-stroke"/>
+  <g stroke="#ffffff" stroke-opacity="0.22" stroke-width="1.5" stroke-dasharray="4 9" fill="none">
+    <line x1="80" y1="690" x2="300" y2="430"/>
+    <line x1="552" y1="312" x2="300" y2="430"/>
   </g>
-  <circle r="1.1" fill="#d4a93a">
-    <animateMotion dur="3.2s" repeatCount="indefinite" path="M13 80 L50 46"/>
+  <circle r="5" fill="#d4a93a">
+    <animateMotion dur="3.2s" repeatCount="indefinite" path="M80 690 L300 430"/>
     <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.85;1" dur="3.2s" repeatCount="indefinite"/>
   </circle>
-  <circle r="1.1" fill="#d4a93a">
-    <animateMotion dur="3.2s" begin="1.6s" repeatCount="indefinite" path="M88 38 L50 46"/>
+  <circle r="5" fill="#d4a93a">
+    <animateMotion dur="3.2s" begin="1.6s" repeatCount="indefinite" path="M552 312 L300 430"/>
     <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.85;1" dur="3.2s" begin="1.6s" repeatCount="indefinite"/>
   </circle>
 </svg>

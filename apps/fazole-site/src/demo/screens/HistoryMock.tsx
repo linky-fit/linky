@@ -11,7 +11,8 @@ import {
 } from "@linky-fit/ui";
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { copy } from "../../copy";
+import type { DemoCopy } from "../../copy";
+import { useCopy } from "../../locale";
 import { DemoScreen, DemoSheet, DetailRows, Page } from "../chrome";
 import type { Detail } from "../chrome";
 import {
@@ -31,28 +32,26 @@ import {
 import { useDemo } from "../store";
 import type { DemoPayment } from "../store";
 
-const t = copy.demo;
-
-const rowDescription = (payment: DemoPayment): string => {
+const rowDescription = (t: DemoCopy, payment: DemoPayment): string => {
   const row = t.history.row(
     formatTime(payment.createdAt),
-    methodLabel(payment),
+    methodLabel(t, payment),
   );
   return payment.tipHalere === null
     ? row
-    : `${row} · ${t.history.tipped(czk(payment.tipHalere))}`;
+    : `${row} · ${t.history.tipped(czk(t, payment.tipHalere))}`;
 };
 
-const paymentDetails = (payment: DemoPayment): Detail[] => [
+const paymentDetails = (t: DemoCopy, payment: DemoPayment): Detail[] => [
   ...(payment.tipHalere === null
     ? []
     : [
         {
           label: t.history.amount,
-          value: czk(payment.amountHalere - payment.tipHalere),
+          value: czk(t, payment.amountHalere - payment.tipHalere),
         },
-        { label: t.history.tip, value: czk(payment.tipHalere) },
-        { label: t.history.total, value: czk(payment.amountHalere) },
+        { label: t.history.tip, value: czk(t, payment.tipHalere) },
+        { label: t.history.total, value: czk(t, payment.amountHalere) },
       ]),
   ...(payment.method === null
     ? []
@@ -79,6 +78,7 @@ function PaymentDetail({
   payment: DemoPayment;
   onShowQr: () => void;
 }) {
+  const t = useCopy().demo;
   return (
     <Stack gap="$lg" paddingTop="$sm">
       <Stack alignItems="center" gap="$sm">
@@ -102,7 +102,7 @@ function PaymentDetail({
           </Text>
         </Row>
       ) : null}
-      <DetailRows details={paymentDetails(payment)} />
+      <DetailRows details={paymentDetails(t, payment)} />
       {payment.status === "pending" ? (
         <Button icon="QrCode" onPress={onShowQr}>
           {t.history.showQr}
@@ -120,6 +120,7 @@ export function HistoryMock({
   tabBar: ReactNode;
   onOpenPayment: (id: string) => void;
 }) {
+  const t = useCopy().demo;
   const { payments } = useDemo();
   const [selectedId, setSelectedId] = useState<string>();
   const [now] = useState(() => new Date());
@@ -148,14 +149,14 @@ export function HistoryMock({
           <Stack key={day.startMs} gap="$xs">
             <Row justifyContent="space-between" paddingVertical="$sm">
               <Text eyebrow role="heading">
-                {dayTitle(day.startMs, now)}
+                {dayTitle(t, day.startMs, now)}
               </Text>
               <Text
                 variant="caption"
                 color="$colorMuted"
                 fontVariant={["tabular-nums"]}
               >
-                {t.history.dayTotal(czk(day.paidTotal))}
+                {t.history.dayTotal(czk(t, day.paidTotal))}
               </Text>
             </Row>
             <Card paddingVertical="$sm" gap="$none">
@@ -163,8 +164,8 @@ export function HistoryMock({
                 <ListRow
                   key={payment.id}
                   icon={paymentIcon(payment)}
-                  title={czk(payment.amountHalere)}
-                  description={rowDescription(payment)}
+                  title={czk(t, payment.amountHalere)}
+                  description={rowDescription(t, payment)}
                   trailing={
                     <Pill
                       size="sm"

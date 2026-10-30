@@ -1,9 +1,9 @@
-import { copy } from "../copy";
+import { useCopy } from "../locale";
 import { PointGrid, Reveal, SectionHeading, SiteSection } from "./parts";
 import { sectionIds } from "./sectionIds";
 
 export function Why() {
-  const { why } = copy;
+  const { why } = useCopy();
   return (
     <SiteSection id={sectionIds.why}>
       <Reveal>

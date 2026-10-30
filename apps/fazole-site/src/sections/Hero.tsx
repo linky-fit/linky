@@ -9,17 +9,17 @@ import {
   useMedia,
 } from "@linky-fit/ui";
 import type { IconName } from "@linky-fit/ui";
+import type { ReactNode } from "react";
 import { siteConfig } from "../config";
-import { copy } from "../copy";
 import { DemoApp } from "../demo/DemoApp";
+import { useCopy } from "../locale";
 import { Glow, Handwritten } from "./parts";
-
-const hero = copy.hero;
 
 /** "Vyzkoušejte", written by hand beside the phone, with an arrow into it. */
 function TryIt({ wide }: { wide: boolean }) {
+  const { hero } = useCopy();
   return (
-    <Row alignItems="flex-end" gap="$xs" rotate="-4deg">
+    <Row alignItems="flex-end" gap="$xs" rotate="-4deg" flexShrink={0}>
       <Handwritten>{hero.tryIt}</Handwritten>
       <Icon
         name={wide ? "ArrowRight" : "ArrowDownRight"}
@@ -30,21 +30,55 @@ function TryIt({ wide }: { wide: boolean }) {
   );
 }
 
-/** A way to pay, placed on the stage; its spark travels to the phone along `/stage.svg`. */
-function StageNode({
-  icon,
-  label,
-  ...position
+type Percent = `${number}%`;
+
+/**
+ * Places its child on the stage at `top`, in a band from `left` of `width`
+ * (both percentages of the stage), aligned to the band's start or end. Widths
+ * are the one percentage the UI tokens allow, so the band does the placing.
+ */
+function Placed({
+  top,
+  left = "0%",
+  width = "100%",
+  align = "start",
+  children,
 }: {
-  icon: IconName;
-  label: string;
-  left?: number | undefined;
-  right?: number | undefined;
-  top?: number | undefined;
-  bottom?: number | undefined;
+  top: Percent;
+  left?: Percent | undefined;
+  width?: Percent | undefined;
+  align?: "start" | "end" | undefined;
+  children: ReactNode;
 }) {
   return (
-    <Stack position="absolute" zIndex="$raised" gap="$none" {...position}>
+    <Stack
+      position="absolute"
+      top={0}
+      left={0}
+      right={0}
+      bottom={0}
+      gap="$none"
+      pointerEvents="box-none"
+    >
+      <Stack height={top} />
+      <Row gap="$none" alignItems="flex-start" pointerEvents="box-none">
+        <Stack width={left} />
+        <Row
+          width={width}
+          justifyContent={align === "end" ? "flex-end" : "flex-start"}
+          pointerEvents="box-none"
+        >
+          {children}
+        </Row>
+      </Row>
+    </Stack>
+  );
+}
+
+/** A way to pay, placed on the stage; its spark travels to the phone along `/stage.svg`. */
+function StageNode({ icon, label }: { icon: IconName; label: string }) {
+  return (
+    <Stack zIndex="$raised" gap="$none">
       <Pill
         label={label}
         leading={<Icon name={icon} size="sm" color="$accentText" />}
@@ -56,19 +90,18 @@ function StageNode({
 /**
  * The phone with the ways to pay around it: bank transfer and Bitcoin, each
  * sending a spark of light under the phone, like Payky's landing page. The
- * sparks and their dashed paths are an animated SVG stretched over the stage,
- * so the node positions below match its `viewBox` percentages.
+ * sparks and their dashed paths are an animated SVG drawn in a 600×820 box;
+ * the stage keeps that aspect ratio and places everything in percentages of
+ * it, so the paths meet the labels and the phone at every width.
  */
-function Stage({ wide }: { wide: boolean }) {
-  const phoneWidth = wide ? 340 : 320;
+function Stage() {
+  const { hero, demo } = useCopy();
   return (
     <Stack
       position="relative"
       width="100%"
-      maxWidth={wide ? 600 : 420}
-      alignItems="center"
-      paddingTop={wide ? "$xxxl" : "$huge"}
-      paddingBottom="$xxxl"
+      maxWidth={600}
+      aspectRatio={600 / 820}
       gap="$none"
     >
       <Glow />
@@ -82,35 +115,27 @@ function Stage({ wide }: { wide: boolean }) {
         width="100%"
         height="100%"
       />
-      <Stack
-        position="absolute"
-        top={wide ? "$xl" : "$sm"}
-        left={wide ? "$none" : "$md"}
-        gap="$none"
-      >
-        <TryIt wide={wide} />
-      </Stack>
-      <StageNode
-        icon="Landmark"
-        label={hero.stage.bank}
-        left={0}
-        bottom={wide ? 140 : 120}
-      />
-      <StageNode
-        icon="Bitcoin"
-        label={hero.stage.bitcoin}
-        right={0}
-        top={wide ? 300 : 280}
-      />
-      <DemoApp
-        accessibilityLabel={copy.demo.labels.terminal}
-        maxWidth={phoneWidth}
-      />
+      <Placed top="7%" left="23%" width="54%">
+        <Stack width="100%" gap="$none">
+          <DemoApp accessibilityLabel={demo.labels.terminal} maxWidth={324} />
+        </Stack>
+      </Placed>
+      {/* Ends where the phone starts and runs out to the left as far as it needs. */}
+      <Placed top="17%" width="21%" align="end">
+        <TryIt wide />
+      </Placed>
+      <Placed top="82%">
+        <StageNode icon="Landmark" label={hero.stage.bank} />
+      </Placed>
+      <Placed top="36%" align="end">
+        <StageNode icon="Bitcoin" label={hero.stage.bitcoin} />
+      </Placed>
     </Stack>
   );
 }
 
 export function Hero() {
+  const { hero, demo } = useCopy();
   const { wide } = useMedia();
   const Columns = wide ? Row : Stack;
   const titleVariant = wide ? "headline" : "display";
@@ -174,12 +199,20 @@ export function Hero() {
         flex={wide ? 1 : undefined}
         flexBasis={wide ? 0 : undefined}
         width="100%"
+        position="relative"
         alignItems="center"
         gap="$none"
         transition={["slow", { delay: 150 }]}
         enterStyle={{ opacity: 0, y: 40 }}
       >
-        <Stage wide={wide} />
+        {wide ? (
+          <Stage />
+        ) : (
+          <Stack width="100%" maxWidth={360} gap="$sm">
+            <TryIt wide={false} />
+            <DemoApp accessibilityLabel={demo.labels.terminal} maxWidth={360} />
+          </Stack>
+        )}
       </Stack>
     </Columns>
   );

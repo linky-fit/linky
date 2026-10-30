@@ -1,13 +1,12 @@
 import { Row, Stack, Text, useMedia } from "@linky-fit/ui";
 import { useEffect, useRef, useState } from "react";
-import { copy } from "../copy";
 import type { Step, StoryScreenKey } from "../copy";
 import { PhoneFrame } from "../demo/chrome";
-import { storyLabels, storyScreen } from "../demo/story";
+import { StoryScreen } from "../demo/story";
+import { useStoryLabels } from "../demo/storyLabels";
+import { useCopy } from "../locale";
 import { Glow, Reveal, SectionHeading, SiteSection } from "./parts";
 import { sectionIds } from "./sectionIds";
-
-const { steps } = copy;
 
 const stepNumber = (index: number) => String(index + 1).padStart(2, "0");
 
@@ -37,8 +36,9 @@ function StoryPhone({
   active: StoryScreenKey;
   maxWidth: number;
 }) {
+  const labels = useStoryLabels();
   return (
-    <PhoneFrame accessibilityLabel={storyLabels[active]} maxWidth={maxWidth}>
+    <PhoneFrame accessibilityLabel={labels[active]} maxWidth={maxWidth}>
       {screens.map((key) => (
         <Stack
           key={key}
@@ -52,7 +52,7 @@ function StoryPhone({
           scale={key === active ? 1 : 1.04}
           transition="slow"
         >
-          {storyScreen(key)}
+          <StoryScreen screen={key} />
         </Stack>
       ))}
     </PhoneFrame>
@@ -82,10 +82,10 @@ function useActiveStep(first: StoryScreenKey) {
   return { register, active };
 }
 
-const screens = steps.items.map((step) => step.screen);
-
 /** The steps scroll past one phone that stays put and turns to each step's screen. */
 function StickyStory() {
+  const { steps } = useCopy();
+  const screens = steps.items.map((step) => step.screen);
   const { register, active } = useActiveStep("amount");
   return (
     <Row alignItems="flex-start" gap="$huge">
@@ -133,6 +133,7 @@ function StickyStory() {
 
 /** On phones every step has its own phone below its text. */
 function StackedStory() {
+  const { steps } = useCopy();
   return (
     <Stack gap="$huge">
       {steps.items.map((step, index) => (
@@ -155,6 +156,7 @@ function StackedStory() {
 }
 
 export function Steps() {
+  const { steps } = useCopy();
   const { wide } = useMedia();
   return (
     <SiteSection id={sectionIds.steps}>

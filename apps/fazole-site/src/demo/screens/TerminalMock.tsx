@@ -11,7 +11,8 @@ import {
 } from "@linky-fit/ui";
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { copy } from "../../copy";
+import type { DemoCopy } from "../../copy";
+import { useCopy } from "../../locale";
 import { DemoScreen, Page } from "../chrome";
 import {
   formatTyped,
@@ -24,13 +25,11 @@ import type { TipChoice } from "../money";
 import { czk } from "../labels";
 import { useDemo } from "../store";
 
-const t = copy.demo;
-
-const keypadLabels = {
+const keypadLabels = (t: DemoCopy) => ({
   clear: t.terminal.keypadClear,
   decimal: t.terminal.keypadDecimal,
   delete: t.terminal.keypadDelete,
-};
+});
 
 /** Where a terminal opens: empty, or with an amount on the tip step. */
 export interface TerminalStart {
@@ -51,6 +50,7 @@ export function TerminalMock({
   onOpenPayment: (id: string) => void;
   onOpenSections: () => void;
 }) {
+  const t = useCopy().demo;
   const { requestPayment, offerTips } = useDemo();
   const [input, setInput] = useState(start.input);
   const [tipping, setTipping] = useState(start.tipping);
@@ -88,7 +88,7 @@ export function TerminalMock({
         <Keypad
           accessibilityLabel={t.terminal.amount}
           decimal
-          labels={keypadLabels}
+          labels={keypadLabels(t)}
           onKeyPress={(key) => setInput((current) => pressKey(current, key))}
         />
         <Button
@@ -118,15 +118,15 @@ const tileRows = tiles.flatMap((_tile, index) =>
   index % 2 === 0 ? [tiles.slice(index, index + 2)] : [],
 );
 
-const choiceLabel = (choice: TipChoice): string =>
+const choiceLabel = (t: DemoCopy, choice: TipChoice): string =>
   choice.kind === "percent"
     ? t.tips.percent(choice.percent)
     : choice.kind === "fixed"
       ? t.tips.fixed(String(choice.tipHalere / 100))
       : t.tips.none;
 
-const tileLabel = (tile: Tile): string =>
-  tile.kind === "custom" ? t.tips.custom : choiceLabel(tile.choice);
+const tileLabel = (t: DemoCopy, tile: Tile): string =>
+  tile.kind === "custom" ? t.tips.custom : choiceLabel(t, tile.choice);
 
 /** "Chcete přidat spropitné?": presets with the total each charges, a custom tip, or none. */
 function TipStep({
@@ -138,8 +138,10 @@ function TipStep({
   onChoose: (choice: TipChoice) => void;
   onBack: () => void;
 }) {
+  const t = useCopy().demo;
   const [custom, setCustom] = useState<string | null>(null);
-  const total = (choice: TipChoice) => czk(withTip(base, choice).totalHalere);
+  const total = (choice: TipChoice) =>
+    czk(t, withTip(base, choice).totalHalere);
 
   if (custom !== null) {
     const tip = typedHalere(custom);
@@ -168,7 +170,7 @@ function TipStep({
           <Keypad
             accessibilityLabel={t.tips.custom}
             decimal
-            labels={keypadLabels}
+            labels={keypadLabels(t)}
             onKeyPress={(key) =>
               setCustom((current) => pressKey(current ?? "", key))
             }
@@ -201,18 +203,22 @@ function TipStep({
             {t.tips.title}
           </Text>
           <Text color="$colorMuted" textAlign="center">
-            {t.tips.base(czk(base))}
+            {t.tips.base(czk(t, base))}
           </Text>
         </Stack>
         <Stack gap="$md">
           {tileRows.map((row) => (
-            <Row key={row.map(tileLabel).join()} gap="$md" alignItems="stretch">
+            <Row
+              key={row.map((tile) => tileLabel(t, tile)).join()}
+              gap="$md"
+              alignItems="stretch"
+            >
               {row.map((tile) => (
                 <OptionTile
-                  key={tileLabel(tile)}
+                  key={tileLabel(t, tile)}
                   flex={1}
                   minHeight="$row"
-                  label={tileLabel(tile)}
+                  label={tileLabel(t, tile)}
                   onPress={() =>
                     tile.kind === "custom"
                       ? setCustom("")

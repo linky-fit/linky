@@ -1,9 +1,10 @@
 import { Button, Card, Row, Stack, Text, useMedia } from "@linky-fit/ui";
 import { siteConfig } from "../config";
-import { copy } from "../copy";
+import { useCopy } from "../locale";
 import { Glow, Logo, Reveal, Wordmark } from "./parts";
 
 export function Closing() {
+  const copy = useCopy();
   const { wide } = useMedia();
   return (
     <Stack render="section" paddingVertical="$huge">
@@ -66,7 +67,42 @@ function FooterLink({ href, label }: { href: string; label: string }) {
   );
 }
 
+/** Who took the merchants' photos, as their Creative Commons licences ask. */
+function PhotoCredits() {
+  const copy = useCopy();
+  return (
+    <Row
+      width="100%"
+      maxWidth="$appWidth"
+      alignSelf="center"
+      flexWrap="wrap"
+      gap="$xs"
+      paddingHorizontal="$xl"
+      paddingBottom="$xl"
+    >
+      <Text variant="caption" color="$colorMuted">
+        {copy.stories.photos}:
+      </Text>
+      {copy.stories.credits.map((credit, index) => (
+        <Text
+          key={credit.url}
+          render={
+            <a href={credit.url} target="_blank" rel="noopener noreferrer" />
+          }
+          variant="caption"
+          color="$colorMuted"
+          hoverStyle={{ color: "$colorStrong" }}
+        >
+          {credit.author} ({credit.license})
+          {index < copy.stories.credits.length - 1 ? "," : ""}
+        </Text>
+      ))}
+    </Row>
+  );
+}
+
 export function SiteFooter() {
+  const copy = useCopy();
   return (
     <Stack render="footer" gap="$none" backgroundColor="$surface">
       <Row
@@ -93,6 +129,7 @@ export function SiteFooter() {
           <FooterLink href={siteConfig.githubUrl} label={copy.footer.github} />
         </Row>
       </Row>
+      <PhotoCredits />
     </Stack>
   );
 }

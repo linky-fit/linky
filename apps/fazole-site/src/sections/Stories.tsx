@@ -1,10 +1,8 @@
 import { Card, Image, Row, Stack, Text, useMedia } from "@linky-fit/ui";
-import { copy } from "../copy";
 import type { Story } from "../copy";
+import { useCopy } from "../locale";
 import { Reveal, SectionHeading, SiteSection } from "./parts";
 import { sectionIds } from "./sectionIds";
-
-const { stories } = copy;
 
 /** A merchant's photo with what they say about Fazole. */
 function StoryCard({ story, wide }: { story: Story; wide: boolean }) {
@@ -36,6 +34,7 @@ function StoryCard({ story, wide }: { story: Story; wide: boolean }) {
 }
 
 export function Stories() {
+  const { stories } = useCopy();
   const { wide } = useMedia();
   const Columns = wide ? Row : Stack;
   return (

@@ -13,7 +13,7 @@ import {
 } from "@linky-fit/ui";
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { copy } from "../copy";
+import { useCopy } from "../locale";
 
 // Screens are laid out at a real phone's CSS size, then scaled to the frame.
 const screen = { width: 390, height: 844 };
@@ -189,6 +189,7 @@ export function DemoSheet({
   dialog?: boolean | undefined;
   children: ReactNode;
 }) {
+  const t = useCopy().demo;
   if (!open) return null;
   return (
     <Stack
@@ -244,7 +245,7 @@ export function DemoSheet({
             <IconButton
               icon="X"
               size="sm"
-              accessibilityLabel={copy.demo.close}
+              accessibilityLabel={t.close}
               onPress={onClose}
             />
           ) : null}

@@ -1,7 +1,7 @@
 import { PaymentBanner, Stack, TabBar } from "@linky-fit/ui";
 import type { NavItem } from "@linky-fit/ui";
 import { useCallback, useEffect, useState } from "react";
-import { copy } from "../copy";
+import { useCopy } from "../locale";
 import { PhoneFrame } from "./chrome";
 import { formatCrowns } from "./money";
 import { HistoryMock } from "./screens/HistoryMock";
@@ -16,17 +16,8 @@ type Section = "terminal" | "history" | "wallet" | "settings";
 
 type Route = { section: Section } | { paymentId: string };
 
-const t = copy.demo;
-
 /** How long the paid banner stays over the terminal, like the app's. */
 export const PAID_BANNER_MS = 3_000;
-
-const navItems: NavItem<Section>[] = [
-  { value: "terminal", label: t.sections.terminal, icon: "QrCode" },
-  { value: "history", label: t.sections.history, icon: "History" },
-  { value: "wallet", label: t.sections.wallet, icon: "Bitcoin" },
-  { value: "settings", label: t.sections.settings, icon: "Settings" },
-];
 
 const emptyTerminal: TerminalStart = { input: "", tipping: false };
 
@@ -38,6 +29,13 @@ export function DemoApp({
   accessibilityLabel: string;
   maxWidth: number;
 }) {
+  const t = useCopy().demo;
+  const navItems: NavItem<Section>[] = [
+    { value: "terminal", label: t.sections.terminal, icon: "QrCode" },
+    { value: "history", label: t.sections.history, icon: "History" },
+    { value: "wallet", label: t.sections.wallet, icon: "Bitcoin" },
+    { value: "settings", label: t.sections.settings, icon: "Settings" },
+  ];
   const [route, setRoute] = useState<Route>({ section: "terminal" });
   const [paid, setPaid] = useState<DemoPayment | null>(null);
   useEffect(() => {

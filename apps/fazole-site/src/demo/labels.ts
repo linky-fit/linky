@@ -1,9 +1,7 @@
 import type { IconName, Tone } from "@linky-fit/ui";
-import { copy } from "../copy";
+import type { DemoCopy } from "../copy";
 import { formatCrowns, formatDay } from "./money";
 import type { DemoPayment, PaymentMethod, PaymentStatus } from "./store";
-
-const t = copy.demo;
 
 export const statusTones: Record<PaymentStatus, Tone> = {
   pending: "warning",
@@ -21,11 +19,11 @@ export const paymentIcon = (payment: DemoPayment): IconName =>
   payment.method === null ? "QrCode" : methodIcons[payment.method];
 
 /** How a payment was paid, or that it was shown as a QR code while nobody paid it. */
-export const methodLabel = (payment: DemoPayment): string =>
+export const methodLabel = (t: DemoCopy, payment: DemoPayment): string =>
   payment.method === null ? t.history.qrShown : t.methods[payment.method];
 
 /** "1 250 Kč", the way the app writes an amount. */
-export const czk = (halere: number): string =>
+export const czk = (t: DemoCopy, halere: number): string =>
   t.czkAmount(formatCrowns(halere));
 
 const startOfDay = (date: Date) => new Date(date).setHours(0, 0, 0, 0);
@@ -51,7 +49,7 @@ export const groupByDay = (payments: readonly DemoPayment[]) => {
 };
 
 /** "Dnes", "Včera" or the date, like the app's history headings. */
-export const dayTitle = (startMs: number, now: Date): string => {
+export const dayTitle = (t: DemoCopy, startMs: number, now: Date): string => {
   const today = startOfDay(now);
   const yesterday = new Date(today).setDate(new Date(today).getDate() - 1);
   if (startMs === today) return t.history.today;

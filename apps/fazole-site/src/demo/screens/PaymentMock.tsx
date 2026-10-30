@@ -15,7 +15,7 @@ import {
   TopBar,
 } from "@linky-fit/ui";
 import { useEffect, useState } from "react";
-import { copy } from "../../copy";
+import { useCopy } from "../../locale";
 import { bitcoinQrValue, prepareBitcoinLeg } from "../bitcoin";
 import { DemoScreen, DetailRows, Page } from "../chrome";
 import { czk } from "../labels";
@@ -24,19 +24,18 @@ import { demoAccount, demoSpd } from "../qr";
 import { useDemo } from "../store";
 import type { DemoPayment } from "../store";
 
-const t = copy.demo;
-
 const COPIED_MS = 2_000;
 
 export type Leg = "bank" | "bitcoin";
 
 function BankLeg({ payment }: { payment: DemoPayment }) {
+  const t = useCopy().demo;
   return (
     <>
       <Stack alignItems="center" gap="$lg">
         <QRCode
           badge="Landmark"
-          accessibilityLabel={t.payment.bankQr(czk(payment.amountHalere))}
+          accessibilityLabel={t.payment.bankQr(czk(t, payment.amountHalere))}
           value={demoSpd(payment.amountHalere, payment.vs, t.shopName)}
         />
         <Amount
@@ -104,6 +103,7 @@ const useBitcoinLeg = (payment: DemoPayment) => {
 };
 
 function Preparing() {
+  const t = useCopy().demo;
   return (
     <Stack
       alignItems="center"
@@ -119,6 +119,7 @@ function Preparing() {
 
 /** A real, payable Bitcoin QR code: a Lightning invoice and a Cashu request for the support account. */
 function BitcoinLeg({ payment }: { payment: DemoPayment }) {
+  const t = useCopy().demo;
   const { czkPerBtc, rateFailed, refreshRate } = useDemo();
   const { failed, retry } = useBitcoinLeg(payment);
   const [copied, setCopied] = useState(false);
@@ -158,7 +159,7 @@ function BitcoinLeg({ payment }: { payment: DemoPayment }) {
     <>
       <Stack alignItems="center">
         <QRCode
-          accessibilityLabel={t.payment.bitcoinQr(czk(payment.amountHalere))}
+          accessibilityLabel={t.payment.bitcoinQr(czk(t, payment.amountHalere))}
           value={link}
         />
       </Stack>
@@ -212,6 +213,7 @@ export function OpenPaymentView({
   onCancel: () => void;
   onClose: () => void;
 }) {
+  const t = useCopy().demo;
   return (
     <DemoScreen>
       <TopBar
