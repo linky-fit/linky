@@ -46,7 +46,7 @@ interface Task {
   done: boolean;
 }
 
-// The web app's Tutorial page in its order, without the experimental beacon.
+// The web app's Tutorial page in its order, without the Android-only beacon.
 const tasks: Task[] = [
   { icon: "UserPlus", title: "Add contact", done: true },
   { icon: "MessageCircleMore", title: "Send a message", done: true },

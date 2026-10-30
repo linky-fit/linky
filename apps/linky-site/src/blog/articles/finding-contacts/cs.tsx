@@ -124,10 +124,8 @@ export function Body() {
       </Paragraph>
       <Paragraph>
         Maják zapnete v záložce <Term>Proxy platby</Term> v sekci{" "}
-        <Term>V okolí</Term>. Zatím je to experimentální funkce v aplikaci pro
-        Android, takže ji nejdřív musíte povolit v <Term>Nastavení</Term> v
-        sekci <Term>Debug</Term>. Potřebuje Bluetooth a dokud běží, ukazuje
-        notifikaci, abyste věděli, že vysíláte.
+        <Term>V okolí</Term>. Je dostupný v aplikaci pro Android. Potřebuje
+        Bluetooth a dokud běží, ukazuje notifikaci, abyste věděli, že vysíláte.
       </Paragraph>
       <FigureRow>
         <ScreenshotFigure

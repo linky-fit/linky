@@ -22,6 +22,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - Payments report their progress in a small banner at the top of the screen instead of covering it, so you can keep typing while a payment is sent or arrives.
 - Recurring payments go out at their due time without a countdown.
 - Paying a Lightning invoice shows the fee estimate before you confirm, and Lightning address payments show it under the amount.
+- On-chain bitcoin transfers and the Bluetooth beacon for nearby contacts are available to everyone; they no longer need the experimental features switch.
 
 ### cs-CZ
 
@@ -31,6 +32,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - Platby hlásí průběh v malém proužku nahoře místo překrytí celé obrazovky, takže můžete dál psát, zatímco platba odchází nebo přichází.
 - Pravidelné platby odcházejí v termínu bez odpočtu.
 - Platba Lightning faktury ukáže odhad poplatku před potvrzením a platby na Lightning adresu ho ukážou pod částkou.
+- On-chain bitcoinové převody a Bluetooth maják pro kontakty v okolí jsou dostupné všem; už nevyžadují zapnuté experimentální funkce.
 
 ## [26.10.8] - 2026-10-24
 
