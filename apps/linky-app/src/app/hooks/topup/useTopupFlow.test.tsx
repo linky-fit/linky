@@ -226,6 +226,7 @@ describe("useTopupFlow", () => {
         amount: 21,
         direction: "in",
         method: "lightning_invoice",
+        paymentType: "topup",
         mint: MINT_URL,
         status: "ok",
       }),

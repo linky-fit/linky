@@ -573,6 +573,7 @@ export const useCashuPaymentRequests = ({
         method: "cashu_chat",
         mint: requestMints[0] ?? null,
         note,
+        paymentType: "request_sent",
         status: "ok",
         transactionId: transactionIdForRequest(requestId),
         unit: "sat",

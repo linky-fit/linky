@@ -61,7 +61,7 @@ interface PaymentEventFields {
   mint?: string | null;
   /** The payment's note: bolt11 description, token memo, LNURL comment or request description. */
   note?: string | null;
-  /** What kind of payment went out; left out for receives, restores and top-ups. */
+  /** What kind of payment this is, on either direction. */
   paymentType?: PaymentTelemetryPaymentType | null;
   phase?: PaymentTelemetryPhase | null;
   unit?: string | null;

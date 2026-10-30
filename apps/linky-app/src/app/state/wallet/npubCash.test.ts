@@ -396,6 +396,7 @@ describe("npub.cash claim", () => {
     expect(logPaymentEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         direction: "in",
+        paymentType: "received_lightning",
         phase: "receive",
         status: "ok",
       }),

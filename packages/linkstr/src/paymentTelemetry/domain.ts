@@ -35,9 +35,13 @@ export const PaymentTelemetryPhase = Schema.Literals([
 export type PaymentTelemetryPhase = typeof PaymentTelemetryPhase.Type;
 
 /**
- * What kind of payment went out: to a contact, a Lightning invoice or
- * address outside a contact, the sats of a proxy payment, a run of a
- * recurring payment, or a paid payment request. Receives have none.
+ * What kind of payment the report is about. Outgoing: to a contact, a
+ * Lightning invoice or address outside a contact, the sats of a proxy
+ * payment, a run of a recurring payment, a paid payment request, or a token
+ * issued for sharing. Incoming: a token from a contact, a token paying the
+ * user's own payment request, a token accepted outside a contact, sats to
+ * the user's Lightning address, a top-up over Lightning, a restore, or a
+ * payment request the user sent out.
  */
 export const PaymentTelemetryPaymentType = Schema.Literals([
   "contact",
@@ -45,6 +49,14 @@ export const PaymentTelemetryPaymentType = Schema.Literals([
   "proxy",
   "recurring",
   "request",
+  "issue",
+  "received_contact",
+  "received_request",
+  "received_token",
+  "received_lightning",
+  "topup",
+  "restore",
+  "request_sent",
 ]);
 export type PaymentTelemetryPaymentType =
   typeof PaymentTelemetryPaymentType.Type;

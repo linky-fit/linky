@@ -157,6 +157,7 @@ describe("useSaveCashuFromText", () => {
     });
     expect(logPaymentEvent).toHaveBeenCalledWith(
       expect.objectContaining({
+        paymentType: "received_token",
         status: "ok",
         transactionId: transactionIdForOperation(transfer.id),
       }),
@@ -184,9 +185,36 @@ describe("useSaveCashuFromText", () => {
         amount: 20,
         details: expect.objectContaining({ requestId: "request-1" }),
         direction: "in",
+        paymentType: "received_request",
         method: "cashu_receive",
         status: "ok",
         unit: transfer.unit,
+      }),
+    );
+  });
+
+  it("classifies a token from a contact's chat as received from that contact", async () => {
+    const transfer = receiveTransfer("pending");
+    const { save, logPaymentEvent } = await setup(async () =>
+      Result.succeed(
+        new ReceiveReceipt({
+          operationId: transfer.id,
+          tokenText: transfer.tokenText,
+          mint: transfer.mint,
+          unit: transfer.unit,
+          amount: transfer.amount,
+        }),
+      ),
+    );
+
+    await save(transfer.tokenText, { automatic: true, contactId: "contact-1" });
+
+    expect(logPaymentEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contactId: "contact-1",
+        direction: "in",
+        paymentType: "received_contact",
+        status: "ok",
       }),
     );
   });

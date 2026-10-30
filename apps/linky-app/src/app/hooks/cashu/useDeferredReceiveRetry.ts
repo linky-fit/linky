@@ -84,6 +84,7 @@ export const useDeferredReceiveRetry = ({
           unit: receipt.unit,
           error: null,
           method: "cashu_receive",
+          paymentType: "received_token",
           phase: "receive",
         });
       }

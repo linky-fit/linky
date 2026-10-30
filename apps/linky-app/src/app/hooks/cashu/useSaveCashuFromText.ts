@@ -10,7 +10,10 @@ import { parseTokenText } from "@linky-fit/linkshu";
 import { navigateTo } from "../../../hooks/useRouting";
 import type { DisplayAmountParts } from "../../../utils/displayAmounts";
 import { getUnknownErrorMessage } from "../../../utils/unknown";
-import type { LoggedPaymentEventParams } from "../../types/appTypes";
+import type {
+  LoggedPaymentEventParams,
+  PaymentTelemetryPaymentType,
+} from "../../types/appTypes";
 import {
   describeTaggedCashuError,
   isTransientCashuErrorTag,
@@ -141,6 +144,11 @@ export const useSaveCashuFromText = ({
         ...(unknownContactId ? { unknownContactId } : {}),
         ...(options?.requestId ? { requestId: options.requestId } : {}),
       };
+      const paymentType: PaymentTelemetryPaymentType = options?.requestId
+        ? "received_request"
+        : optionContactId
+          ? "received_contact"
+          : "received_token";
       const logFailure = (message: string): void => {
         logPaymentEvent({
           direction: "in",
@@ -153,6 +161,7 @@ export const useSaveCashuFromText = ({
           unit: null,
           error: message,
           method: "cashu_receive",
+          paymentType,
           phase: "receive",
         });
       };
@@ -230,6 +239,7 @@ export const useSaveCashuFromText = ({
             unit: receipt.unit,
             error: null,
             method: "cashu_receive",
+            paymentType,
             phase: "receive",
           });
 
