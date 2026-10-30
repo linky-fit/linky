@@ -1,4 +1,5 @@
 import type { IconName } from "@linky-fit/ui";
+import type { SiteLocale } from "./sitePreferences";
 
 export interface Point {
   readonly icon: IconName;
@@ -15,6 +16,13 @@ export interface Step {
   readonly screen: StoryScreenKey;
 }
 
+/** Who took a story's photo, as its Creative Commons licence asks. */
+export interface Credit {
+  readonly author: string;
+  readonly license: string;
+  readonly url: string;
+}
+
 export interface Story {
   readonly role: string;
   readonly quote: string;
@@ -22,11 +30,15 @@ export interface Story {
   readonly alt: string;
 }
 
-/** Every string on the site; it is Czech only. */
-export const copy = {
+const cs = {
   nav: {
     home: "Fazole, úvod",
     openApp: "Spustit",
+    language: "Jazyk",
+    languages: { cs: "Čeština", en: "English" } satisfies Record<
+      SiteLocale,
+      string
+    >,
   },
   hero: {
     titleBefore: "Terminál, který patří ",
@@ -51,22 +63,40 @@ export const copy = {
       {
         role: "Truhlář",
         quote: "Peníze okamžitě na účet.",
-        image: "/stories/truhlar.svg",
-        alt: "Truhlářská dílna",
+        image: "/stories/truhlar.jpg",
+        alt: "Truhlář u pracovního stolu ve své dílně",
       },
       {
         role: "Květinářství",
         quote: "Když někdo nemá hotovost.",
-        image: "/stories/kvetinarstvi.svg",
-        alt: "Květinářství",
+        image: "/stories/kvetinarstvi.jpg",
+        alt: "Květinářka s kyticí ve svém obchodě",
       },
       {
         role: "Restaurace",
         quote: "Šetříme na poplatcích.",
-        image: "/stories/restaurace.svg",
-        alt: "Prostřený stůl v restauraci",
+        image: "/stories/restaurace.jpg",
+        alt: "Číšník nese tác s pitím",
       },
     ] satisfies Story[],
+    photos: "Fotografie",
+    credits: [
+      {
+        author: "Jorge Royan",
+        license: "CC BY-SA 3.0",
+        url: "https://commons.wikimedia.org/wiki/File:Paris_-_Carpenter_workshop_-_4980.jpg",
+      },
+      {
+        author: "direct2Florist",
+        license: "CC BY 2.0",
+        url: "https://commons.wikimedia.org/wiki/File:Florist_working_in_flower_shop.jpg",
+      },
+      {
+        author: "Florian Plag",
+        license: "CC BY 2.0",
+        url: "https://commons.wikimedia.org/wiki/File:Waiter_in_a_restaurant,_Paris_2011.jpg",
+      },
+    ] satisfies Credit[],
   },
   steps: {
     title: "Jak to funguje",
@@ -297,4 +327,287 @@ export const copy = {
   },
 };
 
-export type SiteCopy = typeof copy;
+export type SiteCopy = typeof cs;
+export type DemoCopy = SiteCopy["demo"];
+
+const en: SiteCopy = {
+  nav: {
+    home: "Fazole, home",
+    openApp: "Start",
+    language: "Language",
+    languages: { cs: "Čeština", en: "English" },
+  },
+  hero: {
+    titleBefore: "A terminal that is ",
+    titleAccent: "yours alone",
+    subtitle:
+      "The customer scans a QR code and pays by bank transfer straight to your account, or in bitcoin. No contract, no sign-up, no terminal. A phone is enough.",
+    primaryCta: "Start",
+    points: [
+      { icon: "Smartphone", label: "Easy" },
+      { icon: "Coins", label: "Free" },
+      { icon: "KeyRound", label: "Yours" },
+    ],
+    tryIt: "Try it",
+    stage: {
+      bank: "Bank transfer",
+      bitcoin: "Bitcoin",
+    },
+  },
+  stories: {
+    title: "Fazole grows to fit you",
+    items: [
+      {
+        role: "Carpenter",
+        quote: "Money straight to my account, at once.",
+        image: "/stories/truhlar.jpg",
+        alt: "A carpenter at the bench in his workshop",
+      },
+      {
+        role: "Flower shop",
+        quote: "For when someone has no cash.",
+        image: "/stories/kvetinarstvi.jpg",
+        alt: "A florist holding a bouquet in her shop",
+      },
+      {
+        role: "Restaurant",
+        quote: "We save on fees.",
+        image: "/stories/restaurace.jpg",
+        alt: "A waiter carrying a tray of drinks",
+      },
+    ],
+    photos: "Photos",
+    credits: cs.stories.credits,
+  },
+  steps: {
+    title: "How it works",
+    items: [
+      {
+        title: "Enter the amount",
+        body: "Type what it comes to. The customer can add a tip.",
+        screen: "amount",
+      },
+      {
+        title: "The customer scans and pays",
+        body: "With a banking app, or a bitcoin wallet. Both from one QR code.",
+        screen: "qr",
+      },
+      {
+        title: "The money lands in your account",
+        body: "Straight from the customer's bank to yours, with nobody in between. With a MONETA account you learn of the payment at once.",
+        screen: "paid",
+      },
+    ],
+  },
+  why: {
+    title: "Your money, your data",
+    points: [
+      {
+        icon: "KeyRound",
+        title: "The data is yours alone",
+        body: "We know nothing about you. Takings and history stay on your phone.",
+      },
+      {
+        icon: "Landmark",
+        title: "Money goes straight to your account, at once",
+        body: "Nobody holds it on the way and you never wait for a payout.",
+      },
+      {
+        icon: "Coins",
+        title: "We are starting out, everything is free",
+        body: "No monthly fee and no cut of your payments.",
+      },
+      {
+        icon: "Bitcoin",
+        title: "Why take bitcoin too?",
+        body: "One more way to protect your privacy and savings. It also brings a few new customers. You need not carry the exchange risk: instead of bitcoin you can take cash.",
+      },
+    ],
+  },
+  closing: {
+    title: "Start taking payments today",
+    body: "Start the app, name your shop and you are ready.",
+  },
+  contact: {
+    title: "Write to us",
+    body: "Leave us an email or a phone number and we will get back to you.",
+    channel: "How should we reach you?",
+    email: "Email",
+    phone: "Phone",
+    emailLabel: "Your email",
+    phoneLabel: "Your phone number",
+    emailInvalid: "Enter a valid email.",
+    phoneInvalid: "Enter a phone number.",
+    message: "Message",
+    messagePlaceholder: "What would you like to ask, or what are you planning?",
+    submit: "Get in touch",
+    sentTitle: "Thanks, we have it.",
+    sentBody: "We will be in touch soon.",
+    failed: "The message could not be sent. Please try again.",
+    privacy: "We use your details only to get back to you.",
+  },
+  footer: {
+    tagline: "A payment terminal for Czech merchants.",
+    linky: "Linky",
+    github: "GitHub",
+  },
+  demo: {
+    shopName: "Kavárna U Lípy",
+    navigation: "Main sections",
+    sections: {
+      terminal: "Terminal",
+      history: "History",
+      wallet: "Wallet",
+      settings: "Settings",
+    },
+    back: "Back",
+    close: "Close",
+    done: "Done",
+    czk: "CZK",
+    sat: "sat",
+    czkAmount: (amount: string) => `${amount} CZK`,
+    satAmount: (sats: string) => `${sats} sat`,
+    approxCzk: (amount: string) => `≈ ${amount} CZK`,
+    terminal: {
+      amount: "Amount",
+      keypadClear: "Clear",
+      keypadDecimal: ",",
+      keypadDelete: "Delete",
+      request: "Confirm",
+    },
+    tips: {
+      title: "Would you like to add a tip?",
+      base: (amount: string) => `Amount ${amount}`,
+      percent: (percent: number) => `${percent} %`,
+      fixed: (amount: string) => `+${amount} CZK`,
+      custom: "Custom tip",
+      customHint: "Enter an amount",
+      none: "No tip",
+      customTotal: (amount: string) => `Total ${amount}`,
+      confirm: "Confirm",
+    },
+    payment: {
+      title: "Payment",
+      method: "Payment method",
+      bank: "Bank",
+      bitcoin: "Bitcoin",
+      bankQr: (amount: string) => `QR code to pay ${amount} by bank`,
+      bitcoinQr: (amount: string) => `QR code to pay ${amount} in bitcoin`,
+      vs: "Variable symbol",
+      account: "Account",
+      recipient: "Recipient",
+      markPaid: "Paid",
+      cancel: "Cancel payment",
+      paidTitle: "Paid",
+      paidFrom: (name: string) => `From: ${name}`,
+      copyLink: "Copy link",
+      copied: "Link copied",
+      waiting: "Waiting for payment…",
+      sats: "In bitcoin",
+      preparing: "Preparing the QR code…",
+      rateUnavailable: "The bitcoin rate is unavailable",
+      unavailable: "The Bitcoin QR code could not be prepared",
+      unavailableHint: "Try again, or let the customer pay by bank.",
+      retry: "Try again",
+    },
+    methods: { bank: "Bank", lightning: "Bitcoin", cashu: "Bitcoin" },
+    statuses: { pending: "Pending", paid: "Paid", cancelled: "Cancelled" },
+    history: {
+      today: "Today",
+      yesterday: "Yesterday",
+      dayTotal: (amount: string) => `Received ${amount}`,
+      row: (time: string, method: string) => `${time} · ${method}`,
+      tipped: (tip: string) => `incl. ${tip} tip`,
+      amount: "Amount",
+      tip: "Tip",
+      total: "Total",
+      qrShown: "QR code",
+      detail: "Payment detail",
+      method: "Payment method",
+      created: "Created",
+      paidAt: "Paid",
+      showQr: "Show QR code",
+    },
+    wallet: {
+      rateUnavailable: "Rate unavailable",
+      switchUnit: "Switch between CZK and sat",
+      withdraw: "Withdraw",
+      cash: "Cash",
+    },
+    cash: {
+      title: "Cash",
+      contact: "Contact",
+      contactPlaceholder: "name",
+      amount: "Amount",
+      amountInvalid: "Enter an amount in CZK.",
+      continue: "Continue",
+      requested: "Exchange request sent.",
+    },
+    withdraw: {
+      title: "Withdraw from wallet",
+      chooseLinky: "Send to Linky",
+      chooseLinkyDescription: "To a Linky profile, as a message with money.",
+      chooseLightning: "Lightning",
+      chooseLightningDescription: "To a Lightning address or invoice.",
+      linkyRecipient: "Linky profile",
+      linkyRecipientPlaceholder: "npub1…",
+      linkyRecipientHint: "npub, nprofile or a link to a Linky profile",
+      linkyRecipientInvalid: "This is not a Linky profile.",
+      lightningTarget: "Lightning address or invoice",
+      lightningTargetPlaceholder: "name@domain.com",
+      lightningTargetInvalid: "Enter a Lightning address.",
+      paste: "Paste a sample",
+      scan: "Scan a sample QR code",
+      amount: "Amount",
+      amountWhole: "Whole balance, fees deducted",
+      amountInvalid: "Enter a whole number of sats.",
+      insufficient: "The wallet does not hold enough for this and the fee.",
+      available: (sats: string) => `${sats} sat available`,
+      review: "Review",
+      to: "To",
+      receives: "Recipient gets",
+      fee: "Fee at most",
+      total: "Total at most",
+      submit: "Send",
+      sentTitle: "Sent",
+      sentDetail: (sats: string) => `${sats} sat left the wallet.`,
+      linkySentDetail: (sats: string) =>
+        `${sats} sat will arrive in the Linky chat.`,
+    },
+    settings: {
+      shop: "Shop",
+      offerTips: "Offer tips",
+      bitcoinQr: "Bitcoin QR code",
+      bitcoinQrUniversal: "Universal",
+      mint: "Mint",
+      help: "Help",
+      contactSupport: "Contact support",
+      about: "About",
+      language: "Language",
+      languageValue: "English",
+      security: "Security",
+      recoverySeed: "Recovery seed",
+      reset: "Reset this device",
+      version: cs.demo.settings.version,
+    },
+    recoverySeed: {
+      description:
+        "The recovery seed is the only backup of the shop, its history and its wallet. Save it to a password manager or copy it somewhere safe.",
+      warning:
+        "Show the seed to nobody. Whoever knows it has access to the shop.",
+      show: "Show",
+      hide: "Hide",
+      save: "Save to passwords",
+      demoNote: "In the demo these are made-up words.",
+    },
+    labels: {
+      terminal: "Live terminal demo",
+      amountStep: "Terminal with an amount entered",
+      qrStep: "QR code to pay",
+      paidStep: "Terminal with a payment received",
+    },
+  },
+};
+
+/** Every string on the site, by language. */
+export const copy: Record<SiteLocale, SiteCopy> = { cs, en };

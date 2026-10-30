@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import type { Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DemoApp } from "./DemoApp";
+import { LocaleProvider } from "../LocaleProvider";
 import { DemoProvider } from "./DemoProvider";
 
 let root: Root | undefined;
@@ -53,10 +54,12 @@ const renderPhones = async () => {
   await act(async () =>
     root?.render(
       <UIProvider mode="dark" brand="fazole">
-        <DemoProvider>
-          <DemoApp accessibilityLabel="Telefon s terminálem" maxWidth={320} />
-          <DemoApp accessibilityLabel="Telefon s historií" maxWidth={320} />
-        </DemoProvider>
+        <LocaleProvider locale="cs" onLocaleChange={() => {}}>
+          <DemoProvider>
+            <DemoApp accessibilityLabel="Telefon s terminálem" maxWidth={320} />
+            <DemoApp accessibilityLabel="Telefon s historií" maxWidth={320} />
+          </DemoProvider>
+        </LocaleProvider>
       </UIProvider>,
     ),
   );

@@ -80,8 +80,8 @@ export function Handwritten({ children }: { children: string }) {
     <Text
       fontFamily="$handwriting"
       fontWeight="$semibold"
-      fontSize={34}
-      lineHeight={36}
+      fontSize={30}
+      lineHeight={32}
       color="$accent"
     >
       {children}

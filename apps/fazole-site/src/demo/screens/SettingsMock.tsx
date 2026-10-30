@@ -12,12 +12,10 @@ import {
 } from "@linky-fit/ui";
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { copy } from "../../copy";
+import { useCopy } from "../../locale";
 import { DemoScreen, DemoSheet, Page } from "../chrome";
 import { demoAccount } from "../qr";
 import { useDemo } from "../store";
-
-const t = copy.demo;
 
 /** Made-up words in the shape of the app's 20-word recovery seed, never a real one. */
 const demoSeed =
@@ -26,6 +24,7 @@ const demoSeed =
 const MASK = "•••••";
 
 function RecoverySeed() {
+  const t = useCopy().demo;
   const [visible, setVisible] = useState(false);
   const words = demoSeed.split(" ");
   return (
@@ -60,6 +59,7 @@ function RecoverySeed() {
 
 /** The shop's store icon, centered on a row's icon slot so the title lines up with the other rows. */
 function ShopAvatar() {
+  const t = useCopy().demo;
   return (
     <Stack width={size.iconSm} alignItems="center">
       <Avatar name={t.shopName} icon="Store" size="sm" />
@@ -69,6 +69,7 @@ function ShopAvatar() {
 
 /** Settings, like the app's: the shop and its payment options, help, the language, and the recovery seed. */
 export function SettingsMock({ tabBar }: { tabBar: ReactNode }) {
+  const t = useCopy().demo;
   const { offerTips, setOfferTips } = useDemo();
   const [showingSeed, setShowingSeed] = useState(false);
   return (

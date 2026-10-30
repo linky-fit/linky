@@ -13,11 +13,9 @@ import { useState } from "react";
 import { sendContactMessage } from "../contact";
 import { isEmail } from "../contactMessage";
 import type { ContactMessage } from "../contactMessage";
-import { copy } from "../copy";
+import { useCopy } from "../locale";
 import { Reveal, SiteSection } from "./parts";
 import { sectionIds } from "./sectionIds";
-
-const c = copy.contact;
 
 /** Which one of the two the sender gives; the other stays empty. */
 type Channel = "email" | "phone";
@@ -29,6 +27,7 @@ const optional = (value: string): string | undefined =>
 
 /** The one thing the form asks for: a way to reach the sender. Sent as a Nostr chat message to us. */
 export function Contact() {
+  const c = useCopy().contact;
   const { wide } = useMedia();
   const Columns = wide ? Row : Stack;
   const [channel, setChannel] = useState<Channel>("email");

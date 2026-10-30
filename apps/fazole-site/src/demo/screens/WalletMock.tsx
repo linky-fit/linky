@@ -12,13 +12,12 @@ import {
 } from "@linky-fit/ui";
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { copy } from "../../copy";
+import type { DemoCopy } from "../../copy";
+import { useCopy } from "../../locale";
 import { DemoScreen, DemoSheet, DetailRows, Page } from "../chrome";
 import { formatCrowns, formatWhole, satsToHalere } from "../money";
 import { quoteWithdrawal, useDemo } from "../store";
 import type { WithdrawalKind, WithdrawalQuote } from "../store";
-
-const t = copy.demo;
 
 /** Who is asked for cash unless the merchant names someone else, like the app's default. */
 const DEFAULT_CASH_CONTACT = "hynek@linky.fit";
@@ -61,12 +60,8 @@ type Step =
   | { kind: "review"; quote: WithdrawalQuote }
   | { kind: "done"; quote: WithdrawalQuote };
 
-const choiceTitles: Record<WithdrawalKind, string> = {
-  linky: t.withdraw.chooseLinky,
-  lightning: t.withdraw.chooseLightning,
-};
-
-const sats = (value: number) => t.satAmount(formatWhole(value));
+const choiceTitle = (t: DemoCopy, kind: WithdrawalKind) =>
+  kind === "linky" ? t.withdraw.chooseLinky : t.withdraw.chooseLightning;
 
 /** The app's withdraw sheet: Linky or Lightning, the recipient, a review of amount and fee, then send. */
 function WithdrawSheet({
@@ -76,6 +71,8 @@ function WithdrawSheet({
   czkPerBtc: number | null;
   onClose: () => void;
 }) {
+  const t = useCopy().demo;
+  const sats = (value: number) => t.satAmount(formatWhole(value));
   const { balanceSats, withdraw } = useDemo();
   const [step, setStep] = useState<Step>({ kind: "choose" });
   const [target, setTarget] = useState("");
@@ -266,9 +263,9 @@ function WithdrawSheet({
       onClose={onClose}
       title={
         step.kind === "form"
-          ? choiceTitles[step.choice]
+          ? choiceTitle(t, step.choice)
           : step.kind === "review"
-            ? choiceTitles[step.quote.kind]
+            ? choiceTitle(t, step.quote.kind)
             : t.withdraw.title
       }
     >
@@ -290,6 +287,7 @@ function CashSheet({
   czkPerBtc: number | null;
   onClose: () => void;
 }) {
+  const t = useCopy().demo;
   const [contact, setContact] = useState(DEFAULT_CASH_CONTACT);
   const [amountText, setAmountText] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -344,6 +342,7 @@ function CashSheet({
 
 /** The wallet, like the app's: the balance in crowns (a tap shows sats), withdrawing, and cash from a contact. */
 export function WalletMock({ tabBar }: { tabBar: ReactNode }) {
+  const t = useCopy().demo;
   const { balanceSats, czkPerBtc, rateFailed } = useDemo();
   const [sheet, setSheet] = useState<"withdraw" | "cash" | null>(null);
   // Starts in CZK on every visit, so a merchant never lands on sats unexpectedly.
