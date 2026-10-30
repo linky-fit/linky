@@ -12,6 +12,8 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ## [Unreleased]
 
+## [26.10.9] - 2026-10-30
+
 ### en-US
 
 - Payments report their progress in a small banner at the top of the screen instead of covering it, so you can keep typing while a payment is sent or arrives.
