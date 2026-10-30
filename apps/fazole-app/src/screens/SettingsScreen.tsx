@@ -13,26 +13,34 @@ import {
 } from "@linky-fit/ui";
 import { useState } from "react";
 import { copy } from "../copy";
-import { formatCzechIban, type ShopProfile } from "../domain";
+import { formatCzechIban, isMonetaIban, type ShopProfile } from "../domain";
 import { navigateTo } from "../platform/hashRoute";
 import { language, LANGUAGE_NAMES } from "../platform/language";
 import {
   useAppServices,
   useBitcoinQrMode,
   useDevice,
+  useMonetaConnection,
   useOfferTips,
   useSupportChat,
 } from "../services/react";
 import { BITCOIN_QR_MODES } from "../storage/bitcoinQrSetting";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { LanguageDialog } from "./LanguageDialog";
+import { MonetaDialog } from "./MonetaDialog";
 import { Page } from "./Page";
 import { RecoverySeed } from "./RecoverySeed";
 import { ShopFields } from "./ShopFields";
 import { ShopPictureDialog } from "./ShopPictureDialog";
 import { useShopForm } from "./shopForm";
 
-type OpenDialog = "shop" | "bitcoinQr" | "seed" | "reset" | "language";
+type OpenDialog =
+  | "shop"
+  | "moneta"
+  | "bitcoinQr"
+  | "seed"
+  | "reset"
+  | "language";
 
 const versionLabel = __APP_COMMIT_SHA__
   ? `${__APP_VERSION__} (${__APP_COMMIT_SHA__})`
@@ -66,6 +74,10 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
   const offerTips = useOfferTips() ?? true;
   const bitcoinQrMode = useBitcoinQrMode() ?? "universal";
   const supportUnread = useSupportChat()?.unread ?? false;
+  const connection = useMonetaConnection() ?? null;
+  // The bank confirms payments only for a MONETA account; a token for another account no longer counts.
+  const monetaAccount = shop.iban !== null && isMonetaIban(shop.iban);
+  const monetaConnected = connection !== null && connection.iban === shop.iban;
   const [dialog, setDialog] = useState<OpenDialog | null>(null);
   const close = () => setDialog(null);
 
@@ -82,6 +94,19 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
             }
             onPress={() => setDialog("shop")}
           />
+          {monetaAccount ? (
+            <ListRow
+              testID="settings-moneta"
+              icon="ShieldCheck"
+              title={copy.settings.moneta}
+              value={
+                monetaConnected
+                  ? copy.settings.monetaOn
+                  : copy.settings.monetaOff
+              }
+              onPress={() => setDialog("moneta")}
+            />
+          ) : null}
           <ListRow
             testID="settings-tips"
             icon="HandCoins"
@@ -165,7 +190,27 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
       </Text>
 
       {dialog === "shop" ? (
-        <EditShopDialog shop={shop} onClose={close} />
+        <EditShopDialog
+          shop={shop}
+          onClose={close}
+          onSaved={(edited) => {
+            // A MONETA account just entered is offered the bank's confirmation right away.
+            setDialog(
+              edited.iban !== null &&
+                isMonetaIban(edited.iban) &&
+                connection?.iban !== edited.iban
+                ? "moneta"
+                : null,
+            );
+          }}
+        />
+      ) : null}
+      {dialog === "moneta" ? (
+        <MonetaDialog
+          shop={shop}
+          connection={monetaConnected ? connection : null}
+          onClose={close}
+        />
       ) : null}
       <Dialog
         open={dialog === "bitcoinQr"}
@@ -215,9 +260,11 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
 function EditShopDialog({
   shop,
   onClose,
+  onSaved,
 }: {
   readonly shop: ShopProfile;
   readonly onClose: () => void;
+  readonly onSaved: (shop: ShopProfile) => void;
 }) {
   const services = useAppServices();
   const form = useShopForm(shop);
@@ -229,7 +276,7 @@ function EditShopDialog({
     setSaving(true);
     try {
       await services.shop.save(edited);
-      onClose();
+      onSaved(edited);
     } catch (error) {
       console.warn("[fazole] shop not saved", error);
       setSaving(false);

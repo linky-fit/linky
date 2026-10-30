@@ -21,16 +21,20 @@ import {
   buildBitcoinPaymentUri,
   buildSpd,
   formatCzechIban,
+  isMonetaIban,
+  type CzechIban,
   type Payment,
   type ShopProfile,
 } from "../domain";
 import { formatCzkValue } from "../format";
 import { copyText } from "../platform/clipboard";
 import { navigateTo } from "../platform/hashRoute";
+import type { BankWatchState } from "../services/bankPayments";
 import type { BitcoinRequestFailure } from "../services/bitcoinPayments";
 import {
   useAppServices,
   useBitcoinQrMode,
+  useMonetaConnection,
   usePayment,
 } from "../services/react";
 import { showPaidBanner } from "../shell/paidBanner";
@@ -214,6 +218,7 @@ function BankLeg({
           })}
         />
         <Amount value={amount} unit={copy.czk} size="md" />
+        <BankStatus payment={payment} iban={shop.iban} />
       </Stack>
       <Card>
         <DetailRows
@@ -227,6 +232,69 @@ function BankLeg({
         />
       </Card>
     </>
+  );
+}
+
+/** Under a MONETA account's QR: the bank watching for the transfer, or the offer to let it. */
+function BankStatus({
+  payment,
+  iban,
+}: {
+  readonly payment: Payment;
+  readonly iban: CzechIban;
+}) {
+  const connection = useMonetaConnection();
+  if (!isMonetaIban(iban) || connection === undefined) return null;
+  if (connection === null || connection.iban !== iban) {
+    return (
+      <Notice
+        tone="accent"
+        icon="ShieldCheck"
+        title={copy.payment.monetaOfferTitle}
+        description={copy.payment.monetaOfferDescription}
+        action={{
+          label: copy.payment.openSettings,
+          onPress: () => navigateTo("settings"),
+        }}
+      />
+    );
+  }
+  return <BankWatch payment={payment} />;
+}
+
+function BankWatch({ payment }: { readonly payment: Payment }) {
+  const { bankPayments } = useAppServices();
+  const [state, setState] = useState<BankWatchState>("watching");
+  useEffect(
+    () => bankPayments.watch(payment.id, setState),
+    [bankPayments, payment.id],
+  );
+  if (state === "unauthorized") {
+    return (
+      <Notice
+        tone="danger"
+        title={copy.payment.bankTokenInvalid}
+        description={copy.payment.bankTokenInvalidHint}
+        action={{
+          label: copy.payment.openSettings,
+          onPress: () => navigateTo("settings"),
+        }}
+      />
+    );
+  }
+  return state === "unreachable" ? (
+    <Pill
+      testID="payment-bank-unreachable"
+      tone="neutral"
+      label={copy.payment.bankUnreachable}
+    />
+  ) : (
+    <Pill
+      testID="payment-bank-waiting"
+      tone="warning"
+      label={copy.payment.waiting}
+      leading={<Spinner color="$warningText" />}
+    />
   );
 }
 

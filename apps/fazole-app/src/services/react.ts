@@ -24,6 +24,7 @@ import {
 } from "../domain";
 import { shortNpub } from "../format";
 import type { BitcoinQrMode } from "../storage/bitcoinQrSetting";
+import type { MonetaConnection } from "../storage/monetaSetting";
 import type { FazoleRecords } from "../storage/transactions";
 import type { AppServices } from "./appServices";
 import type { Device, Session } from "./device";
@@ -70,6 +71,13 @@ export const useOfferTips = (): boolean | undefined =>
 export const useBitcoinQrMode = (): BitcoinQrMode | undefined =>
   useLiveValue<BitcoinQrMode | undefined>(
     useAppServices().live.bitcoinQrMode,
+    undefined,
+  );
+
+/** The MONETA connection; `undefined` until read, `null` while the shop has none. */
+export const useMonetaConnection = (): MonetaConnection | null | undefined =>
+  useLiveValue<MonetaConnection | null | undefined>(
+    useAppServices().live.moneta,
     undefined,
   );
 

@@ -24,6 +24,11 @@ import {
   type Repositories,
 } from "../storage/repositories";
 import { readPledge } from "../storage/pledgeSetting";
+import {
+  readMonetaConnection,
+  saveMonetaConnection,
+  type MonetaConnection,
+} from "../storage/monetaSetting";
 import { readShop, saveShop } from "../storage/shop";
 import { readOfferTips, saveOfferTips } from "../storage/tipSetting";
 import {
@@ -32,10 +37,12 @@ import {
   type BitcoinQrMode,
 } from "../storage/bitcoinQrSetting";
 import { readFazoleRecords, type FazoleRecords } from "../storage/transactions";
+import { createBankPayments, type BankPayments } from "./bankPayments";
 import {
   createBitcoinPayments,
   type BitcoinRequestFailure,
 } from "./bitcoinPayments";
+import { createMonetaApi } from "./monetaApi";
 import { createNostr, type Nostr, type PayerProfile } from "./nostr";
 import { createPledges, type Pledges } from "./pledges";
 import { uploadToBlossom, type ImageFile } from "./blossom";
@@ -101,6 +108,8 @@ export interface LiveSources {
   /** Whether the terminal offers a tip before the payment. */
   readonly offerTips: LiveSource<boolean>;
   readonly bitcoinQrMode: LiveSource<BitcoinQrMode>;
+  /** The MONETA connection; `null` while the shop has none. */
+  readonly moneta: LiveSource<MonetaConnection | null>;
   readonly records: LiveSource<FazoleRecords>;
   readonly balances: LiveSource<WalletBalances>;
   /** The open pledge; `null` while the merchant owes nobody. */
@@ -121,6 +130,8 @@ export interface AppServices {
   readonly saveOfferTips: (offer: boolean) => Promise<void>;
   readonly saveBitcoinQrMode: (mode: BitcoinQrMode) => Promise<void>;
   readonly payments: Payments;
+  /** Confirms bank QR payments through MONETA's API. */
+  readonly bankPayments: BankPayments;
   readonly history: History;
   readonly payers: Payers;
   readonly withdrawals: Withdrawals;
@@ -142,6 +153,8 @@ export interface ServicePorts {
   readonly fetchRates?:
     | ((signal: AbortSignal) => Promise<FiatRates | null>)
     | undefined;
+  /** Reaches the app's own origin, e.g. the bank relay; the browser's `fetch` unless a test supplies one. */
+  readonly fetch?: typeof fetch | undefined;
   /** Subscribes to the browser coming back online. */
   readonly onOnline?: ((listener: () => void) => () => void) | undefined;
   /** Holds a new release's reload back until the wallet operation settles. */
@@ -198,6 +211,17 @@ export const createAppServices = ({
     whenHydrated: hydrated,
   });
   const withdrawals = createWithdrawals({ ledger, nostr, wallet });
+  const monetaConnection = readMonetaConnection(repositories.settings);
+  const bankPayments = createBankPayments({
+    ledger,
+    api: createMonetaApi(ports.fetch),
+    connection: () => Effect.runPromise(monetaConnection),
+    saveConnection: (connection) =>
+      Effect.runPromise(
+        saveMonetaConnection(repositories.settings, connection),
+      ),
+    shopIban: async () => (await loadShop())?.iban ?? null,
+  });
   const pledges = createPledges({
     ledger,
     settings: repositories.settings,
@@ -263,6 +287,7 @@ export const createAppServices = ({
         settle(id, (payment) => ledger.completePayment(payment, "bank")),
       cancel: (id) => settle(id, ledger.cancelPayment),
     },
+    bankPayments,
     history: { hide: ledger.hideFromHistory },
     payers: {
       profile: (pubkey) => {
@@ -308,6 +333,10 @@ export const createAppServices = ({
         all: readBitcoinQrMode(repositories.settings),
         subscribe: repositories.settings.subscribe,
       },
+      moneta: {
+        all: monetaConnection,
+        subscribe: repositories.settings.subscribe,
+      },
       records: {
         all: readFazoleRecords(repositories.transactions),
         subscribe: repositories.transactions.subscribe,
@@ -351,6 +380,7 @@ export const createAppServices = ({
     dispose: async () => {
       for (const stop of stops.splice(0)) stop();
       pledges.stop();
+      bankPayments.stop();
       await bitcoinPayments.stop();
       await Promise.all([linkstr.dispose(), linkshu.dispose()]);
     },

@@ -59,6 +59,17 @@ const serveSqliteWasm = (): Plugin => ({
   },
 });
 
+// MONETA's API answers no browser directly (no CORS), so the app calls
+// `/api/moneta/*` on its own origin: this proxy in development, `api/moneta.ts` on Vercel.
+const monetaProxy = {
+  "/api/moneta": {
+    target: "https://api.moneta.cz",
+    changeOrigin: true,
+    rewrite: (path: string) =>
+      path.replace(/^\/api\/moneta/u, "/api/v4/vip/aisp/my"),
+  },
+};
+
 export default defineConfig({
   define: {
     global: "globalThis",
@@ -124,6 +135,6 @@ export default defineConfig({
       },
     },
   },
-  server: { port: 5280, strictPort: true },
-  preview: { port: 5280, strictPort: true },
+  server: { port: 5280, strictPort: true, proxy: monetaProxy },
+  preview: { port: 5280, strictPort: true, proxy: monetaProxy },
 });

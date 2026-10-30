@@ -15,7 +15,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: "node",
-          include: ["src/**/*.test.ts"],
+          include: ["src/**/*.test.ts", "api/**/*.test.ts"],
           environment: "node",
           setupFiles: ["./src/testing/czechDevice.ts"],
         },
