@@ -1,4 +1,4 @@
-import { Duration, Effect, Layer, Stream } from "effect";
+import { Duration, Effect, Layer, Stream, SubscriptionRef } from "effect";
 import { TestClock } from "effect/testing";
 import { finalizeEvent, generateSecretKey, getPublicKey } from "nostr-tools";
 import type { Event as NostrToolsEvent, Filter } from "nostr-tools";
@@ -15,6 +15,7 @@ import type {
   PushWrapFailure,
 } from "./PushInbox";
 import { PushInbox } from "./PushInbox";
+import { watchPushInbox } from "./headless";
 
 const STRICT_FILTER_CLOSE_REASON = "bad req: unindexed tag filter";
 
@@ -48,6 +49,14 @@ const pushWrap = (content: string): NostrToolsEvent =>
     },
     secretKey,
   );
+
+/** Lets forked fibers and transport promises run without advancing the TestClock. */
+const settle = Effect.gen(function* () {
+  for (let round = 0; round < 20; round++) {
+    yield* Effect.yieldNow;
+    yield* Effect.promise(() => Promise.resolve());
+  }
+});
 
 describe("PushInbox", () => {
   it("rejects multi-letter tag filters like a strict production relay", async () => {
@@ -94,6 +103,7 @@ describe("PushInbox", () => {
     await Effect.gen(function* () {
       const inbox = yield* PushInbox;
       const events = yield* inbox.open({
+        recipients: Stream.make([recipient]),
         lookback: Duration.days(3),
         resubscribeDelay: Duration.millis(10),
       });
@@ -112,6 +122,8 @@ describe("PushInbox", () => {
       const expectedSince =
         Math.floor(Date.now() / 1000) - Duration.toSeconds(Duration.days(3));
       expect(filter?.kinds).toEqual([1059]);
+      expect(filter?.["#p"]).toEqual([recipient]);
+      expect(filter?.limit).toBe(1);
       expect(filter?.since).toBeGreaterThanOrEqual(expectedSince - 2);
       expect(filter?.since).toBeLessThanOrEqual(expectedSince + 2);
       expect(
@@ -159,6 +171,85 @@ describe("PushInbox", () => {
     }).pipe(Effect.scoped, Effect.provide(layer), Effect.runPromise);
   });
 
+  it("opens no REQ without recipients and hands recipient changes over without a gap", async () => {
+    const relay = RelayUrl.make("wss://recipients-relay.test");
+    const fake = new FakeRelay();
+    const pool = poolFor(new Map([[relay, fake]]));
+    const layer = PushInbox.layer.pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          RelayPolicy.fixed({ readRelays: [relay], writeRelays: [] }),
+          Layer.succeed(NostrTransport, makeRelayPoolTransport(pool)),
+        ),
+      ),
+    );
+    const many = Array.from({ length: 251 }, () =>
+      Pubkey.make(getPublicKey(generateSecretKey())),
+    );
+    const relayStatuses: Array<PushRelayStatusEvent> = [];
+    const collected: Array<DeliveredPushWrap> = [];
+
+    await Effect.gen(function* () {
+      const recipients = yield* SubscriptionRef.make<ReadonlyArray<Pubkey>>([]);
+      const inbox = yield* PushInbox;
+      const events = yield* inbox.open({
+        recipients: SubscriptionRef.changes(recipients),
+        lookback: Duration.days(3),
+        resubscribeDelay: Duration.millis(10),
+        onRelayStatus: (event) => relayStatuses.push(event),
+      });
+      yield* Effect.forkScoped(
+        Stream.runForEach(events, (event) =>
+          Effect.sync(() => collected.push(event)),
+        ),
+      );
+      yield* Effect.sleep(Duration.millis(20));
+      expect(fake.subscriptions).toHaveLength(0);
+
+      yield* SubscriptionRef.set(recipients, many);
+      yield* eventually(() => fake.subscriptions.length === 2);
+      expect(
+        fake.subscriptions.map(({ filters }) => filters[0]?.["#p"]?.length),
+      ).toEqual([250, 1]);
+      expect(
+        fake.subscriptions.flatMap(({ filters }) => filters[0]?.["#p"] ?? []),
+      ).toEqual([...many].sort());
+
+      fake.eose();
+      yield* eventually(() => relayStatuses.length === 1);
+      expect(relayStatuses).toEqual([{ type: "eose", relay }]);
+
+      yield* SubscriptionRef.set(recipients, [...many].reverse());
+      yield* Effect.sleep(Duration.millis(20));
+      expect(fake.subscriptions).toHaveLength(2);
+
+      yield* SubscriptionRef.set(recipients, [recipient]);
+      yield* eventually(() => fake.subscriptions.length === 3);
+      expect(fake.subscriptions[2]?.filters[0]?.["#p"]).toEqual([recipient]);
+      expect(fake.subscriptions.some(({ closed }) => closed)).toBe(false);
+
+      const duringHandover = pushWrap("during handover");
+      fake.emit(duringHandover);
+      yield* eventually(() =>
+        collected.some(
+          ({ delivery, wrap }) =>
+            delivery === "live" && wrap.wrapId === duringHandover.id,
+        ),
+      );
+
+      fake.eose();
+      yield* eventually(() =>
+        fake.subscriptions.slice(0, 2).every(({ closed }) => closed),
+      );
+      expect(fake.subscriptions[2]?.closed).toBe(false);
+
+      yield* SubscriptionRef.set(recipients, []);
+      yield* eventually(() => fake.subscriptions[2]?.closed === true);
+      yield* Effect.sleep(Duration.millis(20));
+      expect(fake.subscriptions).toHaveLength(3);
+    }).pipe(Effect.scoped, Effect.provide(layer), Effect.runPromise);
+  });
+
   it("filters a live cross-relay duplicate before transport delivery", async () => {
     const relayA = RelayUrl.make("wss://relay-a.test");
     const relayB = RelayUrl.make("wss://relay-b.test");
@@ -182,6 +273,7 @@ describe("PushInbox", () => {
     await Effect.gen(function* () {
       const inbox = yield* PushInbox;
       const events = yield* inbox.open({
+        recipients: Stream.make([recipient]),
         lookback: Duration.days(3),
         resubscribeDelay: Duration.millis(10),
       });
@@ -228,22 +320,19 @@ describe("PushInbox", () => {
       yield* TestClock.setTime(1_754_000_000_000);
       const inbox = yield* PushInbox;
       const events = yield* inbox.open({
+        recipients: Stream.make([recipient]),
         lookback: Duration.days(3),
         refreshInterval,
         resubscribeDelay: Duration.millis(10),
       });
       yield* Effect.forkScoped(Stream.runDrain(events));
-      yield* Effect.yieldNow;
-      yield* Effect.promise(() => Promise.resolve());
-      yield* Effect.yieldNow;
+      yield* settle;
       expect(fake.subscriptions).toHaveLength(1);
 
       yield* TestClock.adjust(refreshInterval);
       expect(fake.subscriptions[0]?.closed).toBe(true);
       yield* TestClock.adjust(Duration.millis(20));
-      yield* Effect.yieldNow;
-      yield* Effect.promise(() => Promise.resolve());
-      yield* Effect.yieldNow;
+      yield* settle;
 
       expect(fake.subscriptions).toHaveLength(2);
     }).pipe(
@@ -272,6 +361,7 @@ describe("PushInbox", () => {
     await Effect.gen(function* () {
       const inbox = yield* PushInbox;
       const events = yield* inbox.open({
+        recipients: Stream.make([recipient]),
         lookback: Duration.days(3),
         resubscribeDelay: Duration.seconds(1),
         onInvalidWrap: (failure) => invalidWraps.push(failure),
@@ -305,5 +395,41 @@ describe("PushInbox", () => {
         },
       ]);
     }).pipe(Effect.scoped, Effect.provide(layer), Effect.runPromise);
+  });
+
+  it("watchPushInbox resubscribes on setRecipients", async () => {
+    const relay = RelayUrl.make("wss://headless-relay.test");
+    const fake = new FakeRelay();
+    const pool = poolFor(new Map([[relay, fake]]));
+    const other = Pubkey.make(getPublicKey(generateSecretKey()));
+    const subscription = watchPushInbox(
+      {
+        readRelays: [relay],
+        recipients: [recipient],
+        lookbackSeconds: 3 * 24 * 60 * 60,
+        transport: Layer.succeed(NostrTransport, makeRelayPoolTransport(pool)),
+      },
+      () => {},
+    );
+
+    try {
+      await Effect.runPromise(
+        eventually(() => fake.subscriptions.length === 1),
+      );
+      subscription.setRecipients([recipient, other]);
+      await Effect.runPromise(
+        eventually(() => fake.subscriptions.length === 2),
+      );
+      expect(fake.subscriptions[1]?.filters[0]?.["#p"]).toEqual(
+        [recipient, other].sort(),
+      );
+
+      fake.eose();
+      await Effect.runPromise(
+        eventually(() => fake.subscriptions[0]?.closed === true),
+      );
+    } finally {
+      await subscription.close();
+    }
   });
 });

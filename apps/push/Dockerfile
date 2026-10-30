@@ -1,4 +1,4 @@
-FROM oven/bun:1.3.9-alpine AS build
+FROM oven/bun:1.4.4-alpine AS build
 
 WORKDIR /app
 
@@ -32,11 +32,12 @@ COPY tools/nostr-error-tracker/package.json tools/nostr-error-tracker/package.js
 RUN bun install --frozen-lockfile
 
 COPY apps/push apps/push
+COPY packages/linkauth packages/linkauth
 COPY packages/linkstr packages/linkstr
 
 RUN bun run --filter @linky-fit/push build
 
-FROM oven/bun:1.3.9-alpine AS runtime
+FROM oven/bun:1.4.4-alpine AS runtime
 
 WORKDIR /app
 

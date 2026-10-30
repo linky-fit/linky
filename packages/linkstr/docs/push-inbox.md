@@ -4,23 +4,30 @@
 
 ## The `["linky", "push"]` marker
 
-Senders opt a wrap into push by adding a `["linky", "push"]` tag to the recipient copy: chat text and files, payment notices and pushable bank-offer statuses set it; token messages, edits, reactions and seen receipts do not ([kind index](./README.md#kind-index)). The subscription filter is only `{ kinds: [1059], since }`, because relays do not reliably index multi-letter tags; the codec checks the marker client-side and silently ignores wraps without it.
+Senders opt a wrap into push by adding a `["linky", "push"]` tag to the recipient copy: chat text and files, payment notices and pushable bank-offer statuses set it; token messages, edits, reactions and seen receipts do not ([kind index](./README.md#kind-index)). The subscription filter is `{ kinds: [1059], "#p": recipients, since, limit: 1 }` without the marker, because relays do not reliably index multi-letter tags; the codec checks the marker client-side and silently ignores wraps without it.
+
+## Recipients
+
+The inbox asks relays only for wraps addressed to the recipients you pass, split into REQs of 250 pubkeys each. That tells every read relay which pubkeys have push enabled. Each change to the set resubscribes every relay without a gap: a relay's old REQs stay open until its new ones reach EOSE or end, so a wrap arriving during the switch still comes through live. While the set is empty no REQ is open.
 
 ## `watchPushInbox`
 
 The Promise-facing entry for long-lived services. No identity is needed. Keep the subscription handle and close it from your shutdown path:
 
 ```ts
-import { RelayUrl, watchPushInbox } from "@linky-fit/linkstr";
+import { Pubkey, RelayUrl, watchPushInbox } from "@linky-fit/linkstr";
 
 /** Placeholder: look up subscriptions for `recipient` and send the push. */
 declare const notify: (recipient: string, wrapId: string) => void;
+/** Placeholder: the pubkeys that currently have push enabled. */
+declare const subscribedPubkeys: () => ReadonlyArray<Pubkey>;
 
 const subscription = watchPushInbox(
   {
     readRelays: ["wss://relay.damus.io", "wss://nos.lol"].map((url) =>
       RelayUrl.make(url),
     ),
+    recipients: subscribedPubkeys(),
     lookbackSeconds: 3 * 24 * 60 * 60,
     onInvalidWrap: (failure) => console.warn("invalid push wrap", failure),
     onRelayStatus: (event) =>
@@ -38,6 +45,9 @@ const subscription = watchPushInbox(
   },
 );
 
+// After subscribers change; an unchanged set is a no-op.
+subscription.setRecipients(subscribedPubkeys());
+
 process.on("SIGTERM", () => {
   void subscription.close().then(() => process.exit(0));
 });
@@ -46,7 +56,8 @@ process.on("SIGTERM", () => {
 | Config                   | Meaning                                                                    |
 | ------------------------ | -------------------------------------------------------------------------- |
 | `readRelays`             | relays to subscribe on; one reconnecting subscription each                 |
-| `lookbackSeconds`        | `since = now − lookback` on every (re)subscription                         |
+| `recipients`             | initial pubkeys to watch; replace them with `subscription.setRecipients`   |
+| `lookbackSeconds`        | `since = now − lookback` on every (re)subscription, see below              |
 | `allowInsecureLocalhost` | opt into loopback `ws://` for development; default false                   |
 | `refreshInterval`        | force a fresh REQ this often (default 10 min) to detect deaf subscriptions |
 | `resubscribeDelay`       | base backoff after an attempt ends (default 5 s)                           |
@@ -57,11 +68,12 @@ process.on("SIGTERM", () => {
 
 Each `DeliveredPushWrap` is `{ delivery, wrap }` with `wrap: PushWrap = { wrapId, recipient, createdAt }`. That is everything a notification payload needs: the client fetches and decrypts the wrap itself with `WrapInbox.fetchWrapEvent(wrapId)` from its own relays ([inbox.md](./inbox.md#fetchwrapevent-for-notification-opens)). The wrap's `p` tags may carry sender-controlled relay hints; the codec does not surface them.
 
-Per-relay reconnects are automatic and never reach `onFatal`. `onFatal` means the watcher fiber itself died and nothing restarts it: call `watchPushInbox` again from the callback, or exit and let the supervisor restart the process. For an Effect composition use `PushInbox.open(options)` directly: it returns a scoped `Stream<DeliveredPushWrap>` over `RelayPolicy` and `NostrTransport`, and fails with `NoReadRelaysConfigured`.
+Per-relay reconnects are automatic and never reach `onFatal`. `onFatal` means the watcher fiber itself died and nothing restarts it: call `watchPushInbox` again from the callback, or exit and let the supervisor restart the process. For an Effect composition use `PushInbox.open(options)` directly: `options.recipients` is a `Stream` of recipient sets (for example `SubscriptionRef.changes`), and it returns a scoped `Stream<DeliveredPushWrap>` over `RelayPolicy` and `NostrTransport`, and fails with `NoReadRelaysConfigured`.
 
 ## Backfill vs live, and dedupe
 
-- Every subscription attempt starts in `backfill`; the first EOSE from that relay flips it to `live`. After a reconnect the relay replays its window, so those arrivals are backfill again.
+- Every subscription attempt starts in `backfill`; the first EOSE from that relay flips it to `live`. Each REQ asks for at most one stored wrap (`limit: 1`), so a (re)subscription costs the relay and the server almost nothing however busy the relay is.
+- Relays match live wraps against `since` as well, and NIP-59 backdates `created_at` by up to two days, so keep `lookbackSeconds` above that (three days is a safe value) or live wraps go missing.
 - Live wraps are deduped across relays by wrap id (a bounded cache of the last 4096 authenticated wraps), so you see each live wrap once while it stays cached.
 - Backfill wraps are **re-emitted per copy**. Suppress them yourself and do not record them, so a later live copy of the same wrap is still delivered. Keep a ledger only of wraps you attempted to deliver.
 

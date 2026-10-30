@@ -9,8 +9,8 @@ import { describe, expect, it, setSystemTime } from "bun:test";
 import { Database } from "bun:sqlite";
 
 import {
-  CATCH_UP_LOOKBACK_SECONDS,
   SEEN_EVENT_RETENTION_MARGIN_MS,
+  WRAP_LOOKBACK_SECONDS,
 } from "./config";
 import { RelayWatcher } from "./relayWatcher";
 import { PushStorage } from "./storage";
@@ -23,7 +23,7 @@ import type {
 
 const recipient = derivePubkey(NostrSecretKey.make(new Uint8Array(32).fill(1)));
 const retentionMs =
-  CATCH_UP_LOOKBACK_SECONDS * 1000 + SEEN_EVENT_RETENTION_MARGIN_MS;
+  WRAP_LOOKBACK_SECONDS * 1000 + SEEN_EVENT_RETENTION_MARGIN_MS;
 
 interface DeliveryRecord<T> {
   subscription: T;

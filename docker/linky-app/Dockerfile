@@ -7,7 +7,7 @@
 # Vite inlines `import.meta.env` at build time and `vite build` does not load
 # .env.development, so these ARGs are the only source of the endpoints.
 
-FROM oven/bun:1.3.9-alpine AS build
+FROM oven/bun:1.4.4-alpine AS build
 WORKDIR /app
 
 # Manifests first so editing source does not bust the dependency layer.

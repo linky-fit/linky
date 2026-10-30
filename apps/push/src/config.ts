@@ -2,7 +2,9 @@ import { DEFAULT_NOSTR_RELAYS } from "@linky-fit/linkstr";
 import { resolve } from "node:path";
 import { normalizeIp } from "./requestSecurity";
 
-export const CATCH_UP_LOOKBACK_SECONDS = 3 * 24 * 60 * 60;
+// NIP-59 backdates wraps up to two days, and relays match live events against
+// the REQ's `since` too.
+export const WRAP_LOOKBACK_SECONDS = 3 * 24 * 60 * 60;
 export const SEEN_EVENT_RETENTION_MARGIN_MS = 6 * 60 * 60 * 1000;
 
 export interface PushServiceConfig {
