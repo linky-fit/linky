@@ -33,7 +33,7 @@ export const en: Copy = {
   shopFields: {
     name: "Shop name",
     namePlaceholder: "Linden Tree Café",
-    nameHint: "Customers see it in the message for the recipient.",
+    nameHint: "Customers see it as the recipient's name.",
     nameTooLong: "The name can have at most 100 characters.",
     account: "Account number",
     accountPlaceholder: "2000145399/0800",

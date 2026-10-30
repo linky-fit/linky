@@ -214,7 +214,7 @@ function BankLeg({
             iban: shop.iban,
             amount: payment.amountCzk,
             variableSymbol: payment.vs,
-            ...(shop.name === null ? {} : { message: shop.name }),
+            ...(shop.name === null ? {} : { recipientName: shop.name }),
           })}
         />
         <Amount value={amount} unit={copy.czk} size="md" />

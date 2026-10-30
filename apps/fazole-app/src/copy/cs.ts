@@ -31,7 +31,7 @@ export const cs = {
   shopFields: {
     name: "Název obchodu",
     namePlaceholder: "Kavárna U Lípy",
-    nameHint: "Zákazník ho uvidí ve zprávě pro příjemce.",
+    nameHint: "Zákazník ho uvidí jako jméno příjemce.",
     nameTooLong: "Název může mít nejvýš 100 znaků.",
     account: "Číslo účtu",
     accountPlaceholder: "2000145399/0800",
