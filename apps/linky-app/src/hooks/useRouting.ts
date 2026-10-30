@@ -100,6 +100,7 @@ type NavigationAction =
   | { route: "chatStorage" }
   | { route: "evoluServers" }
   | { route: "lnAddressPay"; lnAddress: string }
+  | { route: "lnInvoicePay"; invoice: string }
   | { route: "manualPay" }
   | { route: "bankPayment"; spdPayload: string; editing?: boolean }
   | { route: "bankPaymentNew" }
@@ -306,6 +307,11 @@ export const navigateTo = (action: NavigationAction): void => {
       break;
     case "lnAddressPay":
       window.location.assign(`#payln/${encodeURIComponent(action.lnAddress)}`);
+      break;
+    case "lnInvoicePay":
+      window.location.assign(
+        `#payinvoice/${encodeURIComponent(action.invoice.trim())}`,
+      );
       break;
     case "manualPay":
       window.location.assign("#wallet/pay");

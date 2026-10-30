@@ -250,16 +250,25 @@ interface SendingOptions {
   readonly onSending?: () => void;
 }
 
+export interface PayInvoiceOptions extends SendingOptions {
+  /** The amount to pay an amountless invoice with; ignored when the invoice names its own. */
+  readonly amountSat?: number | undefined;
+}
+
 /** A payment runs while the user waits: offline it fails with `NetworkError`, it is never queued for later. */
 export interface PaymentsCommands {
   readonly fundsFor: (amountSat: number) => Promise<FundsCheck>;
   readonly payLightningInvoice: (
     invoice: string,
-    options?: SendingOptions,
+    options?: PayInvoiceOptions,
   ) => Promise<PayInvoiceOutcome>;
-  /** Prices an invoice at the mint that would pay it; nothing moves. */
+  /**
+   * Prices an invoice at the mint that would pay it; nothing moves.
+   * `amountSat` is what an amountless invoice would be paid; ignored otherwise.
+   */
   readonly quoteLightningInvoice: (
     invoice: string,
+    amountSat?: number,
   ) => Promise<QuoteLightningInvoiceOutcome>;
   readonly payLightningAddress: (
     args: {
@@ -368,9 +377,25 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
       amount: amountSat,
     });
 
+  /**
+   * The amount an invoice is paid: its own, else the one entered for an
+   * amountless invoice when that is a whole positive number.
+   */
+  const invoiceAmount = (
+    preview: { readonly amountSat: number | null } | null,
+    entered: number | undefined,
+  ): { readonly amountSat: number | null; readonly amountless: boolean } => {
+    if (preview?.amountSat != null)
+      return { amountSat: preview.amountSat, amountless: false };
+    const valid =
+      entered !== undefined && Number.isSafeInteger(entered) && entered > 0;
+    return { amountSat: valid ? entered : null, amountless: true };
+  };
+
   const melt = async (
     invoice: string,
     mint: MintUrl,
+    amountSat?: number,
   ): Promise<
     Result.Result<
       MeltReceipt,
@@ -378,7 +403,11 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
     >
   > => {
     try {
-      const outcome = await linkshu.meltCashuInvoice({ invoice, mint });
+      const outcome = await linkshu.meltCashuInvoice({
+        invoice,
+        mint,
+        ...(amountSat === undefined ? {} : { amountSat }),
+      });
       if (Result.isSuccess(outcome)) return Result.succeed(outcome.success);
       return Result.fail({
         detail: describeError(outcome.failure),
@@ -434,7 +463,10 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
     if (!normalized) return { _tag: "Invalid" };
     if (!deps.isOnline()) return NETWORK_FAILURE;
     const preview = getLightningInvoicePreview(normalized);
-    const amountSat = preview?.amountSat ?? null;
+    const { amountSat, amountless } = invoiceAmount(
+      preview,
+      options?.amountSat,
+    );
     const current = await balances();
     if (amountSat !== null && amountSat > current.spendable)
       return shortfall(current, amountSat);
@@ -442,14 +474,19 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
 
     const paid = await ops.runExclusiveTask(
       async (): Promise<PayInvoiceOutcome> => {
-        // An amountless invoice cannot pre-select by size; any funded mint
-        // may quote it, so fall back to the 1-sat threshold.
+        // An amountless invoice without an entered amount cannot pre-select
+        // by size; any funded mint may quote it, so fall back to the 1-sat
+        // threshold and let the mint answer.
         const mint = sendMint(current, amountSat ?? 1);
         if (mint === null) return { _tag: "Insufficient" };
         options?.onSending?.();
         const details = { lightningInvoice: normalized };
         const note = preview?.description ?? null;
-        const outcome = await melt(normalized, mint);
+        const outcome = await melt(
+          normalized,
+          mint,
+          amountless && amountSat !== null ? amountSat : undefined,
+        );
         if (Result.isFailure(outcome)) {
           const { detail, pending, network } = outcome.failure;
           if (pending !== null) {
@@ -969,12 +1006,13 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
   };
 
   const quoteLightningInvoice: PaymentsCommands["quoteLightningInvoice"] =
-    async (invoice) => {
+    async (invoice, entered) => {
       const normalized = invoice.trim();
-      const amountSat = getLightningInvoicePreview(normalized)?.amountSat;
-      if (amountSat === undefined || amountSat === null) {
-        return { _tag: "Invalid" };
-      }
+      const { amountSat, amountless } = invoiceAmount(
+        getLightningInvoicePreview(normalized),
+        entered,
+      );
+      if (amountSat === null) return { _tag: "Invalid" };
       if (!deps.isOnline()) return NETWORK_FAILURE;
       const mint = sendMint(await balances(), amountSat);
       if (mint === null) return { _tag: "Insufficient" };
@@ -982,6 +1020,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
         const outcome = await linkshu.quoteCashuMelt({
           invoice: normalized,
           mint,
+          ...(amountless ? { amountSat } : {}),
         });
         if (Result.isFailure(outcome)) {
           return isNetworkFailure(outcome.failure)

@@ -167,6 +167,25 @@ describe("useLightningPayments", () => {
     await ui.view.unmount();
   });
 
+  it("pays an amountless invoice with the entered amount and returns to the wallet from its page", async () => {
+    commandsAnswering({});
+    const ui = await render("lnInvoicePay");
+
+    expect(
+      await act(() => ui.current().payLightningInvoiceWithCashu("lnbc", 25)),
+    ).toBe(true);
+    expect(commandsRef.current?.payLightningInvoice).toHaveBeenCalledWith(
+      "lnbc",
+      { amountSat: 25 },
+    );
+    expect(ui.showPaymentSending).toHaveBeenCalledWith({
+      direction: "out",
+      amountSat: 25,
+    });
+    expect(navigateTo).toHaveBeenCalledWith({ route: "wallet" });
+    await ui.view.unmount();
+  });
+
   it("shows a paid invoice and returns to the wallet from manual pay", async () => {
     commandsAnswering({});
     const ui = await render();

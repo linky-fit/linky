@@ -73,6 +73,8 @@ export type Route =
   | { kind: "bankPayment"; spdPayload: string; editing?: true }
   | { kind: "bankPaymentNew" }
   | { kind: "lnAddressPay"; lnAddress: string }
+  /** A Lightning invoice that names no amount; the page asks for one. */
+  | { kind: "lnInvoicePay"; invoice: string }
   | { kind: "cashuTokens" }
   | { kind: "cashuProofs" }
   | { kind: "cashuTokenNew" }
@@ -216,6 +218,8 @@ export const parseRouteFromHash = (): Route => {
   if (hash === "#wallet/tokens/proofs") return { kind: "cashuProofs" };
   if (hash === "#wallet/tokens") return { kind: "cashuTokens" };
 
+  const invoice = decodeHashSegment(hash, "#payinvoice/");
+  if (invoice) return { kind: "lnInvoicePay", invoice };
   const payLnPrefix = "#payln/";
   const lnAddress = decodeHashSegment(hash, payLnPrefix);
   if (lnAddress) return { kind: "lnAddressPay", lnAddress };

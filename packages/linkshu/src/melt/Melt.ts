@@ -188,6 +188,8 @@ interface MeltTarget {
   readonly mint: MintUrl;
   readonly invoice: Bolt11Invoice;
   readonly quoteId?: QuoteId | undefined;
+  /** The amount an amountless invoice is paid with. */
+  readonly amount?: Amount | undefined;
 }
 
 /**
@@ -222,10 +224,22 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
     > =>
       Effect.gen(function* () {
         const raw = yield* Effect.tryPromise({
-          try: () => wallet.createMeltQuoteBolt11(draft.invoice),
+          try: () =>
+            draft.amount === undefined
+              ? wallet.createMeltQuoteBolt11(draft.invoice)
+              : wallet.createMeltQuoteBolt11(
+                  draft.invoice,
+                  draft.amount * 1000,
+                ),
           catch: (error) => classifyMintError(draft.mint, error),
         });
         const quote = yield* toMeltQuote(draft.mint, raw);
+        if (draft.amount !== undefined && quote.amount !== draft.amount)
+          return yield* new MintRejected({
+            mint: draft.mint,
+            code: null,
+            detail: "melt quote does not match the requested amount",
+          });
         emitQuoteState(inspector, "melt", quote, raw.state);
         return { raw, quote };
       });

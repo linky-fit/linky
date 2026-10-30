@@ -369,6 +369,12 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
           await payLightningInvoiceWithCashu(normalized);
           return;
         }
+        // An invoice without an amount is paid from its own page, where the
+        // user types the amount and sends in one go.
+        if (preview !== null && preview.amountSat === null) {
+          navigateTo({ route: "lnInvoicePay", invoice: normalized });
+          return;
+        }
 
         requestLightningInvoiceConfirmation(
           preview ?? {

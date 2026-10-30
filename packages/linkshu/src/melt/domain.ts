@@ -23,6 +23,11 @@ export class MeltDraft extends Schema.Class<MeltDraft>("MeltDraft")({
   invoice: Bolt11Invoice,
   quoteId: Schema.optional(QuoteId),
   /**
+   * The amount to pay an invoice that names none (NUT-23 amountless);
+   * never given for an invoice with its own amount.
+   */
+  amount: Schema.optional(Amount),
+  /**
    * The most the melt may take from the balance, such as the
    * `MeltCost.maxTotal` the user confirmed. A melt that would cost more fails
    * with `PaymentFailed` before any proof moves.

@@ -119,6 +119,8 @@ export type SendCashuToken = (
 interface MeltCashuInvoiceArgs {
   readonly invoice: string;
   readonly mint: string;
+  /** The amount to pay an amountless invoice with; never given for an invoice with its own amount. */
+  readonly amountSat?: number | undefined;
 }
 
 /** linkshu Melt; invalid mint/invoice input and defects reject. */
@@ -438,18 +440,24 @@ const makeLinkshuCommands = (run: LinkshuRun) => {
       }),
     );
 
-  const meltCashuInvoice: MeltCashuInvoice = ({ invoice, mint }) =>
+  const meltDraft = ({ invoice, mint, amountSat }: MeltCashuInvoiceArgs) =>
+    decodeMeltDraft({
+      invoice,
+      mint,
+      ...(amountSat === undefined ? {} : { amount: amountSat }),
+    });
+
+  const meltCashuInvoice: MeltCashuInvoice = (args) =>
     runResult(
-      Effect.suspend(() => {
-        const draft = decodeMeltDraft({ invoice, mint });
-        return Effect.flatMap(Melt, (melt) => melt.melt(draft));
-      }),
+      Effect.suspend(() =>
+        Effect.flatMap(Melt, (melt) => melt.melt(meltDraft(args))),
+      ),
     );
 
-  const quoteCashuMelt: QuoteCashuMelt = ({ invoice, mint }) =>
+  const quoteCashuMelt: QuoteCashuMelt = (args) =>
     runResult(
       Effect.suspend(() => {
-        const draft = decodeMeltDraft({ invoice, mint });
+        const draft = meltDraft(args);
         return Effect.flatMap(Melt, (melt) =>
           Effect.flatMap(melt.quote(draft), (quote) => melt.cost(quote)),
         );

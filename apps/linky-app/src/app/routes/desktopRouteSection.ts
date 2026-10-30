@@ -25,6 +25,7 @@ export const getDesktopRouteSection = (route: Route): DesktopRouteSection => {
     case "manualPay":
     case "bankPayment":
     case "lnAddressPay":
+    case "lnInvoicePay":
       return "wallet";
 
     case "proxyPayments":
@@ -102,6 +103,7 @@ export const isDesktopSectionEntryRoute = (route: Route): boolean => {
     case "bankPayment":
     case "bankPaymentNew":
     case "lnAddressPay":
+    case "lnInvoicePay":
     case "settingsLanguage":
     case "settingsAppearance":
     case "settingsUnits":

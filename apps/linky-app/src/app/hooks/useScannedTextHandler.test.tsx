@@ -424,7 +424,13 @@ describe("scanned Lightning auto-pay", () => {
       const invoice = lightningInvoice(amount);
       await scan.handle(invoice);
 
-      if (amount !== null && amount <= 1000) {
+      if (amount === null) {
+        expect(scan.payLightningInvoiceWithCashu).not.toHaveBeenCalled();
+        expect(scan.requestLightningInvoiceConfirmation).not.toHaveBeenCalled();
+        expect(window.location.hash).toBe(
+          `#payinvoice/${encodeURIComponent(invoice)}`,
+        );
+      } else if (amount <= 1000) {
         expect(
           scan.payLightningInvoiceWithCashu,
         ).toHaveBeenCalledExactlyOnceWith(invoice);

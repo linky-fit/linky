@@ -12,7 +12,11 @@ export interface OnchainTransferPaymentOptions {
 }
 
 export interface WalletCommands {
-  readonly payLightningInvoiceWithCashu: (invoice: string) => Promise<boolean>;
+  readonly payLightningInvoiceWithCashu: (
+    invoice: string,
+    /** What an amountless invoice is paid with. */
+    amountSat?: number,
+  ) => Promise<boolean>;
   readonly payLightningAddressWithCashu: (
     lnAddress: string,
     amountSat: number,

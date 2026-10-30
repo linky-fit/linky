@@ -133,6 +133,7 @@ const makeWallet = (args: FakeWalletArgs) => {
   const sendCalls: SendCall[] = [];
   const meltCalls: MeltCall[] = [];
   const checkQuoteCalls: string[] = [];
+  const quoteCalls: Array<{ invoice: string; amountMsat: unknown }> = [];
   const restoreCalls: Array<{ start: number; count: number }> = [];
   const wallet = fakeWallet({
     keysetId: KEYSET_HEX,
@@ -177,8 +178,10 @@ const makeWallet = (args: FakeWalletArgs) => {
         ? args.restore(start, count)
         : Promise.reject(new Error("restore unavailable"));
     },
-    createMeltQuoteBolt11: () =>
-      args.quote ? args.quote() : Promise.resolve(quoteResponse()),
+    createMeltQuoteBolt11: (quotedInvoice, amountMsat) => {
+      quoteCalls.push({ invoice: quotedInvoice, amountMsat });
+      return args.quote ? args.quote() : Promise.resolve(quoteResponse());
+    },
     checkMeltQuoteBolt11: (quote) => {
       checkQuoteCalls.push(typeof quote === "string" ? quote : quote.quote);
       return args.checkQuote
@@ -197,7 +200,14 @@ const makeWallet = (args: FakeWalletArgs) => {
         : Promise.reject(new Error("melt not stubbed"));
     },
   });
-  return { wallet, sendCalls, meltCalls, checkQuoteCalls, restoreCalls };
+  return {
+    wallet,
+    sendCalls,
+    meltCalls,
+    checkQuoteCalls,
+    quoteCalls,
+    restoreCalls,
+  };
 };
 
 /** One runtime over the given storage — a second one models a restart. */
@@ -330,6 +340,33 @@ describe("Melt.quote", () => {
     expect(sendCalls).toEqual([]);
     // No invoice text in any event.
     expect(JSON.stringify(events)).not.toContain("lnbc");
+  });
+
+  it("asks the mint for the draft's amount in millisats and holds it to that amount", async () => {
+    const { wallet, quoteCalls } = makeWallet({});
+    const amountless = new MeltDraft({
+      mint,
+      invoice,
+      amount: SatAmount.make(10),
+    });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(
+      Effect.flatMap(Melt, (melt) => melt.quote(amountless)),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.amount).toBe(10);
+    expect(quoteCalls).toEqual([{ invoice, amountMsat: 10_000 }]);
+
+    const other = makeWallet({
+      quote: () => Promise.resolve(quoteResponse({ amount: Amount.from(11) })),
+    });
+    const mismatch = await makeHarness(other.wallet).run(
+      Effect.flatMap(Melt, (melt) => Effect.flip(melt.quote(amountless))),
+    );
+    assert(Exit.isSuccess(mismatch));
+    expect(mismatch.value).toMatchObject({ _tag: "MintRejected", mint });
+    expect(other.quoteCalls).toEqual([{ invoice, amountMsat: 10_000 }]);
   });
 
   it("rejects a malformed melt quote as MintRejected", async () => {
