@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/moneta/:path*",
+      "destination": "/api/moneta?path=:path*"
+    }
+  ]
+}

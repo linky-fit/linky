@@ -134,6 +134,13 @@ export const en: Copy = {
     minimum: (amount: string) => `Bitcoin from ${amount}`,
     minimumHint:
       "Let the customer pay a smaller amount by bank; mint fees would eat almost all of it.",
+    bankUnreachable: "The bank is not responding",
+    bankTokenInvalid: "The MONETA token is not valid",
+    bankTokenInvalidHint:
+      "Create a new one in Internet Banka and paste it in Settings.",
+    monetaOfferTitle: "The bank can confirm the payment itself",
+    monetaOfferDescription:
+      "The account is at MONETA. Add an API token in Settings and the payment shows as paid without tapping Paid.",
   },
 
   methods: {
@@ -285,6 +292,26 @@ export const en: Copy = {
     help: "Help",
     contactSupport: "Contact support",
     unreadSupport: "New reply from support",
+    moneta: "Bank payment confirmation",
+    monetaOn: "On",
+    monetaOff: "Off",
+    monetaTitle: "MONETA API",
+    monetaDescription:
+      "The bank reports a QR payment itself as soon as it reaches the account. In MONETA's Internet Banka open Settings › API token management, create a token for the shop's account with view-only rights and paste it here.",
+    monetaToken: "API token",
+    monetaConnect: "Connect",
+    monetaConnected: (account: string) =>
+      `Connected to account ${account}. QR payments are confirmed by themselves.`,
+    monetaDisconnect: "Disconnect",
+    monetaFailures: {
+      "invalid-token": "Paste the whole token.",
+      "no-account": "Enter the shop's account number first.",
+      unauthorized:
+        "The bank did not recognize the token. Check that it is copied whole and still valid.",
+      unreachable: "The bank is not responding. Try again.",
+      "account-not-visible": (account: string) =>
+        `The token does not see account ${account}. Create it for the shop's account.`,
+    },
   },
   support: {
     title: "Support",

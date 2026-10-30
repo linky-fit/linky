@@ -13,10 +13,12 @@ Každá vydaná verze musí obsahovat nejprve `en-US` a potom `cs-CZ`.
 ### en-US
 
 - A payment that arrives shows as a small banner at the top of the terminal instead of covering the screen, so the next charge can start right away; a direct transfer is announced the same way.
+- A shop with a MONETA account can paste an API token from Internet Banka in Settings; the bank then confirms a bank QR payment by itself while its QR code is on screen, the same way a bitcoin payment is confirmed. The token is offered as soon as a MONETA account is saved and under every bank QR code until it is added.
 
 ### cs-CZ
 
 - Příchozí platba se ukáže jako malý proužek nahoře na terminálu místo překrytí celé obrazovky, takže další účtování může začít hned; přímý převod se hlásí stejně.
+- Obchod s účtem u MONETA může v Nastavení vložit API token z Internet Banky; banka pak sama potvrdí platbu bankovním QR kódem, dokud je kód na obrazovce, stejně jako se potvrzuje platba bitcoinem. Token se nabídne hned po uložení účtu u MONETA a pod každým bankovním QR kódem, dokud není přidaný.
 
 ## [26.10.3] - 2026-10-19
 

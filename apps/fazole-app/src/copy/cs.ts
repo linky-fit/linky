@@ -131,6 +131,13 @@ export const cs = {
     minimum: (amount: string) => `Bitcoinem od ${amount}`,
     minimumHint:
       "Menší částku nechte zaplatit bankou, poplatky mincovny by ji skoro celou spotřebovaly.",
+    bankUnreachable: "Banka neodpovídá",
+    bankTokenInvalid: "Token MONETA neplatí",
+    bankTokenInvalidHint:
+      "Vytvořte v Internet Bance nový a vložte ho v Nastavení.",
+    monetaOfferTitle: "Banka může platbu potvrdit sama",
+    monetaOfferDescription:
+      "Účet je u MONETA. Přidejte v Nastavení API token a zaplacení se ukáže bez klepnutí na Zaplaceno.",
   },
 
   methods: {
@@ -280,6 +287,26 @@ export const cs = {
     help: "Pomoc",
     contactSupport: "Kontaktovat podporu",
     unreadSupport: "Nová odpověď podpory",
+    moneta: "Potvrzování plateb bankou",
+    monetaOn: "Zapnuto",
+    monetaOff: "Vypnuto",
+    monetaTitle: "MONETA API",
+    monetaDescription:
+      "Banka sama ohlásí platbu QR kódem, jakmile dorazí na účet. V Internet Bance MONETA otevřete Nastavení › Správa API tokenů, vytvořte token pro účet obchodu s právy „Pasivní – pouze náhled“ a vložte ho sem.",
+    monetaToken: "API token",
+    monetaConnect: "Připojit",
+    monetaConnected: (account: string) =>
+      `Připojeno k účtu ${account}. Platby QR kódem se potvrzují samy.`,
+    monetaDisconnect: "Odpojit",
+    monetaFailures: {
+      "invalid-token": "Vložte celý token.",
+      "no-account": "Nejdřív zadejte číslo účtu obchodu.",
+      unauthorized:
+        "Banka token nepoznala. Zkontrolujte, že je zkopírovaný celý a stále platí.",
+      unreachable: "Banka neodpovídá. Zkuste to znovu.",
+      "account-not-visible": (account: string) =>
+        `Token nevidí účet ${account}. Vytvořte ho pro účet obchodu.`,
+    },
   },
   support: {
     title: "Podpora",

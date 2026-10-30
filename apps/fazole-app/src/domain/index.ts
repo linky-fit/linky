@@ -6,6 +6,7 @@ export { CZECH_BANKS } from "./czechBanks";
 export * from "./history";
 export * from "./keypad";
 export * from "./money";
+export * from "./moneta";
 export * from "./note";
 export * from "./payment";
 export * from "./pledge";
