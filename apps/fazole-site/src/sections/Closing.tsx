@@ -41,7 +41,7 @@ export function Closing() {
           <Button
             render={<a href={siteConfig.webAppUrl} />}
             role="link"
-            icon="Smartphone"
+            icon="Play"
             minHeight="$controlLg"
             paddingHorizontal="$xxl"
           >

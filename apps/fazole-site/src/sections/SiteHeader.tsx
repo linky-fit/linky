@@ -1,35 +1,12 @@
-import { Button, Row, Stack, Text, useMedia } from "@linky-fit/ui";
+import { Button, Row, Stack } from "@linky-fit/ui";
 import { siteConfig } from "../config";
 import { copy } from "../copy";
 import { Logo, Wordmark } from "./parts";
-import { sectionIds } from "./sectionIds";
 
 const nav = copy.nav;
 
-const links = [
-  { id: sectionIds.benefits, label: nav.benefits },
-  { id: sectionIds.howItWorks, label: nav.howItWorks },
-  { id: sectionIds.tips, label: nav.tips },
-  { id: sectionIds.wallet, label: nav.wallet },
-  { id: sectionIds.faq, label: nav.faq },
-];
-
-function NavLink({ href, label }: { href: string; label: string }) {
-  return (
-    <Text
-      render={<a href={href} />}
-      variant="label"
-      color="$colorMuted"
-      hoverStyle={{ color: "$colorStrong" }}
-    >
-      {label}
-    </Text>
-  );
-}
-
-/** The sticky, translucent bar: the brand, the sections on wide screens and the app. */
+/** The sticky, translucent bar: the brand and the app. */
 export function SiteHeader() {
-  const { wide } = useMedia();
   return (
     <Stack
       render="header"
@@ -58,18 +35,7 @@ export function SiteHeader() {
           <Logo size={36} />
           <Wordmark />
         </Row>
-        {wide ? (
-          <Row render="nav" aria-label={nav.label} gap="$xxl">
-            {links.map((link) => (
-              <NavLink key={link.id} href={`#${link.id}`} label={link.label} />
-            ))}
-          </Row>
-        ) : null}
-        <Button
-          render={<a href={siteConfig.webAppUrl} />}
-          role="link"
-          size="sm"
-        >
+        <Button render={<a href={siteConfig.webAppUrl} />} role="link">
           {nav.openApp}
         </Button>
       </Row>

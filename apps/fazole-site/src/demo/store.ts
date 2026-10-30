@@ -9,6 +9,13 @@ export interface DemoPayer {
   readonly name: string;
 }
 
+/** The Bitcoin leg of a payment, once prepared: a Lightning invoice and a Cashu request for the same sats. */
+export interface BitcoinLeg {
+  readonly invoice: string;
+  readonly request: string;
+  readonly sats: number;
+}
+
 export interface DemoPayment {
   readonly id: string;
   /** The total charged in haléře, the tip included. */
@@ -20,6 +27,7 @@ export interface DemoPayment {
   readonly vs: string;
   readonly sats: number | null;
   readonly payer: DemoPayer | null;
+  readonly bitcoin: BitcoinLeg | null;
   readonly createdAt: Date;
   readonly paidAt: Date | null;
 }
@@ -62,6 +70,7 @@ const seedPayment = (
     id,
     tipHalere: null,
     payer: null,
+    bitcoin: null,
     ...payment,
     sats:
       paid && payment.method !== "bank" && payment.method !== null
@@ -175,11 +184,24 @@ export const createPayment = (
       status: "pending",
       sats: null,
       payer: null,
+      bitcoin: null,
       createdAt: payment.now,
       paidAt: null,
     },
     ...data.payments,
   ],
+});
+
+/** Keeps a payment's prepared Bitcoin leg, so reopening the leg shows the same QR code. */
+export const attachBitcoin = (
+  data: DemoData,
+  id: string,
+  bitcoin: BitcoinLeg,
+): DemoData => ({
+  ...data,
+  payments: data.payments.map((payment) =>
+    payment.id === id ? { ...payment, bitcoin } : payment,
+  ),
 });
 
 /** Marks a pending payment paid; a Bitcoin one brings its sats into the wallet. */
@@ -199,7 +221,7 @@ export const settlePayment = (
           sats:
             settlement.method === "bank"
               ? null
-              : halereToSats(payment.amountHalere),
+              : (payment.bitcoin?.sats ?? halereToSats(payment.amountHalere)),
           payer: settlement.method === "cashu" ? settlement.payer : null,
           paidAt: now,
         }
@@ -278,6 +300,7 @@ export interface DemoActions {
     amountHalere: number,
     tipHalere: number | null,
   ) => DemoPayment;
+  readonly attachBitcoin: (id: string, bitcoin: BitcoinLeg) => void;
   readonly settle: (id: string, settlement: Settlement) => void;
   readonly cancel: (id: string) => void;
   readonly withdraw: (quote: WithdrawalQuote) => void;
@@ -286,6 +309,10 @@ export interface DemoActions {
 
 export interface DemoState extends DemoData, DemoActions {
   readonly balanceSats: number;
+  /** The live CZK price of bitcoin; `null` until fetched, or when the rate service cannot be reached. */
+  readonly czkPerBtc: number | null;
+  readonly rateFailed: boolean;
+  readonly refreshRate: () => void;
 }
 
 export const DemoContext = createContext<DemoState | undefined>(undefined);

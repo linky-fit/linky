@@ -10,6 +10,7 @@ import {
   TopBar,
 } from "@linky-fit/ui";
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { copy } from "../../copy";
 import { DemoScreen, Page } from "../chrome";
 import {
@@ -40,10 +41,13 @@ export interface TerminalStart {
 /** The terminal, full screen like the app's: type an amount, let the customer tip, open the payment. */
 export function TerminalMock({
   start,
+  banner,
   onOpenPayment,
   onOpenSections,
 }: {
   start: TerminalStart;
+  /** A payment that just arrived, announced over the keypad like the app does. */
+  banner?: ReactNode;
   onOpenPayment: (id: string) => void;
   onOpenSections: () => void;
 }) {
@@ -67,24 +71,19 @@ export function TerminalMock({
     );
   }
   return (
-    <DemoScreen>
+    <DemoScreen overlay={banner}>
       <TopBar
-        content={
-          <Text eyebrow textAlign="center" numberOfLines={1}>
-            {t.shopName}
-          </Text>
-        }
         trailing={
           <IconButton
-            icon="ArrowRight"
+            icon="Menu"
             accessibilityLabel={t.sections.history}
             onPress={onOpenSections}
           />
         }
       />
-      <Stack flex={1} paddingHorizontal="$xl" paddingBottom="$xxl" gap="$lg">
+      <Stack flex={1} paddingHorizontal="$xl" paddingBottom="$xl" gap="$lg">
         <Stack flex={1} justifyContent="center" minHeight="$hero">
-          <Amount value={formatTyped(input)} unit={t.czk} />
+          <Amount value={formatTyped(input)} unit={t.czk} size="xl" />
         </Stack>
         <Keypad
           accessibilityLabel={t.terminal.amount}
@@ -156,7 +155,7 @@ function TipStep({
             />
           }
         />
-        <Stack flex={1} paddingHorizontal="$xl" paddingBottom="$xxl" gap="$lg">
+        <Stack flex={1} paddingHorizontal="$xl" paddingBottom="$xl" gap="$lg">
           <Stack flex={1} justifyContent="center" minHeight="$hero">
             <Amount
               value={formatTyped(custom)}

@@ -13,6 +13,7 @@ const empty = { payments: [], withdrawals: [], offerTips: true };
 
 describe("the demo store", () => {
   it("settles a Cashu payment with its payer and adds its sats to the balance", () => {
+    // Priced at the seed rate, as no Bitcoin leg was prepared for it.
     const opened = createPayment(empty, {
       id: "p",
       amountHalere: 11_000,

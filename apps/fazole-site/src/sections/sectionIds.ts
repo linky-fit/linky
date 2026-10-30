@@ -1,12 +1,7 @@
-/** The page's anchors, shared by the sections and the header links. */
+/** The page's anchors, shared by the sections and the links to them. */
 export const sectionIds = {
-  benefits: "vyhody",
-  howItWorks: "jak-to-funguje",
-  tips: "spropitne",
-  audience: "pro-koho",
-  history: "historie",
-  wallet: "penezenka",
-  comparison: "srovnani",
-  privacy: "soukromi",
-  faq: "otazky",
+  stories: "na-miru",
+  steps: "jak-to-funguje",
+  why: "proc",
+  contact: "kontakt",
 } as const;

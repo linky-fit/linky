@@ -17,8 +17,11 @@ describe("the site copy", () => {
     expect(text).not.toMatch(/zaměstnan|tým|obsluh/iu);
   });
 
-  it("describes the recovery seed as the app's 20 words", () => {
+  it("calls bitcoin bitcoin, never Cashu", () => {
+    expect(text).not.toMatch(/cashu/iu);
+  });
+
+  it("never calls the recovery seed 24 words, which the app's is not", () => {
     expect(text).not.toMatch(/24 slov/u);
-    expect(text).toMatch(/20 slov/u);
   });
 });

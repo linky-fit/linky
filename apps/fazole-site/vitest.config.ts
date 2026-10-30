@@ -15,7 +15,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: "node",
-          include: ["src/**/*.test.ts"],
+          include: ["api/**/*.test.ts", "src/**/*.test.ts"],
           environment: "node",
         },
       },

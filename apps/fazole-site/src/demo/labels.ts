@@ -1,12 +1,7 @@
 import type { IconName, Tone } from "@linky-fit/ui";
 import { copy } from "../copy";
 import { formatCrowns, formatDay } from "./money";
-import type {
-  DemoPayment,
-  DemoWithdrawal,
-  PaymentMethod,
-  PaymentStatus,
-} from "./store";
+import type { DemoPayment, PaymentMethod, PaymentStatus } from "./store";
 
 const t = copy.demo;
 
@@ -63,52 +58,3 @@ export const dayTitle = (startMs: number, now: Date): string => {
   if (startMs === yesterday) return t.history.yesterday;
   return formatDay(new Date(startMs));
 };
-
-export interface Activity {
-  readonly id: string;
-  readonly at: Date;
-  readonly icon: IconName;
-  readonly direction: "in" | "out";
-  readonly sats: number;
-  readonly feeSats: number;
-  readonly label: string;
-}
-
-/** Bitcoin payments and withdrawals, newest first, like the app's wallet activity. */
-export const walletActivity = (
-  payments: readonly DemoPayment[],
-  withdrawals: readonly DemoWithdrawal[],
-): Activity[] =>
-  [
-    ...payments.flatMap((payment): Activity[] =>
-      payment.status === "paid" &&
-      payment.sats !== null &&
-      payment.method !== null
-        ? [
-            {
-              id: payment.id,
-              at: payment.paidAt ?? payment.createdAt,
-              icon: methodIcons[payment.method],
-              direction: "in",
-              sats: payment.sats,
-              feeSats: 0,
-              label: t.methods[payment.method],
-            },
-          ]
-        : [],
-    ),
-    ...withdrawals.map(
-      (withdrawal): Activity => ({
-        id: withdrawal.id,
-        at: withdrawal.at,
-        icon: withdrawal.kind === "linky" ? "Send" : "ArrowUpRight",
-        direction: "out",
-        sats: withdrawal.sats + withdrawal.feeSats,
-        feeSats: withdrawal.feeSats,
-        label:
-          withdrawal.kind === "linky"
-            ? t.wallet.withdrawalLinky
-            : t.wallet.withdrawalLightning,
-      }),
-    ),
-  ].sort((a, b) => b.at.getTime() - a.at.getTime());

@@ -1,18 +1,12 @@
 import { Stack, UIProvider } from "@linky-fit/ui";
 import { DemoProvider } from "./demo/DemoProvider";
-import { Audience, Benefits } from "./sections/Benefits";
 import { Closing, SiteFooter } from "./sections/Closing";
-import { Comparison } from "./sections/Comparison";
-import { Faq } from "./sections/Faq";
-import {
-  HistoryFeature,
-  PrivacyFeature,
-  TipsFeature,
-  WalletFeature,
-} from "./sections/Features";
+import { Contact } from "./sections/Contact";
 import { Hero } from "./sections/Hero";
-import { HowItWorks } from "./sections/HowItWorks";
 import { SiteHeader } from "./sections/SiteHeader";
+import { Steps } from "./sections/Steps";
+import { Stories } from "./sections/Stories";
+import { Why } from "./sections/Why";
 
 export function App() {
   return (
@@ -29,16 +23,11 @@ export function App() {
             gap="$none"
           >
             <Hero />
-            <Benefits />
-            <HowItWorks />
-            <TipsFeature />
-            <Audience />
-            <HistoryFeature />
-            <WalletFeature />
-            <Comparison />
-            <PrivacyFeature />
-            <Faq />
+            <Stories />
+            <Steps />
+            <Why />
             <Closing />
+            <Contact />
           </Stack>
           <SiteFooter />
         </Stack>
