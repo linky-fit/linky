@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatTyped, pressKey, typedHalere, withTip } from "./money";
-import { demoBip321, demoSpd } from "./qr";
+import { demoSpd } from "./qr";
 
 const type = (keys: Parameters<typeof pressKey>[1][]) =>
   keys.reduce(pressKey, "");
@@ -29,10 +29,9 @@ describe("demo money", () => {
     });
   });
 
-  it("builds QR payloads that cannot move money", () => {
-    expect(demoSpd(125_050, "1234567890")).toBe(
-      "SPD*1.0*ACC:CZ0000000000000123456789*AM:1250.50*CC:CZK*X-VS:1234567890*MSG:DEMO - NEPLATIT",
+  it("builds the bank QR payload for the account, like the app's", () => {
+    expect(demoSpd(125_050, "1234567890", "Kavárna U Lípy")).toBe(
+      "SPD*1.0*ACC:CZ5606000000000283078181*AM:1250.50*CC:CZK*X-VS:1234567890*MSG:Kavárna U Lípy",
     );
-    expect(demoBip321(6_875)).toContain("do0not0pay");
   });
 });

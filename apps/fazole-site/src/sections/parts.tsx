@@ -65,14 +65,26 @@ export function Logo({ size }: { size: number }) {
   );
 }
 
-/** "fazole" with an accent ".fit", set like the logo. */
+/** "Fazole", set like the logo. */
 export function Wordmark() {
   return (
     <Text variant="title" color="$colorStrong">
-      fazole
-      <Text variant="title" color="$accent">
-        .fit
-      </Text>
+      Fazole
+    </Text>
+  );
+}
+
+/** A short note in handwriting, like a pen mark on the page. */
+export function Handwritten({ children }: { children: string }) {
+  return (
+    <Text
+      fontFamily="$handwriting"
+      fontWeight="$semibold"
+      fontSize={34}
+      lineHeight={36}
+      color="$accent"
+    >
+      {children}
     </Text>
   );
 }
@@ -83,7 +95,7 @@ export function SectionHeading({
   body,
   centered = false,
 }: {
-  eyebrow: string;
+  eyebrow?: string | undefined;
   title: string;
   body?: string | undefined;
   centered?: boolean | undefined;
@@ -96,9 +108,11 @@ export function SectionHeading({
       alignSelf={centered ? "center" : "flex-start"}
       alignItems={centered ? "center" : "flex-start"}
     >
-      <Text variant="label" bold color="$accentText" textAlign={align}>
-        {eyebrow}
-      </Text>
+      {eyebrow ? (
+        <Text variant="label" bold color="$accentText" textAlign={align}>
+          {eyebrow}
+        </Text>
+      ) : null}
       <Text
         variant="display"
         color="$colorStrong"
@@ -146,19 +160,6 @@ function PointText({ point }: { point: Point }) {
         {point.title}
       </Text>
       <Text color="$colorMuted">{point.body}</Text>
-    </Stack>
-  );
-}
-
-export function PointList({ points }: { points: readonly Point[] }) {
-  return (
-    <Stack gap="$xl">
-      {points.map((point) => (
-        <Row key={point.title} alignItems="flex-start" gap="$lg">
-          <IconTile icon={point.icon} />
-          <PointText point={point} />
-        </Row>
-      ))}
     </Stack>
   );
 }
@@ -221,52 +222,6 @@ export function SiteSection({
       paddingVertical={wide ? "$huge" : "$xxxl"}
     >
       {children}
-    </Stack>
-  );
-}
-
-/** Text beside a phone on wide screens, stacked above it on phones. */
-export function Showcase({
-  text,
-  phone,
-  phoneFirst = false,
-}: {
-  text: ReactNode;
-  phone: ReactNode;
-  phoneFirst?: boolean | undefined;
-}) {
-  const { wide } = useMedia();
-  const phoneColumn = (
-    <Stack
-      flex={wide ? 1 : undefined}
-      flexBasis={wide ? 0 : undefined}
-      position="relative"
-      alignItems="center"
-      paddingVertical="$xl"
-    >
-      <Glow />
-      {phone}
-    </Stack>
-  );
-  const textColumn = (
-    <Stack
-      flex={wide ? 1 : undefined}
-      flexBasis={wide ? 0 : undefined}
-      gap="$xxxl"
-      justifyContent="center"
-    >
-      {text}
-    </Stack>
-  );
-  return wide ? (
-    <Row gap="$huge" alignItems="center">
-      {phoneFirst ? phoneColumn : textColumn}
-      {phoneFirst ? textColumn : phoneColumn}
-    </Row>
-  ) : (
-    <Stack gap="$xxl">
-      {textColumn}
-      {phoneColumn}
     </Stack>
   );
 }

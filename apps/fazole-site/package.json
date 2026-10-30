@@ -14,18 +14,23 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource/caveat": "^5.2.5",
+    "@linky-fit/linkshu": "workspace:*",
     "@linky-fit/ui": "workspace:*",
+    "nostr-tools": "^2.25.2",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-native": "0.86.3",
     "react-native-svg": "15.15.4",
-    "react-native-web": "0.21.3"
+    "react-native-web": "0.21.3",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@linky-fit/config": "workspace:*",
     "@types/node": "^24.10.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react-swc": "^4.2.2",
     "eslint": "^9.39.1",
     "jsdom": "^28.1.0",

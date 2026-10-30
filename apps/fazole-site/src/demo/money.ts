@@ -2,8 +2,8 @@ import type { KeypadKey } from "@linky-fit/ui";
 
 const LOCALE = "cs-CZ";
 
-/** A fixed demo rate, so the sats figures stay the same between visits. */
-export const DEMO_CZK_PER_BTC = 2_000_000;
+/** The rate the seeded history was priced at; a live payment uses the fetched one. */
+export const SEED_CZK_PER_BTC = 2_000_000;
 
 const SATS_PER_BTC = 100_000_000;
 
@@ -66,11 +66,15 @@ export const formatDay = (date: Date): string =>
   }).format(date);
 
 /** Rounds up, so the merchant never receives less than the CZK amount. */
-export const halereToSats = (halere: number): number =>
-  Math.ceil((halere * SATS_PER_BTC) / (DEMO_CZK_PER_BTC * 100));
+export const halereToSats = (
+  halere: number,
+  czkPerBtc: number = SEED_CZK_PER_BTC,
+): number => Math.ceil((halere * SATS_PER_BTC) / (czkPerBtc * 100));
 
-export const satsToHalere = (sats: number): number =>
-  Math.round((sats * DEMO_CZK_PER_BTC * 100) / SATS_PER_BTC);
+export const satsToHalere = (
+  sats: number,
+  czkPerBtc: number = SEED_CZK_PER_BTC,
+): number => Math.round((sats * czkPerBtc * 100) / SATS_PER_BTC);
 
 /** What the customer chose on the tip step. */
 export type TipChoice =

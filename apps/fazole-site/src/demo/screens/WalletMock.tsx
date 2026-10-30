@@ -5,28 +5,23 @@ import {
   IconButton,
   ListRow,
   Notice,
+  Pressable,
   Row,
-  Section,
   Stack,
-  Text,
   TextField,
 } from "@linky-fit/ui";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { copy } from "../../copy";
 import { DemoScreen, DemoSheet, DetailRows, Page } from "../chrome";
-import { walletActivity } from "../labels";
-import type { Activity } from "../labels";
-import {
-  formatCrowns,
-  formatDateTime,
-  formatWhole,
-  satsToHalere,
-} from "../money";
+import { formatCrowns, formatWhole, satsToHalere } from "../money";
 import { quoteWithdrawal, useDemo } from "../store";
 import type { WithdrawalKind, WithdrawalQuote } from "../store";
 
 const t = copy.demo;
+
+/** Who is asked for cash unless the merchant names someone else, like the app's default. */
+const DEFAULT_CASH_CONTACT = "hynek@linky.fit";
 
 /** What paste and the scanner fill in: the demo touches neither the clipboard nor the camera. */
 const demoTargets: Record<WithdrawalKind, string> = {
@@ -48,6 +43,15 @@ const parseSats = (text: string) => {
     : null;
 };
 
+/** A typed amount of crowns, `null` when it is not a positive number. */
+const parseCrowns = (text: string): number | null => {
+  const normalized = text.replace(/\s/gu, "").replace(",", ".");
+  const value = Number(normalized);
+  return normalized !== "" && Number.isFinite(value) && value > 0
+    ? value
+    : null;
+};
+
 const shorten = (text: string) =>
   text.length > 24 ? `${text.slice(0, 14)}…${text.slice(-8)}` : text;
 
@@ -65,13 +69,23 @@ const choiceTitles: Record<WithdrawalKind, string> = {
 const sats = (value: number) => t.satAmount(formatWhole(value));
 
 /** The app's withdraw sheet: Linky or Lightning, the recipient, a review of amount and fee, then send. */
-function WithdrawSheet({ onClose }: { onClose: () => void }) {
+function WithdrawSheet({
+  czkPerBtc,
+  onClose,
+}: {
+  czkPerBtc: number | null;
+  onClose: () => void;
+}) {
   const { balanceSats, withdraw } = useDemo();
   const [step, setStep] = useState<Step>({ kind: "choose" });
   const [target, setTarget] = useState("");
   const [amountText, setAmountText] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [insufficient, setInsufficient] = useState(false);
+  const approx = (value: number) =>
+    czkPerBtc === null
+      ? null
+      : t.approxCzk(formatCrowns(satsToHalere(value, czkPerBtc)));
 
   const toForm = (choice: WithdrawalKind) => {
     setInsufficient(false);
@@ -116,6 +130,8 @@ function WithdrawSheet({ onClose }: { onClose: () => void }) {
           if (quote !== "insufficient") setStep({ kind: "review", quote });
         };
         const fillDemoTarget = () => setTarget(demoTargets[choice]);
+        const typedApprox =
+          amount === undefined || amount === null ? null : approx(amount);
         return (
           <Stack gap="$lg">
             <TextField
@@ -165,9 +181,9 @@ function WithdrawSheet({ onClose }: { onClose: () => void }) {
                   : undefined
               }
               hint={
-                amount === undefined || amount === null
+                typedApprox === null
                   ? `${t.withdraw.amountWhole} · ${available}`
-                  : `${t.approxCzk(formatCrowns(satsToHalere(amount)))} · ${available}`
+                  : `${typedApprox} · ${available}`
               }
             />
             <Stack gap="$sm">
@@ -187,6 +203,7 @@ function WithdrawSheet({ onClose }: { onClose: () => void }) {
       }
       case "review": {
         const { quote } = step;
+        const receives = approx(quote.amountSats);
         return (
           <Stack gap="$lg">
             <Card backgroundColor="$neutralSoft">
@@ -195,9 +212,10 @@ function WithdrawSheet({ onClose }: { onClose: () => void }) {
                   { label: t.withdraw.to, value: shorten(quote.target) },
                   {
                     label: t.withdraw.receives,
-                    value: `${sats(quote.amountSats)} (${t.approxCzk(
-                      formatCrowns(satsToHalere(quote.amountSats)),
-                    )})`,
+                    value:
+                      receives === null
+                        ? sats(quote.amountSats)
+                        : `${sats(quote.amountSats)} (${receives})`,
                   },
                   { label: t.withdraw.fee, value: sats(quote.feeSats) },
                   { label: t.withdraw.total, value: sats(quote.totalSats) },
@@ -264,62 +282,125 @@ function WithdrawSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
-function ActivityRow({ item }: { item: Activity }) {
-  const row = t.wallet.row(formatDateTime(item.at), item.label);
-  const amount = formatWhole(item.sats);
+/** The app's cash sheet: a Linky contact and an amount, who then gets a request to exchange the bitcoin for cash. */
+function CashSheet({
+  czkPerBtc,
+  onClose,
+}: {
+  czkPerBtc: number | null;
+  onClose: () => void;
+}) {
+  const [contact, setContact] = useState(DEFAULT_CASH_CONTACT);
+  const [amountText, setAmountText] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [requested, setRequested] = useState(false);
+  const amount = parseCrowns(amountText);
+  const request = () => {
+    setSubmitted(true);
+    if (amount !== null && contact.trim() !== "") setRequested(true);
+  };
   return (
-    <ListRow
-      icon={item.icon}
-      title={
-        item.direction === "in" ? t.wallet.in(amount) : t.wallet.out(amount)
-      }
-      description={
-        item.feeSats > 0 ? t.wallet.rowFee(row, formatWhole(item.feeSats)) : row
-      }
-      chevron={false}
-    />
+    <DemoSheet open onClose={onClose} title={t.cash.title}>
+      <Stack gap="$lg" paddingTop="$sm">
+        {requested ? (
+          <>
+            <Notice tone="accent" title={t.cash.requested} />
+            <Button onPress={onClose}>{t.done}</Button>
+          </>
+        ) : (
+          <>
+            {czkPerBtc === null ? (
+              <Notice tone="warning" title={t.wallet.rateUnavailable} />
+            ) : null}
+            <TextField
+              label={t.cash.contact}
+              placeholder={t.cash.contactPlaceholder}
+              value={contact}
+              onChangeText={setContact}
+              autoCapitalize="none"
+              autoComplete="off"
+              autoCorrect={false}
+              spellCheck={false}
+            />
+            <TextField
+              label={t.cash.amount}
+              value={amountText}
+              onChangeText={setAmountText}
+              inputMode="decimal"
+              trailing={t.czk}
+              error={
+                submitted && amount === null ? t.cash.amountInvalid : undefined
+              }
+            />
+            <Button icon="Banknote" onPress={request}>
+              {t.cash.continue}
+            </Button>
+          </>
+        )}
+      </Stack>
+    </DemoSheet>
   );
 }
 
-/** The wallet, like the app's: the balance, a withdraw button and what moved. */
+/** The wallet, like the app's: the balance in crowns (a tap shows sats), withdrawing, and cash from a contact. */
 export function WalletMock({ tabBar }: { tabBar: ReactNode }) {
-  const { balanceSats, payments, withdrawals } = useDemo();
-  const [withdrawing, setWithdrawing] = useState(false);
+  const { balanceSats, czkPerBtc, rateFailed } = useDemo();
+  const [sheet, setSheet] = useState<"withdraw" | "cash" | null>(null);
+  // Starts in CZK on every visit, so a merchant never lands on sats unexpectedly.
+  const [showSats, setShowSats] = useState(false);
+  const czk = showSats ? null : czkPerBtc;
+  const balance = (
+    <Amount
+      value={
+        czk === null
+          ? formatWhole(balanceSats)
+          : formatWhole(Math.round(satsToHalere(balanceSats, czk) / 100))
+      }
+      unit={czk === null ? t.sat : t.czk}
+      caption={rateFailed ? t.wallet.rateUnavailable : undefined}
+    />
+  );
   return (
     <DemoScreen
       tabBar={tabBar}
       overlay={
-        withdrawing ? (
-          <WithdrawSheet onClose={() => setWithdrawing(false)} />
+        sheet === "withdraw" ? (
+          <WithdrawSheet czkPerBtc={czkPerBtc} onClose={() => setSheet(null)} />
+        ) : sheet === "cash" ? (
+          <CashSheet czkPerBtc={czkPerBtc} onClose={() => setSheet(null)} />
         ) : null
       }
     >
       <Page title={t.sections.wallet}>
-        <Card alignItems="center" gap="$md" paddingVertical="$xxl">
-          <Text variant="label" color="$colorMuted">
-            {t.wallet.balance}
-          </Text>
-          <Amount
-            value={formatWhole(balanceSats)}
-            unit={t.sat}
-            caption={t.approxCzk(formatCrowns(satsToHalere(balanceSats)))}
-          />
-        </Card>
+        <Stack alignItems="center" paddingVertical="$xxl">
+          {czkPerBtc === null ? (
+            balance
+          ) : (
+            <Pressable
+              tooltip={t.wallet.switchUnit}
+              alignSelf="center"
+              onPress={() => setShowSats((current) => !current)}
+            >
+              {balance}
+            </Pressable>
+          )}
+        </Stack>
         <Button
           icon="ArrowUpRight"
           minHeight="$controlLg"
           disabled={balanceSats === 0}
-          onPress={() => setWithdrawing(true)}
+          onPress={() => setSheet("withdraw")}
         >
           {t.wallet.withdraw}
         </Button>
-        <Section title={t.wallet.activity}>
-          <Card paddingVertical="$sm" gap="$none">
-            {walletActivity(payments, withdrawals).map((item) => (
-              <ActivityRow key={item.id} item={item} />
-            ))}
-          </Card>
-        </Section>
+        <Button
+          variant="secondary"
+          icon="Banknote"
+          minHeight="$controlLg"
+          onPress={() => setSheet("cash")}
+        >
+          {t.wallet.cash}
+        </Button>
       </Page>
     </DemoScreen>
   );

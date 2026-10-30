@@ -1,4 +1,7 @@
 @import "@linky-fit/ui/manrope.css";
+/* The handwritten notes; Czech needs latin-ext. */
+@import "@fontsource/caveat/latin-600.css";
+@import "@fontsource/caveat/latin-ext-600.css";
 
 /* Painted before the bundle loads; repeats the fazole theme of @linky-fit/ui. */
 :root {

@@ -9,6 +9,7 @@ import {
   space,
   Stack,
   Text,
+  TopBar,
 } from "@linky-fit/ui";
 import { useState } from "react";
 import type { ReactNode } from "react";
@@ -143,7 +144,7 @@ export function DemoScreen({
   );
 }
 
-/** A scrolling page in the phone, like the app's `Page`. */
+/** A scrolling page in the phone, like the app's `Page`; `title` names it in a top bar. */
 export function Page({
   title,
   centered = false,
@@ -153,17 +154,19 @@ export function Page({
   centered?: boolean | undefined;
   children: ReactNode;
 }) {
-  return (
+  const page = (
     <ScrollView flex={1} contentContainerStyle={{ flexGrow: 1 }}>
       <Screen justifyContent={centered ? "center" : "flex-start"} gap="$xl">
-        {title ? (
-          <Text variant="heading" role="heading">
-            {title}
-          </Text>
-        ) : null}
         {children}
       </Screen>
     </ScrollView>
+  );
+  if (!title) return page;
+  return (
+    <Stack flex={1} gap="$none" minHeight={0}>
+      <TopBar title={title} />
+      {page}
+    </Stack>
   );
 }
 

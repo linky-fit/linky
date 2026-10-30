@@ -1,9 +1,11 @@
 import {
+  Avatar,
   Button,
   Card,
   ListRow,
   Notice,
   Section,
+  size,
   Stack,
   Switch,
   Text,
@@ -56,7 +58,16 @@ function RecoverySeed() {
   );
 }
 
-/** Settings, like the app's: the shop, the tip switch, the recovery seed and the mint. */
+/** The shop's store icon, centered on a row's icon slot so the title lines up with the other rows. */
+function ShopAvatar() {
+  return (
+    <Stack width={size.iconSm} alignItems="center">
+      <Avatar name={t.shopName} icon="Store" size="sm" />
+    </Stack>
+  );
+}
+
+/** Settings, like the app's: the shop and its payment options, help, the language, and the recovery seed. */
 export function SettingsMock({ tabBar }: { tabBar: ReactNode }) {
   const { offerTips, setOfferTips } = useDemo();
   const [showingSeed, setShowingSeed] = useState(false);
@@ -78,15 +89,13 @@ export function SettingsMock({ tabBar }: { tabBar: ReactNode }) {
         <Section title={t.settings.shop}>
           <Card paddingVertical="$sm" gap="$none">
             <ListRow
-              icon="Store"
+              leading={<ShopAvatar />}
               title={t.shopName}
               description={demoAccount.display}
-              chevron
             />
             <ListRow
               icon="HandCoins"
               title={t.settings.offerTips}
-              description={t.settings.offerTipsDescription}
               chevron={false}
               trailing={
                 <Switch
@@ -95,6 +104,26 @@ export function SettingsMock({ tabBar }: { tabBar: ReactNode }) {
                   onValueChange={setOfferTips}
                 />
               }
+            />
+            <ListRow
+              icon="QrCode"
+              title={t.settings.bitcoinQr}
+              value={t.settings.bitcoinQrUniversal}
+            />
+            <ListRow icon="Bitcoin" title={t.settings.mint} value="cashu.cz" />
+          </Card>
+        </Section>
+        <Section title={t.settings.help}>
+          <Card paddingVertical="$sm" gap="$none">
+            <ListRow icon="MessageCircle" title={t.settings.contactSupport} />
+          </Card>
+        </Section>
+        <Section title={t.settings.about}>
+          <Card paddingVertical="$sm" gap="$none">
+            <ListRow
+              icon="Languages"
+              title={t.settings.language}
+              value={t.settings.languageValue}
             />
           </Card>
         </Section>
@@ -105,20 +134,12 @@ export function SettingsMock({ tabBar }: { tabBar: ReactNode }) {
               title={t.settings.recoverySeed}
               onPress={() => setShowingSeed(true)}
             />
-            <ListRow icon="RefreshCcw" title={t.settings.restore} chevron />
-            <ListRow
-              icon="Trash2"
-              title={t.settings.reset}
-              destructive
-              chevron
-            />
+            <ListRow icon="Trash2" title={t.settings.reset} destructive />
           </Card>
         </Section>
-        <Section title={t.settings.about}>
-          <Card paddingVertical="$sm" gap="$none">
-            <ListRow icon="Bitcoin" title={t.settings.mint} value="cashu.cz" />
-          </Card>
-        </Section>
+        <Text variant="caption" color="$colorMuted" textAlign="center">
+          {t.settings.version}
+        </Text>
       </Page>
     </DemoScreen>
   );
