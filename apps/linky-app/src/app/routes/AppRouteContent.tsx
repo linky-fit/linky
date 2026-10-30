@@ -44,6 +44,7 @@ import {
   AppearancePage,
   ReceiveMethodPage,
   LnAddressPayRoute,
+  LnInvoicePayRoute,
   ManualPayRoute,
   MasterKeysPage,
   NostrIdentityPage,
@@ -210,6 +211,8 @@ const RoutePage = (): React.ReactElement => {
       return <ContactPayRoute route={route} />;
     case "lnAddressPay":
       return <LnAddressPayRoute lnAddress={route.lnAddress} />;
+    case "lnInvoicePay":
+      return <LnInvoicePayRoute invoice={route.invoice} />;
     case "manualPay":
       return <ManualPayRoute />;
     case "bankPayment":

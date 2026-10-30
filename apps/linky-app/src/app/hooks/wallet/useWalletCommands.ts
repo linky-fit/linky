@@ -45,8 +45,13 @@ export const useWalletCommands = () => {
         commands
           ?.read()
           .payLightningAddressWithCashu(lnAddress, amountSat, comment),
-      payLightningInvoiceWithCashu: async (invoice: string) =>
-        (await commands?.read().payLightningInvoiceWithCashu(invoice)) ?? false,
+      payLightningInvoiceWithCashu: async (
+        invoice: string,
+        amountSat?: number,
+      ) =>
+        (await commands
+          ?.read()
+          .payLightningInvoiceWithCashu(invoice, amountSat)) ?? false,
       paySelectedContact: async (options: { note: string | null }) =>
         commands?.read().paySelectedContact(options),
       reclaimHandedOutTokens: async () =>

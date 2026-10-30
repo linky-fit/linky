@@ -88,8 +88,9 @@ export const useLightningPayments = ({
     };
   }, [commands, pendingLightningInvoiceConfirmation, setInvoiceQuote]);
 
+  /** Pays `invoice`; `amountSat` is what an amountless one is paid with. */
   const payLightningInvoiceWithCashu = React.useCallback(
-    async (invoice: string): Promise<boolean> => {
+    async (invoice: string, amountSat?: number): Promise<boolean> => {
       if (commands === null) {
         setStatus(`${t("errorPrefix")}: ${NOT_READY}`);
         return false;
@@ -98,9 +99,14 @@ export const useLightningPayments = ({
       showPaymentSending({
         direction: "out",
         amountSat:
-          getLightningInvoicePreview(invoice.trim())?.amountSat ?? null,
+          getLightningInvoicePreview(invoice.trim())?.amountSat ??
+          amountSat ??
+          null,
       });
-      const outcome = await commands.payLightningInvoice(invoice);
+      const outcome = await commands.payLightningInvoice(
+        invoice,
+        amountSat === undefined ? undefined : { amountSat },
+      );
       dismissPaymentSending();
       switch (outcome._tag) {
         case "Paid": {
@@ -130,7 +136,8 @@ export const useLightningPayments = ({
         case "Invalid":
           return false;
       }
-      if (routeKind === "manualPay") navigateTo({ route: "wallet" });
+      if (routeKind === "manualPay" || routeKind === "lnInvoicePay")
+        navigateTo({ route: "wallet" });
       return true;
     },
     [

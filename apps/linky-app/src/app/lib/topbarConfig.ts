@@ -107,6 +107,7 @@ export const resolveBackAction = (
 
     case "transactions":
     case "manualPay":
+    case "lnInvoicePay":
     case "cashuTokens":
     case "cashuTokenEmit":
     case "topup":
@@ -263,6 +264,7 @@ const SHOWS_MENU_BUTTON: Record<
   keryxCompany: false,
   keryxCompanyNew: false,
   lnAddressPay: true,
+  lnInvoicePay: false,
   manualPay: false,
   onchainReceive: false,
   onchainSend: false,
@@ -458,6 +460,7 @@ const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
   keryxCompany: "keryxCompany",
   keryxCompanyNew: "keryxAddCompany",
   lnAddressPay: "pay",
+  lnInvoicePay: "pay",
   manualPay: "manualPayTitle",
   mint: "mints",
   mintNew: "mintAdd",

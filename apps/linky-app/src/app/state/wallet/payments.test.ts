@@ -398,11 +398,38 @@ describe("quoteLightningInvoice", () => {
     });
   });
 
+  it("prices an amountless invoice at the entered amount, and an invoice's own amount over it", async () => {
+    const { commands, linkshu } = setup();
+    const amountless = makeLightningInvoice("");
+
+    expect(await commands.quoteLightningInvoice(amountless, 40)).toEqual({
+      _tag: "Quoted",
+      amount: 40,
+      fee: 3,
+      mint: MINT_URL,
+    });
+    expect(linkshu.quoteCashuMelt).toHaveBeenCalledWith({
+      invoice: amountless,
+      mint: MINT_URL,
+      amountSat: 40,
+    });
+
+    const priced = makeLightningInvoice("400n");
+    await commands.quoteLightningInvoice(priced, 7);
+    expect(linkshu.quoteCashuMelt).toHaveBeenLastCalledWith({
+      invoice: priced,
+      mint: MINT_URL,
+    });
+  });
+
   it("asks no mint for an amountless invoice or without funds", async () => {
     const { commands, linkshu } = setup();
     expect(await commands.quoteLightningInvoice("lnbc-mock")).toEqual({
       _tag: "Invalid",
     });
+    expect(
+      await commands.quoteLightningInvoice(makeLightningInvoice(""), 0),
+    ).toEqual({ _tag: "Invalid" });
     const broke = setup({ balances: {} });
     expect(
       await broke.commands.quoteLightningInvoice(makeLightningInvoice("400n")),
@@ -457,6 +484,22 @@ describe("payLightningInvoice", () => {
         status: "ok",
       }),
     );
+  });
+
+  it("pays an amountless invoice with the entered amount", async () => {
+    const { commands, linkshu } = setup();
+    const amountless = makeLightningInvoice("");
+
+    const outcome = await commands.payLightningInvoice(amountless, {
+      amountSat: 40,
+    });
+
+    expect(outcome).toEqual({ _tag: "Paid", receipt: meltReceipt(40) });
+    expect(linkshu.meltCashuInvoice).toHaveBeenCalledWith({
+      invoice: amountless,
+      mint: MINT_URL,
+      amountSat: 40,
+    });
   });
 
   it("reports a typed melt failure with its detail", async () => {
