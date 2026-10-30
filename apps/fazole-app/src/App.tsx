@@ -8,7 +8,13 @@ export function App({ device }: { readonly device: Device }) {
   return (
     <UIProvider mode="dark" brand="fazole">
       <DeviceProvider device={device}>
-        <Stack flex={1} gap="$none" backgroundColor="$background">
+        {/* Every screen starts below the status bar and the notch; the bottom edge is each screen's own. */}
+        <Stack
+          flex={1}
+          gap="$none"
+          backgroundColor="$background"
+          data-safe-area="top"
+        >
           <UpdateBanner />
           <AppShell />
         </Stack>

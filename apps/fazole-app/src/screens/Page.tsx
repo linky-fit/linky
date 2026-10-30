@@ -1,7 +1,7 @@
-import { Screen, ScrollView, Stack, Text } from "@linky-fit/ui";
+import { Screen, ScrollView, Stack, TopBar } from "@linky-fit/ui";
 import type { ReactNode } from "react";
 
-/** A scrolling page in a narrow column, centered on wide screens. */
+/** A scrolling page in a narrow column, centered on wide screens; `title` names it in a top bar, like the payment screen. */
 export function Page({
   title,
   centered = false,
@@ -14,7 +14,7 @@ export function Page({
   readonly testID?: string | undefined;
   readonly children: ReactNode;
 }) {
-  return (
+  const page = (
     <ScrollView
       flex={1}
       contentContainerStyle={{ flexGrow: 1 }}
@@ -28,14 +28,18 @@ export function Page({
         justifyContent={centered ? "center" : "flex-start"}
         gap="$xl"
       >
-        {title ? (
-          <Text variant="heading" role="heading">
-            {title}
-          </Text>
-        ) : null}
         {children}
       </Screen>
     </ScrollView>
+  );
+  if (!title) return page;
+  return (
+    <Stack flex={1} gap="$none" minHeight={0}>
+      <Stack width="100%" maxWidth="$sheetWidth" alignSelf="center">
+        <TopBar title={title} />
+      </Stack>
+      {page}
+    </Stack>
   );
 }
 

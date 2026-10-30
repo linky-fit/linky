@@ -27,11 +27,7 @@ export function WelcomeScreen() {
   return (
     <Page testID="welcome-screen">
       {/* Pinned to the top of the content column, spanning its gutter, like Linky's welcome. */}
-      <Stack
-        marginTop={-space.lg}
-        marginHorizontal={-space.xl}
-        data-safe-area="top"
-      >
+      <Stack marginTop={-space.lg} marginHorizontal={-space.xl}>
         <TopBar
           trailing={
             <IconButton
