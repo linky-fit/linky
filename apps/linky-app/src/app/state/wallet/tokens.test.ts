@@ -272,7 +272,11 @@ describe("recoverTokens", () => {
     expect(onStarted).toHaveBeenCalledOnce();
     expect(recoverEnvelopes).toHaveBeenCalledOnce();
     expect(restored.logPaymentEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ method: "cashu_restore", amount: 12 }),
+      expect.objectContaining({
+        method: "cashu_restore",
+        paymentType: "restore",
+        amount: 12,
+      }),
     );
   });
 
@@ -366,7 +370,12 @@ describe("issueToken", () => {
       produceAs: "issued",
     });
     expect(logPaymentEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ note: "tip", phase: "swap", status: "ok" }),
+      expect.objectContaining({
+        note: "tip",
+        paymentType: "issue",
+        phase: "swap",
+        status: "ok",
+      }),
     );
   });
 
@@ -394,7 +403,11 @@ describe("issueToken", () => {
       await short.commands.issueToken({ amountSat: 21, memo: null }),
     ).toMatchObject({ _tag: "Failed", insufficient: true });
     expect(short.logPaymentEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ status: "error", phase: "swap" }),
+      expect.objectContaining({
+        status: "error",
+        paymentType: "issue",
+        phase: "swap",
+      }),
     );
   });
 

@@ -1,4 +1,7 @@
-import { classifyPaymentErrorCode } from "@linky-fit/linkstr";
+import {
+  classifyPaymentErrorCode,
+  PaymentTelemetryPaymentType,
+} from "@linky-fit/linkstr";
 import { Schema } from "effect";
 export { classifyPaymentErrorCode } from "@linky-fit/linkstr";
 import {
@@ -157,17 +160,7 @@ const LocalPaymentTelemetryEventSchema = Schema.Struct({
     "swap",
     "unknown",
   ]),
-  paymentType: Schema.optional(
-    Schema.NullOr(
-      Schema.Literals([
-        "contact",
-        "lightning",
-        "proxy",
-        "recurring",
-        "request",
-      ]),
-    ),
-  ),
+  paymentType: Schema.optional(Schema.NullOr(PaymentTelemetryPaymentType)),
   appVersion: Schema.String,
   appHost: Schema.optional(Schema.NullOr(Schema.String)),
   appRuntime: Schema.optional(

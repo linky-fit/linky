@@ -162,6 +162,7 @@ export const useTopupFlow = ({
           noteByQuoteIdRef.current.get(quote.quoteId) ??
           invoicePreview?.description ??
           null,
+        paymentType: "topup",
         status: "ok",
         transactionId: transactionIdForQuote(
           "topup",

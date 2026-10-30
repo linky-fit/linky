@@ -269,6 +269,7 @@ export const makeNpubCashCommands = (deps: NpubCashDeps): NpubCashCommands => {
       contactId: null,
       method: payment.method,
       note: payment.note ?? null,
+      paymentType: "received_lightning",
       phase: "receive",
       ...(payment.details === undefined ? {} : { details: payment.details }),
     });
@@ -292,6 +293,7 @@ export const makeNpubCashCommands = (deps: NpubCashDeps): NpubCashCommands => {
         error: message,
         contactId: null,
         method: "cashu_receive",
+        paymentType: "received_lightning",
         phase: "receive",
       });
     return ops.runQueuedTask(async () => {
@@ -449,6 +451,7 @@ export const makeNpubCashCommands = (deps: NpubCashDeps): NpubCashCommands => {
       error: describeTaggedCashuError(error) ?? error._tag,
       contactId: null,
       method: "lightning_address",
+      paymentType: "received_lightning",
       phase: "receive",
       details: { quoteId: quote.quoteId, retry: !definitive },
     });

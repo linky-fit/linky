@@ -164,6 +164,7 @@ describe("useDeferredReceiveRetry", () => {
     expect(view.params.logPaymentEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         direction: "in",
+        paymentType: "received_token",
         status: "ok",
         transactionId: transactionIdForOperation(receiveId),
         amount: 20,

@@ -276,6 +276,7 @@ export const makeTokensCommands = (deps: TokensDeps): TokensCommands => {
         error,
         contactId: null,
         method: "unknown",
+        paymentType: "issue",
         phase: "swap",
       });
     const issued = await ops.runExclusiveTask(
@@ -321,6 +322,7 @@ export const makeTokensCommands = (deps: TokensDeps): TokensCommands => {
             error: null,
             contactId: null,
             method: "unknown",
+            paymentType: "issue",
             phase: "swap",
           });
           return { _tag: "Issued", receipt };
@@ -527,6 +529,7 @@ export const makeTokensCommands = (deps: TokensDeps): TokensCommands => {
             error: null,
             contactId: null,
             method: "cashu_restore",
+            paymentType: "restore",
             phase: "restore",
             details: { scannedMints: [...restore.scannedMints] },
           });
