@@ -1,14 +1,16 @@
 # Changelog
 
-All notable user-facing changes to the fazole.fit app are documented in this file.
+All notable user-facing changes to the Fazole app are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Every release must include `en-US` followed by `cs-CZ`.
 
-Všechny významné uživatelské změny aplikace fazole.fit jsou uvedené v tomto souboru.
+Všechny významné uživatelské změny aplikace Fazole jsou uvedené v tomto souboru.
 Formát vychází z [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Každá vydaná verze musí obsahovat nejprve `en-US` a potom `cs-CZ`.
 
 ## [Unreleased]
+
+## [26.10.4] - 2026-10-30
 
 ### en-US
 
@@ -17,6 +19,7 @@ Každá vydaná verze musí obsahovat nejprve `en-US` a potom `cs-CZ`.
 - The bank QR code carries the shop's name as the recipient's name instead of the message for the recipient, and its fields follow the order of the banking standard's own example, so every banking app reads the instant payment request the same way.
 - Every screen starts below the phone's status bar and notch, so the terminal's menu button and the other top bars are no longer hidden under them on phones with a cut-out.
 - History, Wallet and Settings name themselves in a small centered top bar, like the payment screen, instead of a large heading.
+- The app is called Fazole, without the ".fit": on the welcome screen, in the installed app's name and in the update notice.
 
 ### cs-CZ
 
@@ -25,6 +28,7 @@ Každá vydaná verze musí obsahovat nejprve `en-US` a potom `cs-CZ`.
 - Bankovní QR kód nese název obchodu jako jméno příjemce místo zprávy pro příjemce a jeho pole jdou v pořadí vzorového příkazu z bankovního standardu, aby každá bankovní aplikace stejně přečetla i požadavek na okamžitou platbu.
 - Každá obrazovka začíná pod stavovou lištou a výřezem displeje, takže tlačítko menu na terminálu ani ostatní horní lišty už na telefonech s výřezem nezůstávají schované pod nimi.
 - Historie, Peněženka a Nastavení mají název v malé vycentrované horní liště jako obrazovka platby místo velkého nadpisu.
+- Aplikace se jmenuje Fazole, bez koncovky „.fit“: na úvodní obrazovce, v názvu nainstalované aplikace i v upozornění na novou verzi.
 
 ## [26.10.3] - 2026-10-19
 
