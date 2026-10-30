@@ -282,19 +282,24 @@ function BankWatch({ payment }: { readonly payment: Payment }) {
       />
     );
   }
-  return state === "unreachable" ? (
-    <Pill
-      testID="payment-bank-unreachable"
-      tone="neutral"
-      label={copy.payment.bankUnreachable}
-    />
-  ) : (
-    <Pill
-      testID="payment-bank-waiting"
-      tone="warning"
-      label={copy.payment.waiting}
-      leading={<Spinner color="$warningText" />}
-    />
+  // Quiet on purpose: the QR code is what the customer and the merchant look at.
+  return (
+    <Row
+      gap="$xs"
+      alignItems="center"
+      testID={
+        state === "unreachable"
+          ? "payment-bank-unreachable"
+          : "payment-bank-waiting"
+      }
+    >
+      {state === "watching" ? <Spinner color="$colorMuted" /> : null}
+      <Text variant="caption" color="$colorMuted">
+        {state === "unreachable"
+          ? copy.payment.bankUnreachable
+          : copy.payment.waiting}
+      </Text>
+    </Row>
   );
 }
 
