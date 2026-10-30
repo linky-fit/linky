@@ -12,6 +12,8 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ## [Unreleased]
 
+## [26.10.9] - 2026-10-30
+
 ### en-US
 
 - On-chain sends show one amount, stepped down or up, with the fee below it, and go out the moment you tap Send; on-chain receives explain the terms, then show one address in groups of four, and once the bitcoin arrives only the status, what you get and a link to the transaction.
