@@ -10,17 +10,32 @@ The job needs the `ZAPSTORE_NSEC` environment secret and fails, without printing
 2. Have the matching private key in `nsec1...` format.
 3. In the repository's **Settings → Environments**, create the environment `zapstore` with the secret `ZAPSTORE_NSEC` set to the complete `nsec1...` for the `pubkey` in `zapstore.yaml`.
 4. Restrict the environment's deployment branches and tags to the protected `main` branch and release tags (`v*`). Do not add required reviewers if publishing must stay automatic.
-5. Run the first publish locally with the release signing keystore available; it links the APK signing certificate to the Nostr identity:
+5. Prove that the APK signing certificate belongs to the Nostr identity. Zapstore only lists releases whose certificate has an active ownership proof (NIP-C1, kind `30509`) from the signer; without one every publish is silently dropped. The `zsp` wizard creates the proof from the release keystore and the `nsec`, and renews it the same way; the current proof expires on 2028-10-30:
 
    ```bash
-   go install github.com/zapstore/zsp@v0.4.14
-   bun run zapstore:screenshots
-   read -r -s ZAPSTORE_NSEC
-   SIGN_WITH="$ZAPSTORE_NSEC" zsp publish --wizard
-   unset ZAPSTORE_NSEC
+   go install github.com/zapstore/zsp/v2/cmd/zsp@latest
+   cd <repo root>
+   export KEYSTORE_PASSWORD=<storePassword from keystore.properties>
+   export KEYSTORE_KEY_PASSWORD=<keyPassword from keystore.properties>
+   read -r -s SIGN_WITH && export SIGN_WITH
+   zsp
+   unset SIGN_WITH KEYSTORE_PASSWORD KEYSTORE_KEY_PASSWORD
    ```
 
-   `read -s` keeps the `nsec` out of shell history.
+   `read -s` keeps the `nsec` out of shell history. When the wizard asks for the signing keystore, give it the path to the release keystore (`~/.keys/linky/linky-upload-key.jks` on the machine that generated it).
+
+## Publishing a release by hand
+
+`zapstore.yaml` names the APK at the Gradle output path, which holds whatever was built last on this machine. To publish the APK from a GitHub release instead, override the source:
+
+```bash
+gh release download linky-v<version> --pattern linky.apk --dir "$TMPDIR"
+read -r -s SIGN_WITH && export SIGN_WITH
+zsp publish zapstore.yaml -s "$TMPDIR/linky.apk"
+unset SIGN_WITH
+```
+
+`zsp check zapstore.yaml -s <apk>` shows, without signing anything, whether the app is listed, which proof is active and which version code is already published.
 
 ## Key handling
 

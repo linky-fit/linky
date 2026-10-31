@@ -302,8 +302,8 @@ jobs:
       contents: read
     env:
       RELEASE_SHA: ${{ needs.resolve.outputs.sha }}
-      ZSP_VERSION: 0.4.14
-      ZSP_LINUX_AMD64_SHA256: f655a6c253a0aff6c6768dd24c65fb12aafe9cd2e48d35605e623adf54aaddb2
+      ZSP_VERSION: 2.0.0
+      ZSP_LINUX_AMD64_SHA256: 5483806beafde1b5deaa16f5efbead35a211b7d6015752f86d099e0faecc4a66
 
     steps:
       - name: Checkout Zapstore metadata
