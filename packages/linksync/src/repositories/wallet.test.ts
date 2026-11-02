@@ -384,6 +384,28 @@ describe("wallet repository", () => {
       ).toEqual(["https://abc.example"]);
     });
 
+    it("binds a keyset to the lowest mint among its proofs created in the same second", () => {
+      const { store } = linkyStore();
+      const { proofs } = makeWalletRepository(store);
+      tick(1_700_000_000_100);
+      run(
+        proofs.write({
+          insert: [proof("zed", "available", { mint: "https://zed.example" })],
+        }),
+      );
+      tick(800);
+      run(
+        proofs.write({
+          insert: [proof("abc", "available", { mint: "https://abc.example" })],
+        }),
+      );
+      expect(
+        run(proofs.findOldestByKeysets([KeysetId.make("00ab")])).map(
+          (p) => p.mint,
+        ),
+      ).toEqual(["https://abc.example"]);
+    });
+
     it("binds a keyset by its oldest valid proof when the oldest row does not validate", () => {
       const { db, store } = linkyStore();
       const { proofs } = makeWalletRepository(store);

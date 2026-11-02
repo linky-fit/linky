@@ -655,4 +655,20 @@ describe("evolu shard db filtered reads over SQLite", () => {
 
     expect(rows.map((row) => row.mint)).toEqual(["https://a.example"]);
   });
+
+  it("ties rows created within the same second", async () => {
+    const { runtime, insert } = sqliteEvolu();
+    const db = createEvoluShardDb(runtime, reportedOwnerSync().ownerSync);
+    for (const [id, mint, createdAt] of [
+      ["z", "https://z.example", "2026-01-01T00:00:00.100Z"],
+      ["a", "https://a.example", "2026-01-01T00:00:00.900Z"],
+    ] as const)
+      insert({ id, ownerId: older, createdAt, keysetId: "00aa", mint });
+
+    const rows = await Effect.runPromise(
+      db.readOldest("cashuProof", "keysetId", ["00aa"], [older], "mint"),
+    );
+
+    expect(rows.map((row) => row.mint)).toEqual(["https://a.example"]);
+  });
 });
