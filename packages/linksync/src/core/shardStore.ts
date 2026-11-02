@@ -9,6 +9,7 @@ import {
 } from "./scope";
 import type {
   Columns,
+  CopiesWhereOptions,
   DbSchema,
   Mutation,
   Patch,
@@ -137,8 +138,9 @@ export interface ShardStore<
     ids: ReadonlyArray<S[T]["id"]>,
   ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
   /**
-   * `copies` narrowed to the ids with a live copy whose `column` holds one
-   * of `values`; every copy of such an id comes back, tombstones included.
+   * `copies` narrowed to the ids with a live copy (any copy with
+   * `matchTombstones`) whose `column` holds one of `values`; every copy of
+   * such an id comes back, tombstones included.
    */
   readonly copiesWhere: <
     Scope extends keyof R & string,
@@ -148,10 +150,12 @@ export interface ShardStore<
     table: T,
     column: keyof S[T] & string,
     values: ReadonlyArray<string>,
+    options?: CopiesWhereOptions,
   ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
   /**
    * Per value, the earliest created copy in the visible shards whose
-   * `column` holds it, tombstones included; a value no copy holds is absent.
+   * `column` holds it, tombstones included, ties going to the lowest
+   * `thenBy`; a value no copy holds is absent.
    */
   readonly oldestWhere: <
     Scope extends keyof R & string,
@@ -161,6 +165,7 @@ export interface ShardStore<
     table: T,
     column: keyof S[T] & string,
     values: ReadonlyArray<string>,
+    thenBy: keyof S[T] & string,
   ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
   /**
    * Writes the row's columns into the active shard. A tombstone there stays
@@ -294,7 +299,7 @@ export interface ShardStore<
       readonly table: T;
       readonly column: keyof S[T] & string;
       readonly values: ReadonlyArray<string>;
-    },
+    } & CopiesWhereOptions,
     listener: () => void,
   ) => () => void;
   /** Fires after any change to the pointers, local or synced. */
@@ -521,11 +526,12 @@ export const createShardStore = <
     table: T,
     column: keyof S[T] & string,
     values: ReadonlyArray<string>,
+    options?: CopiesWhereOptions,
   ) =>
     Effect.map(
       Effect.all([
         visibleShards(scope),
-        db.readCopiesWhere(table, column, values),
+        db.readCopiesWhere(table, column, values, options),
       ]),
       ([shards, all]) => visibleNewestFirst(shards, all),
     );
@@ -535,6 +541,7 @@ export const createShardStore = <
     table: T,
     column: keyof S[T] & string,
     values: ReadonlyArray<string>,
+    thenBy: keyof S[T] & string,
   ) =>
     Effect.flatMap(visibleShards(scope), (shards) =>
       db.readOldest(
@@ -542,6 +549,7 @@ export const createShardStore = <
         column,
         values,
         shards.map((shard) => shard.owner.id),
+        thenBy,
       ),
     );
 
@@ -926,7 +934,10 @@ export const createShardStore = <
       return yield* Effect.ensuring(
         Effect.map(
           rotate(scope),
-          (index): RotationOutcome => ({ rotated: true, index }),
+          (index): RotationOutcome => ({
+            rotated: true,
+            index,
+          }),
         ),
         Effect.sync(() => rotationInFlight.delete(scope)),
       );
@@ -958,11 +969,13 @@ export const createShardStore = <
 
   const subscribeWhere = <T extends keyof S & string>(
     scope: string,
-    filter: {
-      readonly table: T;
-      readonly column: keyof S[T] & string;
-      readonly values: ReadonlyArray<string>;
-    } | null,
+    filter:
+      | ({
+          readonly table: T;
+          readonly column: keyof S[T] & string;
+          readonly values: ReadonlyArray<string>;
+        } & CopiesWhereOptions)
+      | null,
     listener: () => void,
   ): (() => void) => {
     const notify = () => listener();
@@ -975,6 +988,7 @@ export const createShardStore = <
               filter.column,
               filter.values,
               listener,
+              filter,
             )
           : db.subscribe(table, listener),
       ),

@@ -458,13 +458,14 @@ const sqliteEvolu = () => {
     readonly createdAt: string;
     readonly isDeleted?: 1;
     readonly state?: string;
+    readonly operationId?: string;
     readonly keysetId?: string;
     readonly mint?: string;
   }) =>
     sqlite
       .prepare(
-        `insert into cashuProof (id, ownerId, createdAt, updatedAt, isDeleted, state, keysetId, mint)
-          values (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `insert into cashuProof (id, ownerId, createdAt, updatedAt, isDeleted, state, operationId, keysetId, mint)
+          values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         row.id,
@@ -473,6 +474,7 @@ const sqliteEvolu = () => {
         row.createdAt,
         row.isDeleted ?? null,
         row.state ?? null,
+        row.operationId ?? null,
         row.keysetId ?? null,
         row.mint ?? null,
       );
@@ -536,6 +538,34 @@ describe("evolu shard db filtered reads over SQLite", () => {
     expect(loaded.map((result) => result.length)).toEqual([5]);
   });
 
+  it("matches on tombstoned copies too when asked", async () => {
+    const { runtime, insert } = sqliteEvolu();
+    const db = createEvoluShardDb(runtime, reportedOwnerSync().ownerSync);
+    // Spent under the send by another device after this one copied it forward.
+    insert({
+      id: "raced",
+      ownerId: older,
+      createdAt: at,
+      isDeleted: 1,
+      state: "spent",
+      operationId: "send",
+    });
+    insert({ id: "raced", ownerId: newer, createdAt: at, state: "available" });
+    insert({ id: "other", ownerId: older, createdAt: at, operationId: "else" });
+
+    const live = await Effect.runPromise(
+      db.readCopiesWhere("cashuProof", "operationId", ["send"]),
+    );
+    const any = await Effect.runPromise(
+      db.readCopiesWhere("cashuProof", "operationId", ["send"], {
+        matchTombstones: true,
+      }),
+    );
+
+    expect(live).toEqual([]);
+    expect(keysOf(any)).toEqual(["raced@0", "raced@1"]);
+  });
+
   it("returns a pending write that newly matches together with its stored copies", async () => {
     const { runtime, insert } = sqliteEvolu();
     const db = createEvoluShardDb(runtime, reportedOwnerSync().ownerSync);
@@ -597,9 +627,32 @@ describe("evolu shard db filtered reads over SQLite", () => {
     });
 
     const rows = await Effect.runPromise(
-      db.readOldest("cashuProof", "keysetId", ["00aa", "00bb"], [older, newer]),
+      db.readOldest(
+        "cashuProof",
+        "keysetId",
+        ["00aa", "00bb"],
+        [older, newer],
+        "mint",
+      ),
     );
 
     expect(rows.map((row) => row.mint)).toEqual(["first"]);
+  });
+
+  it("breaks a tie on the creation time by the lowest tie-break column", async () => {
+    const { runtime, insert } = sqliteEvolu();
+    const db = createEvoluShardDb(runtime, reportedOwnerSync().ownerSync);
+    for (const [id, mint] of [
+      ["b", "https://b.example"],
+      ["a", "https://a.example"],
+      ["c", "https://c.example"],
+    ] as const)
+      insert({ id, ownerId: older, createdAt: at, keysetId: "00aa", mint });
+
+    const rows = await Effect.runPromise(
+      db.readOldest("cashuProof", "keysetId", ["00aa"], [older], "mint"),
+    );
+
+    expect(rows.map((row) => row.mint)).toEqual(["https://a.example"]);
   });
 });

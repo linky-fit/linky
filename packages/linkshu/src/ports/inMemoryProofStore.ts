@@ -1,5 +1,6 @@
 import { Clock, Effect, Layer } from "effect";
 import { ProofId, UnixSeconds } from "../domain/primitives";
+import { isOlderProof } from "../internal/proofs";
 import { deriveStoreId } from "./ids";
 import { ProofStore, StoredProof } from "./ProofStore";
 import type { ProofPatch, ProofStoreService, ProofWrite } from "./ProofStore";
@@ -70,7 +71,7 @@ export const proofReadsOf = (
           const current = oldest.get(proof.keysetId);
           if (
             wanted.has(proof.keysetId) &&
-            (current === undefined || proof.createdAt < current.createdAt)
+            (current === undefined || isOlderProof(proof, current))
           )
             oldest.set(proof.keysetId, proof);
         }

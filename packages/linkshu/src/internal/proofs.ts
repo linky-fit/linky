@@ -18,6 +18,11 @@ import { Proof } from "../token/domain";
  * batch, and the two lookups (by mint, by secret) spending and dedup need.
  */
 
+/** The order that binds a keyset to a mint: oldest first, ties to the lowest mint. */
+export const isOlderProof = (proof: StoredProof, than: StoredProof): boolean =>
+  proof.createdAt < than.createdAt ||
+  (proof.createdAt === than.createdAt && proof.mint < than.mint);
+
 export const totalAmount = (
   proofs: ReadonlyArray<{ readonly amount: number }>,
 ): number => proofs.reduce((sum, proof) => sum + proof.amount, 0);

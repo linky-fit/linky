@@ -4,6 +4,11 @@ import {
   NewProof,
   parseP2pkPubkey,
 } from "@linky-fit/linkshu";
+import {
+  createLinkyStore,
+  type LinkyDbSchema,
+  type ShardDb,
+} from "@linky-fit/linksync";
 import { encodeNpub, encodeNsec, type Pubkey } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { RegistryContext } from "@linky-fit/linkstr-react";
@@ -150,6 +155,46 @@ const proofAt = (mint: string) =>
     operationId: null,
   });
 
+const sendOperation = Schema.decodeUnknownSync(NewOperation)({
+  kind: "send",
+  status: "issued",
+  mint: "https://mint.example",
+  unit: "sat",
+  keysetId: null,
+  amount: 8,
+  feeReserve: null,
+  inputsTotal: null,
+  quoteId: null,
+  invoice: null,
+  sourceMint: null,
+  counter: null,
+  locked: null,
+  expiresAt: null,
+  createdAt: 1_700_000_000,
+  tokenText: "cashuBsend",
+  error: null,
+});
+
+/** `subscribeWhere` firing only when its read changes, as Evolu's query subscription does. */
+const firingOnResultChange = (
+  db: ShardDb<LinkyDbSchema>,
+): ShardDb<LinkyDbSchema> => ({
+  ...db,
+  subscribeWhere: (table, column, values, listener, options) => {
+    const read = () =>
+      JSON.stringify(
+        Effect.runSync(db.readCopiesWhere(table, column, values, options)),
+      );
+    let last = read();
+    return db.subscribe(table, () => {
+      const next = read();
+      if (next === last) return;
+      last = next;
+      listener();
+    });
+  },
+});
+
 beforeEach(() => {
   calls.order = [];
   calls.storedCashuMnemonic = null;
@@ -272,27 +317,7 @@ describe("walletReadModelAtom", () => {
     const registry = boot();
     const wallet = await result(registry, walletRepositoryAtom);
     const send = await Effect.runPromise(
-      wallet.operations.insert(
-        Schema.decodeUnknownSync(NewOperation)({
-          kind: "send",
-          status: "issued",
-          mint: "https://mint.example",
-          unit: "sat",
-          keysetId: null,
-          amount: 8,
-          feeReserve: null,
-          inputsTotal: null,
-          quoteId: null,
-          invoice: null,
-          sourceMint: null,
-          counter: null,
-          locked: null,
-          expiresAt: null,
-          createdAt: 1_700_000_000,
-          tokenText: "cashuBsend",
-          error: null,
-        }),
-      ),
+      wallet.operations.insert(sendOperation),
     );
     const [proof] = await Effect.runPromise(
       wallet.proofs.write({
@@ -328,6 +353,42 @@ describe("walletReadModelAtom", () => {
     });
     unmountProofs();
     unmountModel();
+  });
+
+  it("re-reads an operation's proofs when one arrives already spent", async () => {
+    const { db, appOwner } = makeTestLinkyStore();
+    openLinkyStore.mockResolvedValue(
+      createLinkyStore(firingOnResultChange(db), appOwner),
+    );
+    const registry = makeTestAppRegistry({
+      session: signedInSession({ appMnemonic: APP_MNEMONIC }),
+    });
+    const wallet = await result(registry, walletRepositoryAtom);
+    const send = await Effect.runPromise(
+      wallet.operations.insert(sendOperation),
+    );
+    const unmount = registry.mount(operationProofsAtom(send.id));
+    expect(await result(registry, operationProofsAtom(send.id))).toEqual([]);
+
+    await Effect.runPromise(
+      wallet.proofs.write({
+        insert: [
+          new NewProof({
+            ...proofAt("https://mint.example"),
+            state: "spent",
+            operationId: send.id,
+          }),
+        ],
+      }),
+    );
+
+    await vi.waitFor(() => {
+      const linked = Option.getOrThrow(
+        AsyncResult.value(registry.get(operationProofsAtom(send.id))),
+      );
+      expect(linked.map((p) => p.state)).toEqual(["spent"]);
+    });
+    unmount();
   });
 });
 
