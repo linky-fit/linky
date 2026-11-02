@@ -81,7 +81,7 @@ export const selectSpendableProofs = (
 ): Effect.Effect<SpendSelection, MintUnreachable | MintRejected> =>
   Effect.gen(function* () {
     const candidates = proofsAt(
-      yield* ctx.proofStore.loadAll,
+      yield* ctx.proofStore.loadUnspent,
       ctx.mint,
       ctx.unit,
     ).filter((proof) => proof.state === "available");

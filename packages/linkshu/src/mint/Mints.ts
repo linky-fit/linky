@@ -82,7 +82,7 @@ export class Mints extends Context.Service<Mints>()("linkshu/Mints", {
         inspectOperation(inspector, "mints.fetchInfo", { mint }),
       );
 
-    /** Every mint the wallet has state for: stored proofs plus seen mints. */
+    /** Every mint the wallet has state for: unspent proofs, operations and seen mints. */
     const knownMints: Effect.Effect<ReadonlyArray<MintUrl>> = collectKnownMints(
       kv,
       proofStore,
@@ -98,11 +98,8 @@ export class Mints extends Context.Service<Mints>()("linkshu/Mints", {
     const usesOf = (mint: MintUrl) =>
       Effect.all({
         proofCount: Effect.map(
-          proofStore.loadAll,
-          (proofs) =>
-            proofs.filter(
-              (proof) => proof.mint === mint && proof.state !== "spent",
-            ).length,
+          proofStore.loadUnspent,
+          (proofs) => proofs.filter((proof) => proof.mint === mint).length,
         ),
         deferredReceiveCount: Effect.map(
           operationStore.loadAll,

@@ -1,4 +1,9 @@
-import { Mints, NewProof, parseP2pkPubkey } from "@linky-fit/linkshu";
+import {
+  Mints,
+  NewOperation,
+  NewProof,
+  parseP2pkPubkey,
+} from "@linky-fit/linkshu";
 import { encodeNpub, encodeNsec, type Pubkey } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { RegistryContext } from "@linky-fit/linkstr-react";
@@ -18,7 +23,7 @@ import type { SessionState } from "../session/session";
 import { sessionAtom } from "../session/session";
 import { walletRepositoryAtom } from "../session/store";
 import { linkshuCommandsAtom } from "./commands";
-import { walletReadModelAtom } from "./readModel";
+import { operationProofsAtom, walletReadModelAtom } from "./readModel";
 import {
   LinkshuNotConfigured,
   linkshuRuntimeAtom,
@@ -246,7 +251,7 @@ describe("walletReadModelAtom", () => {
     const registry = boot();
     const unmount = registry.mount(walletReadModelAtom);
     const loaded = await result(registry, walletReadModelAtom);
-    expect(loaded.proofs).toEqual([]);
+    expect(loaded.unspentProofs).toEqual([]);
 
     const wallet = await result(registry, walletRepositoryAtom);
     await Effect.runPromise(
@@ -257,10 +262,66 @@ describe("walletReadModelAtom", () => {
       const model = Option.getOrThrow(
         AsyncResult.value(registry.get(walletReadModelAtom)),
       );
-      expect(model.proofs).toHaveLength(1);
+      expect(model.unspentProofs).toHaveLength(1);
       expect(model.balances.total).toBe(8);
     });
     unmount();
+  });
+
+  it("drops a spent proof from the working set while its operation's proofs keep it", async () => {
+    const registry = boot();
+    const wallet = await result(registry, walletRepositoryAtom);
+    const send = await Effect.runPromise(
+      wallet.operations.insert(
+        Schema.decodeUnknownSync(NewOperation)({
+          kind: "send",
+          status: "issued",
+          mint: "https://mint.example",
+          unit: "sat",
+          keysetId: null,
+          amount: 8,
+          feeReserve: null,
+          inputsTotal: null,
+          quoteId: null,
+          invoice: null,
+          sourceMint: null,
+          counter: null,
+          locked: null,
+          expiresAt: null,
+          createdAt: 1_700_000_000,
+          tokenText: "cashuBsend",
+          error: null,
+        }),
+      ),
+    );
+    const [proof] = await Effect.runPromise(
+      wallet.proofs.insert([
+        new NewProof({
+          ...proofAt("https://mint.example"),
+          state: "handedOut",
+          operationId: send.id,
+        }),
+      ]),
+    );
+    if (proof === undefined) throw new Error("no proof stored");
+    const unmountModel = registry.mount(walletReadModelAtom);
+    const unmountProofs = registry.mount(operationProofsAtom(send.id));
+    await result(registry, walletReadModelAtom);
+
+    await Effect.runPromise(wallet.proofs.update(proof.id, { state: "spent" }));
+
+    await vi.waitFor(() => {
+      const model = Option.getOrThrow(
+        AsyncResult.value(registry.get(walletReadModelAtom)),
+      );
+      expect(model.unspentProofs).toEqual([]);
+      const linked = Option.getOrThrow(
+        AsyncResult.value(registry.get(operationProofsAtom(send.id))),
+      );
+      expect(linked.map((p) => p.state)).toEqual(["spent"]);
+    });
+    unmountProofs();
+    unmountModel();
   });
 });
 

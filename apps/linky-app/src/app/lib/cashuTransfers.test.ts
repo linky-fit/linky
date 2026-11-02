@@ -112,47 +112,27 @@ describe("isShownDeferredReceive", () => {
 });
 
 describe("sentTokenClaims", () => {
-  const proof = (
-    id: string,
-    operationId: string,
-    state: "handedOut" | "spent",
-    amount = 50,
-  ) => createStoredProofFixture({ id, operationId, state, amount });
+  const handedOut = (id: string, operationId: string) =>
+    createStoredProofFixture({ id, operationId, state: "handedOut" });
 
-  it("marks an own send claimed once every proof it handed out is spent", () => {
+  it("marks an own send claimed once it closed done with no proof left unspent", () => {
     const claimed = transfer("AQEBAQEBAQEBAQEBAQEBAQ", "send", "done");
-    const partial = transfer("AgICAgICAgICAgICAgICAg", "send", "done");
+    const forgotten = transfer("AgICAgICAgICAgICAgICAg", "send", "done");
+    const open = transfer("BQUFBQUFBQUFBQUFBQUFBQ", "send", "issued");
     const returned = transfer("AwMDAwMDAwMDAwMDAwMDAw", "send", "returned");
     const received = transfer("BAQEBAQEBAQEBAQEBAQEBA", "receive", "done");
 
     const claims = sentTokenClaims(
-      [claimed, partial, returned, received],
-      [
-        proof("BQUFBQUFBQUFBQUFBQUFBQ", claimed.id, "spent"),
-        proof("BgYGBgYGBgYGBgYGBgYGBg", claimed.id, "spent"),
-        proof("BwcHBwcHBwcHBwcHBwcHBw", partial.id, "spent"),
-        proof("CAgICAgICAgICAgICAgICA", partial.id, "handedOut"),
-        proof("CQkJCQkJCQkJCQkJCQkJCQ", returned.id, "spent"),
-        proof("CgoKCgoKCgoKCgoKCgoKCg", received.id, "spent"),
-      ],
+      [claimed, forgotten, open, returned, received],
+      [handedOut("CAgICAgICAgICAgICAgICA", forgotten.id)],
     );
 
     expect([...claims]).toEqual([
       [tokenProofsKey(claimed.tokenText), true],
-      [tokenProofsKey(partial.tokenText), false],
+      [tokenProofsKey(forgotten.tokenText), false],
+      [tokenProofsKey(open.tokenText), false],
       [tokenProofsKey(returned.tokenText), false],
     ]);
-  });
-
-  it("keeps a send unclaimed while spent proofs cover only part of its amount", () => {
-    const send = transfer("AQEBAQEBAQEBAQEBAQEBAQ", "send", "done");
-
-    const claims = sentTokenClaims(
-      [send],
-      [proof("BQUFBQUFBQUFBQUFBQUFBQ", send.id, "spent", 20)],
-    );
-
-    expect(claims.get(tokenProofsKey(send.tokenText) ?? "")).toBe(false);
   });
 
   it("finds a send by its proofs whether the message carries it as v4 text or a NUT-18 payload", () => {
@@ -167,10 +147,7 @@ describe("sentTokenClaims", () => {
       }),
     );
 
-    const claims = sentTokenClaims(
-      [send],
-      [proof("BQUFBQUFBQUFBQUFBQUFBQ", send.id, "spent", send.amount)],
-    );
+    const claims = sentTokenClaims([send], []);
 
     expect(
       getCashuTokenMessageInfo(payload, new Set(), true, claims)?.sent,

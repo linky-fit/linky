@@ -135,9 +135,6 @@ test("adding a relay with capacity syncs quota-rejected token history and spent 
       await second.page.goto("/#wallet/tokens/proofs");
       const available = second.page.getByLabel("Available", { exact: true });
       await expect(available).toContainText("Available · 476 sat");
-      await expect(available).toContainText(
-        /Spent proofs kept for bookkeeping: \d+/,
-      );
       expect(secondMintResponses).toEqual([]);
       for (const device of devices) {
         await expectNoBootErrorPanel(device.page, device.label);

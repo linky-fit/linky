@@ -45,7 +45,12 @@ import {
 import type { ProofStateName } from "../testing/fakeWallet";
 import { runOnTestClock, settlePromises } from "../testing/clock";
 import { recordingInspector } from "../testing/inspector";
-import { secretsOf, seedProofs, seedTransfer } from "../testing/inventory";
+import {
+  allProofs,
+  secretsOf,
+  seedProofs,
+  seedTransfer,
+} from "../testing/inventory";
 import { parseTokenText } from "../token/codec";
 import { ReceiveDraft } from "./domain";
 import { Inspector } from "../inspector/Inspector";
@@ -168,7 +173,7 @@ const makeHarness = (
 
 const inventory = Effect.gen(function* () {
   return {
-    proofs: yield* (yield* ProofStore).loadAll,
+    proofs: yield* allProofs,
     operations: yield* (yield* OperationStore).loadAll,
   };
 });

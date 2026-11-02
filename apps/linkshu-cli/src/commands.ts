@@ -72,8 +72,8 @@ const summarize: Effect.Effect<void, never, LinkshuServices> = Effect.gen(
       print(`  ${mint}  ${amount} sat`);
 
     const tokens = yield* Tokens;
-    for (const proof of yield* tokens.proofs)
-      if (proof.state !== "available" && proof.state !== "spent")
+    for (const proof of yield* tokens.unspentProofs)
+      if (proof.state !== "available")
         print(
           `  ${proof.state.padEnd(12)} ${proof.amount} sat  proof ${proof.id}`,
         );

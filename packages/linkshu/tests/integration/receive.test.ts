@@ -6,6 +6,7 @@ import {
   runLinkshu,
   Tokens,
 } from "../../src";
+import { allProofs } from "../../src/testing/inventory";
 import {
   availableTotalOf,
   durableStorage,
@@ -82,7 +83,7 @@ describe("receive vertical against the local mint", () => {
           first: firstReceipt,
           second: secondError,
           transfers: yield* tokens.transfers,
-          proofs: yield* tokens.proofs,
+          proofs: yield* allProofs,
         };
       }),
     );
@@ -117,7 +118,7 @@ describe("receive vertical against the local mint", () => {
         return {
           error: failure,
           transfers: yield* tokens.transfers,
-          proofs: yield* tokens.proofs,
+          proofs: yield* allProofs,
         };
       }),
     );
@@ -152,7 +153,7 @@ describe("receive vertical against the local mint", () => {
         return {
           error: failure,
           transfers: yield* tokens.transfers,
-          proofs: yield* tokens.proofs,
+          proofs: yield* allProofs,
         };
       }),
     );
@@ -191,7 +192,7 @@ describe("receive vertical against the local mint", () => {
       Effect.flatMap(Receive, (receive) => receive.resumeDeferred()),
     );
     const operations = await Effect.runPromise(storage.operations.loadAll);
-    const proofs = await Effect.runPromise(storage.proofs.loadAll);
+    const proofs = await Effect.runPromise(storage.proofs.all);
 
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({ status: "received", amount: 4 });

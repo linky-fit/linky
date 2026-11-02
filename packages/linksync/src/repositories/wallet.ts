@@ -12,6 +12,7 @@ import {
   operationKeyOf,
   OperationStore,
   ProofId,
+  ProofState,
   ProofStore,
   StoredOperation,
   StoredProof,
@@ -258,8 +259,25 @@ export interface WalletRepository {
   readonly operations: OperationStoreService;
   readonly proofStore: Layer.Layer<ProofStore>;
   readonly operationStore: Layer.Layer<OperationStore>;
+  /** Every proof in any state, spent included: a full read for backups, never for wallet decisions. */
+  readonly allProofs: Effect.Effect<ReadonlyArray<StoredProof>>;
   readonly subscribe: (listener: () => void) => () => void;
 }
+
+/** A proof whose merged state is not spent has a live copy in one of these states. */
+const unspentFilter = {
+  table: "cashuProof",
+  column: "state",
+  values: ProofState.literals.filter((state) => state !== "spent"),
+} as const;
+
+const toStoredProofs = (
+  rows: ReadonlyArray<CashuProofRow>,
+): ReadonlyArray<StoredProof> =>
+  rows.flatMap((row) => {
+    const stored = toStoredProof(row);
+    return stored === null ? [] : [stored];
+  });
 
 export const makeWalletRepository = (store: LinkyStore): WalletRepository => {
   const proofTable = tableRepository(store, "cashu", "cashuProof");
@@ -269,13 +287,18 @@ export const makeWalletRepository = (store: LinkyStore): WalletRepository => {
     // One rotation check for the whole batch, not one per proof.
     insert: (rows) =>
       Effect.gen(function* () {
-        const existing = new Map(
-          (yield* proofTable.all).map((row) => [row.id, row]),
-        );
+        const newest = new Map<string, CashuProofRow>();
+        for (const copy of yield* store.copiesOfIds(
+          "cashu",
+          "cashuProof",
+          rows.map((proof) => cashuProofIdFor(proof.secret)),
+        ))
+          if (!newest.has(copy.id)) newest.set(copy.id, copy);
         const stored: StoredProof[] = [];
         for (const proof of rows) {
           const id = cashuProofIdFor(proof.secret);
-          const previous = existing.get(id);
+          const copy = newest.get(id);
+          const previous = copy?.isDeleted === 1 ? undefined : copy;
           const columns = toProofColumns(proof, id);
           yield* previous === undefined
             ? store.insert("cashu", "cashuProof", columns)
@@ -300,12 +323,43 @@ export const makeWalletRepository = (store: LinkyStore): WalletRepository => {
       patchKnownRow(CashuProofId.fromUnknown(id), (proofId) =>
         proofTable.update(proofId, toProofPatch(patch)),
       ),
-    loadAll: Effect.map(store.copies("cashu", "cashuProof"), (copies) =>
-      mergeProofCopies(copies).flatMap((row) => {
-        const stored = toStoredProof(row);
-        return stored === null ? [] : [stored];
-      }),
+    loadUnspent: Effect.map(
+      store.copiesWhere(
+        "cashu",
+        "cashuProof",
+        unspentFilter.column,
+        unspentFilter.values,
+      ),
+      (copies) =>
+        toStoredProofs(
+          mergeProofCopies(copies).filter((row) => row.state !== "spent"),
+        ),
     ),
+    findBySecrets: (secrets) =>
+      Effect.map(
+        store.copiesOfIds("cashu", "cashuProof", secrets.map(cashuProofIdFor)),
+        (copies) => toStoredProofs(mergeProofCopies(copies)),
+      ),
+    findByOperation: (operationId) => {
+      const decoded = CashuOperationId.fromUnknown(operationId);
+      if (!decoded.ok) return Effect.succeed([]);
+      return Effect.map(
+        store.copiesWhere("cashu", "cashuProof", "operationId", [
+          decoded.value,
+        ]),
+        (copies) =>
+          toStoredProofs(
+            mergeProofCopies(copies).filter(
+              (row) => row.operationId === decoded.value,
+            ),
+          ),
+      );
+    },
+    findOldestByKeysets: (keysetIds) =>
+      Effect.map(
+        store.oldestWhere("cashu", "cashuProof", "keysetId", keysetIds),
+        toStoredProofs,
+      ),
   };
 
   const operations: OperationStoreService = {
@@ -336,6 +390,10 @@ export const makeWalletRepository = (store: LinkyStore): WalletRepository => {
     operations,
     proofStore: Layer.succeed(ProofStore, proofs),
     operationStore: Layer.succeed(OperationStore, operations),
-    subscribe: proofTable.subscribe,
+    allProofs: Effect.map(store.copies("cashu", "cashuProof"), (copies) =>
+      toStoredProofs(mergeProofCopies(copies)),
+    ),
+    subscribe: (listener) =>
+      store.subscribeWhere("cashu", unspentFilter, listener),
   };
 };

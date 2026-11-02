@@ -7,7 +7,7 @@ import { Effect, Schema } from "effect";
  * `(ownerId, id)`, owners opted into sync, and per-owner history usage. The
  * port decides nothing; every shard rule lives in the store.
  *
- * Contract: `readTable` reflects earlier `mutate` calls immediately, even when
+ * Contract: every read reflects earlier `mutate` calls immediately, even when
  * the underlying database commits later. The store chains writes and reads
  * within one operation and holds no cache of its own.
  */
@@ -61,6 +61,40 @@ export interface Mutation {
   readonly row: Columns & { readonly isDeleted?: boolean };
 }
 
+/** `readCopiesWhere` over rows already read: every copy of each id with a matching live row. */
+export const copiesMatching = <R extends Row<Columns>>(
+  rows: ReadonlyArray<R>,
+  column: string,
+  values: ReadonlyArray<string>,
+): ReadonlyArray<R> => {
+  const wanted = new Set<unknown>(values);
+  const matched = new Set(
+    rows
+      .filter((row) => row.isDeleted !== 1 && wanted.has(row[column]))
+      .map((row) => row.id),
+  );
+  return rows.filter((row) => matched.has(row.id));
+};
+
+/** `readOldest` over rows already read and filtered by owner. */
+export const oldestPerValue = <R extends Row<Columns>>(
+  rows: ReadonlyArray<R>,
+  column: string,
+  values: ReadonlyArray<string>,
+): ReadonlyArray<R> => {
+  const wanted = new Set<unknown>(values);
+  const oldest = new Map<unknown, R>();
+  for (const row of rows) {
+    const current = oldest.get(row[column]);
+    if (
+      wanted.has(row[column]) &&
+      (current === undefined || row.createdAt < current.createdAt)
+    )
+      oldest.set(row[column], row);
+  }
+  return [...oldest.values()];
+};
+
 export class ShardDbError extends Schema.TaggedError<ShardDbError>()(
   "ShardDbError",
   { table: Schema.String, message: Schema.String },
@@ -71,10 +105,30 @@ export interface ShardDb<S extends DbSchema> {
   readonly readTable: <T extends keyof S & string>(
     table: T,
   ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
-  /** Every owner's copy of the row with this id, tombstones included. */
+  /** Every owner's copy of the rows with these ids, tombstones included. */
   readonly readCopies: <T extends keyof S & string>(
     table: T,
-    id: string,
+    ids: ReadonlyArray<string>,
+  ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
+  /**
+   * Every owner's copy, tombstones included, of each id that has a live row
+   * whose `column` holds one of `values`. All copies of a matched id come
+   * back, so a repository's own merge rule still sees every copy.
+   */
+  readonly readCopiesWhere: <T extends keyof S & string>(
+    table: T,
+    column: keyof S[T] & string,
+    values: ReadonlyArray<string>,
+  ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
+  /**
+   * For each of `values`, the earliest created row among `ownerIds` whose
+   * `column` holds it, tombstones included; a value no row holds is absent.
+   */
+  readonly readOldest: <T extends keyof S & string>(
+    table: T,
+    column: keyof S[T] & string,
+    values: ReadonlyArray<string>,
+    ownerIds: ReadonlyArray<OwnerId>,
   ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
   /** Column-level writes; an `update` of an unknown `(ownerId, id)` creates a row. */
   readonly mutate: (
@@ -83,6 +137,13 @@ export interface ShardDb<S extends DbSchema> {
   /** Fires after any change to the table, local or synced. */
   readonly subscribe: (
     table: keyof S & string,
+    listener: () => void,
+  ) => () => void;
+  /** Fires after a change to what `readCopiesWhere` with these arguments returns. */
+  readonly subscribeWhere: <T extends keyof S & string>(
+    table: T,
+    column: keyof S[T] & string,
+    values: ReadonlyArray<string>,
     listener: () => void,
   ) => () => void;
   /** Opts the owner into sync; returns the unuse function. */

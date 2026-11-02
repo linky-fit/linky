@@ -36,7 +36,7 @@ import {
   type KeyValueStoreService,
 } from "../../ports/KeyValueStore";
 import { ProofStore } from "../../ports/ProofStore";
-import type { StoredProof } from "../../ports/ProofStore";
+import type { ProofStoreService, StoredProof } from "../../ports/ProofStore";
 import { errorMessage } from "../../internal/errorMessage";
 import { loadWallet } from "./loadWallet";
 
@@ -218,6 +218,12 @@ export const foreignKeysetProof = (
   return [...oldest.values()].find((proof) => proof.mint !== mint);
 };
 
+const listedKeysets = (wallet: LoadedWallet): ReadonlyArray<KeysetId> =>
+  wallet.keyChain.getKeysets().flatMap(({ id }) => {
+    const decoded = decodeKeysetId(id);
+    return decoded._tag === "Some" ? [decoded.value] : [];
+  });
+
 export type WalletLoader = (
   mint: MintUrl,
   unit: CurrencyUnit,
@@ -234,12 +240,12 @@ export type WalletLoader = (
 export const makeWalletInstances = (
   kv: KeyValueStoreService,
   load: WalletLoader,
-  storedProofs: Effect.Effect<ReadonlyArray<StoredProof>>,
+  oldestByKeysets: ProofStoreService["findOldestByKeysets"],
 ) => {
   const inFlight = new Map<string, Promise<LoadedWallet>>();
 
   const rejectForeignKeysets = (mint: MintUrl, wallet: LoadedWallet) =>
-    Effect.flatMap(storedProofs, (proofs) => {
+    Effect.flatMap(oldestByKeysets(listedKeysets(wallet)), (proofs) => {
       const foreign = foreignKeysetProof(mint, wallet, proofs);
       return foreign === undefined
         ? Effect.void
@@ -329,7 +335,7 @@ export class WalletInstances extends Context.Service<WalletInstances>()(
             unit,
             bip39seed: bip39Seed,
           }),
-        proofStore.loadAll,
+        proofStore.findOldestByKeysets,
       );
     }),
   },

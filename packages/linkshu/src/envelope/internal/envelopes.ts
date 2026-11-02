@@ -107,6 +107,13 @@ export const rowsOf = (
   return proofs.filter((proof) => secrets.has(proof.secret));
 };
 
+/** `rowsOf` read from the store. */
+export const storedRowsOf = (
+  proofStore: ProofStoreService,
+  envelope: LocalEnvelope,
+): Effect.Effect<ReadonlyArray<StoredProof>> =>
+  proofStore.findBySecrets(envelope.proofs.map((proof) => proof.secret));
+
 /** Rows held under the envelope itself: present only while it is open here. */
 export const heldRowsOf = (
   proofs: ReadonlyArray<StoredProof>,
@@ -148,7 +155,7 @@ const reconcileRows = (
   reason: string,
 ): Effect.Effect<void> =>
   Effect.gen(function* () {
-    const stored = rowsOf(yield* ctx.proofStore.loadAll, envelope);
+    const stored = yield* storedRowsOf(ctx.proofStore, envelope);
     const known = storedSecrets(stored);
     yield* insertProofs(
       ctx,
@@ -353,7 +360,7 @@ export const closeIfSpent = (
 ): Effect.Effect<void> =>
   Effect.gen(function* () {
     const { status } = envelope.operation;
-    const rows = rowsOf(yield* ctx.proofStore.loadAll, envelope);
+    const rows = yield* storedRowsOf(ctx.proofStore, envelope);
     if (
       (status === "pending" || status === "issued") &&
       rows.length === envelope.proofs.length &&

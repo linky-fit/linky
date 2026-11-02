@@ -61,7 +61,7 @@ const harness = (args: {
             Effect.succeed(candidates.map(() => ({ state: "UNSPENT" }))))
         )(proofs);
       },
-      knownSecrets: new Set(args.knownSecrets ?? []),
+      knownSecrets: () => Effect.succeed(new Set(args.knownSecrets ?? [])),
       cursor: args.cursor,
       counter: args.counter,
     },

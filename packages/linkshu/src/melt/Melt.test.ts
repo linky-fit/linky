@@ -36,6 +36,7 @@ import {
 } from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
 import {
+  allProofs,
   amountIn,
   proofsIn,
   secretsOf,
@@ -252,14 +253,14 @@ const meltAndInspect = (seeds: ReadonlyArray<ReadonlyArray<CashuProof>>) =>
     const receipt = yield* Effect.result(melt.melt(draft));
     return {
       receipt,
-      proofs: yield* (yield* ProofStore).loadAll,
+      proofs: yield* allProofs,
       operations: yield* (yield* OperationStore).loadAll,
       counter: yield* kv.get(counterKey),
     };
   });
 
 const storedProofs = (storage: Storage) =>
-  Effect.runPromise(storage.proofs.loadAll);
+  Effect.runPromise(storage.proofs.all);
 
 const meltOperations = (storage: Storage) =>
   Effect.runPromise(storage.operations.loadAll).then((operations) =>
@@ -290,7 +291,7 @@ const resumeAndInspect = Effect.gen(function* () {
   const results = yield* (yield* Melt).resumePending;
   return {
     results,
-    proofs: yield* (yield* ProofStore).loadAll,
+    proofs: yield* allProofs,
     operations: yield* (yield* OperationStore).loadAll,
   };
 });
@@ -326,7 +327,7 @@ describe("Melt.quote", () => {
         yield* seedProofs(mint, proofsA);
         const melt = yield* Melt;
         const quoted = yield* melt.quote(draft);
-        return { quoted, proofs: yield* (yield* ProofStore).loadAll };
+        return { quoted, proofs: yield* allProofs };
       }),
     );
     assert(Exit.isSuccess(exit));
@@ -857,7 +858,7 @@ describe("Melt.melt with a maximum total", () => {
               }),
             ),
           );
-          return { receipt, proofs: yield* (yield* ProofStore).loadAll };
+          return { receipt, proofs: yield* allProofs };
         }),
       )
       .then((exit) => ({ exit, sendCalls }));

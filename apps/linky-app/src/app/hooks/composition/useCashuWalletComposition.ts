@@ -317,8 +317,6 @@ export const useCashuWalletComposition = ({
     saveCashuFromText,
   });
 
-  // Every mint the wallet ever touched, spent proofs included: a mint whose
-  // proofs are all spent must still be offered to a recovery.
   const walletMints = React.useMemo(() => {
     const mints = new Set<string>();
     for (const proof of walletProofs) mints.add(proof.mint);

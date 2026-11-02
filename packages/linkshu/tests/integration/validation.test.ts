@@ -9,7 +9,7 @@ import {
   Tokens,
   Validation,
 } from "../../src";
-import { amountIn } from "../../src/testing/inventory";
+import { allProofs, amountIn } from "../../src/testing/inventory";
 import { claimExternally, fundToken, mintUrl, randomSeed } from "./helpers";
 
 describe("validation vertical against the local mint", () => {
@@ -37,7 +37,7 @@ describe("validation vertical against the local mint", () => {
         return {
           funding,
           report,
-          proofs: yield* tokens.proofs,
+          proofs: yield* allProofs,
           balances: yield* tokens.balances,
         };
       }),
@@ -85,7 +85,7 @@ describe("validation vertical against the local mint", () => {
           receipt,
           report,
           transfers: yield* tokens.transfers,
-          proofs: yield* tokens.proofs,
+          proofs: yield* allProofs,
         };
       }),
     );

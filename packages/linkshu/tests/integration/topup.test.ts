@@ -59,7 +59,7 @@ describe("topup vertical against the local mint", () => {
     expect(receipt.amount).toBe(32);
     expect(receipt.tokenText.startsWith("cashu")).toBe(true);
 
-    const stored = await Effect.runPromise(proofs.loadAll);
+    const stored = await Effect.runPromise(proofs.all);
     expect(stored.length).toBeGreaterThan(0);
     expect(stored.every((proof) => proof.state === "available")).toBe(true);
     expect(availableTotalOf(stored)).toBe(32);
@@ -100,7 +100,7 @@ describe("topup vertical against the local mint", () => {
     expect(atMint.state).toBe("ISSUED");
 
     expect(receipt.amount).toBe(48);
-    expect(availableTotalOf(await Effect.runPromise(proofs.loadAll))).toBe(48);
+    expect(availableTotalOf(await Effect.runPromise(proofs.all))).toBe(48);
     expect(await Effect.runPromise(operations.loadAll)).toMatchObject([
       { kind: "topup", status: "done", locked: true },
     ]);
@@ -127,7 +127,7 @@ describe("topup vertical against the local mint", () => {
     );
 
     expect(quote.invoice.toLowerCase().startsWith("ln")).toBe(true);
-    expect(await Effect.runPromise(proofs.loadAll)).toEqual([]);
+    expect(await Effect.runPromise(proofs.all)).toEqual([]);
     const pending = await pendingOperations(operations, "topup");
     expect(pending).toHaveLength(1);
     expect(pending[0]?.quoteId).toBe(quote.quoteId);
@@ -162,7 +162,7 @@ describe("topup vertical against the local mint", () => {
 
     // The topup is closed and the funds are proofs, not a dangling quote.
     expect(await pendingOperations(operations, "topup")).toEqual([]);
-    expect(availableTotalOf(await Effect.runPromise(proofs.loadAll))).toBe(
+    expect(availableTotalOf(await Effect.runPromise(proofs.all))).toBe(
       64 - 8 - sent.feePaid,
     );
   });
@@ -205,7 +205,7 @@ describe("topup vertical against the local mint", () => {
     // the 16 sats are minted exactly once.
     expect(await resumeOnce()).toBeNull();
     expect(await pendingOperations(operations, "topup")).toEqual([]);
-    expect(availableTotalOf(await Effect.runPromise(proofs.loadAll))).toBe(16);
+    expect(availableTotalOf(await Effect.runPromise(proofs.all))).toBe(16);
   });
 });
 
@@ -254,7 +254,7 @@ describe("adopting externally paid quotes against the local mint", () => {
     assert(second._tag === "Failure");
     expect(second.failure._tag).toBe("QuoteAlreadyIssued");
 
-    expect(availableTotalOf(await Effect.runPromise(proofs.loadAll))).toBe(24);
+    expect(availableTotalOf(await Effect.runPromise(proofs.all))).toBe(24);
     expect(await pendingOperations(operations, "topup")).toEqual([]);
   });
 
@@ -282,7 +282,7 @@ describe("adopting externally paid quotes against the local mint", () => {
     assert(withKey._tag === "Success");
     expect(withKey.success.amount).toBe(40);
 
-    const stored = await Effect.runPromise(proofs.loadAll);
+    const stored = await Effect.runPromise(proofs.all);
     expect(stored.every((proof) => proof.state === "available")).toBe(true);
     expect(availableTotalOf(stored)).toBe(40);
   });

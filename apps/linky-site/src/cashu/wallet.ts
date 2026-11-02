@@ -117,7 +117,7 @@ const withWallet = async <A>(
       Effect.gen(function* () {
         const tokens = yield* Tokens;
         if (
-          (yield* tokens.proofs).length === 0 &&
+          (yield* tokens.unspentProofs).length === 0 &&
           localStorage.getItem(`${key}.initialized`) === null
         ) {
           yield* tokens.adoptToken(text);
@@ -209,7 +209,7 @@ export const redeemToken = (
       address: string,
     ) => {
       const proofs = availableProofs(
-        await run(Effect.flatMap(Tokens, (tokens) => tokens.proofs)),
+        await run(Effect.flatMap(Tokens, (tokens) => tokens.unspentProofs)),
       );
       const result = {
         amountSent,

@@ -190,7 +190,7 @@ const websocketMintInfo = (
 const draft = new TopupDraft({ mint, amount: Amount.make(16) });
 
 const storedProofs = (storage: Storage) =>
-  Effect.runPromise(storage.proofs.loadAll);
+  Effect.runPromise(storage.proofs.all);
 
 const topupOperations = (storage: Storage) =>
   Effect.runPromise(storage.operations.loadAll).then((operations) =>

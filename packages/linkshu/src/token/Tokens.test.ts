@@ -53,6 +53,7 @@ import {
 import { runOnTestClock, settlePromises } from "../testing/clock";
 import { recordingInspector } from "../testing/inspector";
 import {
+  allProofs,
   amountIn,
   proofsIn,
   secretsOf,
@@ -141,7 +142,7 @@ const makeHarness = (args: HarnessArgs = {}) => {
 
 const inventory = Effect.gen(function* () {
   return {
-    proofs: yield* (yield* ProofStore).loadAll,
+    proofs: yield* allProofs,
     operations: yield* (yield* OperationStore).loadAll,
   };
 });
@@ -185,7 +186,7 @@ const seedOperation = (operation: NewOperation) =>
   Effect.flatMap(OperationStore, (store) => store.insert(operation));
 
 describe("Tokens read models", () => {
-  it("lists every proof whatever its state", async () => {
+  it("lists every proof not yet spent", async () => {
     const { run } = makeHarness();
 
     const exit = await run(
@@ -193,12 +194,29 @@ describe("Tokens read models", () => {
         yield* seedProofs(mint, [proof(4, "a")], "available");
         yield* seedProofs(mint, [proof(2, "b")], "spent");
         yield* seedProofs(mint, [proof(1, "c")], "handedOut");
-        return yield* (yield* Tokens).proofs;
+        return yield* (yield* Tokens).unspentProofs;
       }),
     );
 
     assert(Exit.isSuccess(exit));
-    expect(secretsOf(exit.value)).toEqual(["a", "b", "c"]);
+    expect(secretsOf(exit.value)).toEqual(["a", "c"]);
+  });
+
+  it("lists an operation's proofs whatever their state", async () => {
+    const { run } = makeHarness();
+    const send = OperationId.make("send-1");
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* seedProofs(mint, [proof(4, "a")], "available");
+        yield* seedProofs(mint, [proof(2, "b")], "spent", send);
+        yield* seedProofs(mint, [proof(1, "c")], "handedOut", send);
+        return yield* (yield* Tokens).proofsOf(send);
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    expect(secretsOf(exit.value)).toEqual(["b", "c"]);
   });
 
   it("lists operations newest first and transfers without quote operations", async () => {
@@ -1563,7 +1581,7 @@ describe("Tokens.reclaim", () => {
         );
         yield* seedProofs(mint, [proof(8, "held")], "held");
         yield* seedProofs(mint, [proof(16, "keep")], "available");
-        const ids = (yield* tokens.proofs)
+        const ids = (yield* allProofs)
           .filter((p) => p.state !== "available")
           .map((p) => p.id);
         const report = yield* tokens.reclaim(ids);
@@ -1611,7 +1629,7 @@ describe("Tokens.reclaim", () => {
         );
         yield* seedProofs(mint, [proof(8, "other")], "handedOut", other.id);
         const tokens = yield* Tokens;
-        const ids = (yield* tokens.proofs)
+        const ids = (yield* allProofs)
           .filter((proof) => proof.operationId === selected.id)
           .map((proof) => proof.id);
         const report = yield* tokens.reclaim(ids);
@@ -1641,7 +1659,7 @@ describe("Tokens.reclaim", () => {
         const tokens = yield* Tokens;
         yield* seedProofs(mint, proofsA, "handedOut");
         const report = yield* tokens.reclaim(
-          (yield* tokens.proofs).map((p) => p.id),
+          (yield* allProofs).map((p) => p.id),
         );
         return { report, ...(yield* inventory) };
       }),
@@ -1666,7 +1684,7 @@ describe("Tokens.reclaim", () => {
         const tokens = yield* Tokens;
         yield* seedProofs(mint, [proof(8, "offline")], "externalized");
         yield* seedProofs(otherMint, proofsA, "handedOut");
-        const ids = (yield* tokens.proofs).map((p) => p.id);
+        const ids = (yield* allProofs).map((p) => p.id);
         const first = yield* tokens.reclaim(ids);
         const second = yield* tokens.reclaim(ids);
         return { first, second, ...(yield* inventory) };

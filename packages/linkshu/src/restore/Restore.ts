@@ -15,7 +15,7 @@ import { inspectOperation, inspectOperationWith } from "../internal/operations";
 import {
   domainToNewProofs,
   insertProofs,
-  storedSecrets,
+  knownSecretsOf,
   totalAmount,
 } from "../internal/proofs";
 import { checkProofStates } from "../internal/proofStates";
@@ -161,7 +161,7 @@ export class Restore extends Context.Service<Restore>()("linkshu/Restore", {
             // stored proofs this one must not import again. Any state
             // counts — a spent proof restored again would be balance the
             // mint will not honor.
-            knownSecrets: storedSecrets(yield* proofStore.loadAll),
+            knownSecrets: (proofs) => knownSecretsOf(proofStore, proofs),
             cursor: yield* readRestoreCursor(kv, scope),
             counter: yield* readCounter(kv, scope),
           });

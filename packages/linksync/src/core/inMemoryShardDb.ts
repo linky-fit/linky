@@ -8,6 +8,7 @@ import type {
   Row,
   ShardDb,
 } from "./ShardDb";
+import { copiesMatching, oldestPerValue } from "./ShardDb";
 
 export interface InMemoryShardDb<S extends DbSchema> extends ShardDb<S> {
   /** Owners currently opted into sync, for asserting the subscribe set. */
@@ -34,6 +35,7 @@ export type TableColumns<S extends DbSchema> = {
  * `tableColumns` lists each table's columns so a column never written reads
  * back as `null`, the way Evolu returns it. There is no relay, so every owner
  * counts as synced unless `holdSync` keeps them unsynced until `finishSync`.
+ * `subscribeWhere` fires on every change to the table, not only to its rows.
  */
 export const makeInMemoryShardDb = <S extends DbSchema>(
   tableColumns: TableColumns<S>,
@@ -92,6 +94,15 @@ export const makeInMemoryShardDb = <S extends DbSchema>(
     for (const listener of listeners.get(table) ?? []) listener();
   };
 
+  const subscribe = (table: string, listener: () => void): (() => void) => {
+    const set = listeners.get(table) ?? new Set();
+    listeners.set(table, set);
+    set.add(listener);
+    return () => {
+      set.delete(listener);
+    };
+  };
+
   // The overload lets the untyped storage satisfy the typed port without a
   // cast; every row in a table's map was written for that table.
   function readTable<T extends keyof S & string>(
@@ -105,20 +116,60 @@ export const makeInMemoryShardDb = <S extends DbSchema>(
 
   function readCopies<T extends keyof S & string>(
     table: T,
-    id: string,
+    ids: ReadonlyArray<string>,
   ): Effect.Effect<ReadonlyArray<Row<S[T]>>>;
   function readCopies(
     table: string,
-    id: string,
+    ids: ReadonlyArray<string>,
+  ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
+    const wanted = new Set(ids);
+    return Effect.sync(() =>
+      [...tableRows(table).values()].filter((row) => wanted.has(row.id)),
+    );
+  }
+
+  function readCopiesWhere<T extends keyof S & string>(
+    table: T,
+    column: keyof S[T] & string,
+    values: ReadonlyArray<string>,
+  ): Effect.Effect<ReadonlyArray<Row<S[T]>>>;
+  function readCopiesWhere(
+    table: string,
+    column: string,
+    values: ReadonlyArray<string>,
   ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
     return Effect.sync(() =>
-      [...tableRows(table).values()].filter((row) => row.id === id),
+      copiesMatching([...tableRows(table).values()], column, values),
+    );
+  }
+
+  function readOldest<T extends keyof S & string>(
+    table: T,
+    column: keyof S[T] & string,
+    values: ReadonlyArray<string>,
+    ownerIds: ReadonlyArray<OwnerId>,
+  ): Effect.Effect<ReadonlyArray<Row<S[T]>>>;
+  function readOldest(
+    table: string,
+    column: string,
+    values: ReadonlyArray<string>,
+    ownerIds: ReadonlyArray<OwnerId>,
+  ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
+    const owners = new Set(ownerIds);
+    return Effect.sync(() =>
+      oldestPerValue(
+        [...tableRows(table).values()].filter((row) => owners.has(row.ownerId)),
+        column,
+        values,
+      ),
     );
   }
 
   return {
     readTable,
     readCopies,
+    readCopiesWhere,
+    readOldest,
     mutate: (mutations) =>
       Effect.map(Clock.currentTimeMillis, (millis) => {
         const nowIso = new Date(millis).toISOString();
@@ -126,14 +177,9 @@ export const makeInMemoryShardDb = <S extends DbSchema>(
         for (const table of new Set(mutations.map((m) => m.table)))
           notify(table);
       }),
-    subscribe: (table, listener) => {
-      const set = listeners.get(table) ?? new Set();
-      listeners.set(table, set);
-      set.add(listener);
-      return () => {
-        set.delete(listener);
-      };
-    },
+    subscribe,
+    subscribeWhere: (table, _column, _values, listener) =>
+      subscribe(table, listener),
     useOwner: (owner: SyncOwner) => {
       used.set(owner.id, (used.get(owner.id) ?? 0) + 1);
       return () => {

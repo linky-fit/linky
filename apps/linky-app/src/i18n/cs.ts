@@ -1044,7 +1044,6 @@ export const cs = {
     "Vyhrazeno pro pravidelnou platbu, dokud neodejde, nebo vstupy Lightning platby, kterou mincovna ještě nevyřídila.",
   cashuHeldUnknownHint:
     "Zadržené operací, která se do tohoto zařízení ještě nesynchronizovala.",
-  cashuSpentProofsKept: "Utracené důkazy ponechané pro evidenci: {count}.",
   cashuTransfers: "Převody",
   cashuTransfersEmpty: "Žádné otevřené převody.",
   cashuTransferIssued: "Emitováno, čeká na vyzvednutí.",

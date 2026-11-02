@@ -1,6 +1,6 @@
 # Core
 
-The generic shard store: no Linky in it. The repositories are its everyday surface; call the store directly to boot it, to add a scope or a port, and for what the repositories do not wrap (`forget`, `rotate`, `ingest`, `copies`, `copiesOf`, hydration, pointer repair).
+The generic shard store: no Linky in it. The repositories are its everyday surface; call the store directly to boot it, to add a scope or a port, and for what the repositories do not wrap (`forget`, `rotate`, `ingest`, `copies`, `copiesOf`, `copiesOfIds`, `copiesWhere`, `oldestWhere`, hydration, pointer repair). `copiesWhere` and `oldestWhere` narrow a read through the port's `readCopiesWhere` and `readOldest` ([ports](./ports.md#sharddb)), over the visible shards.
 
 ## Scopes
 
@@ -27,7 +27,7 @@ Reads and writes are `Effect`s. Errors are `ShardDbError` (the port rejected or 
 4. `repairPointers()` once, in the background: it waits for hydration and then for the relay ([pointer repair](#pointer-repair)).
 5. `forget(scope?)` only on an explicit user action. It narrows one scope, or every forgettable scope, to its newest window, notifies readers and unsubscribes the rest; it deletes only when the port can.
 
-`subscribe(scope, listener)` fires after a change to the scope's tables or pointer and after explicit forgetting; `subscribePointers(listener)` after any pointer change, local or synced, and after forgetting.
+`subscribe(scope, listener)` fires after a change to the scope's tables or pointer and after explicit forgetting; `subscribeWhere(scope, { table, column, values }, listener)` fires for the filtered table only when what `copiesWhere` returns for it changes; `subscribePointers(listener)` after any pointer change, local or synced, and after forgetting.
 
 ## Hydration
 

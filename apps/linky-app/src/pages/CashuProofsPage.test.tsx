@@ -7,10 +7,7 @@ import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { CashuProofsPage } from "./CashuProofsPage";
 
 vi.mock("../app/hooks/shell", async () =>
-  (await import("../testUtils/shellHooks")).shellHooksMock({
-    t: (key) =>
-      key === "cashuSpentProofsKept" ? "cashuSpentProofsKept {count}" : key,
-  }),
+  (await import("../testUtils/shellHooks")).shellHooksMock(),
 );
 vi.mock("../hooks/useRouting", () => ({ navigateTo: vi.fn() }));
 
@@ -23,11 +20,6 @@ const held = createStoredProofFixture({
   amount: 32,
   state: "held",
   operationId: "AwMDAwMDAwMDAwMDAwMDAw",
-});
-const spent = createStoredProofFixture({
-  id: "BAQEBAQEBAQEBAQEBAQEBA",
-  amount: 5,
-  state: "spent",
 });
 const snapshot = (
   proofId: string,
@@ -43,7 +35,7 @@ const props = (
   cashuBulkCheckIsBusy: false,
   cashuIsBusy: false,
   cashuMeltToMainMintButtonLabel: null,
-  cashuProofs: [available, held, spent],
+  cashuProofs: [available, held],
   checkAllCashuTokensAndDeleteInvalid: async () => {},
   checkIssuedCashuTokensAndDeleteClaimed: async () => ({ claimed: [] }),
   meltLargestForeignMintToMainMint: async () => {},
@@ -79,7 +71,7 @@ describe("CashuProofsPage inventory", () => {
         ])}
       />,
     );
-    for (const proof of [available, held, spent]) {
+    for (const proof of [available, held]) {
       expect(container.outerHTML).not.toContain(proof.secret);
       expect(container.outerHTML).not.toContain(proof.C);
     }
@@ -90,8 +82,6 @@ describe("CashuProofsPage inventory", () => {
     expect(heldSection).toContain("cashuProofStateHeld · 32 sat");
     expect(heldSection).toContain("cashuMintStatePending");
     expect(heldSection).toContain("cashuHeldProofsHint");
-    expect(container.textContent).toContain("cashuSpentProofsKept 1");
-    expect(container.textContent).toContain("cashuSpentProofsKept");
     await unmount();
   });
 

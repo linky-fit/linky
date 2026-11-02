@@ -1052,8 +1052,6 @@ export const de = {
     "Für eine wiederkehrende Zahlung zurückgelegt, bis sie rausgeht, oder Eingaben einer Lightning-Zahlung, die die Mint noch nicht abgeschlossen hat.",
   cashuHeldUnknownHint:
     "Von einem Vorgang gehalten, der noch nicht auf dieses Gerät synchronisiert wurde.",
-  cashuSpentProofsKept:
-    "Ausgegebene Proofs für die Buchführung behalten: {count}.",
   cashuTransfers: "Übertragungen",
   cashuTransfersEmpty: "Keine offenen Übertragungen.",
   cashuTransferIssued: "Ausgestellt, wartet auf Einlösung.",

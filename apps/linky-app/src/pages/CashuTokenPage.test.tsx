@@ -33,7 +33,7 @@ const props = (tokenText: string): ComponentProps<typeof CashuTokenPage> => ({
   canSendToContact: false,
   canWriteToNfc: false,
   cashuIsBusy: false,
-  cashuProofs: [],
+  transferProofs: [],
   cashuTransfers: [
     Schema.decodeUnknownSync(TokenTransfer)({
       id: "AQEBAQEBAQEBAQEBAQEBAQ",
@@ -233,7 +233,7 @@ describe("claimable token actions", () => {
         <CashuTokenPage
           {...pageProps}
           cashuTransfers={[new TokenTransfer({ ...transfer, status })]}
-          cashuProofs={[
+          transferProofs={[
             createStoredProofFixture({
               operationId: pageProps.routeId,
               state: status === "externalized" ? "externalized" : "handedOut",
@@ -273,7 +273,7 @@ describe("claimable token actions", () => {
       await rendered.rerender(
         <CashuTokenPage
           {...pageProps}
-          cashuProofs={[
+          transferProofs={[
             createStoredProofFixture({
               operationId: pageProps.routeId,
               amount: 10,
@@ -303,7 +303,7 @@ describe("claimable token actions", () => {
     const rendered = await renderIntoDocument(
       <CashuTokenPage
         {...pageProps}
-        cashuProofs={[
+        transferProofs={[
           createStoredProofFixture({
             operationId: pageProps.routeId,
             amount: 21,
@@ -372,7 +372,7 @@ it("shows chat handoff and the return action on a delivered token's detail", asy
   const pageProps = {
     ...baseProps,
     cashuTransfers: [transfer],
-    cashuProofs: [
+    transferProofs: [
       createStoredProofFixture({
         operationId: transfer.id,
         state: "handedOut",
@@ -405,7 +405,7 @@ it("shows chat handoff and the return action on a delivered token's detail", asy
   await rerender(
     <CashuTokenPage
       {...pageProps}
-      cashuProofs={[
+      transferProofs={[
         createStoredProofFixture({
           operationId: transfer.id,
           state: "spent",

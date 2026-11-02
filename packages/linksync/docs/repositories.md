@@ -72,9 +72,11 @@ await runLinkshu(
 );
 ```
 
-Ids are `cashuProofIdFor(secret)` and `cashuOperationIdFor(operationKeyOf(op))`, so re-inserting a stored proof or operation patches that row with the fields present; a proof keeps its `createdAt`, and the insert returns it. A proof insert batch runs one rotation check. Both `update`s apply only the present patch fields and are a no-op for an unknown id. `loadAll` returns every row that decodes as `StoredProof` / `StoredOperation` (`toStoredProof`, `toStoredOperation`); a row missing a required column is skipped, not repaired.
+Ids are `cashuProofIdFor(secret)` and `cashuOperationIdFor(operationKeyOf(op))`, so re-inserting a stored proof or operation patches that row with the fields present; a proof keeps its `createdAt`, and the insert returns it. A proof insert batch runs one rotation check. Both `update`s apply only the present patch fields and are a no-op for an unknown id. Every read returns only rows that decode as `StoredProof` / `StoredOperation` (`toStoredProof`, `toStoredOperation`); a row missing a required column is skipped, not repaired.
 
 `spent` is terminal, so the proof store adds one rule to the core's "highest shard wins" merge: a proof is spent when any copy in any visible shard says so, live or tombstoned. The next `update` patches the winning copy and the copies agree again.
+
+The proof reads never load the whole table. `loadUnspent` reads the copies of the proofs with a live copy in a state other than `spent` (`copiesWhere`), `findByOperation` those with a live copy naming the operation, and `findBySecrets` the copies of the ids the secrets derive; each merges the copies by the rule above, so a spent mark in any copy still wins. `findOldestByKeysets` reads the earliest created copy per keyset (`oldestWhere`). `subscribe` fires on changes to the operations, the pointers and the unspent proofs, not on a write that only touches spent ones. The operation store still reads every operation.
 
 ## Transactions
 

@@ -7,7 +7,7 @@ import type { ProofStoreService } from "../../ports/ProofStore";
 import { SEEN_MINTS_KEY_PREFIX } from "./WalletInstances";
 
 /**
- * Every mint the wallet has state for: the mints of stored proofs and
+ * Every mint the wallet has state for: the mints of unspent proofs and of
  * operations plus the mints any wallet load has seen. Restore scans these
  * when the caller names none.
  */
@@ -18,7 +18,7 @@ export const collectKnownMints = (
 ): Effect.Effect<ReadonlyArray<MintUrl>> =>
   Effect.gen(function* () {
     const mints = new Set<MintUrl>();
-    for (const proof of yield* proofStore.loadAll) mints.add(proof.mint);
+    for (const proof of yield* proofStore.loadUnspent) mints.add(proof.mint);
     for (const operation of yield* operationStore.loadAll) {
       mints.add(operation.mint);
       if (operation.sourceMint !== null) mints.add(operation.sourceMint);

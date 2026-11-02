@@ -21,8 +21,8 @@ export const reclaimProofs = (
 ) =>
   Effect.gen(function* () {
     const selected = new Set(ids);
-    const candidates = (yield* ctx.proofStore.loadAll).filter(
-      (proof) => selected.has(proof.id) && proof.state !== "spent",
+    const candidates = (yield* ctx.proofStore.loadUnspent).filter((proof) =>
+      selected.has(proof.id),
     );
     const groups = new Map<string, StoredProof[]>();
     for (const proof of candidates) {
@@ -91,16 +91,14 @@ export const reclaimProofs = (
       );
       if (Result.isSuccess(outcome)) amount += outcome.success;
     }
-    const proofs = yield* ctx.proofStore.loadAll;
+    const touched = new Set(
+      candidates
+        .filter((proof) => reclaimed.has(proof.id) || spent.has(proof.id))
+        .map((proof) => proof.operationId),
+    );
     for (const operation of yield* ctx.operationStore.loadAll) {
-      if (operation.kind !== "send") continue;
-      const linked = proofs.filter(
-        (proof) => proof.operationId === operation.id,
-      );
-      if (
-        !linked.some((proof) => reclaimed.has(proof.id) || spent.has(proof.id))
-      )
-        continue;
+      if (operation.kind !== "send" || !touched.has(operation.id)) continue;
+      const linked = yield* ctx.proofStore.findByOperation(operation.id);
       if (!linked.every((proof) => proof.state === "spent")) continue;
       yield* patchOperation(
         ctx,

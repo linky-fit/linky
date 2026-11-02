@@ -22,6 +22,7 @@ import {
  *                    (`operationId` names the send)
  * - `externalized` — handed off outside the app entirely
  * - `spent`        — terminal; kept so re-ingest and restore dedup against it
+ *                    and keysets stay bound to their mint
  */
 export const ProofState = Schema.Literals([
   "available",
@@ -76,8 +77,27 @@ export interface ProofStoreService {
   ) => Effect.Effect<ReadonlyArray<StoredProof>>;
   /** Applies the present fields; unknown id: no-op. */
   readonly update: (id: ProofId, patch: ProofPatch) => Effect.Effect<void>;
-  /** Every stored proof, any state; the package holds no cache of its own. */
-  readonly loadAll: Effect.Effect<ReadonlyArray<StoredProof>>;
+  /**
+   * Every stored proof whose state is not `spent`: the working set the
+   * package reads before every decision. It must not grow with the
+   * wallet's history; the package holds no cache of its own.
+   */
+  readonly loadUnspent: Effect.Effect<ReadonlyArray<StoredProof>>;
+  /** The stored proofs with these secrets, any state. */
+  readonly findBySecrets: (
+    secrets: ReadonlyArray<string>,
+  ) => Effect.Effect<ReadonlyArray<StoredProof>>;
+  /** The stored proofs whose `operationId` is this operation, any state. */
+  readonly findByOperation: (
+    operationId: OperationId,
+  ) => Effect.Effect<ReadonlyArray<StoredProof>>;
+  /**
+   * Per keyset id, its oldest stored proof (lowest `createdAt`), any state;
+   * a keyset with no stored proof is absent.
+   */
+  readonly findOldestByKeysets: (
+    keysetIds: ReadonlyArray<KeysetId>,
+  ) => Effect.Effect<ReadonlyArray<StoredProof>>;
 }
 
 export class ProofStore extends Context.Service<

@@ -35,7 +35,12 @@ import {
   proof,
 } from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
-import { proofsIn, secretsOf, seedProofs } from "../testing/inventory";
+import {
+  allProofs,
+  proofsIn,
+  secretsOf,
+  seedProofs,
+} from "../testing/inventory";
 import { decodeTokenText, parseTokenText } from "../token/codec";
 import { SendDraft } from "./domain";
 import { Send } from "./Send";
@@ -183,7 +188,7 @@ const sendAndInspect = (
     const receipt = yield* Effect.result(send.send(draft));
     return {
       receipt,
-      proofs: yield* (yield* ProofStore).loadAll,
+      proofs: yield* allProofs,
       operations: yield* (yield* OperationStore).loadAll,
       counter: yield* kv.get(counterKey),
     };

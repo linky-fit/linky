@@ -6,7 +6,8 @@ import type { Proof } from "../../token/domain";
 
 /**
  * NUT-09 scan of one keyset's derivation tree. Kept free of services so the
- * scan strategy itself stays testable: the mint calls arrive as two effects.
+ * scan strategy itself stays testable: the mint calls and the store lookup
+ * arrive as effects.
  */
 
 /** Counter positions scanned behind the cursor/counter high water. */
@@ -31,8 +32,10 @@ export interface KeysetScanInput {
   readonly proofStates: (
     proofs: ReadonlyArray<Proof>,
   ) => Effect.Effect<ReadonlyArray<ProofStateEntry>, MintFailure>;
-  /** Secrets already stored; restoring them again would duplicate rows. */
-  readonly knownSecrets: ReadonlySet<string>;
+  /** Which of the secrets are already stored; restoring them again would duplicate rows. */
+  readonly knownSecrets: (
+    proofs: ReadonlyArray<Proof>,
+  ) => Effect.Effect<ReadonlySet<string>>;
   readonly cursor: number;
   readonly counter: number;
 }
@@ -64,17 +67,16 @@ const nextCursorFrom = (
 const spendableProofs = (
   input: KeysetScanInput,
   restored: ReadonlyArray<Proof>,
-): Effect.Effect<ReadonlyArray<Proof>> => {
-  const fresh = restored.filter(
-    (proof) => !input.knownSecrets.has(proof.secret),
-  );
-  return fresh.length === 0
-    ? Effect.succeed([])
-    : input.proofStates(fresh).pipe(
-        Effect.map((states) => unspentProofs(fresh, states)),
-        Effect.orElseSucceed(() => []),
-      );
-};
+): Effect.Effect<ReadonlyArray<Proof>> =>
+  Effect.flatMap(input.knownSecrets(restored), (known) => {
+    const fresh = restored.filter((proof) => !known.has(proof.secret));
+    return fresh.length === 0
+      ? Effect.succeed([])
+      : input.proofStates(fresh).pipe(
+          Effect.map((states) => unspentProofs(fresh, states)),
+          Effect.orElseSucceed(() => []),
+        );
+  });
 
 /**
  * Scans a window behind the high water first — that is where a crashed

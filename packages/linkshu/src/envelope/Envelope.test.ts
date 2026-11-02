@@ -45,7 +45,7 @@ import {
   proof,
 } from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
-import { amountIn, seedProofs } from "../testing/inventory";
+import { allProofs, amountIn, seedProofs } from "../testing/inventory";
 import { freshStorage } from "../testing/storage";
 import type { Storage } from "../testing/storage";
 import { decodeTokenText, parseTokenText } from "../token/codec";
@@ -281,7 +281,7 @@ const makeDevice = (
   const inventory = () =>
     run(
       Effect.all({
-        proofs: Effect.flatMap(ProofStore, (store) => store.loadAll),
+        proofs: allProofs,
         operations: Effect.flatMap(OperationStore, (store) => store.loadAll),
       }),
     );

@@ -113,7 +113,7 @@ export class Validation extends Context.Service<Validation>()(
        */
       const checkAll: Effect.Effect<ValidationReport> = Effect.gen(
         function* () {
-          const proofs = (yield* proofStore.loadAll).filter(
+          const proofs = (yield* proofStore.loadUnspent).filter(
             (proof) => proof.state === "available",
           );
           const markedSpent: SpentProofReport[] = [];
@@ -197,7 +197,7 @@ export class Validation extends Context.Service<Validation>()(
       /** Detect handed-out tokens the recipient has claimed. */
       const checkIssued: Effect.Effect<IssuedClaimReport> = Effect.gen(
         function* () {
-          const proofs = yield* proofStore.loadAll;
+          const proofs = yield* proofStore.loadUnspent;
           const operations = yield* operationStore.loadAll;
           const handedOut = proofs.filter(
             (proof) =>
@@ -235,7 +235,7 @@ export class Validation extends Context.Service<Validation>()(
             operationId,
             status: "unavailable",
           });
-          const proofs = yield* proofStore.loadAll;
+          const proofs = yield* proofStore.findByOperation(operationId);
           const handedOut = handedOutOf(proofs, operation);
           if (operation.kind === "send") {
             if (handedOut.length === 0) {
@@ -304,9 +304,7 @@ export class Validation extends Context.Service<Validation>()(
       const inspectProofStates: Effect.Effect<
         ReadonlyArray<ProofStateSnapshot>
       > = Effect.gen(function* () {
-        const proofs = (yield* proofStore.loadAll).filter(
-          (proof) => proof.state !== "spent",
-        );
+        const proofs = yield* proofStore.loadUnspent;
         const snapshots = new Map<string, ProofStateSnapshot>(
           proofs.map((proof) => [
             proof.id,

@@ -1,5 +1,5 @@
 import { toContactTextFields } from "../lib/contactFields";
-import { Option, Schema, Struct } from "effect";
+import { Effect, Option, Schema, Struct } from "effect";
 import {
   ImportProofDraft,
   LegacyTokenRow,
@@ -36,7 +36,7 @@ import {
 } from "./composition/useLinkshuComposition";
 import { usePushToast, useTranslation } from "./shell";
 import { currentNpubAtom } from "../state/session/session";
-import { useContactsRepository } from "./useLinksync";
+import { useContactsRepository, useWalletRepository } from "./useLinksync";
 import { useWalletInventory } from "./wallet/useWalletInventory";
 import type { Translate } from "../../i18n";
 
@@ -101,7 +101,8 @@ const buildExportFile = ({
 
 interface UseAppDataTransferParams<TContact extends ImportableContact> {
   cashuOperations: readonly StoredOperation[];
-  cashuProofs: readonly StoredProof[];
+  /** Every proof, spent included; read only when exporting. */
+  loadCashuProofs: () => Promise<readonly StoredProof[]>;
   contacts: readonly TContact[];
   contactsRepository: Pick<ContactsRepository, "insert" | "update">;
   currentNpub: string | null;
@@ -115,7 +116,7 @@ interface UseAppDataTransferParams<TContact extends ImportableContact> {
 
 export const useAppDataTransfer = <TContact extends ImportableContact>({
   cashuOperations,
-  cashuProofs,
+  loadCashuProofs,
   contacts,
   contactsRepository,
   currentNpub,
@@ -128,10 +129,10 @@ export const useAppDataTransfer = <TContact extends ImportableContact>({
   const exportAppData = React.useCallback(() => {
     const summary = {
       contacts: contacts.length,
-      proofs: cashuProofs.length,
       operations: cashuOperations.length,
     };
     const run = async () => {
+      const cashuProofs = await loadCashuProofs();
       const file = buildExportFile({
         cashuOperations,
         cashuProofs,
@@ -142,7 +143,12 @@ export const useAppDataTransfer = <TContact extends ImportableContact>({
       reportAppLog({
         tag: "AppDataExported",
         summary: "App data export handed to the platform",
-        payload: { ...summary, fileName: file.fileName, size: file.blob.size },
+        payload: {
+          ...summary,
+          proofs: cashuProofs.length,
+          fileName: file.fileName,
+          size: file.blob.size,
+        },
       });
       pushToast(t("exportDone"));
     };
@@ -155,7 +161,7 @@ export const useAppDataTransfer = <TContact extends ImportableContact>({
       });
       pushToast(t("exportFailed"));
     });
-  }, [cashuOperations, cashuProofs, contacts, pushToast, t]);
+  }, [cashuOperations, loadCashuProofs, contacts, pushToast, t]);
 
   const importAppDataFromText = React.useCallback(
     async (text: string) => {
@@ -379,12 +385,16 @@ export const useAppDataTransfer = <TContact extends ImportableContact>({
 
 /** Backup export and import of contacts and wallet rows, for Settings. */
 export const useAppDataActions = () => {
-  const { allProofs, operations } = useWalletInventory();
+  const { operations } = useWalletInventory();
+  const { allProofs } = useWalletRepository();
   const lifecycle = useLinkshuCommands()?.cashuTransferLifecycle ?? null;
+  const loadCashuProofs = React.useCallback(
+    () => Effect.runPromise(allProofs),
+    [allProofs],
+  );
   return useAppDataTransfer({
     cashuOperations: operations,
-    // Backups need every proof, including hidden test-mint proofs.
-    cashuProofs: allProofs,
+    loadCashuProofs,
     contacts: useAtomValue(contactsAtom),
     contactsRepository: useContactsRepository(),
     currentNpub: useAtomValue(currentNpubAtom),

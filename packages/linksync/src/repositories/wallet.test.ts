@@ -1,4 +1,5 @@
 import {
+  KeysetId,
   NewOperation,
   NewProof,
   OperationId,
@@ -13,7 +14,15 @@ import { linkyStore, runNow } from "../testing/linky";
 import { run, testAppOwner, tick } from "../testing/toy";
 import { makeWalletRepository } from "./wallet";
 
-const proof = (secret: string, state: NewProof["state"] = "available") =>
+const proof = (
+  secret: string,
+  state: NewProof["state"] = "available",
+  overrides: Partial<{
+    keysetId: string;
+    mint: string;
+    operationId: string;
+  }> = {},
+) =>
   Schema.decodeUnknownSync(NewProof)({
     mint: "https://mint.example",
     unit: "sat",
@@ -24,6 +33,7 @@ const proof = (secret: string, state: NewProof["state"] = "available") =>
     dleq: null,
     state,
     operationId: null,
+    ...overrides,
   });
 
 const toColumns = (p: NewProof) => ({
@@ -57,6 +67,9 @@ const operation = (tokenText: string) =>
     error: null,
   });
 
+const statesOf = (proofs: ReadonlyArray<{ readonly state: string }>) =>
+  proofs.map((p) => p.state);
+
 describe("wallet repository", () => {
   describe("proof store", () => {
     it("derives the id from the secret and upserts onto the same row", () => {
@@ -76,9 +89,8 @@ describe("wallet repository", () => {
       expect(first?.id).toBe(cashuProofIdFor("s1"));
       expect(again?.id).toBe(first?.id);
       expect(again?.createdAt).toBe(first?.createdAt);
-      const all = run(proofs.loadAll);
-      expect(all).toHaveLength(1);
-      expect(all[0]?.state).toBe("spent");
+      expect(statesOf(run(proofs.findBySecrets(["s1"])))).toEqual(["spent"]);
+      expect(run(proofs.loadUnspent)).toEqual([]);
     });
 
     it("applies patches and ignores unknown ids", () => {
@@ -92,7 +104,7 @@ describe("wallet repository", () => {
           state: "spent",
         }),
       );
-      expect(runNow(proofs.loadAll).map((p) => p.state)).toEqual(["held"]);
+      expect(statesOf(runNow(proofs.loadUnspent))).toEqual(["held"]);
     });
 
     it("updates a proof born in an old shard on the active shard, not in place", () => {
@@ -115,7 +127,8 @@ describe("wallet repository", () => {
         secret: "s1",
         isDeleted: null,
       });
-      expect(runNow(proofs.loadAll).map((p) => p.state)).toEqual(["spent"]);
+      expect(statesOf(runNow(proofs.findBySecrets(["s1"])))).toEqual(["spent"]);
+      expect(runNow(proofs.loadUnspent)).toEqual([]);
     });
 
     it("reads a proof as spent when an older shard's copy says so", () => {
@@ -137,7 +150,8 @@ describe("wallet repository", () => {
           },
         ]),
       );
-      expect(runNow(proofs.loadAll).map((p) => p.state)).toEqual(["spent"]);
+      expect(statesOf(runNow(proofs.findBySecrets(["s1"])))).toEqual(["spent"]);
+      expect(runNow(proofs.loadUnspent)).toEqual([]);
     });
 
     it("reads a proof as spent when the copy a copy-forward tombstoned was spent meanwhile", () => {
@@ -158,11 +172,144 @@ describe("wallet repository", () => {
           },
         ]),
       );
-      expect(runNow(proofs.loadAll).map((p) => p.state)).toEqual(["spent"]);
+      expect(statesOf(runNow(proofs.findBySecrets(["s1"])))).toEqual(["spent"]);
+      expect(runNow(proofs.loadUnspent)).toEqual([]);
       runNow(proofs.update(stored.id, { state: "spent" }));
       expect(
         runNow(db.readTable("cashuProof")).map((row) => row.state),
       ).toEqual(["spent", "spent"]);
+    });
+
+    it("loads a copied-forward proof once, in the state of its live copy", () => {
+      const { store } = linkyStore();
+      const { proofs } = makeWalletRepository(store);
+      const [held, spent] = runNow(
+        proofs.insert([proof("held"), proof("spent")]),
+      );
+      if (held === undefined || spent === undefined)
+        throw new Error("no proof stored");
+      runNow(store.rotate("cashu"));
+      runNow(proofs.update(held.id, { state: "held" }));
+      runNow(proofs.update(spent.id, { state: "spent" }));
+      expect(
+        runNow(proofs.loadUnspent).map((p) => [p.secret, p.state]),
+      ).toEqual([["held", "held"]]);
+    });
+
+    it("reads every proof for backups, spent ones included", () => {
+      const { store } = linkyStore();
+      const wallet = makeWalletRepository(store);
+      const [, spent] = runNow(
+        wallet.proofs.insert([proof("kept"), proof("spent")]),
+      );
+      if (spent === undefined) throw new Error("no proof stored");
+      runNow(store.rotate("cashu"));
+      runNow(wallet.proofs.update(spent.id, { state: "spent" }));
+      expect(
+        runNow(wallet.allProofs)
+          .map((p) => [p.secret, p.state])
+          .sort(),
+      ).toEqual([
+        ["kept", "available"],
+        ["spent", "spent"],
+      ]);
+    });
+
+    it("finds an operation's proofs in any state and nothing else", () => {
+      const { store } = linkyStore();
+      const { proofs, operations } = makeWalletRepository(store);
+      const send = runNow(operations.insert(operation("cashuBsend")));
+      const other = runNow(operations.insert(operation("cashuBother")));
+      const linked = (secret: string, state: NewProof["state"], id: string) =>
+        proof(secret, state, { operationId: id });
+      runNow(
+        proofs.insert([
+          linked("claimed", "spent", send.id),
+          linked("out", "handedOut", send.id),
+          linked("elsewhere", "handedOut", other.id),
+          proof("free"),
+        ]),
+      );
+      runNow(store.rotate("cashu"));
+      const [out] = runNow(proofs.findBySecrets(["out"]));
+      if (out === undefined) throw new Error("no proof stored");
+      runNow(proofs.update(out.id, { state: "spent" }));
+      expect(
+        runNow(proofs.findByOperation(send.id))
+          .map((p) => [p.secret, p.state])
+          .sort(),
+      ).toEqual([
+        ["claimed", "spent"],
+        ["out", "spent"],
+      ]);
+      expect(
+        runNow(proofs.findByOperation(OperationId.make("unknown"))),
+      ).toEqual([]);
+    });
+
+    it("finds the oldest proof of each keyset, spent ones and old shards included", () => {
+      const { db, appOwner } = linkyStore();
+      tick(1_700_000_000_000);
+      const ticking: ShardDb<LinkyDbSchema> = {
+        ...db,
+        mutate: (mutations) =>
+          Effect.sync(() => tick(1_000)).pipe(
+            Effect.flatMap(() => db.mutate(mutations)),
+          ),
+      };
+      const store = createLinkyStore(ticking, appOwner);
+      const { proofs } = makeWalletRepository(store);
+      const [first] = run(
+        proofs.insert([proof("first", "available", { keysetId: "00aa" })]),
+      );
+      if (first === undefined) throw new Error("no proof stored");
+      run(proofs.update(first.id, { state: "spent" }));
+      run(store.rotate("cashu"));
+      run(
+        proofs.insert([
+          proof("later", "available", {
+            keysetId: "00aa",
+            mint: "https://other.example",
+          }),
+          proof("unasked", "available", { keysetId: "00cc" }),
+        ]),
+      );
+      expect(
+        run(
+          proofs.findOldestByKeysets(
+            ["00aa", "00bb"].map((id) => KeysetId.make(id)),
+          ),
+        ).map((p) => [p.secret, p.mint]),
+      ).toEqual([["first", "https://mint.example"]]);
+    });
+
+    it("subscribes to the unspent proofs, not to the whole proof table", () => {
+      const { db, appOwner } = linkyStore();
+      const narrowed: Array<[string, string, ReadonlyArray<string>]> = [];
+      const whole: Array<string> = [];
+      const recording: ShardDb<LinkyDbSchema> = {
+        ...db,
+        subscribe: (table, listener) => {
+          whole.push(table);
+          return db.subscribe(table, listener);
+        },
+        subscribeWhere: (table, column, values, listener) => {
+          narrowed.push([table, column, values]);
+          return db.subscribeWhere(table, column, values, listener);
+        },
+      };
+      const { subscribe } = makeWalletRepository(
+        createLinkyStore(recording, appOwner),
+      );
+      subscribe(() => {})();
+      expect(narrowed).toEqual([
+        [
+          "cashuProof",
+          "state",
+          ["available", "held", "handedOut", "externalized"],
+        ],
+      ]);
+      expect(whole).not.toContain("cashuProof");
     });
 
     it("checks rotation once per inserted batch and still rotates on time", () => {
@@ -188,7 +335,7 @@ describe("wallet repository", () => {
           ),
         );
       expect(runNow(store.activeIndex("cashu"))).toBe(1);
-      expect(runNow(proofs.loadAll)).toHaveLength(200);
+      expect(runNow(proofs.loadUnspent)).toHaveLength(200);
     });
 
     it("skips rows that do not validate", () => {
@@ -214,7 +361,8 @@ describe("wallet repository", () => {
           },
         ]),
       );
-      expect(runNow(proofs.loadAll)).toEqual([]);
+      expect(runNow(proofs.loadUnspent)).toEqual([]);
+      expect(runNow(proofs.findBySecrets(["bad"]))).toEqual([]);
     });
   });
 

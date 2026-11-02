@@ -315,7 +315,7 @@ export class Autoswap extends Context.Service<Autoswap>()("linkshu/Autoswap", {
         const source = yield* instances.get(draft.sourceMint, sat);
         const target = yield* instances.get(draft.targetMint, sat);
         const candidates = proofsAt(
-          yield* proofStore.loadAll,
+          yield* proofStore.loadUnspent,
           draft.sourceMint,
           sat,
         ).filter((proof) => proof.state === "available");

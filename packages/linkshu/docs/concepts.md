@@ -14,7 +14,7 @@ Each primitive is an effect `Schema` with a brand, so a plain `string` or `numbe
 
 ## Proofs and operations
 
-The wallet is an inventory. The `ProofStore` holds one `StoredProof` per proof; the `OperationStore` holds one `StoredOperation` per operation. The package decides every `state` and `status`; the platform only persists them. Nothing in the package deletes a proof or an operation.
+The wallet is an inventory. The `ProofStore` holds one `StoredProof` per proof; the `OperationStore` holds one `StoredOperation` per operation. The package decides every `state` and `status`; the platform only persists them. Nothing in the package deletes a proof or an operation. Decisions read the working set, the proofs not yet `spent`; spent proofs are looked up by secret or by operation where dedup or a transfer needs them ([ports.md](./ports.md#proofstore)).
 
 ### Proof states
 
@@ -24,7 +24,7 @@ The wallet is an inventory. The `ProofStore` holds one `StoredProof` per proof; 
 | `held`         | Input of an in-flight melt, or reserved by an open envelope; `operationId` names the `melt` or `envelope`. A null `operationId` means the holder has not synced to this device yet; the proof stays out of balance, and an envelope found here takes its proofs back | no       |
 | `handedOut`    | Encoded into a token someone else may claim; `operationId` names the `send` or `envelope`                                                                                                                                                                            | no       |
 | `externalized` | Handed off outside the app entirely; `operationId` names the `send`                                                                                                                                                                                                  | no       |
-| `spent`        | Terminal: the mint reported it spent. Never deleted, so restore and re-ingest dedup against it                                                                                                                                                                       | no       |
+| `spent`        | Terminal: the mint reported it spent. Never deleted, so restore and re-ingest dedup against it and its keyset stays bound to its mint                                                                                                                                | no       |
 
 `Tokens.balances` sums `available` proofs only. `spendable` is the largest single-mint balance, because cashu cannot spend across mints in one operation.
 

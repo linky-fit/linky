@@ -28,6 +28,7 @@ import {
   heldRowsOf,
   loadEnvelope,
   returnToEnvelope,
+  storedRowsOf,
   withEnvelopeLease,
 } from "../envelope/internal/envelopes";
 import type { MeltOfEnvelope } from "../envelope/internal/envelopes";
@@ -47,7 +48,7 @@ import {
   insertProofs,
   proofsAt,
   setProofState,
-  storedSecrets,
+  knownSecretsOf,
   toDomainProof,
   toNewProofs,
   totalAmount,
@@ -256,10 +257,8 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
     const heldInputs = (
       pending: PendingMelt,
     ): Effect.Effect<ReadonlyArray<StoredProof>> =>
-      Effect.map(proofStore.loadAll, (proofs) =>
-        proofs.filter(
-          (proof) => proof.operationId === pending.id && proof.state === "held",
-        ),
+      Effect.map(proofStore.findByOperation(pending.id), (proofs) =>
+        proofs.filter((proof) => proof.state === "held"),
       );
 
     /** Inputs of a melt the mint did not execute: back to their envelope or the balance. */
@@ -315,7 +314,7 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
           .map((operation) => [operation.id, operation]),
       );
       const late = new Map<StoredOperation, StoredProof[]>();
-      for (const proof of yield* proofStore.loadAll) {
+      for (const proof of yield* proofStore.loadUnspent) {
         const melt =
           proof.state === "held" && proof.operationId !== null
             ? closed.get(proof.operationId)
@@ -354,7 +353,7 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
             detail: "mint returned malformed proofs from the change reclaim",
           });
         }
-        const known = storedSecrets(yield* proofStore.loadAll);
+        const known = yield* knownSecretsOf(proofStore, proofs);
         const unstored = proofs.filter((proof) => !known.has(proof.secret));
         const states = yield* checkProofStates(wallet, pending.mint, unstored);
         return unspentProofs(unstored, states);
@@ -863,7 +862,10 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
           if (envelope === null || envelope.operation.status !== "pending") {
             return yield* notFound;
           }
-          const held = heldRowsOf(yield* proofStore.loadAll, envelope);
+          const held = heldRowsOf(
+            yield* storedRowsOf(proofStore, envelope),
+            envelope,
+          );
           if (held.length !== envelope.proofs.length) return yield* notFound;
 
           const wallet = yield* instances.get(draft.mint, sat);
@@ -914,7 +916,7 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
       Effect.gen(function* () {
         const wallet = yield* instances.get(priced.mint, sat);
         const available = proofsAt(
-          yield* proofStore.loadAll,
+          yield* proofStore.loadUnspent,
           priced.mint,
           sat,
         ).filter((proof) => proof.state === "available");

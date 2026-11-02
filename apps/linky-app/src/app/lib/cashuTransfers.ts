@@ -69,36 +69,28 @@ export const takenTokenProofs = (
 };
 
 /**
- * The wallet's own sends by `tokenProofsKey`: true once the recipient claimed it,
- * i.e. the mint reported spent proofs covering the whole amount, so a send
- * whose proofs have not all synced yet stays unclaimed. A returned send's
- * proofs were spent by the wallet itself.
+ * The wallet's own sends by `tokenProofsKey`: true once the recipient claimed
+ * it, i.e. the send closed `done` and none of its proofs is still unspent.
+ * A send closed by `forget` keeps its handed-out proofs and stays unclaimed;
+ * a returned send's proofs were spent by the wallet itself.
  */
 export const sentTokenClaims = (
   transfers: ReadonlyArray<TokenTransfer>,
-  proofs: ReadonlyArray<StoredProof>,
+  unspentProofs: ReadonlyArray<StoredProof>,
 ): ReadonlyMap<string, boolean> => {
-  const spentByOperation = new Map<string, { amount: number; all: boolean }>();
-  for (const proof of proofs) {
-    if (proof.operationId === null) continue;
-    const spent = spentByOperation.get(proof.operationId);
-    spentByOperation.set(proof.operationId, {
-      amount: (spent?.amount ?? 0) + proof.amount,
-      all: (spent?.all ?? true) && proof.state === "spent",
-    });
-  }
+  const outstanding = new Set(
+    unspentProofs.flatMap((proof) =>
+      proof.operationId === null ? [] : [proof.operationId],
+    ),
+  );
   const claims = new Map<string, boolean>();
   for (const transfer of transfers) {
     if (transfer.kind !== "send") continue;
     const key = tokenProofsKey(transfer.tokenText);
     if (key === null) continue;
-    const spent = spentByOperation.get(transfer.id);
     claims.set(
       key,
-      transfer.status !== "returned" &&
-        spent !== undefined &&
-        spent.all &&
-        spent.amount === transfer.amount,
+      transfer.status === "done" && !outstanding.has(transfer.id),
     );
   }
   return claims;

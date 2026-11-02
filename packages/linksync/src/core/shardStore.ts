@@ -118,6 +118,41 @@ export interface ShardStore<
     table: T,
     id: S[T]["id"],
   ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
+  /** `copiesOf` for several rows at once. */
+  readonly copiesOfIds: <
+    Scope extends keyof R & string,
+    T extends TableOf<R, Scope>,
+  >(
+    scope: Scope,
+    table: T,
+    ids: ReadonlyArray<S[T]["id"]>,
+  ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
+  /**
+   * `copies` narrowed to the ids with a live copy whose `column` holds one
+   * of `values`; every copy of such an id comes back, tombstones included.
+   */
+  readonly copiesWhere: <
+    Scope extends keyof R & string,
+    T extends TableOf<R, Scope>,
+  >(
+    scope: Scope,
+    table: T,
+    column: keyof S[T] & string,
+    values: ReadonlyArray<string>,
+  ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
+  /**
+   * Per value, the earliest created copy in the visible shards whose
+   * `column` holds it, tombstones included; a value no copy holds is absent.
+   */
+  readonly oldestWhere: <
+    Scope extends keyof R & string,
+    T extends TableOf<R, Scope>,
+  >(
+    scope: Scope,
+    table: T,
+    column: keyof S[T] & string,
+    values: ReadonlyArray<string>,
+  ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
   /**
    * Writes the row's columns into the active shard. A tombstone there stays
    * unless `revive` is set, so a row fetched again cannot undo a removal.
@@ -223,6 +258,22 @@ export interface ShardStore<
   /** Fires after any change to a table of the scope. */
   readonly subscribe: (
     scope: keyof R & string,
+    listener: () => void,
+  ) => () => void;
+  /**
+   * `subscribe`, except that the filtered table fires only on a change to
+   * what `copiesWhere` with the filter returns.
+   */
+  readonly subscribeWhere: <
+    Scope extends keyof R & string,
+    T extends TableOf<R, Scope>,
+  >(
+    scope: Scope,
+    filter: {
+      readonly table: T;
+      readonly column: keyof S[T] & string;
+      readonly values: ReadonlyArray<string>;
+    },
     listener: () => void,
   ) => () => void;
   /** Fires after any change to the pointers, local or synced. */
@@ -428,14 +479,49 @@ export const createShardStore = <
       ([shards, all]) => visibleNewestFirst(shards, all),
     );
 
+  const copiesOfIds = <T extends keyof S & string>(
+    scope: string,
+    table: T,
+    ids: ReadonlyArray<string>,
+  ) =>
+    Effect.map(
+      Effect.all([visibleShards(scope), db.readCopies(table, ids)]),
+      ([shards, all]) => visibleNewestFirst(shards, all),
+    );
+
   const copiesOf = <T extends keyof S & string>(
     scope: string,
     table: T,
     id: string,
+  ) => copiesOfIds(scope, table, [id]);
+
+  const copiesWhere = <T extends keyof S & string>(
+    scope: string,
+    table: T,
+    column: keyof S[T] & string,
+    values: ReadonlyArray<string>,
   ) =>
     Effect.map(
-      Effect.all([visibleShards(scope), db.readCopies(table, id)]),
+      Effect.all([
+        visibleShards(scope),
+        db.readCopiesWhere(table, column, values),
+      ]),
       ([shards, all]) => visibleNewestFirst(shards, all),
+    );
+
+  const oldestWhere = <T extends keyof S & string>(
+    scope: string,
+    table: T,
+    column: keyof S[T] & string,
+    values: ReadonlyArray<string>,
+  ) =>
+    Effect.flatMap(visibleShards(scope), (shards) =>
+      db.readOldest(
+        table,
+        column,
+        values,
+        shards.map((shard) => shard.owner.id),
+      ),
     );
 
   const activeOwner = (scope: string): Effect.Effect<SyncOwner> =>
@@ -792,11 +878,28 @@ export const createShardStore = <
       return forgotten;
     });
 
-  const subscribe = (scope: string, listener: () => void): (() => void) => {
+  const subscribeWhere = <T extends keyof S & string>(
+    scope: string,
+    filter: {
+      readonly table: T;
+      readonly column: keyof S[T] & string;
+      readonly values: ReadonlyArray<string>;
+    } | null,
+    listener: () => void,
+  ): (() => void) => {
     const notify = () => listener();
     visibilityListeners.add(notify);
     const unsubscribes = [
-      ...definition(scope).tables.map((table) => db.subscribe(table, listener)),
+      ...definition(scope).tables.map((table) =>
+        table === filter?.table
+          ? db.subscribeWhere(
+              filter.table,
+              filter.column,
+              filter.values,
+              listener,
+            )
+          : db.subscribe(table, listener),
+      ),
       db.subscribe("shardPointer", listener),
     ];
     return () => {
@@ -847,6 +950,9 @@ export const createShardStore = <
     rows,
     copies,
     copiesOf,
+    copiesOfIds,
+    copiesWhere,
+    oldestWhere,
     insert: (scope, table, row, options) =>
       Effect.gen(function* () {
         yield* beforeWrite;
@@ -888,7 +994,8 @@ export const createShardStore = <
     subscribeHydration,
     repairPointers,
     forget,
-    subscribe,
+    subscribe: (scope, listener) => subscribeWhere(scope, null, listener),
+    subscribeWhere,
     subscribePointers,
     followPointers,
   };

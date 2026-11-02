@@ -102,28 +102,23 @@ export const CashuProofsPage: FC<CashuProofsPageProps> = ({
   const { t } = useTranslation();
   const { formatDisplayedAmountText } = useDisplayAmounts();
 
-  const unspentProofs = useMemo(
-    () => cashuProofs.filter((proof) => proof.state !== "spent"),
-    [cashuProofs],
-  );
   const {
     reports,
     loading: checkingProofs,
     refresh,
-  } = useTokenProofStates(unspentProofs, inspectCashuProofStates);
+  } = useTokenProofStates(cashuProofs, inspectCashuProofStates);
   const mintStateById = useMemo(
     () => new Map(reports.map((report) => [report.proofId, report.state])),
     [reports],
   );
 
   const byState = (state: ProofState) =>
-    unspentProofs
+    cashuProofs
       .filter((proof) => proof.state === state)
       .sort((a, b) => b.amount - a.amount);
   const available = byState("available");
   const held = byState("held");
   const handedOut = [...byState("handedOut"), ...byState("externalized")];
-  const spentCount = cashuProofs.length - unspentProofs.length;
 
   const checkAll = async () => {
     await checkAllCashuTokensAndDeleteInvalid();
@@ -213,7 +208,7 @@ export const CashuProofsPage: FC<CashuProofsPageProps> = ({
                 cashuIsBusy ||
                 cashuBulkCheckIsBusy ||
                 checkingProofs ||
-                unspentProofs.length === 0
+                cashuProofs.length === 0
               }
             >
               {t("cashuCheckAllTokens")}
@@ -222,11 +217,6 @@ export const CashuProofsPage: FC<CashuProofsPageProps> = ({
         }
       >
         {renderProofTable(available)}
-        {spentCount > 0
-          ? note(
-              t("cashuSpentProofsKept").replace("{count}", String(spentCount)),
-            )
-          : null}
         {cashuMeltToMainMintButtonLabel ? (
           <Button
             variant="secondary"

@@ -1,7 +1,7 @@
 import { Mint, MintOperationError, Wallet } from "@cashu/cashu-ts";
 import { Effect } from "effect";
 import { Amount, ProofStore, runLinkshu, Send, SendDraft } from "../../src";
-import { amountIn, proofsIn } from "../../src/testing/inventory";
+import { allProofs, amountIn, proofsIn } from "../../src/testing/inventory";
 import {
   availableRowsOf,
   claimExternally,
@@ -83,7 +83,7 @@ describe("deterministic output collisions against the local mint", () => {
             produceAs: "issued",
           }),
         );
-        return { receipt, proofs: yield* proofStore.loadAll };
+        return { receipt, proofs: yield* allProofs };
       }),
     ).finally(() => swap.mockRestore());
 

@@ -50,7 +50,7 @@ describe("autoswap between local mints", () => {
     expect(receipt.targetMint).toBe(targetMintUrl);
     expect(receipt.movedAmount).toBeGreaterThan(0);
 
-    const stored = await Effect.runPromise(proofs.loadAll);
+    const stored = await Effect.runPromise(proofs.all);
     const target = stored.filter((proof) => proof.mint === targetMintUrl);
     expect(target.length).toBeGreaterThan(0);
     expect(target.every((proof) => proof.state === "available")).toBe(true);
@@ -160,7 +160,7 @@ describe("autoswap between local mints", () => {
     // The autoswap is closed, so a second pass has nothing left to claim and
     // the 64 sats are minted exactly once.
     expect(await resumeOnce()).toEqual([]);
-    const stored = await Effect.runPromise(proofs.loadAll);
+    const stored = await Effect.runPromise(proofs.all);
     expect(stored.every((proof) => proof.mint === targetMintUrl)).toBe(true);
     expect(availableTotalOf(stored)).toBe(64);
   });
