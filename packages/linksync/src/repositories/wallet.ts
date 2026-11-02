@@ -28,6 +28,7 @@ import type {
 } from "@linky-fit/linkshu";
 import { Clock, Effect, Layer, Schema } from "effect";
 import type { Patch, Row, RowWrite, WriteRow } from "../core";
+import { oldestPerValue } from "../core/ShardDb";
 import {
   CashuOperationId,
   cashuOperationIdFor,
@@ -262,6 +263,11 @@ export interface WalletRepository {
   /** Every proof in any state, spent included: a full read for backups, never for wallet decisions. */
   readonly allProofs: Effect.Effect<ReadonlyArray<StoredProof>>;
   readonly subscribe: (listener: () => void) => () => void;
+  /** Fires on changes to the proofs of these operations, spent ones included. */
+  readonly subscribeOperations: (
+    operationIds: ReadonlyArray<OperationId>,
+    listener: () => void,
+  ) => () => void;
 }
 
 /** A proof whose merged state is not spent has a live copy in one of these states. */
@@ -270,6 +276,26 @@ const unspentFilter = {
   column: "state",
   values: ProofState.literals.filter((state) => state !== "spent"),
 } as const;
+
+/**
+ * The proofs any copy names an operation on: a spent mark may sit in a
+ * tombstoned copy, so tombstones count, and the merge keeps the true owners.
+ */
+const operationFilter = (operationIds: ReadonlyArray<CashuOperationId>) =>
+  ({
+    table: "cashuProof",
+    column: "operationId",
+    values: operationIds,
+    matchTombstones: true,
+  }) as const;
+
+const toCashuOperationIds = (
+  operationIds: ReadonlyArray<string>,
+): ReadonlyArray<CashuOperationId> =>
+  operationIds.flatMap((id) => {
+    const decoded = CashuOperationId.fromUnknown(id);
+    return decoded.ok ? [decoded.value] : [];
+  });
 
 const toStoredProofs = (
   rows: ReadonlyArray<CashuProofRow>,
@@ -354,10 +380,11 @@ export const makeWalletRepository = (store: LinkyStore): WalletRepository => {
     findByOperation: (operationId) => {
       const decoded = CashuOperationId.fromUnknown(operationId);
       if (!decoded.ok) return Effect.succeed([]);
+      const { table, column, values, matchTombstones } = operationFilter([
+        decoded.value,
+      ]);
       return Effect.map(
-        store.copiesWhere("cashu", "cashuProof", "operationId", [
-          decoded.value,
-        ]),
+        store.copiesWhere("cashu", table, column, values, { matchTombstones }),
         (copies) =>
           toStoredProofs(
             mergeProofCopies(copies).filter(
@@ -366,11 +393,39 @@ export const makeWalletRepository = (store: LinkyStore): WalletRepository => {
           ),
       );
     },
+    // Ties on `createdAt` go to the lowest mint, as linkshu binds keysets.
     findOldestByKeysets: (keysetIds) =>
-      Effect.map(
-        store.oldestWhere("cashu", "cashuProof", "keysetId", keysetIds),
-        toStoredProofs,
-      ),
+      Effect.gen(function* () {
+        const oldest = yield* store.oldestWhere(
+          "cashu",
+          "cashuProof",
+          "keysetId",
+          keysetIds,
+          "mint",
+        );
+        const undecodable = oldest.flatMap((row) =>
+          toStoredProof(row) === null && row.keysetId !== null
+            ? [row.keysetId]
+            : [],
+        );
+        if (undecodable.length === 0) return toStoredProofs(oldest);
+        const copies = yield* store.copiesWhere(
+          "cashu",
+          "cashuProof",
+          "keysetId",
+          undecodable,
+          { matchTombstones: true },
+        );
+        return toStoredProofs([
+          ...oldest,
+          ...oldestPerValue(
+            copies.filter((row) => toStoredProof(row) !== null),
+            "keysetId",
+            undecodable,
+            "mint",
+          ),
+        ]);
+      }),
   };
 
   const operations: OperationStoreService = {
@@ -406,5 +461,11 @@ export const makeWalletRepository = (store: LinkyStore): WalletRepository => {
     ),
     subscribe: (listener) =>
       store.subscribeWhere("cashu", unspentFilter, listener),
+    subscribeOperations: (operationIds, listener) => {
+      const filter = operationFilter(toCashuOperationIds(operationIds));
+      return filter.values.length === 0
+        ? () => {}
+        : store.subscribeWhere("cashu", filter, listener);
+    },
   };
 };

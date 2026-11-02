@@ -61,34 +61,52 @@ export interface Mutation {
   readonly row: Columns & { readonly isDeleted?: boolean };
 }
 
-/** `readCopiesWhere` over rows already read: every copy of each id with a matching live row. */
+export interface CopiesWhereOptions {
+  /** Match on tombstoned rows too, not only on live ones. */
+  readonly matchTombstones?: boolean;
+}
+
+/** `readCopiesWhere` over rows already read: every copy of each id with a matching row. */
 export const copiesMatching = <R extends Row<Columns>>(
   rows: ReadonlyArray<R>,
   column: string,
   values: ReadonlyArray<string>,
+  { matchTombstones = false }: CopiesWhereOptions = {},
 ): ReadonlyArray<R> => {
   const wanted = new Set<unknown>(values);
   const matched = new Set(
     rows
-      .filter((row) => row.isDeleted !== 1 && wanted.has(row[column]))
+      .filter(
+        (row) =>
+          (matchTombstones || row.isDeleted !== 1) && wanted.has(row[column]),
+      )
       .map((row) => row.id),
   );
   return rows.filter((row) => matched.has(row.id));
 };
 
+// SQLite sorts null first and compares text by code unit, as `String` and `<` do here.
+const sortKey = (value: unknown): string =>
+  value === null || value === undefined ? "" : String(value);
+
 /** `readOldest` over rows already read and filtered by owner. */
-export const oldestPerValue = <R extends Row<Columns>>(
+export const oldestPerValue = <R extends SystemColumns>(
   rows: ReadonlyArray<R>,
-  column: string,
+  column: keyof R & string,
   values: ReadonlyArray<string>,
+  thenBy: keyof R & string,
 ): ReadonlyArray<R> => {
   const wanted = new Set<unknown>(values);
   const oldest = new Map<unknown, R>();
+  const isOlder = (row: R, than: R): boolean =>
+    row.createdAt < than.createdAt ||
+    (row.createdAt === than.createdAt &&
+      sortKey(row[thenBy]) < sortKey(than[thenBy]));
   for (const row of rows) {
     const current = oldest.get(row[column]);
     if (
       wanted.has(row[column]) &&
-      (current === undefined || row.createdAt < current.createdAt)
+      (current === undefined || isOlder(row, current))
     )
       oldest.set(row[column], row);
   }
@@ -112,23 +130,27 @@ export interface ShardDb<S extends DbSchema> {
   ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
   /**
    * Every owner's copy, tombstones included, of each id that has a live row
-   * whose `column` holds one of `values`. All copies of a matched id come
-   * back, so a repository's own merge rule still sees every copy.
+   * (any row with `matchTombstones`) whose `column` holds one of `values`.
+   * All copies of a matched id come back, so a repository's own merge rule
+   * still sees every copy.
    */
   readonly readCopiesWhere: <T extends keyof S & string>(
     table: T,
     column: keyof S[T] & string,
     values: ReadonlyArray<string>,
+    options?: CopiesWhereOptions,
   ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
   /**
    * For each of `values`, the earliest created row among `ownerIds` whose
-   * `column` holds it, tombstones included; a value no row holds is absent.
+   * `column` holds it, tombstones included, ties going to the lowest
+   * `thenBy`; a value no row holds is absent.
    */
   readonly readOldest: <T extends keyof S & string>(
     table: T,
     column: keyof S[T] & string,
     values: ReadonlyArray<string>,
     ownerIds: ReadonlyArray<OwnerId>,
+    thenBy: keyof S[T] & string,
   ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
   /**
    * Column-level writes, applied all-or-nothing as one transaction; an
@@ -148,6 +170,7 @@ export interface ShardDb<S extends DbSchema> {
     column: keyof S[T] & string,
     values: ReadonlyArray<string>,
     listener: () => void,
+    options?: CopiesWhereOptions,
   ) => () => void;
   /** Opts the owner into sync; returns the unuse function. */
   readonly useOwner: (owner: SyncOwner) => () => void;

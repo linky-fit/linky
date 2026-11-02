@@ -69,6 +69,22 @@ describe("inMemoryProofStore reads", () => {
       }).pipe(Effect.provide(TestClock.layer())),
     );
   });
+
+  it("binds a keyset to the lowest mint among its proofs created together", async () => {
+    const store = makeInMemoryProofStore();
+    const oldest = await Effect.runPromise(
+      Effect.gen(function* () {
+        yield* store.write({
+          insert: [proof("zed", "available"), proof("abc", "available")],
+        });
+        return yield* store.findOldestByKeysets([KeysetId.make("00aa")]);
+      }),
+    );
+
+    expect(oldest.map((stored) => stored.mint)).toEqual([
+      "https://abc.example",
+    ]);
+  });
 });
 
 describe("inMemoryProofStore write", () => {

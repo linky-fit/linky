@@ -38,6 +38,15 @@ const walletChangesAtom = changesAtom(
   (wallet) => wallet.subscribe,
 );
 
+/** Spent-only changes too, which the unspent subscription above misses. */
+const operationChangesAtom = Atom.family((operationId: OperationId) =>
+  changesAtom(
+    walletRepositoryAtom,
+    (wallet) => (listener) =>
+      wallet.subscribeOperations([operationId], listener),
+  ),
+);
+
 const warnOnFailure = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   effect.pipe(
     Effect.tapCause((cause) =>
@@ -67,7 +76,7 @@ export const walletReadModelAtom = linkshuRuntimeAtom.atom((get) =>
 export const operationProofsAtom = Atom.family((operationId: OperationId) =>
   linkshuRuntimeAtom.atom((get) =>
     Effect.gen(function* () {
-      get(walletChangesAtom);
+      get(operationChangesAtom(operationId));
       return yield* (yield* Tokens).proofsOf(operationId);
     }).pipe(warnOnFailure),
   ),
@@ -78,9 +87,10 @@ export const pendingSendsSpentProofsAtom = linkshuRuntimeAtom.atom((get) =>
   Effect.gen(function* () {
     const model = yield* get.result(walletReadModelAtom);
     const tokens = yield* Tokens;
-    const linked = yield* Effect.forEach(
-      pendingTokenTransfers(model.transfers, model.unspentProofs),
-      (send) => tokens.proofsOf(send.id),
+    const sends = pendingTokenTransfers(model.transfers, model.unspentProofs);
+    for (const send of sends) get(operationChangesAtom(send.id));
+    const linked = yield* Effect.forEach(sends, (send) =>
+      tokens.proofsOf(send.id),
     );
     return linked.flat().filter((proof) => proof.state === "spent");
   }).pipe(warnOnFailure),

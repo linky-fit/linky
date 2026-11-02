@@ -106,8 +106,8 @@ export interface ProofStoreService {
     operationId: OperationId,
   ) => Effect.Effect<ReadonlyArray<StoredProof>>;
   /**
-   * Per keyset id, its oldest stored proof (lowest `createdAt`), any state;
-   * a keyset with no stored proof is absent.
+   * Per keyset id, its oldest stored proof (lowest `createdAt`, ties to the
+   * lowest `mint`), any state; a keyset with no stored proof is absent.
    */
   readonly findOldestByKeysets: (
     keysetIds: ReadonlyArray<KeysetId>,

@@ -16,6 +16,7 @@ export type {
 export { ShardDbError } from "./ShardDb";
 export type {
   Columns,
+  CopiesWhereOptions,
   DbSchema,
   Mutation,
   OwnerUsage,

@@ -67,6 +67,26 @@ const operation = (tokenText: string) =>
     error: null,
   });
 
+/** `subscribeWhere` firing only when its read changes, as Evolu's query subscription does. */
+const firingOnResultChange = (
+  db: ShardDb<LinkyDbSchema>,
+): ShardDb<LinkyDbSchema> => ({
+  ...db,
+  subscribeWhere: (table, column, values, listener, options) => {
+    const read = () =>
+      JSON.stringify(
+        runNow(db.readCopiesWhere(table, column, values, options)),
+      );
+    let last = read();
+    return db.subscribe(table, () => {
+      const next = read();
+      if (next === last) return;
+      last = next;
+      listener();
+    });
+  },
+});
+
 const statesOf = (proofs: ReadonlyArray<{ readonly state: string }>) =>
   proofs.map((p) => p.state);
 
@@ -276,6 +296,34 @@ describe("wallet repository", () => {
       ).toEqual([]);
     });
 
+    it("finds a proof spent under an operation only in a tombstoned copy", () => {
+      const { db, store } = linkyStore();
+      const { proofs, operations } = makeWalletRepository(store);
+      const send = runNow(operations.insert(operation("cashuBsend")));
+      const [stored] = runNow(proofs.write({ insert: [proof("raced")] }));
+      if (stored === undefined) throw new Error("no proof stored");
+      runNow(store.rotate("cashu"));
+      runNow(
+        proofs.write({
+          update: [{ id: stored.id, patch: { state: "available" } }],
+        }),
+      );
+      // Another device spent it under the send in shard 0 after this one copied it forward.
+      runNow(
+        db.mutate([
+          {
+            kind: "update",
+            table: "cashuProof",
+            ownerId: store.shardOwner("cashu", 0).id,
+            row: { id: stored.id, state: "spent", operationId: send.id },
+          },
+        ]),
+      );
+      expect(
+        runNow(proofs.findByOperation(send.id)).map((p) => [p.secret, p.state]),
+      ).toEqual([["raced", "spent"]]);
+    });
+
     it("finds the oldest proof of each keyset, spent ones and old shards included", () => {
       const { db, appOwner } = linkyStore();
       tick(1_700_000_000_000);
@@ -316,6 +364,89 @@ describe("wallet repository", () => {
           ),
         ).map((p) => [p.secret, p.mint]),
       ).toEqual([["first", "https://mint.example"]]);
+    });
+
+    it("binds a keyset to the lowest mint among its proofs created together", () => {
+      const { store } = linkyStore();
+      const { proofs } = makeWalletRepository(store);
+      runNow(
+        proofs.write({
+          insert: [
+            proof("zed", "available", { mint: "https://zed.example" }),
+            proof("abc", "available", { mint: "https://abc.example" }),
+          ],
+        }),
+      );
+      expect(
+        runNow(proofs.findOldestByKeysets([KeysetId.make("00ab")])).map(
+          (p) => p.mint,
+        ),
+      ).toEqual(["https://abc.example"]);
+    });
+
+    it("binds a keyset by its oldest valid proof when the oldest row does not validate", () => {
+      const { db, store } = linkyStore();
+      const { proofs } = makeWalletRepository(store);
+      tick(1_700_000_000_000);
+      run(
+        db.mutate([
+          {
+            kind: "upsert",
+            table: "cashuProof",
+            ownerId: store.shardOwner("cashu", 0).id,
+            row: {
+              ...toColumns(proof("bad")),
+              id: cashuProofIdFor("bad"),
+              mint: "not a url",
+            },
+          },
+        ]),
+      );
+      tick(1_000);
+      run(
+        proofs.write({
+          insert: [proof("first", "spent", { mint: "https://first.example" })],
+        }),
+      );
+      tick(1_000);
+      run(
+        proofs.write({
+          insert: [
+            proof("later", "available", { mint: "https://later.example" }),
+          ],
+        }),
+      );
+      expect(
+        run(proofs.findOldestByKeysets([KeysetId.make("00ab")])).map(
+          (p) => p.mint,
+        ),
+      ).toEqual(["https://first.example"]);
+    });
+
+    it("subscribes to an operation's proofs, firing when one arrives already spent", () => {
+      const { db, appOwner } = linkyStore();
+      const store = createLinkyStore(firingOnResultChange(db), appOwner);
+      const { proofs, operations, subscribe, subscribeOperations } =
+        makeWalletRepository(store);
+      const send = runNow(operations.insert(operation("cashuBsend")));
+      let unspentChanges = 0;
+      let sendChanges = 0;
+      const stopUnspent = subscribe(() => {
+        unspentChanges += 1;
+      });
+      const stopSend = subscribeOperations([send.id], () => {
+        sendChanges += 1;
+      });
+
+      runNow(
+        proofs.write({
+          insert: [proof("claimed", "spent", { operationId: send.id })],
+        }),
+      );
+
+      expect([unspentChanges, sendChanges]).toEqual([0, 1]);
+      stopSend();
+      stopUnspent();
     });
 
     it("subscribes to the unspent proofs, not to the whole proof table", () => {

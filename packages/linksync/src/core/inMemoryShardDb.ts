@@ -2,6 +2,7 @@ import type { OwnerId, SqliteBoolean, SyncOwner } from "@evolu/common";
 import { Clock, Effect } from "effect";
 import type {
   Columns,
+  CopiesWhereOptions,
   DbSchema,
   Mutation,
   OwnerUsage,
@@ -132,14 +133,16 @@ export const makeInMemoryShardDb = <S extends DbSchema>(
     table: T,
     column: keyof S[T] & string,
     values: ReadonlyArray<string>,
+    options?: CopiesWhereOptions,
   ): Effect.Effect<ReadonlyArray<Row<S[T]>>>;
   function readCopiesWhere(
     table: string,
     column: string,
     values: ReadonlyArray<string>,
+    options?: CopiesWhereOptions,
   ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
     return Effect.sync(() =>
-      copiesMatching([...tableRows(table).values()], column, values),
+      copiesMatching([...tableRows(table).values()], column, values, options),
     );
   }
 
@@ -148,12 +151,14 @@ export const makeInMemoryShardDb = <S extends DbSchema>(
     column: keyof S[T] & string,
     values: ReadonlyArray<string>,
     ownerIds: ReadonlyArray<OwnerId>,
+    thenBy: keyof S[T] & string,
   ): Effect.Effect<ReadonlyArray<Row<S[T]>>>;
   function readOldest(
     table: string,
     column: string,
     values: ReadonlyArray<string>,
     ownerIds: ReadonlyArray<OwnerId>,
+    thenBy: string,
   ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
     const owners = new Set(ownerIds);
     return Effect.sync(() =>
@@ -161,6 +166,7 @@ export const makeInMemoryShardDb = <S extends DbSchema>(
         [...tableRows(table).values()].filter((row) => owners.has(row.ownerId)),
         column,
         values,
+        thenBy,
       ),
     );
   }

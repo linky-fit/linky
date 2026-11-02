@@ -71,12 +71,12 @@ In a browser, `localStorage` has neither a compare-and-swap nor a locked read-mo
 
 The inventory. Spent proofs are never deleted, so the store grows with the wallet's history while the proofs that can still move stay few. The package reads only what a decision needs:
 
-| Read                             | Returns                                                         | Used for                                                                   |
-| -------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `loadUnspent`                    | every proof whose state is not `spent`                          | spending, balances, validation, resuming melts; before every decision      |
-| `findBySecrets(secrets)`         | the proofs with these secrets, any state                        | dedup when receiving, restoring, importing or reclaiming change            |
-| `findByOperation(operationId)`   | the proofs whose `operationId` is the operation, any state      | a melt's inputs, a reclaimed send, one transfer's proofs                   |
-| `findOldestByKeysets(keysetIds)` | per keyset id, its proof with the lowest `createdAt`, any state | binding a keyset to its mint on every wallet load ([mints.md](./mints.md)) |
+| Read                             | Returns                                                                                     | Used for                                                                   |
+| -------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `loadUnspent`                    | every proof whose state is not `spent`                                                      | spending, balances, validation, resuming melts; before every decision      |
+| `findBySecrets(secrets)`         | the proofs with these secrets, any state                                                    | dedup when receiving, restoring, importing or reclaiming change            |
+| `findByOperation(operationId)`   | the proofs whose `operationId` is the operation, any state                                  | a melt's inputs, a reclaimed send, one transfer's proofs                   |
+| `findOldestByKeysets(keysetIds)` | per keyset id, its proof with the lowest `createdAt` (ties to the lowest `mint`), any state | binding a keyset to its mint on every wallet load ([mints.md](./mints.md)) |
 
 `loadUnspent` runs before every operation, so its cost must follow the working set, not the history: filter by state in the store (an index on it) instead of loading every row and filtering in memory. A store small enough to load whole for every read, such as a file, can build the four reads with `proofReadsOf(loadAll)`.
 

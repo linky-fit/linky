@@ -35,6 +35,7 @@ import {
   KeyValueStore,
   type KeyValueStoreService,
 } from "../../ports/KeyValueStore";
+import { isOlderProof } from "../../internal/proofs";
 import { ProofStore } from "../../ports/ProofStore";
 import type { ProofStoreService, StoredProof } from "../../ports/ProofStore";
 import { errorMessage } from "../../internal/errorMessage";
@@ -190,10 +191,6 @@ export const classifyMintError = (
   return new MintRejected({ mint, code: null, detail });
 };
 
-const isOlder = (proof: StoredProof, than: StoredProof): boolean =>
-  proof.createdAt < than.createdAt ||
-  (proof.createdAt === than.createdAt && proof.mint < than.mint);
-
 /**
  * NUT-13 derives secrets from the seed, keyset id and counter but not the
  * mint, so a mint listing another mint's keyset id would re-derive proofs the
@@ -211,7 +208,7 @@ export const foreignKeysetProof = (
     const current = oldest.get(proof.keysetId);
     if (
       listed.has(proof.keysetId) &&
-      (current === undefined || isOlder(proof, current))
+      (current === undefined || isOlderProof(proof, current))
     )
       oldest.set(proof.keysetId, proof);
   }
