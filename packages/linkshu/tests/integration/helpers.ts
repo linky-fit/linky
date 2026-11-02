@@ -29,6 +29,7 @@ import type {
   StoredProof,
 } from "../../src";
 import { toNewProofs } from "../../src/internal/proofs";
+import { allProofs } from "../../src/testing/inventory";
 
 /**
  * The dev-stack Nutshell FakeWallet mint (docker-compose.dev.yml
@@ -169,7 +170,7 @@ export const receiveOnce = (seed: Bip39Seed, text: string) =>
     Effect.gen(function* () {
       const receive = yield* Receive;
       const receipt = yield* receive.receive(new ReceiveDraft({ text }));
-      const proofs = yield* (yield* ProofStore).loadAll;
+      const proofs = yield* allProofs;
       return { receipt, proofs };
     }),
   );

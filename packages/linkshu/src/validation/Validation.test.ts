@@ -15,7 +15,12 @@ import type { ProofState, StoredProof } from "../ports/ProofStore";
 import { fakeWallet, proof } from "../testing/fakeWallet";
 import type { ProofStateName } from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
-import { proofsIn, seedProofs, seedTransfer } from "../testing/inventory";
+import {
+  allProofs,
+  proofsIn,
+  seedProofs,
+  seedTransfer,
+} from "../testing/inventory";
 import { Validation } from "./Validation";
 
 const mint = MintUrl.make("https://mint.example");
@@ -109,7 +114,7 @@ const withProofs = <A, E>(
       ),
     );
     const result = yield* operation(yield* Validation);
-    return { result, proofs: yield* (yield* ProofStore).loadAll };
+    return { result, proofs: yield* allProofs };
   });
 
 const stateOfSecret = (
@@ -340,7 +345,7 @@ describe("Validation.checkTransfer", () => {
       const result = yield* (yield* Validation).checkTransfer(operation.id);
       return {
         result,
-        proofs: yield* (yield* ProofStore).loadAll,
+        proofs: yield* allProofs,
         status: yield* operationStatus(operation.id),
       };
     });
@@ -349,7 +354,7 @@ describe("Validation.checkTransfer", () => {
     Effect.gen(function* () {
       const operation = yield* seedTransfer("receive", "done", mint, tokenB, 8);
       const result = yield* (yield* Validation).checkTransfer(operation.id);
-      return { result, proofs: yield* (yield* ProofStore).loadAll };
+      return { result, proofs: yield* allProofs };
     });
 
   it("closes a handed-out send as claimed once every proof is spent", async () => {
@@ -485,7 +490,7 @@ describe("Validation.checkIssued", () => {
         return {
           result,
           sendB,
-          proofs: yield* (yield* ProofStore).loadAll,
+          proofs: yield* allProofs,
           statusA: yield* operationStatus(sendA.id),
           statusB: yield* operationStatus(sendB.id),
         };
@@ -539,7 +544,7 @@ describe("Validation.checkIssued", () => {
         const result = yield* (yield* Validation).checkIssued;
         return {
           result,
-          proofs: yield* (yield* ProofStore).loadAll,
+          proofs: yield* allProofs,
           status: yield* operationStatus(send.id),
         };
       }),
@@ -566,7 +571,7 @@ describe("Validation.checkIssued", () => {
         const result = yield* (yield* Validation).checkIssued;
         return {
           result,
-          proofs: yield* (yield* ProofStore).loadAll,
+          proofs: yield* allProofs,
           status: yield* operationStatus(send.id),
         };
       }),

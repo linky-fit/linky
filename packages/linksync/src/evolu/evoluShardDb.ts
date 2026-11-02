@@ -15,6 +15,7 @@ import type {
   SystemColumns,
 } from "../core";
 import { ShardDbError } from "../core";
+import { copiesMatching, oldestPerValue } from "../core/ShardDb";
 import {
   LinkySchema,
   linkyTableColumns,
@@ -114,13 +115,30 @@ const callUntyped = (
   return Reflect.apply(fn, target, args);
 };
 
+interface UntypedWhere {
+  where: (
+    column: string,
+    op: "=" | "in" | "is not",
+    value: string | number | null | ReadonlyArray<string> | UntypedWhere,
+  ) => UntypedWhere;
+  orderBy: (column: string) => UntypedWhere;
+  limit: (count: number) => UntypedWhere;
+}
+
 interface UntypedSelect {
   selectFrom: (table: string) => {
-    selectAll: () => {
-      where: (column: string, op: "=", value: string) => unknown;
-    };
+    selectAll: () => UntypedWhere;
+    select: (column: string) => UntypedWhere;
   };
 }
+
+// Keeps one `in` list's bound parameters far below SQLite's limit.
+const ID_CHUNK = 500;
+
+const chunked = <A>(items: ReadonlyArray<A>): ReadonlyArray<ReadonlyArray<A>> =>
+  Array.from({ length: Math.ceil(items.length / ID_CHUNK) }, (_, index) =>
+    items.slice(index * ID_CHUNK, (index + 1) * ID_CHUNK),
+  );
 
 const overlayKey = (table: string, ownerId: OwnerId, id: string): string =>
   `${table}/${ownerId}/${id}`;
@@ -205,28 +223,10 @@ export const createEvoluShardDb = (
       return Array.isArray(rows) ? rows.filter(isUntypedRow) : [];
     });
 
-  const toStoredRows = (rows: ReadonlyArray<UntypedRow>) =>
-    rows.filter(isStoredRow).flatMap(withChangeTimes);
-
-  // Evolu returns the same result array until the query's rows change.
-  const validatedResults = new WeakMap<object, ReadonlyArray<Row<Columns>>>();
-  const loadStoredRows = (
-    query: string,
-  ): Effect.Effect<ReadonlyArray<Row<Columns>>> =>
-    Effect.promise(async () => {
-      const result = await callUntyped(evolu, "loadQuery", query);
-      if (!Array.isArray(result)) return [];
-      const cached = validatedResults.get(result);
-      if (cached !== undefined) return cached;
-      const rows = toStoredRows(result.filter(isUntypedRow));
-      validatedResults.set(result, rows);
-      return rows;
-    });
-
   const mergeOverlay = (
     table: string,
     loaded: ReadonlyArray<Row<Columns>>,
-    onlyId?: string,
+    includePending: (entry: OverlayEntry) => boolean = () => true,
   ): ReadonlyArray<Row<Columns>> => {
     if (![...overlay.values()].some((entry) => entry.table === table))
       return loaded;
@@ -245,7 +245,7 @@ export const createEvoluShardDb = (
     const pending = [...overlay.values()].filter(
       (entry) =>
         entry.table === table &&
-        (onlyId === undefined || entry.columns.id === onlyId) &&
+        includePending(entry) &&
         !seen.has(overlayKey(table, entry.ownerId, entry.columns.id)),
     );
     return [...merged, ...pending.map((entry) => asRow(entry))];
@@ -260,31 +260,154 @@ export const createEvoluShardDb = (
     table: string,
   ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
     if (!isTable(table)) return Effect.succeed([]);
-    return Effect.map(loadStoredRows(tableQuery(table)), (rows) =>
+    return Effect.map(loadQueryRows(tableQuery(table)), (rows) =>
       mergeOverlay(table, rows),
     );
   }
 
+  const loadStoredRows = (
+    build: (db: UntypedSelect) => UntypedWhere,
+  ): Effect.Effect<ReadonlyArray<Row<Columns>>> =>
+    loadQueryRows(
+      asQuery(callUntyped(evolu, "createQuery", build, { prepare: true })),
+    );
+
+  // Evolu returns the same result array until the query's rows change.
+  const storedRowsByResult = new WeakMap<object, ReadonlyArray<Row<Columns>>>();
+  const loadQueryRows = (
+    query: string,
+  ): Effect.Effect<ReadonlyArray<Row<Columns>>> =>
+    Effect.promise(async () => {
+      const result = await callUntyped(evolu, "loadQuery", query);
+      if (!Array.isArray(result)) return [];
+      const cached = storedRowsByResult.get(result);
+      if (cached !== undefined) return cached;
+      const rows = result
+        .filter(isUntypedRow)
+        .filter(isStoredRow)
+        .flatMap(withChangeTimes);
+      storedRowsByResult.set(result, rows);
+      return rows;
+    });
+
   function readCopies<T extends LinkyTable>(
     table: T,
-    id: string,
+    ids: ReadonlyArray<string>,
   ): Effect.Effect<ReadonlyArray<Row<LinkyDbSchema[T]>>>;
   function readCopies(
     table: string,
-    id: string,
+    ids: ReadonlyArray<string>,
   ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
-    if (!isTable(table)) return Effect.succeed([]);
-    const query = asQuery(
-      callUntyped(
-        evolu,
-        "createQuery",
-        (db: UntypedSelect) =>
-          db.selectFrom(table).selectAll().where("id", "=", id),
-        { prepare: true },
+    return copiesById(table, ids);
+  }
+
+  const copiesById = (
+    table: string,
+    ids: ReadonlyArray<string>,
+  ): Effect.Effect<ReadonlyArray<Row<Columns>>> => {
+    if (!isTable(table) || ids.length === 0) return Effect.succeed([]);
+    const wanted = new Set(ids);
+    return Effect.map(
+      Effect.forEach(chunked([...wanted]), (chunk) =>
+        loadStoredRows((db) =>
+          db.selectFrom(table).selectAll().where("id", "in", chunk),
+        ),
+      ),
+      (chunks) =>
+        mergeOverlay(table, chunks.flat(), (entry) =>
+          wanted.has(entry.columns.id),
+        ),
+    );
+  };
+
+  const copiesWhereQuery = (
+    table: LinkyTable,
+    column: string,
+    values: ReadonlyArray<string>,
+  ): string =>
+    asQuery(
+      callUntyped(evolu, "createQuery", (db: UntypedSelect) =>
+        db
+          .selectFrom(table)
+          .selectAll()
+          .where(
+            "id",
+            "in",
+            db
+              .selectFrom(table)
+              .select("id")
+              .where(column, "in", values)
+              .where("isDeleted", "is not", 1),
+          ),
       ),
     );
-    return Effect.map(loadRows(query), (rows) =>
-      mergeOverlay(table, toStoredRows(rows), id),
+
+  function readCopiesWhere<T extends LinkyTable>(
+    table: T,
+    column: keyof LinkyDbSchema[T] & string,
+    values: ReadonlyArray<string>,
+  ): Effect.Effect<ReadonlyArray<Row<LinkyDbSchema[T]>>>;
+  function readCopiesWhere(
+    table: string,
+    column: string,
+    values: ReadonlyArray<string>,
+  ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
+    if (!isTable(table)) return Effect.succeed([]);
+    return Effect.gen(function* () {
+      const loaded = yield* loadQueryRows(
+        copiesWhereQuery(table, column, values),
+      );
+      const loadedIds = new Set(loaded.map((row) => row.id));
+      const merged = mergeOverlay(table, loaded, (entry) =>
+        loadedIds.has(entry.columns.id),
+      );
+      // A pending write can make an id match whose other copies the query skipped.
+      const pending = yield* copiesById(
+        table,
+        [...overlay.values()]
+          .filter((entry) => entry.table === table)
+          .map((entry) => entry.columns.id)
+          .filter((id) => !loadedIds.has(id)),
+      );
+      return copiesMatching([...merged, ...pending], column, values);
+    });
+  }
+
+  function readOldest<T extends LinkyTable>(
+    table: T,
+    column: keyof LinkyDbSchema[T] & string,
+    values: ReadonlyArray<string>,
+    ownerIds: ReadonlyArray<OwnerId>,
+  ): Effect.Effect<ReadonlyArray<Row<LinkyDbSchema[T]>>>;
+  function readOldest(
+    table: string,
+    column: string,
+    values: ReadonlyArray<string>,
+    ownerIds: ReadonlyArray<OwnerId>,
+  ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
+    if (!isTable(table) || ownerIds.length === 0) return Effect.succeed([]);
+    const owners = new Set<string>(ownerIds);
+    return Effect.map(
+      Effect.forEach(values, (value) =>
+        loadStoredRows((db) =>
+          db
+            .selectFrom(table)
+            .selectAll()
+            .where(column, "=", value)
+            .where("ownerId", "in", ownerIds)
+            .where("createdAt", "is not", null)
+            .orderBy("createdAt")
+            .limit(1),
+        ),
+      ),
+      (perValue) =>
+        oldestPerValue(
+          mergeOverlay(table, perValue.flat(), (entry) =>
+            owners.has(entry.ownerId),
+          ),
+          column,
+          values,
+        ),
     );
   }
 
@@ -427,23 +550,25 @@ export const createEvoluShardDb = (
   ownerSync.subscribe(absorbSyncedOwners);
   absorbSyncedOwners();
 
+  const subscribeQuery = (query: string, listener: () => void) => {
+    const unsubscribe = callUntyped(evolu, "subscribeQuery", query);
+    if (typeof unsubscribe !== "function")
+      throw new Error("evolu.subscribeQuery did not return a subscriber");
+    const stop = unsubscribe(listener);
+    return () => {
+      if (typeof stop === "function") stop();
+    };
+  };
+
   return {
     readTable,
     readCopies,
+    readCopiesWhere,
+    readOldest,
     mutate,
-    subscribe: (table, listener) => {
-      const unsubscribe = callUntyped(
-        evolu,
-        "subscribeQuery",
-        tableQuery(table),
-      );
-      if (typeof unsubscribe !== "function")
-        throw new Error("evolu.subscribeQuery did not return a subscriber");
-      const stop = unsubscribe(listener);
-      return () => {
-        if (typeof stop === "function") stop();
-      };
-    },
+    subscribe: (table, listener) => subscribeQuery(tableQuery(table), listener),
+    subscribeWhere: (table, column, values, listener) =>
+      subscribeQuery(copiesWhereQuery(table, column, values), listener),
     useOwner: (owner: SyncOwner) => evolu.useOwner(owner),
     isOwnerSynced: (ownerId) => readable.has(ownerId),
     subscribeOwnerSync: (listener) => {

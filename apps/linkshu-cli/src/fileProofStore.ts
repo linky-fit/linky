@@ -3,6 +3,7 @@ import {
   deriveStoreId,
   ProofId,
   ProofStore,
+  proofReadsOf,
   StoredProof,
   UnixSeconds,
 } from "@linky-fit/linkshu";
@@ -47,7 +48,7 @@ export const makeFileProofStore = (filePath: string): ProofStoreService => {
         undefined,
       ]),
 
-    loadAll: file.read,
+    ...proofReadsOf(file.read),
   };
 };
 

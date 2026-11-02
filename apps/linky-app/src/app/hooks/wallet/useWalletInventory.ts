@@ -1,3 +1,4 @@
+import type { OperationId, StoredProof } from "@linky-fit/linkshu";
 import { useAtomValue } from "@linky-fit/linkstr-react";
 import { Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
@@ -19,6 +20,8 @@ import {
 } from "../../lib/testMintGate";
 import {
   emptyReadModel,
+  operationProofsAtom,
+  pendingSendsSpentProofsAtom,
   walletReadModelAtom,
 } from "../../state/linkshu/readModel";
 import { allowTestMintsAtom } from "../../state/session/settings";
@@ -40,8 +43,8 @@ export const useWalletInventory = () => {
     [allowTestMints, model.balances],
   );
   const proofs = React.useMemo(
-    () => withoutHiddenTestMints(model.proofs, allowTestMints),
-    [allowTestMints, model.proofs],
+    () => withoutHiddenTestMints(model.unspentProofs, allowTestMints),
+    [allowTestMints, model.unspentProofs],
   );
   const deferredReceives = React.useMemo(
     () =>
@@ -55,8 +58,8 @@ export const useWalletInventory = () => {
   );
 
   return {
-    /** Every stored proof, test mints included; backups must not lose hidden funds. */
-    allProofs: model.proofs,
+    /** Every unspent proof, test mints included; backups must not lose hidden funds. */
+    unspentProofs: model.unspentProofs,
     balances,
     /** Sat tokens kept for an unreachable mint, without hidden test mints. */
     deferredReceives,
@@ -67,6 +70,24 @@ export const useWalletInventory = () => {
     transfers: model.transfers,
   };
 };
+
+const NO_PROOFS: ReadonlyArray<StoredProof> = [];
+
+/** One operation's proofs, spent ones included; empty until read. */
+export const useOperationProofs = (
+  operationId: OperationId,
+): ReadonlyArray<StoredProof> =>
+  Option.getOrElse(
+    AsyncResult.value(useAtomValue(operationProofsAtom(operationId))),
+    () => NO_PROOFS,
+  );
+
+/** The spent proofs of the sends the tokens screen lists. */
+export const usePendingSendsSpentProofs = (): ReadonlyArray<StoredProof> =>
+  Option.getOrElse(
+    AsyncResult.value(useAtomValue(pendingSendsSpentProofsAtom)),
+    () => NO_PROOFS,
+  );
 
 /** What the wallet can spend, and whether a move into the default mint would cover more. */
 export const useWalletBalance = () => {
@@ -106,14 +127,14 @@ export const useWalletBalance = () => {
 /** What a token in a message is worth and what the wallet knows about it. */
 export const useCashuTokenMessageInfo = () => {
   const allowTestMints = useAtomValue(allowTestMintsAtom);
-  const { allProofs, operations, transfers } = useWalletInventory();
+  const { unspentProofs, operations, transfers } = useWalletInventory();
   const takenProofs = React.useMemo(
     () => takenTokenProofs(transfers, operations),
     [operations, transfers],
   );
   const sentClaims = React.useMemo(
-    () => sentTokenClaims(transfers, allProofs),
-    [allProofs, transfers],
+    () => sentTokenClaims(transfers, unspentProofs),
+    [unspentProofs, transfers],
   );
   return React.useCallback(
     (text: string) =>

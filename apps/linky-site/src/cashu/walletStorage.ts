@@ -10,6 +10,7 @@ import {
   OperationStore,
   ProofId,
   ProofStore,
+  proofReadsOf,
   StoredOperation,
   StoredProof,
   UnixSeconds,
@@ -70,7 +71,7 @@ export const walletStorage = (prefix: string) => {
   return {
     bip39Seed: Bip39Seed.make(Uint8Array.from(seed)),
     proofStore: Layer.succeed(ProofStore, {
-      loadAll: Effect.sync(loadProofs),
+      ...proofReadsOf(Effect.sync(loadProofs)),
       insert: (proofs) =>
         Effect.sync(() => {
           const byId = new Map(loadProofs().map((row) => [row.id, row]));

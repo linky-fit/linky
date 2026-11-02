@@ -64,7 +64,7 @@ import {
   isHandedOut,
   loadEnvelope,
   probeEnvelope,
-  rowsOf,
+  storedRowsOf,
   storeEnvelope,
   withEnvelopeLease,
 } from "./internal/envelopes";
@@ -270,7 +270,7 @@ export class Envelope extends Context.Service<Envelope>()("linkshu/Envelope", {
             .filter((_, index) => answers[index] === "spent")
             .map((proof) => proof.secret),
         );
-        const rows = rowsOf(yield* proofStore.loadAll, envelope).filter(
+        const rows = (yield* storedRowsOf(proofStore, envelope)).filter(
           (proof) => proof.state !== "spent" && spentSecrets.has(proof.secret),
         );
         yield* setProofState(ctx, rows, "spent", "envelope-spent");
@@ -343,14 +343,14 @@ export class Envelope extends Context.Service<Envelope>()("linkshu/Envelope", {
           const ref = { mint: draft.mint, key: draft.key };
           const envelope = yield* findLocal(ref);
           if (envelope === null) return yield* new EnvelopeNotFound(ref);
-          const proofs = yield* proofStore.loadAll;
-          if (!isSendable(envelope, rowsOf(proofs, envelope))) {
+          const rows = yield* storedRowsOf(proofStore, envelope);
+          if (!isSendable(envelope, rows)) {
             return yield* new EnvelopeNotFound(ref);
           }
           const { operation } = envelope;
           yield* setProofState(
             ctx,
-            heldRowsOf(proofs, envelope),
+            heldRowsOf(rows, envelope),
             "handedOut",
             "envelope-send",
           );
@@ -406,7 +406,7 @@ export class Envelope extends Context.Service<Envelope>()("linkshu/Envelope", {
           const envelope = yield* loadOrAdopt(wallet, ref);
           if (
             envelope === null ||
-            isHandedOut(envelope, rowsOf(yield* proofStore.loadAll, envelope))
+            isHandedOut(envelope, yield* storedRowsOf(proofStore, envelope))
           ) {
             return nothing;
           }
@@ -439,7 +439,7 @@ export class Envelope extends Context.Service<Envelope>()("linkshu/Envelope", {
           const released = new Set(unspent.map((proof) => proof.secret));
           yield* setProofState(
             ctx,
-            rowsOf(yield* proofStore.loadAll, envelope).filter((proof) =>
+            (yield* storedRowsOf(proofStore, envelope)).filter((proof) =>
               released.has(proof.secret),
             ),
             "spent",

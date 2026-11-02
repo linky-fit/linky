@@ -1,7 +1,6 @@
 import { Effect } from "effect";
 import {
   Amount,
-  ProofStore,
   Receive,
   ReceiveDraft,
   Restore,
@@ -11,6 +10,7 @@ import {
   SendDraft,
 } from "../../src";
 import type { Bip39Seed, RestoreProgress } from "../../src";
+import { allProofs } from "../../src/testing/inventory";
 import {
   availableTotalOf,
   fundToken,
@@ -34,7 +34,7 @@ const restoreFromSeedAlone = (seed: Bip39Seed) =>
       const second = yield* restore.restore(
         new RestoreDraft({ mints: [mintUrl] }),
       );
-      return { first, second, proofs: yield* (yield* ProofStore).loadAll };
+      return { first, second, proofs: yield* allProofs };
     }),
   );
 
@@ -67,7 +67,7 @@ describe("restore vertical against the local mint", () => {
           new RestoreDraft({ mints: [mintUrl, targetMintUrl] }),
           (update) => progress.push(update),
         );
-        return { result, proofs: yield* (yield* ProofStore).loadAll };
+        return { result, proofs: yield* allProofs };
       }),
     );
     const scanning = progress.filter((update) => update.phase === "scanning");

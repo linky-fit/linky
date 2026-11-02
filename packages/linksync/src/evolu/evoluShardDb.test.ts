@@ -1,5 +1,7 @@
 import { ownerIdToOwnerIdBytes, type OwnerId } from "@evolu/common";
+import { createQuery, deserializeQuery } from "@evolu/common/local-first";
 import { Effect } from "effect";
+import { DatabaseSync } from "node:sqlite";
 import { testAppOwner } from "../testing/toy";
 import {
   createEvoluShardDb,
@@ -247,7 +249,7 @@ describe("evolu shard db", () => {
     );
     for (const rows of [
       await Effect.runPromise(db.readTable("onchainTransfer")),
-      await Effect.runPromise(db.readCopies("onchainTransfer", "transfer-1")),
+      await Effect.runPromise(db.readCopies("onchainTransfer", ["transfer-1"])),
     ]) {
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({
@@ -333,9 +335,9 @@ describe("evolu shard db", () => {
         },
       ]),
     );
-    const copies = await Effect.runPromise(db.readCopies("reaction", "r1"));
+    const copies = await Effect.runPromise(db.readCopies("reaction", ["r1"]));
     expect(copies.map((row) => [row.id, row.emoji])).toEqual([["r1", "👍"]]);
-    expect(fake.queries.at(-1)).toContain('["where","id","=","r1"]');
+    expect(fake.queries.at(-1)).toContain('["where","id","in",["r1"]]');
   });
 
   it("asks evolu_history for the owner id's bytes", async () => {
@@ -382,5 +384,186 @@ describe("evolu shard db", () => {
     const db = createEvoluShardDb(fake.runtime, sync.ownerSync);
     await settle();
     expect(db.isOwnerSynced(owner.id)).toBe(true);
+  });
+});
+
+/**
+ * Evolu's own query compiler over a real SQLite table, so the SQL the
+ * adapter builds is what decides which rows come back. Writes go through
+ * the fake and stay in the adapter's overlay.
+ */
+const sqliteEvolu = () => {
+  const sqlite = new DatabaseSync(":memory:");
+  const loaded: Array<ReadonlyArray<Record<string, unknown>>> = [];
+  sqlite.exec(
+    `create table cashuProof (id text, ownerId text, createdAt text, updatedAt text,
+      isDeleted integer, state text, operationId text, keysetId text, mint text)`,
+  );
+  const evolu = {
+    ...fakeEvolu().runtime,
+    createQuery,
+    loadQuery: (query: Parameters<typeof deserializeQuery>[0]) => {
+      const { sql, parameters } = deserializeQuery(query);
+      const rows = sqlite
+        .prepare(sql)
+        .all(
+          ...parameters.filter(
+            (value) => typeof value === "string" || typeof value === "number",
+          ),
+        );
+      loaded.push(rows);
+      return Promise.resolve(rows);
+    },
+  };
+  const runtime: EvoluRuntime = evolu;
+  const insert = (row: {
+    readonly id: string;
+    readonly ownerId: OwnerId;
+    readonly createdAt: string;
+    readonly isDeleted?: 1;
+    readonly state?: string;
+    readonly keysetId?: string;
+    readonly mint?: string;
+  }) =>
+    sqlite
+      .prepare(
+        `insert into cashuProof (id, ownerId, createdAt, updatedAt, isDeleted, state, keysetId, mint)
+          values (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        row.id,
+        row.ownerId,
+        row.createdAt,
+        row.createdAt,
+        row.isDeleted ?? null,
+        row.state ?? null,
+        row.keysetId ?? null,
+        row.mint ?? null,
+      );
+  return { runtime, insert, loaded };
+};
+
+describe("evolu shard db filtered reads over SQLite", () => {
+  const older = testAppOwner(1).id;
+  const newer = testAppOwner(2).id;
+  const unrelated = testAppOwner(3).id;
+  const at = "2026-01-01T00:00:00.000Z";
+  const unspent = ["available", "held", "handedOut", "externalized"];
+  const keysOf = (rows: ReadonlyArray<{ id: string; ownerId: OwnerId }>) =>
+    rows.map((row) => `${row.id}@${row.ownerId === older ? 0 : 1}`).sort();
+
+  it("returns every copy of the ids with a live matching copy, tombstones and spent marks included", async () => {
+    const { runtime, insert, loaded } = sqliteEvolu();
+    const db = createEvoluShardDb(runtime, reportedOwnerSync().ownerSync);
+    // Copied forward, then spent: only a tombstone matches.
+    insert({
+      id: "gone",
+      ownerId: older,
+      createdAt: at,
+      isDeleted: 1,
+      state: "available",
+    });
+    insert({ id: "gone", ownerId: newer, createdAt: at, state: "spent" });
+    // Spent on another device in a shard this one already copied it out of.
+    insert({
+      id: "raced",
+      ownerId: older,
+      createdAt: at,
+      isDeleted: 1,
+      state: "spent",
+    });
+    insert({ id: "raced", ownerId: newer, createdAt: at, state: "held" });
+    // Spent in an older shard while a device unaware of it wrote it anew.
+    insert({ id: "stale", ownerId: older, createdAt: at, state: "spent" });
+    insert({ id: "stale", ownerId: newer, createdAt: at, state: "available" });
+    insert({ id: "live", ownerId: older, createdAt: at, state: "available" });
+    insert({
+      id: "removed",
+      ownerId: older,
+      createdAt: at,
+      isDeleted: 1,
+      state: "available",
+    });
+
+    const rows = await Effect.runPromise(
+      db.readCopiesWhere("cashuProof", "state", unspent),
+    );
+
+    expect(keysOf(rows)).toEqual([
+      "live@0",
+      "raced@0",
+      "raced@1",
+      "stale@0",
+      "stale@1",
+    ]);
+    // The query itself narrows; nothing beyond these copies leaves SQLite.
+    expect(loaded.map((result) => result.length)).toEqual([5]);
+  });
+
+  it("returns a pending write that newly matches together with its stored copies", async () => {
+    const { runtime, insert } = sqliteEvolu();
+    const db = createEvoluShardDb(runtime, reportedOwnerSync().ownerSync);
+    insert({ id: "p1", ownerId: older, createdAt: at, state: "spent" });
+    await Effect.runPromise(
+      db.mutate([
+        {
+          kind: "upsert",
+          table: "cashuProof",
+          ownerId: newer,
+          row: { id: "p1", state: "available" },
+        },
+      ]),
+    );
+
+    const rows = await Effect.runPromise(
+      db.readCopiesWhere("cashuProof", "state", unspent),
+    );
+
+    expect(
+      rows.map((row) => [row.ownerId === older ? 0 : 1, row.state]).sort(),
+    ).toEqual([
+      [0, "spent"],
+      [1, "available"],
+    ]);
+  });
+
+  it("reads the earliest created copy per value among the given owners", async () => {
+    const { runtime, insert } = sqliteEvolu();
+    const db = createEvoluShardDb(runtime, reportedOwnerSync().ownerSync);
+    insert({
+      id: "a",
+      ownerId: unrelated,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      keysetId: "00aa",
+      mint: "unrelated",
+    });
+    insert({
+      id: "b",
+      ownerId: older,
+      createdAt: "2026-01-02T00:00:00.000Z",
+      isDeleted: 1,
+      keysetId: "00aa",
+      mint: "first",
+    });
+    insert({
+      id: "c",
+      ownerId: newer,
+      createdAt: "2026-01-03T00:00:00.000Z",
+      keysetId: "00aa",
+      mint: "second",
+    });
+    insert({
+      id: "d",
+      ownerId: newer,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      keysetId: "00cc",
+      mint: "unasked",
+    });
+
+    const rows = await Effect.runPromise(
+      db.readOldest("cashuProof", "keysetId", ["00aa", "00bb"], [older, newer]),
+    );
+
+    expect(rows.map((row) => row.mint)).toEqual(["first"]);
   });
 });

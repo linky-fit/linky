@@ -132,7 +132,7 @@ export const createWallet = (
     availableProofCount: async (mint) =>
       (
         await runtime.runPromise(
-          Effect.flatMap(ProofStore, (store) => store.loadAll),
+          Effect.flatMap(ProofStore, (store) => store.loadUnspent),
         )
       ).filter(
         (proof) =>

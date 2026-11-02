@@ -53,7 +53,7 @@ const mount = async (
   const Harness = () => {
     const api = useAppDataTransfer({
       cashuOperations: [],
-      cashuProofs: [],
+      loadCashuProofs: () => Promise.resolve([]),
       contacts: [],
       contactsRepository: {
         insert: () => {

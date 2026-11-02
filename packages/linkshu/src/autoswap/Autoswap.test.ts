@@ -252,7 +252,7 @@ const onlyClaim = async (storage: Storage): Promise<StoredOperation> => {
 };
 
 const targetProofs = (storage: Storage) =>
-  Effect.runPromise(storage.proofs.loadAll).then((proofs) =>
+  Effect.runPromise(storage.proofs.all).then((proofs) =>
     proofs.filter((proof) => proof.mint === targetMint),
   );
 
@@ -513,7 +513,7 @@ describe("Autoswap.estimate", () => {
     expect(melt.quotedInvoices).toEqual([invoice]);
     expect(melt.invoices).toEqual([]);
     expect(await claimOperations(storage)).toEqual([]);
-    const proofs = await Effect.runPromise(storage.proofs.loadAll);
+    const proofs = await Effect.runPromise(storage.proofs.all);
     expect(proofs.every((proof) => proof.state === "available")).toBe(true);
     expect(
       harness.events.some(

@@ -106,6 +106,16 @@ export const storedSecrets = (
   proofs: ReadonlyArray<StoredProof>,
 ): Set<string> => new Set(proofs.map((proof) => proof.secret));
 
+/** The secrets of `proofs` the store already holds, in any state. */
+export const knownSecretsOf = (
+  proofStore: ProofStoreService,
+  proofs: ReadonlyArray<{ readonly secret: string }>,
+): Effect.Effect<Set<string>> =>
+  Effect.map(
+    proofStore.findBySecrets(proofs.map((proof) => proof.secret)),
+    storedSecrets,
+  );
+
 export interface ProofContext {
   readonly proofStore: ProofStoreService;
   readonly inspector: InspectorService;

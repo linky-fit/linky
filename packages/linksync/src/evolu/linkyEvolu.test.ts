@@ -5,10 +5,11 @@ import {
   type EvoluConfig,
   type EvoluDeps,
 } from "@evolu/common";
+import { evoluSchemaToDbSchema } from "@evolu/common/local-first";
 import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
 import { appOwnerFromMnemonic } from "../core";
-import { linkyScopes } from "../model";
+import { LinkySchema, linkyScopes } from "../model";
 import { memoryKeyValueStorage } from "../testing/keyValueStorage";
 import type { WorkerMessage } from "./dbWorker";
 import {
@@ -21,7 +22,7 @@ import {
 
 const evoluMock = vi.hoisted(() => {
   const state: {
-    calls: Array<{ schema: unknown; config: unknown }>;
+    calls: Array<{ schema: unknown; config: EvoluConfig }>;
     instance: object;
   } = { calls: [], instance: {} };
   return state;
@@ -114,6 +115,22 @@ describe("createLinkyEvolu", () => {
       inMemory: true,
       externalAppOwner: appOwner,
     });
+  });
+
+  it("indexes every table's id and the proof columns the wallet filters on", () => {
+    const { call } = open(mnemonic);
+    expect(
+      evoluSchemaToDbSchema(LinkyEvoluSchema, call.config.indexes).indexes.map(
+        (index) => index.sql,
+      ),
+    ).toEqual([
+      ...Object.keys(LinkySchema).map(
+        (table) => `create index "${table}Id" on "${table}" ("id")`,
+      ),
+      'create index "cashuProofState" on "cashuProof" ("state")',
+      'create index "cashuProofOperationId" on "cashuProof" ("operationId")',
+      'create index "cashuProofKeysetCreatedAt" on "cashuProof" ("keysetId", "createdAt")',
+    ]);
   });
 
   it("lets Evolu create its own owner without a mnemonic", () => {

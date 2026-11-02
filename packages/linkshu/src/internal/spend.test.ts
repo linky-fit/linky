@@ -5,7 +5,12 @@ import { inMemoryProofStore } from "../ports/inMemoryProofStore";
 import { fakeWallet, KEYSET_HEX, proof } from "../testing/fakeWallet";
 import type { ProofStateName } from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
-import { proofsIn, secretsOf, seedProofs } from "../testing/inventory";
+import {
+  allProofs,
+  proofsIn,
+  secretsOf,
+  seedProofs,
+} from "../testing/inventory";
 import { selectSpendableProofs, settleSwap } from "./spend";
 import type { SpendContext } from "./spend";
 
@@ -55,8 +60,6 @@ const makeHarness = (args: HarnessArgs = {}) => {
   return { run, checked, events: inspector.events };
 };
 
-const loadAll = Effect.flatMap(ProofStore, (store) => store.loadAll);
-
 describe("selectSpendableProofs", () => {
   it("offers only available proofs at the mint the mint confirms unspent", async () => {
     const { run, checked, events } = makeHarness({
@@ -79,7 +82,7 @@ describe("selectSpendableProofs", () => {
         yield* seedProofs(mint, [proof(32, "out")], "handedOut");
         yield* seedProofs(otherMint, [proof(64, "foreign")]);
         const selection = yield* selectSpendableProofs(ctx);
-        return { selection, proofs: yield* loadAll };
+        return { selection, proofs: yield* allProofs };
       }),
     );
 
@@ -127,7 +130,7 @@ describe("selectSpendableProofs", () => {
       Effect.gen(function* () {
         yield* seedProofs(mint, [proof(4, "ok")]);
         const error = yield* Effect.flip(selectSpendableProofs(ctx));
-        return { error, proofs: yield* loadAll };
+        return { error, proofs: yield* allProofs };
       }),
     );
 
@@ -157,7 +160,7 @@ describe("settleSwap", () => {
           },
           "settle",
         );
-        return { outcome, proofs: yield* loadAll };
+        return { outcome, proofs: yield* allProofs };
       }),
     );
 
@@ -204,7 +207,7 @@ describe("settleSwap", () => {
           },
           "settle",
         );
-        return { outcome, proofs: yield* loadAll };
+        return { outcome, proofs: yield* allProofs };
       }),
     );
 

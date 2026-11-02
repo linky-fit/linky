@@ -11,7 +11,7 @@ import {
   Tokens,
   Validation,
 } from "../../src";
-import { amountIn } from "../../src/testing/inventory";
+import { allProofs, amountIn } from "../../src/testing/inventory";
 import { claimExternally, fundToken, mintUrl, randomSeed } from "./helpers";
 
 describe("tokens vertical against the local mint", () => {
@@ -40,7 +40,7 @@ describe("tokens vertical against the local mint", () => {
         );
         yield* tokens.markExternalized(nfc.operationId);
         const before = yield* tokens.balances;
-        const selected = (yield* tokens.proofs)
+        const selected = (yield* allProofs)
           .filter(
             (proof) =>
               proof.state === "handedOut" || proof.state === "externalized",
@@ -54,7 +54,7 @@ describe("tokens vertical against the local mint", () => {
           before,
           report,
           again,
-          proofs: yield* tokens.proofs,
+          proofs: yield* allProofs,
           transfers: yield* tokens.transfers,
           after: yield* tokens.balances,
         };
@@ -105,7 +105,7 @@ describe("tokens vertical against the local mint", () => {
           new RestoreDraft({ mints: [mintUrl] }),
         );
         const report = yield* tokens.reclaim(
-          (yield* tokens.proofs).map((proof) => proof.id),
+          (yield* allProofs).map((proof) => proof.id),
         );
         return { restored, report, balance: yield* tokens.balances };
       }),
@@ -138,7 +138,7 @@ describe("tokens vertical against the local mint", () => {
           sent,
           returned,
           transfers: yield* tokens.transfers,
-          proofs: yield* tokens.proofs,
+          proofs: yield* allProofs,
           balances: yield* tokens.balances,
         };
       }),
@@ -194,7 +194,7 @@ describe("tokens vertical against the local mint", () => {
           live,
           before,
           report,
-          proofs: yield* tokens.proofs,
+          proofs: yield* allProofs,
           after: yield* tokens.balances,
         };
       }),

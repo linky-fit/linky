@@ -5,7 +5,11 @@ import {
 import { tokenChatMessages } from "../app/lib/pendingTokenTransfers";
 import type { LocalNostrMessage } from "../app/types/appTypes";
 import { useLatest } from "../hooks/useLatest";
-import type { StoredProof, TokenTransfer } from "@linky-fit/linkshu";
+import {
+  OperationId,
+  type StoredProof,
+  type TokenTransfer,
+} from "@linky-fit/linkshu";
 import { Button, LoadingState, Notice, Stack, Text } from "@linky-fit/ui";
 import type { FC } from "react";
 import { useArmedAction } from "../hooks/useArmedAction";
@@ -17,7 +21,10 @@ import {
   useSetStatus,
   useTranslation,
 } from "../app/hooks/shell";
-import { useWalletInventory } from "../app/hooks/wallet/useWalletInventory";
+import {
+  useOperationProofs,
+  useWalletInventory,
+} from "../app/hooks/wallet/useWalletInventory";
 import { useAtomValue } from "@linky-fit/linkstr-react";
 import { useContacts } from "../app/hooks/contacts/useDisplayContacts";
 import { localMessagesAtom } from "../app/state/messages/readModel";
@@ -49,7 +56,8 @@ interface CashuTokenPageProps {
   canSendToContact: boolean;
   canWriteToNfc: boolean;
   cashuIsBusy: boolean;
-  cashuProofs: readonly StoredProof[];
+  /** The proofs linked to the transfer, spent ones included. */
+  transferProofs: readonly StoredProof[];
   cashuTransfers: readonly TokenTransfer[];
   checkAndRefreshCashuToken: (
     id: CashuOperationId,
@@ -104,7 +112,7 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
   canSendToContact,
   canWriteToNfc,
   cashuIsBusy,
-  cashuProofs,
+  transferProofs,
   cashuTransfers,
   checkAndRefreshCashuToken,
   checkSingleIssuedCashuTokenIsClaimed,
@@ -136,15 +144,6 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
   );
   const tokenAmount = transfer?.amount ?? 0;
   const mintDisplay = getMintDisplay(transfer?.mint);
-  const transferProofs = React.useMemo(
-    () =>
-      cashuProofs.filter(
-        (proof) =>
-          proof.operationId !== null && String(proof.operationId) === routeId,
-      ),
-    [cashuProofs, routeId],
-  );
-
   const isSend = transfer?.kind === "send";
   const isIssued = isSend && transfer.status === "issued";
   const isOpenSend =
@@ -388,7 +387,8 @@ export const CashuTokenRoute: FC<Pick<CashuTokenPageProps, "routeId">> = ({
   const writeToNfc = useWriteCashuTokenToNfc();
   const contacts = useContacts();
   const messages = useAtomValue(localMessagesAtom);
-  const { proofs, transfers } = useWalletInventory();
+  const { transfers } = useWalletInventory();
+  const transferProofs = useOperationProofs(OperationId.make(routeId));
   const tokens = useWalletTokens();
   const inspectCashuProofStates = useInspectCashuProofStates();
   const copyText = useCopyText();
@@ -399,7 +399,7 @@ export const CashuTokenRoute: FC<Pick<CashuTokenPageProps, "routeId">> = ({
       canSendToContact={contacts.length > 0}
       canWriteToNfc={canWriteNfc()}
       cashuIsBusy={tokens.tokenWorkIsBusy}
-      cashuProofs={proofs}
+      transferProofs={transferProofs}
       cashuTransfers={transfers}
       checkAndRefreshCashuToken={tokens.checkAndRefreshCashuToken}
       checkSingleIssuedCashuTokenIsClaimed={

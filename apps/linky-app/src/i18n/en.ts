@@ -1035,7 +1035,6 @@ export const en = {
     "Set aside for a recurring payment until it goes out, or inputs of a Lightning payment the mint has not settled yet.",
   cashuHeldUnknownHint:
     "Held by an operation that has not synced to this device yet.",
-  cashuSpentProofsKept: "Spent proofs kept for bookkeeping: {count}.",
   cashuTransfers: "Transfers",
   cashuTransfersEmpty: "No open transfers.",
   cashuTransferIssued: "Issued, waiting to be claimed.",

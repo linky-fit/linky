@@ -11,7 +11,12 @@ import { toNewProofs } from "../internal/proofs";
 import { NewOperation, OperationStore } from "../ports/OperationStore";
 import type { OperationStatus, StoredOperation } from "../ports/OperationStore";
 import { ProofStore } from "../ports/ProofStore";
-import type { ProofState, StoredProof } from "../ports/ProofStore";
+import type { InMemoryProofStore } from "../ports/inMemoryProofStore";
+import type {
+  ProofState,
+  ProofStoreService,
+  StoredProof,
+} from "../ports/ProofStore";
 
 const sat = CurrencyUnit.make("sat");
 
@@ -69,6 +74,20 @@ export const seedTransfer = (
       ),
     ),
   );
+
+const isInMemory = (store: ProofStoreService): store is InMemoryProofStore =>
+  "all" in store;
+
+/** Every stored proof, any state; tests run on the in-memory store, which lists them. */
+export const allProofs: Effect.Effect<
+  ReadonlyArray<StoredProof>,
+  never,
+  ProofStore
+> = Effect.flatMap(ProofStore, (store) =>
+  isInMemory(store)
+    ? store.all
+    : Effect.die(new Error("allProofs needs the in-memory proof store")),
+);
 
 export const proofsIn = (
   proofs: ReadonlyArray<StoredProof>,

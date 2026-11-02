@@ -616,7 +616,7 @@ const makeLinkshuCommands = (run: LinkshuRun) => {
             : yield* Effect.flatMap(Restore, (service) =>
                 service.restore(decodeRestoreDraft({ mints })),
               );
-        const ids = (yield* tokens.proofs)
+        const ids = (yield* tokens.unspentProofs)
           .filter(
             (proof) =>
               proof.state === "handedOut" ||
@@ -684,11 +684,10 @@ const makeLinkshuCommands = (run: LinkshuRun) => {
         Effect.gen(function* () {
           const tokens = yield* Tokens;
           const transferId = operationId(id);
-          const ids = (yield* tokens.proofs)
+          const ids = (yield* tokens.proofsOf(transferId))
             .filter(
               (proof) =>
-                proof.operationId === transferId &&
-                (proof.state === "handedOut" || proof.state === "externalized"),
+                proof.state === "handedOut" || proof.state === "externalized",
             )
             .map((proof) => proof.id);
           return yield* tokens.reclaim(ids);

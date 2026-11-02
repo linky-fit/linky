@@ -58,7 +58,7 @@ const stubKv = (sets: Array<[string, string]>): KeyValueStoreService => ({
   releaseLease: () => Effect.die("not under test"),
 });
 
-const noProofs = Effect.succeed([]);
+const noProofs = () => Effect.succeed([]);
 
 describe("makeWalletInstances", () => {
   it("shares one load between concurrent callers for the same mint/unit", async () => {
@@ -228,23 +228,28 @@ describe("keyset ownership", () => {
 
   it("rejects a mint listing a keyset held at another mint and does not record it as seen", async () => {
     const sets: Array<[string, string]> = [];
+    const asked: Array<ReadonlyArray<string>> = [];
     const instances = makeWalletInstances(
       stubKv(sets),
       () => Promise.resolve(listing()),
-      Effect.succeed([heldAt(honest, 1)]),
+      (keysetIds) => {
+        asked.push(keysetIds);
+        return Effect.succeed([heldAt(honest, 1)]);
+      },
     );
 
     expect(await Effect.runPromiseExit(instances.get(impostor, sat))).toEqual(
       rejectedBy(honest),
     );
     expect(sets).toEqual([]);
+    expect(asked).toEqual([[keyset]]);
   });
 
   it("checks inactive keysets too, so an impostor cannot restore through them", async () => {
     const instances = makeWalletInstances(
       stubKv([]),
       () => Promise.resolve(listing(false)),
-      Effect.succeed([heldAt(honest, 1)]),
+      () => Effect.succeed([heldAt(honest, 1)]),
     );
 
     expect(await Effect.runPromiseExit(instances.get(impostor, sat))).toEqual(
@@ -256,7 +261,7 @@ describe("keyset ownership", () => {
     const instances = makeWalletInstances(
       stubKv([]),
       () => Promise.resolve(listing()),
-      Effect.succeed([heldAt(impostor, 2), heldAt(honest, 1)]),
+      () => Effect.succeed([heldAt(impostor, 2), heldAt(honest, 1)]),
     );
 
     expect(
@@ -272,7 +277,7 @@ describe("keyset ownership", () => {
     const instances = makeWalletInstances(
       stubKv([]),
       () => Promise.resolve(listing()),
-      Effect.sync(() => proofs),
+      () => Effect.sync(() => proofs),
     );
 
     await Effect.runPromise(instances.get(impostor, sat));

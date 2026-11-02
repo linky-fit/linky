@@ -1051,7 +1051,6 @@ export const pt = {
     "Reservadas para um pagamento recorrente até ele sair, ou entradas de um pagamento Lightning que o mint ainda não liquidou.",
   cashuHeldUnknownHint:
     "Retidas por uma operação que ainda não foi sincronizada com este aparelho.",
-  cashuSpentProofsKept: "Provas gastas mantidas para contabilidade: {count}.",
   cashuTransfers: "Transferências",
   cashuTransfersEmpty: "Nenhuma transferência em aberto.",
   cashuTransferIssued: "Emitido, aguardando resgate.",

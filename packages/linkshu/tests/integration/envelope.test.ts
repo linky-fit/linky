@@ -13,7 +13,7 @@ import {
   runLinkshu,
 } from "../../src";
 import type { Bip39Seed } from "../../src";
-import { amountIn } from "../../src/testing/inventory";
+import { allProofs, amountIn } from "../../src/testing/inventory";
 import {
   availableTotalOf,
   claimExternally,
@@ -77,7 +77,7 @@ const device = async (seed: Bip39Seed, sats: number) => {
           ),
         ),
       ),
-    proofs: () => run(Effect.flatMap(ProofStore, (store) => store.loadAll)),
+    proofs: () => run(allProofs),
   };
 };
 

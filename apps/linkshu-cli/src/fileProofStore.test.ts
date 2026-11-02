@@ -36,7 +36,7 @@ const proof = (secret: string, amount = 4): NewProof =>
 
 describe("fileProofStore", () => {
   it("loads nothing from a wallet that has never been written", async () => {
-    expect(await Effect.runPromise(wallet().open().loadAll)).toEqual([]);
+    expect(await Effect.runPromise(wallet().open().loadUnspent)).toEqual([]);
   });
 
   it("derives the id from the secret and stamps a creation time", async () => {
@@ -45,14 +45,14 @@ describe("fileProofStore", () => {
     const [again] = await Effect.runPromise(open().insert([proof("aa")]));
     expect(stored?.id).toBe(again?.id);
     expect(stored?.createdAt).toBeGreaterThan(0);
-    expect(await Effect.runPromise(open().loadAll)).toHaveLength(1);
+    expect(await Effect.runPromise(open().loadUnspent)).toHaveLength(1);
   });
 
   it("survives the process that inserted the proofs", async () => {
     const { open } = wallet();
     await Effect.runPromise(open().insert([proof("aa"), proof("bb")]));
 
-    const reloaded = await Effect.runPromise(open().loadAll);
+    const reloaded = await Effect.runPromise(open().loadUnspent);
     expect(reloaded.map((row) => row.secret).sort()).toEqual(["aa", "bb"]);
   });
 
@@ -62,7 +62,7 @@ describe("fileProofStore", () => {
     if (stored === undefined) throw new Error("nothing stored");
     await Effect.runPromise(open().update(stored.id, { state: "spent" }));
 
-    const [updated] = await Effect.runPromise(open().loadAll);
+    const [updated] = await Effect.runPromise(open().findBySecrets(["aa"]));
     expect(updated?.state).toBe("spent");
     expect(updated?.operationId).toBeNull();
     expect(updated?.createdAt).toBe(stored.createdAt);
@@ -78,7 +78,7 @@ describe("fileProofStore", () => {
         { concurrency: "unbounded" },
       ),
     );
-    expect(await Effect.runPromise(store.loadAll)).toHaveLength(25);
+    expect(await Effect.runPromise(store.loadUnspent)).toHaveLength(25);
   });
 
   it("stores the port's own row shape, so the file stays hand-readable", async () => {

@@ -69,17 +69,26 @@ In a browser, `localStorage` has neither a compare-and-swap nor a locked read-mo
 
 ## `ProofStore`
 
-The inventory. The package holds no cache: it calls `loadAll` before every decision, so `loadAll` must reflect your own earlier `insert`/`update` calls immediately, even when the underlying database commits asynchronously (keep a write overlay if it does).
+The inventory. Spent proofs are never deleted, so the store grows with the wallet's history while the proofs that can still move stay few. The package reads only what a decision needs:
+
+| Read                             | Returns                                                         | Used for                                                                   |
+| -------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `loadUnspent`                    | every proof whose state is not `spent`                          | spending, balances, validation, resuming melts; before every decision      |
+| `findBySecrets(secrets)`         | the proofs with these secrets, any state                        | dedup when receiving, restoring, importing or reclaiming change            |
+| `findByOperation(operationId)`   | the proofs whose `operationId` is the operation, any state      | a melt's inputs, a reclaimed send, one transfer's proofs                   |
+| `findOldestByKeysets(keysetIds)` | per keyset id, its proof with the lowest `createdAt`, any state | binding a keyset to its mint on every wallet load ([mints.md](./mints.md)) |
+
+`loadUnspent` runs before every operation, so its cost must follow the working set, not the history: filter by state in the store (an index on it) instead of loading every row and filtering in memory. The package holds no cache, so every read must reflect your own earlier `insert`/`update` calls immediately, even when the underlying database commits asynchronously (keep a write overlay if it does). A store small enough to load whole for every read, such as a file, can build the four reads with `proofReadsOf(loadAll)`.
 
 Why ids derive from the secret: two devices that both come to hold one proof (a synced balance, a restore on each) must converge on one row, or the balance doubles. `deriveStoreId(secret)` is the package's hash for stores without an id scheme of their own; neither it nor your own scheme may reveal the secret. Inserting a secret that is already stored is an upsert onto that row, keeping its `createdAt`.
 
-The platform never decides states. Do not default, normalize, or "fix" a state on write, and never delete a proof; `spent` is kept on purpose. Skip a stored row that does not validate as `StoredProof` in `loadAll` instead of repairing it. `StoredProof.secret` and `dleq` are spendable material; keep them out of logs.
+The platform never decides states. Do not default, normalize, or "fix" a state on write, and never delete a proof; `spent` is kept on purpose: dedup and the keyset binding read it. Skip a stored row that does not validate as `StoredProof` in every read instead of repairing it. `StoredProof.secret` and `dleq` are spendable material; keep them out of logs.
 
 `applyProofPatch` is exported so an adapter does not reimplement `update`: map it over the row with that id.
 
 ## `OperationStore`
 
-The same shape for operations, with the same read-after-write requirement on `loadAll`.
+The same shape for operations, read whole through `loadAll`, with the same read-after-write requirement.
 
 `operationKeyOf` is the natural key: a quote operation is `kind|mint|quoteId`, even a `melt` that carries its envelope's token text; any other operation with token text (a transfer, a `deferredReceive` or an `envelope`) is `kind|tokenText`. Hash it with `deriveStoreId` (or your own scheme); the key contains token text, so it must not become the id as is. Inserting an existing key replaces every field of that row. Inputs are never stored on the operation: they are the proofs whose `operationId` points at it. `StoredOperation.tokenText` carries proof secrets.
 
@@ -98,7 +107,7 @@ You only build this yourself when assembling layers by hand; `linkshuServices` d
 
 ## In-memory defaults and durability across runtimes
 
-`inMemoryKeyValueStore`, `inMemoryProofStore`, and `inMemoryOperationStore` are `Layer.sync`, so every runtime built from them gets a fresh, empty store. To model a restart (two runtimes over one storage) create the instances once and wrap them with `Layer.succeed`:
+`inMemoryKeyValueStore`, `inMemoryProofStore`, and `inMemoryOperationStore` are `Layer.sync`, so every runtime built from them gets a fresh, empty store. The instance `makeInMemoryProofStore()` returns also has `all`, every proof in any state, for inspection. To model a restart (two runtimes over one storage) create the instances once and wrap them with `Layer.succeed`:
 
 ```ts
 import {

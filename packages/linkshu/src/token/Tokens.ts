@@ -22,8 +22,8 @@ import {
 import {
   domainToNewProofs,
   insertProofs,
+  knownSecretsOf,
   setProofState,
-  storedSecrets,
   totalAmount,
 } from "../internal/proofs";
 import { sat } from "../internal/units";
@@ -127,11 +127,17 @@ export class Tokens extends Context.Service<Tokens>()("linkshu/Tokens", {
       rows: ReadonlyArray<T>,
     ): ReadonlyArray<T> => [...rows].sort((a, b) => b.createdAt - a.createdAt);
 
-    /** The whole inventory, any state, newest first. */
-    const proofs: Effect.Effect<ReadonlyArray<StoredProof>> = Effect.map(
-      proofStore.loadAll,
+    /** The working set: every proof not yet `spent`, newest first. */
+    const unspentProofs: Effect.Effect<ReadonlyArray<StoredProof>> = Effect.map(
+      proofStore.loadUnspent,
       newestFirst,
     );
+
+    /** The proofs linked to the operation, any state, newest first. */
+    const proofsOf = (
+      operationId: OperationId,
+    ): Effect.Effect<ReadonlyArray<StoredProof>> =>
+      Effect.map(proofStore.findByOperation(operationId), newestFirst);
 
     /** Every stored operation, newest first. */
     const operations: Effect.Effect<ReadonlyArray<StoredOperation>> =
@@ -148,7 +154,7 @@ export class Tokens extends Context.Service<Tokens>()("linkshu/Tokens", {
     );
 
     const balances: Effect.Effect<WalletBalances> = Effect.map(
-      proofStore.loadAll,
+      proofStore.loadUnspent,
       (rows) => {
         const perMint = new Map<MintUrl, number>();
         for (const proof of rows) {
@@ -183,13 +189,6 @@ export class Tokens extends Context.Service<Tokens>()("linkshu/Tokens", {
           : Effect.succeed(operation);
       });
 
-    const proofsOf = (
-      operation: StoredOperation,
-    ): Effect.Effect<ReadonlyArray<StoredProof>> =>
-      Effect.map(proofStore.loadAll, (rows) =>
-        rows.filter((proof) => proof.operationId === operation.id),
-      );
-
     /**
      * One transition of a `send` transfer: the status moves when legal, and
      * its handed-out proofs follow when `proofState` is given.
@@ -211,7 +210,7 @@ export class Tokens extends Context.Service<Tokens>()("linkshu/Tokens", {
           });
         }
         if (proofState !== undefined) {
-          const held = (yield* proofsOf(transfer)).filter(
+          const held = (yield* proofsOf(transfer.id)).filter(
             (proof) => proof.state !== "spent",
           );
           yield* setProofState(ctx, held, proofState, operation);
@@ -323,7 +322,7 @@ export class Tokens extends Context.Service<Tokens>()("linkshu/Tokens", {
       drafts: ReadonlyArray<ImportProofDraft>,
     ): Effect.Effect<number> =>
       Effect.gen(function* () {
-        const known = storedSecrets(yield* proofStore.loadAll);
+        const known = yield* knownSecretsOf(proofStore, drafts);
         const fresh = drafts
           .filter((draft) => !known.has(draft.secret))
           .map((draft) => new NewProof({ ...draft }));
@@ -382,7 +381,7 @@ export class Tokens extends Context.Service<Tokens>()("linkshu/Tokens", {
             detail: "token proofs could not be decoded",
           });
         }
-        const known = storedSecrets(yield* proofStore.loadAll);
+        const known = yield* knownSecretsOf(proofStore, decoded.proofs);
         const fresh = decoded.proofs.filter(
           (proof) => !known.has(proof.secret),
         );
@@ -420,8 +419,7 @@ export class Tokens extends Context.Service<Tokens>()("linkshu/Tokens", {
       rows: ReadonlyArray<LegacyTokenRow>,
     ): Effect.Effect<LegacyIngestReport> =>
       Effect.gen(function* () {
-        const stored = yield* proofStore.loadAll;
-        const known = storedSecrets(stored);
+        const stored = yield* proofStore.loadUnspent;
         const heldByNone = new Map(
           stored
             .filter(
@@ -442,6 +440,7 @@ export class Tokens extends Context.Service<Tokens>()("linkshu/Tokens", {
           if (row.state === "pending") continue;
           const decoded = yield* decodeStored(row.tokenText);
           if (decoded === null) continue;
+          const known = yield* knownSecretsOf(proofStore, decoded.proofs);
           const fresh = decoded.proofs.filter(
             (proof) => !known.has(proof.secret),
           );
@@ -452,7 +451,6 @@ export class Tokens extends Context.Service<Tokens>()("linkshu/Tokens", {
                 )
               : [];
           if (fresh.length === 0 && stranded.length === 0) continue;
-          for (const proof of fresh) known.add(proof.secret);
           for (const proof of stranded) heldByNone.delete(proof.secret);
 
           let state: ProofState = "available";
@@ -536,7 +534,8 @@ export class Tokens extends Context.Service<Tokens>()("linkshu/Tokens", {
       );
 
     return {
-      proofs,
+      unspentProofs,
+      proofsOf,
       operations,
       transfers,
       balances,

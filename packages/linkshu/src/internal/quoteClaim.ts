@@ -28,7 +28,7 @@ import { recoverFromCollision } from "./collisionRecovery";
 import { advanceCounterTo, readCounter, withCounterLock } from "./counters";
 import type { CounterScope } from "./counters";
 import { isRecoverableOutputCollision } from "./outputCollisions";
-import { insertProofs, storedSecrets, toNewProofs } from "./proofs";
+import { insertProofs, knownSecretsOf, toNewProofs } from "./proofs";
 import { checkProofStates, unspentProofs } from "./proofStates";
 import type { QuoteRecord, QuoteRecordStore } from "./quoteRecords";
 
@@ -179,7 +179,7 @@ const reclaimIssued = <R extends ClaimableQuote>(
       });
     }
 
-    const known = storedSecrets(yield* ctx.proofStore.loadAll);
+    const known = yield* knownSecretsOf(ctx.proofStore, proofs);
     const unstored = proofs.filter((proof) => !known.has(proof.secret));
     if (unstored.length < proofs.length) {
       // A previous run stored (some of) them already; nothing left to mint.

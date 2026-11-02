@@ -12,6 +12,7 @@ import {
   SendDraft,
   Tokens,
 } from "../../src";
+import { allProofs } from "../../src/testing/inventory";
 import {
   availableTotalOf,
   fundToken,
@@ -42,7 +43,7 @@ describe("melt vertical against the local mint", () => {
           funding,
           quoted,
           receipt,
-          proofs: yield* tokens.proofs,
+          proofs: yield* allProofs,
           operations: yield* tokens.operations,
         };
       }),
@@ -123,7 +124,7 @@ describe("melt vertical against the local mint", () => {
           funding,
           quoted,
           failure,
-          proofs: yield* (yield* Tokens).proofs,
+          proofs: yield* allProofs,
         };
       }),
     );

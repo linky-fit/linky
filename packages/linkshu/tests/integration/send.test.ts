@@ -10,7 +10,7 @@ import {
   SendDraft,
   Tokens,
 } from "../../src";
-import { amountIn, secretsOf } from "../../src/testing/inventory";
+import { allProofs, amountIn, secretsOf } from "../../src/testing/inventory";
 import {
   availableRowsOf,
   availableTotalOf,
@@ -48,7 +48,7 @@ describe("send vertical against the local mint", () => {
           funding,
           receipt,
           transfers: yield* tokens.transfers,
-          proofs: yield* tokens.proofs,
+          proofs: yield* allProofs,
         };
       }),
     );
@@ -155,7 +155,7 @@ describe("send vertical against the local mint", () => {
         return {
           funding,
           refused,
-          proofs: yield* (yield* ProofStore).loadAll,
+          proofs: yield* allProofs,
         };
       }),
     );
@@ -198,7 +198,7 @@ describe("send vertical against the local mint", () => {
           funding,
           receipt,
           transfers: yield* tokens.transfers,
-          proofs: yield* tokens.proofs,
+          proofs: yield* allProofs,
         };
       }),
     );

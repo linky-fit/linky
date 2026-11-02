@@ -19,7 +19,12 @@ import {
   proof,
 } from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
-import { amountIn, secretsOf, seedProofs } from "../testing/inventory";
+import {
+  allProofs,
+  amountIn,
+  secretsOf,
+  seedProofs,
+} from "../testing/inventory";
 import type { RestoreProgress } from "./domain";
 import { RestoreDraft } from "./domain";
 import { restoreCursorKey, seenKeysetKey } from "./internal/restoreState";
@@ -134,7 +139,7 @@ const restoreAt = (mints: ReadonlyArray<MintUrl> = [mint]) =>
     const kv = yield* KeyValueStore;
     return {
       report,
-      proofs: yield* (yield* ProofStore).loadAll,
+      proofs: yield* allProofs,
       counter: yield* kv.get(counterKey),
       cursor: yield* kv.get(cursorKey),
     };
@@ -496,7 +501,7 @@ describe("Restore.restoreAndReclaim", () => {
         const second = yield* restore.restoreAndReclaim(
           new RestoreDraft({ mints: [mint] }),
         );
-        return { first, second, proofs: yield* (yield* ProofStore).loadAll };
+        return { first, second, proofs: yield* allProofs };
       }),
     );
     assert(Exit.isSuccess(exit));
@@ -543,7 +548,7 @@ describe("Restore.restoreAndReclaim", () => {
         const result = yield* (yield* Restore).restoreAndReclaim(
           new RestoreDraft({ mints: [mint] }),
         );
-        return { result, proofs: yield* (yield* ProofStore).loadAll };
+        return { result, proofs: yield* allProofs };
       }),
     );
     assert(Exit.isSuccess(exit));
@@ -573,7 +578,7 @@ describe("Restore.wipeSeedBoundState", () => {
           cursor: yield* kv.get(cursorKey),
           seenMint: yield* kv.get(seenMintKey(mint)),
           seenKeyset: yield* kv.get(seenKeysetKey(mint, sat, keysetHex)),
-          proofs: (yield* (yield* ProofStore).loadAll).length,
+          proofs: (yield* allProofs).length,
         };
       }),
     );

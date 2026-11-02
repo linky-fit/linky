@@ -12,6 +12,7 @@ import {
   UnixSeconds,
 } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
+import { proofReadsOf } from "../ports/inMemoryProofStore";
 import { KeyValueStore } from "../ports/KeyValueStore";
 import { OperationStore, StoredOperation } from "../ports/OperationStore";
 import type { OperationKind, OperationStatus } from "../ports/OperationStore";
@@ -54,7 +55,7 @@ const stubProofStore = (
   Layer.succeed(ProofStore, {
     insert: () => Effect.die("not under test"),
     update: () => Effect.die("not under test"),
-    loadAll: Effect.succeed(proofs),
+    ...proofReadsOf(Effect.succeed(proofs)),
   });
 
 const stubOperationStore = (
@@ -346,7 +347,7 @@ describe("Mints.fetchInfo", () => {
 });
 
 describe("Mints.knownMints", () => {
-  it("unions proof, operation, and seen mints, deduped, normalized, sorted", async () => {
+  it("unions unspent proof, operation, and seen mints, deduped, normalized, sorted", async () => {
     const seen = MintUrl.make("https://seen.example");
     const target = MintUrl.make("https://target.example");
     const source = MintUrl.make("https://source.example");
@@ -361,8 +362,8 @@ describe("Mints.knownMints", () => {
         ),
         stubProofStore([
           proofAt("p-1", mint, "available"),
-          // Any state counts: a spent proof still names where funds were.
-          proofAt("p-2", mint, "spent"),
+          // Spent proofs are history; only the working set names a mint.
+          proofAt("p-2", MintUrl.make("https://spent.example"), "spent"),
         ]),
         stubOperationStore([
           // An autoswap names both ends of the move.

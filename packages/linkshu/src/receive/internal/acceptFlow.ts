@@ -34,7 +34,7 @@ import {
 import {
   insertProofs,
   setProofState,
-  storedSecrets,
+  knownSecretsOf,
   toNewProofs,
 } from "../../internal/proofs";
 import {
@@ -317,7 +317,7 @@ const unstoredUnspent = (
   proofs: ReadonlyArray<CashuProof>,
 ): Effect.Effect<ReadonlyArray<CashuProof>, MintUnreachable | MintRejected> =>
   Effect.gen(function* () {
-    const known = storedSecrets(yield* ctx.proofStore.loadAll);
+    const known = yield* knownSecretsOf(ctx.proofStore, proofs);
     const unstored = proofs.filter((proof) => !known.has(proof.secret));
     const decoded = toDomainProofs(unstored);
     if (decoded === null) return yield* malformedSwapProofs(mint);
@@ -589,6 +589,15 @@ const isFailedReceive = (operation: StoredOperation): boolean =>
  * an automatic receive that resumes nothing, a text whose deferral was
  * closed is known too.
  */
+/** The stored proofs carrying the token's secrets, any state. */
+const storedProofsOf = (
+  ctx: ReceiveContext,
+  decoded: DecodedToken | null,
+): Effect.Effect<ReadonlyArray<StoredProof>> =>
+  decoded === null
+    ? Effect.succeed([])
+    : ctx.proofStore.findBySecrets(decoded.proofs.map((proof) => proof.secret));
+
 const findKnown = (
   operations: ReadonlyArray<StoredOperation>,
   proofs: ReadonlyArray<StoredProof>,
@@ -795,12 +804,13 @@ const deferReceive = (
     if (findReopened(operations, parsed.tokenText, null) !== undefined) {
       return yield* Effect.fail(error);
     }
+    const decoded = decodeTokenText(parsed.tokenText);
     const known = findKnown(
       operations,
-      yield* ctx.proofStore.loadAll,
+      yield* storedProofsOf(ctx, decoded),
       parsed.tokenText,
       null,
-      decodeTokenText(parsed.tokenText),
+      decoded,
       automatic,
     );
     if (known !== null) return yield* known;
@@ -874,7 +884,7 @@ const receiptOf = (
 
 /**
  * The unfinished receive this one continues, from freshly loaded rows, and
- * the proofs as stored now. Fails `TokenAlreadyKnown` when a transfer or a
+ * the stored proofs carrying the token's secrets. Fails `TokenAlreadyKnown` when a transfer or a
  * stored proof already accounts for the text, or when another context
  * finished the replaced transfer or closed the retried deferral.
  */
@@ -892,7 +902,7 @@ const dedup = (
 > =>
   Effect.gen(function* () {
     const operations = yield* ctx.operationStore.loadAll;
-    const proofs = yield* ctx.proofStore.loadAll;
+    const proofs = yield* storedProofsOf(ctx, decoded);
     if (
       origin._tag === "deferred" &&
       !operations.some(

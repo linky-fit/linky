@@ -44,7 +44,6 @@ export const useLinkshuComposition = () => {
 
   return {
     adoptPaidCashuQuote: commands?.adoptPaidCashuQuote ?? null,
-    allWalletProofs: inventory.allProofs,
     autoswapCashu: commands?.autoswapCashu ?? null,
     cashuEnvelopes: commands?.cashuEnvelopes ?? null,
     cashuTransferLifecycle: commands?.cashuTransferLifecycle ?? null,

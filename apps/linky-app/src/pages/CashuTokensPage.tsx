@@ -19,6 +19,7 @@ import {
 import { useEffect, useMemo, useRef, useState, type FC } from "react";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import {
+  usePendingSendsSpentProofs,
   useWalletBalance,
   useWalletInventory,
 } from "../app/hooks/wallet/useWalletInventory";
@@ -53,6 +54,7 @@ interface CashuTokensPageProps {
   tokensRestoreProgress: RestoreProgress | null;
   restoreMissingTokens: () => Promise<void>;
   cashuBulkCheckIsBusy: boolean;
+  /** The unspent proofs plus the spent ones of the sends still listed. */
   cashuProofs: readonly StoredProof[];
   cashuTransfers: readonly TokenTransfer[];
   contacts: CashuTokenHandoffProps["contacts"];
@@ -337,6 +339,11 @@ export const CashuTokensRoute: FC = () => {
   const contacts = useContacts();
   const messages = useAtomValue(localMessagesAtom);
   const { proofs, transfers } = useWalletInventory();
+  const spentOfListedSends = usePendingSendsSpentProofs();
+  const cashuProofs = useMemo(
+    () => [...proofs, ...spentOfListedSends],
+    [proofs, spentOfListedSends],
+  );
   const { cashuIsBusy } = useWalletBalance();
   const tokens = useWalletTokens();
   return (
@@ -344,7 +351,7 @@ export const CashuTokensRoute: FC = () => {
       canRestoreTokens={canRestoreTokens}
       cashuBulkCheckIsBusy={tokens.cashuBulkCheckIsBusy}
       cashuIsBusy={cashuIsBusy}
-      cashuProofs={proofs}
+      cashuProofs={cashuProofs}
       cashuTransfers={transfers}
       checkIssuedCashuTokensAndDeleteClaimed={
         tokens.checkIssuedCashuTokensAndDeleteClaimed
