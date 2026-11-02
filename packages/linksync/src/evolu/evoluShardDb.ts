@@ -205,11 +205,31 @@ export const createEvoluShardDb = (
       return Array.isArray(rows) ? rows.filter(isUntypedRow) : [];
     });
 
+  const toStoredRows = (rows: ReadonlyArray<UntypedRow>) =>
+    rows.filter(isStoredRow).flatMap(withChangeTimes);
+
+  // Evolu returns the same result array until the query's rows change.
+  const validatedResults = new WeakMap<object, ReadonlyArray<Row<Columns>>>();
+  const loadStoredRows = (
+    query: string,
+  ): Effect.Effect<ReadonlyArray<Row<Columns>>> =>
+    Effect.promise(async () => {
+      const result = await callUntyped(evolu, "loadQuery", query);
+      if (!Array.isArray(result)) return [];
+      const cached = validatedResults.get(result);
+      if (cached !== undefined) return cached;
+      const rows = toStoredRows(result.filter(isUntypedRow));
+      validatedResults.set(result, rows);
+      return rows;
+    });
+
   const mergeOverlay = (
     table: string,
     loaded: ReadonlyArray<Row<Columns>>,
     onlyId?: string,
   ): ReadonlyArray<Row<Columns>> => {
+    if (![...overlay.values()].some((entry) => entry.table === table))
+      return loaded;
     const seen = new Set<string>();
     const merged = loaded.map((row) => {
       const key = overlayKey(table, row.ownerId, row.id);
@@ -240,8 +260,8 @@ export const createEvoluShardDb = (
     table: string,
   ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
     if (!isTable(table)) return Effect.succeed([]);
-    return Effect.map(loadRows(tableQuery(table)), (rows) =>
-      mergeOverlay(table, rows.filter(isStoredRow).flatMap(withChangeTimes)),
+    return Effect.map(loadStoredRows(tableQuery(table)), (rows) =>
+      mergeOverlay(table, rows),
     );
   }
 
@@ -255,16 +275,16 @@ export const createEvoluShardDb = (
   ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
     if (!isTable(table)) return Effect.succeed([]);
     const query = asQuery(
-      callUntyped(evolu, "createQuery", (db: UntypedSelect) =>
-        db.selectFrom(table).selectAll().where("id", "=", id),
+      callUntyped(
+        evolu,
+        "createQuery",
+        (db: UntypedSelect) =>
+          db.selectFrom(table).selectAll().where("id", "=", id),
+        { prepare: true },
       ),
     );
     return Effect.map(loadRows(query), (rows) =>
-      mergeOverlay(
-        table,
-        rows.filter(isStoredRow).flatMap(withChangeTimes),
-        id,
-      ),
+      mergeOverlay(table, toStoredRows(rows), id),
     );
   }
 

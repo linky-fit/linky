@@ -231,6 +231,11 @@ export const createLinkyEvolu = ({
     LinkyEvoluSchema,
     {
       name: generateDbNameFromMnemonic(mnemonic),
+      // Tables are keyed by (ownerId, id); the shard store looks rows up by id across owners.
+      indexes: (create) =>
+        Object.keys(LinkySchema).map((table) =>
+          create(`${table}Id`).on(table).column("id"),
+        ),
       transports,
       enableLogging,
       inMemory,
