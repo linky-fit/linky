@@ -292,7 +292,9 @@ const makeDevice = (
   const setProofs = (proofs: ReadonlyArray<StoredProof>, state: ProofState) =>
     run(
       Effect.flatMap(ProofStore, (store) =>
-        Effect.forEach(proofs, (entry) => store.update(entry.id, { state })),
+        store.write({
+          update: proofs.map((entry) => ({ id: entry.id, patch: { state } })),
+        }),
       ),
     );
   return {
@@ -323,11 +325,11 @@ const syncInto = (
     Effect.gen(function* () {
       const operations = yield* OperationStore;
       yield* Effect.forEach(synced.operations ?? [], operations.insert);
-      yield* (yield* ProofStore).insert(
-        (synced.proofs ?? []).map(
+      yield* (yield* ProofStore).write({
+        insert: (synced.proofs ?? []).map(
           (entry) => new NewProof(Struct.omit(entry, ["id", "createdAt"])),
         ),
-      );
+      });
     }),
   );
 

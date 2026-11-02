@@ -55,7 +55,7 @@ The receipt carries `paidAmount`, `feeReserve`, `feePaid` (what the melt inputs 
 1. Price. Fetch or re-check the quote; it must be `UNPAID` (else `PaymentFailed`, nothing sent) and not past `expiresAt` (else `QuoteExpired`).
 2. Select sources. `available` proofs at `mint`, NUT-07 filtered; spent ones are marked `spent`. The confirmed unspent total must cover `amount + feeReserve`, else `InsufficientFunds`.
 3. Swap fee-inclusive. Exactly `amount + feeReserve` plus the swap's own input fee is swapped out under the counter lock.
-4. Persist before melting. A `pending` `melt` operation (quote, invoice, amounts, `inputsTotal`) is inserted; the melt inputs are stored `held` under it; the remainder is stored `available`; then the consumed sources are marked `spent`. From here on the payment is reconstructible from the stores alone.
+4. Persist before melting. A `pending` `melt` operation (quote, invoice, amounts, `inputsTotal`) is inserted; then one write stores the melt inputs `held` under it and the remainder `available`, and marks the consumed sources `spent`. From here on the payment is reconstructible from the stores alone.
 5. Melt and settle. Each attempt writes its blank-output slot to the operation's `counter` and advances the deterministic counter past the full NUT-08 blank range before the request leaves.
 
 | Mint answer             | Result                                                                                                                                      |

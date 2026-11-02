@@ -255,7 +255,7 @@ describe("walletReadModelAtom", () => {
 
     const wallet = await result(registry, walletRepositoryAtom);
     await Effect.runPromise(
-      wallet.proofs.insert([proofAt("https://mint.example")]),
+      wallet.proofs.write({ insert: [proofAt("https://mint.example")] }),
     );
 
     await vi.waitFor(() => {
@@ -295,20 +295,26 @@ describe("walletReadModelAtom", () => {
       ),
     );
     const [proof] = await Effect.runPromise(
-      wallet.proofs.insert([
-        new NewProof({
-          ...proofAt("https://mint.example"),
-          state: "handedOut",
-          operationId: send.id,
-        }),
-      ]),
+      wallet.proofs.write({
+        insert: [
+          new NewProof({
+            ...proofAt("https://mint.example"),
+            state: "handedOut",
+            operationId: send.id,
+          }),
+        ],
+      }),
     );
     if (proof === undefined) throw new Error("no proof stored");
     const unmountModel = registry.mount(walletReadModelAtom);
     const unmountProofs = registry.mount(operationProofsAtom(send.id));
     await result(registry, walletReadModelAtom);
 
-    await Effect.runPromise(wallet.proofs.update(proof.id, { state: "spent" }));
+    await Effect.runPromise(
+      wallet.proofs.write({
+        update: [{ id: proof.id, patch: { state: "spent" } }],
+      }),
+    );
 
     await vi.waitFor(() => {
       const model = Option.getOrThrow(
@@ -418,7 +424,7 @@ describe("linkshu commands", () => {
     const registry = boot();
     const wallet = await result(registry, walletRepositoryAtom);
     await Effect.runPromise(
-      wallet.proofs.insert([proofAt("https://mint-a.test")]),
+      wallet.proofs.write({ insert: [proofAt("https://mint-a.test")] }),
     );
     type Wallet = ReturnType<typeof useLinkshuComposition>;
     const hook: { commands: Wallet | null } = { commands: null };

@@ -64,10 +64,10 @@ const interruptReceive = async (
       }),
       proofStore: Layer.succeed(ProofStore, {
         ...storage.proofs,
-        insert: (proofs) =>
-          stop === "before storing proofs"
-            ? pause.pipe(Effect.andThen(storage.proofs.insert(proofs)))
-            : storage.proofs.insert(proofs),
+        write: (batch) =>
+          stop === "before storing proofs" && (batch.insert?.length ?? 0) > 0
+            ? pause.pipe(Effect.andThen(storage.proofs.write(batch)))
+            : storage.proofs.write(batch),
       }),
     }),
   );

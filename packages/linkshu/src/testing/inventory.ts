@@ -36,7 +36,7 @@ export const seedProofs = (
       operationId,
     );
     if (rows === null) return Effect.die(new Error("malformed seed proofs"));
-    return store.insert(rows);
+    return store.write({ insert: rows });
   });
 
 /** Stores a `send`, `receive` or `deferredReceive` carrying `tokenText`. */

@@ -148,34 +148,94 @@ const emitChanged = (
   );
 };
 
+/** Fresh proofs to store, reported under `reason`. */
+export interface ProofInsert {
+  readonly proofs: ReadonlyArray<NewProof>;
+  readonly reason: string;
+}
+
+/**
+ * Stored proofs to move to `state`, optionally re-pointed at an operation
+ * (`operationId` undefined keeps each proof's link).
+ */
+export interface ProofMove {
+  readonly proofs: ReadonlyArray<StoredProof>;
+  readonly state: ProofState;
+  readonly reason: string;
+  readonly operationId?: OperationId | null | undefined;
+}
+
+const emitMoved = (
+  inspector: InspectorService,
+  { proofs, state, reason, operationId }: ProofMove,
+): void => {
+  const byFrom = new Map<ProofState, StoredProof[]>();
+  for (const proof of proofs) {
+    const group = byFrom.get(proof.state) ?? [];
+    group.push(proof);
+    byFrom.set(proof.state, group);
+  }
+  for (const [from, group] of byFrom) {
+    emitChanged(
+      inspector,
+      group,
+      from,
+      state,
+      operationId === undefined ? (group[0]?.operationId ?? null) : operationId,
+      reason,
+    );
+  }
+};
+
+/**
+ * Books the inserts and moves in one store write, so they land together or
+ * not at all. One event per insert and per state a move's proofs came from.
+ * Returns each insert's stored proofs.
+ */
+export const bookProofs = (
+  ctx: ProofContext,
+  inserts: ReadonlyArray<ProofInsert>,
+  moves: ReadonlyArray<ProofMove> = [],
+): Effect.Effect<ReadonlyArray<ReadonlyArray<StoredProof>>> =>
+  Effect.gen(function* () {
+    const insert = inserts.flatMap(({ proofs }) => proofs);
+    const update = moves.flatMap(({ proofs, state, operationId }) => {
+      const patch =
+        operationId === undefined ? { state } : { state, operationId };
+      return proofs.map((proof) => ({ id: proof.id, patch }));
+    });
+    if (insert.length === 0 && update.length === 0)
+      return inserts.map(() => []);
+    const stored = yield* ctx.proofStore.write({ insert, update });
+    let offset = 0;
+    const booked = inserts.map(({ proofs, reason }) => {
+      const group = stored.slice(offset, offset + proofs.length);
+      offset += proofs.length;
+      const first = group[0];
+      if (first !== undefined)
+        emitChanged(
+          ctx.inspector,
+          group,
+          null,
+          first.state,
+          first.operationId,
+          reason,
+        );
+      return group;
+    });
+    for (const move of moves) emitMoved(ctx.inspector, move);
+    return booked;
+  });
+
 /** Persists fresh proofs and reports the batch. */
 export const insertProofs = (
   ctx: ProofContext,
   proofs: ReadonlyArray<NewProof>,
   reason: string,
 ): Effect.Effect<ReadonlyArray<StoredProof>> =>
-  proofs.length === 0
-    ? Effect.succeed([])
-    : Effect.tap(ctx.proofStore.insert(proofs), (stored) =>
-        Effect.sync(() => {
-          const first = stored[0];
-          if (first !== undefined)
-            emitChanged(
-              ctx.inspector,
-              stored,
-              null,
-              first.state,
-              first.operationId,
-              reason,
-            );
-        }),
-      );
+  Effect.map(bookProofs(ctx, [{ proofs, reason }]), ([stored]) => stored ?? []);
 
-/**
- * Moves proofs to `state`, optionally re-pointing them at an operation
- * (`operationId` undefined keeps the current link). One event per batch,
- * grouped by the state the proofs came from.
- */
+/** Moves proofs to `state` in one write; see `ProofMove`. */
 export const setProofState = (
   ctx: ProofContext,
   proofs: ReadonlyArray<StoredProof>,
@@ -183,33 +243,7 @@ export const setProofState = (
   reason: string,
   operationId?: OperationId | null,
 ): Effect.Effect<void> =>
-  Effect.gen(function* () {
-    const patch =
-      operationId === undefined ? { state } : { state, operationId };
-    yield* Effect.forEach(
-      proofs,
-      (proof) => ctx.proofStore.update(proof.id, patch),
-      { discard: true },
-    );
-    const byFrom = new Map<ProofState, StoredProof[]>();
-    for (const proof of proofs) {
-      const group = byFrom.get(proof.state) ?? [];
-      group.push(proof);
-      byFrom.set(proof.state, group);
-    }
-    for (const [from, group] of byFrom) {
-      emitChanged(
-        ctx.inspector,
-        group,
-        from,
-        state,
-        operationId === undefined
-          ? (group[0]?.operationId ?? null)
-          : operationId,
-        reason,
-      );
-    }
-  });
+  Effect.asVoid(bookProofs(ctx, [], [{ proofs, state, reason, operationId }]));
 
 export const amountOf = (proofs: ReadonlyArray<StoredProof>): Amount =>
   Amount.make(totalAmount(proofs));

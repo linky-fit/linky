@@ -441,31 +441,60 @@ export const createEvoluShardDb = (
     readonly applied: Effect.Effect<void>;
   }
 
-  /** Queues the mutation at once, so a batch stays one Evolu transaction. */
-  const queue = (mutation: Mutation): Effect.Effect<Queued, ShardDbError> => {
-    const fail = (message: string) =>
-      Effect.fail(new ShardDbError({ table: mutation.table, message }));
-    if (!isTable(mutation.table)) return fail("unknown table");
-    const row = toEvoluRow(mutation.row);
-    const validation = callUntyped(evolu, mutation.kind, mutation.table, row, {
-      ownerId: mutation.ownerId,
-      onlyValidate: true,
-    });
-    if (!isMutationResult(validation))
-      return fail("unexpected mutation result");
-    if (!validation.ok) return fail(JSON.stringify(validation.error));
-    const completed = Deferred.makeUnsafe<void>();
-    callUntyped(evolu, mutation.kind, mutation.table, row, {
-      ownerId: mutation.ownerId,
-      onComplete: () => Deferred.doneUnsafe(completed, Effect.void),
-    });
-    const entry = record(mutation, new Date().toISOString());
-    return Effect.succeed({
-      mutation,
-      entry,
-      applied: Deferred.await(completed),
-    });
+  /** Why Evolu would reject the mutation, or `null` when it would accept it. */
+  const rejection = (mutation: Mutation): string | null => {
+    if (!isTable(mutation.table)) return "unknown table";
+    const validation = callUntyped(
+      evolu,
+      mutation.kind,
+      mutation.table,
+      toEvoluRow(mutation.row),
+      { ownerId: mutation.ownerId, onlyValidate: true },
+    );
+    if (!isMutationResult(validation)) return "unexpected mutation result";
+    return validation.ok ? null : JSON.stringify(validation.error);
   };
+
+  const queue = (mutation: Mutation, nowIso: string): Queued => {
+    const completed = Deferred.makeUnsafe<void>();
+    callUntyped(
+      evolu,
+      mutation.kind,
+      mutation.table,
+      toEvoluRow(mutation.row),
+      {
+        ownerId: mutation.ownerId,
+        onComplete: () => Deferred.doneUnsafe(completed, Effect.void),
+      },
+    );
+    return {
+      mutation,
+      entry: record(mutation, nowIso),
+      applied: Deferred.await(completed),
+    };
+  };
+
+  /**
+   * Validates every mutation before queueing any, then queues them all in
+   * one synchronous loop: Evolu runs the mutations queued within one
+   * microtask as one transaction, so a batch lands whole or not at all.
+   */
+  const queueAll = (
+    mutations: ReadonlyArray<Mutation>,
+  ): Effect.Effect<ReadonlyArray<Queued>, ShardDbError> =>
+    Effect.suspend(() => {
+      for (const mutation of mutations) {
+        const message = rejection(mutation);
+        if (message !== null)
+          return Effect.fail(
+            new ShardDbError({ table: mutation.table, message }),
+          );
+      }
+      const nowIso = new Date().toISOString();
+      return Effect.succeed(
+        mutations.map((mutation) => queue(mutation, nowIso)),
+      );
+    });
 
   const unconfirm = ({ mutation, entry }: Queued): void => {
     const key = overlayKey(mutation.table, mutation.ownerId, mutation.row.id);
@@ -480,7 +509,7 @@ export const createEvoluShardDb = (
   const mutate = (
     mutations: ReadonlyArray<Mutation>,
   ): Effect.Effect<void, ShardDbError> =>
-    Effect.flatMap(Effect.forEach(mutations, queue), (batch) =>
+    Effect.flatMap(queueAll(mutations), (batch) =>
       Effect.all(
         batch.map(({ applied }) => applied),
         { discard: true },

@@ -26,8 +26,8 @@ import type {
   ProofPatch,
   ProofStoreService,
 } from "@linky-fit/linkshu";
-import { Effect, Layer, Schema } from "effect";
-import type { Patch, Row, WriteRow } from "../core";
+import { Clock, Effect, Layer, Schema } from "effect";
+import type { Patch, Row, RowWrite, WriteRow } from "../core";
 import {
   CashuOperationId,
   cashuOperationIdFor,
@@ -284,45 +284,56 @@ export const makeWalletRepository = (store: LinkyStore): WalletRepository => {
   const operationTable = tableRepository(store, "cashu", "cashuOperation");
 
   const proofs: ProofStoreService = {
-    // One rotation check for the whole batch, not one per proof.
-    insert: (rows) =>
+    // One mutate and one rotation check for the whole batch.
+    write: ({ insert = [], update = [] }) =>
       Effect.gen(function* () {
+        const inserted = insert.map((proof) => ({
+          proof,
+          id: cashuProofIdFor(proof.secret),
+        }));
         const newest = new Map<string, CashuProofRow>();
-        for (const copy of yield* store.copiesOfIds(
-          "cashu",
-          "cashuProof",
-          rows.map((proof) => cashuProofIdFor(proof.secret)),
-        ))
-          if (!newest.has(copy.id)) newest.set(copy.id, copy);
-        const stored: StoredProof[] = [];
-        for (const proof of rows) {
-          const id = cashuProofIdFor(proof.secret);
+        if (inserted.length > 0)
+          for (const copy of yield* store.copiesOfIds(
+            "cashu",
+            "cashuProof",
+            inserted.map(({ id }) => id),
+          ))
+            if (!newest.has(copy.id)) newest.set(copy.id, copy);
+        const now = Math.floor((yield* Clock.currentTimeMillis) / 1000);
+        const writes: Array<RowWrite<LinkyDbSchema["cashuProof"]>> = [];
+        const stored = inserted.map(({ proof, id }) => {
           const copy = newest.get(id);
           const previous = copy?.isDeleted === 1 ? undefined : copy;
           const columns = toProofColumns(proof, id);
-          yield* previous === undefined
-            ? store.insert("cashu", "cashuProof", columns)
-            : store.update("cashu", "cashuProof", id, columns);
-          const persisted = previous ?? (yield* proofTable.byId(id));
-          if (persisted === null)
-            return yield* Effect.die(new Error("proof vanished after insert"));
-          stored.push(
-            new StoredProof({
-              ...proof,
-              id: ProofId.make(id),
-              createdAt: UnixSeconds.make(
-                isoToUnixSeconds(persisted.createdAt),
-              ),
-            }),
+          writes.push(
+            previous === undefined
+              ? { kind: "insert", row: columns }
+              : { kind: "update", id, patch: columns },
           );
+          return new StoredProof({
+            ...proof,
+            id: ProofId.make(id),
+            createdAt: UnixSeconds.make(
+              previous === undefined
+                ? now
+                : isoToUnixSeconds(previous.createdAt),
+            ),
+          });
+        });
+        for (const { id, patch } of update) {
+          // An id that is not even an Evolu id cannot be stored, so it is unknown.
+          const decoded = CashuProofId.fromUnknown(id);
+          if (decoded.ok)
+            writes.push({
+              kind: "update",
+              id: decoded.value,
+              patch: toProofPatch(patch),
+            });
         }
+        yield* store.write("cashu", "cashuProof", writes);
         yield* proofTable.maybeRotate;
         return stored;
       }).pipe(Effect.orDie),
-    update: (id, patch) =>
-      patchKnownRow(CashuProofId.fromUnknown(id), (proofId) =>
-        proofTable.update(proofId, toProofPatch(patch)),
-      ),
     loadUnspent: Effect.map(
       store.copiesWhere(
         "cashu",

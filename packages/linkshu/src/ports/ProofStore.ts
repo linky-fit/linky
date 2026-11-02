@@ -65,18 +65,32 @@ export interface ProofPatch {
   readonly operationId?: OperationId | null;
 }
 
+export interface ProofUpdate {
+  readonly id: ProofId;
+  readonly patch: ProofPatch;
+}
+
+/**
+ * Proof writes that land together: the inserts, then the updates, in order.
+ * An update may patch a proof inserted earlier in the same batch.
+ */
+export interface ProofWrite {
+  readonly insert?: ReadonlyArray<NewProof>;
+  readonly update?: ReadonlyArray<ProofUpdate>;
+}
+
 export interface ProofStoreService {
   /**
-   * Persists the proofs and assigns ids and `createdAt`. The id MUST be a
-   * pure function of `secret`, so two devices storing one proof converge on
-   * one row; inserting a secret that is already stored is therefore an
-   * upsert onto that row.
+   * Persists the batch all-or-nothing and returns the inserted proofs with
+   * their ids and `createdAt`, in input order. An inserted proof's id MUST
+   * be a pure function of `secret`, so two devices storing one proof
+   * converge on one row; inserting a secret that is already stored is
+   * therefore an upsert onto that row. An update applies the present patch
+   * fields; an unknown id is a no-op.
    */
-  readonly insert: (
-    proofs: ReadonlyArray<NewProof>,
+  readonly write: (
+    batch: ProofWrite,
   ) => Effect.Effect<ReadonlyArray<StoredProof>>;
-  /** Applies the present fields; unknown id: no-op. */
-  readonly update: (id: ProofId, patch: ProofPatch) => Effect.Effect<void>;
   /**
    * Every stored proof whose state is not `spent`: the working set the
    * package reads before every decision. It must not grow with the

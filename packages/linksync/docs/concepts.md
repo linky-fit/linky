@@ -30,6 +30,7 @@ Money truth is the proofs and operations, never forgotten; the transaction histo
 
 - `insert` writes into the active shard of the scope (the shard the pointer names, or index 0). A repository's `insert` also marks the row live, reviving a removed copy; `insertIfAbsent` and `ingest` write only the columns, so a removal from another device that syncs later still wins.
 - `update` of a row in the active shard patches it in place. Update of a row in an older shard copies the whole row, patch applied, into the active shard and tombstones the copy where it was. Retired shards therefore receive at most tombstones.
+- `write(scope, table, writes)` does what `insert` and `update` would for each row of a batch, in order, and issues it all as one `mutate`, so the batch lands whole or not at all. An update of an id with no live copy is skipped instead of failing, and an update may follow the insert of its row in the same batch.
 - `remove` tombstones the row where it lives; nothing is copied.
 - `insertRemoved` writes a tombstone into the active shard for a row that has not arrived yet, so a later insert of that id can be refused. It carries only the columns given.
 - A read takes every row of the visible shards, keeps one copy per id from the highest shard index, and drops tombstones.

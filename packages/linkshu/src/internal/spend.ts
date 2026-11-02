@@ -20,13 +20,14 @@ import {
   isRecoverableOutputCollision,
 } from "./outputCollisions";
 import {
-  insertProofs,
+  bookProofs,
   proofsAt,
   setProofState,
   toDomainProof,
   toNewProofs,
   totalAmount,
 } from "./proofs";
+import type { ProofInsert } from "./proofs";
 import { checkProofStates, spentSecrets, unspentProofs } from "./proofStates";
 
 /**
@@ -243,16 +244,18 @@ export interface SwapOutcome {
 }
 
 /**
- * Books a swap: fresh change is stored `available` before the consumed
- * inputs are marked `spent`, so the funds are never outside the store.
- * Passthrough inputs (offered but not consumed) are untouched. `null` when
- * the mint handed back malformed change.
+ * Books a swap in one write: fresh change `available`, the consumed inputs
+ * `spent`, and the `alongside` proofs the swap produced for the caller, so
+ * the funds are never outside the store. Passthrough inputs (offered but not
+ * consumed) are untouched. `null` when the mint handed back malformed change;
+ * the `alongside` proofs are then booked alone.
  */
 export const settleSwap = (
   ctx: SpendContext,
   offered: ReadonlyArray<StoredProof>,
   swapped: SendResponse,
   reason: string,
+  alongside: ReadonlyArray<ProofInsert> = [],
 ): Effect.Effect<SwapOutcome | null> =>
   Effect.gen(function* () {
     const offeredSecrets = new Set(offered.map((proof) => proof.secret));
@@ -264,10 +267,17 @@ export const settleSwap = (
       "available",
       null,
     );
-    if (fresh === null) return null;
-    const freshKeep = yield* insertProofs(ctx, fresh, reason);
+    if (fresh === null) {
+      yield* bookProofs(ctx, alongside);
+      return null;
+    }
     const consumed = offered.filter((proof) => !keepSecrets.has(proof.secret));
-    yield* setProofState(ctx, consumed, "spent", reason, null);
+    const booked = yield* bookProofs(
+      ctx,
+      [...alongside, { proofs: fresh, reason }],
+      [{ proofs: consumed, state: "spent", reason, operationId: null }],
+    );
+    const freshKeep = booked.at(-1) ?? [];
     return {
       freshKeep,
       consumed,

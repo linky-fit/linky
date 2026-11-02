@@ -113,6 +113,65 @@ describe("shard store", () => {
       ).toBe("Failure");
     });
 
+    it("writes a batch of inserts and updates in one mutation, copying old rows forward", () => {
+      const { db, store } = toyStore();
+      run(store.insert("notes", "note", { ...note("old"), body: "kept" }));
+      run(store.rotate("notes"));
+      run(store.insert("notes", "note", note("active")));
+      const batches: Array<ReadonlyArray<{ kind: string; ownerId: string }>> =
+        [];
+      const recording = createShardStore<ToySchema, typeof toyScopes>({
+        db: {
+          ...db,
+          mutate: (mutations) => {
+            batches.push(mutations);
+            return db.mutate(mutations);
+          },
+        },
+        appOwner: store.appOwner,
+        scopes: toyScopes,
+      });
+
+      run(
+        recording.write("notes", "note", [
+          { kind: "insert", row: note("fresh") },
+          { kind: "update", id: "fresh", patch: { body: "same batch" } },
+          { kind: "update", id: "old", patch: { title: "renamed" } },
+          { kind: "update", id: "active", patch: { body: "patched" } },
+          { kind: "update", id: "unknown", patch: { body: "skipped" } },
+        ]),
+      );
+
+      const shard0 = store.shardOwner("notes", 0).id;
+      const shard1 = store.shardOwner("notes", 1).id;
+      expect(batches).toHaveLength(1);
+      expect(
+        batches[0]?.map(({ kind, ownerId }) => [
+          kind,
+          ownerId === shard1 ? 1 : 0,
+        ]),
+      ).toEqual([
+        ["upsert", 1],
+        ["update", 1],
+        ["upsert", 1],
+        ["update", 0],
+        ["update", 1],
+      ]);
+      const rows = run(db.readTable("note"));
+      expect(
+        rows.find((row) => row.id === "old" && row.ownerId === shard0),
+      ).toMatchObject({ isDeleted: 1 });
+      expect(
+        run(store.rows("notes", "note"))
+          .map(({ id, title, body, ownerId }) => [id, title, body, ownerId])
+          .sort(),
+      ).toEqual([
+        ["active", "title active", "patched", shard1],
+        ["fresh", "title fresh", "same batch", shard1],
+        ["old", "renamed", "kept", shard1],
+      ]);
+    });
+
     it("writes app-scope rows into the app owner", () => {
       const { db, store, appOwner } = toyStore();
       run(store.insert("meta", "setting", { id: "lang", value: "cs" }));
