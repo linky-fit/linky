@@ -29,6 +29,7 @@ import {
   setMessagesRotation,
 } from "../../app/state/session/store";
 import { makeLocalStorageKeyValueStore } from "../../platform/linkshu/localStorageKeyValueStore";
+import { seedCashuHistory, type CashuHistory } from "./seedCashuHistory";
 
 /**
  * Test-only entry point the Playwright suites reach through
@@ -74,6 +75,8 @@ export interface LinkyE2eHooks {
   ) => Promise<string | null>;
   /** Restarts a recurring payment's schedule at `atSec`, as an edit would, but without the form's no-past rule. */
   readonly makeRecurringDue: (id: string, atSec: number) => Promise<void>;
+  /** Fills the cashu shards with a long-lived wallet's spent history; resolves to the active shard index. */
+  readonly seedCashuHistory: (history: CashuHistory) => Promise<number>;
 }
 
 declare global {
@@ -202,5 +205,7 @@ export const installLinkyE2eHooks = (
         }),
       );
     },
+    seedCashuHistory: async (history) =>
+      seedCashuHistory(await getLinkyStore(), db().mutate, history),
   };
 };

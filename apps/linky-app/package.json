@@ -13,7 +13,8 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "preview": "vite preview",
-    "prev": "vite preview"
+    "prev": "vite preview",
+    "bench:send": "playwright test -c bench/playwright.config.ts"
   },
   "dependencies": {
     "@capacitor/clipboard": "^7.0.0",
