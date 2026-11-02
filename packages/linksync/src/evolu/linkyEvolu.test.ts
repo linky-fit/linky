@@ -108,6 +108,7 @@ describe("createLinkyEvolu", () => {
     expect(call.schema).toBe(LinkyEvoluSchema);
     expect(call.config).toEqual({
       name: "linky-4cc788f4",
+      indexes: expect.any(Function),
       transports,
       enableLogging: false,
       inMemory: true,
@@ -119,6 +120,7 @@ describe("createLinkyEvolu", () => {
     const { call } = open(null);
     expect(call.config).toEqual({
       name: "linky-anon",
+      indexes: expect.any(Function),
       transports,
       enableLogging: false,
       inMemory: true,
