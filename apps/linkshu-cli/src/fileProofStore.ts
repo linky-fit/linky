@@ -1,7 +1,5 @@
 import {
-  applyProofPatch,
-  deriveStoreId,
-  ProofId,
+  applyProofWrite,
   ProofStore,
   proofReadsOf,
   StoredProof,
@@ -15,38 +13,26 @@ import { makeJsonFile } from "./jsonFile";
  * The `ProofStore` port over a JSON array of the port's own row schema, so
  * the file is exactly the inventory the package handed over — no adapter
  * mapping to drift, and the wallet stays readable with any text editor.
- * Ids derive from the secret, so inserting a stored secret replaces its row.
+ * Ids derive from the secret, so inserting a stored secret replaces its row,
+ * and a write batch is one file write.
  */
 const ProofFile = Schema.Array(StoredProof);
 
 export const makeFileProofStore = (filePath: string): ProofStoreService => {
   const file = makeJsonFile(filePath, ProofFile, []);
   return {
-    insert: (proofs) =>
+    write: (batch) =>
       Effect.flatMap(Clock.currentTimeMillis, (millis) =>
         file.modify((rows) => {
           const byId = new Map(rows.map((row) => [row.id, row]));
-          const stored = proofs.map((proof) => {
-            const id = ProofId.make(deriveStoreId(proof.secret));
-            const row = new StoredProof({
-              ...proof,
-              id,
-              createdAt:
-                byId.get(id)?.createdAt ??
-                UnixSeconds.make(Math.floor(millis / 1000)),
-            });
-            byId.set(id, row);
-            return row;
-          });
+          const stored = applyProofWrite(
+            byId,
+            batch,
+            UnixSeconds.make(Math.floor(millis / 1000)),
+          );
           return [[...byId.values()], stored];
         }),
       ),
-
-    update: (id, patch) =>
-      file.modify((rows) => [
-        rows.map((row) => (row.id === id ? applyProofPatch(row, patch) : row)),
-        undefined,
-      ]),
 
     ...proofReadsOf(file.read),
   };

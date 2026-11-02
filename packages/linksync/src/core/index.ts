@@ -40,6 +40,7 @@ export type {
   ForgottenShard,
   PointerRepair,
   RotationOutcome,
+  RowWrite,
   Shard,
   ShardPointerColumns,
   ShardRotation,

@@ -6,7 +6,9 @@ import {
   KeysetId,
   MintUrl,
   OperationId,
+  ProofId,
 } from "../domain/primitives";
+import { deriveStoreId } from "./ids";
 import { makeInMemoryProofStore } from "./inMemoryProofStore";
 import { NewProof } from "./ProofStore";
 import type { ProofState } from "./ProofStore";
@@ -40,12 +42,14 @@ describe("inMemoryProofStore reads", () => {
     await Effect.runPromise(
       Effect.gen(function* () {
         yield* TestClock.setTime(1_700_000_000_000);
-        yield* store.insert([proof("old", "spent", "00aa", send)]);
+        yield* store.write({ insert: [proof("old", "spent", "00aa", send)] });
         yield* TestClock.adjust("2 seconds");
-        yield* store.insert([
-          proof("out", "handedOut", "00aa", send),
-          proof("free", "available", "00bb"),
-        ]);
+        yield* store.write({
+          insert: [
+            proof("out", "handedOut", "00aa", send),
+            proof("free", "available", "00bb"),
+          ],
+        });
 
         expect(secretsOf(yield* store.loadUnspent)).toEqual(["free", "out"]);
         expect(
@@ -64,5 +68,47 @@ describe("inMemoryProofStore reads", () => {
         ).toEqual(["old"]);
       }).pipe(Effect.provide(TestClock.layer())),
     );
+  });
+});
+
+describe("inMemoryProofStore write", () => {
+  it("applies the inserts, then the updates, and skips unknown ids", async () => {
+    const store = makeInMemoryProofStore();
+    const all = await Effect.runPromise(
+      Effect.gen(function* () {
+        const [held] = yield* store.write({ insert: [proof("held", "held")] });
+        assert(held !== undefined);
+        const stored = yield* store.write({
+          insert: [proof("fresh", "available")],
+          update: [
+            { id: held.id, patch: { state: "spent" } },
+            { id: ProofId.make("unknown"), patch: { state: "spent" } },
+          ],
+        });
+        expect(secretsOf(stored)).toEqual(["fresh"]);
+        yield* store.write({
+          insert: [proof("late", "available")],
+          update: [
+            {
+              id: ProofId.make(deriveStoreId("late")),
+              patch: { operationId: send },
+            },
+          ],
+        });
+        return yield* store.all;
+      }),
+    );
+
+    expect(
+      all.map(({ secret, state, operationId }) => ({
+        secret,
+        state,
+        operationId,
+      })),
+    ).toEqual([
+      { secret: "held", state: "spent", operationId: null },
+      { secret: "fresh", state: "available", operationId: null },
+      { secret: "late", state: "available", operationId: send },
+    ]);
   });
 });

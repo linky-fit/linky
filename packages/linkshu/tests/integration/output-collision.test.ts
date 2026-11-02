@@ -75,7 +75,7 @@ describe("deterministic output collisions against the local mint", () => {
       { bip39Seed: seed },
       Effect.gen(function* () {
         const proofStore = yield* ProofStore;
-        yield* proofStore.insert(availableRowsOf(sourceProofs));
+        yield* proofStore.write({ insert: availableRowsOf(sourceProofs) });
         const receipt = yield* (yield* Send).send(
           new SendDraft({
             mint: mintUrl,

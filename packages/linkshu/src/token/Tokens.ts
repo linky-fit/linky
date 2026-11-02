@@ -20,6 +20,7 @@ import {
   redactReceipt,
 } from "../internal/operations";
 import {
+  bookProofs,
   domainToNewProofs,
   insertProofs,
   knownSecretsOf,
@@ -505,23 +506,21 @@ export class Tokens extends Context.Service<Tokens>()("linkshu/Tokens", {
           ) {
             state = "spent";
           }
-          yield* insertProofs(
+          yield* bookProofs(
             ctx,
-            domainToNewProofs(
-              fresh,
-              decoded.mint,
-              decoded.unit,
-              state,
-              operationId,
-            ),
-            "legacy-ingest",
-          );
-          yield* setProofState(
-            ctx,
-            stranded,
-            state,
-            "legacy-ingest",
-            operationId,
+            [
+              {
+                proofs: domainToNewProofs(
+                  fresh,
+                  decoded.mint,
+                  decoded.unit,
+                  state,
+                  operationId,
+                ),
+                reason: "legacy-ingest",
+              },
+            ],
+            [{ proofs: stranded, state, reason: "legacy-ingest", operationId }],
           );
           ingestedRows += fresh.length > 0 ? 1 : 0;
           proofCount += fresh.length;

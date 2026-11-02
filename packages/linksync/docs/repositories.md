@@ -72,7 +72,7 @@ await runLinkshu(
 );
 ```
 
-Ids are `cashuProofIdFor(secret)` and `cashuOperationIdFor(operationKeyOf(op))`, so re-inserting a stored proof or operation patches that row with the fields present; a proof keeps its `createdAt`, and the insert returns it. A proof insert batch runs one rotation check. Both `update`s apply only the present patch fields and are a no-op for an unknown id. Every read returns only rows that decode as `StoredProof` / `StoredOperation` (`toStoredProof`, `toStoredOperation`); a row missing a required column is skipped, not repaired.
+Ids are `cashuProofIdFor(secret)` and `cashuOperationIdFor(operationKeyOf(op))`, so re-inserting a stored proof or operation patches that row with the fields present. A re-inserted proof keeps its `createdAt` and `write` returns it; a new proof's returned `createdAt` is the time of the call, not read back from Evolu. A proof `write` batch, inserts and patches together, is one store `write` (one `mutate`, so one Evolu transaction) and one rotation check. Proof patches and the operation `update` apply only the present fields and are a no-op for an unknown id. Every read returns only rows that decode as `StoredProof` / `StoredOperation` (`toStoredProof`, `toStoredOperation`); a row missing a required column is skipped, not repaired.
 
 `spent` is terminal, so the proof store adds one rule to the core's "highest shard wins" merge: a proof is spent when any copy in any visible shard says so, live or tombstoned. The next `update` patches the winning copy and the copies agree again.
 

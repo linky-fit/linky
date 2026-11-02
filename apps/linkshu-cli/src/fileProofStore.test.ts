@@ -41,8 +41,12 @@ describe("fileProofStore", () => {
 
   it("derives the id from the secret and stamps a creation time", async () => {
     const { open } = wallet();
-    const [stored] = await Effect.runPromise(open().insert([proof("aa")]));
-    const [again] = await Effect.runPromise(open().insert([proof("aa")]));
+    const [stored] = await Effect.runPromise(
+      open().write({ insert: [proof("aa")] }),
+    );
+    const [again] = await Effect.runPromise(
+      open().write({ insert: [proof("aa")] }),
+    );
     expect(stored?.id).toBe(again?.id);
     expect(stored?.createdAt).toBeGreaterThan(0);
     expect(await Effect.runPromise(open().loadUnspent)).toHaveLength(1);
@@ -50,7 +54,9 @@ describe("fileProofStore", () => {
 
   it("survives the process that inserted the proofs", async () => {
     const { open } = wallet();
-    await Effect.runPromise(open().insert([proof("aa"), proof("bb")]));
+    await Effect.runPromise(
+      open().write({ insert: [proof("aa"), proof("bb")] }),
+    );
 
     const reloaded = await Effect.runPromise(open().loadUnspent);
     expect(reloaded.map((row) => row.secret).sort()).toEqual(["aa", "bb"]);
@@ -58,9 +64,13 @@ describe("fileProofStore", () => {
 
   it("applies only the fields a sparse patch mentions", async () => {
     const { open } = wallet();
-    const [stored] = await Effect.runPromise(open().insert([proof("aa")]));
+    const [stored] = await Effect.runPromise(
+      open().write({ insert: [proof("aa")] }),
+    );
     if (stored === undefined) throw new Error("nothing stored");
-    await Effect.runPromise(open().update(stored.id, { state: "spent" }));
+    await Effect.runPromise(
+      open().write({ update: [{ id: stored.id, patch: { state: "spent" } }] }),
+    );
 
     const [updated] = await Effect.runPromise(open().findBySecrets(["aa"]));
     expect(updated?.state).toBe("spent");
@@ -73,7 +83,7 @@ describe("fileProofStore", () => {
     await Effect.runPromise(
       Effect.all(
         Array.from({ length: 25 }, (_unused, index) =>
-          store.insert([proof(`x${index}`)]),
+          store.write({ insert: [proof(`x${index}`)] }),
         ),
         { concurrency: "unbounded" },
       ),
@@ -83,7 +93,7 @@ describe("fileProofStore", () => {
 
   it("stores the port's own row shape, so the file stays hand-readable", async () => {
     const { filePath, open } = wallet();
-    await Effect.runPromise(open().insert([proof("aa")]));
+    await Effect.runPromise(open().write({ insert: [proof("aa")] }));
 
     const written: unknown = JSON.parse(fs.readFileSync(filePath, "utf8"));
     expect(written).toMatchObject([

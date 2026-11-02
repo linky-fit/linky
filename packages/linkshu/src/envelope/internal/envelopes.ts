@@ -8,7 +8,7 @@ import { withKeyLease } from "../../internal/lease";
 import { insertOperation, patchOperation } from "../../internal/operations";
 import {
   domainToNewProofs,
-  insertProofs,
+  bookProofs,
   setProofState,
   storedSecrets,
 } from "../../internal/proofs";
@@ -157,25 +157,30 @@ const reconcileRows = (
   Effect.gen(function* () {
     const stored = yield* storedRowsOf(ctx.proofStore, envelope);
     const known = storedSecrets(stored);
-    yield* insertProofs(
+    yield* bookProofs(
       ctx,
-      domainToNewProofs(
-        envelope.proofs.filter((proof) => !known.has(proof.secret)),
-        envelope.operation.mint,
-        sat,
-        rowStateOf(envelope.operation.status),
-        envelope.operation.id,
-      ),
-      reason,
-    );
-    yield* setProofState(
-      ctx,
-      stored.filter(
-        (proof) => proof.state === "held" && proof.operationId === null,
-      ),
-      "held",
-      reason,
-      envelope.operation.id,
+      [
+        {
+          proofs: domainToNewProofs(
+            envelope.proofs.filter((proof) => !known.has(proof.secret)),
+            envelope.operation.mint,
+            sat,
+            rowStateOf(envelope.operation.status),
+            envelope.operation.id,
+          ),
+          reason,
+        },
+      ],
+      [
+        {
+          proofs: stored.filter(
+            (proof) => proof.state === "held" && proof.operationId === null,
+          ),
+          state: "held",
+          reason,
+          operationId: envelope.operation.id,
+        },
+      ],
     );
   });
 

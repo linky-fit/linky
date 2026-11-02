@@ -45,7 +45,7 @@ import { inspectOperation } from "../internal/operations";
 import { isRecoverableOutputCollision } from "../internal/outputCollisions";
 import {
   domainToNewProofs,
-  insertProofs,
+  bookProofs,
   proofsAt,
   setProofState,
   knownSecretsOf,
@@ -360,9 +360,9 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
       });
 
     /**
-     * The payment settled: NUT-08 change becomes `available` before the held
-     * inputs are marked `spent` and the record closes, so the funds are never
-     * outside the store; the actual fee is what the inputs lost beyond
+     * The payment settled: NUT-08 change becomes `available` in the same
+     * write that marks the held inputs `spent`, then the record closes, so
+     * the funds are never outside the store; the actual fee is what the inputs lost beyond
      * invoice + change.
      */
     const finishPaid = (
@@ -379,19 +379,23 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
             detail: "mint returned more change than the melt inputs held",
           });
         }
-        yield* insertProofs(
-          ctx,
-          domainToNewProofs(
-            change,
-            pending.mint,
-            pending.unit,
-            "available",
-            null,
-          ),
-          "melt-change",
-        );
         const inputs = yield* heldInputs(pending);
-        yield* setProofState(ctx, inputs, "spent", "melt-paid");
+        yield* bookProofs(
+          ctx,
+          [
+            {
+              proofs: domainToNewProofs(
+                change,
+                pending.mint,
+                pending.unit,
+                "available",
+                null,
+              ),
+              reason: "melt-change",
+            },
+          ],
+          [{ proofs: inputs, state: "spent", reason: "melt-paid" }],
+        );
         const envelope = yield* envelopeOfMelt(envelopeCtx, pending, inputs);
         if (envelope !== null) {
           yield* closeIfSpent(envelopeCtx, envelope, "melt-paid");
@@ -736,8 +740,8 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
       });
 
     /**
-     * Books funded inputs under the melt record: the inputs `held`, the
-     * remainder `available`, then the consumed sources `spent`.
+     * Books funded inputs under the melt record in one write: the inputs
+     * `held`, the remainder `available`, the consumed sources `spent`.
      */
     const holdFunded = (
       funded: FundedInputs,
@@ -752,12 +756,12 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
           pending.id,
         );
         if (held === null) return yield* malformedSwapProofs(pending.mint);
-        yield* insertProofs(ctx, held, "melt");
         const outcome = yield* settleSwap(
           funded.spendContext,
           funded.spendable,
           funded.swapped,
           "melt-keep",
+          [{ proofs: held, reason: "melt" }],
         );
         if (outcome === null) return yield* malformedSwapProofs(pending.mint);
         // What the swap consumed beyond the inputs and change it minted.

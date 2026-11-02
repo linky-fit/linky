@@ -1,6 +1,7 @@
 import { Effect, Exit } from "effect";
 import { CurrencyUnit, MintUrl } from "../domain/primitives";
 import { ProofStore } from "../ports/ProofStore";
+import type { ProofWrite } from "../ports/ProofStore";
 import { inMemoryProofStore } from "../ports/inMemoryProofStore";
 import { fakeWallet, KEYSET_HEX, proof } from "../testing/fakeWallet";
 import type { ProofStateName } from "../testing/fakeWallet";
@@ -11,6 +12,7 @@ import {
   secretsOf,
   seedProofs,
 } from "../testing/inventory";
+import { toNewProofs } from "./proofs";
 import { selectSpendableProofs, settleSwap } from "./spend";
 import type { SpendContext } from "./spend";
 
@@ -58,6 +60,24 @@ const makeHarness = (args: HarnessArgs = {}) => {
       ).pipe(Effect.provide(inMemoryProofStore)),
     );
   return { run, checked, events: inspector.events };
+};
+
+/** `ctx` whose store records every write batch into `writes`. */
+const recordingWrites = (ctx: SpendContext, writes: ProofWrite[]) => ({
+  ...ctx,
+  proofStore: {
+    ...ctx.proofStore,
+    write: (batch: ProofWrite) => {
+      writes.push(batch);
+      return ctx.proofStore.write(batch);
+    },
+  },
+});
+
+const handedOut = (secret: string) => {
+  const rows = toNewProofs([proof(6, secret)], mint, sat, "handedOut", null);
+  assert(rows !== null);
+  return { proofs: rows, reason: "send" };
 };
 
 describe("selectSpendableProofs", () => {
@@ -192,6 +212,45 @@ describe("settleSwap", () => {
     });
   });
 
+  it("books the caller's proofs, the change and the consumed inputs in one write", async () => {
+    const { run, events } = makeHarness();
+    const writes: ProofWrite[] = [];
+
+    const exit = await run((ctx) =>
+      Effect.gen(function* () {
+        const offered = yield* seedProofs(mint, [
+          proof(4, "a1"),
+          proof(8, "b1"),
+        ]);
+        const outcome = yield* settleSwap(
+          recordingWrites(ctx, writes),
+          offered,
+          {
+            keep: [proof(4, "a1"), proof(3, "change")],
+            send: [proof(6, "s1")],
+          },
+          "settle",
+          [handedOut("s1")],
+        );
+        return { outcome, proofs: yield* allProofs };
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    const { outcome, proofs } = exit.value;
+    expect(secretsOf(outcome?.freshKeep ?? [])).toEqual(["change"]);
+    expect(writes).toHaveLength(1);
+    expect(secretsOf(writes[0]?.insert ?? [])).toEqual(["change", "s1"]);
+    expect(writes[0]?.update?.map((entry) => entry.patch)).toEqual([
+      { state: "spent", operationId: null },
+    ]);
+    expect(secretsOf(proofsIn(proofs, "handedOut"))).toEqual(["s1"]);
+    expect(secretsOf(proofsIn(proofs, "spent"))).toEqual(["b1"]);
+    expect(
+      events.map((event) => ("reason" in event ? event.reason : null)),
+    ).toEqual(["send", "settle", "settle"]);
+  });
+
   it("refuses malformed change before touching anything", async () => {
     const { run } = makeHarness();
 
@@ -214,5 +273,31 @@ describe("settleSwap", () => {
     assert(Exit.isSuccess(exit));
     expect(exit.value.outcome).toBeNull();
     expect(secretsOf(proofsIn(exit.value.proofs, "available"))).toEqual(["a1"]);
+  });
+
+  it("still books the caller's proofs when the change is malformed", async () => {
+    const { run } = makeHarness();
+
+    const exit = await run((ctx) =>
+      Effect.gen(function* () {
+        const offered = yield* seedProofs(mint, [proof(4, "a1")]);
+        const outcome = yield* settleSwap(
+          ctx,
+          offered,
+          {
+            keep: [{ ...proof(1, "bad"), C: "not-hex" }],
+            send: [proof(3, "s1")],
+          },
+          "settle",
+          [handedOut("s1")],
+        );
+        return { outcome, proofs: yield* allProofs };
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.outcome).toBeNull();
+    expect(secretsOf(proofsIn(exit.value.proofs, "available"))).toEqual(["a1"]);
+    expect(secretsOf(proofsIn(exit.value.proofs, "handedOut"))).toEqual(["s1"]);
   });
 });

@@ -186,7 +186,7 @@ describe("send vertical against the local mint", () => {
         );
         // Stale available proofs pointing at the spent secrets (e.g. state
         // synced from a device that missed the spend).
-        yield* (yield* ProofStore).insert(availableRowsOf(stale));
+        yield* (yield* ProofStore).write({ insert: availableRowsOf(stale) });
         const receipt = yield* send.send(
           new SendDraft({
             mint: mintUrl,

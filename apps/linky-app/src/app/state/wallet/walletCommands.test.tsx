@@ -50,19 +50,21 @@ const boot = async () => {
   });
   const wallet = await result(registry, walletRepositoryAtom);
   await Effect.runPromise(
-    wallet.proofs.insert([
-      Schema.decodeUnknownSync(NewProof)({
-        mint: MINT,
-        unit: "sat",
-        keysetId: "00ab",
-        amount: 128,
-        secret: "secret-128",
-        C: "02ab",
-        dleq: null,
-        state: "available",
-        operationId: null,
-      }),
-    ]),
+    wallet.proofs.write({
+      insert: [
+        Schema.decodeUnknownSync(NewProof)({
+          mint: MINT,
+          unit: "sat",
+          keysetId: "00ab",
+          amount: 128,
+          secret: "secret-128",
+          C: "02ab",
+          dleq: null,
+          state: "available",
+          operationId: null,
+        }),
+      ],
+    }),
   );
   return registry;
 };

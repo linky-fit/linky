@@ -78,13 +78,15 @@ The inventory. Spent proofs are never deleted, so the store grows with the walle
 | `findByOperation(operationId)`   | the proofs whose `operationId` is the operation, any state      | a melt's inputs, a reclaimed send, one transfer's proofs                   |
 | `findOldestByKeysets(keysetIds)` | per keyset id, its proof with the lowest `createdAt`, any state | binding a keyset to its mint on every wallet load ([mints.md](./mints.md)) |
 
-`loadUnspent` runs before every operation, so its cost must follow the working set, not the history: filter by state in the store (an index on it) instead of loading every row and filtering in memory. The package holds no cache, so every read must reflect your own earlier `insert`/`update` calls immediately, even when the underlying database commits asynchronously (keep a write overlay if it does). A store small enough to load whole for every read, such as a file, can build the four reads with `proofReadsOf(loadAll)`.
+`loadUnspent` runs before every operation, so its cost must follow the working set, not the history: filter by state in the store (an index on it) instead of loading every row and filtering in memory. A store small enough to load whole for every read, such as a file, can build the four reads with `proofReadsOf(loadAll)`.
+
+Every proof write is one `write({ insert, update })` call: the inserts, then the patches (`{ id, patch }`), in order, so a patch may target a proof inserted earlier in the same batch. The package books everything one step decides in one batch; a send's handed-out proofs, its change and its spent inputs are a single call. A batch must land all-or-nothing: a crash or error leaves either every row of it or none. Make it one transaction of your database, not one per row. `write` returns the inserted proofs, in input order, with their ids and `createdAt`; an update of an unknown id is a no-op. The package holds no cache, so every read must reflect your own earlier writes immediately, even when the underlying database commits asynchronously (keep a write overlay if it does).
 
 Why ids derive from the secret: two devices that both come to hold one proof (a synced balance, a restore on each) must converge on one row, or the balance doubles. `deriveStoreId(secret)` is the package's hash for stores without an id scheme of their own; neither it nor your own scheme may reveal the secret. Inserting a secret that is already stored is an upsert onto that row, keeping its `createdAt`.
 
 The platform never decides states. Do not default, normalize, or "fix" a state on write, and never delete a proof; `spent` is kept on purpose: dedup and the keyset binding read it. Skip a stored row that does not validate as `StoredProof` in every read instead of repairing it. `StoredProof.secret` and `dleq` are spendable material; keep them out of logs.
 
-`applyProofPatch` is exported so an adapter does not reimplement `update`: map it over the row with that id.
+`applyProofWrite(rows, batch, now)` applies a batch to a `Map` of rows by id and returns the inserted proofs, so an adapter that keeps its rows in memory or in one file implements `write` as load, apply, save.
 
 ## `OperationStore`
 

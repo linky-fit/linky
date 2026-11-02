@@ -76,6 +76,15 @@ export class UnknownScope extends Schema.TaggedError<UnknownScope>()(
   { scope: Schema.String },
 ) {}
 
+/** One row of a `write` batch, written as `insert` (no revive) or `update` would. */
+export type RowWrite<C extends Columns> =
+  | { readonly kind: "insert"; readonly row: WriteRow<C> }
+  | {
+      readonly kind: "update";
+      readonly id: C["id"];
+      readonly patch: Patch<C>;
+    };
+
 type TableOf<
   R extends ScopeRegistry,
   Scope extends keyof R,
@@ -192,6 +201,18 @@ export interface ShardStore<
     id: S[T]["id"],
     patch: Patch<S[T]>,
   ) => Effect.Effect<void, ShardDbError | RowNotFound>;
+  /**
+   * `insert` and `update` for many rows of one table in one `mutate`, so
+   * they land together or not at all. Writes apply in order, so an update
+   * may follow the insert of its row; an update of an id with no live copy
+   * is skipped. Like the single writes it does not rotate: run `maybeRotate`
+   * once after it.
+   */
+  readonly write: <Scope extends keyof R & string, T extends TableOf<R, Scope>>(
+    scope: Scope,
+    table: T,
+    writes: ReadonlyArray<RowWrite<S[T]>>,
+  ) => Effect.Effect<void, ShardDbError>;
   /** Tombstones the row where it lives; nothing is copied forward. */
   readonly remove: <
     Scope extends keyof R & string,
@@ -545,6 +566,34 @@ export const createShardStore = <
         : Effect.succeed(newest),
     );
 
+  /** Copy-on-write of `patch` onto `current`, the row's newest live copy. */
+  const patchMutations = (
+    table: string,
+    current: Row<Columns>,
+    active: OwnerId,
+    patch: Readonly<Record<string, unknown>>,
+  ): ReadonlyArray<Mutation> => {
+    const id = current.id;
+    if (current.ownerId === active)
+      return [
+        { kind: "update", table, ownerId: active, row: { ...patch, id } },
+      ];
+    return [
+      {
+        kind: "upsert",
+        table,
+        ownerId: active,
+        row: { ...columnsOf(current), ...patch, id },
+      },
+      {
+        kind: "update",
+        table,
+        ownerId: current.ownerId,
+        row: { id, isDeleted: true },
+      },
+    ];
+  };
+
   const update = <T extends keyof S & string>(
     scope: string,
     table: T,
@@ -556,26 +605,55 @@ export const createShardStore = <
       const current = yield* locateLive(scope, table, id);
       yield* retainBeforeWrite(scope);
       const active = yield* activeOwner(scope);
-      if (current.ownerId === active.id) {
-        yield* db.mutate([
-          { kind: "update", table, ownerId: active.id, row: { ...patch, id } },
-        ]);
-        return;
+      yield* db.mutate(patchMutations(table, current, active.id, patch));
+    });
+
+  const write = <T extends keyof S & string>(
+    scope: string,
+    table: T,
+    writes: ReadonlyArray<RowWrite<Columns>>,
+  ): Effect.Effect<void, ShardDbError> =>
+    Effect.gen(function* () {
+      if (writes.length === 0) return;
+      yield* beforeWrite;
+      const updatedIds = writes.flatMap((entry) =>
+        entry.kind === "update" ? [entry.id] : [],
+      );
+      const newest = new Map<string, Row<Columns>>();
+      if (updatedIds.length > 0)
+        for (const copy of yield* copiesOfIds(scope, table, updatedIds))
+          if (!newest.has(copy.id)) newest.set(copy.id, copy);
+      yield* retainBeforeWrite(scope);
+      const active = (yield* activeOwner(scope)).id;
+      const writtenHere = new Set<string>();
+      const mutations: Mutation[] = [];
+      for (const entry of writes) {
+        if (entry.kind === "insert") {
+          mutations.push({
+            kind: "upsert",
+            table,
+            ownerId: active,
+            row: entry.row,
+          });
+          writtenHere.add(entry.row.id);
+          continue;
+        }
+        const current = newest.get(entry.id);
+        if (writtenHere.has(entry.id)) {
+          mutations.push({
+            kind: "update",
+            table,
+            ownerId: active,
+            row: { ...entry.patch, id: entry.id },
+          });
+        } else if (current !== undefined && isLive(current)) {
+          mutations.push(
+            ...patchMutations(table, current, active, entry.patch),
+          );
+          writtenHere.add(entry.id);
+        }
       }
-      yield* db.mutate([
-        {
-          kind: "upsert",
-          table,
-          ownerId: active.id,
-          row: { ...columnsOf(current), ...patch, id },
-        },
-        {
-          kind: "update",
-          table,
-          ownerId: current.ownerId,
-          row: { id, isDeleted: true },
-        },
-      ]);
+      yield* db.mutate(mutations);
     });
 
   const remove = <T extends keyof S & string>(
@@ -980,6 +1058,7 @@ export const createShardStore = <
         ]);
       }),
     update,
+    write,
     remove,
     ingest,
     foreignRows: (table, ownerId) =>

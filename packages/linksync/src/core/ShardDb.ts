@@ -130,7 +130,10 @@ export interface ShardDb<S extends DbSchema> {
     values: ReadonlyArray<string>,
     ownerIds: ReadonlyArray<OwnerId>,
   ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
-  /** Column-level writes; an `update` of an unknown `(ownerId, id)` creates a row. */
+  /**
+   * Column-level writes, applied all-or-nothing as one transaction; an
+   * `update` of an unknown `(ownerId, id)` creates a row.
+   */
   readonly mutate: (
     mutations: ReadonlyArray<Mutation>,
   ) => Effect.Effect<void, ShardDbError>;

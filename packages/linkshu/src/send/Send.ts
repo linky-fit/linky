@@ -12,7 +12,7 @@ import {
   inspectOperationWith,
   redactReceipt,
 } from "../internal/operations";
-import { insertProofs, toDomainProof, toNewProofs } from "../internal/proofs";
+import { toDomainProof, toNewProofs } from "../internal/proofs";
 import {
   malformedSwapProofs,
   selectSpendableProofs,
@@ -39,11 +39,11 @@ import type { SendDraft, SendError } from "./domain";
 
 /**
  * Sending is one call: select confirmed-unspent `available` proofs, swap the
- * amount out with disjoint send/keep deterministic counter blocks, persist
- * the send proofs as `handedOut` under a `send` transfer in the drafted
- * status and the change as `available`, then mark the consumed inputs
- * `spent`. Funds are never outside the store even when the caller crashes
- * mid-flow.
+ * amount out with disjoint send/keep deterministic counter blocks, store a
+ * `send` transfer in the drafted status, then book in one write the send
+ * proofs `handedOut` under it, the change `available` and the consumed
+ * inputs `spent`. Funds are never outside the store even when the caller
+ * crashes mid-flow.
  */
 export class Send extends Context.Service<Send>()("linkshu/Send", {
   make: Effect.gen(function* () {
@@ -119,9 +119,9 @@ export class Send extends Context.Service<Send>()("linkshu/Send", {
           return yield* malformedSwapProofs(draft.mint);
         }
 
-        // The transfer and its proofs land before the change and the
-        // consumed inputs are booked, so a crash anywhere leaves every sat
-        // accounted for.
+        // The transfer lands before its proofs, and its proofs land in one
+        // write with the change and the consumed inputs, so a crash anywhere
+        // leaves every sat accounted for.
         const transfer = yield* insertOperation(
           { operationStore, inspector },
           new NewOperation({
@@ -153,12 +153,12 @@ export class Send extends Context.Service<Send>()("linkshu/Send", {
           transfer.id,
         );
         if (handedOut === null) return yield* malformedSwapProofs(draft.mint);
-        yield* insertProofs({ proofStore, inspector }, handedOut, "send");
         const outcome = yield* settleSwap(
           spendContext,
           spendable,
           swapped,
           "send-change",
+          [{ proofs: handedOut, reason: "send" }],
         );
         if (outcome === null) return yield* malformedSwapProofs(draft.mint);
         const feePaid = available - sendEncoded.amount - outcome.keepAmount;

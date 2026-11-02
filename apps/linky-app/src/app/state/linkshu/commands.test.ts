@@ -16,19 +16,21 @@ describe("storedSourceMint", () => {
     async (storedMint) => {
       const proofs = makeInMemoryProofStore();
       Effect.runSync(
-        proofs.insert([
-          Schema.decodeUnknownSync(NewProof)({
-            mint: storedMint,
-            unit: "sat",
-            keysetId: "009a1f293253e41e",
-            amount: 64,
-            secret: `secret-${storedMint}`,
-            C: "02" + "ab".repeat(32),
-            dleq: null,
-            state: "available",
-            operationId: null,
-          }),
-        ]),
+        proofs.write({
+          insert: [
+            Schema.decodeUnknownSync(NewProof)({
+              mint: storedMint,
+              unit: "sat",
+              keysetId: "009a1f293253e41e",
+              amount: 64,
+              secret: `secret-${storedMint}`,
+              C: "02" + "ab".repeat(32),
+              dleq: null,
+              state: "available",
+              operationId: null,
+            }),
+          ],
+        }),
       );
       const appSpelling = normalizeMintUrl(storedMint);
       expect(appSpelling).not.toBe(storedMint);

@@ -72,22 +72,16 @@ const statesOf = (proofs: ReadonlyArray<{ readonly state: string }>) =>
 
 describe("wallet repository", () => {
   describe("proof store", () => {
-    it("derives the id from the secret and upserts onto the same row", () => {
-      const { db, appOwner } = linkyStore();
+    it("derives the id from the secret and upserts onto the same row, keeping its createdAt", () => {
+      const { store } = linkyStore();
       tick(1_700_000_000_000);
-      const delayedDb: ShardDb<LinkyDbSchema> = {
-        ...db,
-        mutate: (mutations) =>
-          Effect.sync(() => tick(1_000)).pipe(
-            Effect.flatMap(() => db.mutate(mutations)),
-          ),
-      };
-      const store = createLinkyStore(delayedDb, appOwner);
       const { proofs } = makeWalletRepository(store);
-      const [first] = run(proofs.insert([proof("s1")]));
-      const [again] = run(proofs.insert([proof("s1", "spent")]));
+      const [first] = run(proofs.write({ insert: [proof("s1")] }));
+      tick(5_000);
+      const [again] = run(proofs.write({ insert: [proof("s1", "spent")] }));
       expect(first?.id).toBe(cashuProofIdFor("s1"));
       expect(again?.id).toBe(first?.id);
+      expect(first?.createdAt).toBe(1_700_000_000);
       expect(again?.createdAt).toBe(first?.createdAt);
       expect(statesOf(run(proofs.findBySecrets(["s1"])))).toEqual(["spent"]);
       expect(run(proofs.loadUnspent)).toEqual([]);
@@ -96,12 +90,21 @@ describe("wallet repository", () => {
     it("applies patches and ignores unknown ids", () => {
       const { store } = linkyStore();
       const { proofs } = makeWalletRepository(store);
-      const [stored] = runNow(proofs.insert([proof("s1")]));
+      const [stored] = runNow(proofs.write({ insert: [proof("s1")] }));
       if (stored === undefined) throw new Error("no proof stored");
-      runNow(proofs.update(stored.id, { state: "held" }));
       runNow(
-        proofs.update(ProofId.make(cashuProofIdFor("missing")), {
-          state: "spent",
+        proofs.write({ update: [{ id: stored.id, patch: { state: "held" } }] }),
+      );
+      runNow(
+        proofs.write({
+          update: [
+            {
+              id: ProofId.make(cashuProofIdFor("missing")),
+              patch: {
+                state: "spent",
+              },
+            },
+          ],
         }),
       );
       expect(statesOf(runNow(proofs.loadUnspent))).toEqual(["held"]);
@@ -110,10 +113,14 @@ describe("wallet repository", () => {
     it("updates a proof born in an old shard on the active shard, not in place", () => {
       const { db, store } = linkyStore();
       const { proofs } = makeWalletRepository(store);
-      const [stored] = runNow(proofs.insert([proof("s1")]));
+      const [stored] = runNow(proofs.write({ insert: [proof("s1")] }));
       if (stored === undefined) throw new Error("no proof stored");
       runNow(store.rotate("cashu"));
-      runNow(proofs.update(stored.id, { state: "spent" }));
+      runNow(
+        proofs.write({
+          update: [{ id: stored.id, patch: { state: "spent" } }],
+        }),
+      );
       const rows = runNow(db.readTable("cashuProof"));
       const old = rows.find(
         (r) => r.ownerId === store.shardOwner("cashu", 0).id,
@@ -134,9 +141,13 @@ describe("wallet repository", () => {
     it("reads a proof as spent when an older shard's copy says so", () => {
       const { db, store } = linkyStore();
       const { proofs } = makeWalletRepository(store);
-      const [stored] = runNow(proofs.insert([proof("s1")]));
+      const [stored] = runNow(proofs.write({ insert: [proof("s1")] }));
       if (stored === undefined) throw new Error("no proof stored");
-      runNow(proofs.update(stored.id, { state: "spent" }));
+      runNow(
+        proofs.write({
+          update: [{ id: stored.id, patch: { state: "spent" } }],
+        }),
+      );
       runNow(store.rotate("cashu"));
       // Another device that had not seen the rotation wrote the same
       // proof into the new shard before learning it was spent.
@@ -157,10 +168,12 @@ describe("wallet repository", () => {
     it("reads a proof as spent when the copy a copy-forward tombstoned was spent meanwhile", () => {
       const { db, store } = linkyStore();
       const { proofs } = makeWalletRepository(store);
-      const [stored] = runNow(proofs.insert([proof("s1")]));
+      const [stored] = runNow(proofs.write({ insert: [proof("s1")] }));
       if (stored === undefined) throw new Error("no proof stored");
       runNow(store.rotate("cashu"));
-      runNow(proofs.update(stored.id, { state: "held" }));
+      runNow(
+        proofs.write({ update: [{ id: stored.id, patch: { state: "held" } }] }),
+      );
       // The other device spent it in shard 0 while this one held it in shard 1.
       runNow(
         db.mutate([
@@ -174,7 +187,11 @@ describe("wallet repository", () => {
       );
       expect(statesOf(runNow(proofs.findBySecrets(["s1"])))).toEqual(["spent"]);
       expect(runNow(proofs.loadUnspent)).toEqual([]);
-      runNow(proofs.update(stored.id, { state: "spent" }));
+      runNow(
+        proofs.write({
+          update: [{ id: stored.id, patch: { state: "spent" } }],
+        }),
+      );
       expect(
         runNow(db.readTable("cashuProof")).map((row) => row.state),
       ).toEqual(["spent", "spent"]);
@@ -184,13 +201,17 @@ describe("wallet repository", () => {
       const { store } = linkyStore();
       const { proofs } = makeWalletRepository(store);
       const [held, spent] = runNow(
-        proofs.insert([proof("held"), proof("spent")]),
+        proofs.write({ insert: [proof("held"), proof("spent")] }),
       );
       if (held === undefined || spent === undefined)
         throw new Error("no proof stored");
       runNow(store.rotate("cashu"));
-      runNow(proofs.update(held.id, { state: "held" }));
-      runNow(proofs.update(spent.id, { state: "spent" }));
+      runNow(
+        proofs.write({ update: [{ id: held.id, patch: { state: "held" } }] }),
+      );
+      runNow(
+        proofs.write({ update: [{ id: spent.id, patch: { state: "spent" } }] }),
+      );
       expect(
         runNow(proofs.loadUnspent).map((p) => [p.secret, p.state]),
       ).toEqual([["held", "held"]]);
@@ -200,11 +221,15 @@ describe("wallet repository", () => {
       const { store } = linkyStore();
       const wallet = makeWalletRepository(store);
       const [, spent] = runNow(
-        wallet.proofs.insert([proof("kept"), proof("spent")]),
+        wallet.proofs.write({ insert: [proof("kept"), proof("spent")] }),
       );
       if (spent === undefined) throw new Error("no proof stored");
       runNow(store.rotate("cashu"));
-      runNow(wallet.proofs.update(spent.id, { state: "spent" }));
+      runNow(
+        wallet.proofs.write({
+          update: [{ id: spent.id, patch: { state: "spent" } }],
+        }),
+      );
       expect(
         runNow(wallet.allProofs)
           .map((p) => [p.secret, p.state])
@@ -223,17 +248,21 @@ describe("wallet repository", () => {
       const linked = (secret: string, state: NewProof["state"], id: string) =>
         proof(secret, state, { operationId: id });
       runNow(
-        proofs.insert([
-          linked("claimed", "spent", send.id),
-          linked("out", "handedOut", send.id),
-          linked("elsewhere", "handedOut", other.id),
-          proof("free"),
-        ]),
+        proofs.write({
+          insert: [
+            linked("claimed", "spent", send.id),
+            linked("out", "handedOut", send.id),
+            linked("elsewhere", "handedOut", other.id),
+            proof("free"),
+          ],
+        }),
       );
       runNow(store.rotate("cashu"));
       const [out] = runNow(proofs.findBySecrets(["out"]));
       if (out === undefined) throw new Error("no proof stored");
-      runNow(proofs.update(out.id, { state: "spent" }));
+      runNow(
+        proofs.write({ update: [{ id: out.id, patch: { state: "spent" } }] }),
+      );
       expect(
         runNow(proofs.findByOperation(send.id))
           .map((p) => [p.secret, p.state])
@@ -260,19 +289,25 @@ describe("wallet repository", () => {
       const store = createLinkyStore(ticking, appOwner);
       const { proofs } = makeWalletRepository(store);
       const [first] = run(
-        proofs.insert([proof("first", "available", { keysetId: "00aa" })]),
+        proofs.write({
+          insert: [proof("first", "available", { keysetId: "00aa" })],
+        }),
       );
       if (first === undefined) throw new Error("no proof stored");
-      run(proofs.update(first.id, { state: "spent" }));
+      run(
+        proofs.write({ update: [{ id: first.id, patch: { state: "spent" } }] }),
+      );
       run(store.rotate("cashu"));
       run(
-        proofs.insert([
-          proof("later", "available", {
-            keysetId: "00aa",
-            mint: "https://other.example",
-          }),
-          proof("unasked", "available", { keysetId: "00cc" }),
-        ]),
+        proofs.write({
+          insert: [
+            proof("later", "available", {
+              keysetId: "00aa",
+              mint: "https://other.example",
+            }),
+            proof("unasked", "available", { keysetId: "00cc" }),
+          ],
+        }),
       );
       expect(
         run(
@@ -326,16 +361,72 @@ describe("wallet repository", () => {
       const store = createLinkyStore(counting, testAppOwner());
       const { proofs } = makeWalletRepository(store);
       const batch = Array.from({ length: 20 }, (_, i) => proof(`s${i}`));
-      runNow(proofs.insert(batch));
+      runNow(proofs.write({ insert: batch }));
       expect(usageReads).toBe(1);
       for (let i = 1; i < 10; i += 1)
         runNow(
-          proofs.insert(
-            batch.map((p) => ({ ...p, secret: `${i}-${p.secret}` })),
-          ),
+          proofs.write({
+            insert: batch.map((p) => ({ ...p, secret: `${i}-${p.secret}` })),
+          }),
         );
       expect(runNow(store.activeIndex("cashu"))).toBe(1);
       expect(runNow(proofs.loadUnspent)).toHaveLength(200);
+    });
+
+    it("writes a settlement in one mutation, copying old proofs forward", () => {
+      const { db, appOwner } = linkyStore();
+      const store = createLinkyStore(db, appOwner);
+      const { proofs } = makeWalletRepository(store);
+      const [old, active] = runNow(
+        proofs.write({ insert: [proof("old"), proof("kept")] }),
+      );
+      if (old === undefined || active === undefined)
+        throw new Error("no proof stored");
+      runNow(store.rotate("cashu"));
+      const [current] = runNow(proofs.write({ insert: [proof("current")] }));
+      if (current === undefined) throw new Error("no proof stored");
+      let mutates = 0;
+      const counting = makeWalletRepository(
+        createLinkyStore(
+          {
+            ...db,
+            mutate: (mutations) => {
+              mutates += 1;
+              return db.mutate(mutations);
+            },
+          },
+          appOwner,
+        ),
+      );
+
+      const stored = runNow(
+        counting.proofs.write({
+          insert: [proof("out", "handedOut"), proof("change")],
+          update: [
+            { id: old.id, patch: { state: "spent" } },
+            { id: current.id, patch: { state: "spent" } },
+          ],
+        }),
+      );
+
+      expect(mutates).toBe(1);
+      expect(stored.map((p) => p.secret)).toEqual(["out", "change"]);
+      expect(
+        runNow(proofs.loadUnspent)
+          .map((p) => [p.secret, p.state])
+          .sort(),
+      ).toEqual([
+        ["change", "available"],
+        ["kept", "available"],
+        ["out", "handedOut"],
+      ]);
+      const oldCopies = runNow(db.readTable("cashuProof")).filter(
+        (row) => row.secret === "old",
+      );
+      expect(oldCopies.map((row) => [row.state, row.isDeleted])).toEqual([
+        ["available", 1],
+        ["spent", null],
+      ]);
     });
 
     it("skips rows that do not validate", () => {

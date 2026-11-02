@@ -6,8 +6,9 @@ How the store talks to storage, what a new runtime must implement, and how a Lin
 
 `ShardDb` mirrors what Evolu offers and nothing more: rows partitioned by owner, column-level writes keyed by `(ownerId, id)`, owners opted into sync, which of them finished a sync round, and per-owner history usage. The port decides nothing; every shard rule lives in the store. Rows come back as `Row<Columns>`: the table's columns, every non-id one nullable, plus Evolu's system columns.
 
-Two contracts the type cannot express:
+Contracts the type cannot express:
 
+- One `mutate` is one transaction: its mutations land together or none does. A copy-forward (copy plus tombstone) and the wallet's proof batches rely on it.
 - Read-after-write. The store chains a write and a read inside one operation (copy-on-write reads the current row, the wallet reads the inventory it just changed) and holds no cache, so every read (`readTable`, `readCopies` by ids, `readCopiesWhere`, `readOldest`) must return what `mutate` was given even when the database commits later. Columns never written read as `null`, including in the Evolu adapter's local write overlay.
 - `deleteOwner` is `null` when the runtime cannot delete an owner; `forget` then only unsubscribes and hides the rows (`deleted: false`).
 - `isOwnerSynced(ownerId)` turns true once the owner finished a sync round with a relay since the database opened, and only when `readTable` already returns what that round brought; `subscribeOwnerSync` fires when more owners finish. The store's [hydration](./core.md#hydration) rests on it.
@@ -41,7 +42,7 @@ const contacts = makeContactsRepository(store);
 
 ## Evolu 7
 
-`createEvoluShardDb(evolu, ownerSync)` from `@linky-fit/linksync/evolu` takes an `EvoluRuntime`: structurally, an Evolu instance whose schema contains `LinkySchema` (a superset is fine). Each row is validated before it is queued, so one rejected row fails as `ShardDbError` instead of failing Evolu's whole mutation batch. A `mutate` resolves once Evolu's worker has applied the batch. Evolu never completes a batch it dropped, so one not applied within ten seconds fails as `ShardDbError` and stops being served from the adapter's read overlay; writing it again may succeed. Pass `onWriteUnconfirmed` in the third argument to hear about each such write. `ownerUsage` is measured over `evolu_history`. `deleteOwner` is `null`: a forgotten shard keeps its local bytes and relay history until Evolu can delete an owner.
+`createEvoluShardDb(evolu, ownerSync)` from `@linky-fit/linksync/evolu` takes an `EvoluRuntime`: structurally, an Evolu instance whose schema contains `LinkySchema` (a superset is fine). Every row of a `mutate` is validated before any is queued, so one rejected row fails the call as `ShardDbError` with nothing written, instead of failing Evolu's whole mutation batch; the rows are then queued in one synchronous pass, which Evolu runs as one transaction. A `mutate` resolves once Evolu's worker has applied the batch. Evolu never completes a batch it dropped, so one not applied within ten seconds fails as `ShardDbError` and stops being served from the adapter's read overlay; writing it again may succeed. Pass `onWriteUnconfirmed` in the third argument to hear about each such write. `ownerUsage` is measured over `evolu_history`. `deleteOwner` is `null`: a forgotten shard keeps its local bytes and relay history until Evolu can delete an owner.
 
 Evolu 7 syncs in its database worker and tells the page nothing about it, so `ownerSync` needs the worker to come from this package. Run it in the worker module through `@linky-fit/linksync/evolu/worker`, which keeps the store out of the worker bundle, and hand Evolu the page side:
 

@@ -1,6 +1,6 @@
 import {
   applyOperationPatch,
-  applyProofPatch,
+  applyProofWrite,
   Bip39Seed,
   deriveStoreId,
   KeyValueStore,
@@ -8,7 +8,6 @@ import {
   OperationId,
   operationKeyOf,
   OperationStore,
-  ProofId,
   ProofStore,
   proofReadsOf,
   StoredOperation,
@@ -72,30 +71,13 @@ export const walletStorage = (prefix: string) => {
     bip39Seed: Bip39Seed.make(Uint8Array.from(seed)),
     proofStore: Layer.succeed(ProofStore, {
       ...proofReadsOf(Effect.sync(loadProofs)),
-      insert: (proofs) =>
+      write: (batch) =>
         Effect.sync(() => {
           const byId = new Map(loadProofs().map((row) => [row.id, row]));
-          const stored = proofs.map((proof) => {
-            const id = ProofId.make(deriveStoreId(proof.secret));
-            const row = new StoredProof({
-              ...proof,
-              id,
-              createdAt: byId.get(id)?.createdAt ?? nowSeconds(),
-            });
-            byId.set(id, row);
-            return row;
-          });
+          const stored = applyProofWrite(byId, batch, nowSeconds());
           saveProofs([...byId.values()]);
           return stored;
         }),
-      update: (id, patch) =>
-        Effect.sync(() =>
-          saveProofs(
-            loadProofs().map((row) =>
-              row.id === id ? applyProofPatch(row, patch) : row,
-            ),
-          ),
-        ),
     }),
     operationStore: Layer.succeed(OperationStore, {
       loadAll: Effect.sync(loadOperations),

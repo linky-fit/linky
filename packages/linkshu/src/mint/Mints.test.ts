@@ -53,8 +53,7 @@ const stubProofStore = (
   proofs: ReadonlyArray<StoredProof>,
 ): Layer.Layer<ProofStore> =>
   Layer.succeed(ProofStore, {
-    insert: () => Effect.die("not under test"),
-    update: () => Effect.die("not under test"),
+    write: () => Effect.die("not under test"),
     ...proofReadsOf(Effect.succeed(proofs)),
   });
 

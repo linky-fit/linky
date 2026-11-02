@@ -15,7 +15,9 @@ import type { OwnerSync } from "./ownerSync";
  * answers queries with the rows a test seeds. Enough to check what the
  * adapter hands Evolu, which the in-memory port cannot.
  */
-const fakeEvolu = () => {
+const fakeEvolu = (
+  rejects: (row: Record<string, unknown>) => boolean = () => false,
+) => {
   const mutations: Array<{
     kind: string;
     table: string;
@@ -42,7 +44,7 @@ const fakeEvolu = () => {
         if (heldCompletions === null) queueMicrotask(complete);
         else heldCompletions.push(complete);
       }
-      return { ok: true };
+      return rejects(row) ? { ok: false, error: "invalid" } : { ok: true };
     };
   const evolu = {
     useOwner: () => () => {},
@@ -156,10 +158,44 @@ describe("evolu shard db", () => {
     ]);
     expect(fake.mutations.map((m) => m.options.onlyValidate)).toEqual([
       true,
-      undefined,
       true,
       undefined,
+      undefined,
     ]);
+  });
+
+  it("queues a whole batch at once, and none of it when Evolu would reject one row", async () => {
+    const fake = fakeEvolu((row) => row.id === "bad");
+    const db = createEvoluShardDb(fake.runtime, reportedOwnerSync().ownerSync);
+    const owner = testAppOwner();
+    const queued = () =>
+      fake.mutations
+        .filter(({ options }) => options.onlyValidate !== true)
+        .map(({ row }) => row.id);
+    const proofRow = (id: string) => ({
+      kind: "upsert" as const,
+      table: "cashuProof",
+      ownerId: owner.id,
+      row: { id, state: "spent" },
+    });
+
+    const write = Effect.runPromise(
+      db.mutate([proofRow("p1"), proofRow("p2"), proofRow("p3")]),
+    );
+    // Evolu makes one transaction of what is queued before its microtask runs.
+    expect(queued()).toEqual(["p1", "p2", "p3"]);
+    await write;
+
+    const rejected = await Effect.runPromise(
+      Effect.flip(db.mutate([proofRow("p4"), proofRow("bad")])),
+    );
+    expect(rejected).toMatchObject({ _tag: "ShardDbError" });
+    expect(queued()).toEqual(["p1", "p2", "p3"]);
+    expect(
+      (await Effect.runPromise(db.readTable("cashuProof"))).map(
+        (row) => row.id,
+      ),
+    ).not.toContain("p4");
   });
 
   it("resolves a write only once Evolu has applied it", async () => {

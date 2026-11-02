@@ -2,12 +2,9 @@ import { Clock, Effect, Layer } from "effect";
 import { ProofId, UnixSeconds } from "../domain/primitives";
 import { deriveStoreId } from "./ids";
 import { ProofStore, StoredProof } from "./ProofStore";
-import type { ProofPatch, ProofStoreService } from "./ProofStore";
+import type { ProofPatch, ProofStoreService, ProofWrite } from "./ProofStore";
 
-export const applyProofPatch = (
-  proof: StoredProof,
-  patch: ProofPatch,
-): StoredProof =>
+const applyProofPatch = (proof: StoredProof, patch: ProofPatch): StoredProof =>
   new StoredProof({
     ...proof,
     ...(patch.state !== undefined ? { state: patch.state } : {}),
@@ -15,6 +12,33 @@ export const applyProofPatch = (
       ? { operationId: patch.operationId }
       : {}),
   });
+
+/**
+ * Applies a `ProofStore.write` batch to rows keyed by id and returns the
+ * inserted proofs, so an adapter that holds its rows in memory or in one
+ * file implements `write` as load, apply, save.
+ */
+export const applyProofWrite = (
+  rows: Map<ProofId, StoredProof>,
+  batch: ProofWrite,
+  now: UnixSeconds,
+): ReadonlyArray<StoredProof> => {
+  const stored = (batch.insert ?? []).map((proof) => {
+    const id = ProofId.make(deriveStoreId(proof.secret));
+    const row = new StoredProof({
+      ...proof,
+      id,
+      createdAt: rows.get(id)?.createdAt ?? now,
+    });
+    rows.set(id, row);
+    return row;
+  });
+  for (const { id, patch } of batch.update ?? []) {
+    const current = rows.get(id);
+    if (current !== undefined) rows.set(id, applyProofPatch(current, patch));
+  }
+  return stored;
+};
 
 type ProofReads = Pick<
   ProofStoreService,
@@ -66,27 +90,14 @@ export const makeInMemoryProofStore = (): InMemoryProofStore => {
   const proofs = new Map<ProofId, StoredProof>();
   const all = Effect.sync(() => [...proofs.values()]);
   return {
-    insert: (rows) =>
+    write: (batch) =>
       Effect.map(Clock.currentTimeMillis, (millis) =>
-        rows.map((row) => {
-          const id = ProofId.make(deriveStoreId(row.secret));
-          const stored = new StoredProof({
-            ...row,
-            id,
-            createdAt:
-              proofs.get(id)?.createdAt ??
-              UnixSeconds.make(Math.floor(millis / 1000)),
-          });
-          proofs.set(id, stored);
-          return stored;
-        }),
+        applyProofWrite(
+          proofs,
+          batch,
+          UnixSeconds.make(Math.floor(millis / 1000)),
+        ),
       ),
-    update: (id, patch) =>
-      Effect.sync(() => {
-        const current = proofs.get(id);
-        if (current !== undefined)
-          proofs.set(id, applyProofPatch(current, patch));
-      }),
     ...proofReadsOf(all),
     all,
   };

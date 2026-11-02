@@ -21,11 +21,14 @@ import { WalletInstances } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import { inMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
 import { inMemoryOperationStore } from "../ports/inMemoryOperationStore";
-import { inMemoryProofStore } from "../ports/inMemoryProofStore";
+import {
+  inMemoryProofStore,
+  makeInMemoryProofStore,
+} from "../ports/inMemoryProofStore";
 import { KeyValueStore } from "../ports/KeyValueStore";
 import { OperationStore } from "../ports/OperationStore";
 import { ProofStore } from "../ports/ProofStore";
-import type { StoredProof } from "../ports/ProofStore";
+import type { ProofWrite, StoredProof } from "../ports/ProofStore";
 import {
   answerProofStates,
   fakeKeyChain,
@@ -143,7 +146,10 @@ const makeWallet = (args: FakeWalletArgs) => {
   return { wallet, sendCalls, restoreCalls };
 };
 
-const makeHarness = (wallet: LoadedWallet) => {
+const makeHarness = (
+  wallet: LoadedWallet,
+  proofStore: Layer.Layer<ProofStore> = inMemoryProofStore,
+) => {
   const inspector = recordingInspector();
   const layer = Send.layerWithoutDependencies.pipe(
     Layer.provideMerge(
@@ -156,7 +162,7 @@ const makeHarness = (wallet: LoadedWallet) => {
           }),
         ),
         inMemoryKeyValueStore,
-        inMemoryProofStore,
+        proofStore,
         inMemoryOperationStore,
         inspector.layer,
       ),
@@ -318,6 +324,36 @@ describe("Send.send", () => {
     expect(serialized).not.toContain("cashu");
     expect(serialized).not.toContain("s1");
     expect(serialized).not.toContain("src-a1");
+  });
+
+  it("books the sent proofs, the change and the spent inputs in one proof write", async () => {
+    const { wallet } = makeWallet({
+      send: () =>
+        Promise.resolve({
+          keep: [proof(4, "src-a1"), proof(4, "k1")],
+          send: [proof(4, "s1"), proof(1, "s2")],
+        }),
+    });
+    const store = makeInMemoryProofStore();
+    const writes: ProofWrite[] = [];
+    const { run } = makeHarness(
+      wallet,
+      Layer.succeed(ProofStore, {
+        ...store,
+        write: (batch) => {
+          writes.push(batch);
+          return store.write(batch);
+        },
+      }),
+    );
+
+    const exit = await run(sendAndInspect(draft(5)));
+
+    assert(Exit.isSuccess(exit));
+    // The first write is the seed.
+    expect(writes).toHaveLength(2);
+    expect(secretsOf(writes[1]?.insert ?? [])).toEqual(["k1", "s1", "s2"]);
+    expect(writes[1]?.update).toHaveLength(2);
   });
 
   it("leaves a NUT-07 pending proof available but does not offer it", async () => {
