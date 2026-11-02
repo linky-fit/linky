@@ -122,8 +122,16 @@ interface UntypedWhere {
     op: "=" | "in" | "is not",
     value: string | number | null | ReadonlyArray<string> | UntypedWhere,
   ) => UntypedWhere;
-  orderBy: (column: string) => UntypedWhere;
+  orderBy: (
+    by: string | ((eb: UntypedOrderExpressions) => object),
+  ) => UntypedWhere;
   limit: (count: number) => UntypedWhere;
+}
+
+interface UntypedOrderExpressions {
+  fn: (name: string, args: ReadonlyArray<object>) => object;
+  ref: (column: string) => object;
+  lit: (value: number) => object;
 }
 
 interface UntypedSelect {
@@ -404,7 +412,9 @@ export const createEvoluShardDb = (
             .where(column, "=", value)
             .where("ownerId", "in", ownerIds)
             .where("createdAt", "is not", null)
-            .orderBy("createdAt")
+            .orderBy((eb) =>
+              eb.fn("substr", [eb.ref("createdAt"), eb.lit(1), eb.lit(19)]),
+            )
             .orderBy(thenBy)
             .limit(1),
         ),

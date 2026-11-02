@@ -89,6 +89,10 @@ export const copiesMatching = <R extends Row<Columns>>(
 const sortKey = (value: unknown): string =>
   value === null || value === undefined ? "" : String(value);
 
+/** `YYYY-MM-DDTHH:MM:SS`: rows created within one second tie and fall to `thenBy`. */
+export const createdSecond = (row: Pick<SystemColumns, "createdAt">): string =>
+  row.createdAt.slice(0, 19);
+
 /** `readOldest` over rows already read and filtered by owner. */
 export const oldestPerValue = <R extends SystemColumns>(
   rows: ReadonlyArray<R>,
@@ -99,8 +103,8 @@ export const oldestPerValue = <R extends SystemColumns>(
   const wanted = new Set<unknown>(values);
   const oldest = new Map<unknown, R>();
   const isOlder = (row: R, than: R): boolean =>
-    row.createdAt < than.createdAt ||
-    (row.createdAt === than.createdAt &&
+    createdSecond(row) < createdSecond(than) ||
+    (createdSecond(row) === createdSecond(than) &&
       sortKey(row[thenBy]) < sortKey(than[thenBy]));
   for (const row of rows) {
     const current = oldest.get(row[column]);
@@ -142,8 +146,8 @@ export interface ShardDb<S extends DbSchema> {
   ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
   /**
    * For each of `values`, the earliest created row among `ownerIds` whose
-   * `column` holds it, tombstones included, ties going to the lowest
-   * `thenBy`; a value no row holds is absent.
+   * `column` holds it, tombstones included, compared by whole seconds with
+   * ties going to the lowest `thenBy`; a value no row holds is absent.
    */
   readonly readOldest: <T extends keyof S & string>(
     table: T,
