@@ -6,6 +6,7 @@ import { useRouting } from "../../../hooks/useRouting";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import {
   buildTopbar,
+  buildTopbarLeading,
   buildTopbarRight,
   buildTopbarTitle,
 } from "../../lib/topbarConfig";
@@ -39,7 +40,7 @@ const parseContactId = (value: unknown): ContactId | null => {
   return result.ok ? result.value : null;
 };
 
-/** The top bar's back button, trailing action, title and chat peer for the route. */
+/** The top bar's back button, root-screen actions, title and chat peer for the route. */
 export const useTopbar = () => {
   const route = useRouting();
   const { t } = useTranslation();
@@ -48,7 +49,7 @@ export const useTopbar = () => {
   const deleteContact = useDeleteContact();
   const contactPayBackToChatId = useNavIntent("contactPayBackToChat");
   const { navigateToMainReturn, openMenu } = useMainMenu();
-  const { openReceiveScan } = useScanCommands();
+  const { openReceiveScan, openScan, openWalletScan } = useScanCommands();
   const toggleContactsFilter = useToggleContactsFilter();
   const selectedChatContact = useChatContact(route);
   const selectedContact = useRouteContact(route);
@@ -78,23 +79,31 @@ export const useTopbar = () => {
     t,
   });
 
+  const topbarLeading = buildTopbarLeading({
+    contactsFilterIsActive:
+      contactsSearch.trim() !== "" || activeGroup !== null,
+    isProfileEditing,
+    pendingOnchainTransfers,
+    route,
+    t,
+    toggleContactsFilter,
+  });
+
   const topbarRight = buildTopbarRight({
     chatEditContactId:
       route.kind === "chat" && !selectedChatContact?.isUnknownContact
         ? parseContactId(selectedContact?.id)
         : null,
-    contactsFilterIsActive:
-      contactsSearch.trim() !== "" || activeGroup !== null,
     deleteEditedContact: () => {
       if (route.kind === "contactEdit") void deleteContact(route.id);
     },
     hiddenTransactionsShown,
     isProfileEditing,
+    openContactScan: openScan,
     openReceiveScan,
-    pendingOnchainTransfers,
+    openWalletScan,
     route,
     t,
-    toggleContactsFilter,
     toggleHiddenTransactions: () =>
       setHiddenTransactionsShown((shown) => !shown),
     openMenu,
@@ -115,6 +124,7 @@ export const useTopbar = () => {
   return {
     chatTopbarContact,
     topbar,
+    topbarLeading,
     topbarRight,
     topbarTitle: React.useMemo(
       () => buildTopbarTitle(route, t, onchainTransferDirection),
