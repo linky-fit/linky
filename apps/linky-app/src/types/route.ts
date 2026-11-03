@@ -2,6 +2,7 @@ import {
   CashuOperationId,
   ContactId,
   KeryxSubscriptionId,
+  ListingId,
   OnchainTransferId,
   RecurringPaymentId,
 } from "@linky-fit/linksync";
@@ -45,7 +46,12 @@ export type Route =
   | { kind: "keryxCompanyNew" }
   | { kind: "keryxCompany"; id: KeryxSubscriptionId }
   | { kind: "keryxAnnouncement"; id: KeryxSubscriptionId; key: string }
+  | { kind: "collaboration" }
   | { kind: "proxyPayments" }
+  | { kind: "cash" }
+  | { kind: "listings" }
+  | { kind: "listingNew" }
+  | { kind: "listingEdit"; id: ListingId }
   | { kind: "advanced" }
   | { kind: "advancedAutoPayLimit" }
   | { kind: "advancedInspector" }
@@ -137,6 +143,14 @@ export const parseRouteFromHash = (): Route => {
   if (hash === "#proxy" || hash === "#settings/proxy-payments") {
     return { kind: "proxyPayments" };
   }
+  if (hash === "#collaboration") return { kind: "collaboration" };
+  if (hash === "#collaboration/cash") return { kind: "cash" };
+  if (hash === "#collaboration/listings") return { kind: "listings" };
+  if (hash === "#collaboration/listings/new") return { kind: "listingNew" };
+  const listingId = ListingId.fromUnknown(
+    decodeHashSegment(hash, "#collaboration/listings/"),
+  );
+  if (listingId.ok) return { kind: "listingEdit", id: listingId.value };
   if (hash === "#advanced") return { kind: "advanced" };
   if (hash === "#advanced/auto-pay-limit") {
     return { kind: "advancedAutoPayLimit" };

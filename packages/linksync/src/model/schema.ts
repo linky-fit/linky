@@ -15,6 +15,7 @@ import {
   ContactId,
   ConversationId,
   KeryxSubscriptionId,
+  ListingId,
   MessageId,
   NostrIdentityId,
   ReactionId,
@@ -107,6 +108,23 @@ export const LinkySchema = {
     groupName: nullOr(NonEmptyString1000),
     groupNamesJson: nullOr(NonEmptyString1000),
     archivedAtSec: nullOr(PositiveInt),
+  },
+  /**
+   * Contacts scope: one thing the user offers to, or wants from, the
+   * contacts who saved them back; what the app publishes as listings.
+   */
+  listing: {
+    id: ListingId,
+    createdAtSec: PositiveInt,
+    // "offer" | "want"
+    side: NonEmptyString100,
+    title: NonEmptyString1000,
+    // Decimal text as typed, up to two fraction digits, in `currency`.
+    amount: NonEmptyString100,
+    // ISO 4217 code, or "SAT" for whole sats.
+    currency: NonEmptyString100,
+    // What the amount buys, in the user's words ("za hodinu").
+    unit: NonEmptyString100,
   },
   /**
    * Contacts scope: the user's instruction to pay a contact on a schedule.
@@ -339,6 +357,7 @@ export type CashuProofRow = Row<LinkyDbSchema["cashuProof"]>;
 export type CashuOperationRow = Row<LinkyDbSchema["cashuOperation"]>;
 export type TransactionRow = Row<LinkyDbSchema["transaction"]>;
 export type RecurringPaymentRow = Row<LinkyDbSchema["recurringPayment"]>;
+export type ListingRow = Row<LinkyDbSchema["listing"]>;
 export type KeryxSubscriptionRow = Row<LinkyDbSchema["keryxSubscription"]>;
 export type OnchainTransferRow = Row<LinkyDbSchema["onchainTransfer"]>;
 export type OnchainTransferMessageRow = Row<
@@ -364,6 +383,7 @@ export const linkyTableColumns: TableColumns<LinkyDbSchema> = {
   cashuOperation: columnNames(LinkySchema.cashuOperation),
   transaction: columnNames(LinkySchema.transaction),
   recurringPayment: columnNames(LinkySchema.recurringPayment),
+  listing: columnNames(LinkySchema.listing),
   keryxSubscription: columnNames(LinkySchema.keryxSubscription),
   onchainTransfer: columnNames(LinkySchema.onchainTransfer),
   onchainTransferMessage: columnNames(LinkySchema.onchainTransferMessage),

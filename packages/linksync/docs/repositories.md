@@ -96,6 +96,12 @@ Insert `mintUrl`, `rail` and the initial `progress` with every new payment. `min
 
 `unit`, `intervalUnit`, `rail`, `progress` and `lastRunStatus` stay strings here; their values, the schedule math and the run keys belong to `@linky-fit/recurring-payment`, whose `readRecurringPaymentOrder` validates a record into an order.
 
+## Listings
+
+`makeListingsRepository(store)` over `listing` in the `contacts` scope, which is never forgotten: one row per thing the user offers to, or wants from, their contacts. `all` returns `ListingRecord`s, whose creation time, kind, side, title, amount, currency and unit are present; a row still arriving column by column is skipped (`normalizeListing`).
+
+Adding a listing is `insert` with every column; editing is `update`; withdrawing it is `remove`. `side`, `unit`, `amount` and `currency` stay strings here and are validated into `@linky-fit/linkstr`'s `Listing` by the consumer that publishes them; the row id is the listing's stable id on the wire. The cash intent is the `cashIntent` setting, not a row.
+
 ## Keryx subscriptions
 
 `makeKeryxSubscriptionsRepository(store)` over `keryxSubscription` in the `keryx` scope, which is never forgotten: one row per company the user paired with, keyed by `keryxSubscriptionIdFor(origin)`, so pairing the same join origin on two devices lands on one row. Pass the join origin as the Keryx protocol canonicalizes it; another spelling derives another id. Announcements are not stored here; each device fetches and caches them itself. `all` returns `KeryxSubscriptionRecord`s, whose origin, trust, identity, channels and pairing time are present; a row still arriving column by column is skipped.

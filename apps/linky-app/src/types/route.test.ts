@@ -140,6 +140,18 @@ describe("parseRouteFromHash", () => {
 
     replaceHash("#settings/proxy-payments");
     expect(parseRouteFromHash()).toEqual({ kind: "proxyPayments" });
+
+    replaceHash("#collaboration");
+    expect(parseRouteFromHash()).toEqual({ kind: "collaboration" });
+
+    replaceHash("#collaboration/cash");
+    expect(parseRouteFromHash()).toEqual({ kind: "cash" });
+
+    replaceHash("#collaboration/listings");
+    expect(parseRouteFromHash()).toEqual({ kind: "listings" });
+
+    replaceHash("#collaboration/listings/new");
+    expect(parseRouteFromHash()).toEqual({ kind: "listingNew" });
   });
 
   it("parses the manual bank payment entry before the payload routes", () => {

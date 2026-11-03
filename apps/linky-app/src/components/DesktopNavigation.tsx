@@ -46,10 +46,10 @@ export function DesktopNavigation(): React.ReactElement {
           testID: "open-wallet",
         },
         {
-          value: "proxy",
-          label: t("proxyPayments"),
-          icon: "HandCoins",
-          testID: "open-proxy",
+          value: "collaboration",
+          label: t("collaboration"),
+          icon: "Handshake",
+          testID: "open-collaboration",
         },
       ]}
       footerItems={[

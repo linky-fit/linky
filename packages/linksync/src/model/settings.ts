@@ -21,6 +21,8 @@ const settingSchemas = {
   experimentalFeatures: Flag,
   /** The display currencies the user enabled; the app drops ones it does not know. */
   displayCurrencies: Schema.fromJsonString(Schema.Array(Schema.String)),
+  /** Whether the user offers cash for bitcoin or wants cash for it; absent means neither. */
+  cashIntent: Schema.Literals(["offer", "want"]),
 };
 
 export type SettingKey = keyof typeof settingSchemas;

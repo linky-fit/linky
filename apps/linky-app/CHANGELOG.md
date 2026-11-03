@@ -12,6 +12,14 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ## [Unreleased]
 
+### en-US
+
+- The bottom bar's Proxy payments became Collaboration: bank transfers paid by a friend, cash, goods and services in one place. Say whether you offer or look for cash; contacts who also saved you see it, and the beacon carries it. Add goods or services with a price, and see what your contacts offer or want, visible only between contacts who saved each other.
+
+### cs-CZ
+
+- Z Proxy plateb v dolní liště je Spolupráce: platební převody za kamaráda, hotovost, zboží a služby na jednom místě. Řekněte, jestli hotovost nabízíte nebo poptáváte; uvidí to kontakty, které si uložily i vás, a vysílá to i maják. Přidejte zboží nebo službu s cenou a podívejte se, co nabízejí nebo shánějí vaše kontakty, jen mezi kontakty, které si uložily navzájem.
+
 ## [26.10.10] - 2026-10-31
 
 ### en-US
