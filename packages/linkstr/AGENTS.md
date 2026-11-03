@@ -14,6 +14,7 @@ Copy the closest template: `reactions/` (peer copy plus own echo), `paymentNotic
 - Register the service in `linkstrServices` (`src/composition.ts`); a durable send also extends `OutboxOperation`.
 - Receipts name the delivered rumor `rumorId`; codecs build rumors with `rumorWithHash`.
 - A Linky-invented rumor kind takes the next free number above 24136, a Linky-invented addressable kind the next free number above 34133 (a rumor may use the ephemeral range because only its wrap is stored; a plain event may not); each carries a `["linky", <value>]` tag.
+- Linky's relays (nostr.linky.fit, nostr.eu.freedomrelay.dev) keep a replaceable or addressable event past 24 h only when its author has an `@linky.fit` lightning address or it is on the prune's keep list: kinds 0, 10000, 10002 and 10050, 30315 `d=general`, 34133 `d=listings*`, 30078 `d=linky.*`. App data takes a `linky.` `d` tag. Any other replaceable kind or `d` tag the app reads goes on the keep list (ask Dave) before it ships.
 - linkstr-react gets one command per direct operation in `makeLinkstrCommands`; outbox operations go through `enqueueOutbox` instead.
 
 ## Inspector events
