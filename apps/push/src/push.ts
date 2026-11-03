@@ -205,10 +205,12 @@ export class PushDeliveryService {
           },
         ),
       );
+      this.storage.countDelivery("sent");
       console.info(
         `[push] sent notification successfully id=${subscription.id} ${describePayload(payloadData)} recipient=${payloadData.recipientPubkey} endpoint=${endpointHash} ttl=${deliveryTtlSeconds(payloadData)}`,
       );
     } catch (error) {
+      this.storage.countDelivery("failed");
       const statusCode = readErrorStatusCode(error);
       const errorBody = readErrorBody(error);
       const permanentFailureReason = describePermanentPushFailure(
@@ -259,10 +261,12 @@ export class PushDeliveryService {
 
     try {
       const messageId = await this.messaging.send(message, false);
+      this.storage.countDelivery("sent");
       console.info(
         `[push] sent native notification successfully id=${subscription.id} ${describePayload(payloadData)} recipient=${payloadData.recipientPubkey} token=${tokenHash} messageId=${messageId}`,
       );
     } catch (error) {
+      this.storage.countDelivery("failed");
       const code = readFirebaseErrorCode(error);
       if (isPermanentFirebaseFailure(code)) {
         this.storage.removeNativeSubscriptionById(subscription.id);
