@@ -19,18 +19,28 @@ interface BuildTopbarArgs extends BackActionContext {
   t: Translate;
 }
 
-interface BuildTopbarRightArgs {
-  chatEditContactId: ContactId | null;
+interface BuildTopbarLeadingArgs {
   contactsFilterIsActive: boolean;
-  deleteEditedContact: () => void;
-  hiddenTransactionsShown: boolean;
   isProfileEditing: boolean;
-  openReceiveScan: () => void;
   /** The wallet's link to unfinished on-chain transfers; null when none runs. */
   pendingOnchainTransfers: { label: string; open: () => void } | null;
   route: Route;
   t: Translate;
   toggleContactsFilter: () => void;
+}
+
+interface BuildTopbarRightArgs {
+  chatEditContactId: ContactId | null;
+  deleteEditedContact: () => void;
+  hiddenTransactionsShown: boolean;
+  isProfileEditing: boolean;
+  /** Opens the scanner for a contact's code. */
+  openContactScan: () => void;
+  openReceiveScan: () => void;
+  /** Opens the scanner for payments, which reads contact codes too. */
+  openWalletScan: () => void;
+  route: Route;
+  t: Translate;
   toggleHiddenTransactions: () => void;
   openMenu: () => void;
 }
@@ -223,6 +233,49 @@ export const buildTopbar = ({
   };
 };
 
+/**
+ * What a root screen shows where a back button would be: the contacts filter,
+ * the profile's pencil and the wallet's unfinished on-chain transfers. The
+ * scanner takes the right slot of every root screen.
+ */
+export const buildTopbarLeading = ({
+  contactsFilterIsActive,
+  isProfileEditing,
+  pendingOnchainTransfers,
+  route,
+  t,
+  toggleContactsFilter,
+}: BuildTopbarLeadingArgs): TopbarButton | null => {
+  if (route.kind === "contacts") {
+    return {
+      icon: "Search",
+      isActive: contactsFilterIsActive,
+      label: t("contactsFilterToggle"),
+      onClick: toggleContactsFilter,
+    };
+  }
+
+  if (route.kind === "profile" && !isProfileEditing) {
+    return {
+      guide: "profile-edit",
+      icon: "Pencil",
+      label: t("edit"),
+      onClick: () => navigateTo({ route: "profileEdit" }),
+    };
+  }
+
+  if (route.kind === "wallet" && pendingOnchainTransfers) {
+    return {
+      icon: "Bitcoin",
+      indicator: "warning",
+      label: pendingOnchainTransfers.label,
+      onClick: pendingOnchainTransfers.open,
+    };
+  }
+
+  return null;
+};
+
 // Routes whose right button is decided above are narrowed away before the
 // lookup, so adding a route kind forces a decision here.
 const SHOWS_MENU_BUTTON: Record<
@@ -231,9 +284,14 @@ const SHOWS_MENU_BUTTON: Record<
     | "chat"
     | "contact"
     | "contactEdit"
+    | "contacts"
     | "evoluServers"
     | "nostrRelays"
+    | "profile"
+    | "proxyPayments"
+    | "settings"
     | "topup"
+    | "wallet"
   >,
   boolean
 > = {
@@ -252,7 +310,6 @@ const SHOWS_MENU_BUTTON: Record<
   cashuProofs: false,
   contactNew: false,
   contactPay: true,
-  contacts: false,
   chatStorage: false,
   evoluCurrentData: false,
   evoluData: false,
@@ -274,14 +331,11 @@ const SHOWS_MENU_BUTTON: Record<
   mints: false,
   nostrRelay: true,
   nostrRelayNew: true,
-  profile: false,
   profileEdit: false,
-  settings: false,
   settingsLanguage: false,
   settingsAppearance: false,
   settingsMasterKeys: false,
   settingsNostrIdentity: false,
-  proxyPayments: false,
   settingsReceiveMethod: false,
   settingsTutorial: false,
   settingsBlocked: false,
@@ -293,30 +347,34 @@ const SHOWS_MENU_BUTTON: Record<
   recurringPaymentNew: false,
   recurringPayment: false,
   recurringPaymentEdit: false,
-  wallet: false,
 };
 
 export const buildTopbarRight = ({
   chatEditContactId,
-  contactsFilterIsActive,
   deleteEditedContact,
   hiddenTransactionsShown,
   isProfileEditing,
+  openContactScan,
   openReceiveScan,
-  pendingOnchainTransfers,
+  openWalletScan,
   route,
   t,
-  toggleContactsFilter,
   toggleHiddenTransactions,
   openMenu,
 }: BuildTopbarRightArgs): TopbarButton | null => {
-  if (route.kind === "contacts") {
-    return {
-      icon: "Search",
-      isActive: contactsFilterIsActive,
-      label: t("contactsFilterToggle"),
-      onClick: toggleContactsFilter,
-    };
+  // Every root screen opens the scanner on the right. The profile and the
+  // contacts read a contact's code; the others read payments as well.
+  if (route.kind === "contacts" || route.kind === "profile") {
+    if (isProfileEditing && route.kind === "profile") return null;
+    return { icon: "ScanLine", label: t("scan"), onClick: openContactScan };
+  }
+
+  if (
+    route.kind === "wallet" ||
+    route.kind === "proxyPayments" ||
+    route.kind === "settings"
+  ) {
+    return { icon: "ScanLine", label: t("scan"), onClick: openWalletScan };
   }
 
   if (route.kind === "transactions") {
@@ -348,17 +406,10 @@ export const buildTopbarRight = ({
     };
   }
 
-  if (route.kind === "profile" && !isProfileEditing) {
-    return {
-      icon: "Pencil",
-      label: t("edit"),
-      onClick: () => navigateTo({ route: "profileEdit" }),
-    };
-  }
-
   if (route.kind === "chat") {
     if (!chatEditContactId) return null;
     return {
+      guide: "contact-edit",
       icon: "Pencil",
       label: t("edit"),
       onClick: () =>
@@ -368,6 +419,7 @@ export const buildTopbarRight = ({
 
   if (route.kind === "contact") {
     return {
+      guide: "contact-edit",
       icon: "Pencil",
       label: t("editContact"),
       onClick: () => navigateTo({ route: "contactEdit", id: route.id }),
@@ -403,15 +455,6 @@ export const buildTopbarRight = ({
           spdPayload: route.spdPayload,
           editing: true,
         }),
-    };
-  }
-
-  if (route.kind === "wallet" && pendingOnchainTransfers) {
-    return {
-      icon: "Bitcoin",
-      indicator: "warning",
-      label: pendingOnchainTransfers.label,
-      onClick: pendingOnchainTransfers.open,
     };
   }
 

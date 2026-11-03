@@ -226,6 +226,8 @@ export interface ContactFormState {
 }
 
 export interface TopbarButton {
+  /** The tutorial step anchored to the button, as its data-guide value. */
+  guide?: string;
   icon: IconName;
   /** A dot on the button, e.g. for something waiting. */
   indicator?: Tone;

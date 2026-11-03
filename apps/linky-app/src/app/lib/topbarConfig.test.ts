@@ -5,6 +5,7 @@ import type { Route } from "../../types/route";
 import { setBankPaymentOfferMinimized } from "./bankPaymentOfferStorage";
 import {
   buildTopbar,
+  buildTopbarLeading,
   buildTopbarRight,
   buildTopbarTitle,
   resolveBackAction,
@@ -191,23 +192,142 @@ describe("buildTopbar", () => {
   });
 });
 
+describe("buildTopbarLeading", () => {
+  const t = (key: string) => key;
+  const leadingArgs = {
+    contactsFilterIsActive: false,
+    isProfileEditing: false,
+    pendingOnchainTransfers: null,
+    t,
+    toggleContactsFilter: vi.fn(),
+  };
+
+  it("toggles the contact filter from the contacts page", () => {
+    const toggleContactsFilter = vi.fn();
+    const button = buildTopbarLeading({
+      ...leadingArgs,
+      contactsFilterIsActive: true,
+      route: { kind: "contacts" },
+      toggleContactsFilter,
+    });
+
+    button?.onClick();
+
+    expect(button?.icon).toBe("Search");
+    expect(button?.isActive).toBe(true);
+    expect(toggleContactsFilter).toHaveBeenCalledOnce();
+  });
+
+  it("offers the pencil on the profile until editing starts", () => {
+    const button = buildTopbarLeading({
+      ...leadingArgs,
+      route: { kind: "profile" },
+    });
+
+    button?.onClick();
+
+    expect(button).toMatchObject({
+      guide: "profile-edit",
+      icon: "Pencil",
+      label: "edit",
+    });
+    expect(assignMock).toHaveBeenLastCalledWith("#profile/edit");
+    expect(
+      buildTopbarLeading({
+        ...leadingArgs,
+        isProfileEditing: true,
+        route: { kind: "profile" },
+      }),
+    ).toBeNull();
+  });
+
+  it("marks unfinished on-chain transfers on the wallet with a dot that opens them", () => {
+    const open = vi.fn();
+    const button = buildTopbarLeading({
+      ...leadingArgs,
+      pendingOnchainTransfers: { label: "Pending", open },
+      route: { kind: "wallet" },
+    });
+    button?.onClick();
+
+    expect(button).toMatchObject({ indicator: "warning", label: "Pending" });
+    expect(open).toHaveBeenCalledOnce();
+    expect(
+      buildTopbarLeading({ ...leadingArgs, route: { kind: "wallet" } }),
+    ).toBeNull();
+  });
+
+  it("leaves the other root screens without a leading button", () => {
+    expect(
+      buildTopbarLeading({ ...leadingArgs, route: { kind: "proxyPayments" } }),
+    ).toBeNull();
+    expect(
+      buildTopbarLeading({ ...leadingArgs, route: { kind: "settings" } }),
+    ).toBeNull();
+  });
+});
+
 describe("buildTopbarRight", () => {
+  const t = (key: string) => key;
+  const rightArgs = {
+    chatEditContactId: null,
+    deleteEditedContact: vi.fn(),
+    hiddenTransactionsShown: false,
+    isProfileEditing: false,
+    openContactScan: vi.fn(),
+    openReceiveScan: vi.fn(),
+    openWalletScan: vi.fn(),
+    t,
+    toggleHiddenTransactions: vi.fn(),
+    openMenu: vi.fn(),
+  };
+
+  it("opens the contact scanner from the profile and the contacts", () => {
+    const openContactScan = vi.fn();
+    const openWalletScan = vi.fn();
+    for (const kind of ["profile", "contacts"] as const) {
+      const button = buildTopbarRight({
+        ...rightArgs,
+        openContactScan,
+        openWalletScan,
+        route: { kind },
+      });
+      button?.onClick();
+      expect(button).toMatchObject({ icon: "ScanLine", label: "scan" });
+    }
+
+    expect(openContactScan).toHaveBeenCalledTimes(2);
+    expect(openWalletScan).not.toHaveBeenCalled();
+    expect(
+      buildTopbarRight({
+        ...rightArgs,
+        isProfileEditing: true,
+        route: { kind: "profile" },
+      }),
+    ).toBeNull();
+  });
+
+  it("opens the payment scanner from the wallet, proxy and settings", () => {
+    const openContactScan = vi.fn();
+    const openWalletScan = vi.fn();
+    for (const kind of ["wallet", "proxyPayments", "settings"] as const) {
+      const button = buildTopbarRight({
+        ...rightArgs,
+        openContactScan,
+        openWalletScan,
+        route: { kind },
+      });
+      button?.onClick();
+      expect(button).toMatchObject({ icon: "ScanLine", label: "scan" });
+    }
+
+    expect(openWalletScan).toHaveBeenCalledTimes(3);
+    expect(openContactScan).not.toHaveBeenCalled();
+  });
+
   it("offers the pencil on the bank payment page and hides it while editing", () => {
-    const args = {
-      chatEditContactId: null,
-      contactsFilterIsActive: false,
-      deleteEditedContact: vi.fn(),
-      hiddenTransactionsShown: false,
-      isProfileEditing: false,
-      openReceiveScan: vi.fn(),
-      pendingOnchainTransfers: null,
-      t: (key: string) => key,
-      toggleContactsFilter: vi.fn(),
-      toggleHiddenTransactions: vi.fn(),
-      openMenu: vi.fn(),
-    };
     const button = buildTopbarRight({
-      ...args,
+      ...rightArgs,
       route: { kind: "bankPayment", spdPayload: "SPD*1.0" },
     });
 
@@ -220,56 +340,34 @@ describe("buildTopbarRight", () => {
     );
     expect(
       buildTopbarRight({
-        ...args,
+        ...rightArgs,
         route: { kind: "bankPayment", spdPayload: "SPD*1.0", editing: true },
       }),
     ).toBeNull();
   });
 
-  it("marks unfinished on-chain transfers on the wallet with a dot that opens them", () => {
-    const open = vi.fn();
-    const args = {
-      chatEditContactId: null,
-      contactsFilterIsActive: false,
-      deleteEditedContact: vi.fn(),
-      hiddenTransactionsShown: false,
-      isProfileEditing: false,
-      openReceiveScan: vi.fn(),
-      pendingOnchainTransfers: null,
-      route: { kind: "wallet" } as const,
-      t: (key: string) => key,
-      toggleContactsFilter: vi.fn(),
-      toggleHiddenTransactions: vi.fn(),
-      openMenu: vi.fn(),
-    };
-    const button = buildTopbarRight({
-      ...args,
-      pendingOnchainTransfers: { label: "Pending", open },
-    });
-    button?.onClick();
-
-    expect(button).toMatchObject({ indicator: "warning", label: "Pending" });
-    expect(open).toHaveBeenCalledOnce();
+  it("anchors the contact tutorial to the edit pencil", () => {
     expect(
-      buildTopbarRight({ ...args, pendingOnchainTransfers: null }),
-    ).toBeNull();
+      buildTopbarRight({
+        ...rightArgs,
+        route: { kind: "contact", id: contactId },
+      }),
+    ).toMatchObject({ guide: "contact-edit", icon: "Pencil" });
+    expect(
+      buildTopbarRight({
+        ...rightArgs,
+        chatEditContactId: contactId,
+        route: { kind: "chat", id: contactId },
+      }),
+    ).toMatchObject({ guide: "contact-edit", icon: "Pencil" });
   });
 
   it("deletes the edited contact from the contact edit page", () => {
     const deleteEditedContact = vi.fn();
     const button = buildTopbarRight({
-      chatEditContactId: null,
-      contactsFilterIsActive: false,
+      ...rightArgs,
       deleteEditedContact,
-      hiddenTransactionsShown: false,
-      isProfileEditing: false,
-      openReceiveScan: vi.fn(),
-      pendingOnchainTransfers: null,
       route: { kind: "contactEdit", id: contactId },
-      t: (key) => key,
-      toggleContactsFilter: vi.fn(),
-      toggleHiddenTransactions: vi.fn(),
-      openMenu: vi.fn(),
     });
 
     button?.onClick();
@@ -282,18 +380,9 @@ describe("buildTopbarRight", () => {
   it("opens the receive scanner from the top-up page", () => {
     const openReceiveScan = vi.fn();
     const button = buildTopbarRight({
-      chatEditContactId: null,
-      contactsFilterIsActive: false,
-      deleteEditedContact: vi.fn(),
-      hiddenTransactionsShown: false,
-      isProfileEditing: false,
+      ...rightArgs,
       openReceiveScan,
-      pendingOnchainTransfers: null,
       route: { kind: "topup" },
-      t: (key) => key,
-      toggleContactsFilter: vi.fn(),
-      toggleHiddenTransactions: vi.fn(),
-      openMenu: vi.fn(),
     });
 
     button?.onClick();
@@ -302,45 +391,13 @@ describe("buildTopbarRight", () => {
     expect(openReceiveScan).toHaveBeenCalledOnce();
   });
 
-  it("toggles the contact filter from the contacts page", () => {
-    const toggleContactsFilter = vi.fn();
-    const button = buildTopbarRight({
-      chatEditContactId: null,
-      contactsFilterIsActive: true,
-      deleteEditedContact: vi.fn(),
-      hiddenTransactionsShown: false,
-      isProfileEditing: false,
-      openReceiveScan: vi.fn(),
-      pendingOnchainTransfers: null,
-      route: { kind: "contacts" },
-      t: (key) => key,
-      toggleContactsFilter,
-      toggleHiddenTransactions: vi.fn(),
-      openMenu: vi.fn(),
-    });
-
-    button?.onClick();
-
-    expect(button?.icon).toBe("Search");
-    expect(button?.isActive).toBe(true);
-    expect(toggleContactsFilter).toHaveBeenCalledOnce();
-  });
-
   it("toggles hidden rows from the transactions page", () => {
     const toggleHiddenTransactions = vi.fn();
     const button = buildTopbarRight({
-      chatEditContactId: null,
-      contactsFilterIsActive: false,
-      deleteEditedContact: vi.fn(),
+      ...rightArgs,
       hiddenTransactionsShown: true,
-      isProfileEditing: false,
-      openReceiveScan: vi.fn(),
-      pendingOnchainTransfers: null,
       route: { kind: "transactions" },
-      t: (key) => key,
-      toggleContactsFilter: vi.fn(),
       toggleHiddenTransactions,
-      openMenu: vi.fn(),
     });
 
     button?.onClick();

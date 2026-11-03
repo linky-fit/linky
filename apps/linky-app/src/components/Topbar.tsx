@@ -25,13 +25,7 @@ interface TopbarProps {
   desktopDetail?: boolean;
 }
 
-const TopbarAction = ({
-  button,
-  guide,
-}: {
-  button: TopbarButton;
-  guide?: string;
-}) => (
+const TopbarAction = ({ button }: { button: TopbarButton }) => (
   <IconButton
     icon={button.icon}
     accessibilityLabel={button.label}
@@ -40,7 +34,7 @@ const TopbarAction = ({
     variant={button.isActive ? "secondary" : "ghost"}
     aria-pressed={button.isActive}
     onPress={button.onClick}
-    data-guide={guide}
+    data-guide={button.guide}
   />
 );
 
@@ -51,7 +45,7 @@ export function Topbar({
   const { t } = useTranslation();
   const nostrPictureByNpub = useNostrPictureByNpub();
   const state = useTopbar();
-  const { chatTopbarContact, topbarTitle } = state;
+  const { chatTopbarContact, topbarLeading, topbarTitle } = state;
 
   const desktopTopbar: TopbarButton | null = isDesktopSectionEntryRoute(route)
     ? {
@@ -69,10 +63,16 @@ export function Topbar({
           onClick: () => navigateTo({ route: "cashuTokens" }),
         }
       : state.topbar;
+  // The desktop detail pane closes with the X on the left, so a root screen's
+  // own action (the profile's pencil) takes the right slot there instead.
   const desktopTopbarRight =
-    state.topbarRight?.icon === "Search" ? null : state.topbarRight;
+    isDesktopSectionEntryRoute(route) && topbarLeading
+      ? topbarLeading
+      : state.topbarRight;
 
-  const topbar = desktopDetail ? desktopTopbar : state.topbar;
+  const topbar = desktopDetail
+    ? desktopTopbar
+    : (state.topbar ?? topbarLeading);
   const topbarRight = desktopDetail ? desktopTopbarRight : state.topbarRight;
 
   const chatContent = chatTopbarContact
@@ -107,16 +107,7 @@ export function Topbar({
     ...(topbarTitle ? { title: topbarTitle } : {}),
     content: chatContent,
     leading: topbar ? <TopbarAction button={topbar} /> : null,
-    trailing: topbarRight ? (
-      <TopbarAction
-        button={topbarRight}
-        {...(route.kind === "contact" || route.kind === "chat"
-          ? { guide: "contact-edit" }
-          : route.kind === "profile"
-            ? { guide: "profile-edit" }
-            : {})}
-      />
-    ) : null,
+    trailing: topbarRight ? <TopbarAction button={topbarRight} /> : null,
   };
 
   return desktopDetail ? (
