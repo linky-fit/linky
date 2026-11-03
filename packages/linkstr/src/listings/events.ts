@@ -23,6 +23,10 @@ export const ListingsDropReason = Schema.Literals([
   "unwatched-author",
   "unsupported-kind",
   "other-d-tag",
+  /** The `chunks` tag is not a count, or the `d` tag names a chunk past it. */
+  "malformed-chunk",
+  /** The reader's slot would be in another chunk of the same publish. */
+  "other-chunk",
   "undecryptable",
   "malformed-document",
   "stale",

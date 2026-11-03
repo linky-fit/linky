@@ -14,6 +14,8 @@ import { listingsPublishFingerprint } from "../lib/listings";
 const PUBLISH_DEBOUNCE_MS = 1_500;
 /** A publish no relay accepted is tried again after this. */
 const PUBLISH_RETRY_MS = 60_000;
+/** Stored while a publish is unsettled: a failed one may still have replaced some chunks, so no state matches it. */
+const UNSETTLED = "unsettled";
 
 interface PublishWhenChangedInput {
   readonly kv: KeyValuePort;
@@ -59,6 +61,7 @@ export const usePublishWhenChanged = ({
     const attempt = async () => {
       timeout = null;
       inFlight.current = true;
+      kv.setItem(storageKey, UNSETTLED);
       const exit = await publish(new ListingsDraft({ document, recipients }));
       inFlight.current = false;
       if (Exit.isSuccess(exit)) {
