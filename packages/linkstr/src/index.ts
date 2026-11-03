@@ -44,10 +44,13 @@ export { SignedPlainEvent } from "./internal/nostrEvent";
 export type { PlainEventTemplate } from "./internal/plainEvent";
 export type { StringStorage } from "./internal/stringStorage";
 export {
+  LISTINGS_CHUNKS_TAG,
   LISTINGS_D_TAG,
   LISTINGS_KIND,
+  LISTINGS_MAX_EVENT_BYTES,
   LISTINGS_SLOT_TAG,
   LISTINGS_VALUE,
+  listingsChunkOf,
   listingsSlotId,
 } from "./listings/codec";
 export * from "./listings/domain";

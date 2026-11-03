@@ -16,8 +16,10 @@ import { eventually, makeIdentity, stubPlainTransport } from "../testing";
 import type { SignedPlainEvent } from "../testing";
 import {
   decodeListingsEvent,
-  encodeListingsEvent,
+  encodeListingsEvents,
   LISTINGS_KIND,
+  LISTINGS_MAX_EVENT_BYTES,
+  listingsChunkOf,
   listingsSlotId,
 } from "./codec";
 import {
@@ -60,15 +62,36 @@ const listingsEvent = (
   recipients: ReadonlyArray<Pubkey>,
   createdAt: number,
   content: ListingsDocument = document,
-): SignedPlainEvent =>
-  signPlainEvent(
-    encodeListingsEvent(
-      new ListingsDraft({ document: content, recipients }),
-      author.secretKey,
-    ),
-    UnixSeconds.make(createdAt),
+): SignedPlainEvent => {
+  const [event] = chunkEvents(author, recipients, createdAt, content);
+  if (event === undefined) throw new Error("a publish has a chunk");
+  return event;
+};
+
+/** Every chunk of one publish, signed with the publish's one `created_at`. */
+const chunkEvents = (
+  author: LinkstrIdentityService,
+  recipients: ReadonlyArray<Pubkey>,
+  createdAt: number,
+  content: ListingsDocument = document,
+): Array<SignedPlainEvent> =>
+  encodeListingsEvents(
+    new ListingsDraft({ document: content, recipients }),
     author.secretKey,
+  ).map((template) =>
+    signPlainEvent(template, UnixSeconds.make(createdAt), author.secretKey),
   );
+
+/** Enough contacts that one event would pass the relay size cap. */
+const crowd = Array.from({ length: 300 }, makeIdentity);
+/** Encoded once: every slot costs an ECDH, too slow to repeat per test on CI. */
+const crowdEvents = chunkEvents(
+  alice,
+  crowd.map(({ pubkey }) => pubkey),
+  base,
+);
+/** A sample of the crowd, since every decode costs an ECDH per chunk. */
+const sampledReaders = crowd.filter((_, index) => index % 15 === 0);
 
 describe("listings codec", () => {
   it("lets every recipient, and nobody else, read the document", () => {
@@ -123,10 +146,10 @@ describe("listings codec", () => {
   it("drops the wrong d tag and a document that does not decode", () => {
     const other = signPlainEvent(
       {
-        ...encodeListingsEvent(
+        ...encodeListingsEvents(
           new ListingsDraft({ document, recipients: [bob.pubkey] }),
           alice.secretKey,
-        ),
+        )[0],
         tags: [["d", "other"]],
       },
       UnixSeconds.make(base),
@@ -138,6 +161,62 @@ describe("listings codec", () => {
     expect(
       () => new Listing({ ...eggs, amount: ListingAmount.make("1.234") }),
     ).toThrow();
+  });
+});
+
+describe("listings chunks", () => {
+  it("keeps a small publish in one event without a chunks tag", () => {
+    const events = chunkEvents(alice, [bob.pubkey, carol.pubkey], base);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.tags.find((tag) => tag[0] === "chunks")).toBeUndefined();
+  });
+
+  it("splits a publish too large for one event so every reader decodes only its own chunk", () => {
+    const events = crowdEvents;
+    expect(events.length).toBeGreaterThan(1);
+    expect(events.map((event) => event.tags[0])).toEqual(
+      events.map((_, chunk) => [
+        "d",
+        chunk === 0 ? "listings" : `listings:${chunk}`,
+      ]),
+    );
+    for (const event of events) {
+      expect(JSON.stringify(event).length).toBeLessThan(
+        LISTINGS_MAX_EVENT_BYTES,
+      );
+      expect(event.tags).toContainEqual(["chunks", String(events.length)]);
+    }
+    const readable = (reader: LinkstrIdentityService) => {
+      const results = events.map((event) =>
+        decodeListingsEvent(event, reader.secretKey),
+      );
+      expect(results.filter(Result.isFailure).map(dropReason)).toEqual(
+        Array.from({ length: events.length - 1 }, () => "other-chunk"),
+      );
+      return results.filter(Result.isSuccess).map(documentOf);
+    };
+    for (const reader of sampledReaders) {
+      expect(readable(reader)).toEqual([document]);
+    }
+    expect(readable(makeIdentity())).toEqual([emptyListingsDocument]);
+  });
+
+  it("drops a chunk past the publish's chunk count", () => {
+    const event = signPlainEvent(
+      {
+        kind: LISTINGS_KIND,
+        tags: [
+          ["d", "listings:2"],
+          ["chunks", "2"],
+        ],
+        content: "",
+      },
+      UnixSeconds.make(base),
+      alice.secretKey,
+    );
+    expect(dropReason(decodeListingsEvent(event, bob.secretKey))).toBe(
+      "malformed-chunk",
+    );
   });
 });
 
@@ -176,6 +255,40 @@ describe("Listings.publish", () => {
     expect(published[0]?.kind).toBe(LISTINGS_KIND);
     expect(published[1]?.created_at).toBe((published[0]?.created_at ?? 0) + 1);
   });
+});
+
+describe("Listings.publish chunks", () => {
+  it("publishes every chunk with one created_at", async () => {
+    const published: Array<SignedPlainEvent> = [];
+    const exit = await Effect.runPromiseExit(
+      Effect.flatMap(Listings, (listings) =>
+        listings.publish(
+          new ListingsDraft({
+            document,
+            recipients: crowd.map(({ pubkey }) => pubkey),
+          }),
+        ),
+      ).pipe(
+        Effect.provide(
+          Listings.layer.pipe(
+            Layer.provide(
+              Layer.mergeAll(
+                LinkstrIdentity.fromSecretKey(alice.secretKey),
+                RelayPolicy.fixed({
+                  readRelays: [relayA],
+                  writeRelays: [relayA],
+                }),
+                stubPlainTransport(published),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(Exit.isSuccess(exit)).toBe(true);
+    expect(published.length).toBeGreaterThan(1);
+    expect(new Set(published.map((event) => event.created_at)).size).toBe(1);
+  }, 20_000);
 });
 
 interface FakeSubscription {
@@ -266,7 +379,6 @@ describe("Listings.watch", () => {
             filter: {
               kinds: [LISTINGS_KIND],
               authors: [alice.pubkey],
-              "#d": ["listings"],
             },
           })),
         );
@@ -318,4 +430,32 @@ describe("Listings.watch", () => {
         ]);
       }),
     ));
+
+  it("decides only on the chunk that carries the reader's slot", () => {
+    const events = crowdEvents;
+    const chunkOfReader = (reader: LinkstrIdentityService) =>
+      listingsChunkOf(
+        listingsSlotId(getConversationKey(reader.secretKey, alice.pubkey)),
+        events.length,
+      );
+    const reader = crowd.find((member) => chunkOfReader(member) !== 0);
+    if (reader === undefined) throw new Error("every reader is in chunk 0");
+    return withWatch(
+      reader,
+      [alice.pubkey],
+      ({ facts, inspected, subscriptions }) =>
+        Effect.gen(function* () {
+          for (const event of events) subscriptions[0]?.onEvent(event);
+          yield* eventually(
+            () =>
+              facts.length === 1 &&
+              droppedWith(inspected).length === events.length - 1,
+          );
+          expect(facts[0]?.document).toEqual(document);
+          expect(
+            new Set(droppedWith(inspected).map((drop) => drop.reason)),
+          ).toEqual(new Set(["other-chunk"]));
+        }),
+    );
+  });
 });

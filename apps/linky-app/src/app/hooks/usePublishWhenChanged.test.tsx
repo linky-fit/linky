@@ -25,39 +25,63 @@ const alice = Pubkey.make(
 );
 const offering = new ListingsDocument({ cash: "offer" });
 
+const publisherOf = (
+  publish: (draft: ListingsDraft) => Promise<Exit.Exit<unknown, unknown>>,
+) => {
+  const kv = memoryKv();
+  return function Publisher({ document }: { document: ListingsDocument }) {
+    usePublishWhenChanged({
+      kv,
+      storageKey: "linky.listings.published.test",
+      hydrated: true,
+      document,
+      recipients: [alice],
+      publish,
+    });
+    return null;
+  };
+};
+
+const settle = () => act(() => vi.advanceTimersByTimeAsync(2_000));
+
 describe("usePublishWhenChanged", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
   it("withdraws a document changed while its publish was in flight", async () => {
-    const kv = memoryKv();
     const sent: ListingsDocument[] = [];
     const pending: Array<() => void> = [];
-    const publish = (draft: ListingsDraft) => {
+    const Publisher = publisherOf((draft) => {
       sent.push(draft.document);
-      return new Promise<Exit.Exit<unknown, unknown>>((resolve) => {
+      return new Promise((resolve) => {
         pending.push(() => resolve(Exit.void));
       });
-    };
-    const Publisher = ({ document }: { document: ListingsDocument }) => {
-      usePublishWhenChanged({
-        kv,
-        storageKey: "linky.listings.published.test",
-        hydrated: true,
-        document,
-        recipients: [alice],
-        publish,
-      });
-      return null;
-    };
+    });
 
     const view = await renderIntoDocument(<Publisher document={offering} />);
-    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    await settle();
     expect(sent).toEqual([offering]);
 
     await view.rerender(<Publisher document={emptyListingsDocument} />);
     await act(async () => pending.shift()?.());
-    await act(() => vi.advanceTimersByTimeAsync(2_000));
+    await settle();
     expect(sent).toEqual([offering, emptyListingsDocument]);
+  });
+
+  it("publishes a state again after a failed publish that may have replaced some chunks", async () => {
+    const sent: ListingsDocument[] = [];
+    const outcomes = [Exit.void, Exit.fail("one chunk refused")];
+    const Publisher = publisherOf((draft) => {
+      sent.push(draft.document);
+      return Promise.resolve(outcomes.shift() ?? Exit.void);
+    });
+
+    const view = await renderIntoDocument(<Publisher document={offering} />);
+    await settle();
+    await view.rerender(<Publisher document={emptyListingsDocument} />);
+    await settle();
+    await view.rerender(<Publisher document={offering} />);
+    await settle();
+    expect(sent).toEqual([offering, emptyListingsDocument, offering]);
   });
 });

@@ -19,7 +19,7 @@ import { Inspector } from "../inspector/Inspector";
 import { ProfileWatchRouted } from "../inspector/events";
 import { inspectPlainOperation } from "../internal/inspectPlainOperation";
 import type { SignedPlainEvent } from "../internal/nostrEvent";
-import { deliverPlainEvent } from "../internal/plainDelivery";
+import { publishPlainEvent, replacementDate } from "../internal/plainDelivery";
 import { decodeVerifiedPlainEvent } from "../internal/plainEvent";
 import { resubscribeForever } from "../internal/resubscribe";
 import { acquireStreamQueue } from "../internal/streamQueue";
@@ -28,7 +28,7 @@ import { NostrTransport } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
 import {
   decodeListingsEvent,
-  encodeListingsEvent,
+  encodeListingsEvents,
   listingsFilters,
 } from "./codec";
 import type { ListingsDraft } from "./domain";
@@ -43,10 +43,12 @@ export interface ListingsWatchOptions {
 const DEFAULT_RESUBSCRIBE_DELAY = Duration.seconds(5);
 
 /**
- * Listings (kind 34133): the one addressable event in which an author shares
- * cash intent and listings with chosen contacts only. `publish` replaces the
- * author's event on every write relay; `watch` follows a pubkey set and
- * surfaces each author's newest document that holds a slot for this identity,
+ * Listings (kind 34133): the addressable event in which an author shares
+ * cash intent and listings with chosen contacts only, split into chunks when
+ * one event would be too large. `publish` replaces the author's chunks on
+ * every write relay and fails unless every chunk reached a relay; `watch`
+ * follows a pubkey set and surfaces each author's newest document read
+ * through the chunk that carries this identity's slot,
  * newest-wins per author within the session. `watch` is a scoped resource;
  * watching a different set means closing the scope and calling it again.
  */
@@ -63,24 +65,22 @@ export class Listings extends Context.Service<Listings>()("linkstr/Listings", {
     let publishedAt: UnixSeconds | undefined;
     const publish = (
       draft: ListingsDraft,
-    ): Effect.Effect<PlainEventReceipt, NoRelayAcceptedEvent> =>
+    ): Effect.Effect<ReadonlyArray<PlainEventReceipt>, NoRelayAcceptedEvent> =>
       publications.withPermit(
-        Effect.suspend(() =>
-          deliverPlainEvent(
-            context,
-            encodeListingsEvent(draft, context.identity.secretKey),
-            publishedAt,
-          ),
-        ).pipe(
-          Effect.tap((receipt) =>
-            Effect.sync(() => {
-              publishedAt = receipt.sentAt;
-            }),
-          ),
-          Effect.map((receipt) => ({
-            result: receipt,
-            eventIds: [receipt.eventId],
-          })),
+        Effect.gen(function* () {
+          const sentAt = yield* replacementDate(publishedAt);
+          // Set before sending: a publish that fails halfway may still have replaced some chunks.
+          publishedAt = sentAt;
+          const receipts = yield* Effect.forEach(
+            encodeListingsEvents(draft, context.identity.secretKey),
+            (template) => publishPlainEvent(context, template, sentAt),
+            { concurrency: "unbounded" },
+          );
+          return {
+            result: receipts,
+            eventIds: receipts.map((receipt) => receipt.eventId),
+          };
+        }).pipe(
           inspectPlainOperation(inspector, "listings.publish", {
             cash: draft.document.cash,
             listings: draft.document.listings.length,
