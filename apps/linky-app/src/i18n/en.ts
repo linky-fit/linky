@@ -1330,6 +1330,7 @@ export const en = {
   listingTitlePlaceholder: "E.g. Eggs from the garden or Babysitting",
   listingPrice: "Price",
   listingUnit: "Unit",
+  listingCurrency: "Currency",
   listingUnitPlaceholder: "per hour, per kg…",
   listingAdd: "Add",
   listingSave: "Save",

@@ -1337,6 +1337,7 @@ export const cs = {
   listingTitlePlaceholder: "Třeba Domácí vajíčka nebo Hlídání dětí",
   listingPrice: "Cena",
   listingUnit: "Jednotka",
+  listingCurrency: "Měna",
   listingUnitPlaceholder: "za hodinu, za kg…",
   listingAdd: "Přidat",
   listingSave: "Uložit",

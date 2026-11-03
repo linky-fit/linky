@@ -1348,6 +1348,7 @@ export const pt = {
   listingTitlePlaceholder: "Por ex. Ovos caipiras ou Cuidar de crianças",
   listingPrice: "Preço",
   listingUnit: "Unidade",
+  listingCurrency: "Moeda",
   listingUnitPlaceholder: "por hora, por kg…",
   listingAdd: "Adicionar",
   listingSave: "Salvar",

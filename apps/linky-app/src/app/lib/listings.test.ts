@@ -6,6 +6,7 @@ import {
   beaconTradeOfCashIntent,
   buildListingsDocument,
   formatListingPrice,
+  listingCurrencyChoices,
   listingCurrencyLabel,
   listingCurrencyOfDisplay,
   listingsPublishFingerprint,
@@ -82,6 +83,13 @@ describe("listing amounts", () => {
     expect(normalizeListingAmount("21.5", "SAT")).toBeNull();
   });
 
+  it("offers the allowed display currencies as price units, the current one first", () => {
+    expect(
+      listingCurrencyChoices(["sat", "czk", "btc", "hidden"], "CZK"),
+    ).toEqual(["CZK", "SAT"]);
+    expect(listingCurrencyChoices(["sat"], "EUR")).toEqual(["EUR", "SAT"]);
+  });
+
   it("prices a listing in the display currency, sats for a bitcoin display", () => {
     expect(listingCurrencyOfDisplay("czk")).toBe("CZK");
     expect(listingCurrencyOfDisplay("sat")).toBe("SAT");
@@ -124,6 +132,6 @@ describe("listing amounts", () => {
     // Without rates the author's price stands.
     expect(
       squash(formatListingPrice("12.50", "EUR", { ...sat, fiatRates: null })),
-    ).toBe("12,50 €");
+    ).toBe("12,50 EUR");
   });
 });
