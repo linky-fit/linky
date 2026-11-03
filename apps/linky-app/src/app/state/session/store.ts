@@ -6,6 +6,7 @@ import {
   makeInboxCursorsRepository,
   makeKeryxSubscriptionsRepository,
   makeOnchainTransfersRepository,
+  makeListingsRepository,
   makeRecurringPaymentsRepository,
   makeSettingsRepository,
   makeTransactionsRepository,
@@ -86,6 +87,7 @@ export const onchainTransfersRepositoryAtom = repositoryAtom(
 export const recurringPaymentsRepositoryAtom = repositoryAtom(
   makeRecurringPaymentsRepository,
 );
+export const listingsRepositoryAtom = repositoryAtom(makeListingsRepository);
 export const settingsRepositoryAtom = repositoryAtom(makeSettingsRepository);
 export const transactionsRepositoryAtom = repositoryAtom(
   makeTransactionsRepository,

@@ -6,6 +6,7 @@ import { Chat } from "./chat/Chat";
 import type { NostrSecretKey, RelayUrl } from "./domain/primitives";
 import { InboxCursorStore } from "./inbox/InboxCursorStore";
 import { WrapInbox } from "./inbox/WrapInbox";
+import { Listings } from "./listings/Listings";
 import { MuteList } from "./muteList/MuteList";
 import { NostrConnect } from "./nostrConnect/NostrConnect";
 import { NostrConnectClient } from "./nostrConnect/NostrConnectClient";
@@ -67,6 +68,7 @@ export const linkstrServices = (config: LinkstrServicesConfig) =>
     ),
     Profiles.layer,
     ProfileWatch.layer,
+    Listings.layer,
     RelayLists.layer,
     MuteList.layer,
     NostrConnect.layer,

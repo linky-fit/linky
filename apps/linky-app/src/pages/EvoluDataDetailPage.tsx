@@ -45,6 +45,7 @@ const USER_TABLES = [
   "nostrReaction",
   "transaction",
   "recurringPayment",
+  "listing",
   "keryxSubscription",
   "onchainTransfer",
 ];

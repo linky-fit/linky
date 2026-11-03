@@ -18,12 +18,14 @@ import {
   AdvancedAutoPayLimitPage,
   AdvancedPage,
   BankPaymentOfferDetailRoute,
+  CashPage,
   CashuTokenEmitPage,
   CashuTokenNewPage,
   CashuTokenRoute,
   CashuTokensRoute,
   CashuProofsRoute,
   ChatRoute,
+  CollaborationPage,
   ContactEditRoute,
   ContactNewRoute,
   ContactRoute,
@@ -57,6 +59,8 @@ import {
   OnchainTransferNewPage,
   OnchainTransferPage,
   ProfileRoute,
+  ListingFormPage,
+  ListingsPage,
   ProxyPaymentsPage,
   PushDebugPage,
   SettingsPage,
@@ -125,8 +129,18 @@ const RoutePage = (): React.ReactElement => {
       return (
         <KeryxAnnouncementPage id={route.id} announcementKey={route.key} />
       );
+    case "collaboration":
+      return <CollaborationPage />;
     case "proxyPayments":
       return <ProxyPaymentsPage />;
+    case "cash":
+      return <CashPage />;
+    case "listings":
+      return <ListingsPage />;
+    case "listingNew":
+      return <ListingFormPage />;
+    case "listingEdit":
+      return <ListingFormPage id={route.id} />;
     case "advancedAutoPayLimit":
       return <AdvancedAutoPayLimitPage />;
     case "advancedInspector":
@@ -267,8 +281,8 @@ const getBottomTab = (route: Route): BottomTabKey | null => {
     case "settings":
     case "profile":
       return route.kind;
-    case "proxyPayments":
-      return "proxy";
+    case "collaboration":
+      return "collaboration";
     default:
       return null;
   }
@@ -333,8 +347,8 @@ export const AppRouteContent = (): React.ReactElement => {
               <DesktopContactsPane />
             ) : section === "wallet" ? (
               <WalletPane />
-            ) : section === "proxy" ? (
-              <ProxyPaymentsPage />
+            ) : section === "collaboration" ? (
+              <CollaborationPage />
             ) : (
               <AdvancedPage />
             )}

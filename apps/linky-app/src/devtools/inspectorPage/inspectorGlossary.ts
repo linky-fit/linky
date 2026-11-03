@@ -17,6 +17,8 @@ const NOSTR_KIND_EXPLANATIONS: Record<number, string> = {
   10050:
     "NIP-17 DM inbox relay list: tells other clients where to deliver gift-wrapped DMs for this user.",
   30315: "NIP-38 user status.",
+  34133:
+    "Linky listings: the author's cash intent and goods or services, encrypted so that only the contacts with a key slot in the event can read it.",
 };
 
 const TAG_DESCRIPTIONS: Record<string, string> = {

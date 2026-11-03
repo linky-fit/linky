@@ -12,13 +12,13 @@ export type BottomTabKey =
   | "profile"
   | "contacts"
   | "wallet"
-  | "proxy"
+  | "collaboration"
   | "settings";
 
 const TAB_ROUTE = {
+  collaboration: "collaboration",
   contacts: "contacts",
   profile: "profile",
-  proxy: "proxyPayments",
   settings: "settings",
   wallet: "wallet",
 } as const;
@@ -60,10 +60,10 @@ export function BottomTabBar({
       testID: "open-wallet",
     },
     {
-      value: "proxy",
-      label: t("proxyPayments"),
-      icon: "HandCoins",
-      testID: "open-proxy",
+      value: "collaboration",
+      label: t("collaboration"),
+      icon: "Handshake",
+      testID: "open-collaboration",
     },
     {
       value: "settings",

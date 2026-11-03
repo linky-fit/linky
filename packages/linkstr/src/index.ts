@@ -43,6 +43,16 @@ export * from "./inspector/inspectTransport";
 export { SignedPlainEvent } from "./internal/nostrEvent";
 export type { PlainEventTemplate } from "./internal/plainEvent";
 export type { StringStorage } from "./internal/stringStorage";
+export {
+  LISTINGS_D_TAG,
+  LISTINGS_KIND,
+  LISTINGS_SLOT_TAG,
+  LISTINGS_VALUE,
+  listingsSlotId,
+} from "./listings/codec";
+export * from "./listings/domain";
+export * from "./listings/events";
+export * from "./listings/Listings";
 export * from "./muteList/MuteList";
 export {
   DEVICE_AUTHORIZATION_KIND,

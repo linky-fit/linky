@@ -4,6 +4,7 @@ import {
   AppData,
   AppMessages,
   BankOffers,
+  Listings,
   MuteList,
   NostrConnect,
   Outbox,
@@ -20,6 +21,7 @@ import type {
   AppMessageDraft,
   BankOfferDraft,
   DiscoverActiveProfilesOptions,
+  ListingsDraft,
   NostrConnectRequest,
   OutboxRef,
   PaymentNoticeDraft,
@@ -159,6 +161,8 @@ const makeLinkstrCommands = (run: LinkstrRun) => ({
     ),
   nostrConnectLogin: (request: NostrConnectRequest) =>
     run(Effect.flatMap(NostrConnect, (connect) => connect.login(request))),
+  publishListings: (draft: ListingsDraft) =>
+    run(Effect.flatMap(Listings, (listings) => listings.publish(draft))),
   publishAppData: (draft: AppDataDraft) =>
     run(Effect.flatMap(AppData, (appData) => appData.publish(draft))),
   fetchAppData: (query: AppDataQuery) =>

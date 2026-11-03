@@ -297,8 +297,11 @@ describe("useContactsGuide proxy_payment and beacon tasks", () => {
     });
     expect(getApi().contactsGuideActiveStep?.step?.id).toBe("proxy_payment_1");
 
-    render({ kind: "proxyPayments" });
+    render({ kind: "collaboration" });
     expect(getApi().contactsGuideActiveStep?.step?.id).toBe("proxy_payment_2");
+
+    render({ kind: "proxyPayments" });
+    expect(getApi().contactsGuideActiveStep?.step?.id).toBe("proxy_payment_3");
 
     cleanup();
   });
@@ -310,11 +313,14 @@ describe("useContactsGuide proxy_payment and beacon tasks", () => {
     act(() => {
       getApi().startContactsGuide("beacon");
     });
-    render({ kind: "proxyPayments" });
+    render({ kind: "collaboration" });
     expect(getApi().contactsGuideActiveStep?.step?.id).toBe("beacon_2");
 
-    render({ kind: "proxyPayments" }, false, true);
+    render({ kind: "cash" });
     expect(getApi().contactsGuideActiveStep?.step?.id).toBe("beacon_3");
+
+    render({ kind: "cash" }, false, true);
+    expect(getApi().contactsGuideActiveStep?.step?.id).toBe("beacon_4");
 
     cleanup();
   });

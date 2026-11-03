@@ -123,6 +123,11 @@ type NavigationAction =
   | { route: "keryxCompany"; id: KeryxSubscriptionId }
   | { route: "keryxAnnouncement"; id: KeryxSubscriptionId; key: string }
   | { route: "proxyPayments" }
+  | { route: "collaboration" }
+  | { route: "cash" }
+  | { route: "listings" }
+  | { route: "listingNew" }
+  | { route: "listingEdit"; id: string }
   | { route: "settingsUnits" }
   | { route: "settingsTutorial" }
   | { route: "settingsBlocked" }
@@ -200,6 +205,23 @@ export const navigateTo = (action: NavigationAction): void => {
       break;
     case "proxyPayments":
       window.location.assign("#proxy");
+      break;
+    case "collaboration":
+      window.location.assign("#collaboration");
+      break;
+    case "cash":
+      window.location.assign("#collaboration/cash");
+      break;
+    case "listings":
+      window.location.assign("#collaboration/listings");
+      break;
+    case "listingNew":
+      window.location.assign("#collaboration/listings/new");
+      break;
+    case "listingEdit":
+      window.location.assign(
+        `#collaboration/listings/${encodeURIComponent(action.id)}`,
+      );
       break;
     case "advanced":
       window.location.assign("#advanced");

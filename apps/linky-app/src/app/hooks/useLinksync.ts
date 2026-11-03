@@ -10,6 +10,8 @@ import {
   type KeryxSubscriptionsRepository,
   type LinkyScope,
   type LinkyStore,
+  type ListingRecord,
+  type ListingsRepository,
   type MessageRow,
   type OnchainTransferRecord,
   type OnchainTransfersRepository,
@@ -44,6 +46,7 @@ import {
   inboxCursorsRepositoryAtom,
   keryxSubscriptionsRepositoryAtom,
   linkyStoreAtom,
+  listingsRepositoryAtom,
   onchainTransfersRepositoryAtom,
   recurringPaymentsRepositoryAtom,
   settingsRepositoryAtom,
@@ -125,6 +128,12 @@ export const useRecurringPaymentsRepository = (): RecurringPaymentsRepository =>
 export const useRecurringPaymentRecords =
   (): ReadonlyArray<RecurringPaymentRecord> =>
     useRepositoryRows(useRecurringPaymentsRepository());
+
+export const useListingsRepository = (): ListingsRepository =>
+  useAtomSuspense(listingsRepositoryAtom).value;
+
+export const useListingRecords = (): ReadonlyArray<ListingRecord> =>
+  useRepositoryRows(useListingsRepository());
 
 export const useKeryxSubscriptionsRepository =
   (): KeryxSubscriptionsRepository =>

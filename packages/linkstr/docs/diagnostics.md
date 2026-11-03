@@ -57,21 +57,21 @@ The resubscribe loops of the inbox and profile watch flip an unreachable relay b
 
 ### Event families
 
-| Group           | Event                                                          | Fired when                                                             |
-| --------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| Operations      | `OperationSucceeded`                                           | a wrap vertical finished a send, e.g. `reactions.react`                |
-| Operations      | `OperationFailed`                                              | any vertical's send failed, or an outbox job failed                    |
-| Operations      | `PlainOperationSucceeded`                                      | a plain publish, a fetch, `outbox.enqueue`, `outbox.job`               |
-| Inbox and watch | `InboxRouted`                                                  | the inbox produced a fact, including `WrapDropped`                     |
-| Inbox and watch | `InboxWrapDeduped`                                             | a cross-relay duplicate was skipped                                    |
-| Inbox and watch | `InboxWalkGivenUp`                                             | a relay stopped holding the inbox cursor after failing three attempts  |
-| Inbox and watch | `InboxEventUnconfirmed`                                        | linkstr-react's inbox handler rejected, so the event stays unconfirmed |
-| Inbox and watch | `ProfileWatchRouted`                                           | `ProfileWatch` routed or dropped (`ProfileEventDropped`) a plain event |
-| Wire            | `WirePublished`                                                | one signed wrap pushed to the write relays                             |
-| Wire            | `WirePlainPublished`                                           | one signed plain event pushed                                          |
-| Wire            | `WireSubscribed`, `WireSubscriptionEnded`, `WireEventReceived` | subscription lifecycle and raw arrivals, per relay                     |
-| Wire            | `WireFetched`                                                  | one one-shot fetch answered or failed                                  |
-| Wire            | `WireRequestResent`                                            | a subscription or fetch REQ got no EOSE in time and was sent again     |
+| Group           | Event                                                          | Fired when                                                                                                         |
+| --------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Operations      | `OperationSucceeded`                                           | a wrap vertical finished a send, e.g. `reactions.react`                                                            |
+| Operations      | `OperationFailed`                                              | any vertical's send failed, or an outbox job failed                                                                |
+| Operations      | `PlainOperationSucceeded`                                      | a plain publish, a fetch, `outbox.enqueue`, `outbox.job`                                                           |
+| Inbox and watch | `InboxRouted`                                                  | the inbox produced a fact, including `WrapDropped`                                                                 |
+| Inbox and watch | `InboxWrapDeduped`                                             | a cross-relay duplicate was skipped                                                                                |
+| Inbox and watch | `InboxWalkGivenUp`                                             | a relay stopped holding the inbox cursor after failing three attempts                                              |
+| Inbox and watch | `InboxEventUnconfirmed`                                        | linkstr-react's inbox handler rejected, so the event stays unconfirmed                                             |
+| Inbox and watch | `ProfileWatchRouted`                                           | `ProfileWatch` or `Listings.watch` routed or dropped (`ProfileEventDropped`, `ListingsEventDropped`) a plain event |
+| Wire            | `WirePublished`                                                | one signed wrap pushed to the write relays                                                                         |
+| Wire            | `WirePlainPublished`                                           | one signed plain event pushed                                                                                      |
+| Wire            | `WireSubscribed`, `WireSubscriptionEnded`, `WireEventReceived` | subscription lifecycle and raw arrivals, per relay                                                                 |
+| Wire            | `WireFetched`                                                  | one one-shot fetch answered or failed                                                                              |
+| Wire            | `WireRequestResent`                                            | a subscription or fetch REQ got no EOSE in time and was sent again                                                 |
 
 Operation names are `<vertical>.<operation>` (`chat.sendText`, `bankOffers.send`, `profiles.fetchProfile`, `inbox.fetchWrapEvent`, …). Rows correlate through shared ids: `OperationSucceeded.selfCopy.wrapId` and `recipientCopy.wrapId` match two `WirePublished.wrapId`s; `rumorId` / `clientId` tie a send to its `InboxRouted` echo and to outbox rows. `InboxRouted.rumorKind` is how an unknown kind shows up.
 

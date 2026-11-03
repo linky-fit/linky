@@ -47,6 +47,7 @@ Each call runs exactly once, on the runtime that is current when the call is mad
 | `fetchWrapEvent`                           | `WrapInbox.fetchWrapEvent` (`{ wrapId, extraRelays? }`)                              |
 | `nostrConnectLogin`                        | `NostrConnect.login` (a `NostrConnectRequest`)                                       |
 | `sendAppMessage`                           | `AppMessages.send`                                                                   |
+| `publishListings`                          | `Listings.publish`                                                                   |
 | `publishAppData`, `fetchAppData`           | `AppData.publish`, `AppData.fetch`                                                   |
 | `run`                                      | Any effect over the linkstr services, with the same guarantees                       |
 
@@ -107,6 +108,10 @@ For manual registration, set `outboxResultsHandlerAtom` to `{ onResult }` and mo
 ## Profile watch
 
 `watchedProfilesAtom` (the pubkey set), `profileWatchHandlerAtom` (`{ onEvent }`) and `profileWatchAtom` follow the inbox pattern: set the handler once (through a ref, as above), mount `profileWatchAtom`, and set `watchedProfilesAtom` whenever the set changes; that resubscribes without rebuilding the runtime. Swapping the handler object also reopens the subscriptions. Facts are in [plain-events.md](./plain-events.md#watching).
+
+## Listings watch
+
+`watchedListingsAtom`, `listingsWatchHandlerAtom` (`{ onEvent }`) and `listingsWatchAtom` are the same pattern for kind 34133: set the handler once, mount `listingsWatchAtom`, set the pubkey set whenever it changes. Facts and drop reasons are in [listings.md](./listings.md#watching); `publishListings` is the command for the author's side.
 
 ## Mute list watch
 

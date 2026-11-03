@@ -10,7 +10,7 @@ A scope is one kind of data with one storage policy. `meta` lives in the Evolu `
 | ---------------- | ------------------------------------ | ------------------------------------------- | ------------------------ | ------------- |
 | `meta`           | `AppOwner`                           | `shardPointer`, `setting`                   | no                       | never         |
 | `identity`       | `ShardOwner` `["identity", 0]`       | `nostrIdentity`                             | no                       | never         |
-| `contacts`       | `ShardOwner` `["contacts", n]`       | `contact`, `recurringPayment`               | 256 KiB or 220 mutations | never         |
+| `contacts`       | `ShardOwner` `["contacts", n]`       | `contact`, `recurringPayment`, `listing`    | 256 KiB or 220 mutations | never         |
 | `messages`       | `ShardOwner` `["messages", n]`       | `conversation`, `message`, `reaction`       | 256 KiB or 160 mutations | keep newest 4 |
 | `unknownSenders` | `ShardOwner` `["unknownSenders", n]` | `unknownSenderMessage`                      | 256 KiB or 160 mutations | keep newest 2 |
 | `cashu`          | `ShardOwner` `["cashu", n]`          | `cashuProof`, `cashuOperation`              | 256 KiB or 170 mutations | never         |

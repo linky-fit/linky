@@ -339,6 +339,58 @@ export function OptionTile({
   );
 }
 
+export interface ActionTileProps extends Omit<
+  PressableProps,
+  "children" | "icon"
+> {
+  label: string;
+  /** A large accent icon above the label. */
+  icon: IconName;
+  /** A muted line under the label, e.g. a count. */
+  caption?: string | undefined;
+}
+
+/** A raised navigation tile for a hub screen: an icon, a short label and an optional caption, laid out in a grid of tiles. */
+export function ActionTile({
+  label,
+  icon,
+  caption,
+  ...props
+}: ActionTileProps) {
+  return (
+    <Pressable
+      flexDirection="column"
+      justifyContent="center"
+      gap="$xs"
+      paddingTop="$xxl"
+      paddingBottom="$xl"
+      paddingHorizontal="$md"
+      borderRadius="$card"
+      backgroundColor="$surfaceRaised"
+      hoverStyle={{ backgroundColor: "$backgroundPress" }}
+      pressStyle={{ backgroundColor: "$backgroundPress" }}
+      {...props}
+    >
+      <View marginBottom="$xs">
+        <Icon name={icon} size="xl" color="$accentText" />
+      </View>
+      <Text bold textAlign="center" numberOfLines={2}>
+        {label}
+      </Text>
+      {caption ? (
+        <Text
+          variant="caption"
+          color="$colorMuted"
+          textAlign="center"
+          numberOfLines={1}
+        >
+          {caption}
+        </Text>
+      ) : null}
+    </Pressable>
+  );
+}
+
 export interface SegmentedOption<T extends string> {
   value: T;
   label: string;
@@ -387,7 +439,8 @@ export function SegmentedControl<T extends string>({
               variant="caption"
               bold
               color={selected ? "$onAccent" : "$colorSubtle"}
-              numberOfLines={1}
+              textAlign="center"
+              numberOfLines={2}
             >
               {option.label}
             </Text>

@@ -317,8 +317,30 @@ A mutual contact whose beacon this device received in the last two minutes.
 _Avoid_: in range, close by, presence
 
 **Trade**:
-The buy or sell intent, without an amount, that a beacon can carry; shown as "Buys BTC" or "Sells BTC".
+The buy or sell intent, without an amount, that a beacon can carry; shown as "Buys BTC" or "Sells BTC". It is the cash intent as the beacon transmits it: cash offered buys BTC, cash wanted sells it.
 _Avoid_: offer (taken by proxy payments), bid, listing
+
+## Collaboration
+
+**Collaboration**:
+The bottom-bar section where contacts help each other for bitcoin: proxy payments, cash, goods and services.
+_Avoid_: marketplace, exchange, services tab
+
+**Cash intent**:
+Whether the user offers cash for bitcoin, wants cash for bitcoin, or neither; a synced setting shared with mutual contacts in the listings document and carried by the beacon as its trade.
+_Avoid_: cash status, cash offer, trade (that is the beacon's encoding of it)
+
+**Listing**:
+One thing the user offers to, or wants from, their mutual contacts: goods or a service with a title, a price and a unit. Listings live in a synced table and are shared in the listings document.
+_Avoid_: offer (taken by proxy payments), ad, classified, product
+
+**Listings document**:
+The one addressable Nostr event (kind 34133) in which a user shares their cash intent and listings; its content is readable only by the contacts the user chose, each through their own key slot. A contact's document reaching the user proves the contact saved them.
+_Avoid_: listings event, catalog, shop
+
+**Mutual contact**:
+A contact who also saved the user. Nothing records this; it shows itself in what only a mutual contact can decode: a beacon sighting or a listings document.
+_Avoid_: friend, follower, mutual follow
 
 ## Recurring payments
 

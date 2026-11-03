@@ -12,6 +12,7 @@ const NOSTR_KIND_NAMES: Record<number, string> = {
   10002: "relay list",
   10050: "DM inbox relays",
   30315: "status",
+  34133: "listings",
 };
 
 export const nostrKindLabel = (kind: number): string => {
