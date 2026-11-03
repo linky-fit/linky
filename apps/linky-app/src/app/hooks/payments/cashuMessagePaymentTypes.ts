@@ -17,7 +17,6 @@ interface CashuMessagePaymentPublishError {
 
 export interface CashuMessagePaymentPublishingOutcome {
   hasPendingMessages: boolean;
-  paymentNoticeError: string | null;
   publishErrors: CashuMessagePaymentPublishError[];
   publishedTokenTexts: string[];
   unpublishedTokenTexts: string[];

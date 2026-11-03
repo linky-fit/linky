@@ -72,7 +72,6 @@ const failOutboxJob = () =>
 
 const published = (error: string | null) => ({
   hasPendingMessages: error !== null,
-  paymentNoticeError: null,
   publishErrors:
     error === null
       ? []

@@ -727,9 +727,9 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
   };
 
   /**
-   * Publishes a send's message to its contact and closes the pending send
-   * once a relay took it; an unpublished one stays pending, guarded by the
-   * pending-row cleanup and return-to-wallet.
+   * Publishes a send's message to its contact and, without making the
+   * caller wait, closes the pending send once a relay took it; an unpublished
+   * one stays pending, guarded by the pending-row cleanup and return-to-wallet.
    */
   const publishSend = async (args: {
     readonly receipt: SendReceipt;
@@ -774,14 +774,14 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
       sendPaymentNotice: deps.linkstr.sendPaymentNotice,
       updateLocalNostrMessage: chat.updateLocalNostrMessage,
     });
-    if (!publishing.hasPendingMessages) {
-      await linkshu.cashuTransferLifecycle.forget(receipt.operationId);
-      reportCashuSendForgotten({
-        mint: receipt.mint,
-        reason: "message-published",
-        operationId: receipt.operationId,
-      });
-    }
+    if (!publishing.hasPendingMessages)
+      void linkshu.cashuTransferLifecycle.forget(receipt.operationId).then(() =>
+        reportCashuSendForgotten({
+          mint: receipt.mint,
+          reason: "message-published",
+          operationId: receipt.operationId,
+        }),
+      );
     return publishing;
   };
 
