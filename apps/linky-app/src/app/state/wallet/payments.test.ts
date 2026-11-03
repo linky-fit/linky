@@ -894,6 +894,18 @@ describe("payContact", () => {
     expect(onSending).toHaveBeenCalledOnce();
   });
 
+  it("reports a published send as sent before its row is forgotten", async () => {
+    const lifecycle = transferLifecycle({
+      forget: vi.fn(() => new Promise<never>(() => {})),
+    });
+    const { commands } = setup({ lifecycle });
+
+    expect(await commands.payContact(alicePayment())).toMatchObject({
+      _tag: "Sent",
+    });
+    expect(lifecycle.forget).toHaveBeenCalledWith("send-op");
+  });
+
   it("types a send for a bank offer as proxy", async () => {
     const { commands, logPaymentEvent } = setup();
 

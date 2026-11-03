@@ -87,6 +87,47 @@ const failureMessage = (
     onSome: (failure) => failure._tag,
   });
 
+const publishPaymentNotice = async ({
+  contactPublicKey,
+  clientId,
+  logPayStep,
+  paymentNoticeContext,
+  offerId,
+  sendPaymentNotice,
+}: {
+  contactPublicKey: Pubkey;
+  clientId: ClientId;
+  logPayStep: (step: string, data?: PaymentLogData) => void;
+  paymentNoticeContext: PaymentNoticeContext | undefined;
+  offerId: string;
+  sendPaymentNotice: SendPaymentNotice;
+}): Promise<void> => {
+  let anySuccess = false;
+  let error: string | null = null;
+  let wrapId: string | null = null;
+  try {
+    const exit = await sendPaymentNotice(
+      new PaymentNoticeDraft({
+        to: contactPublicKey,
+        clientId,
+        ...(paymentNoticeContext === undefined
+          ? {}
+          : { context: paymentNoticeContext }),
+        ...(offerId === "" ? {} : { offerId }),
+      }),
+    );
+    if (Exit.isSuccess(exit)) {
+      anySuccess = true;
+      wrapId = exit.value.recipientCopy.wrapId;
+    } else {
+      error = failureMessage(exit.cause);
+    }
+  } catch (caught) {
+    error = getUnknownErrorMessage(caught, "publish failed");
+  }
+  logPayStep("payment-notice-publish", { anySuccess, clientId, error, wrapId });
+};
+
 export const publishCashuMessagePayment = async ({
   appendLocalNostrMessage,
   batches,
@@ -231,45 +272,19 @@ export const publishCashuMessagePayment = async ({
     publishedTokenTexts.add(messageText);
   }
 
-  let paymentNoticeError: string | null = null;
-  if (publishedAnyTokenMessage) {
-    const clientId = ClientId.make(createId());
-    const offerId = (paymentNoticeOfferId ?? "").trim();
-    let anySuccess = false;
-    let error: string | null = null;
-    let wrapId: string | null = null;
-    try {
-      const exit = await sendPaymentNotice(
-        new PaymentNoticeDraft({
-          to: contactPublicKey,
-          clientId,
-          ...(paymentNoticeContext === undefined
-            ? {}
-            : { context: paymentNoticeContext }),
-          ...(offerId === "" ? {} : { offerId }),
-        }),
-      );
-      if (Exit.isSuccess(exit)) {
-        anySuccess = true;
-        wrapId = exit.value.recipientCopy.wrapId;
-      } else {
-        error = failureMessage(exit.cause);
-      }
-    } catch (caught) {
-      error = getUnknownErrorMessage(caught, "publish failed");
-    }
-    paymentNoticeError = anySuccess ? null : (error ?? "publish failed");
-    logPayStep("payment-notice-publish", {
-      anySuccess,
-      clientId,
-      error,
-      wrapId,
+  // Best effort and valueless, so the payment does not wait for relays.
+  if (publishedAnyTokenMessage)
+    void publishPaymentNotice({
+      contactPublicKey,
+      clientId: ClientId.make(createId()),
+      logPayStep,
+      paymentNoticeContext,
+      offerId: (paymentNoticeOfferId ?? "").trim(),
+      sendPaymentNotice,
     });
-  }
 
   return {
     hasPendingMessages: unpublishedTokenTexts.size > 0,
-    paymentNoticeError,
     publishErrors,
     publishedTokenTexts: Array.from(publishedTokenTexts),
     unpublishedTokenTexts: Array.from(unpublishedTokenTexts),

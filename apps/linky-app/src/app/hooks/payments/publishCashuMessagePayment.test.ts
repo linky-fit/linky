@@ -262,7 +262,6 @@ describe("publishCashuMessagePayment", () => {
     });
     expect(result).toEqual({
       hasPendingMessages: false,
-      paymentNoticeError: null,
       publishErrors: [],
       publishedTokenTexts: [tokenText],
       unpublishedTokenTexts: [],
@@ -375,9 +374,27 @@ describe("publishCashuMessagePayment", () => {
     });
     expect(result).toMatchObject({
       hasPendingMessages: false,
-      paymentNoticeError: "NoRelayReachable",
       publishedTokenTexts: [tokenText],
       unpublishedTokenTexts: [],
     });
+    await vi.waitFor(() =>
+      expect(args.logPayStep).toHaveBeenCalledWith(
+        "payment-notice-publish",
+        expect.objectContaining({
+          anySuccess: false,
+          error: "NoRelayReachable",
+        }),
+      ),
+    );
+  });
+
+  it("returns without waiting for the payment notice to reach a relay", async () => {
+    const args = createArgs();
+    args.sendPaymentNotice.mockImplementation(() => new Promise(() => {}));
+
+    const result = await publishCashuMessagePayment(args);
+
+    expect(args.sendPaymentNotice).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({ publishedTokenTexts: [tokenText] });
   });
 });
