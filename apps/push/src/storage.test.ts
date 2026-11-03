@@ -6,7 +6,11 @@ import {
   StorageConflictError,
   StorageLimitError,
 } from "./storage";
-import { createStoragePath, removeStoragePath } from "./testSupport";
+import {
+  createStoragePath,
+  readPushStats,
+  removeStoragePath,
+} from "./testSupport";
 import type {
   NativePushSubscriptionData,
   WebPushSubscriptionData,
@@ -545,6 +549,21 @@ describe("PushStorage recurring reminders", () => {
         storage.takeDueReminders(nowSec + 20_000, nowSec + 20_000 - 3600),
       ).toEqual([]);
       expect(storage.getReminders(pubkeyA)).toEqual([]);
+    });
+  });
+});
+
+describe("PushStorage delivery counts", () => {
+  it("keeps running totals of sent and failed deliveries", () => {
+    withStorage((storage, path) => {
+      expect(readPushStats(path)).toEqual({ sent: 0, failed: 0 });
+      storage.countDelivery("sent");
+      storage.countDelivery("sent");
+      storage.countDelivery("failed");
+      storage.close();
+
+      new PushStorage(path).close();
+      expect(readPushStats(path)).toEqual({ sent: 2, failed: 1 });
     });
   });
 });

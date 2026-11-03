@@ -103,6 +103,8 @@ interface ReplaceRemindersParams {
   nowMs: number;
 }
 
+export type DeliveryOutcome = "sent" | "failed";
+
 export class StorageLimitError extends Error {
   readonly status = 409;
   readonly code = "subscription_limit";
@@ -226,6 +228,14 @@ export class PushStorage {
 
       CREATE INDEX IF NOT EXISTS idx_recurring_reminders_notify_at
       ON recurring_reminders (notify_at);
+
+      CREATE TABLE IF NOT EXISTS push_stats (
+        name TEXT PRIMARY KEY,
+        value INTEGER NOT NULL
+      );
+
+      INSERT OR IGNORE INTO push_stats (name, value)
+      VALUES ('sent', 0), ('failed', 0);
     `);
     this.ensureSubscriptionsInstallationIdColumn();
     this.db.exec(`
@@ -504,6 +514,13 @@ export class PushStorage {
         `,
       )
       .run(nowMs - maxAgeMs);
+  }
+
+  /** Running totals for monitoring; they only grow, so readers diff them over time. */
+  countDelivery(outcome: DeliveryOutcome): void {
+    this.db
+      .query("UPDATE push_stats SET value = value + 1 WHERE name = ?")
+      .run(outcome);
   }
 
   private getSubscriptionRows<Row extends IdRow & { pubkey: string }>(
