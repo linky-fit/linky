@@ -55,7 +55,7 @@ describe("resolveBackAction", () => {
     expect(resolveBackAction({ kind: "contacts" }, baseContext)).toBeNull();
     expect(resolveBackAction({ kind: "wallet" }, baseContext)).toBeNull();
     expect(
-      resolveBackAction({ kind: "proxyPayments" }, baseContext),
+      resolveBackAction({ kind: "collaboration" }, baseContext),
     ).toBeNull();
   });
 
@@ -68,6 +68,10 @@ describe("resolveBackAction", () => {
     expect(backHashFor({ kind: "settingsMasterKeys" })).toBe("#settings");
     expect(backHashFor({ kind: "settingsNostrIdentity" })).toBe("#settings");
     expect(backHashFor({ kind: "bankPaymentNew" })).toBe("#proxy");
+    expect(backHashFor({ kind: "proxyPayments" })).toBe("#collaboration");
+    expect(backHashFor({ kind: "cash" })).toBe("#collaboration");
+    expect(backHashFor({ kind: "listings" })).toBe("#collaboration");
+    expect(backHashFor({ kind: "listingNew" })).toBe("#collaboration/listings");
     expect(backHashFor({ kind: "advancedAutoPayLimit" })).toBe("#settings");
     expect(backHashFor({ kind: "advancedInspector" })).toBe("#settings");
     expect(backHashFor({ kind: "advancedInspectorTimeline" })).toBe(
@@ -310,7 +314,12 @@ describe("buildTopbarRight", () => {
   it("opens the payment scanner from the wallet, proxy and settings", () => {
     const openContactScan = vi.fn();
     const openWalletScan = vi.fn();
-    for (const kind of ["wallet", "proxyPayments", "settings"] as const) {
+    for (const kind of [
+      "wallet",
+      "collaboration",
+      "proxyPayments",
+      "settings",
+    ] as const) {
       const button = buildTopbarRight({
         ...rightArgs,
         openContactScan,
@@ -321,7 +330,7 @@ describe("buildTopbarRight", () => {
       expect(button).toMatchObject({ icon: "ScanLine", label: "scan" });
     }
 
-    expect(openWalletScan).toHaveBeenCalledTimes(3);
+    expect(openWalletScan).toHaveBeenCalledTimes(4);
     expect(openContactScan).not.toHaveBeenCalled();
   });
 

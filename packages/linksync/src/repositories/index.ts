@@ -20,6 +20,8 @@ export type {
   OnchainTransferRecord,
   OnchainTransfersRepository,
 } from "./onchainTransfers";
+export { makeListingsRepository, normalizeListing } from "./listings";
+export type { ListingRecord, ListingsRepository } from "./listings";
 export { makeSettingsRepository } from "./settings";
 export type { SettingsRepository } from "./settings";
 export {

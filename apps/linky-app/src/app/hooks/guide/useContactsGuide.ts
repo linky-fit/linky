@@ -135,6 +135,8 @@ export const useContactsGuide = ({
       if (kind === "contacts") navigateTo({ route: "contacts" });
       if (kind === "wallet") navigateTo({ route: "wallet" });
       if (kind === "proxyPayments") navigateTo({ route: "proxyPayments" });
+      if (kind === "collaboration") navigateTo({ route: "collaboration" });
+      if (kind === "cash") navigateTo({ route: "cash" });
       if (kind === "profile") navigateTo({ route: "profile" });
       if (kind === "profileEdit") navigateTo({ route: "profileEdit" });
       if (kind === "settings") navigateTo({ route: "settings" });
@@ -314,12 +316,21 @@ export const useContactsGuide = ({
 
     if (
       (id === "proxy_payment_1" || id === "beacon_1") &&
-      transition("contacts", "proxyPayments")
+      transition("contacts", "collaboration")
     ) {
       goToStep(1);
     }
-    if (id === "beacon_2" && beaconEnabled && !contactsGuide.doneAtStart) {
+    if (
+      id === "proxy_payment_2" &&
+      transition("collaboration", "proxyPayments")
+    ) {
       goToStep(2);
+    }
+    if (id === "beacon_2" && transition("collaboration", "cash")) {
+      goToStep(2);
+    }
+    if (id === "beacon_3" && beaconEnabled && !contactsGuide.doneAtStart) {
+      goToStep(3);
     }
 
     if (id === "backup_keys_1" && transition("contacts", "settings")) {

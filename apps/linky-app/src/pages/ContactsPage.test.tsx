@@ -110,7 +110,7 @@ describe("ContactsPage", () => {
       id: bea.contactId,
     });
     await act(async () => avatars[0]?.click());
-    expect(navigateTo).toHaveBeenCalledWith({ route: "proxyPayments" });
+    expect(navigateTo).toHaveBeenCalledWith({ route: "cash" });
     await unmount();
   });
 

@@ -1,12 +1,15 @@
 import type { Route } from "../../types/route";
 
-export type DesktopRouteSection = "contacts" | "wallet" | "proxy" | "settings";
+export type DesktopRouteSection =
+  | "contacts"
+  | "wallet"
+  | "collaboration"
+  | "settings";
 
 /** The root route each section opens on. */
 export const getDesktopSectionRoute = (
   section: DesktopRouteSection,
-): "contacts" | "wallet" | "proxyPayments" | "settings" =>
-  section === "proxy" ? "proxyPayments" : section;
+): DesktopRouteSection => section;
 
 export const getDesktopRouteSection = (route: Route): DesktopRouteSection => {
   switch (route.kind) {
@@ -28,9 +31,14 @@ export const getDesktopRouteSection = (route: Route): DesktopRouteSection => {
     case "lnInvoicePay":
       return "wallet";
 
+    case "collaboration":
     case "proxyPayments":
+    case "cash":
+    case "listings":
+    case "listingNew":
+    case "listingEdit":
     case "bankPaymentNew":
-      return "proxy";
+      return "collaboration";
 
     case "settings":
     case "settingsLanguage":
@@ -86,7 +94,7 @@ export const getDesktopRouteSection = (route: Route): DesktopRouteSection => {
 export const isDesktopSectionRoot = (route: Route): boolean =>
   route.kind === "contacts" ||
   route.kind === "wallet" ||
-  route.kind === "proxyPayments" ||
+  route.kind === "collaboration" ||
   route.kind === "settings" ||
   route.kind === "advanced";
 
@@ -102,6 +110,9 @@ export const isDesktopSectionEntryRoute = (route: Route): boolean => {
     case "manualPay":
     case "bankPayment":
     case "bankPaymentNew":
+    case "proxyPayments":
+    case "cash":
+    case "listings":
     case "lnAddressPay":
     case "lnInvoicePay":
     case "settingsLanguage":

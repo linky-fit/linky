@@ -87,6 +87,15 @@ export const resolveBackAction = (
     case "bankPaymentNew":
       return () => navigateTo({ route: "proxyPayments" });
 
+    case "proxyPayments":
+    case "cash":
+    case "listings":
+      return () => navigateTo({ route: "collaboration" });
+
+    case "listingNew":
+    case "listingEdit":
+      return () => navigateTo({ route: "listings" });
+
     case "advancedInspectorTimeline":
     case "advancedPushDebug":
       return () => navigateTo({ route: "advancedInspector" });
@@ -198,7 +207,7 @@ export const resolveBackAction = (
     // Root screens: nothing above them.
     case "contacts":
     case "wallet":
-    case "proxyPayments":
+    case "collaboration":
       return null;
   }
 };
@@ -287,6 +296,7 @@ const SHOWS_MENU_BUTTON: Record<
     | "contacts"
     | "evoluServers"
     | "nostrRelays"
+    | "collaboration"
     | "profile"
     | "proxyPayments"
     | "settings"
@@ -308,6 +318,10 @@ const SHOWS_MENU_BUTTON: Record<
   cashuTokenNew: false,
   cashuTokens: false,
   cashuProofs: false,
+  cash: false,
+  listings: false,
+  listingNew: false,
+  listingEdit: false,
   contactNew: false,
   contactPay: true,
   chatStorage: false,
@@ -371,6 +385,7 @@ export const buildTopbarRight = ({
 
   if (
     route.kind === "wallet" ||
+    route.kind === "collaboration" ||
     route.kind === "proxyPayments" ||
     route.kind === "settings"
   ) {
@@ -485,7 +500,12 @@ const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
   cashuTokenNew: "cashuAddToken",
   cashuTokens: "tokens",
   cashuProofs: "cashuInspectProofs",
+  cash: "cash",
   chat: "messagesTitle",
+  collaboration: "collaboration",
+  listings: "listings",
+  listingNew: "listingNewTitle",
+  listingEdit: "listingEditTitle",
   contact: "contact",
   contactEdit: "contactEditTitle",
   contactNew: "newContact",

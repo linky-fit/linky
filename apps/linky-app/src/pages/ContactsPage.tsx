@@ -83,7 +83,7 @@ function NearbyContactsSection({ t }: { t: Translate }) {
             label={t("nearbyYou")}
             isSelf
             badge={badge(ownTrade)}
-            onPress={() => navigateTo({ route: "proxyPayments" })}
+            onPress={() => navigateTo({ route: "cash" })}
           />
         )}
         {nearby.map(({ pubkey, contactId, state }) => {

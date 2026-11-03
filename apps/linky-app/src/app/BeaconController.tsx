@@ -17,6 +17,7 @@ import { isDeletedContact } from "../utils/contactName";
 import { formatShortNpub } from "../utils/formatting";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 import { useBeacon, useBeaconSupport } from "./hooks/useBeacon";
+import { useCashIntent } from "./hooks/useCashIntent";
 import {
   useContactRows,
   useConversationRows,
@@ -24,11 +25,13 @@ import {
 } from "./hooks/useLinksync";
 import { contactIdByConversationId } from "./hooks/messages/messageRows";
 import { beaconKeysFor } from "./lib/beaconKeys";
+import { beaconTradeOfCashIntent } from "./lib/listings";
 import {
   getBeaconSnapshot,
   NO_BEACON_PEERS,
   setBeaconKeyTable,
   setBeaconPeers,
+  setBeaconTrade,
   subscribeBeacon,
   takeBeaconPendingOpen,
 } from "./lib/beaconStore";
@@ -150,6 +153,13 @@ export const BeaconController = ({ currentNsec }: { currentNsec: string }) => {
   const { enabled } = useBeacon();
   const contacts = useBeaconContacts(identity?.pubkey ?? null);
   const blockList = useAtomValue(blockListAtom);
+  const { cashIntent } = useCashIntent();
+
+  // The beacon carries the cash intent as its trade: cash offered buys BTC, cash wanted sells it.
+  React.useEffect(() => {
+    const trade = beaconTradeOfCashIntent(cashIntent);
+    if (getBeaconSnapshot().trade !== trade) setBeaconTrade(trade);
+  }, [cashIntent]);
 
   React.useEffect(() => {
     const hidden = new Set(blockList);

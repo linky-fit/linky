@@ -230,7 +230,8 @@ const REQUIRED_COLUMNS: {
   cashuProof: ["mint", "unit", "keysetId", "amount", "secret", "c", "state"],
   cashuOperation: ["kind", "status", "mint", "unit", "amount", "createdAtSec"],
   transaction: ["createdAtSec", "direction", "status"],
-  // Never ingested from a lane: no legacy version wrote recurring payments.
+  // Never ingested from a lane: no legacy version wrote listings or recurring payments.
+  listing: ["createdAtSec", "side", "title", "amount", "currency", "unit"],
   recurringPayment: [
     "createdAtSec",
     "contactId",

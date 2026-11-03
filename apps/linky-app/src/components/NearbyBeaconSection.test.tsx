@@ -2,7 +2,7 @@ import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { UseBeacon } from "../app/hooks/useBeacon";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
-import { NearbyBeaconSection } from "./ProxyPaymentsPage";
+import { NearbyBeaconSection } from "./NearbyBeaconSection";
 
 const beacon = vi.hoisted(() => {
   const state: { current: UseBeacon | null } = { current: null };
@@ -108,15 +108,6 @@ describe("NearbyBeaconSection", () => {
     await unmount();
   });
 
-  it("disables the trade while the beacon is off", async () => {
-    const { container, unmount } = await render();
-    const trades = container.querySelectorAll('[role="radio"]');
-    expect(trades).toHaveLength(3);
-    for (const trade of trades)
-      expect(trade.getAttribute("aria-disabled")).toBe("true");
-    await unmount();
-  });
-
   it("shows the intro before the first switch-on and turns on from it", async () => {
     const { container, unmount } = await render();
     await press(container.querySelector('[role="switch"]'));
@@ -146,6 +137,23 @@ describe("NearbyBeaconSection", () => {
     expect(beacon.current?.markIntroSeen).not.toHaveBeenCalled();
     expect(beacon.current?.setEnabled).not.toHaveBeenCalled();
     await unmount();
+  });
+
+  it("offers the beacon once per session when the page opens with it off", async () => {
+    beacon.current = makeBeacon();
+    const first = await renderIntoDocument(
+      <NearbyBeaconSection offerOnMount t={(key) => key} />,
+    );
+    expect(document.body.textContent).toContain("beaconIntroNpub");
+    await press(button("beaconNotNow"));
+    expect(beacon.current?.setEnabled).not.toHaveBeenCalled();
+    await first.unmount();
+
+    const second = await renderIntoDocument(
+      <NearbyBeaconSection offerOnMount t={(key) => key} />,
+    );
+    expect(button("beaconTurnOn")).toBeUndefined();
+    await second.unmount();
   });
 
   it("turns on without the intro once it was seen", async () => {

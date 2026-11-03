@@ -29,6 +29,9 @@ export type TransactionId = typeof TransactionId.Type;
 export const RecurringPaymentId = id("RecurringPayment");
 export type RecurringPaymentId = typeof RecurringPaymentId.Type;
 
+export const ListingId = id("Listing");
+export type ListingId = typeof ListingId.Type;
+
 export const KeryxSubscriptionId = id("KeryxSubscription");
 export type KeryxSubscriptionId = typeof KeryxSubscriptionId.Type;
 

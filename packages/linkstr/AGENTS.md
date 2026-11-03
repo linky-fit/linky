@@ -13,7 +13,7 @@ Copy the closest template: `reactions/` (peer copy plus own echo), `paymentNotic
 - Add the kind to `routeRumor` (`src/inbox/decodeWrapEvent.ts`) and a `WrapInbox.test.ts` case routing a real wrap: an unrouted kind is silently dropped as `unsupported-kind`.
 - Register the service in `linkstrServices` (`src/composition.ts`); a durable send also extends `OutboxOperation`.
 - Receipts name the delivered rumor `rumorId`; codecs build rumors with `rumorWithHash`.
-- A Linky-invented kind takes the next free number above 24136 and carries a `["linky", <value>]` tag.
+- A Linky-invented rumor kind takes the next free number above 24136, a Linky-invented addressable kind the next free number above 34133 (a rumor may use the ephemeral range because only its wrap is stored; a plain event may not); each carries a `["linky", <value>]` tag.
 - linkstr-react gets one command per direct operation in `makeLinkstrCommands`; outbox operations go through `enqueueOutbox` instead.
 
 ## Inspector events
