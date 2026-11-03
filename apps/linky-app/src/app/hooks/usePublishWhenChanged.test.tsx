@@ -2,6 +2,7 @@ import {
   emptyListingsDocument,
   ListingsDocument,
   Pubkey,
+  RelayUrl,
   type ListingsDraft,
 } from "@linky-fit/linkstr";
 import { Exit } from "effect";
@@ -24,18 +25,26 @@ const alice = Pubkey.make(
   "32e1827635450ebb3c5a7d12c1f8e7b2b514439ac10a67eef3d9fd9c5c68e245",
 );
 const offering = new ListingsDocument({ cash: "offer" });
+const firstRelay = [RelayUrl.make("wss://first.example")];
 
 const publisherOf = (
   publish: (draft: ListingsDraft) => Promise<Exit.Exit<unknown, unknown>>,
 ) => {
   const kv = memoryKv();
-  return function Publisher({ document }: { document: ListingsDocument }) {
+  return function Publisher({
+    document,
+    relays = firstRelay,
+  }: {
+    document: ListingsDocument;
+    relays?: ReadonlyArray<RelayUrl>;
+  }) {
     usePublishWhenChanged({
       kv,
       storageKey: "linky.listings.published.test",
       hydrated: true,
       document,
       recipients: [alice],
+      relays,
       publish,
     });
     return null;
@@ -83,5 +92,46 @@ describe("usePublishWhenChanged", () => {
     await view.rerender(<Publisher document={offering} />);
     await settle();
     expect(sent).toEqual([offering, emptyListingsDocument, offering]);
+  });
+
+  it("publishes an unchanged document to an added relay", async () => {
+    const sent: ListingsDocument[] = [];
+    const Publisher = publisherOf((draft) => {
+      sent.push(draft.document);
+      return Promise.resolve(Exit.void);
+    });
+
+    const view = await renderIntoDocument(<Publisher document={offering} />);
+    await settle();
+    await view.rerender(
+      <Publisher
+        document={offering}
+        relays={[...firstRelay, RelayUrl.make("wss://added.example")]}
+      />,
+    );
+    await settle();
+    expect(sent).toEqual([offering, offering]);
+  });
+
+  it("publishes an unchanged document again a week later, not on every start", async () => {
+    vi.setSystemTime(new Date("2026-11-02T12:00:00Z"));
+    const sent: ListingsDocument[] = [];
+    const Publisher = publisherOf((draft) => {
+      sent.push(draft.document);
+      return Promise.resolve(Exit.void);
+    });
+    const start = async () => {
+      const view = await renderIntoDocument(<Publisher document={offering} />);
+      await settle();
+      await view.unmount();
+    };
+
+    await start();
+    await start();
+    expect(sent).toEqual([offering]);
+
+    vi.setSystemTime(new Date("2026-11-09T12:00:00Z"));
+    await start();
+    expect(sent).toEqual([offering, offering]);
   });
 });

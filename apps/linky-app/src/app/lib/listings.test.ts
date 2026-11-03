@@ -1,4 +1,4 @@
-import { Pubkey } from "@linky-fit/linkstr";
+import { Pubkey, RelayUrl } from "@linky-fit/linkstr";
 import type { ListingRecord } from "@linky-fit/linksync";
 import { createId, OwnerId, PositiveInt } from "@linky-fit/linksync";
 import { describe, expect, it } from "vitest";
@@ -50,17 +50,34 @@ describe("buildListingsDocument", () => {
     ]);
   });
 
-  it("fingerprints the document and the recipient set, order-insensitively", () => {
-    const document = buildListingsDocument([record()], null);
-    expect(listingsPublishFingerprint(document, [alice, bob])).toBe(
-      listingsPublishFingerprint(document, [bob, alice]),
-    );
-    expect(listingsPublishFingerprint(document, [alice])).not.toBe(
-      listingsPublishFingerprint(document, [alice, bob]),
-    );
+  it("fingerprints a publication, ignoring recipient and relay order", () => {
+    const publication = {
+      document: buildListingsDocument([record()], null),
+      recipients: [alice, bob],
+      relays: [
+        RelayUrl.make("wss://a.example"),
+        RelayUrl.make("wss://b.example"),
+      ],
+      refreshPeriod: 1,
+    };
+    const fingerprint = listingsPublishFingerprint(publication);
     expect(
-      listingsPublishFingerprint(buildListingsDocument([], "offer"), [alice]),
-    ).not.toBe(listingsPublishFingerprint(document, [alice]));
+      listingsPublishFingerprint({
+        ...publication,
+        recipients: [bob, alice],
+        relays: [...publication.relays].reverse(),
+      }),
+    ).toBe(fingerprint);
+    for (const changed of [
+      { document: buildListingsDocument([], "offer") },
+      { recipients: [alice] },
+      { relays: [RelayUrl.make("wss://a.example")] },
+      { refreshPeriod: 2 },
+    ]) {
+      expect(
+        listingsPublishFingerprint({ ...publication, ...changed }),
+      ).not.toBe(fingerprint);
+    }
   });
 });
 
