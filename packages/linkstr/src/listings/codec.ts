@@ -8,7 +8,7 @@ import { chunkAuthors } from "../internal/authorChunks";
 import { firstTagValue, tagsNamed } from "../internal/nostrEvent";
 import type { NostrTags, SignedPlainEvent } from "../internal/nostrEvent";
 import type { PlainEventTemplate } from "../internal/plainEvent";
-import { ListingsDocument } from "./domain";
+import { emptyListingsDocument, ListingsDocument } from "./domain";
 import type { ListingsDraft } from "./domain";
 import type { ListingsDropReason } from "./events";
 
@@ -92,7 +92,7 @@ const tryDecrypt = (payload: string, key: Uint8Array): string | null => {
   }
 };
 
-/** The document a verified event of `LISTINGS_KIND` holds for the reader, or why it holds none. */
+/** The document a verified event of `LISTINGS_KIND` holds for the reader, empty when it has no slot for them, or why it is unreadable. */
 export const decodeListingsEvent = (
   event: SignedPlainEvent,
   secretKey: NostrSecretKey,
@@ -106,7 +106,8 @@ export const decodeListingsEvent = (
   const slot = tagsNamed(event.tags, LISTINGS_SLOT_TAG).find(
     (tag) => tag[1] === slotId,
   );
-  if (slot?.[2] === undefined) return Result.fail("no-slot");
+  // The author stopped sharing with the reader, which withdraws everything from them.
+  if (slot?.[2] === undefined) return Result.succeed(emptyListingsDocument);
   const contentKeyHex = tryDecrypt(slot[2], conversationKey);
   if (contentKeyHex === null || !CONTENT_KEY_HEX.test(contentKeyHex)) {
     return Result.fail("undecryptable");

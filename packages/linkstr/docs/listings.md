@@ -4,7 +4,7 @@
 
 ## Publishing
 
-`Listings.publish(draft)` signs one event under the configured identity with the whole document and one key slot per recipient, and publishes it to every write relay. Publish the complete document every time; the newest event is the document. Publish again whenever the document or the recipient set changes, including when it becomes empty: `emptyListingsDocument` withdraws everything from everyone still listed, and a recipient left out of `recipients` cannot read the new version at all.
+`Listings.publish(draft)` signs one event under the configured identity with the whole document and one key slot per recipient, and publishes it to every write relay. Publish the complete document every time; the newest event is the document. Publish again whenever the document or the recipient set changes, including when it becomes empty: `emptyListingsDocument` withdraws everything from everyone still listed, and a recipient left out of `recipients` cannot read the new version and sees it as empty.
 
 ```ts
 import { Effect } from "effect";
@@ -49,7 +49,7 @@ Publishes of one identity run one at a time and a second publish within the same
 
 `Listings.watch(pubkeys, options?)` returns a scoped `Stream<ListingsUpdated>` for a pubkey set: the stored event of every author on subscribe, then every replacement. Each fact is the author's whole `document` with the event's `updatedAt`. Newest wins per author within the session; closing the scope tears the subscriptions down, and watching a different set means calling `watch` again (the React atoms do this for you, [react.md](./react.md#listings-watch)).
 
-Only an event holding a key slot for the watching identity decodes. An author who never saved the reader has no slot for them, so a reader that watches their own contacts sees exactly the documents of contacts who saved them back; no other check is needed for that, and the author's own event is dropped for the author as well. Linkstr persists nothing: compare `updatedAt` against your cache.
+Only an event holding a key slot for the watching identity decodes to what the author shares. An event without a slot for the reader surfaces as `emptyListingsDocument`: an author who never saved the reader shares nothing with them, and an author who removed the reader withdraws everything from them. So a reader that watches their own contacts sees exactly the documents of contacts who saved them back, and no other check is needed for that. Linkstr persists nothing: compare `updatedAt` against your cache, and replace the cached document with an empty one too.
 
 An event that is dropped is only visible to the inspector, as `ListingsEventDropped` inside `ProfileWatchRouted` ([diagnostics.md](./diagnostics.md#inspector)), with one of these reasons:
 
@@ -60,7 +60,6 @@ An event that is dropped is only visible to the inspector, as `ListingsEventDrop
 | `unwatched-author`   | a relay answered with an author outside the watched set                    |
 | `unsupported-kind`   | a relay answered with another kind                                         |
 | `other-d-tag`        | not the `listings` slot                                                    |
-| `no-slot`            | no key slot for this identity: the author does not share with it           |
 | `undecryptable`      | the slot or the content does not decrypt with the keys derived             |
 | `malformed-document` | the decrypted content is not a `ListingsDocument`                          |
 | `stale`              | older than, or as old as, the author's event already surfaced this session |
