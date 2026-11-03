@@ -194,14 +194,22 @@ export interface UnconfirmedWrite {
   readonly id: string;
 }
 
+/** A write Evolu applied, with how long it took from queueing to `onComplete`. */
+export interface AppliedWrite {
+  readonly tables: ReadonlyArray<string>;
+  readonly rows: number;
+  readonly durationMs: number;
+}
+
 export interface EvoluShardDbOptions {
   readonly onWriteUnconfirmed?: (write: UnconfirmedWrite) => void;
+  readonly onWriteApplied?: (write: AppliedWrite) => void;
 }
 
 export const createEvoluShardDb = (
   evolu: EvoluRuntime,
   ownerSync: OwnerSync,
-  { onWriteUnconfirmed }: EvoluShardDbOptions = {},
+  { onWriteUnconfirmed, onWriteApplied }: EvoluShardDbOptions = {},
 ): ShardDb<LinkyDbSchema> => {
   const overlay = new Map<string, OverlayEntry>();
   // Evolu queries are branded strings that Evolu keys its promise cache by;
@@ -526,6 +534,10 @@ export const createEvoluShardDb = (
     });
   };
 
+  const tablesOf = (mutations: ReadonlyArray<Mutation>) => [
+    ...new Set(mutations.map(({ table }) => table)),
+  ];
+
   const mutate = (
     mutations: ReadonlyArray<Mutation>,
   ): Effect.Effect<void, ShardDbError> =>
@@ -534,14 +546,22 @@ export const createEvoluShardDb = (
         batch.map(({ applied }) => applied),
         { discard: true },
       ).pipe(
+        Effect.timed,
+        Effect.flatMap(([took]) =>
+          Effect.sync(() =>
+            onWriteApplied?.({
+              tables: tablesOf(mutations),
+              rows: mutations.length,
+              durationMs: Math.round(Duration.toMillis(took)),
+            }),
+          ),
+        ),
         Effect.timeoutOrElse({
           duration: MAX_WRITE_COMPLETION_WAIT,
           orElse: () =>
             Effect.fail(
               new ShardDbError({
-                table: [...new Set(mutations.map(({ table }) => table))].join(
-                  ",",
-                ),
+                table: tablesOf(mutations).join(","),
                 message: "Evolu did not confirm the write",
               }),
             ),

@@ -5,6 +5,9 @@ import { getInspectorEmissionEnabled } from "../../../devtools/inspector/inspect
 import { reportInspectorRows } from "../../../devtools/inspector/reportInspectorRows";
 import { getUnknownErrorMessage } from "../../../utils/unknown";
 
+/** A healthy write applies in tens of ms; one past this is worth a row. */
+const SLOW_WRITE_MS = 250;
+
 export const reportShardsSubscribed = (
   reason: "boot" | "rotation" | "forget",
   owners: ReadonlyArray<OwnerId>,
@@ -98,6 +101,19 @@ export const reportLinkyEvoluEvent = (event: LinkyEvoluEvent): void => {
           tag: "WriteUnconfirmed",
           summary: `Evolu did not confirm a ${event.write.table} write within 10 s; it may have been dropped`,
           links: { owner: event.write.ownerId, row: event.write.id },
+          payload: event.write,
+        },
+      ]);
+      return;
+    case "WriteApplied":
+      if (event.write.durationMs < SLOW_WRITE_MS) return;
+      reportInspectorRows([
+        {
+          at: Date.now(),
+          channel: "evolu.sync",
+          tag: "WriteSlow",
+          summary: `A ${event.write.tables.join(", ")} write of ${event.write.rows} rows took ${event.write.durationMs} ms to apply`,
+          links: {},
           payload: event.write,
         },
       ]);

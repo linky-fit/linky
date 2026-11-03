@@ -15,7 +15,11 @@ import {
   type LinkyStore,
 } from "../model";
 import type { PageMessage, WorkerMessage } from "./dbWorker";
-import { createEvoluShardDb, type UnconfirmedWrite } from "./evoluShardDb";
+import {
+  createEvoluShardDb,
+  type AppliedWrite,
+  type UnconfirmedWrite,
+} from "./evoluShardDb";
 import { createAccountStore } from "./firstHydration";
 import { readJson, writeJson, type KeyValueStorage } from "./keyValueStorage";
 import {
@@ -157,6 +161,7 @@ export type LinkyEvoluEvent =
       readonly owners: ReadonlyArray<Evolu.OwnerId>;
     }
   | { readonly _tag: "WriteUnconfirmed"; readonly write: UnconfirmedWrite }
+  | { readonly _tag: "WriteApplied"; readonly write: AppliedWrite }
   | {
       readonly _tag: "ShardPointersRepaired";
       readonly repairs: ReadonlyArray<{
@@ -301,6 +306,7 @@ export const openLinkyStore = async (
     createEvoluShardDb(evolu, ownerSync, {
       onWriteUnconfirmed: (write) =>
         onEvent?.({ _tag: "WriteUnconfirmed", write }),
+      onWriteApplied: (write) => onEvent?.({ _tag: "WriteApplied", write }),
     }),
     owner,
     {
