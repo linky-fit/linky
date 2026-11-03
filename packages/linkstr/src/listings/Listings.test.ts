@@ -21,6 +21,7 @@ import {
   listingsSlotId,
 } from "./codec";
 import {
+  emptyListingsDocument,
   Listing,
   ListingAmount,
   ListingCurrency,
@@ -86,12 +87,12 @@ describe("listings codec", () => {
       );
     }
     const stranger = makeIdentity();
-    expect(dropReason(decodeListingsEvent(event, stranger.secretKey))).toBe(
-      "no-slot",
+    expect(documentOf(decodeListingsEvent(event, stranger.secretKey))).toEqual(
+      emptyListingsDocument,
     );
     // The author keeps no slot for themselves.
-    expect(dropReason(decodeListingsEvent(event, alice.secretKey))).toBe(
-      "no-slot",
+    expect(documentOf(decodeListingsEvent(event, alice.secretKey))).toEqual(
+      emptyListingsDocument,
     );
   });
 
@@ -107,12 +108,12 @@ describe("listings codec", () => {
     expect(slot?.[1]).not.toContain(bob.pubkey.slice(0, 8));
   });
 
-  it("uses a fresh content key per publish, so a dropped recipient loses the next version", () => {
+  it("uses a fresh content key per publish, so a dropped recipient sees the next version as empty", () => {
     const first = listingsEvent(alice, [bob.pubkey, carol.pubkey], base);
     const second = listingsEvent(alice, [bob.pubkey], base + 1);
     expect(first.content).not.toBe(second.content);
-    expect(dropReason(decodeListingsEvent(second, carol.secretKey))).toBe(
-      "no-slot",
+    expect(documentOf(decodeListingsEvent(second, carol.secretKey))).toEqual(
+      emptyListingsDocument,
     );
     expect(documentOf(decodeListingsEvent(second, bob.secretKey))).toEqual(
       document,
@@ -299,20 +300,22 @@ describe("Listings.watch", () => {
       }),
     ));
 
-  it("drops an author without a slot for the reader and an unwatched author", () =>
+  it("empties the document of an author who stops sharing with the reader and drops an unwatched author", () =>
     withWatch(bob, [alice.pubkey], ({ facts, inspected, subscriptions }) =>
       Effect.gen(function* () {
-        subscriptions[0]?.onEvent(listingsEvent(alice, [carol.pubkey], base));
+        subscriptions[0]?.onEvent(listingsEvent(alice, [bob.pubkey], base));
+        yield* eventually(() => facts.length === 1);
+        expect(facts[0]?.document).toEqual(document);
+        subscriptions[0]?.onEvent(
+          listingsEvent(alice, [carol.pubkey], base + 1),
+        );
+        yield* eventually(() => facts.length === 2);
+        expect(facts[1]?.document).toEqual(emptyListingsDocument);
         subscriptions[0]?.onEvent(listingsEvent(carol, [bob.pubkey], base));
-        yield* eventually(() => droppedWith(inspected).length === 2);
+        yield* eventually(() => droppedWith(inspected).length === 1);
         expect(droppedWith(inspected).map((drop) => drop.reason)).toEqual([
-          "no-slot",
           "unwatched-author",
         ]);
-        expect(facts).toHaveLength(0);
-        // A later version that does include the reader goes through.
-        subscriptions[0]?.onEvent(listingsEvent(alice, [bob.pubkey], base + 1));
-        yield* eventually(() => facts.length === 1);
       }),
     ));
 });

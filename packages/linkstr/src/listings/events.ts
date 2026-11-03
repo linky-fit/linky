@@ -23,8 +23,6 @@ export const ListingsDropReason = Schema.Literals([
   "unwatched-author",
   "unsupported-kind",
   "other-d-tag",
-  /** No key slot for the reader: the author does not share with them (or an older version did not). */
-  "no-slot",
   "undecryptable",
   "malformed-document",
   "stale",
