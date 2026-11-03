@@ -33,7 +33,7 @@ export type PublishedEvent = Parameters<NostrTransportService["publish"]>[1];
 
 export interface FakeSubscription {
   readonly relay: RelayUrl;
-  readonly filter: Filter;
+  readonly filters: ReadonlyArray<Filter>;
   readonly onEvent: (event: NostrToolsEvent) => void;
   /** Ends the stored events, as the relay's EOSE would. */
   readonly eose: () => void;
@@ -57,11 +57,11 @@ export const fakeTransport = (
           new RelayPublishResult({ relay, accepted: true, detail: null }),
       );
     }),
-  subscribe: (relay, filter, onEvent, options) =>
+  subscribe: (relay, filters, onEvent, options) =>
     Effect.suspend(() => {
       const subscription: FakeSubscription = {
         relay,
-        filter,
+        filters,
         onEvent,
         eose: () => options?.onEose?.(),
       };

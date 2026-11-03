@@ -27,10 +27,9 @@ describe("muteListWatchAtom", () => {
     const unmount = registry.mount(muteListWatchAtom);
 
     await expect.poll(() => subscriptions.length).toBe(1);
-    expect(subscriptions[0]?.filter).toEqual({
-      kinds: [10000],
-      authors: [alice.pubkey],
-    });
+    expect(subscriptions[0]?.filters).toEqual([
+      { kinds: [10000], authors: [alice.pubkey] },
+    ]);
 
     subscriptions[0]?.onEvent(
       finalizeEvent(

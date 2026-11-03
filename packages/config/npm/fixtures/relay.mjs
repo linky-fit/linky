@@ -52,7 +52,7 @@ try {
         yield* Effect.forkScoped(
           transport.subscribe(
             RelayUrl.make(`ws://127.0.0.1:${address.port}`),
-            { kinds: [1] },
+            [{ kinds: [1] }],
             () => {},
           ),
         );

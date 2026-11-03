@@ -41,7 +41,7 @@ class FakeSite {
   readonly client = makeIdentity();
   readonly replies: Array<SignerReply> = [];
   readonly subscriptions: Array<{
-    filter: Filter;
+    filters: ReadonlyArray<Filter>;
     closed: boolean;
     closeFromRelay: (reason: string) => void;
   }> = [];
@@ -108,12 +108,12 @@ class FakeSite {
             }),
         );
       }),
-    subscribe: (relay, filter, onEvent, options) =>
+    subscribe: (relay, filters, onEvent, options) =>
       this.unreachable.includes(relay)
         ? Effect.fail(new RelayUnreachable({ relay, detail: "503" }))
         : Effect.callback<string>((resume) => {
             const subscription = {
-              filter,
+              filters,
               closed: false,
               closeFromRelay: (reason: string) => {
                 subscription.closed = true;
@@ -203,12 +203,14 @@ describe("NostrConnect.login", () => {
           created_at: START_MILLIS / 1000,
         });
         expect(site.subscriptions).toHaveLength(2);
-        expect(site.subscriptions[0]?.filter).toEqual({
-          kinds: [24133],
-          authors: [site.client.pubkey],
-          "#p": [me.pubkey],
-          since: START_MILLIS / 1000 - 60,
-        });
+        expect(site.subscriptions[0]?.filters).toEqual([
+          {
+            kinds: [24133],
+            authors: [site.client.pubkey],
+            "#p": [me.pubkey],
+            since: START_MILLIS / 1000 - 60,
+          },
+        ]);
         expect(site.subscriptions.every(({ closed }) => closed)).toBe(true);
       }),
     ));

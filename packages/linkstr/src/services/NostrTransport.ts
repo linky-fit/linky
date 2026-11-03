@@ -26,7 +26,9 @@ export class RelayUnreachable extends Schema.TaggedError<RelayUnreachable>()(
  * caller derives delivery semantics. Retry policy deliberately does not live
  * here — it belongs to the outbox.
  *
- * Subscribing runs one live subscription on one relay: raw events flow through
+ * Subscribing runs one live subscription on one relay, one REQ with every
+ * filter, since relays cap the subscriptions a connection may hold open: raw
+ * events flow through
  * `onEvent` until the relay ends the subscription, which resolves the effect
  * with the close reason. Interruption closes the subscription. Resubscribe and
  * backfill policy live in the inbox machine, not here.
@@ -64,7 +66,7 @@ export interface NostrTransportService {
   ) => Effect.Effect<ReadonlyArray<RelayPublishResult>>;
   readonly subscribe: (
     relay: RelayUrl,
-    filter: Filter,
+    filters: ReadonlyArray<Filter>,
     onEvent: (event: NostrToolsEvent) => void,
     options?: SubscribeOptions,
   ) => Effect.Effect<string, RelayUnreachable>;
@@ -130,14 +132,14 @@ interface SentRequest {
 }
 
 /**
- * Sends `filter` as a REQ and, when no EOSE arrived halfway to the timeout,
+ * Sends `filters` as one REQ and, when no EOSE arrived halfway to the timeout,
  * once more on a fresh subscription; until the replay ends, an event both
  * deliver arrives once. The first EOSE closes the other REQ, and so does the
  * deadline, which keeps the newer one. A CLOSED on either ends both.
  */
 const requestStoredEvents = (
   connection: RelayConnection,
-  filter: Filter,
+  filters: ReadonlyArray<Filter>,
   eoseTimeoutMs: number,
   params: StoredEventsRequest,
 ): RelaySubscriptionHandle => {
@@ -158,7 +160,7 @@ const requestStoredEvents = (
   const send = () => {
     const request: SentRequest = { open: true, handle: null };
     sent.push(request);
-    request.handle = connection.subscribe([filter], {
+    request.handle = connection.subscribe([...filters], {
       onevent: (event) => {
         if (!request.open) return;
         if (replaying) {
@@ -279,7 +281,7 @@ export const makeRelayPoolTransport = (
 
   const subscribeToRelay = (
     relay: RelayUrl,
-    filter: Filter,
+    filters: ReadonlyArray<Filter>,
     onEvent: (event: NostrToolsEvent) => void,
     options?: SubscribeOptions,
   ): Effect.Effect<string, RelayUnreachable> =>
@@ -290,7 +292,7 @@ export const makeRelayPoolTransport = (
       ensureRelay(relay).then(
         (connection) => {
           if (interrupted) return;
-          handle = requestStoredEvents(connection, filter, eoseTimeoutMs, {
+          handle = requestStoredEvents(connection, filters, eoseTimeoutMs, {
             onevent: onEvent,
             alreadyHaveEvent: options?.alreadyHaveEvent,
             oneose: onEose,
@@ -335,7 +337,7 @@ export const makeRelayPoolTransport = (
         ensureRelay(relay).then(
           (connection) => {
             if (done) return;
-            handle = requestStoredEvents(connection, filter, eoseTimeoutMs, {
+            handle = requestStoredEvents(connection, [filter], eoseTimeoutMs, {
               onevent: (event) => {
                 events.push(event);
               },

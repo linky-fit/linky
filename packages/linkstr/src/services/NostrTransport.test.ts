@@ -183,7 +183,7 @@ describe("makeRelayPoolTransport subscribe", () => {
         const fiber = yield* Effect.forkChild(
           makeRelayPoolTransport(pool).subscribe(
             relayOk,
-            { kinds: [1059] },
+            [{ kinds: [1059] }],
             (incoming) => {
               received.push(incoming.id);
             },
@@ -208,7 +208,7 @@ describe("makeRelayPoolTransport subscribe", () => {
     const exit = await Effect.runPromiseExit(
       makeRelayPoolTransport(pool).subscribe(
         relayDown,
-        { kinds: [1059] },
+        [{ kinds: [1059] }],
         () => {
           throw new Error("no events from an unreachable relay");
         },
@@ -239,7 +239,7 @@ describe("makeRelayPoolTransport subscribe", () => {
             eoseTimeout: Duration.millis(100),
           }).subscribe(
             relayOk,
-            { kinds: [0] },
+            [{ kinds: [0] }],
             (incoming) => {
               received.push(incoming.id);
             },
@@ -280,7 +280,7 @@ describe("makeRelayPoolTransport subscribe", () => {
         yield* Effect.forkChild(
           makeRelayPoolTransport(pool, {
             eoseTimeout: Duration.millis(50),
-          }).subscribe(relayOk, { kinds: [0] }, () => {}, {
+          }).subscribe(relayOk, [{ kinds: [0] }], () => {}, {
             onEose: () => {
               eoses += 1;
             },
@@ -304,7 +304,7 @@ describe("makeRelayPoolTransport subscribe", () => {
         const fiber = yield* Effect.forkChild(
           makeRelayPoolTransport(pool).subscribe(
             relayOk,
-            { kinds: [1059] },
+            [{ kinds: [1059] }],
             () => {},
           ),
         );
@@ -521,7 +521,7 @@ describe("loopback relay opt-in", () => {
     expect(
       Exit.isFailure(
         await Effect.runPromiseExit(
-          localTransport.subscribe(local, {}, () => {}),
+          localTransport.subscribe(local, [{}], () => {}),
         ),
       ),
     ).toBe(true);

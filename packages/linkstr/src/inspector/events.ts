@@ -97,7 +97,7 @@ export class WireSubscribed extends Schema.TaggedClass<WireSubscribed>()(
   "WireSubscribed",
   {
     relay: RelayUrl,
-    filter: Schema.Unknown,
+    filters: Schema.Array(Schema.Unknown),
   },
 ) {}
 
@@ -114,7 +114,7 @@ export class WireRequestResent extends Schema.TaggedClass<WireRequestResent>()(
   "WireRequestResent",
   {
     relay: RelayUrl,
-    filter: Schema.Unknown,
+    filters: Schema.Array(Schema.Unknown),
   },
 ) {}
 

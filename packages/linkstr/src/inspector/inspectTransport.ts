@@ -20,12 +20,12 @@ const reportResent =
   (
     inspector: InspectorService,
     relay: RelayUrl,
-    filter: Filter,
+    filters: ReadonlyArray<Filter>,
     onRequestResent: (() => void) | undefined,
   ) =>
   () => {
     inspector.emit(
-      () => new WireRequestResent({ relay, filter }, { disableChecks: true }),
+      () => new WireRequestResent({ relay, filters }, { disableChecks: true }),
     );
     onRequestResent?.();
   };
@@ -54,14 +54,14 @@ const tapWire = (
           ),
         ),
       ),
-  subscribe: (relay, filter, onEvent, options) =>
+  subscribe: (relay, filters, onEvent, options) =>
     Effect.suspend(() => {
       inspector.emit(
-        () => new WireSubscribed({ relay, filter }, { disableChecks: true }),
+        () => new WireSubscribed({ relay, filters }, { disableChecks: true }),
       );
       return inner.subscribe(
         relay,
-        filter,
+        filters,
         (event) => {
           inspector.emit(
             () =>
@@ -74,7 +74,7 @@ const tapWire = (
           onRequestResent: reportResent(
             inspector,
             relay,
-            filter,
+            filters,
             options?.onRequestResent,
           ),
         },
@@ -110,7 +110,7 @@ const tapWire = (
         onRequestResent: reportResent(
           inspector,
           relay,
-          filter,
+          [filter],
           options?.onRequestResent,
         ),
       })

@@ -17,6 +17,7 @@ import { NoReadRelaysConfigured } from "../domain/errors";
 import type { Pubkey, RelayUrl, UnixSeconds } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import { ProfileWatchRouted } from "../inspector/events";
+import { subscriptionRequests } from "../internal/authorChunks";
 import { inspectPlainOperation } from "../internal/inspectPlainOperation";
 import type { SignedPlainEvent } from "../internal/nostrEvent";
 import { publishPlainEvent, replacementDate } from "../internal/plainDelivery";
@@ -105,20 +106,23 @@ export class Listings extends Context.Service<Listings>()("linkstr/Listings", {
           options?.resubscribeDelay ?? DEFAULT_RESUBSCRIBE_DELAY;
 
         const watched = new Set<Pubkey>(pubkeys);
-        const filters = listingsFilters([...watched]);
+        const requests = subscriptionRequests(listingsFilters([...watched]));
         const rawEvents = yield* acquireStreamQueue(
           Queue.unbounded<unknown, Cause.Done>(),
         );
-        const keepSubscribed = (relay: RelayUrl, filter: Filter) =>
+        const keepSubscribed = (
+          relay: RelayUrl,
+          filters: ReadonlyArray<Filter>,
+        ) =>
           resubscribeForever(
-            context.transport.subscribe(relay, filter, (event) => {
+            context.transport.subscribe(relay, filters, (event) => {
               Queue.offerUnsafe(rawEvents, event);
             }),
             resubscribeDelay,
           );
         yield* Effect.forEach(relays, (relay) =>
-          Effect.forEach(filters, (filter) =>
-            Effect.forkScoped(keepSubscribed(relay, filter)),
+          Effect.forEach(requests, (filters) =>
+            Effect.forkScoped(keepSubscribed(relay, filters)),
           ),
         );
 

@@ -161,7 +161,7 @@ export class AppData extends Context.Service<AppData>()("linkstr/AppData", {
         yield* Effect.forEach(relays, (relay) =>
           Effect.forkScoped(
             resubscribeForever(
-              context.transport.subscribe(relay, filter, (event) => {
+              context.transport.subscribe(relay, [filter], (event) => {
                 Queue.offerUnsafe(raw, event);
               }),
               options?.resubscribeDelay ?? DEFAULT_RESUBSCRIBE_DELAY,

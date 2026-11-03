@@ -31,6 +31,7 @@ import {
 } from "./codec";
 import { ProfileEventDropped } from "./events";
 import type { ProfileDropReason, ProfileWatchEvent } from "./events";
+import { subscriptionRequests } from "../internal/authorChunks";
 import { profileFilters } from "./filters";
 
 export interface ProfileWatchOptions {
@@ -74,21 +75,24 @@ export class ProfileWatch extends Context.Service<ProfileWatch>()(
             options?.resubscribeDelay ?? DEFAULT_RESUBSCRIBE_DELAY;
 
           const watched = new Set<Pubkey>(pubkeys);
-          const filters = profileFilters([...watched]);
+          const requests = subscriptionRequests(profileFilters([...watched]));
           const rawEvents = yield* acquireStreamQueue(
             Queue.unbounded<unknown, Cause.Done>(),
           );
 
-          const keepSubscribed = (relay: RelayUrl, filter: Filter) =>
+          const keepSubscribed = (
+            relay: RelayUrl,
+            filters: ReadonlyArray<Filter>,
+          ) =>
             resubscribeForever(
-              transport.subscribe(relay, filter, (event) => {
+              transport.subscribe(relay, filters, (event) => {
                 Queue.offerUnsafe(rawEvents, event);
               }),
               resubscribeDelay,
             );
           yield* Effect.forEach(relays, (relay) =>
-            Effect.forEach(filters, (filter) =>
-              Effect.forkScoped(keepSubscribed(relay, filter)),
+            Effect.forEach(requests, (filters) =>
+              Effect.forkScoped(keepSubscribed(relay, filters)),
             ),
           );
 

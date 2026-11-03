@@ -163,7 +163,8 @@ export const linkstrEventToRow = (
         at,
         channel: "nostr.wire",
         tag: event._tag,
-        summary: `subscribe ${filterKindsLabel(event.filter)} @ ${event.relay}`,
+        // A REQ holds filters of one kind, so its first filter names them all.
+        summary: `subscribe ${filterKindsLabel(event.filters[0])} @ ${event.relay}`,
         links: {},
         context: { relay: event.relay },
         payload: event,
@@ -211,7 +212,7 @@ export const linkstrEventToRow = (
         at,
         channel: "nostr.wire",
         tag: event._tag,
-        summary: `REQ ${filterKindsLabel(event.filter)} resent @ ${event.relay} — no EOSE yet`,
+        summary: `REQ ${filterKindsLabel(event.filters[0])} resent @ ${event.relay} — no EOSE yet`,
         links: {},
         context: { relay: event.relay },
         payload: event,

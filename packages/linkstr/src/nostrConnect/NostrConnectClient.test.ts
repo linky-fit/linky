@@ -30,14 +30,16 @@ const matches = (filter: Filter, event: NostrToolsEvent): boolean =>
 /** One relay both sides share: a publish reaches every open matching subscription. */
 const relayBus = (): NostrTransportService => {
   const listeners = new Set<{
-    filter: Filter;
+    filters: ReadonlyArray<Filter>;
     onEvent: (event: NostrToolsEvent) => void;
   }>();
   return {
     publish: (relays, event) =>
       Effect.sync(() => {
         for (const listener of [...listeners]) {
-          if (matches(listener.filter, event)) listener.onEvent(event);
+          if (listener.filters.some((filter) => matches(filter, event))) {
+            listener.onEvent(event);
+          }
         }
         return relays.map(
           (url) =>
@@ -48,10 +50,10 @@ const relayBus = (): NostrTransportService => {
             }),
         );
       }),
-    subscribe: (_relay, filter, onEvent, options) =>
+    subscribe: (_relay, filters, onEvent, options) =>
       Effect.acquireRelease(
         Effect.sync(() => {
-          const listener = { filter, onEvent };
+          const listener = { filters, onEvent };
           listeners.add(listener);
           options?.onEose?.();
           return listener;

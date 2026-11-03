@@ -16,12 +16,12 @@ const tapHealth = (
         }),
       ),
     ),
-  subscribe: (relay, filter, onEvent, options) =>
+  subscribe: (relay, filters, onEvent, options) =>
     Effect.suspend(() => {
       health.reportSubscribing(relay);
       return inner.subscribe(
         relay,
-        filter,
+        filters,
         (event) => {
           health.reportSeen(relay);
           onEvent(event);
