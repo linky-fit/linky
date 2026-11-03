@@ -104,31 +104,37 @@ export const normalizeListingAmount = (
   return text;
 };
 
-const priceFormatters = new Map<string, Intl.NumberFormat>();
+const numberFormatters = new Map<string, Intl.NumberFormat>();
 
-/** `90 Kč`, `1 800 Kč`, `12,50 €`: the amount in its own currency, decimals only when the author typed them. */
+/** `90 Kč`, `1 800 Kč`, `12,50 EUR`: the amount with the same unit label the rest of the app uses, decimals only when the author typed them. */
 const formatInListingCurrency = (
   amount: string,
   currency: string,
   lang: string,
 ): string => {
   const fractionDigits = amount.includes(".") ? 2 : 0;
-  const key = `${lang}:${currency}:${fractionDigits}`;
-  let formatter = priceFormatters.get(key);
+  const key = `${lang}:${fractionDigits}`;
+  let formatter = numberFormatters.get(key);
   if (!formatter) {
-    try {
-      formatter = new Intl.NumberFormat(lang, {
-        style: "currency",
-        currency,
-        minimumFractionDigits: fractionDigits,
-        maximumFractionDigits: fractionDigits,
-      });
-    } catch {
-      return `${amount} ${currency}`;
-    }
-    priceFormatters.set(key, formatter);
+    formatter = new Intl.NumberFormat(lang, {
+      minimumFractionDigits: fractionDigits,
+      maximumFractionDigits: fractionDigits,
+    });
+    numberFormatters.set(key, formatter);
   }
-  return formatter.format(Number(amount));
+  return `${formatter.format(Number(amount))} ${listingCurrencyLabel(currency, lang)}`;
+};
+
+/** The currencies a listing can be priced in on this device: every allowed display currency, sats once, plus `current` when it is not among them. */
+export const listingCurrencyChoices = (
+  allowed: ReadonlyArray<DisplayCurrency>,
+  current: string,
+): ReadonlyArray<string> => {
+  const choices = new Set<string>([current]);
+  for (const currency of allowed) {
+    if (currency !== "hidden") choices.add(listingCurrencyOfDisplay(currency));
+  }
+  return [...choices];
 };
 
 /**

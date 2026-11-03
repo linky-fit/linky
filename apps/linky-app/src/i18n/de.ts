@@ -1344,6 +1344,7 @@ export const de = {
   listingTitlePlaceholder: "Z. B. Eier aus dem Garten oder Babysitten",
   listingPrice: "Preis",
   listingUnit: "Einheit",
+  listingCurrency: "Währung",
   listingUnitPlaceholder: "pro Stunde, pro kg …",
   listingAdd: "Hinzufügen",
   listingSave: "Speichern",

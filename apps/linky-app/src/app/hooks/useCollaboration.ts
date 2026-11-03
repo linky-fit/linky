@@ -3,6 +3,7 @@ import type { Pubkey } from "@linky-fit/linkstr";
 import { useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
 import { isDeletedContact } from "../../utils/contactName";
+import { formatShortNpub } from "../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
 import { peerListingsAtom } from "../state/contacts/listings";
 import { profileCacheAtom } from "../state/contacts/profiles";
@@ -56,7 +57,9 @@ export const useSharingContacts = (): ReadonlyArray<SharingContact> => {
           {
             contact,
             pubkey,
-            name: (contact.name ?? "").trim(),
+            name:
+              (contact.name ?? "").trim() ||
+              formatShortNpub(encodeNpub(pubkey)),
             pictureUrl: pictures[encodeNpub(pubkey)] ?? null,
             cash: peer.document.cash,
             listings: peer.document.listings,

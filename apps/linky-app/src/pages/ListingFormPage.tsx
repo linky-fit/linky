@@ -16,6 +16,7 @@ import {
 } from "@linky-fit/ui";
 import React from "react";
 import { reportAppLog } from "../devtools/inspector/appLog";
+import { useAtomValue } from "@linky-fit/linkstr-react";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import {
   useListingRecords,
@@ -23,11 +24,13 @@ import {
 } from "../app/hooks/useLinksync";
 import {
   LISTING_SIDES,
+  listingCurrencyChoices,
   listingCurrencyLabel,
   listingCurrencyOfDisplay,
   normalizeListingAmount,
 } from "../app/lib/listings";
 import { runWrite } from "../app/lib/storeWrite";
+import { allowedDisplayCurrenciesAtom } from "../app/state/shell/displayPrefs";
 import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey } from "../i18n";
 import { nowSeconds } from "../utils/time";
@@ -48,6 +51,7 @@ export function ListingFormPage({
 }): React.ReactElement {
   const { lang, t } = useTranslation();
   const { displayCurrency } = useDisplayAmounts();
+  const allowedDisplayCurrencies = useAtomValue(allowedDisplayCurrenciesAtom);
   const repository = useListingsRepository();
   const records = useListingRecords();
   const existing = id
@@ -76,6 +80,17 @@ export function ListingFormPage({
     setUnit(existing.unit);
     setCurrency(existing.currency);
   }, [existing]);
+
+  // Tapping the unit cycles through the device's display currencies.
+  const currencyChoices = listingCurrencyChoices(
+    allowedDisplayCurrencies,
+    currency,
+  );
+  const nextCurrency = () => {
+    const index = currencyChoices.indexOf(currency);
+    const next = currencyChoices[(index + 1) % currencyChoices.length];
+    if (next !== undefined) setCurrency(next);
+  };
 
   const normalizedAmount = normalizeListingAmount(amount, currency);
   const canSave =
@@ -156,27 +171,41 @@ export function ListingFormPage({
         testID="listing-title"
       />
       <Row gap="$sm" alignItems="flex-start">
-        <TextField
-          flex={1}
-          label={t("listingPrice")}
-          hideLabel
-          placeholder={t("listingPrice")}
-          inputMode="decimal"
-          value={amount}
-          onChangeText={setAmount}
-          trailing={listingCurrencyLabel(currency, lang)}
-          testID="listing-amount"
-        />
-        <TextField
-          flex={1}
-          label={t("listingUnit")}
-          hideLabel
-          placeholder={t("listingUnitPlaceholder")}
-          value={unit}
-          onChangeText={setUnit}
-          maxLength={40}
-          testID="listing-unit"
-        />
+        <Stack flex={1} minWidth={0}>
+          <TextField
+            label={t("listingPrice")}
+            hideLabel
+            placeholder={t("listingPrice")}
+            inputMode="decimal"
+            value={amount}
+            onChangeText={setAmount}
+            trailing={
+              <Button
+                variant="ghost"
+                size="sm"
+                onPress={nextCurrency}
+                disabled={currencyChoices.length < 2}
+                tooltip={t("listingCurrency")}
+                aria-label={`${t("listingCurrency")}: ${listingCurrencyLabel(currency, lang)}`}
+                testID="listing-currency"
+              >
+                {listingCurrencyLabel(currency, lang)}
+              </Button>
+            }
+            testID="listing-amount"
+          />
+        </Stack>
+        <Stack flex={1} minWidth={0}>
+          <TextField
+            label={t("listingUnit")}
+            hideLabel
+            placeholder={t("listingUnitPlaceholder")}
+            value={unit}
+            onChangeText={setUnit}
+            maxLength={40}
+            testID="listing-unit"
+          />
+        </Stack>
       </Row>
       {error ? (
         <Text variant="caption" color="$dangerText">
