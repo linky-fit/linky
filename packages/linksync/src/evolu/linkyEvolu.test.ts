@@ -129,7 +129,7 @@ describe("createLinkyEvolu", () => {
       ),
       'create index "cashuProofState" on "cashuProof" ("state")',
       'create index "cashuProofOperationId" on "cashuProof" ("operationId")',
-      'create index "cashuProofKeysetCreatedAt" on "cashuProof" ("keysetId", "createdAt")',
+      'create index "cashuProofKeysetCreatedSecond" on "cashuProof" ("keysetId", substr("createdAt", 1, 19), "mint")',
     ]);
   });
 

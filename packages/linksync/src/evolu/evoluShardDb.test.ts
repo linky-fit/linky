@@ -1,5 +1,9 @@
 import { ownerIdToOwnerIdBytes, type OwnerId } from "@evolu/common";
-import { createQuery, deserializeQuery } from "@evolu/common/local-first";
+import {
+  createQuery,
+  deserializeQuery,
+  evoluSchemaToDbSchema,
+} from "@evolu/common/local-first";
 import { Effect } from "effect";
 import { DatabaseSync } from "node:sqlite";
 import { testAppOwner } from "../testing/toy";
@@ -8,6 +12,7 @@ import {
   type EvoluRuntime,
   type UnconfirmedWrite,
 } from "./evoluShardDb";
+import { LinkyEvoluSchema, linkyIndexes } from "./linkyEvolu";
 import type { OwnerSync } from "./ownerSync";
 
 /**
@@ -433,20 +438,26 @@ const sqliteEvolu = () => {
   const loaded: Array<ReadonlyArray<Record<string, unknown>>> = [];
   sqlite.exec(
     `create table cashuProof (id text, ownerId text, createdAt text, updatedAt text,
-      isDeleted integer, state text, operationId text, keysetId text, mint text)`,
+      isDeleted integer, state text, operationId text, keysetId text, mint text,
+      primary key (ownerId, id)) without rowid`,
   );
+  for (const index of evoluSchemaToDbSchema(LinkyEvoluSchema, linkyIndexes)
+    .indexes)
+    if (index.sql.includes(`on "cashuProof"`)) sqlite.exec(index.sql);
+  const plans: string[] = [];
   const evolu = {
     ...fakeEvolu().runtime,
     createQuery,
     loadQuery: (query: Parameters<typeof deserializeQuery>[0]) => {
       const { sql, parameters } = deserializeQuery(query);
-      const rows = sqlite
-        .prepare(sql)
-        .all(
-          ...parameters.filter(
-            (value) => typeof value === "string" || typeof value === "number",
-          ),
-        );
+      const bound = parameters.filter(
+        (value) => typeof value === "string" || typeof value === "number",
+      );
+      for (const step of sqlite
+        .prepare(`explain query plan ${sql}`)
+        .all(...bound))
+        plans.push(String(step.detail));
+      const rows = sqlite.prepare(sql).all(...bound);
       loaded.push(rows);
       return Promise.resolve(rows);
     },
@@ -478,7 +489,7 @@ const sqliteEvolu = () => {
         row.keysetId ?? null,
         row.mint ?? null,
       );
-  return { runtime, insert, loaded };
+  return { runtime, insert, loaded, plans };
 };
 
 describe("evolu shard db filtered reads over SQLite", () => {
@@ -654,6 +665,26 @@ describe("evolu shard db filtered reads over SQLite", () => {
     );
 
     expect(rows.map((row) => row.mint)).toEqual(["https://a.example"]);
+  });
+
+  it("finds the oldest proof of a keyset through its index, without sorting the history", async () => {
+    const { runtime, insert, plans } = sqliteEvolu();
+    const db = createEvoluShardDb(runtime, reportedOwnerSync().ownerSync);
+    insert({
+      id: "a",
+      ownerId: older,
+      createdAt: at,
+      keysetId: "00aa",
+      mint: "m",
+    });
+
+    await Effect.runPromise(
+      db.readOldest("cashuProof", "keysetId", ["00aa"], [older, newer], "mint"),
+    );
+
+    expect(plans).toEqual([
+      expect.stringContaining("USING INDEX cashuProofKeysetCreatedSecond"),
+    ]);
   });
 
   it("ties rows created within the same second", async () => {
