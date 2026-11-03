@@ -10,10 +10,10 @@
 // ingest, and transactions lose their deprecated columns.
 //
 // The same routine is the mixed-version grace period: an older app version
-// keeps writing to the lanes, so each boot and subsequent legacy query change
-// inside the grace period re-runs it over the rows the device holds. There is no watermark: a row
-// that syncs in late carries an old `updatedAt`, so a watermark would skip
-// it, while the ingest's per-row comparison costs one map lookup.
+// keeps writing to the lanes, so inside the grace period it re-runs over the
+// rows the device holds whenever the lanes' change count in `evolu_history`
+// moved since the last run. A count, not a watermark: a row that syncs in
+// late carries an old timestamp, so a watermark would skip it.
 //
 // It writes no shard pointer and no cutoff: a restored device runs it before
 // the app owner syncs, and Evolu's last-writer-wins would let that write
@@ -98,6 +98,20 @@ export const isLaneMigrationDoneLocally = (): boolean =>
 
 export const markLaneMigrationDoneLocally = (): void =>
   safeLocalStorageSet(LANE_MIGRATION_DONE_STORAGE_KEY, "1");
+
+export const LANES_INGESTED_STORAGE_KEY = "linky.laneMigration.ingested.v1";
+
+/** The lanes read and how many changes they held, so an ingest repeats only after a change. */
+export const laneIngestKey = (
+  ownerIds: ReadonlyArray<string>,
+  changes: number,
+): string => JSON.stringify([[...ownerIds].sort(), changes]);
+
+export const readIngestedLanesKey = (): string | null =>
+  safeLocalStorageGet(LANES_INGESTED_STORAGE_KEY);
+
+export const markLanesIngested = (key: string): void =>
+  safeLocalStorageSet(LANES_INGESTED_STORAGE_KEY, key);
 
 export const isLaneGracePeriodActive = (nowMs: number): boolean =>
   nowMs < LANE_MIGRATION_RELEASED_AT_MS + LANE_MIGRATION_GRACE_PERIOD_MS;
@@ -185,16 +199,6 @@ export interface LegacyLaneSnapshot {
   readonly identities: ReadonlyArray<NostrIdentityRow>;
   readonly ownerMeta: ReadonlyArray<OwnerMetaRow>;
 }
-
-export const legacySnapshotKey = (
-  snapshot: LegacyLaneSnapshot,
-  legacyOwnerIds: ReadonlySet<string>,
-): string =>
-  JSON.stringify(
-    Object.values(snapshot).map((rows: ReadonlyArray<LegacyRow>) =>
-      rows.filter((row) => legacyOwnerIds.has(row.ownerId)),
-    ),
-  );
 
 type LegacyRow = { readonly id: string } & SystemColumns;
 /** Any legacy row with extra columns the target table may or may not have. */

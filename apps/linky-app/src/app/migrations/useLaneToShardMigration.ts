@@ -34,6 +34,8 @@ import {
   createCashuProofsAllQuery,
   createCashuTokensAllQuery,
   createContactsAllQuery,
+  createLegacyChangeCountQuery,
+  createLegacyUnspentProofCopiesQuery,
   createNostrIdentitiesAllQuery,
   createNostrMessagesAllQuery,
   createNostrReactionsAllQuery,
@@ -51,8 +53,10 @@ import {
   deriveLegacyLaneOwners,
   isLaneGracePeriodActive,
   isLaneMigrationDoneLocally,
+  laneIngestKey,
   markLaneMigrationDoneLocally,
-  legacySnapshotKey,
+  markLanesIngested,
+  readIngestedLanesKey,
   readLegacyLaneIndexes,
   runLaneToShardMigration,
   type LaneMigrationReport,
@@ -197,17 +201,31 @@ const bootLaneMigration = async (
     },
   );
 
-  const snapshot = await readLegacyLaneSnapshot(evolu);
-  const report = await runLaneToShardMigration({
-    store,
-    snapshot,
-    legacyOwnerIds: new Set(legacyOwnerIds),
-    ingestLegacyTokens: (rows) =>
-      ingestLegacyTokensThroughShards(store, resolveSeed, rows),
-  });
+  const readIngestKey = async (): Promise<string> => {
+    const [count] = await evolu.loadQuery(
+      createLegacyChangeCountQuery(evolu, legacyOwnerIds),
+    );
+    return laneIngestKey(legacyOwnerIds, count?.changes ?? 0);
+  };
+  const ingestLanes = async (key: string): Promise<LaneMigrationReport> => {
+    const report = await runLaneToShardMigration({
+      store,
+      snapshot: await readLegacyLaneSnapshot(evolu),
+      legacyOwnerIds: new Set(legacyOwnerIds),
+      ingestLegacyTokens: (rows) =>
+        ingestLegacyTokensThroughShards(store, resolveSeed, rows),
+    });
+    markLanesIngested(key);
+    return report;
+  };
+
+  const bootKey = await readIngestKey();
+  const report =
+    firstRun || bootKey !== readIngestedLanesKey()
+      ? await ingestLanes(bootKey)
+      : null;
   markLaneMigrationDoneLocally();
 
-  const proofQuery = createCashuProofsAllQuery(evolu);
   let mirroring = false;
   let dirty = false;
   const mirrorSpentProofs = async (): Promise<void> => {
@@ -217,13 +235,12 @@ const bootLaneMigration = async (
     try {
       while (dirty && isLaneGracePeriodActive(Date.now())) {
         dirty = false;
-        const [legacy, shardCopies] = await Promise.all([
-          evolu.loadQuery(proofQuery),
-          Effect.runPromise(store.copies("cashu", "cashuProof")),
-        ]);
+        const copies = await evolu.loadQuery(
+          createLegacyUnspentProofCopiesQuery(evolu, legacyOwnerIds),
+        );
         const changed = legacyProofsToMarkSpent(
-          legacy,
-          shardCopies,
+          copies,
+          copies,
           new Set(legacyOwnerIds),
         );
         for (const proof of changed) {
@@ -254,10 +271,7 @@ const bootLaneMigration = async (
       mirroring = false;
     }
   };
-  evolu.subscribeQuery(proofQuery)(() => void mirrorSpentProofs());
-  await mirrorSpentProofs();
 
-  let lastSnapshotKey = legacySnapshotKey(snapshot, new Set(legacyOwnerIds));
   let indexesKey = JSON.stringify(
     readLegacyLaneIndexes(ownerMeta, store.appOwner.id),
   );
@@ -271,9 +285,8 @@ const bootLaneMigration = async (
       while (pending) {
         pending = false;
         if (!isLaneGracePeriodActive(Date.now())) return;
-        const latest = await readLegacyLaneSnapshot(evolu);
         const indexes = readLegacyLaneIndexes(
-          latest.ownerMeta,
+          await evolu.loadQuery(createOwnerMetaAllQuery(evolu)),
           store.appOwner.id,
         );
         const nextIndexesKey = JSON.stringify(indexes);
@@ -284,18 +297,11 @@ const bootLaneMigration = async (
             evolu.useOwner(owner);
           }
           indexesKey = nextIndexesKey;
+          watchLanes();
         }
-        const ownerIds = new Set(legacyOwnerIds);
-        const nextKey = legacySnapshotKey(latest, ownerIds);
-        if (nextKey === lastSnapshotKey) continue;
-        const ingested = await runLaneToShardMigration({
-          store,
-          snapshot: latest,
-          legacyOwnerIds: ownerIds,
-          ingestLegacyTokens: (rows) =>
-            ingestLegacyTokensThroughShards(store, resolveSeed, rows),
-        });
-        lastSnapshotKey = nextKey;
+        const key = await readIngestKey();
+        if (key === readIngestedLanesKey()) continue;
+        const ingested = await ingestLanes(key);
         await mirrorSpentProofs();
         emit(
           "LaneGracePeriodReingested",
@@ -315,24 +321,43 @@ const bootLaneMigration = async (
       reingesting = false;
     }
   };
-  for (const query of [
-    createContactsAllQuery(evolu),
-    createNostrMessagesAllQuery(evolu),
-    createNostrReactionsAllQuery(evolu),
-    createCashuTokensAllQuery(evolu),
-    createCashuProofsAllQuery(evolu),
-    createCashuOperationsAllQuery(evolu),
-    createTransactionsAllQuery(evolu),
-    createNostrIdentitiesAllQuery(evolu),
-    createOwnerMetaAllQuery(evolu),
-  ])
-    evolu.subscribeQuery(query)(() => void reingestLateRows());
-  // Late rows wait for hydration; the migrating screen waits only for the first run.
-  void reingestLateRows();
+
+  // Narrow queries: Evolu re-runs every subscribed query on every write.
+  let unwatchLanes = (): void => {};
+  const watchLanes = (): void => {
+    unwatchLanes();
+    const stops = [
+      evolu.subscribeQuery(createLegacyChangeCountQuery(evolu, legacyOwnerIds))(
+        () => void reingestLateRows(),
+      ),
+      evolu.subscribeQuery(
+        createLegacyUnspentProofCopiesQuery(evolu, legacyOwnerIds),
+      )(() => void mirrorSpentProofs()),
+    ];
+    unwatchLanes = () => {
+      for (const stop of stops) stop();
+    };
+  };
+  if (gracePeriodActive) {
+    watchLanes();
+    await mirrorSpentProofs();
+    // Late rows wait for hydration; the migrating screen waits only for the first run.
+    void reingestLateRows();
+  }
 
   const shardOwnerIds = (await Effect.runPromise(store.syncOwners())).map(
     (owner) => owner.id,
   );
+  const durationMs = Date.now() - startedAtMs;
+  if (report === null) {
+    emit(
+      "LaneGracePeriodUnchanged",
+      `Owner lanes unchanged since the last ingest; checked in ${durationMs} ms`,
+      [...legacyOwnerIds, ...shardOwnerIds],
+      { durationMs },
+    );
+    return;
+  }
   if (firstRun) {
     for (const [scope, tables] of countsByScope(report)) {
       const ingested = Object.values(tables).reduce(
@@ -350,12 +375,12 @@ const bootLaneMigration = async (
   emit(
     firstRun ? "LaneMigrationDone" : "LaneGracePeriodReingested",
     firstRun
-      ? `Owner lanes migrated in ${Date.now() - startedAtMs} ms`
-      : `Owner lanes re-ingested in ${Date.now() - startedAtMs} ms`,
+      ? `Owner lanes migrated in ${durationMs} ms`
+      : `Owner lanes re-ingested in ${durationMs} ms`,
     [...legacyOwnerIds, ...shardOwnerIds],
     {
       firstRun,
-      durationMs: Date.now() - startedAtMs,
+      durationMs,
       gracePeriodActive,
       counts: report.counts,
     },

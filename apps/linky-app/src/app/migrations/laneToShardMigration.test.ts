@@ -29,7 +29,6 @@ import {
   LANE_MIGRATION_GRACE_PERIOD_MS,
   LANE_MIGRATION_RELEASED_AT_MS,
   legacyPointerIndex,
-  legacySnapshotKey,
   readLegacyLaneIndexes,
   runLaneToShardMigration,
   type LegacyLaneSnapshot,
@@ -591,33 +590,5 @@ describe("isLaneGracePeriodActive", () => {
     expect(isLaneGracePeriodActive(LANE_MIGRATION_RELEASED_AT_MS)).toBe(true);
     expect(isLaneGracePeriodActive(end - 1)).toBe(true);
     expect(isLaneGracePeriodActive(end)).toBe(false);
-  });
-});
-
-describe("legacy snapshot change detection", () => {
-  it("ignores shard rows and detects late legacy columns with the same timestamp", () => {
-    const legacy = contact(laneA, { name: text("Before") });
-    const owners = new Set([laneA.id]);
-    const snapshot = { ...emptySnapshot, contacts: [legacy] };
-    const key = legacySnapshotKey(snapshot, owners);
-    expect(
-      legacySnapshotKey(
-        { ...snapshot, contacts: [legacy, contact(foreign)] },
-        owners,
-      ),
-    ).toBe(key);
-    expect(
-      legacySnapshotKey(
-        { ...snapshot, contacts: [{ ...legacy, name: text("After") }] },
-        owners,
-      ),
-    ).not.toBe(key);
-  });
-
-  it("detects rows when a newly discovered legacy owner becomes eligible", () => {
-    const snapshot = { ...emptySnapshot, contacts: [contact(laneB)] };
-    expect(legacySnapshotKey(snapshot, new Set([laneA.id, laneB.id]))).not.toBe(
-      legacySnapshotKey(snapshot, new Set([laneA.id])),
-    );
   });
 });

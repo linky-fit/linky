@@ -4,11 +4,15 @@ import { act, Suspense, use } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makeTestLinkyStore } from "../../testUtils/linkyStore";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
-import { LANE_MIGRATION_DONE_STORAGE_KEY } from "./laneToShardMigration";
+import {
+  LANE_MIGRATION_DONE_STORAGE_KEY,
+  LANE_MIGRATION_RELEASED_AT_MS,
+} from "./laneToShardMigration";
 
 const legacy = vi.hoisted(() => ({
   store: Promise.resolve<LinkyStore | null>(null),
   tables: new Map<string, ReadonlyArray<Readonly<Record<string, unknown>>>>(),
+  loaded: new Array<string>(),
   update: vi.fn(() => ({ ok: true })),
   reportAppLog: vi.fn(),
   reportInspectorRows: vi.fn(),
@@ -17,8 +21,10 @@ const legacy = vi.hoisted(() => ({
 vi.mock("../../evolu", () => {
   const query = (table: string) => () => table;
   const evolu = {
-    loadQuery: (table: string) =>
-      Promise.resolve(legacy.tables.get(table) ?? []),
+    loadQuery: (table: string) => {
+      legacy.loaded.push(table);
+      return Promise.resolve(legacy.tables.get(table) ?? []);
+    },
     subscribeQuery: () => () => () => {},
     useOwner: () => {},
     update: legacy.update,
@@ -29,6 +35,8 @@ vi.mock("../../evolu", () => {
     createCashuProofsAllQuery: query("cashuProof"),
     createCashuTokensAllQuery: query("cashuToken"),
     createContactsAllQuery: query("contact"),
+    createLegacyChangeCountQuery: query("legacyChanges"),
+    createLegacyUnspentProofCopiesQuery: query("legacyUnspentProofCopies"),
     createNostrIdentitiesAllQuery: query("nostrIdentity"),
     createNostrMessagesAllQuery: query("nostrMessage"),
     createNostrReactionsAllQuery: query("nostrReaction"),
@@ -87,6 +95,7 @@ const doneFlag = () => localStorage.getItem(LANE_MIGRATION_DONE_STORAGE_KEY);
 beforeEach(() => {
   vi.resetModules();
   legacy.tables.clear();
+  legacy.loaded = [];
   legacy.update.mockClear();
   legacy.reportAppLog.mockClear();
   legacy.reportInspectorRows.mockClear();
@@ -132,7 +141,7 @@ describe("useLaneToShardMigration", () => {
   });
 
   it("marks a legacy proof spent once its shard copy is spent, and reports it", async () => {
-    const { appOwner, db, store } = makeTestLinkyStore(1);
+    const { appOwner, store } = makeTestLinkyStore(1);
     legacy.store = Promise.resolve(store);
     const proof = {
       id: createId<"CashuProof">(),
@@ -145,19 +154,14 @@ describe("useLaneToShardMigration", () => {
       dleq: null,
       operationId: null,
     };
-    legacy.tables.set("cashuProof", [
-      legacyRow(appOwner.id, { ...proof, state: "held" }),
+    legacy.tables.set("legacyUnspentProofCopies", [
+      legacyRow(appOwner.id, { id: proof.id, state: "held" }),
+      {
+        ownerId: store.shardOwner("cashu", 0).id,
+        id: proof.id,
+        state: "spent",
+      },
     ]);
-    await Effect.runPromise(
-      db.mutate([
-        {
-          kind: "upsert",
-          table: "cashuProof",
-          ownerId: store.shardOwner("cashu", 0).id,
-          row: { ...proof, state: "spent" },
-        },
-      ]),
-    );
 
     const { view } = await mountMigration();
     await vi.waitFor(() => expect(doneFlag()).toBe("1"));
@@ -176,5 +180,47 @@ describe("useLaneToShardMigration", () => {
       }),
     ]);
     await view.unmount();
+  });
+
+  it("skips a later boot's ingest while the lanes' change count stands still", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(LANE_MIGRATION_RELEASED_AT_MS);
+    const { appOwner, store } = makeTestLinkyStore(1);
+    legacy.store = Promise.resolve(store);
+    legacy.tables.set("contact", [
+      legacyRow(appOwner.id, { id: createId(), name: "Lane contact" }),
+    ]);
+    legacy.tables.set("legacyChanges", [{ changes: 3 }]);
+    const boot = async () => {
+      vi.resetModules();
+      legacy.loaded = [];
+      const { view } = await mountMigration();
+      await vi.waitFor(() =>
+        expect(legacy.reportInspectorRows).toHaveBeenCalledWith([
+          expect.objectContaining({
+            tag: expect.stringMatching(
+              /^(LaneMigrationDone|LaneGracePeriod(Reingested|Unchanged))$/,
+            ),
+          }),
+        ]),
+      );
+      await view.unmount();
+      const tags = legacy.reportInspectorRows.mock.calls.map(
+        ([rows]) => rows[0].tag,
+      );
+      legacy.reportInspectorRows.mockClear();
+      return { tags, readContacts: legacy.loaded.includes("contact") };
+    };
+
+    expect(await boot()).toMatchObject({ readContacts: true });
+    expect(await boot()).toMatchObject({
+      tags: expect.arrayContaining(["LaneGracePeriodUnchanged"]),
+      readContacts: false,
+    });
+    legacy.tables.set("legacyChanges", [{ changes: 4 }]);
+    expect(await boot()).toMatchObject({
+      tags: expect.arrayContaining(["LaneGracePeriodReingested"]),
+      readContacts: true,
+    });
   });
 });

@@ -264,6 +264,65 @@ export const createCashuTokensAllQuery = (evolu: LinkyEvolu) =>
 
 export const createCashuProofsAllQuery = (evolu: LinkyEvolu) =>
   evolu.createQuery((db) => db.selectFrom("cashuProof").selectAll());
+
+const LEGACY_LANE_TABLES = [
+  "contact",
+  "nostrMessage",
+  "nostrReaction",
+  "cashuToken",
+  "cashuProof",
+  "cashuOperation",
+  "transaction",
+  "nostrIdentity",
+  "ownerMeta",
+];
+
+/**
+ * How many changes the lanes of `ownerIds` hold; it grows with every lane
+ * write, local or synced, however old its timestamp. Proof state changes are
+ * left out: the lane migration writes them itself, and the wallet learns a
+ * spend from the mint.
+ */
+export const createLegacyChangeCountQuery = (
+  evolu: LinkyEvolu,
+  ownerIds: ReadonlyArray<Evolu.OwnerId>,
+) => {
+  const { sql } = Evolu.kysely;
+  const owners = sql.join(ownerIds.map(Evolu.ownerIdToOwnerIdBytes));
+  const history = sql<{ changes: number }>`(select count(*) as changes
+    from evolu_history
+    where "ownerId" in (${owners})
+      and "table" in (${sql.join(LEGACY_LANE_TABLES)})
+      and not ("table" = 'cashuProof' and "column" in ('state', 'updatedAt')))`;
+  return evolu.createQuery((db) =>
+    db.selectFrom(history.as("history")).selectAll(),
+  );
+};
+
+/** Every copy, in any owner, of a proof the lanes of `ownerIds` hold unspent. */
+export const createLegacyUnspentProofCopiesQuery = (
+  evolu: LinkyEvolu,
+  ownerIds: ReadonlyArray<Evolu.OwnerId>,
+) =>
+  evolu.createQuery((db) =>
+    db
+      .selectFrom("cashuProof")
+      .select(["id", "ownerId", "state"])
+      .where(
+        "id",
+        "in",
+        db
+          .selectFrom("cashuProof")
+          .select("id")
+          .where("ownerId", "in", ownerIds)
+          .where((eb) =>
+            eb.or([
+              eb("state", "is", null),
+              eb("state", "!=", Evolu.NonEmptyString100.orThrow("spent")),
+            ]),
+          ),
+      ),
+  );
 export const createCashuOperationsAllQuery = (evolu: LinkyEvolu) =>
   evolu.createQuery((db) => db.selectFrom("cashuOperation").selectAll());
 

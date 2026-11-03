@@ -109,7 +109,9 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   LaneMigrationDone:
     "The lane migration finished. The payload carries the per-table counts and whether the grace period for older app versions, 180 days from release 26.9.18, is still running.",
   LaneGracePeriodReingestStarted:
-    "A later launch inside the grace period: the old lanes are read again so rows written by an older app version reach the shards.",
+    "A later launch inside the grace period: the old lanes are checked for changes, and read again when they changed, so rows written by an older app version reach the shards.",
+  LaneGracePeriodUnchanged:
+    "A later launch inside the grace period found the old lanes holding the same changes as at the last ingest, so it skipped reading and ingesting them. Owner links list the lanes checked.",
   LaneGracePeriodReingested:
     "A boot or late-row grace-period re-ingest finished; counts show which lane rows were newer than their shard copies.",
   LaneSpentProofsMirrored:
