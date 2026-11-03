@@ -56,7 +56,7 @@ describe("acquireRelayPool", () => {
         yield* Effect.forkDetach(
           transport.subscribe(
             RelayUrl.make("wss://relay.test"),
-            { kinds: [1059] },
+            [{ kinds: [1059] }],
             () => {},
           ),
         );

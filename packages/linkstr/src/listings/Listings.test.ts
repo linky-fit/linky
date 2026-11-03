@@ -5,7 +5,10 @@ import { RelayUrl, UnixSeconds } from "../domain/primitives";
 import type { Pubkey } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import type { InspectorEvent } from "../inspector/events";
-import { AUTHOR_FILTER_LIMIT } from "../internal/authorChunks";
+import {
+  AUTHOR_FILTER_LIMIT,
+  REQUEST_FILTER_LIMIT,
+} from "../internal/authorChunks";
 import { signPlainEvent } from "../internal/plainEvent";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
 import { NostrTransport } from "../services/NostrTransport";
@@ -293,7 +296,7 @@ describe("Listings.publish chunks", () => {
 
 interface FakeSubscription {
   readonly relay: RelayUrl;
-  readonly filter: Filter;
+  readonly filters: ReadonlyArray<Filter>;
   readonly onEvent: (event: NostrToolsEvent) => void;
 }
 
@@ -301,9 +304,9 @@ const watchTransport = (
   subscriptions: Array<FakeSubscription>,
 ): NostrTransportService => ({
   publish: () => Effect.die("publish not under test"),
-  subscribe: (relay, filter, onEvent) =>
+  subscribe: (relay, filters, onEvent) =>
     Effect.suspend(() => {
-      subscriptions.push({ relay, filter, onEvent });
+      subscriptions.push({ relay, filters, onEvent });
       return Effect.never;
     }),
   fetch: () => Effect.die("fetch not under test"),
@@ -335,7 +338,11 @@ const withWatch = <A>(
     yield* Effect.forkScoped(
       Stream.runForEach(stream, (fact) => Effect.sync(() => facts.push(fact))),
     );
-    const expected = Math.ceil(new Set(pubkeys).size / AUTHOR_FILTER_LIMIT) * 2;
+    const expected =
+      Math.ceil(
+        Math.ceil(new Set(pubkeys).size / AUTHOR_FILTER_LIMIT) /
+          REQUEST_FILTER_LIMIT,
+      ) * 2;
     yield* eventually(() => subscriptions.length === expected);
     return yield* body({ subscriptions, facts, inspected });
   }).pipe(
@@ -372,14 +379,11 @@ describe("Listings.watch", () => {
     withWatch(bob, [alice.pubkey], ({ facts, inspected, subscriptions }) =>
       Effect.gen(function* () {
         expect(
-          subscriptions.map(({ relay, filter }) => ({ relay, filter })),
+          subscriptions.map(({ relay, filters }) => ({ relay, filters })),
         ).toEqual(
           [relayA, relayB].map((relay) => ({
             relay,
-            filter: {
-              kinds: [LISTINGS_KIND],
-              authors: [alice.pubkey],
-            },
+            filters: [{ kinds: [LISTINGS_KIND], authors: [alice.pubkey] }],
           })),
         );
 

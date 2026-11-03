@@ -170,9 +170,11 @@ const collectImageEmissions = (): Promise<InspectorEvent[]> => {
             }),
         ),
       ),
-    subscribe: (_relay, filter, onEvent) =>
+    subscribe: (_relay, filters, onEvent) =>
       Effect.sync(() => {
-        if (filter.kinds?.includes(1059)) onEvent(incomingImageWrap);
+        if (filters.some((filter) => filter.kinds?.includes(1059))) {
+          onEvent(incomingImageWrap);
+        }
       }).pipe(Effect.andThen(Effect.never)),
     fetch: () => Effect.succeed([incomingImageWrap]),
   });
@@ -258,9 +260,11 @@ const collectWrapEmissions = (
             }),
         ),
       ),
-    subscribe: (_relay, filter, onEvent) =>
+    subscribe: (_relay, filters, onEvent) =>
       Effect.sync(() => {
-        if (filter.kinds?.includes(1059)) onEvent(incomingWrap);
+        if (filters.some((filter) => filter.kinds?.includes(1059))) {
+          onEvent(incomingWrap);
+        }
       }).pipe(Effect.andThen(Effect.never)),
     fetch: () => Effect.succeed([incomingWrap]),
   });

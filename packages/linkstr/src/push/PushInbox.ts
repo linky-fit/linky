@@ -146,7 +146,7 @@ export class PushInbox extends Context.Service<PushInbox>()(
                 let eoseSeen = false;
                 return transport.subscribe(
                   relay,
-                  filter,
+                  [filter],
                   (raw) => {
                     Queue.offerUnsafe(rawWraps, {
                       delivery: eoseSeen ? "live" : "backfill",

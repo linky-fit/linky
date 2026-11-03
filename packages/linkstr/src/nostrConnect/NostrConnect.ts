@@ -72,7 +72,7 @@ export class NostrConnect extends Context.Service<NostrConnect>()(
               yield* transport
                 .subscribe(
                   relay,
-                  filter,
+                  [filter],
                   (event) => Queue.offerUnsafe(incoming, event),
                   { onEose: () => Deferred.doneUnsafe(live, Effect.void) },
                 )

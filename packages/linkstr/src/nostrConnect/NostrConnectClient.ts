@@ -163,7 +163,7 @@ export class NostrConnectClient extends Context.Service<NostrConnectClient>()(
             Effect.gen(function* () {
               const live = yield* Deferred.make<void>();
               yield* transport
-                .subscribe(relay, filter, onEvent, {
+                .subscribe(relay, [filter], onEvent, {
                   onEose: () => Deferred.doneUnsafe(live, Effect.void),
                 })
                 .pipe(

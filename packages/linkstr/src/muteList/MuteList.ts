@@ -240,7 +240,7 @@ export class MuteList extends Context.Service<MuteList>()("linkstr/MuteList", {
         yield* Effect.forEach(yield* relays, (relay) =>
           Effect.forkScoped(
             resubscribeForever(
-              context.transport.subscribe(relay, filter, (event) => {
+              context.transport.subscribe(relay, [filter], (event) => {
                 Queue.offerUnsafe(raw, event);
               }),
               options?.resubscribeDelay ?? DEFAULT_RESUBSCRIBE_DELAY,

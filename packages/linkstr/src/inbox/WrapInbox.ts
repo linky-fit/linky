@@ -355,7 +355,7 @@ export class WrapInbox extends Context.Service<WrapInbox>()(
               let eoseSeen = false;
               const live = transport.subscribe(
                 relay,
-                wrapFilter({ since, limit: 1 }),
+                [wrapFilter({ since, limit: 1 })],
                 (event) =>
                   arrive({
                     delivery: eoseSeen ? "live" : "backfill",

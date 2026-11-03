@@ -5,7 +5,10 @@ import { RelayUrl, UnixSeconds } from "../domain/primitives";
 import type { Pubkey } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import type { InspectorEvent } from "../inspector/events";
-import { AUTHOR_FILTER_LIMIT } from "../internal/authorChunks";
+import {
+  AUTHOR_FILTER_LIMIT,
+  REQUEST_FILTER_LIMIT,
+} from "../internal/authorChunks";
 import { NostrTransport } from "../services/NostrTransport";
 import type { NostrTransportService } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
@@ -47,7 +50,7 @@ const statusEvent = (
 
 interface FakeSubscription {
   readonly relay: RelayUrl;
-  readonly filter: Filter;
+  readonly filters: ReadonlyArray<Filter>;
   readonly onEvent: (event: NostrToolsEvent) => void;
 }
 
@@ -55,9 +58,9 @@ const watchTransport = (
   subscriptions: Array<FakeSubscription>,
 ): NostrTransportService => ({
   publish: () => Effect.die("publish not under test"),
-  subscribe: (relay, filter, onEvent) =>
+  subscribe: (relay, filters, onEvent) =>
     Effect.suspend(() => {
-      subscriptions.push({ relay, filter, onEvent });
+      subscriptions.push({ relay, filters, onEvent });
       return Effect.never;
     }),
   fetch: () => Effect.die("fetch not under test"),
@@ -88,8 +91,11 @@ const withWatch = <A>(
     yield* Effect.forkScoped(
       Stream.runForEach(stream, (fact) => Effect.sync(() => facts.push(fact))),
     );
-    const expectedSubscriptions =
-      Math.ceil(new Set(pubkeys).size / AUTHOR_FILTER_LIMIT) * 2 * 2;
+    const requestsPerKind = Math.ceil(
+      Math.ceil(new Set(pubkeys).size / AUTHOR_FILTER_LIMIT) /
+        REQUEST_FILTER_LIMIT,
+    );
+    const expectedSubscriptions = requestsPerKind * 2 * 2;
     yield* eventually(() => subscriptions.length === expectedSubscriptions);
     return yield* body({ subscriptions, facts, inspected });
   }).pipe(
@@ -125,11 +131,11 @@ describe("ProfileWatch", () => {
     withWatch([alice.pubkey], ({ facts, inspected, subscriptions }) =>
       Effect.gen(function* () {
         expect(
-          subscriptions.map(({ relay, filter }) => ({ relay, filter })),
+          subscriptions.map(({ relay, filters }) => ({ relay, filters })),
         ).toEqual(
           [relayA, relayB].flatMap((relay) => [
-            { relay, filter: { kinds: [0], authors: [alice.pubkey] } },
-            { relay, filter: { kinds: [30315], authors: [alice.pubkey] } },
+            { relay, filters: [{ kinds: [0], authors: [alice.pubkey] }] },
+            { relay, filters: [{ kinds: [30315], authors: [alice.pubkey] }] },
           ]),
         );
 
@@ -178,7 +184,7 @@ describe("ProfileWatch", () => {
       }),
     ));
 
-  it("splits a large pubkey set into filter chunks on every relay", () => {
+  it("splits a large pubkey set into filter chunks sent as one REQ per kind on every relay", () => {
     const extras = Array.from({ length: AUTHOR_FILTER_LIMIT }, makeIdentity);
     const overflow = extras[extras.length - 1];
     if (overflow === undefined) throw new Error("no extras generated");
@@ -187,23 +193,26 @@ describe("ProfileWatch", () => {
       [alice.pubkey, ...extras.map((identity) => identity.pubkey)],
       ({ facts, subscriptions }) =>
         Effect.gen(function* () {
-          expect(subscriptions).toHaveLength(8);
+          expect(subscriptions).toHaveLength(4);
           for (const relay of [relayA, relayB]) {
             const authorCounts = subscriptions
               .filter((subscription) => subscription.relay === relay)
-              .map((subscription) => subscription.filter.authors?.length ?? 0)
-              .sort((a, b) => a - b);
+              .map((subscription) =>
+                subscription.filters.map(
+                  (filter) => filter.authors?.length ?? 0,
+                ),
+              );
             expect(authorCounts).toEqual([
-              1,
-              1,
-              AUTHOR_FILTER_LIMIT,
-              AUTHOR_FILTER_LIMIT,
+              [AUTHOR_FILTER_LIMIT, 1],
+              [AUTHOR_FILTER_LIMIT, 1],
             ]);
           }
 
           // An author from the overflow chunk still routes to a fact.
           const overflowSubscription = subscriptions.find((subscription) =>
-            subscription.filter.authors?.includes(overflow.pubkey),
+            subscription.filters.some((filter) =>
+              filter.authors?.includes(overflow.pubkey),
+            ),
           );
           assert(overflowSubscription !== undefined);
           overflowSubscription.onEvent(

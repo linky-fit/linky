@@ -93,7 +93,7 @@ describe("observeTransport", () => {
       Effect.gen(function* () {
         const transport = yield* NostrTransport;
         yield* Effect.forkScoped(
-          transport.subscribe(relayA, { kinds: [1059] }, () => {}),
+          transport.subscribe(relayA, [{ kinds: [1059] }], () => {}),
         );
         yield* eventually(() => subscriptions.length === 1);
         expect(stateOf(relayA)).toEqual(
@@ -121,7 +121,7 @@ describe("observeTransport", () => {
       Effect.gen(function* () {
         const transport = yield* NostrTransport;
         yield* Effect.forkScoped(
-          transport.subscribe(relayA, { kinds: [1059] }, () => {}, {
+          transport.subscribe(relayA, [{ kinds: [1059] }], () => {}, {
             alreadyHaveEvent,
             onRequestResent,
           }),
@@ -143,7 +143,7 @@ describe("observeTransport", () => {
       Effect.gen(function* () {
         const transport = yield* NostrTransport;
         yield* Effect.forkScoped(
-          transport.subscribe(relayA, { kinds: [1059] }, (event) => {
+          transport.subscribe(relayA, [{ kinds: [1059] }], (event) => {
             received.push(event.id);
           }),
         );
@@ -169,7 +169,7 @@ describe("observeTransport", () => {
         const transport = yield* NostrTransport;
         const subscribeOnce = transport.subscribe(
           relayA,
-          { kinds: [1059] },
+          [{ kinds: [1059] }],
           () => {},
         );
         const fiber = yield* Effect.forkChild(subscribeOnce);
@@ -215,7 +215,7 @@ describe("observeTransport", () => {
       Effect.gen(function* () {
         const transport = yield* NostrTransport;
         yield* Effect.ignore(
-          transport.subscribe(relayA, { kinds: [1059] }, () => {}),
+          transport.subscribe(relayA, [{ kinds: [1059] }], () => {}),
         );
         expect(stateOf(relayA)).toEqual(
           expect.objectContaining({
@@ -318,7 +318,7 @@ describe("observeTransport", () => {
 
         const transport = yield* NostrTransport;
         yield* Effect.forkScoped(
-          transport.subscribe(relayA, { kinds: [1059] }, () => {}),
+          transport.subscribe(relayA, [{ kinds: [1059] }], () => {}),
         );
         yield* eventually(() => subscriptions.length === 1);
         subscriptions[0]?.options?.onEose?.();
@@ -338,7 +338,7 @@ describe("observeTransport", () => {
       Effect.gen(function* () {
         const transport = yield* NostrTransport;
         yield* Effect.forkScoped(
-          transport.subscribe(relayA, { kinds: [1059] }, () => {}, {
+          transport.subscribe(relayA, [{ kinds: [1059] }], () => {}, {
             onEose: () => {
               callerEose += 1;
             },
@@ -358,7 +358,7 @@ describe("observeTransport", () => {
     await Effect.gen(function* () {
       const transport = yield* NostrTransport;
       yield* Effect.forkScoped(
-        transport.subscribe(relayA, { kinds: [1059] }, () => {}),
+        transport.subscribe(relayA, [{ kinds: [1059] }], () => {}),
       );
       yield* eventually(() => subscriptions.length === 1);
     }).pipe(

@@ -69,7 +69,7 @@ describe("PushInbox", () => {
     const reason = await Effect.runPromise(
       transport.subscribe(
         relay,
-        { "#linky": ["push"] },
+        [{ "#linky": ["push"] }],
         () => (delivered += 1),
       ),
     );

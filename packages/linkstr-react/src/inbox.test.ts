@@ -103,12 +103,14 @@ describe("wrapInboxAtom", () => {
     const unmount = registry.mount(wrapInboxAtom);
 
     await expect.poll(() => subscriptions.length).toBe(2);
-    expect(subscriptions[0]?.filter).toEqual({
-      kinds: [1059],
-      "#p": [alice.pubkey],
-      since: expect.any(Number),
-      limit: 1,
-    });
+    expect(subscriptions[0]?.filters).toEqual([
+      {
+        kinds: [1059],
+        "#p": [alice.pubkey],
+        since: expect.any(Number),
+        limit: 1,
+      },
+    ]);
 
     subscriptions[0]?.onEvent(wrap);
     await expect.poll(() => handled.length).toBe(1);
@@ -221,7 +223,7 @@ describe("wrapInboxAtom", () => {
     const unmount = registry.mount(wrapInboxAtom);
 
     await expect.poll(() => subscriptions.length).toBe(2);
-    expect(subscriptions[0]?.filter.since).toBe(
+    expect(subscriptions[0]?.filters[0]?.since).toBe(
       since - NIP59_BACKDATE_MARGIN_SECONDS,
     );
 

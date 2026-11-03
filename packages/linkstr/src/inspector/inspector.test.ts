@@ -294,12 +294,14 @@ describe("Inspector", () => {
         ).toEqual(
           expect.objectContaining({
             relay: relayA,
-            filter: {
-              kinds: [1059],
-              "#p": [alice.pubkey],
-              since: expect.any(Number),
-              limit: 1,
-            },
+            filters: [
+              {
+                kinds: [1059],
+                "#p": [alice.pubkey],
+                since: expect.any(Number),
+                limit: 1,
+              },
+            ],
           }),
         );
         expect(
@@ -426,7 +428,7 @@ describe("Inspector", () => {
         ).toEqual(
           expect.objectContaining({
             relay: relayA,
-            filter: expect.objectContaining({ authors: [bob.pubkey] }),
+            filters: [expect.objectContaining({ authors: [bob.pubkey] })],
           }),
         );
         expect(
