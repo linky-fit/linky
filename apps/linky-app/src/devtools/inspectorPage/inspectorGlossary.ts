@@ -124,6 +124,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "After hydration, conversation archives this device sees were copied onto their contacts, where the archive state now lives. It also fires for archives an older app version wrote on the conversation; an archive is copied only onto a contact without one, and an unarchive clears both, so it is never undone. Contact and conversation links identify the rows.",
   "evolu.legacySpentProofSyncFailed":
     "A terminal proof state could not be mirrored to legacy storage. An older device may show stale funds until its mint check corrects them; the next proof change retries.",
+  "cashu.sendForgetFailed":
+    "A send whose token message went out could not be closed afterwards. It stays pending, where the transfer cleanup closes it once the message shows as sent, and return-to-wallet still works on it. The operation link names the send.",
   "evolu.shardPointerRepairFailed":
     "Writing a repaired shard pointer failed; the pointer stays where it was and the next launch checks again.",
   "evolu.laneMigrationScreenReleased":

@@ -775,12 +775,20 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
       updateLocalNostrMessage: chat.updateLocalNostrMessage,
     });
     if (!publishing.hasPendingMessages)
-      void linkshu.cashuTransferLifecycle.forget(receipt.operationId).then(() =>
-        reportCashuSendForgotten({
-          mint: receipt.mint,
-          reason: "message-published",
-          operationId: receipt.operationId,
-        }),
+      void linkshu.cashuTransferLifecycle.forget(receipt.operationId).then(
+        () =>
+          reportCashuSendForgotten({
+            mint: receipt.mint,
+            reason: "message-published",
+            operationId: receipt.operationId,
+          }),
+        (error: unknown) =>
+          reportAppLog({
+            tag: "cashu.sendForgetFailed",
+            summary: "Could not close a published send; it stays pending",
+            links: { operation: receipt.operationId },
+            payload: { error: getUnknownErrorMessage(error, "unknown") },
+          }),
       );
     return publishing;
   };
