@@ -100,6 +100,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "An Evolu relay answered a sync request with a protocol error (QuotaError, WriteKeyError, WriteError or SyncError). When the relay had already answered the owner without an error on the same connection, the owner's sync round ends there and what the relay held arrived in the rounds before (endsRound true). Otherwise the owner stays unsynced, so hydration and pointer repair keep waiting for it (endsRound false). The owner link names the owner; the payload names the error.",
   WriteUnconfirmed:
     "Evolu's worker did not report a local write applied within 10 seconds, which happens when Evolu drops the batch it was in. The write fails, so its caller retries or reports it like any failed write. Links name the shard owner and the row id.",
+  WriteSlow:
+    "A local write took 250 ms or more from being queued to Evolu's worker applying it. Evolu re-runs every subscribed query inside each write, so the time grows with what the app keeps subscribed and with how much data the device holds. The payload gives the tables, the row count and the duration.",
   ShardPointerRepaired:
     "After hydration, a scope's shard pointer stood below a shard that holds rows, so this device moved it back up to the newest such shard and the shards in between are read again. It happens when a device wrote the pointer from a stale read, such as a seed restore on an older build. The payload gives scope, from and to; the owner link is the shard now active.",
   LaneMigrationStarted:
