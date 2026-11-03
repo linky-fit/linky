@@ -5,6 +5,7 @@ import {
   type CashIntent,
   type ListingSide,
   type Pubkey,
+  type RelayUrl,
 } from "@linky-fit/linkstr";
 import type { ListingRecord } from "@linky-fit/linksync";
 import { Option, Schema } from "effect";
@@ -54,14 +55,26 @@ export const buildListingsDocument = (
       }),
   });
 
+export interface ListingsPublication {
+  readonly document: ListingsDocument;
+  readonly recipients: ReadonlyArray<Pubkey>;
+  readonly relays: ReadonlyArray<RelayUrl>;
+  /** Changes on a schedule, so relays that dropped the events get them again. */
+  readonly refreshPeriod: number;
+}
+
 /** What a publish depends on, as text: equal text means the relays already hold it. */
-export const listingsPublishFingerprint = (
-  document: ListingsDocument,
-  recipients: ReadonlyArray<Pubkey>,
-): string =>
+export const listingsPublishFingerprint = ({
+  document,
+  recipients,
+  relays,
+  refreshPeriod,
+}: ListingsPublication): string =>
   JSON.stringify({
     document: Schema.encodeSync(ListingsDocument)(document),
     recipients: [...recipients].sort(),
+    relays: [...relays].sort(),
+    refreshPeriod,
   });
 
 /** Offering cash means buying bitcoin for it; wanting cash means selling. */

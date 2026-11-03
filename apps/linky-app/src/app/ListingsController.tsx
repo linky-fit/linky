@@ -2,8 +2,10 @@ import {
   parsePubkey,
   type ListingsUpdated,
   type Pubkey,
+  type RelayUrl,
 } from "@linky-fit/linkstr";
 import {
+  linkstrConfigAtom,
   listingsWatchAtom,
   listingsWatchHandlerAtom,
   useAtomMount,
@@ -35,6 +37,7 @@ import { platformAtom } from "./state/platform";
 import { currentPubkeyAtom } from "./state/session/session";
 
 const PUBLISHED_STORAGE_PREFIX = "linky.listings.published.v1.";
+const noRelays: ReadonlyArray<RelayUrl> = [];
 
 /** The contacts who get a key slot: saved, not blocked, with a pubkey. */
 const useRecipients = (ownPubkey: Pubkey | null): ReadonlyArray<Pubkey> => {
@@ -131,6 +134,7 @@ const useListingsPublisher = (
     hydrated: useAccountHydrated(),
     document,
     recipients,
+    relays: useAtomValue(linkstrConfigAtom)?.writeRelays ?? noRelays,
     publish: useLinkstrCommands().publishListings,
   });
 };
