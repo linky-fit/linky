@@ -1,5 +1,4 @@
 import {
-  ListingsDraft,
   parsePubkey,
   type ListingsUpdated,
   type Pubkey,
@@ -13,22 +12,19 @@ import {
   useLinkstrCommands,
   watchedListingsAtom,
 } from "@linky-fit/linkstr-react";
-import { Cause, Exit } from "effect";
 import React from "react";
 import { reportAppLog } from "../devtools/inspector/appLog";
 import { getUnknownErrorMessage } from "../utils/unknown";
 import { isDeletedContact } from "../utils/contactName";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 import { useCashIntent } from "./hooks/useCashIntent";
+import { usePublishWhenChanged } from "./hooks/usePublishWhenChanged";
 import {
   useAccountHydrated,
   useContactRows,
   useListingRecords,
 } from "./hooks/useLinksync";
-import {
-  buildListingsDocument,
-  listingsPublishFingerprint,
-} from "./lib/listings";
+import { buildListingsDocument } from "./lib/listings";
 import { blockListAtom } from "./state/contacts/blockList";
 import {
   loadPeerListings,
@@ -38,10 +34,6 @@ import {
 import { platformAtom } from "./state/platform";
 import { currentPubkeyAtom } from "./state/session/session";
 
-/** Edits settle before the relays hear about them. */
-const PUBLISH_DEBOUNCE_MS = 1_500;
-/** A publish no relay accepted is tried again after this. */
-const PUBLISH_RETRY_MS = 60_000;
 const PUBLISHED_STORAGE_PREFIX = "linky.listings.published.v1.";
 
 /** The contacts who get a key slot: saved, not blocked, with a pubkey. */
@@ -123,86 +115,24 @@ const useListingsWatch = (
   }, [recipients, setWatched]);
 };
 
-/**
- * Publishes the own document whenever it or the recipient set changes. The
- * fingerprint of the last accepted publish is kept per identity on the
- * device, so a restart republishes nothing the relays already hold.
- */
 const useListingsPublisher = (
   ownPubkey: Pubkey,
   recipients: ReadonlyArray<Pubkey>,
 ): void => {
-  const kv = useAtomValue(platformAtom).kv;
-  const hydrated = useAccountHydrated();
   const records = useListingRecords();
   const { cashIntent } = useCashIntent();
-  const { publishListings } = useLinkstrCommands();
-  const storageKey = PUBLISHED_STORAGE_PREFIX + ownPubkey;
-
   const document = React.useMemo(
     () => buildListingsDocument(records, cashIntent),
     [cashIntent, records],
   );
-  const fingerprint = React.useMemo(
-    () => listingsPublishFingerprint(document, recipients),
-    [document, recipients],
-  );
-
-  React.useEffect(() => {
-    // Before hydration the rows are empty, which must not look like a withdrawal.
-    if (!hydrated) return;
-    const published = kv.getItem(storageKey);
-    if (published === fingerprint) return;
-    // Nothing to share and nothing shared before: stay silent on the relays.
-    if (
-      published === null &&
-      document.cash === null &&
-      document.listings.length === 0
-    ) {
-      return;
-    }
-    let timeout: ReturnType<typeof setTimeout> | null = null;
-    let cancelled = false;
-    const attempt = async () => {
-      timeout = null;
-      const exit = await publishListings(
-        new ListingsDraft({ document, recipients }),
-      );
-      if (cancelled) return;
-      if (Exit.isSuccess(exit)) {
-        kv.setItem(storageKey, fingerprint);
-        reportAppLog({
-          tag: "listings.published",
-          summary: `Listings published to ${recipients.length} contacts`,
-          payload: {
-            cash: document.cash,
-            listings: document.listings.length,
-            recipients: recipients.length,
-          },
-        });
-        return;
-      }
-      reportAppLog({
-        tag: "listings.publishFailed",
-        summary: `Listings publish failed: ${Cause.pretty(exit.cause)}`,
-        payload: { recipients: recipients.length },
-      });
-      timeout = setTimeout(() => void attempt(), PUBLISH_RETRY_MS);
-    };
-    timeout = setTimeout(() => void attempt(), PUBLISH_DEBOUNCE_MS);
-    return () => {
-      cancelled = true;
-      if (timeout !== null) clearTimeout(timeout);
-    };
-  }, [
+  usePublishWhenChanged({
+    kv: useAtomValue(platformAtom).kv,
+    storageKey: PUBLISHED_STORAGE_PREFIX + ownPubkey,
+    hydrated: useAccountHydrated(),
     document,
-    fingerprint,
-    hydrated,
-    kv,
-    publishListings,
     recipients,
-    storageKey,
-  ]);
+    publish: useLinkstrCommands().publishListings,
+  });
 };
 
 const ListingsSync = ({ ownPubkey }: { ownPubkey: Pubkey }): null => {
