@@ -1,5 +1,6 @@
 import * as Evolu from "@evolu/common";
-import { createEvolu, SimpleName } from "@evolu/common";
+import { createEvolu, kysely, SimpleName } from "@evolu/common";
+import type { IndexesConfig } from "@evolu/common/local-first";
 import { ContactId } from "@linky-fit/domain";
 import { Effect, Schema } from "effect";
 import {
@@ -199,6 +200,20 @@ export const generateDbNameFromMnemonic = (
     : SimpleName.orThrow("linky-default");
 };
 
+// Tables are keyed by (ownerId, id); the shard store looks rows up by id across owners.
+export const linkyIndexes: IndexesConfig = (create) => [
+  ...Object.keys(LinkySchema).map((table) =>
+    create(`${table}Id`).on(table).column("id"),
+  ),
+  create("cashuProofState").on("cashuProof").column("state"),
+  create("cashuProofOperationId").on("cashuProof").column("operationId"),
+  create("cashuProofKeysetCreatedSecond")
+    .on("cashuProof")
+    .column("keysetId")
+    .expression(kysely.sql`substr("createdAt", 1, 19)`)
+    .column("mint"),
+];
+
 /**
  * Opens the Linky database over a worker started with `runOwnerSyncDbWorker`,
  * owned by the mnemonic's app owner (Evolu's own when `null`).
@@ -231,17 +246,7 @@ export const createLinkyEvolu = ({
     LinkyEvoluSchema,
     {
       name: generateDbNameFromMnemonic(mnemonic),
-      // Tables are keyed by (ownerId, id); the shard store looks rows up by id across owners.
-      indexes: (create) => [
-        ...Object.keys(LinkySchema).map((table) =>
-          create(`${table}Id`).on(table).column("id"),
-        ),
-        create("cashuProofState").on("cashuProof").column("state"),
-        create("cashuProofOperationId").on("cashuProof").column("operationId"),
-        create("cashuProofKeysetCreatedAt")
-          .on("cashuProof")
-          .columns(["keysetId", "createdAt"]),
-      ],
+      indexes: linkyIndexes,
       transports,
       enableLogging,
       inMemory,
