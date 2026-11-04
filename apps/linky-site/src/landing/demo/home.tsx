@@ -143,7 +143,7 @@ export function ContactsScreen({
 }) {
   return (
     <>
-      <DemoTopBar title="Contacts" trailing="Search" />
+      <DemoTopBar title="Contacts" leading="Search" trailing="ScanLine" />
       <DemoBody position="relative">
         <Stack gap="$xs" paddingTop="$xxxl">
           <Tap on={pinned.person === tapped} data-guide="contact-card">
@@ -199,7 +199,7 @@ function WalletAction({
 export function WalletScreen() {
   return (
     <>
-      <DemoTopBar title="Wallet" />
+      <DemoTopBar title="Wallet" trailing="ScanLine" />
       <DemoBody paddingBottom="$lg">
         <Stack
           flex={1}

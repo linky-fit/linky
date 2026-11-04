@@ -238,7 +238,7 @@ function ProfileScene({
 }) {
   return (
     <>
-      <DemoTopBar title="Profile" trailing="Pencil" />
+      <DemoTopBar title="Profile" leading="Pencil" trailing="ScanLine" />
       <DemoBody alignItems="center" gap="$sm" paddingTop="$lg">
         <Avatar name="Dave" uri={avatarUri("Dave")} size="lg" />
         <Text variant="display" textAlign="center">

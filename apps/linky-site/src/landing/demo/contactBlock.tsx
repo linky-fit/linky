@@ -160,7 +160,7 @@ const generalSettings: SettingsRow[] = [
 export function SettingsScene({ tapped }: { tapped?: string | undefined }) {
   return (
     <>
-      <DemoTopBar title="Settings" />
+      <DemoTopBar title="Settings" trailing="ScanLine" />
       <DemoBody paddingTop="$lg">
         <Section title="General">
           {generalSettings.map(({ icon, title, value, toggle }) => (
