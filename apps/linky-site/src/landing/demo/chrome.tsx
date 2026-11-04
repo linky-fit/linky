@@ -14,7 +14,12 @@ import { Tap } from "./flow";
 import { noop } from "./noop";
 import { avatarUri, type Person } from "./people";
 
-export type Tab = "profile" | "contacts" | "wallet" | "proxy" | "settings";
+export type Tab =
+  | "profile"
+  | "contacts"
+  | "wallet"
+  | "collaboration"
+  | "settings";
 
 /** The app's top bar: a title or a contact, with optional icon actions; `tapTrailing` touches the trailing one. */
 export function DemoTopBar({
@@ -64,7 +69,7 @@ const tabs: readonly Tab[] = [
   "profile",
   "contacts",
   "wallet",
-  "proxy",
+  "collaboration",
   "settings",
 ];
 
@@ -90,7 +95,7 @@ export function DemoTabBar({
           },
           { value: "contacts", label: "Contacts", icon: "Users" },
           { value: "wallet", label: "Wallet", icon: "Wallet" },
-          { value: "proxy", label: "Proxy payments", icon: "HandCoins" },
+          { value: "collaboration", label: "Collaboration", icon: "Handshake" },
           { value: "settings", label: "Settings", icon: "Settings" },
         ]}
       />

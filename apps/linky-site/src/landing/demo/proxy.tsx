@@ -16,7 +16,7 @@ import {
   type Tone,
 } from "@linky-fit/ui";
 import type { ComponentType } from "react";
-import { DemoBody, DemoTabBar, DemoTopBar } from "./chrome";
+import { DemoBody, DemoTopBar } from "./chrome";
 import { noop } from "./noop";
 import { avatarUri, type Person } from "./people";
 import { useCues, useFlow } from "./playback";
@@ -59,7 +59,11 @@ const payers: { currency: string; people: Person[] }[] = [
 function HubScene({ at }: { at: At }) {
   return (
     <>
-      <DemoTopBar title="Proxy payments" />
+      <DemoTopBar
+        title="Proxy payments"
+        leading="ChevronLeft"
+        trailing="ScanLine"
+      />
       <DemoBody paddingTop="$lg" gap="$xxxl">
         <Stack gap="$sm">
           <Text variant="heading">
@@ -134,7 +138,6 @@ function HubScene({ at }: { at: At }) {
           />
         </Stack>
       </DemoBody>
-      <DemoTabBar active="proxy" />
     </>
   );
 }
