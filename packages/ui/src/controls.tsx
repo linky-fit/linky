@@ -97,6 +97,8 @@ export interface ButtonProps extends Omit<
   size?: "sm" | "md" | undefined;
   icon?: IconName | undefined;
   loading?: boolean | undefined;
+  /** Runs on a press while `disabled` (not while loading), e.g. to point at the fields a form still needs. */
+  onDisabledPress?: (() => void) | undefined;
 }
 
 export function Button({
@@ -106,11 +108,15 @@ export function Button({
   icon,
   loading = false,
   disabled,
+  onDisabledPress,
+  onPress,
   ...props
 }: ButtonProps) {
   const colors = buttonVariants[variant];
   const small = size === "sm";
-  return (
+  const explainsDisabled =
+    Boolean(disabled) && !loading && onDisabledPress !== undefined;
+  const button = (
     <Pressable
       {...(variant === "primary"
         ? {
@@ -128,6 +134,7 @@ export function Button({
       pressStyle={{ backgroundColor: colors.press, opacity: opacity.dimmed }}
       disabled={disabled || loading}
       aria-busy={loading}
+      onPress={onPress}
       {...props}
     >
       {loading ? (
@@ -149,6 +156,24 @@ export function Button({
         children
       )}
     </Pressable>
+  );
+  if (!explainsDisabled) return button;
+  // A natively disabled button swallows the press (and Tamagui drops it for
+  // `aria-disabled` too), so a transparent, unfocusable layer over the button
+  // takes it. Assistive tech keeps seeing the disabled button underneath.
+  return (
+    <Stack position="relative" gap="$none">
+      {button}
+      <Stack
+        position="absolute"
+        top={0}
+        right={0}
+        bottom={0}
+        left={0}
+        aria-hidden
+        onPress={onDisabledPress}
+      />
+    </Stack>
   );
 }
 
