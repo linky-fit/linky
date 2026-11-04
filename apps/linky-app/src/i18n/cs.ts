@@ -934,6 +934,8 @@ export const cs = {
   spdPaymentInvalidReference:
     "Zadejte buď referenci platby, nebo symboly platby, ne obojí.",
   spdPaymentInvalidAmount: "Neplatná částka.",
+  spdPaymentMissingAmountTitle: "V QR kódu chybí částka",
+  spdPaymentFillAmount: "Doplnit částku",
 
   scan: "Skenovat",
   scanUnsupported: "Nepodporovaný QR kód.",
@@ -1341,6 +1343,9 @@ export const cs = {
   listingAdd: "Přidat",
   listingSave: "Uložit",
   listingRemove: "Odstranit nabídku",
+  listingTitleMissing: "Doplňte název.",
+  listingPriceMissing: "Doplňte cenu.",
+  listingUnitMissing: "Doplňte jednotku.",
   otherContacts: "Ostatní kontakty",
   today: "Dnes",
   yesterday: "Včera",

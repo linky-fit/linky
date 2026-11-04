@@ -140,6 +140,47 @@ describe("SpdPaymentPage offer recipients", () => {
     );
   });
 
+  it("asks for the amount when the scanned payment has none", async () => {
+    const spdPayload = "SPD*1.0*ACC:CZ5855000000001265098001*CC:CZK";
+    const { container } = await renderIntoDocument(
+      <SpdPaymentPage
+        cashuBalanceAfterMelt={100_000}
+        initialOfferContactCount={1}
+        initialOfferDelaySec={0}
+        isEditing={false}
+        isManualEntry={false}
+        offerContacts={[{ id: "a", name: "Alice", npub: "npub1alice" }]}
+        onRequestReimbursement={vi.fn(async () => null)}
+        spdPayload={spdPayload}
+      />,
+    );
+
+    expect(requestButton(container)).toBeNull();
+    await act(async () => {
+      buttonByText(container, "spdPaymentFillAmount")?.click();
+    });
+    expect(navigateTo).toHaveBeenCalledWith({
+      route: "bankPayment",
+      spdPayload,
+      editing: true,
+    });
+
+    const editing = await renderIntoDocument(
+      <SpdPaymentPage
+        cashuBalanceAfterMelt={100_000}
+        initialOfferContactCount={1}
+        initialOfferDelaySec={0}
+        isEditing
+        isManualEntry={false}
+        offerContacts={[{ id: "a", name: "Alice", npub: "npub1alice" }]}
+        onRequestReimbursement={vi.fn(async () => null)}
+        spdPayload={spdPayload}
+      />,
+    );
+    expect(document.activeElement?.id).toBe("bank-payment-field-AM");
+    await editing.unmount();
+  });
+
   it("numbers selected recipients and re-adds a removed contact at the end", async () => {
     const { container } = await renderIntoDocument(
       <SpdPaymentPage

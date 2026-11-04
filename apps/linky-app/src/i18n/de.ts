@@ -940,6 +940,8 @@ export const de = {
   spdPaymentInvalidReference:
     "Entweder Zahlungsreferenz oder Zahlungssymbole angeben, nicht beides.",
   spdPaymentInvalidAmount: "Ungültiger Betrag.",
+  spdPaymentMissingAmountTitle: "Im QR-Code fehlt der Betrag",
+  spdPaymentFillAmount: "Betrag eingeben",
   spdPaymentBic: "BIC / SWIFT",
   spdPaymentReference: "Zahlungsreferenz",
 
@@ -1349,6 +1351,9 @@ export const de = {
   listingAdd: "Hinzufügen",
   listingSave: "Speichern",
   listingRemove: "Angebot entfernen",
+  listingTitleMissing: "Gib einen Namen ein.",
+  listingPriceMissing: "Gib einen Preis ein.",
+  listingUnitMissing: "Gib eine Einheit ein.",
   otherContacts: "Weitere Kontakte",
   today: "Heute",
   yesterday: "Gestern",

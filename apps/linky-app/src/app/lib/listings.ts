@@ -10,6 +10,7 @@ import {
 import type { ListingRecord } from "@linky-fit/linksync";
 import { Option, Schema } from "effect";
 import {
+  DISPLAY_CURRENCIES,
   convertFiatToSat,
   formatDisplayAmountText,
   getDisplayUnitLabel,
@@ -83,33 +84,132 @@ export const beaconTradeOfCashIntent = (
 ): BeaconTrade =>
   cash === "offer" ? "buy" : cash === "want" ? "sell" : "none";
 
-/** A listing is priced in the display currency; a bitcoin or hidden display prices it in sats. */
-export const listingCurrencyOfDisplay = (
-  displayCurrency: DisplayCurrency,
-): string =>
-  isFiatDisplayCurrency(displayCurrency)
-    ? displayCurrency.toUpperCase()
-    : LISTING_SAT_CURRENCY;
+/** `BTC` is a form-only unit: the wire prices bitcoin in whole sats. */
+export const LISTING_BTC_UNIT = "BTC";
 
-/** `Kč`, `EUR`, `sat`: what the amount field shows next to the typed price. */
+const SATS_PER_BTC = 100_000_000;
+const BTC_FRACTION_DIGITS = 8;
+
+/** The price unit a display currency types in: `SAT`, `BTC` or the ISO code; a hidden display has none. */
+export const listingUnitOfDisplay = (
+  displayCurrency: DisplayCurrency,
+): string | null => {
+  if (displayCurrency === "hidden") return null;
+  if (displayCurrency === "btc") return LISTING_BTC_UNIT;
+  if (displayCurrency === "sat") return LISTING_SAT_CURRENCY;
+  return displayCurrency.toUpperCase();
+};
+
+/** The wire currency of a form unit: bitcoin is stored as sats. */
+export const listingWireCurrency = (unit: string): string =>
+  unit === LISTING_BTC_UNIT ? LISTING_SAT_CURRENCY : unit;
+
+/** The price units the form offers: exactly the display currencies enabled in Settings, in the order the unit toggle cycles them; sats when nothing but a hidden display is on. */
+export const listingPriceUnits = (
+  allowed: ReadonlyArray<DisplayCurrency>,
+): ReadonlyArray<string> => {
+  const units = DISPLAY_CURRENCIES.flatMap((currency) => {
+    const unit = listingUnitOfDisplay(currency);
+    return allowed.includes(currency) && unit !== null ? [unit] : [];
+  });
+  return units.length > 0 ? units : [LISTING_SAT_CURRENCY];
+};
+
+/** The unit a new listing is priced in: the display unit when it is among `units`, else the first of them. */
+export const defaultListingUnit = (
+  displayCurrency: DisplayCurrency,
+  units: ReadonlyArray<string>,
+): string => {
+  const unit = listingUnitOfDisplay(displayCurrency);
+  return unit !== null && units.includes(unit)
+    ? unit
+    : (units[0] ?? LISTING_SAT_CURRENCY);
+};
+
+/** Whole sats as a bitcoin number, e.g. "123456" → "0.00123456", built from digits so no float rounding leaks in. */
+const satsToBtcText = (amountSat: string): string => {
+  const digits = amountSat.padStart(BTC_FRACTION_DIGITS + 1, "0");
+  const whole = digits.slice(0, -BTC_FRACTION_DIGITS);
+  const fraction = digits.slice(-BTC_FRACTION_DIGITS).replace(/0+$/, "");
+  return fraction ? `${whole}.${fraction}` : whole;
+};
+
+/** How a stored price opens in the form: a sat price shows in bitcoin when only bitcoin is enabled, anything else stays in its own currency. */
+export const listingPriceInput = (
+  amount: string,
+  currency: string,
+  units: ReadonlyArray<string>,
+): { amount: string; unit: string } =>
+  currency === LISTING_SAT_CURRENCY &&
+  !units.includes(LISTING_SAT_CURRENCY) &&
+  units.includes(LISTING_BTC_UNIT)
+    ? { amount: satsToBtcText(amount), unit: LISTING_BTC_UNIT }
+    : { amount, unit: currency };
+
+/** `Kč`, `EUR`, `₿`, `sat`: what the amount field shows next to the typed price. */
 export const listingCurrencyLabel = (
   currency: string,
   lang: string,
 ): string => {
   if (currency === LISTING_SAT_CURRENCY)
     return getDisplayUnitLabel("sat", lang);
+  if (currency === LISTING_BTC_UNIT) return getDisplayUnitLabel("btc", lang);
   const display = parseDisplayCurrency(currency);
   return display !== null && isFiatDisplayCurrency(display)
     ? getDisplayUnitLabel(display, lang)
     : currency;
 };
 
-/** A typed amount normalized for the wire; null when it is not a price. Sats are whole. */
+/** How many decimals a price in `currency` takes: none for sats, 8 for bitcoin, 2 otherwise. */
+export const listingFractionDigits = (currency: string): number =>
+  currency === LISTING_SAT_CURRENCY
+    ? 0
+    : currency === LISTING_BTC_UNIT
+      ? BTC_FRACTION_DIGITS
+      : 2;
+
+/** The typed price kept numeric: digits and at most one decimal separator, cut where `currency` takes no more decimals. */
+export const filterListingAmountInput = (
+  input: string,
+  currency: string,
+): string => {
+  const fractionDigits = listingFractionDigits(currency);
+  let text = "";
+  let fraction: number | null = null;
+  for (const char of input) {
+    if (/\d/.test(char)) {
+      if (fraction === null) text += char;
+      else if (fraction < fractionDigits) {
+        text += char;
+        fraction += 1;
+      }
+    } else if (char === "." || char === ",") {
+      if (fraction !== null || fractionDigits === 0) break;
+      text += char;
+      fraction = 0;
+    }
+  }
+  return text;
+};
+
+/** A typed amount normalized for the wire; null when it is not a price. Sats are whole; bitcoin becomes whole sats. */
 export const normalizeListingAmount = (
   input: string,
   currency: string,
 ): string | null => {
-  const text = input.trim().replace(",", ".").replace(/\s+/g, "");
+  const text = input
+    .trim()
+    .replace(",", ".")
+    .replace(/\s+/g, "")
+    .replace(/^0+(?=\d)/, "");
+  if (currency === LISTING_BTC_UNIT) {
+    const match = /^(\d{1,4})(?:\.(\d{1,8}))?$/.exec(text);
+    if (!match) return null;
+    const sats =
+      Number(match[1]) * SATS_PER_BTC +
+      Number((match[2] ?? "").padEnd(BTC_FRACTION_DIGITS, "0"));
+    return sats > 0 ? String(sats) : null;
+  }
   const pattern =
     currency === LISTING_SAT_CURRENCY ? /^\d{1,12}$/ : /^\d{1,12}(\.\d{1,2})?$/;
   if (!pattern.test(text)) return null;
@@ -136,18 +236,6 @@ const formatInListingCurrency = (
     numberFormatters.set(key, formatter);
   }
   return `${formatter.format(Number(amount))} ${listingCurrencyLabel(currency, lang)}`;
-};
-
-/** The currencies a listing can be priced in on this device: every allowed display currency, sats once, plus `current` when it is not among them. */
-export const listingCurrencyChoices = (
-  allowed: ReadonlyArray<DisplayCurrency>,
-  current: string,
-): ReadonlyArray<string> => {
-  const choices = new Set<string>([current]);
-  for (const currency of allowed) {
-    if (currency !== "hidden") choices.add(listingCurrencyOfDisplay(currency));
-  }
-  return [...choices];
 };
 
 /**

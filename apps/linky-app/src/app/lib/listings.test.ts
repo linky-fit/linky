@@ -6,9 +6,13 @@ import {
   beaconTradeOfCashIntent,
   buildListingsDocument,
   formatListingPrice,
-  listingCurrencyChoices,
+  defaultListingUnit,
+  filterListingAmountInput,
   listingCurrencyLabel,
-  listingCurrencyOfDisplay,
+  listingPriceInput,
+  listingPriceUnits,
+  listingUnitOfDisplay,
+  listingWireCurrency,
   listingsPublishFingerprint,
   normalizeListingAmount,
 } from "./listings";
@@ -97,24 +101,65 @@ describe("listing amounts", () => {
     expect(normalizeListingAmount("1.234", "CZK")).toBeNull();
     expect(normalizeListingAmount("abc", "CZK")).toBeNull();
     expect(normalizeListingAmount("21000", "SAT")).toBe("21000");
+    expect(normalizeListingAmount("007", "SAT")).toBe("7");
     expect(normalizeListingAmount("21.5", "SAT")).toBeNull();
   });
 
-  it("offers the allowed display currencies as price units, the current one first", () => {
-    expect(
-      listingCurrencyChoices(["sat", "czk", "btc", "hidden"], "CZK"),
-    ).toEqual(["CZK", "SAT"]);
-    expect(listingCurrencyChoices(["sat"], "EUR")).toEqual(["EUR", "SAT"]);
+  it("stores a bitcoin price as whole sats", () => {
+    expect(normalizeListingAmount("0.00123456", "BTC")).toBe("123456");
+    expect(normalizeListingAmount("1,5", "BTC")).toBe("150000000");
+    expect(normalizeListingAmount("0.000000001", "BTC")).toBeNull();
+    expect(normalizeListingAmount("0", "BTC")).toBeNull();
+    expect(listingWireCurrency("BTC")).toBe("SAT");
+    expect(listingWireCurrency("CZK")).toBe("CZK");
   });
 
-  it("prices a listing in the display currency, sats for a bitcoin display", () => {
-    expect(listingCurrencyOfDisplay("czk")).toBe("CZK");
-    expect(listingCurrencyOfDisplay("sat")).toBe("SAT");
-    expect(listingCurrencyOfDisplay("btc")).toBe("SAT");
-    expect(listingCurrencyOfDisplay("hidden")).toBe("SAT");
+  it("keeps the typed price numeric, with the decimals the unit takes", () => {
+    expect(filterListingAmountInput("1 200 Kč", "CZK")).toBe("1200");
+    expect(filterListingAmountInput("12,505", "CZK")).toBe("12,50");
+    expect(filterListingAmountInput("12.5.3", "EUR")).toBe("12.5");
+    expect(filterListingAmountInput("12.50", "SAT")).toBe("12");
+    expect(filterListingAmountInput("0.123456789", "BTC")).toBe("0.12345678");
+    expect(filterListingAmountInput("abc", "CZK")).toBe("");
+  });
+
+  it("offers exactly the enabled display currencies as price units, in cycling order", () => {
+    expect(listingPriceUnits(["czk", "btc", "sat", "hidden"])).toEqual([
+      "SAT",
+      "BTC",
+      "CZK",
+    ]);
+    expect(listingPriceUnits(["eur"])).toEqual(["EUR"]);
+    expect(listingPriceUnits(["hidden"])).toEqual(["SAT"]);
+  });
+
+  it("prices a new listing in the display unit when it is enabled", () => {
+    expect(listingUnitOfDisplay("czk")).toBe("CZK");
+    expect(listingUnitOfDisplay("sat")).toBe("SAT");
+    expect(listingUnitOfDisplay("btc")).toBe("BTC");
+    expect(listingUnitOfDisplay("hidden")).toBeNull();
+    expect(defaultListingUnit("czk", ["SAT", "CZK"])).toBe("CZK");
+    expect(defaultListingUnit("eur", ["SAT", "CZK"])).toBe("SAT");
+    expect(defaultListingUnit("hidden", ["CZK"])).toBe("CZK");
     expect(listingCurrencyLabel("CZK", "cs")).toBe("Kč");
     expect(listingCurrencyLabel("SAT", "cs")).toBe("sat");
+    expect(listingCurrencyLabel("BTC", "cs")).toBe("₿");
     expect(listingCurrencyLabel("XXX", "cs")).toBe("XXX");
+  });
+
+  it("opens a stored sat price in bitcoin only when sats are not enabled", () => {
+    expect(listingPriceInput("123456", "SAT", ["BTC", "CZK"])).toEqual({
+      amount: "0.00123456",
+      unit: "BTC",
+    });
+    expect(listingPriceInput("123456", "SAT", ["SAT", "BTC"])).toEqual({
+      amount: "123456",
+      unit: "SAT",
+    });
+    expect(listingPriceInput("90", "EUR", ["SAT"])).toEqual({
+      amount: "90",
+      unit: "EUR",
+    });
   });
 
   it("shows a price in the viewer's unit, converted and marked when it differs", () => {
