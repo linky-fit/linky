@@ -3,6 +3,7 @@ import { useState, type ComponentType, type ReactNode, type Ref } from "react";
 import type { Screen } from "../copy";
 import { ChatPayFlowScreen } from "./chatPay";
 import { ChatRequestFlowScreen } from "./chatRequest";
+import { CashIntentScreen, ListingsScreen } from "./collaboration";
 import { ContactBlockScreen } from "./contactBlock";
 import { ContactsScreen, WalletScreen } from "./home";
 import { MessageActionsScreen } from "./messageActions";
@@ -15,10 +16,12 @@ import { TokenShareScreen } from "./token";
 import { TutorialReplayScreen } from "./tutorialReplay";
 
 const demoScreens: Record<Screen, ComponentType> = {
+  "cash-intent": CashIntentScreen,
   "chat-payment": ChatPayFlowScreen,
   "chat-request": ChatRequestFlowScreen,
   "contact-block": ContactBlockScreen,
   contacts: ContactsScreen,
+  listings: ListingsScreen,
   "message-actions": MessageActionsScreen,
   wallet: WalletScreen,
   "profile-open": ProfileOpenScreen,
