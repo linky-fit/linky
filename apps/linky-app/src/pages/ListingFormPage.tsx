@@ -24,9 +24,13 @@ import {
 } from "../app/hooks/useLinksync";
 import {
   LISTING_SIDES,
-  listingCurrencyChoices,
+  defaultListingUnit,
+  filterListingAmountInput,
   listingCurrencyLabel,
-  listingCurrencyOfDisplay,
+  listingFractionDigits,
+  listingPriceInput,
+  listingPriceUnits,
+  listingWireCurrency,
   normalizeListingAmount,
 } from "../app/lib/listings";
 import { runWrite } from "../app/lib/storeWrite";
@@ -43,7 +47,7 @@ const SIDE_KEYS: Record<ListingSide, I18nKey> = {
 const isSide = (side: string): side is ListingSide =>
   LISTING_SIDES.some((value) => value === side);
 
-/** Adds a listing, or edits the one with `id`. The price is in the display currency the user has on, sats included. */
+/** Adds a listing, or edits the one with `id`. The price is in one of the display units enabled in Settings, bitcoin stored as sats. */
 export function ListingFormPage({
   id = null,
 }: {
@@ -58,16 +62,22 @@ export function ListingFormPage({
     ? (records.find((record) => record.id === id) ?? null)
     : null;
 
+  const enabledUnits = React.useMemo(
+    () => listingPriceUnits(allowedDisplayCurrencies),
+    [allowedDisplayCurrencies],
+  );
   const [side, setSide] = React.useState<ListingSide>("offer");
   const [title, setTitle] = React.useState("");
   const [amount, setAmount] = React.useState("");
   const [unit, setUnit] = React.useState("");
-  // A new listing takes the display currency; an edit keeps the currency it was priced in.
+  // A new listing takes the display unit; an edit keeps the currency it was priced in.
   const [currency, setCurrency] = React.useState(() =>
-    listingCurrencyOfDisplay(displayCurrency),
+    defaultListingUnit(displayCurrency, enabledUnits),
   );
   const [isSaving, setIsSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  // Pressing Add with gaps marks them; until then an empty form is not an error.
+  const [attempted, setAttempted] = React.useState(false);
 
   // An edit starts from the stored row once it is read.
   const loadedId = React.useRef<ListingId | null>(null);
@@ -76,39 +86,51 @@ export function ListingFormPage({
     loadedId.current = existing.id;
     if (isSide(existing.side)) setSide(existing.side);
     setTitle(existing.title);
-    setAmount(existing.amount);
     setUnit(existing.unit);
-    setCurrency(existing.currency);
-  }, [existing]);
+    const price = listingPriceInput(
+      existing.amount,
+      existing.currency,
+      enabledUnits,
+    );
+    setAmount(price.amount);
+    setCurrency(price.unit);
+  }, [enabledUnits, existing]);
 
-  // Tapping the unit cycles through the device's display currencies.
-  const currencyChoices = listingCurrencyChoices(
-    allowedDisplayCurrencies,
-    currency,
-  );
+  // Tapping the unit cycles through the enabled display units; an edited listing's own currency stays available when Settings no longer list it.
+  const currencyChoices = enabledUnits.includes(currency)
+    ? enabledUnits
+    : [...enabledUnits, currency];
   const nextCurrency = () => {
     const index = currencyChoices.indexOf(currency);
     const next = currencyChoices[(index + 1) % currencyChoices.length];
-    if (next !== undefined) setCurrency(next);
+    if (next === undefined) return;
+    setCurrency(next);
+    setAmount(filterListingAmountInput(amount, next));
   };
 
   const normalizedAmount = normalizeListingAmount(amount, currency);
-  const canSave =
-    title.trim().length > 0 &&
-    unit.trim().length > 0 &&
-    normalizedAmount !== null;
+  const titleMissing = title.trim().length === 0;
+  const unitMissing = unit.trim().length === 0;
+  const amountMissing = normalizedAmount === null;
+  const canSave = !titleMissing && !unitMissing && !amountMissing;
+  const fieldError = (missing: boolean, key: I18nKey): string | undefined =>
+    attempted && missing ? t(key) : undefined;
 
   const back = () => navigateTo({ route: "listings" });
 
   const save = async () => {
-    if (!canSave || normalizedAmount === null) return;
+    if (isSaving) return;
+    if (!canSave || normalizedAmount === null) {
+      setAttempted(true);
+      return;
+    }
     setIsSaving(true);
     setError(null);
     const columns = {
       side: NonEmptyString100.orThrow(side),
       title: NonEmptyString1000.orThrow(title.trim()),
       amount: NonEmptyString100.orThrow(normalizedAmount),
-      currency: NonEmptyString100.orThrow(currency),
+      currency: NonEmptyString100.orThrow(listingWireCurrency(currency)),
       unit: NonEmptyString100.orThrow(unit.trim()),
     };
     const outcome = await runWrite(
@@ -167,6 +189,7 @@ export function ListingFormPage({
         value={title}
         onChangeText={setTitle}
         maxLength={120}
+        error={fieldError(titleMissing, "listingTitleMissing")}
         testID="listing-title"
       />
       <Row gap="$sm" alignItems="flex-start">
@@ -174,9 +197,14 @@ export function ListingFormPage({
           <TextField
             label={t("listingPrice")}
             placeholder={t("listingPrice")}
-            inputMode="decimal"
+            inputMode={
+              listingFractionDigits(currency) > 0 ? "decimal" : "numeric"
+            }
             value={amount}
-            onChangeText={setAmount}
+            onChangeText={(text) =>
+              setAmount(filterListingAmountInput(text, currency))
+            }
+            error={fieldError(amountMissing, "listingPriceMissing")}
             trailing={
               <Button
                 variant="ghost"
@@ -200,6 +228,7 @@ export function ListingFormPage({
             value={unit}
             onChangeText={setUnit}
             maxLength={40}
+            error={fieldError(unitMissing, "listingUnitMissing")}
             testID="listing-unit"
           />
         </Stack>
@@ -211,7 +240,7 @@ export function ListingFormPage({
       ) : null}
       <Button
         icon="Check"
-        disabled={!canSave || isSaving}
+        disabled={isSaving}
         loading={isSaving}
         onPress={() => void save()}
         testID="listing-save"

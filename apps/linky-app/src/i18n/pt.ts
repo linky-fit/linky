@@ -955,6 +955,8 @@ export const pt = {
   spdPaymentInvalidReference:
     "Use ou a referência do pagamento ou os símbolos de pagamento, não os dois.",
   spdPaymentInvalidAmount: "Valor inválido.",
+  spdPaymentMissingAmountTitle: "O código QR não tem valor",
+  spdPaymentFillAmount: "Adicionar valor",
 
   scan: "Escanear",
   scanUnsupported: "QR code não suportado.",
@@ -1373,6 +1375,9 @@ export const pt = {
   listingAdd: "Adicionar",
   listingSave: "Salvar",
   listingRemove: "Remover anúncio",
+  listingTitleMissing: "Adicione um nome.",
+  listingPriceMissing: "Adicione um preço.",
+  listingUnitMissing: "Adicione uma unidade.",
   otherContacts: "Outros contatos",
   today: "Hoje",
   yesterday: "Ontem",

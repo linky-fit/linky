@@ -544,6 +544,8 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
                   )
                 }
                 trailing={key === "AM" ? currencyCode : undefined}
+                // A scanned code without an amount opens here to get one.
+                autoFocus={key === "AM" && !draftFields[key]}
               />
             );
           })}
@@ -574,7 +576,19 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
         ))}
       </Stack>
 
-      {needsSingleTabConsent ? (
+      {amount === null ? (
+        // Bank QR codes may leave the amount to the payer; without it there is nothing to offer.
+        <Notice
+          tone="accent"
+          icon="CircleAlert"
+          title={t("spdPaymentMissingAmountTitle")}
+          action={{
+            label: t("spdPaymentFillAmount"),
+            onPress: () =>
+              navigateTo({ route: "bankPayment", spdPayload, editing: true }),
+          }}
+        />
+      ) : needsSingleTabConsent ? (
         <Notice
           tone="accent"
           icon="CircleAlert"
