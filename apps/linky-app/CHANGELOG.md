@@ -12,6 +12,14 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ## [Unreleased]
 
+### en-US
+
+- A fresh look in light and dark: sent messages are solid with the time inside, the tabs are labelled, the wallet shows your recent activity under the balance, and the keypad sits within thumb reach. On a computer, your contacts stay in a column beside the open chat and pages keep a readable width.
+
+### cs-CZ
+
+- Nový vzhled ve světlém i tmavém režimu: odeslané zprávy jsou plné s časem uvnitř, záložky mají popisky, peněženka ukazuje pod zůstatkem nedávné pohyby a klávesnice je na dosah palce. Na počítači zůstávají kontakty ve sloupci vedle otevřeného chatu a stránky mají čitelnou šířku.
+
 ## [26.10.11] - 2026-11-04
 
 ### en-US

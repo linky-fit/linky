@@ -4,7 +4,7 @@ import type { ComponentProps } from "react";
 const gutters = {
   page: {
     paddingHorizontal: "$xl",
-    paddingTop: "$xxxl",
+    paddingTop: "$md",
     paddingBottom: "$huge",
   },
   detail: {

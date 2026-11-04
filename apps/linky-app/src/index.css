@@ -2,7 +2,7 @@
 
 :root {
   /* Painted before the JS bundle loads, so these repeat themes.dark and themes.light of @linky-fit/ui. */
-  --app-flat-bg: #020617;
+  --app-flat-bg: #070b14;
   --app-color: #e2e8f0;
   --app-accent: #2dd4bf;
   color-scheme: dark;
@@ -28,7 +28,7 @@
 }
 
 :root[data-color-mode="light"] {
-  --app-flat-bg: #f1f5f9;
+  --app-flat-bg: #f2f4f7;
   --app-color: #0f172a;
   --app-accent: #0f766e;
   color-scheme: light;

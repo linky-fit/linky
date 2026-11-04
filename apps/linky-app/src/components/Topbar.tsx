@@ -18,7 +18,15 @@ import {
 } from "../app/routes/desktopRouteSection";
 import type { TopbarButton } from "../app/types/appTypes";
 import { navigateTo } from "../hooks/useRouting";
+import type { Route } from "../types/route";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
+
+const isMainSection = (route: Route): boolean =>
+  route.kind === "contacts" ||
+  route.kind === "wallet" ||
+  route.kind === "collaboration" ||
+  route.kind === "settings" ||
+  route.kind === "profile";
 
 interface TopbarProps {
   /** Renders the static header of the desktop detail pane. */
@@ -105,6 +113,7 @@ export function Topbar({
 
   const props = {
     ...(topbarTitle ? { title: topbarTitle } : {}),
+    large: !desktopDetail && isMainSection(route),
     content: chatContent,
     leading: topbar ? <TopbarAction button={topbar} /> : null,
     trailing: topbarRight ? <TopbarAction button={topbarRight} /> : null,

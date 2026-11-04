@@ -36,9 +36,15 @@ export const layout: Section = {
       </UI.Stack>
     ),
     Section: () => (
-      <UI.Section title="A section">
-        <UI.Text>Related content</UI.Text>
-      </UI.Section>
+      <UI.Stack>
+        <UI.Section title="A section">
+          <UI.Text>Related content</UI.Text>
+        </UI.Section>
+        <UI.Section grouped title="A grouped section">
+          <UI.ListRow icon="Languages" title="Language" onPress={() => {}} />
+          <UI.ListRow icon="Palette" title="Appearance" onPress={() => {}} />
+        </UI.Section>
+      </UI.Stack>
     ),
     Divider: () => (
       <UI.Stack>

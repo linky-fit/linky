@@ -2,6 +2,10 @@ const palette = {
   white: "#ffffff",
   black: "#000000",
   slate50: "#f8fafc",
+  // Linky's light planes: page, control and pressed control under white panels.
+  mist100: "#f2f4f7",
+  mist200: "#e7ecf1",
+  mist300: "#d5dde6",
   slate100: "#f1f5f9",
   slate200: "#e2e8f0",
   slate300: "#cbd5e1",
@@ -13,6 +17,13 @@ const palette = {
   slate900: "#0f172a",
   slate925: "#0b1222",
   slate950: "#020617",
+  // Linky's dark planes: page, panel, control and pressed control, each a step lighter.
+  night950: "#070b14",
+  night900: "#0f1623",
+  night800: "#1a2332",
+  night700: "#253044",
+  teal50: "#f0fdfa",
+  teal100: "#ccfbf1",
   teal200: "#99f6e4",
   teal300: "#5eead4",
   teal400: "#2dd4bf",
@@ -45,6 +56,8 @@ const palette = {
   ink500: "#6f685b",
   ink750: "#2b2721",
   ink800: "#1f1c18",
+  ink850: "#1f1d1a",
+  ink925: "#2b2310",
   ink900: "#151310",
   ink950: "#0a0908",
   gold200: "#efd88e",
@@ -78,8 +91,9 @@ export const space = {
 export const radius = {
   none: 0,
   sm: 8,
-  control: 12,
-  card: 16,
+  control: 14,
+  card: 20,
+  message: 18,
   sheet: 24,
   device: 48,
   pill: 999,
@@ -105,6 +119,10 @@ export const size = {
   device: 300,
   brandHero: 220,
   qr: 240,
+  // The desktop list column beside an open detail pane.
+  sidebar: 360,
+  // A single column of controls on wide screens, e.g. an amount keypad.
+  form: 420,
   sheetWidth: 520,
   contentWidth: 720,
   appWidth: 1240,
@@ -201,18 +219,23 @@ export const typography = {
 export type TextVariant = keyof typeof typography.size;
 
 const dark = {
-  background: palette.slate950,
-  backgroundPress: palette.slate800,
-  surface: palette.slate925,
-  surfaceRaised: palette.slate800,
+  background: palette.night950,
+  backgroundPress: palette.night700,
+  surface: palette.night900,
+  surfaceRaised: palette.night800,
   // A quiet solid for status marks: dimmer than text, so it reads as "nothing happened".
   neutral: palette.slate500,
   neutralSoft: alpha(palette.slate400, 0.18),
+  // An incoming message's fill; outgoing ones wear the `outgoing` sub-theme.
+  bubble: palette.night800,
+  bubbleEdge: alpha(palette.white, 0),
+  // A switch's knob, light on every track.
+  knob: palette.slate50,
   color: palette.slate200,
   colorStrong: palette.slate50,
   colorSubtle: palette.slate300,
   colorMuted: palette.slate400,
-  placeholderColor: palette.slate500,
+  placeholderColor: palette.slate400,
   selectionColor: alpha(palette.teal500, 0.4),
   borderColor: alpha(palette.slate400, 0.2),
   borderColorHover: alpha(palette.slate400, 0.35),
@@ -243,12 +266,16 @@ const dark = {
 export type ThemeColors = typeof dark;
 
 const light: ThemeColors = {
-  background: palette.slate100,
-  backgroundPress: palette.slate300,
+  background: palette.mist100,
+  backgroundPress: palette.mist300,
   surface: palette.white,
-  surfaceRaised: palette.slate200,
+  surfaceRaised: palette.mist200,
   neutral: palette.slate400,
   neutralSoft: alpha(palette.slate500, 0.14),
+  bubble: palette.white,
+  // White bubbles on the pale page need an edge to read as bubbles.
+  bubbleEdge: alpha(palette.slate900, 0.08),
+  knob: palette.white,
   color: palette.slate900,
   colorStrong: palette.slate950,
   colorSubtle: palette.slate700,
@@ -289,6 +316,9 @@ const darkFazole: ThemeColors = {
   surfaceRaised: palette.ink750,
   neutral: palette.ink500,
   neutralSoft: alpha(palette.ink300, 0.12),
+  bubble: palette.ink850,
+  bubbleEdge: alpha(palette.ink300, 0),
+  knob: palette.ink50,
   color: palette.ink100,
   colorStrong: palette.ink50,
   colorSubtle: palette.ink200,
@@ -322,8 +352,48 @@ const darkFazole: ThemeColors = {
   bezel: palette.ink750,
 };
 
-// `dark_fazole` is a Tamagui sub-theme: `<Theme name="fazole">` inside dark resolves to it.
-export const themes = { dark, light, dark_fazole: darkFazole };
+/** A sent message: white on solid teal, in both modes; soft fills darken so tone text stays readable. */
+const outgoing: ThemeColors = {
+  ...dark,
+  background: palette.teal700,
+  backgroundPress: alpha(palette.black, 0.3),
+  surface: alpha(palette.black, 0.18),
+  surfaceRaised: alpha(palette.black, 0.25),
+  neutral: palette.teal200,
+  neutralSoft: alpha(palette.black, 0.15),
+  bubble: palette.teal700,
+  bubbleEdge: alpha(palette.white, 0),
+  knob: palette.white,
+  color: palette.white,
+  colorStrong: palette.white,
+  colorSubtle: palette.teal50,
+  colorMuted: palette.teal100,
+  placeholderColor: palette.teal200,
+  selectionColor: alpha(palette.white, 0.3),
+  borderColor: alpha(palette.white, 0.25),
+  borderColorHover: alpha(palette.white, 0.4),
+  outlineColor: alpha(palette.white, 0.6),
+  accent: palette.white,
+  accentHover: palette.teal50,
+  accentPress: palette.teal100,
+  onAccent: palette.teal900,
+  accentSoft: alpha(palette.black, 0.15),
+  accentText: palette.white,
+  dangerSoft: alpha(palette.black, 0.25),
+  warningSoft: alpha(palette.black, 0.25),
+  infoSoft: alpha(palette.black, 0.25),
+};
+
+// Tamagui sub-themes: `<Theme name="fazole">` inside dark resolves to `dark_fazole`, `<Theme name="outgoing">` to `<mode>_outgoing`.
+export const themes = {
+  dark,
+  light,
+  dark_fazole: darkFazole,
+  dark_outgoing: outgoing,
+  light_outgoing: outgoing,
+  // fazole keeps its quiet gold tint for sent messages.
+  dark_fazole_outgoing: { ...darkFazole, background: palette.ink925 },
+};
 
 export type ColorMode = "dark" | "light";
 

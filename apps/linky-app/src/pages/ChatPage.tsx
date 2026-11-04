@@ -653,11 +653,17 @@ const ChatMessageList = memo(function ChatMessageList({
       flex={1}
       minHeight={0}
       overflowY="auto"
-      paddingHorizontal="$xl"
+      paddingHorizontal="$lg"
     >
       <Stack
         ref={contentNodeRef}
-        gap="$sm"
+        // A short conversation sits just above the composer.
+        flexGrow={1}
+        justifyContent="flex-end"
+        width="100%"
+        maxWidth="$contentWidth"
+        alignSelf="center"
+        gap="$xs"
         paddingTop="$lg"
         paddingBottom="$md"
       >
@@ -933,7 +939,13 @@ export const ChatComposer = memo(function ChatComposer({
   const showSend = hasDraftText || chatAttachments.length > 0;
 
   return (
-    <Stack testID="chat-compose" data-safe-area="bottom">
+    <Stack
+      testID="chat-compose"
+      data-safe-area="bottom"
+      width="100%"
+      maxWidth="$contentWidth"
+      alignSelf="center"
+    >
       <MessageComposerFrame
         header={
           replyContext ||
@@ -1013,14 +1025,15 @@ export const ChatComposer = memo(function ChatComposer({
             </>
           ) : null
         }
-        footer={
+        actions={
           canPayThisContact ? (
-            <Row gap="$sm">
+            <>
               {canRequestThisContact ? (
                 <Button
-                  flex={1}
                   variant="secondary"
                   icon="Request"
+                  borderRadius="$pill"
+                  $compact={{ flex: 1 }}
                   onPress={() =>
                     openContactPay(selectedContact.id, true, "request")
                   }
@@ -1031,9 +1044,9 @@ export const ChatComposer = memo(function ChatComposer({
                 </Button>
               ) : null}
               <Button
-                flex={1}
-                variant="secondary"
                 icon={isFeedbackContact ? "HeartHandshake" : "HandCoins"}
+                borderRadius="$pill"
+                $compact={{ flex: 1 }}
                 onPress={() => openContactPay(selectedContact.id, true)}
                 disabled={cashuIsBusy || !canStartPay}
                 tooltip={!canStartPay ? t("payInsufficient") : undefined}
@@ -1041,7 +1054,7 @@ export const ChatComposer = memo(function ChatComposer({
               >
                 {isFeedbackContact ? t("donate") : t("pay")}
               </Button>
-            </Row>
+            </>
           ) : null
         }
       >

@@ -1,5 +1,4 @@
 import {
-  Divider,
   ListRow,
   Row,
   Section,
@@ -167,8 +166,8 @@ export function AdvancedPage(): React.ReactElement {
   );
 
   return (
-    <Stack gap="$lg">
-      <Section title={t("settingsGeneral")}>
+    <Stack gap="$xl">
+      <Section grouped title={t("settingsGeneral")}>
         {linkRow("Languages", t("language"), () =>
           navigateTo({ route: "settingsLanguage" }),
         )}
@@ -212,9 +211,7 @@ export function AdvancedPage(): React.ReactElement {
         )}
       </Section>
 
-      <Divider />
-
-      <Section title={t("settingsPayments")}>
+      <Section grouped title={t("settingsPayments")}>
         {linkRow(
           "QrCode",
           t("receiveMethod"),
@@ -235,9 +232,7 @@ export function AdvancedPage(): React.ReactElement {
         )}
       </Section>
 
-      <Divider />
-
-      <Section title={t("settingsNetwork")}>
+      <Section grouped title={t("settingsNetwork")}>
         {linkRow(
           "RadioTower",
           "Nostr",
@@ -275,9 +270,7 @@ export function AdvancedPage(): React.ReactElement {
         )}
       </Section>
 
-      <Divider />
-
-      <Section title={t("settingsDebug")}>
+      <Section grouped title={t("settingsDebug")}>
         {linkRow("Coins", t("tokens"), () =>
           navigateTo({ route: "cashuTokens" }),
         )}
@@ -309,9 +302,7 @@ export function AdvancedPage(): React.ReactElement {
         )}
       </Section>
 
-      <Divider />
-
-      <Section title={t("settingsSecurity")}>
+      <Section grouped title={t("settingsSecurity")}>
         <ListRow
           icon="ShieldCheck"
           title={t("masterKeys")}
@@ -340,8 +331,7 @@ export function AdvancedPage(): React.ReactElement {
 
       {experimentalFeatures ? (
         <>
-          <Divider />
-          <Section title={t("settingsExperimental")}>
+          <Section grouped title={t("settingsExperimental")}>
             {linkRow("Megaphone", t("keryxNewsletters"), () =>
               navigateTo({ route: "keryxCompanies" }),
             )}

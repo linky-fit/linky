@@ -11,23 +11,36 @@ export const navigation: Section = {
   title: "Navigation",
   entries: {
     TopBar: () => (
-      <UI.TopBar
-        title="Wallet"
-        leading={
-          <UI.IconButton
-            icon="ArrowLeft"
-            accessibilityLabel="Example back"
-            onPress={() => {}}
-          />
-        }
-        trailing={
-          <UI.IconButton
-            icon="Settings"
-            accessibilityLabel="Example settings"
-            onPress={() => {}}
-          />
-        }
-      />
+      <UI.Stack>
+        <UI.TopBar
+          title="Wallet"
+          leading={
+            <UI.IconButton
+              icon="ArrowLeft"
+              accessibilityLabel="Example back"
+              onPress={() => {}}
+            />
+          }
+          trailing={
+            <UI.IconButton
+              icon="Settings"
+              accessibilityLabel="Example settings"
+              onPress={() => {}}
+            />
+          }
+        />
+        <UI.TopBar
+          large
+          title="Contacts"
+          trailing={
+            <UI.IconButton
+              icon="ScanLine"
+              accessibilityLabel="Example scan"
+              onPress={() => {}}
+            />
+          }
+        />
+      </UI.Stack>
     ),
     TabBar: () => {
       const [tab, setTab] = useState("contacts");

@@ -198,10 +198,46 @@ const useContactCardRenderer = () => {
   );
 };
 
+/** The "Getting started" checklist while the user has not dismissed it. */
+export const ContactsOnboardingCard = (): React.ReactElement | null => {
+  const { t } = useTranslation();
+  const {
+    contactsOnboardingCelebrating,
+    contactsOnboardingTasks,
+    dismissContactsOnboarding,
+    showContactsOnboarding,
+  } = useContactsOnboarding();
+  const startContactsGuide = useStartContactsGuide();
+  if (!showContactsOnboarding) return null;
+  return (
+    <ContactsChecklist
+      contactsOnboardingCelebrating={contactsOnboardingCelebrating}
+      dismissContactsOnboarding={dismissContactsOnboarding}
+      onShowHow={(key) => {
+        if (!isContactsGuideKey(key)) return;
+        startContactsGuide(
+          key,
+          contactsOnboardingTasks.tasks.some(
+            (task) => task.key === key && task.done,
+          ),
+        );
+      }}
+      progressPercent={contactsOnboardingTasks.percent}
+      t={t}
+      tasks={contactsOnboardingTasks.tasks}
+      tasksCompleted={contactsOnboardingTasks.done}
+      tasksTotal={contactsOnboardingTasks.total}
+    />
+  );
+};
+
 const ContactsContent = ({
   filterAlwaysOpen,
+  onboardingInList,
 }: {
   filterAlwaysOpen: boolean;
+  /** On desktop the checklist sits in the detail pane, so the list keeps its place when a chat opens. */
+  onboardingInList: boolean;
 }): React.ReactElement => {
   const { t } = useTranslation();
   const [activeGroup, setActiveGroup] = useAtom(activeContactGroupAtom);
@@ -210,13 +246,6 @@ const ContactsContent = ({
   const contactsSearchInputRef = useAtomValue(contactsSearchInputRefAtom);
   const { contactFilterOptions, showGroupFilter, visibleContacts } =
     useContactsListView();
-  const {
-    contactsOnboardingCelebrating,
-    contactsOnboardingTasks,
-    dismissContactsOnboarding,
-    showContactsOnboarding,
-  } = useContactsOnboarding();
-  const startContactsGuide = useStartContactsGuide();
   const renderContactCard = useContactCardRenderer();
   const visibleContactSections = useVisibleContactSections(
     useActiveBankPaymentOfferContacts(),
@@ -225,28 +254,7 @@ const ContactsContent = ({
 
   return (
     <ContactsPage
-      onboardingContent={
-        showContactsOnboarding ? (
-          <ContactsChecklist
-            contactsOnboardingCelebrating={contactsOnboardingCelebrating}
-            dismissContactsOnboarding={dismissContactsOnboarding}
-            onShowHow={(key) => {
-              if (!isContactsGuideKey(key)) return;
-              startContactsGuide(
-                key,
-                contactsOnboardingTasks.tasks.some(
-                  (task) => task.key === key && task.done,
-                ),
-              );
-            }}
-            progressPercent={contactsOnboardingTasks.percent}
-            t={t}
-            tasks={contactsOnboardingTasks.tasks}
-            tasksCompleted={contactsOnboardingTasks.done}
-            tasksTotal={contactsOnboardingTasks.total}
-          />
-        ) : null
-      }
+      onboardingContent={onboardingInList ? <ContactsOnboardingCard /> : null}
       contactsSearchInputRef={contactsSearchInputRef}
       contactsSearch={contactsSearch}
       filterOpen={contactsFilterOpen || filterAlwaysOpen}
@@ -282,7 +290,7 @@ const AddContactButton = (): React.ReactElement => {
 export const ContactsPane = (): React.ReactElement => (
   <>
     <Stack paddingBottom={floatingActionButtonClearance}>
-      <ContactsContent filterAlwaysOpen={false} />
+      <ContactsContent filterAlwaysOpen={false} onboardingInList />
     </Stack>
     <AddContactButton />
   </>
@@ -290,7 +298,7 @@ export const ContactsPane = (): React.ReactElement => (
 
 export const DesktopContactsPane = (): React.ReactElement => (
   <>
-    <ContactsContent filterAlwaysOpen />
+    <ContactsContent filterAlwaysOpen onboardingInList={false} />
     <AddContactButton />
   </>
 );

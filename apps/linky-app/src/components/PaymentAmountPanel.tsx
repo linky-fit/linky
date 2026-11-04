@@ -49,11 +49,23 @@ export const PaymentAmountPanel: FC<PaymentAmountPanelProps> = ({
   const amountInput = useAmountInputKeypad({ amount, onAmountChange });
 
   return (
-    <Stack gap="$md">
+    <Stack
+      gap="$md"
+      flexGrow={1}
+      width="100%"
+      maxWidth="$form"
+      alignSelf="center"
+      $wide={{ justifyContent: "center" }}
+    >
       {header}
       {notices}
 
-      <Stack gap="$md" data-guide={stepGuideId}>
+      <Stack
+        gap="$md"
+        flexGrow={1}
+        $wide={{ flexGrow: 0 }}
+        data-guide={stepGuideId}
+      >
         <AmountKeypad
           amount={amount}
           input={amountInput}

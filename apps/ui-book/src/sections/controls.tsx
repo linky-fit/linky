@@ -14,7 +14,7 @@ export const controls: Section = {
           label="Bank transfer"
           caption="5 contacts pay"
         />
-        <UI.ActionTile flex={1} icon="Banknote" label="Cash" />
+        <UI.ActionTile flex={1} icon="Banknote" label="Cash" tone="warning" />
       </UI.Row>
     ),
     Button: () => (

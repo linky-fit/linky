@@ -24,12 +24,12 @@ export function TransactionsPage(): React.ReactElement {
   return (
     <Stack paddingTop="$sm" paddingBottom={floatingActionButtonClearance}>
       {hasScheduled ? (
-        <Section title={t("recurringScheduledSection")}>
+        <Section grouped title={t("recurringScheduledSection")}>
           <RecurringPaymentsList />
         </Section>
       ) : null}
       {pendingOnchainTransfers.length > 0 ? (
-        <Section title={t("onchainTransfersInProgress")}>
+        <Section grouped title={t("onchainTransfersInProgress")}>
           <Stack gap="$xs">
             {pendingOnchainTransfers.map((transfer) => (
               <OnchainTransferHistoryRow
@@ -41,6 +41,7 @@ export function TransactionsPage(): React.ReactElement {
         </Section>
       ) : null}
       <Section
+        grouped={entries.length > 0}
         title={
           hasScheduled || pendingOnchainTransfers.length > 0
             ? t("recurringHistorySection")

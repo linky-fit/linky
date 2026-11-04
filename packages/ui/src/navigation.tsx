@@ -3,6 +3,7 @@ import { Pressable } from "./controls";
 import { Icon } from "./icons";
 import type { IconName } from "./icons";
 import { Row, Stack, Text } from "./layout";
+import { border } from "./tokens";
 
 export interface TopBarProps {
   title?: string | undefined;
@@ -10,12 +11,51 @@ export interface TopBarProps {
   content?: ReactNode;
   leading?: ReactNode;
   trailing?: ReactNode;
+  /** A main section's bar: the title as a heading at the start, both actions at the end. */
+  large?: boolean | undefined;
 }
 
 const sentenceCase = (text: string) =>
   text.slice(0, 1).toUpperCase() + text.slice(1).toLowerCase();
 
-export function TopBar({ title, content, leading, trailing }: TopBarProps) {
+export function TopBar({
+  title,
+  content,
+  leading,
+  trailing,
+  large = false,
+}: TopBarProps) {
+  if (large) {
+    return (
+      <Row
+        role="banner"
+        minHeight="$controlLg"
+        paddingLeft="$xl"
+        paddingRight="$md"
+        paddingVertical="$sm"
+        gap="$xs"
+        backgroundColor="$background"
+        zIndex="$sticky"
+      >
+        <Row flex={1}>
+          {content ??
+            (title ? (
+              <Text
+                variant="heading"
+                color="$colorStrong"
+                role="heading"
+                aria-label={title}
+                numberOfLines={1}
+              >
+                {sentenceCase(title)}
+              </Text>
+            ) : null)}
+        </Row>
+        {leading}
+        {trailing}
+      </Row>
+    );
+  }
   return (
     <Row
       role="banner"
@@ -68,21 +108,22 @@ export interface TabBarProps<T extends string> {
   onValueChange: (value: T) => void;
 }
 
-/** The bar of main sections docked at the bottom of phone screens; tabs show icons and use labels as their names. */
+/** The bar of main sections docked at the bottom of phone screens: each tab shows its icon over its label. */
 export function TabBar<T extends string>({
   accessibilityLabel,
   items,
   value,
   onValueChange,
 }: TabBarProps<T>) {
-  const position = items.findIndex((item) => item.value === value);
-  const share = 100 / items.length;
   return (
     <Row
       justifyContent="center"
-      paddingHorizontal="$sm"
-      paddingVertical="$xs"
+      paddingHorizontal="$xs"
+      paddingTop="$sm"
+      paddingBottom="$xs"
       backgroundColor="$surface"
+      borderTopWidth={border.hairline}
+      borderColor="$borderColor"
     >
       <Row
         role="tablist"
@@ -90,25 +131,7 @@ export function TabBar<T extends string>({
         flex={1}
         maxWidth="$sheetWidth"
         gap="$none"
-        position="relative"
       >
-        {position >= 0 ? (
-          <Row
-            position="absolute"
-            inset={0}
-            gap="$none"
-            alignItems="stretch"
-            pointerEvents="none"
-            aria-hidden
-          >
-            <Stack width={`${position * share}%`} transition="base" />
-            <Stack
-              width={`${share}%`}
-              borderRadius="$control"
-              backgroundColor="$accent"
-            />
-          </Row>
-        ) : null}
         {items.map((item) => {
           const active = item.value === value;
           return (
@@ -120,23 +143,53 @@ export function TabBar<T extends string>({
               testID={item.testID}
               disabled={item.disabled}
               onPress={() => onValueChange(item.value)}
-              flex={1}
+              // Tabs share the spare width on top of their own, so a long label gets the room it needs.
+              flexGrow={1}
+              flexBasis="auto"
+              minWidth={0}
+              flexDirection="column"
               justifyContent="center"
+              gap="$xxs"
               minHeight="$control"
-              position="relative"
             >
-              {item.leading ??
-                (item.icon ? (
-                  <Icon
-                    name={item.icon}
-                    color={active ? "$onAccent" : "$colorMuted"}
-                  />
-                ) : null)}
+              <Row
+                justifyContent="center"
+                width="$controlLg"
+                height="$controlSm"
+                borderRadius="$pill"
+                backgroundColor={active ? "$accentSoft" : "$transparent"}
+                transition="fast"
+              >
+                {item.leading ??
+                  (item.icon ? (
+                    <Icon
+                      name={item.icon}
+                      color={active ? "$accentText" : "$colorMuted"}
+                    />
+                  ) : null)}
+              </Row>
+              <NavLabel label={item.label} active={active} />
             </Pressable>
           );
         })}
       </Row>
     </Row>
+  );
+}
+
+function NavLabel({ label, active }: { label: string; active: boolean }) {
+  return (
+    <Text
+      variant="caption"
+      fontWeight="$semibold"
+      color={active ? "$colorStrong" : "$colorMuted"}
+      textAlign="center"
+      numberOfLines={1}
+      maxWidth="100%"
+      aria-hidden
+    >
+      {label}
+    </Text>
   );
 }
 
@@ -151,7 +204,7 @@ export interface NavigationRailProps<T extends string> {
   header?: ReactNode;
 }
 
-/** The full-height column of main sections on wide screens; like the TabBar it shows icons only, with labels as names and tooltips. */
+/** The full-height column of main sections on wide screens; like the TabBar each item shows its icon over its label. */
 export function NavigationRail<T extends string>({
   accessibilityLabel,
   items,
@@ -162,32 +215,38 @@ export function NavigationRail<T extends string>({
 }: NavigationRailProps<T>) {
   const renderItem = (item: NavItem<T>) => {
     const active = item.value === value;
-    const color = active ? "$accentText" : "$colorMuted";
     return (
       <Pressable
         key={item.value}
         aria-current={active ? "page" : undefined}
         aria-label={item.label}
-        tooltip={item.label}
         testID={item.testID}
         disabled={item.disabled}
         onPress={() => onValueChange(item.value)}
         flexDirection="column"
         justifyContent="center"
-        gap="$sm"
-        minHeight="$row"
+        gap="$xs"
         paddingVertical="$sm"
-        paddingHorizontal="$xs"
         borderRadius="$control"
-        backgroundColor={active ? "$accentSoft" : "$transparent"}
-        hoverStyle={{
-          backgroundColor: active ? "$accentSoft" : "$neutralSoft",
-        }}
+        hoverStyle={{ backgroundColor: "$neutralSoft" }}
       >
-        {item.leading ??
-          (item.icon ? (
-            <Icon name={item.icon} size="lg" color={color} />
-          ) : null)}
+        <Row
+          justifyContent="center"
+          width="$controlLg"
+          height="$controlSm"
+          borderRadius="$pill"
+          backgroundColor={active ? "$accentSoft" : "$transparent"}
+          transition="fast"
+        >
+          {item.leading ??
+            (item.icon ? (
+              <Icon
+                name={item.icon}
+                color={active ? "$accentText" : "$colorMuted"}
+              />
+            ) : null)}
+        </Row>
+        <NavLabel label={item.label} active={active} />
       </Pressable>
     );
   };
@@ -201,6 +260,9 @@ export function NavigationRail<T extends string>({
       paddingTop="$lg"
       paddingHorizontal="$sm"
       paddingBottom="$md"
+      backgroundColor="$surface"
+      borderRightWidth={border.hairline}
+      borderColor="$borderColor"
     >
       {header ? (
         <Stack alignItems="center" marginBottom="$xl">

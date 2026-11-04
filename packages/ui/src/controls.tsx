@@ -7,7 +7,7 @@ import { Row, Stack, Text } from "./layout";
 import { Spinner } from "./spinner";
 import { focusRing, toneColors, tooltipProps } from "./styles";
 import type { Tone } from "./tokens";
-import { border, opacity, size as sizes } from "./tokens";
+import { border, opacity, shadow, size as sizes } from "./tokens";
 
 export type PressableProps = GetProps<typeof TamaguiButton> & {
   /** A browser tooltip on the web; ignored on native. */
@@ -88,6 +88,13 @@ const buttonVariants = {
 
 export type ButtonVariant = keyof typeof buttonVariants;
 
+const inertColors = {
+  background: "$backgroundPress",
+  hover: "$backgroundPress",
+  press: "$backgroundPress",
+  color: "$placeholderColor",
+} as const;
+
 export interface ButtonProps extends Omit<
   PressableProps,
   "children" | "icon" | "size" | "variant"
@@ -108,10 +115,13 @@ export function Button({
   disabled,
   ...props
 }: ButtonProps) {
-  const colors = buttonVariants[variant];
+  // A filled action that cannot run turns neutral rather than a faded accent.
+  const inert = disabled === true && !loading && variant === "primary";
+  const colors = inert ? inertColors : buttonVariants[variant];
   const small = size === "sm";
   return (
     <Pressable
+      {...(inert ? { disabledStyle: { cursor: "default" } } : {})}
       justifyContent="center"
       gap="$sm"
       minHeight={small ? "$controlSm" : "$control"}
@@ -242,13 +252,14 @@ export function Switch({
       paddingHorizontal="$xxs"
       borderRadius="$pill"
       justifyContent={value ? "flex-end" : "flex-start"}
-      backgroundColor={value ? "$accentSoft" : "$neutralSoft"}
+      backgroundColor={value ? "$accent" : "$neutral"}
     >
       <View
         width="$icon"
         height="$icon"
         borderRadius="$pill"
-        backgroundColor={value ? "$accentText" : "$colorSubtle"}
+        backgroundColor="$knob"
+        boxShadow={shadow.raised}
       />
     </Pressable>
   );
@@ -344,35 +355,46 @@ export interface ActionTileProps extends Omit<
   "children" | "icon"
 > {
   label: string;
-  /** A large accent icon above the label. */
+  /** A large icon above the label, on a soft badge of the tile's tone. */
   icon: IconName;
+  /** Tells neighbouring tiles apart; defaults to accent. */
+  tone?: Tone | undefined;
   /** A muted line under the label, e.g. a count. */
   caption?: string | undefined;
 }
 
-/** A raised navigation tile for a hub screen: an icon, a short label and an optional caption, laid out in a grid of tiles. */
+/** A navigation tile for a hub screen: an icon badge, a short label and an optional caption, laid out in a grid of tiles. */
 export function ActionTile({
   label,
   icon,
+  tone = "accent",
   caption,
   ...props
 }: ActionTileProps) {
+  const colors = toneColors[tone];
   return (
     <Pressable
       flexDirection="column"
       justifyContent="center"
       gap="$xs"
-      paddingTop="$xxl"
-      paddingBottom="$xl"
+      paddingTop="$xl"
+      paddingBottom="$lg"
       paddingHorizontal="$md"
       borderRadius="$card"
-      backgroundColor="$surfaceRaised"
-      hoverStyle={{ backgroundColor: "$backgroundPress" }}
+      backgroundColor="$surface"
+      borderWidth={border.hairline}
+      borderColor="$borderColor"
+      hoverStyle={{ borderColor: "$borderColorHover" }}
       pressStyle={{ backgroundColor: "$backgroundPress" }}
       {...props}
     >
-      <View marginBottom="$xs">
-        <Icon name={icon} size="xl" color="$accentText" />
+      <View
+        marginBottom="$sm"
+        padding="$md"
+        borderRadius="$card"
+        backgroundColor={colors.background}
+      >
+        <Icon name={icon} size="lg" color={colors.color} />
       </View>
       <Text bold textAlign="center" numberOfLines={2}>
         {label}

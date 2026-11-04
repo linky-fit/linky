@@ -1,11 +1,11 @@
 import {
-  Card,
+  border,
   Divider,
+  EmptyState,
   LoadingState,
   Row,
-  size,
-  space,
   Stack,
+  Text,
 } from "@linky-fit/ui";
 import React from "react";
 import { BottomTabBar, type BottomTabKey } from "../../components/BottomTabBar";
@@ -79,11 +79,18 @@ import { useRouting } from "../../hooks/useRouting";
 import type { Route } from "../../types/route";
 import { useTranslation } from "../hooks/shell";
 import { useScanIsOpen } from "../hooks/shell/scan";
-import { ContactsPane, DesktopContactsPane, WalletPane } from "./MainTabPanes";
+import {
+  ContactsOnboardingCard,
+  ContactsPane,
+  DesktopContactsPane,
+  WalletPane,
+} from "./MainTabPanes";
 import {
   getDesktopRouteSection,
   isDesktopSectionRoot,
+  type DesktopRouteSection,
 } from "./desktopRouteSection";
+import type { I18nKey } from "../../i18n";
 
 const InspectorPage = React.lazy(() => import("../../pages/InspectorPage"));
 
@@ -302,8 +309,12 @@ const PhoneRouteContent = (): React.ReactElement => {
   );
 };
 
-// The panes keep the phone-era app width minus the rail, which stays pinned to the window edge.
-const desktopPanesWidth = size.appWidth - size.hero - space.lg;
+const desktopSectionTitle = {
+  contacts: "contactsTitle",
+  wallet: "wallet",
+  collaboration: "collaboration",
+  settings: "settings",
+} as const satisfies Record<DesktopRouteSection, I18nKey>;
 
 export const AppRouteContent = (): React.ReactElement => {
   const route = useRouting();
@@ -315,6 +326,8 @@ export const AppRouteContent = (): React.ReactElement => {
 
   const section = getDesktopRouteSection(route);
   const secondaryIsOpen = !isDesktopSectionRoot(route) || scanIsOpen;
+  // Contacts keep the list column in place whether or not a chat is open.
+  const paneIsSplit = secondaryIsOpen || section === "contacts";
 
   return (
     <Row
@@ -323,71 +336,108 @@ export const AppRouteContent = (): React.ReactElement => {
       minHeight={0}
       width="100%"
       alignItems="stretch"
-      gap="$lg"
-      padding="$lg"
+      gap="$none"
     >
       <DesktopNavigation />
-      <Row flex={1} minWidth={0} alignItems="stretch" justifyContent="center">
-        <Row
+      <Stack
+        role="main"
+        position="relative"
+        {...(paneIsSplit
+          ? { width: "$sidebar", flexShrink: 0 }
+          : { flex: 1, minWidth: 0 })}
+        minHeight={0}
+        overflowY={section === "contacts" ? "hidden" : "auto"}
+      >
+        <Stack
           flex={1}
-          maxWidth={desktopPanesWidth}
-          alignItems="stretch"
-          gap="$lg"
+          minHeight={0}
+          width="100%"
+          maxWidth="$sheetWidth"
+          alignSelf="center"
+          position="relative"
+          paddingTop="$xl"
+          paddingBottom="$lg"
+          paddingHorizontal="$xl"
         >
-          <Stack
-            role="main"
-            position="relative"
-            flex={secondaryIsOpen ? 0.88 : 1}
-            minHeight={0}
-            paddingVertical="$lg"
-            paddingHorizontal="$xl"
-            overflowY={section === "contacts" ? "hidden" : "auto"}
-          >
-            {section === "contacts" ? (
-              <DesktopContactsPane />
-            ) : section === "wallet" ? (
-              <WalletPane />
-            ) : section === "collaboration" ? (
-              <CollaborationPage />
-            ) : (
-              <AdvancedPage />
-            )}
-          </Stack>
-
-          {secondaryIsOpen ? (
-            <Card
-              outlined
-              backgroundColor="$background"
-              role="region"
-              position="relative"
-              aria-label={t("detail")}
-              flex={1.12}
-              minHeight={0}
-              padding="$none"
-              gap="$none"
-              overflow="hidden"
+          {section === "contacts" ? null : (
+            <Text
+              variant="heading"
+              color="$colorStrong"
+              role="heading"
+              marginBottom="$lg"
             >
-              {scanIsOpen ? (
-                <ScanModal />
+              {t(desktopSectionTitle[section])}
+            </Text>
+          )}
+          {section === "contacts" ? (
+            <DesktopContactsPane />
+          ) : section === "wallet" ? (
+            <WalletPane />
+          ) : section === "collaboration" ? (
+            <CollaborationPage />
+          ) : (
+            <AdvancedPage />
+          )}
+        </Stack>
+      </Stack>
+
+      {paneIsSplit ? (
+        <Stack
+          role="region"
+          position="relative"
+          aria-label={t("detail")}
+          flex={1}
+          minWidth={0}
+          minHeight={0}
+          gap="$none"
+          overflow="hidden"
+          borderLeftWidth={border.hairline}
+          borderColor="$borderColor"
+        >
+          {!secondaryIsOpen ? (
+            <Stack
+              flex={1}
+              justifyContent="center"
+              width="100%"
+              maxWidth="$sheetWidth"
+              alignSelf="center"
+              paddingHorizontal="$xl"
+            >
+              <ContactsOnboardingCard />
+              <EmptyState
+                icon="MessageCircle"
+                title={t("contactsSelectHint")}
+              />
+            </Stack>
+          ) : scanIsOpen ? (
+            <ScanModal />
+          ) : (
+            <>
+              <Topbar desktopDetail />
+              <Divider />
+              {route.kind === "chat" ? (
+                <PageFrame fill>
+                  <RoutePage />
+                </PageFrame>
               ) : (
-                <>
-                  <Topbar desktopDetail />
-                  <Divider />
-                  {route.kind === "chat" ? (
-                    <PageFrame fill>
-                      <RoutePage />
-                    </PageFrame>
-                  ) : (
-                    <PageBody gutter="detail">
-                      <RoutePage />
-                    </PageBody>
-                  )}
-                </>
+                <PageBody gutter="detail">
+                  <Stack
+                    flexGrow={1}
+                    width="100%"
+                    // Settings detail pages hold tables and logs; the rest read best at the wallet's column width.
+                    maxWidth={
+                      section === "settings" ? "$contentWidth" : "$sheetWidth"
+                    }
+                    alignSelf="center"
+                  >
+                    <RoutePage />
+                  </Stack>
+                </PageBody>
               )}
-            </Card>
-          ) : null}
-        </Row>
-      </Row>
+            </>
+          )}
+        </Stack>
+      ) : null}
     </Row>
   );
 };

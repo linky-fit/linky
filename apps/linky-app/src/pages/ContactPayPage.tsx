@@ -5,6 +5,7 @@ import {
   IconButton,
   Notice,
   Row,
+  space,
   Stack,
   Text,
 } from "@linky-fit/ui";
@@ -185,6 +186,8 @@ export const ContactPayPage: FC<ContactPayPageProps> = ({
                 variant="ghost"
                 size="sm"
                 alignSelf="flex-start"
+                // Outset by its padding so the label lines up with the name.
+                marginLeft={-space.md}
                 disabled={!canCoverAnything}
                 onPress={() => setPayAmount(String(cashuBalance))}
               >
