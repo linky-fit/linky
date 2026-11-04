@@ -25,12 +25,11 @@ interface WalletPageProps {
   scanIsOpen: boolean;
 }
 
-function RecentTransactions(): React.ReactElement | null {
+function RecentTransactions(): React.ReactElement {
   const history = useTransactionHistory();
   const pendingOnchainTransfers = usePendingOnchainTransfersLink();
   const { t } = history;
   const recent = history.entries.slice(0, RECENT_TRANSACTIONS);
-  if (recent.length === 0) return null;
   return (
     <Stack gap="$xs">
       <Row justifyContent="space-between" paddingHorizontal="$md">
@@ -58,25 +57,27 @@ function RecentTransactions(): React.ReactElement | null {
           </Row>
         </Button>
       </Row>
-      <Section grouped>
-        {recent.map((entry) =>
-          entry.kind === "onchainTransfer" ? (
-            <OnchainTransferHistoryRow
-              key={entry.transfer.id}
-              transfer={entry.transfer}
-            />
-          ) : (
-            <TransactionRow
-              key={entry.item.id}
-              history={history}
-              item={entry.item}
-              onPress={() =>
-                navigateTo({ route: "transaction", id: entry.item.id })
-              }
-            />
-          ),
-        )}
-      </Section>
+      {recent.length === 0 ? null : (
+        <Section grouped>
+          {recent.map((entry) =>
+            entry.kind === "onchainTransfer" ? (
+              <OnchainTransferHistoryRow
+                key={entry.transfer.id}
+                transfer={entry.transfer}
+              />
+            ) : (
+              <TransactionRow
+                key={entry.item.id}
+                history={history}
+                item={entry.item}
+                onPress={() =>
+                  navigateTo({ route: "transaction", id: entry.item.id })
+                }
+              />
+            ),
+          )}
+        </Section>
+      )}
     </Stack>
   );
 }
