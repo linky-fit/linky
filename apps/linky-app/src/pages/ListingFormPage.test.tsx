@@ -51,6 +51,18 @@ const type = async (element: HTMLInputElement, value: string) => {
   });
 };
 
+const isDisabled = (element: HTMLButtonElement) =>
+  element.getAttribute("aria-disabled") === "true";
+
+// A disabled Button that explains itself takes the press on the layer over it.
+const pressDisabled = async (element: HTMLButtonElement) => {
+  const layer = element.nextElementSibling;
+  if (!(layer instanceof HTMLElement)) throw new Error("no layer");
+  await act(async () => {
+    layer.click();
+  });
+};
+
 const alerts = (container: HTMLElement) =>
   Array.from(container.querySelectorAll('[role="alert"]')).map(
     (element) => element.textContent,
@@ -63,13 +75,12 @@ describe("ListingFormPage", () => {
     navigateTo.mockClear();
   });
 
-  it("marks the empty fields when Add is pressed and saves once they are filled", async () => {
+  it("marks the empty fields when the disabled Add is pressed and saves once they are filled", async () => {
     const { container } = await renderIntoDocument(<ListingFormPage />);
 
+    expect(isDisabled(button(container, "listing-save"))).toBe(true);
     expect(alerts(container)).toEqual([]);
-    await act(async () => {
-      button(container, "listing-save").click();
-    });
+    await pressDisabled(button(container, "listing-save"));
     expect(alerts(container)).toEqual([
       "listingTitleMissing",
       "listingPriceMissing",
@@ -82,6 +93,7 @@ describe("ListingFormPage", () => {
     expect(alerts(container)).toEqual(["listingUnitMissing"]);
     await type(input(container, "listing-unit"), "za 10 ks");
     expect(alerts(container)).toEqual([]);
+    expect(isDisabled(button(container, "listing-save"))).toBe(false);
 
     await act(async () => {
       button(container, "listing-save").click();

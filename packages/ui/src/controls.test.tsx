@@ -53,6 +53,39 @@ describe("disabled press targets", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
+  it("explains itself on a press when it has onDisabledPress", async () => {
+    const onPress = vi.fn();
+    const onDisabledPress = vi.fn();
+    const container = await render(
+      <Button disabled onPress={onPress} onDisabledPress={onDisabledPress}>
+        Add
+      </Button>,
+    );
+    const button = container.querySelector("button");
+    const layer = container.querySelector<HTMLElement>('[aria-hidden="true"]');
+    expect(button?.disabled).toBe(true);
+    expect(button?.getAttribute("aria-disabled")).toBe("true");
+    expect(layer?.tagName).toBe("DIV");
+    expect(layer?.hasAttribute("tabindex")).toBe(false);
+    await act(async () => layer?.click());
+    expect(onDisabledPress).toHaveBeenCalledOnce();
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
+  it("is natively disabled while loading even with onDisabledPress", async () => {
+    const onDisabledPress = vi.fn();
+    const container = await render(
+      <Button disabled loading onDisabledPress={onDisabledPress}>
+        Add
+      </Button>,
+    );
+    const button = container.querySelector("button");
+    expect(button?.disabled).toBe(true);
+    expect(container.querySelector('[aria-hidden="true"]')).toBeNull();
+    await act(async () => button?.click());
+    expect(onDisabledPress).not.toHaveBeenCalled();
+  });
+
   it("stays enabled without the prop", async () => {
     const onPress = vi.fn();
     const button = (

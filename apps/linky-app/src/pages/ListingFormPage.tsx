@@ -76,7 +76,7 @@ export function ListingFormPage({
   );
   const [isSaving, setIsSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  // Pressing Add with gaps marks them; until then an empty form is not an error.
+  // Add is disabled with gaps; pressing it anyway marks them, and until then an empty form is not an error.
   const [attempted, setAttempted] = React.useState(false);
 
   // An edit starts from the stored row once it is read.
@@ -119,11 +119,7 @@ export function ListingFormPage({
   const back = () => navigateTo({ route: "listings" });
 
   const save = async () => {
-    if (isSaving) return;
-    if (!canSave || normalizedAmount === null) {
-      setAttempted(true);
-      return;
-    }
+    if (!canSave || normalizedAmount === null) return;
     setIsSaving(true);
     setError(null);
     const columns = {
@@ -243,8 +239,9 @@ export function ListingFormPage({
       ) : null}
       <Button
         icon="Check"
-        disabled={isSaving}
+        disabled={!canSave || isSaving}
         loading={isSaving}
+        onDisabledPress={() => setAttempted(true)}
         onPress={() => void save()}
         testID="listing-save"
       >
