@@ -150,6 +150,10 @@ export const getNextMintIconUrl = (
 export const formatMintLabel = (mintUrl: string): string =>
   mintUrl.replace(/^https?:\/\//i, "");
 
+/** The letter a mint's avatar shows without its icon. */
+export const fallbackLetterOf = (mint: string): string =>
+  (formatMintLabel(mint).match(/[a-z]/i)?.[0] ?? "?").toUpperCase();
+
 export type MintBadgeKind = "default" | "recommended" | "test";
 
 const RECOMMENDED_MINT_URL = "https://cashu.cz";

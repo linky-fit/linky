@@ -3,7 +3,7 @@ import { Avatar, Pill, Text } from "@linky-fit/ui";
 import type { PillProps } from "@linky-fit/ui";
 import React from "react";
 import { useDisplayAmounts } from "../app/hooks/shell";
-import type { MintIcon } from "../utils/mint";
+import { fallbackLetterOf, type MintIcon } from "../utils/mint";
 
 interface TransferPillProps {
   ariaLabel: string;
@@ -65,6 +65,7 @@ export function CashuTokenPill({
               name={host ?? pill.label}
               uri={mintIcon.url}
               size="xs"
+              fallback={host ? fallbackLetterOf(host) : undefined}
               onError={onMintIconError}
             />
           ) : null}
