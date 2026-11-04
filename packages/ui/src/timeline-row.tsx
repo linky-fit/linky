@@ -1,3 +1,4 @@
+import { View } from "tamagui";
 import { Pressable } from "./controls";
 import { Text } from "./layout";
 import { border } from "./tokens";
@@ -43,17 +44,18 @@ export function TimelineRow({
       gap="$sm"
       paddingHorizontal="$sm"
       paddingVertical="$xs"
-      borderBottomWidth={border.hairline}
-      borderBottomColor="$borderColor"
-      borderLeftWidth={border.emphasis}
-      borderLeftColor={
-        selected ? "$infoText" : related ? "$warningText" : "$transparent"
-      }
       backgroundColor={
         selected ? "$infoSoft" : related ? "$warningSoft" : "$transparent"
       }
       hoverStyle={{ backgroundColor: "$neutralSoft" }}
     >
+      <View
+        width={border.emphasis}
+        alignSelf="stretch"
+        backgroundColor={
+          selected ? "$infoText" : related ? "$warningText" : "$transparent"
+        }
+      />
       <Text
         mono
         variant="caption"

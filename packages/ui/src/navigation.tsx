@@ -3,7 +3,6 @@ import { Pressable } from "./controls";
 import { Icon } from "./icons";
 import type { IconName } from "./icons";
 import { Row, Stack, Text } from "./layout";
-import { border } from "./tokens";
 
 export interface TopBarProps {
   title?: string | undefined;
@@ -122,8 +121,6 @@ export function TabBar<T extends string>({
       paddingTop="$sm"
       paddingBottom="$xs"
       backgroundColor="$surface"
-      borderTopWidth={border.hairline}
-      borderColor="$borderColor"
     >
       <Row
         role="tablist"
@@ -261,8 +258,6 @@ export function NavigationRail<T extends string>({
       paddingHorizontal="$sm"
       paddingBottom="$md"
       backgroundColor="$surface"
-      borderRightWidth={border.hairline}
-      borderColor="$borderColor"
     >
       {header ? (
         <Stack alignItems="center" marginBottom="$xl">

@@ -88,13 +88,6 @@ const buttonVariants = {
 
 export type ButtonVariant = keyof typeof buttonVariants;
 
-const inertColors = {
-  background: "$backgroundPress",
-  hover: "$backgroundPress",
-  press: "$backgroundPress",
-  color: "$placeholderColor",
-} as const;
-
 export interface ButtonProps extends Omit<
   PressableProps,
   "children" | "icon" | "size" | "variant"
@@ -115,13 +108,15 @@ export function Button({
   disabled,
   ...props
 }: ButtonProps) {
-  // A filled action that cannot run turns neutral rather than a faded accent.
-  const inert = disabled === true && !loading && variant === "primary";
-  const colors = inert ? inertColors : buttonVariants[variant];
+  const colors = buttonVariants[variant];
   const small = size === "sm";
   return (
     <Pressable
-      {...(inert ? { disabledStyle: { cursor: "default" } } : {})}
+      {...(variant === "primary"
+        ? {
+            disabledStyle: { opacity: opacity.disabledFill, cursor: "default" },
+          }
+        : {})}
       justifyContent="center"
       gap="$sm"
       minHeight={small ? "$controlSm" : "$control"}
@@ -208,21 +203,30 @@ export function IconButton({
       ) : (
         <Icon name={icon} size={dimensions.icon} color={color} />
       )}
-      {indicator ? (
-        <View
-          position="absolute"
-          top={0}
-          right={0}
-          width="$dot"
-          height="$dot"
-          borderRadius="$pill"
-          borderWidth={border.emphasis}
-          borderColor="$background"
-          backgroundColor={toneColors[indicator].solid}
-          aria-hidden
-        />
-      ) : null}
+      {indicator ? <IndicatorDot tone={indicator} /> : null}
     </Pressable>
+  );
+}
+
+/** A status dot in a control's corner, cut out of the page by a ring of page fill. */
+export function IndicatorDot({ tone }: { tone: Tone }) {
+  return (
+    <View
+      position="absolute"
+      top={-border.emphasis}
+      right={-border.emphasis}
+      padding={border.emphasis}
+      borderRadius="$pill"
+      backgroundColor="$background"
+      aria-hidden
+    >
+      <View
+        width="$dot"
+        height="$dot"
+        borderRadius="$pill"
+        backgroundColor={toneColors[tone].solid}
+      />
+    </View>
   );
 }
 
@@ -382,9 +386,7 @@ export function ActionTile({
       paddingHorizontal="$md"
       borderRadius="$card"
       backgroundColor="$surface"
-      borderWidth={border.hairline}
-      borderColor="$borderColor"
-      hoverStyle={{ borderColor: "$borderColorHover" }}
+      hoverStyle={{ backgroundColor: "$surfaceRaised" }}
       pressStyle={{ backgroundColor: "$backgroundPress" }}
       {...props}
     >

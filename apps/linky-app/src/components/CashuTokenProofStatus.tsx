@@ -57,7 +57,7 @@ export const CashuTokenProofStatus = ({
   );
 
   return (
-    <Card outlined aria-label={t("cashuProofStatus")}>
+    <Card aria-label={t("cashuProofStatus")}>
       <Section title={t("cashuProofStatus")}>
         {loading ? (
           <LoadingState label={t("cashuCheckingProofs")} />

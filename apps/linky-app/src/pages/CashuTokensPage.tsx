@@ -175,6 +175,11 @@ export const CashuTokensPage = ({
 
   return (
     <>
+      <FloatingActionButton
+        icon="Plus"
+        label={t("cashuAddToken")}
+        onPress={() => navigateTo({ route: "cashuTokenNew" })}
+      />
       <Stack gap="$lg" paddingBottom={floatingActionButtonClearance}>
         {balancesByMint.length <= 1 ? (
           <Row gap="$lg" alignItems="flex-start">
@@ -210,14 +215,16 @@ export const CashuTokensPage = ({
             ]}
           />
         )}
-        <Row justifyContent="space-between" flexWrap="wrap">
+        <Row gap="$sm">
           <Button
+            flex={1}
             variant="secondary"
             onPress={() => navigateTo({ route: "cashuProofs" })}
           >
             {t("cashuInspectProofs")}
           </Button>
           <Button
+            flex={1}
             disabled={cashuIsBusy}
             onPress={() => navigateTo({ route: "cashuTokenEmit" })}
           >
@@ -324,11 +331,6 @@ export const CashuTokensPage = ({
         )}
         <Text color="$colorMuted">{t("cashuMissingRestoreHint")}</Text>
       </Stack>
-      <FloatingActionButton
-        icon="CirclePlus"
-        label={t("cashuAddToken")}
-        onPress={() => navigateTo({ route: "cashuTokenNew" })}
-      />
     </>
   );
 };

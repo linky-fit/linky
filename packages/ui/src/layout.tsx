@@ -10,7 +10,7 @@ import {
 } from "tamagui";
 import type { GetProps } from "tamagui";
 import { textVariant } from "./styles";
-import { border, letterSpacing, shadow, space } from "./tokens";
+import { letterSpacing, shadow, space } from "./tokens";
 
 export const Stack = styled(YStack, { name: "Stack", gap: "$md", minWidth: 0 });
 
@@ -108,9 +108,6 @@ export const Card = styled(YStack, {
   minWidth: 0,
   variants: {
     elevated: { true: { boxShadow: shadow.floating } },
-    outlined: {
-      true: { borderWidth: border.hairline, borderColor: "$borderColor" },
-    },
   } as const,
 });
 
@@ -157,6 +154,8 @@ export function Section({ title, children, grouped = false }: SectionProps) {
           paddingHorizontal="$md"
           borderRadius="$card"
           backgroundColor="$surface"
+          // Row highlights reach the card's edge; the card's corners clip them.
+          overflow="hidden"
         >
           {children}
         </Stack>

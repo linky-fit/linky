@@ -19,9 +19,10 @@ const palette = {
   slate950: "#020617",
   // Linky's dark planes: page, panel, control and pressed control, each a step lighter.
   night950: "#070b14",
-  night900: "#0f1623",
+  night850: "#161e2c",
   night800: "#1a2332",
   night700: "#253044",
+  night600: "#313d54",
   teal50: "#f0fdfa",
   teal100: "#ccfbf1",
   teal200: "#99f6e4",
@@ -94,6 +95,8 @@ export const radius = {
   control: 14,
   card: 20,
   message: 18,
+  // A message's corner that faces the next message from the same sender.
+  messageJoin: 6,
   sheet: 24,
   device: 48,
   pill: 999,
@@ -124,6 +127,8 @@ export const size = {
   // A single column of controls on wide screens, e.g. an amount keypad.
   form: 420,
   sheetWidth: 520,
+  // A detail page's column on wide screens: rows and their values stay in one glance.
+  readable: 640,
   contentWidth: 720,
   appWidth: 1240,
 };
@@ -134,7 +139,12 @@ export const iconStroke = 2;
 
 export const letterSpacing = { eyebrow: 1, headline: -2 };
 
-export const opacity = { disabled: 0.5, dimmed: 0.8 };
+export const opacity = {
+  disabled: 0.5,
+  // A filled accent stays bright at half opacity, so a disabled one fades further to read as off.
+  disabledFill: 0.35,
+  dimmed: 0.8,
+};
 
 export const zIndex = {
   base: 0,
@@ -220,15 +230,14 @@ export type TextVariant = keyof typeof typography.size;
 
 const dark = {
   background: palette.night950,
-  backgroundPress: palette.night700,
-  surface: palette.night900,
-  surfaceRaised: palette.night800,
+  backgroundPress: palette.night600,
+  surface: palette.night850,
+  surfaceRaised: palette.night700,
   // A quiet solid for status marks: dimmer than text, so it reads as "nothing happened".
   neutral: palette.slate500,
   neutralSoft: alpha(palette.slate400, 0.18),
   // An incoming message's fill; outgoing ones wear the `outgoing` sub-theme.
   bubble: palette.night800,
-  bubbleEdge: alpha(palette.white, 0),
   // A switch's knob, light on every track.
   knob: palette.slate50,
   color: palette.slate200,
@@ -273,8 +282,6 @@ const light: ThemeColors = {
   neutral: palette.slate400,
   neutralSoft: alpha(palette.slate500, 0.14),
   bubble: palette.white,
-  // White bubbles on the pale page need an edge to read as bubbles.
-  bubbleEdge: alpha(palette.slate900, 0.08),
   knob: palette.white,
   color: palette.slate900,
   colorStrong: palette.slate950,
@@ -317,7 +324,6 @@ const darkFazole: ThemeColors = {
   neutral: palette.ink500,
   neutralSoft: alpha(palette.ink300, 0.12),
   bubble: palette.ink850,
-  bubbleEdge: alpha(palette.ink300, 0),
   knob: palette.ink50,
   color: palette.ink100,
   colorStrong: palette.ink50,
@@ -362,7 +368,6 @@ const outgoing: ThemeColors = {
   neutral: palette.teal200,
   neutralSoft: alpha(palette.black, 0.15),
   bubble: palette.teal700,
-  bubbleEdge: alpha(palette.white, 0),
   knob: palette.white,
   color: palette.white,
   colorStrong: palette.white,

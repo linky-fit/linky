@@ -5,6 +5,7 @@ import {
   Button,
   EmptyState,
   ListRow,
+  Section,
   Stack,
   Text,
 } from "@linky-fit/ui";
@@ -42,11 +43,14 @@ export function BlockedPage(): React.ReactElement {
 
   return (
     <Stack gap="$lg">
-      <Text color="$colorMuted">{t("blockedIntro")}</Text>
       {blocked.length === 0 ? (
-        <EmptyState title={t("blockedEmpty")} />
+        <EmptyState
+          icon="Ban"
+          title={t("blockedEmpty")}
+          description={t("blockedIntro")}
+        />
       ) : (
-        <Stack>
+        <Section grouped>
           {blocked.map((pubkey) => {
             const npub = encodeNpub(pubkey);
             const metadata = profiles.metadataByNpub[npub];
@@ -77,8 +81,13 @@ export function BlockedPage(): React.ReactElement {
               />
             );
           })}
-        </Stack>
+        </Section>
       )}
+      {blocked.length > 0 ? (
+        <Text variant="caption" color="$colorMuted" paddingHorizontal="$md">
+          {t("blockedIntro")}
+        </Text>
+      ) : null}
     </Stack>
   );
 }

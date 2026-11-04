@@ -29,7 +29,7 @@ const tokenLink =
 
 function MessengerMock() {
   return (
-    <Card outlined elevated padding="$md" gap="$sm" width="$qr">
+    <Card elevated padding="$md" gap="$sm" width="$qr">
       <MessageBubble direction="outgoing">
         <Text>5,000 sat for you!</Text>
         <LinkPreview

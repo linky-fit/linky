@@ -10,6 +10,7 @@ export const pt = {
   settingsGeneral: "Geral",
   tutorial: "Tutorial",
   tutorialIntro: "Aprenda o Linky passo a passo.",
+  tutorialTaskDone: "Concluído",
   settingsPayments: "Pagamentos",
   settingsNetwork: "Rede",
   settingsSecurity: "Segurança",
@@ -32,6 +33,7 @@ export const pt = {
   back: "Voltar",
   menu: "Menu",
   transactionsTitle: "Transações",
+  transactionWhen: "Quando",
   transactionTitle: "Pagamento",
   recurringPaymentsTitle: "Pagamentos recorrentes",
   recurringPaymentTitle: "Pagamento recorrente",
@@ -251,6 +253,12 @@ export const pt = {
   tokens: "Tokens",
   preferCashu: "Preferir cashu",
   receiveMethod: "Método de recebimento",
+  receiveMethodUniversalHint:
+    "Um código que carteiras Lightning e Cashu podem pagar",
+  receiveMethodCashuHint:
+    "Um pedido de pagamento Cashu, para carteiras de ecash",
+  receiveMethodLightningHint:
+    "Uma fatura Lightning simples, para qualquer carteira Lightning",
   payWithCashuDisabled:
     "Pagar com cashu está desativado nas configurações avançadas.",
   lightningInvoiceAutoPayLimit: "Limite de pagamento automático",
@@ -382,7 +390,7 @@ export const pt = {
   chatStorageSubscribed: "Inscritos neste aparelho",
   chatStorageForget: "Esquecer shards de chat antigos",
   chatStorageForgetHint:
-    "Mensagens antigas e estados de chat inativos vão sumir do histórico deste aparelho. Contatos e dinheiro continuam completos. No Evolu 7 isso só cancela a inscrição localmente: os dados gravados ficam no disco e no relay. A exclusão no relay precisa esperar o suporte a deleteOwner do Evolu.",
+    "Mensagens antigas saem do histórico deste aparelho; contatos e dinheiro continuam completos. Por enquanto os dados continuam guardados no aparelho e no relay.",
   chatStorageForgotten: "Shards de chat antigos esquecidos neste aparelho.",
   chatStorageFailed:
     "Não foi possível esquecer os shards de chat antigos. Tente de novo.",
@@ -430,8 +438,8 @@ export const pt = {
   transactionsHideHidden: "Ocultar transações falhas e duplicadas",
   transactionReceivedFromContact: "Recebido de contato",
   transactionSentToContact: "Enviado a contato",
-  transactionTopupInvoice: "Recarga por fatura",
-  transactionTopupLnAddress: "Recarga por endereço lightning",
+  transactionTopupInvoice: "Recarga via Lightning",
+  transactionTopupLnAddress: "Recarga via endereço Lightning",
   transactionPaidLightningInvoice: "Fatura lightning paga",
   transactionPaidLightningAddress: "Endereço lightning pago",
   transactionCashuInserted: "Recebido no seu endereço",
@@ -576,6 +584,7 @@ export const pt = {
   send: "Enviar",
 
   profile: "Perfil",
+  profileEditTitle: "Editar perfil",
   status: "Status",
   profileNoName: "Perfil Nostr",
   contactStatusProvides: "Oferece",
@@ -597,6 +606,8 @@ export const pt = {
   list: "Lista",
   contactsTitle: "Contatos",
   contactsSelectHint: "Escolha um contato para conversar ou pagar",
+  collaborationSelectHint: "Escolha como negociar com amigos",
+  settingsSelectHint: "Escolha uma configuração para alterar",
   contactsSearchPlaceholder: "Buscar contatos",
   contactsSearchClear: "Limpar busca",
   contactsFilterToggle: "Buscar e filtrar contatos",
@@ -746,7 +757,7 @@ export const pt = {
   contact: "Contato",
   editContact: "Editar contato",
   contactEditTitle: "Editar contato",
-  contactPayTitle: "Pagar ao contato",
+  contactPayTitle: "Pagar",
   messagesTitle: "Mensagens",
   newContact: "Adicionar contato",
   close: "Fechar",
@@ -806,8 +817,8 @@ export const pt = {
 
   wallet: "Carteira",
   topup: "Recarga",
-  topupTitle: "Recarregar sua conta",
-  topupShowInvoice: "Mostrar fatura de recarga",
+  topupTitle: "Recarregar",
+  topupShowInvoice: "Mostrar fatura",
   topupNoAmount: "Qualquer valor",
   topupNoAmountTitle: "Receber qualquer valor",
   topupNoAmountMissingAddress:
@@ -824,7 +835,8 @@ export const pt = {
   manualPayTitle: "Enviar",
   manualPayOpen: "Digitar destinatário",
   manualPayLabel: "Destinatário",
-  manualPayPlaceholder: "Endereço Lightning, fatura, LNURL, pedido Cashu…",
+  manualPayPlaceholder: "Endereço ou fatura",
+  manualPayFormatsHint: "Endereço Lightning, fatura, LNURL ou pedido Cashu",
   manualPayContinue: "Continuar",
   manualPaySuggestions: "Contatos correspondentes",
   manualPayLinkyAliasHint: "Vai tentar {address}",
@@ -971,6 +983,7 @@ export const pt = {
 
   unit: "Unidades",
   unitCurrent: "Ativa",
+  unitHidden: "Oculto",
   unitCycleAction: "Trocar unidade",
   unitManageInfo:
     "Toque no saldo da carteira ou no valor enquanto digita para alternar entre as moedas permitidas.",
@@ -1130,7 +1143,7 @@ export const pt = {
     "Este pedido de pagamento pertence a um contato Nostr que você ainda não salvou.",
   paymentRequestSelfPayment:
     "{amount} {unit} para a sua própria conta — os fundos ficam na sua carteira.",
-  availablePrefix: "disponível:",
+  availablePrefix: "Disponível:",
   payAmount: "Valor",
   paySend: "Pagar",
   paymentRequestConfirmTitle: "Confirmar pagamento",
@@ -1308,6 +1321,10 @@ export const pt = {
   collaboration: "Colaboração",
   collaborationBody: "Cada um sabe fazer algo. Bitcoin paga por tudo.",
   collaborationProxy: "Transferência bancária",
+  collaborationProxyHint:
+    "Um contato paga sua transferência bancária em troca de sats",
+  collaborationCashHint: "Bitcoin por dinheiro, em pessoa",
+  collaborationListingsHint: "O que amigos oferecem e querem",
   collaborationContactsPayOne: "{count} contato paga",
   collaborationContactsPayFew: "{count} contatos pagam",
   collaborationContactsPayOther: "{count} contatos pagam",
@@ -1319,9 +1336,9 @@ export const pt = {
   collaborationListingsOther: "{count} anúncios",
   cash: "Dinheiro",
   cashLead: "Bitcoin se troca melhor diretamente com amigos.",
-  cashIntentOffer: "Ofereço dinheiro",
-  cashIntentWant: "Procuro dinheiro",
-  cashIntentNone: "Nada agora",
+  cashIntentOffer: "Tenho dinheiro",
+  cashIntentWant: "Preciso de dinheiro",
+  cashIntentNone: "Nada",
   cashIntentOfferHint:
     "Os contatos veem que você tem dinheiro e quer bitcoin por ele.",
   cashIntentWantHint:
@@ -1331,6 +1348,7 @@ export const pt = {
   cashOfferingEmpty: "Nenhum dos seus contatos ainda.",
   cashWanting: "Procuram dinheiro",
   cashWantingEmpty: "Nenhum dos seus contatos ainda.",
+  cashNobodyYet: "Nenhum dos seus contatos oferece ou procura dinheiro ainda.",
   listings: "Produtos e serviços",
   listingsLead: "O que seus contatos oferecem e procuram.",
   listingsEmpty:
@@ -1367,6 +1385,9 @@ export const pt = {
   keryxNewsletters: "Newsletters (Keryx)",
   keryxNewslettersTitle: "Newsletters",
   keryxAddCompany: "Adicionar empresa",
+  keryxEmptyTitle: "Nenhuma newsletter ainda",
+  keryxEmptyBody:
+    "Siga uma empresa para receber aqui os anúncios verificados dela.",
   keryxCompany: "Empresa",
   keryxAnnouncement: "Comunicado",
   keryxJoinUrlLabel: "Link de adesão da empresa",

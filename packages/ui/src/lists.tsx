@@ -4,7 +4,10 @@ import { Avatar, Pill } from "./display";
 import { Icon } from "./icons";
 import type { IconName } from "./icons";
 import { Row, Stack, Text } from "./layout";
+import { View } from "tamagui";
+import { toneColors } from "./styles";
 import { space } from "./tokens";
+import type { Tone } from "./tokens";
 
 export interface ListRowProps {
   title: ReactNode;
@@ -13,6 +16,8 @@ export interface ListRowProps {
   meta?: string | undefined;
   /** A muted icon before the title; use `leading` for anything else. */
   icon?: IconName | undefined;
+  /** Sets the icon on a tinted badge of this tone, e.g. for a hub's destinations. */
+  iconTone?: Tone | undefined;
   leading?: ReactNode;
   /** Muted text at the end of the row, e.g. a setting's current value; a string title also labels it. */
   value?: string | number | undefined;
@@ -20,7 +25,10 @@ export interface ListRowProps {
   onPress?: (() => void) | undefined;
   /** Defaults to true for pressable rows. */
   chevron?: boolean | undefined;
+  /** The chosen option among others: a check mark replaces the chevron. */
   selected?: boolean | undefined;
+  /** The item open beside the list, e.g. the conversation in the detail pane: the row is highlighted. */
+  active?: boolean | undefined;
   /** Marks a row that shows or hides details below it. */
   expanded?: boolean | undefined;
   destructive?: boolean | undefined;
@@ -38,12 +46,14 @@ export function ListRow({
   description,
   meta,
   icon,
+  iconTone,
   leading,
   value,
   trailing,
   onPress,
   chevron = onPress !== undefined,
   selected = false,
+  active = false,
   expanded,
   destructive = false,
   disabled = false,
@@ -52,19 +62,19 @@ export function ListRow({
 }: ListRowProps) {
   const titleColor = destructive
     ? "$dangerText"
-    : selected
+    : active
       ? "$accentText"
       : "$color";
   const Frame = onPress ? Pressable : Row;
-  const background = selected ? "$accentSoft" : "$transparent";
-  const highlight = onPress && !selected ? "$neutralSoft" : background;
+  const background = active ? "$accentSoft" : "$transparent";
+  const highlight = onPress && !active ? "$neutralSoft" : background;
   return (
     <Frame
       testID={testID}
       onPress={onPress}
       disabled={disabled}
       aria-label={accessibilityLabel}
-      aria-selected={selected}
+      aria-selected={selected || active}
       aria-expanded={expanded}
       gap="$md"
       minHeight="$controlLg"
@@ -76,7 +86,19 @@ export function ListRow({
       hoverStyle={{ backgroundColor: highlight }}
       pressStyle={{ backgroundColor: highlight }}
     >
-      {icon ? <Icon name={icon} size="sm" color="$colorMuted" /> : leading}
+      {icon && iconTone ? (
+        <View
+          padding="$sm"
+          borderRadius="$control"
+          backgroundColor={toneColors[iconTone].background}
+        >
+          <Icon name={icon} color={toneColors[iconTone].color} />
+        </View>
+      ) : icon ? (
+        <Icon name={icon} size="sm" color="$colorMuted" />
+      ) : (
+        leading
+      )}
       <Stack flex={1} gap="$xxs">
         <Row gap="$sm" alignItems="baseline">
           {typeof title === "string" ? (
@@ -114,7 +136,9 @@ export function ListRow({
           {trailing}
         </Row>
       ) : null}
-      {chevron ? (
+      {selected ? (
+        <Icon name="Check" color="$accent" />
+      ) : chevron ? (
         <Icon name="ChevronRight" size="sm" color="$colorMuted" />
       ) : null}
     </Frame>
@@ -168,7 +192,7 @@ export function ContactRow({
         <Row gap="$sm">
           <Text
             fontWeight="$semibold"
-            color={selected ? "$accentText" : "$color"}
+            color={selected ? "$accentText" : "$colorStrong"}
             numberOfLines={1}
             flexShrink={1}
           >
@@ -191,7 +215,7 @@ export function ContactRow({
       description={preview}
       meta={time}
       chevron={false}
-      selected={selected}
+      active={selected}
       onPress={onPress}
       accessibilityLabel={accessibilityLabel ?? name}
     />

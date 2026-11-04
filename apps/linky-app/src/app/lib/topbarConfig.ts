@@ -535,7 +535,7 @@ const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
   onchainSend: "onchainSendTitle",
   onchainTransfer: "onchainTransferTitle",
   profile: "profile",
-  profileEdit: "profile",
+  profileEdit: "profileEditTitle",
   settings: "settings",
   settingsLanguage: "language",
   settingsAppearance: "appearance",

@@ -277,7 +277,7 @@ export const InstallPwaBanner: React.FC<InstallPwaBannerProps> = ({ t }) => {
       title={t("installPwaTitle")}
     >
       <Stack gap="$lg">
-        <Card outlined>
+        <Card backgroundColor="$surfaceRaised">
           <Row>
             <Image
               src="/pwa-192x192.png"

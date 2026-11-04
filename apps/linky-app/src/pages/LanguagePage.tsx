@@ -1,4 +1,4 @@
-import { Stack, ListRow } from "@linky-fit/ui";
+import { ListRow, Section } from "@linky-fit/ui";
 import React from "react";
 import { useTranslation } from "../app/hooks/shell";
 import { useSetLang } from "../app/hooks/settings/useDeviceSettings";
@@ -19,7 +19,7 @@ export function LanguagePage(): React.ReactElement {
   const setLang = useSetLang();
 
   return (
-    <Stack>
+    <Section grouped>
       {LANGUAGES.map((language) => (
         <ListRow
           key={language.value}
@@ -29,6 +29,6 @@ export function LanguagePage(): React.ReactElement {
           chevron={false}
         />
       ))}
-    </Stack>
+    </Section>
   );
 }

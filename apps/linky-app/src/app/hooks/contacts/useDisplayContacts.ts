@@ -1,6 +1,9 @@
 import { useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
-import { deriveDefaultProfile } from "../../../derivedProfile";
+import {
+  contactPictureUrl,
+  deriveDefaultProfile,
+} from "../../../derivedProfile";
 import type { Route } from "../../../types/route";
 import { parseProfileGeneralStatus } from "../../../nostrStatus";
 import { getContactGroups } from "../../../utils/contactGroups";
@@ -300,7 +303,7 @@ export const useProxyPaymentPayerContacts = () => {
           {
             contact,
             currencies,
-            pictureUrl: npub ? (pictures[npub] ?? null) : null,
+            pictureUrl: contactPictureUrl(npub, pictures),
           },
         ];
       })

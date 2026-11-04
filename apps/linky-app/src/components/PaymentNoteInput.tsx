@@ -33,6 +33,7 @@ export const PaymentNoteInput: FC<PaymentNoteInputProps> = ({
       PAYMENT_NOTE_MAX_LENGTH,
     )}
     textAlign="center"
+    borderRadius="$pill"
     autoComplete="off"
     autoCapitalize="sentences"
     enterKeyHint="done"

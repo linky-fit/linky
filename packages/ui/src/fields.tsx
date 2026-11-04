@@ -65,7 +65,7 @@ const fieldA11y = (
     "aria-label": label,
     "aria-invalid": Boolean(error) || invalid,
     "aria-describedby": error || hint ? `${id}-description` : undefined,
-    borderColor: error || invalid ? "$danger" : "$transparent",
+    backgroundColor: error || invalid ? "$dangerSoft" : "$neutralSoft",
   }) as const;
 
 export interface TextFieldProps extends Omit<InputProps, "size"> {
@@ -119,7 +119,11 @@ export function TextField({
           // Tamagui drops `spellCheck` on the web and renders `multiline` as a single-line input; the render element fixes both.
           render={
             multiline ? (
-              <textarea spellCheck={props.spellCheck} />
+              // A drag handle would be browser chrome on a filled field; it grows with its rows instead.
+              <textarea
+                spellCheck={props.spellCheck}
+                style={{ resize: "none" }}
+              />
             ) : (
               <input spellCheck={props.spellCheck} />
             )

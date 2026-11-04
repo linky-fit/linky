@@ -5,6 +5,8 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
+import { noBorderOnFillPlugin } from "./noBorderOnFill.js";
+
 export { uiOnlyPlugin } from "./uiOnly.js";
 export { platformSeamPlugin, platformSeamRules } from "./platformSeam.js";
 
@@ -117,6 +119,11 @@ export const webAppEslintConfig = defineConfig([
       ],
       "no-restricted-syntax": ["error", ...restrictedSyntax],
     },
+  },
+  {
+    files: ["**/*.tsx"],
+    plugins: { "linky-style": noBorderOnFillPlugin },
+    rules: { "linky-style/no-border-on-fill": "error" },
   },
 ]);
 

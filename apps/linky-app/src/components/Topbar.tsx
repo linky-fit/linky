@@ -20,6 +20,7 @@ import type { TopbarButton } from "../app/types/appTypes";
 import { navigateTo } from "../hooks/useRouting";
 import type { Route } from "../types/route";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
+import { contactPictureUrl } from "../derivedProfile";
 
 const isMainSection = (route: Route): boolean =>
   route.kind === "contacts" ||
@@ -100,7 +101,7 @@ export function Topbar({
           >
             <Avatar
               name={contactName}
-              uri={(npub ? nostrPictureByNpub[npub] : null) ?? undefined}
+              uri={contactPictureUrl(npub, nostrPictureByNpub) ?? undefined}
               size="sm"
             />
             <Text variant="label" bold color="$colorSubtle" numberOfLines={1}>

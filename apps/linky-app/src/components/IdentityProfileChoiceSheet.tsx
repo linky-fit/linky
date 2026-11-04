@@ -133,7 +133,12 @@ function ProfileChoice({
           ]}
         />
       ) : null}
-      <Card outlined gap="$md" padding="$md" testID="identity-profile-preview">
+      <Card
+        backgroundColor="$surfaceRaised"
+        gap="$md"
+        padding="$md"
+        testID="identity-profile-preview"
+      >
         <Row>
           <Avatar
             name={name}

@@ -507,7 +507,7 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
   if (draftFields) {
     return (
       <BankPaymentScreen>
-        {summary}
+        {amountText ? summary : null}
 
         <Stack gap="$md">
           {isManualEntry ? (

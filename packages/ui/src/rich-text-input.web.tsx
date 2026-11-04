@@ -2,7 +2,8 @@ import { useState } from "react";
 import { getVariableValue, useTheme } from "tamagui";
 import type { RichTextInputProps } from "./rich-text-input";
 import {
-  border,
+  duration,
+  easing,
   fontFamily,
   opacity,
   radius,
@@ -63,13 +64,15 @@ export function RichTextInput({
           overflowWrap: "anywhere",
           whiteSpace: "pre-wrap",
           borderRadius: radius.sheet,
-          border: `${border.hairline}px solid ${getVariableValue(theme.borderColor)}`,
+          border: "none",
           boxSizing: "border-box",
-          background: getVariableValue(theme.surface),
+          // Focus shows as a lighter fill, never as an outline around the filled field.
+          background: getVariableValue(
+            focused ? theme.surfaceRaised : theme.surface,
+          ),
+          transition: `background ${duration.fast}ms ${easing.standard}`,
           color: getVariableValue(theme.color),
-          outline: focused
-            ? `${border.focus}px solid ${getVariableValue(theme.outlineColor)}`
-            : "none",
+          outline: "none",
           cursor: disabled ? "not-allowed" : "text",
           opacity: disabled ? opacity.disabled : 1,
         }}

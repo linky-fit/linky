@@ -21,7 +21,6 @@ function ArticleCard({
   return (
     <Card
       render={<a href={articleHref(article.slug)} />}
-      outlined
       padding="$none"
       gap="$none"
       overflow="hidden"

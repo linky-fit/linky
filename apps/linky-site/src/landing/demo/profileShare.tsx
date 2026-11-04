@@ -123,8 +123,6 @@ function SignalComposer({
         justifyContent="center"
         paddingHorizontal="$lg"
         borderRadius="$pill"
-        borderWidth={1}
-        borderColor="$borderColor"
         backgroundColor="$surface"
       >
         <Text color={draft ? "$color" : "$colorMuted"} numberOfLines={1}>

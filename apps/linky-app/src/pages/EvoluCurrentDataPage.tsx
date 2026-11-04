@@ -58,7 +58,7 @@ export function EvoluCurrentDataPage(): React.ReactElement {
     <Stack gap="$lg">
       <Section title={t("evoluShards")}>
         {evoluShards.map((shard) => (
-          <Card key={shard.scope} outlined gap="$xs">
+          <Card key={shard.scope} gap="$xs">
             <Row justifyContent="space-between">
               <Text variant="label">{shard.scope}</Text>
               {shard.rotates ? (
@@ -99,7 +99,7 @@ export function EvoluCurrentDataPage(): React.ReactElement {
         const hiddenRowsCount = rows.length - visibleRows.length;
         return (
           <Section key={tableName} title={tableName}>
-            <Card outlined gap="$xs">
+            <Card gap="$xs">
               <ListRow title={t("evoluTotalRows")} value={rows.length} />
               {shard ? (
                 <ListRow

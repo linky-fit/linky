@@ -16,6 +16,7 @@ export const tokens: Section = {
             {Object.entries(colors).map(([token, color]) => (
               <UI.Row key={token} gap="$sm">
                 <View
+                  // eslint-disable-next-line linky-style/no-border-on-fill -- the edge shows swatches that match the page
                   style={{
                     backgroundColor: color,
                     width: UI.size.control,
@@ -55,8 +56,6 @@ export const tokens: Section = {
                     height="$controlSm"
                     borderRadius={value}
                     backgroundColor="$accentSoft"
-                    borderWidth={UI.border.hairline}
-                    borderColor="$accent"
                   />
                 ) : (
                   <UI.Stack

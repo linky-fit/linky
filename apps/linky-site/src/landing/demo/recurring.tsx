@@ -60,7 +60,7 @@ const noteTicks = Array.from(
   (_, index) => cues.tapNote + 300 + index * 90,
 );
 
-const topup = "Topup via invoice";
+const topup = "Top-up via Lightning";
 
 interface Payment {
   who: Person | typeof topup;

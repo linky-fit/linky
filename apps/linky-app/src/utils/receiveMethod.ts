@@ -21,3 +21,9 @@ export const RECEIVE_METHOD_LABEL_KEYS: Record<ReceiveMethod, I18nKey> = {
   universal: "topupQrModeUniversal",
   lightning: "topupQrModeLightning",
 };
+
+export const RECEIVE_METHOD_HINT_KEYS: Record<ReceiveMethod, I18nKey> = {
+  cashu: "receiveMethodCashuHint",
+  universal: "receiveMethodUniversalHint",
+  lightning: "receiveMethodLightningHint",
+};

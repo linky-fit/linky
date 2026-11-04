@@ -163,7 +163,6 @@ export function ListingFormPage({
       />
       <TextField
         label={t("listingTitle")}
-        hideLabel
         placeholder={t("listingTitlePlaceholder")}
         value={title}
         onChangeText={setTitle}
@@ -174,7 +173,6 @@ export function ListingFormPage({
         <Stack flex={1} minWidth={0}>
           <TextField
             label={t("listingPrice")}
-            hideLabel
             placeholder={t("listingPrice")}
             inputMode="decimal"
             value={amount}
@@ -198,7 +196,6 @@ export function ListingFormPage({
         <Stack flex={1} minWidth={0}>
           <TextField
             label={t("listingUnit")}
-            hideLabel
             placeholder={t("listingUnitPlaceholder")}
             value={unit}
             onChangeText={setUnit}

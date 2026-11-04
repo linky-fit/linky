@@ -1,4 +1,4 @@
-import { ListRow, Stack } from "@linky-fit/ui";
+import { Button, EmptyState, ListRow, Section } from "@linky-fit/ui";
 import React from "react";
 import { useTranslation } from "../app/hooks/shell";
 import { useKeryx, useRefreshOnOpen } from "../app/hooks/useKeryx";
@@ -9,8 +9,23 @@ export function KeryxCompaniesPage(): React.ReactElement {
   const { t } = useTranslation();
   const { companies, refresh } = useKeryx();
   useRefreshOnOpen(companies, refresh);
+  const addCompany = () => navigateTo({ route: "keryxCompanyNew" });
+  if (companies.length === 0) {
+    return (
+      <EmptyState
+        icon="Newspaper"
+        title={t("keryxEmptyTitle")}
+        description={t("keryxEmptyBody")}
+        action={
+          <Button icon="Plus" onPress={addCompany} testID="keryx-add-company">
+            {t("keryxAddCompany")}
+          </Button>
+        }
+      />
+    );
+  }
   return (
-    <Stack>
+    <Section grouped>
       {companies.map(({ id, subscription }) => (
         <KeryxCompanyRow
           key={id}
@@ -23,8 +38,9 @@ export function KeryxCompaniesPage(): React.ReactElement {
         icon="Plus"
         title={t("keryxAddCompany")}
         testID="keryx-add-company"
-        onPress={() => navigateTo({ route: "keryxCompanyNew" })}
+        chevron={false}
+        onPress={addCompany}
       />
-    </Stack>
+    </Section>
   );
 }

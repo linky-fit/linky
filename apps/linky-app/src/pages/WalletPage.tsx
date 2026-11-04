@@ -23,6 +23,7 @@ const RECENT_TRANSACTIONS = 4;
 interface WalletPageProps {
   openScan: () => void;
   scanIsOpen: boolean;
+  showRecent: boolean;
 }
 
 function RecentTransactions(): React.ReactElement {
@@ -83,7 +84,7 @@ function RecentTransactions(): React.ReactElement {
 }
 
 export const WalletPage: React.FC<WalletPageProps> = React.memo(
-  ({ openScan, scanIsOpen }) => {
+  ({ openScan, scanIsOpen, showRecent }) => {
     const { t } = useTranslation();
     const { cashuTotalBalance } = useWalletBalance();
     return (
@@ -119,7 +120,7 @@ export const WalletPage: React.FC<WalletPageProps> = React.memo(
             {t("walletSend")}
           </Button>
         </Row>
-        <RecentTransactions />
+        {showRecent ? <RecentTransactions /> : null}
       </Stack>
     );
   },

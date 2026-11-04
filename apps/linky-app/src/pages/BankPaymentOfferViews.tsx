@@ -35,6 +35,7 @@ import { PrivateImageBubble } from "../components/PrivateImageBubble";
 import type { Translate } from "../i18n";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 import { pickFile } from "../utils/pickFile";
+import { contactPictureUrl } from "../derivedProfile";
 
 export interface BankPaymentOfferEntry {
   info: BankPaymentOfferInfo;
@@ -375,7 +376,7 @@ export function OwnerOfferView({
     const npub = normalizeNpubIdentifier(contact?.npub ?? "");
     return {
       name: (contact?.name ?? "").trim() || t("unknownContactTitle"),
-      pictureUrl: npub ? (nostrPictureByNpub[npub] ?? null) : null,
+      pictureUrl: contactPictureUrl(npub, nostrPictureByNpub),
     };
   };
   return (

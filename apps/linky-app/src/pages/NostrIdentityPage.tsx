@@ -39,7 +39,7 @@ const IdentityHeader = ({
   const { t } = useTranslation();
   return (
     <Row gap="$md" alignItems="flex-start">
-      <Avatar name={name} size="lg" uri={pictureUrl ?? undefined} />
+      <Avatar name={name} uri={pictureUrl ?? undefined} />
       <Stack flex={1} minWidth={0} gap="$xs" alignItems="flex-start">
         <Text variant="heading" numberOfLines={1}>
           {name}
@@ -49,6 +49,7 @@ const IdentityHeader = ({
             variant="ghost"
             size="sm"
             icon="Copy"
+            maxWidth="100%"
             onPress={() => void copyText(lnAddress)}
             aria-label={t("lightningAddress")}
           >
@@ -59,6 +60,7 @@ const IdentityHeader = ({
           variant="ghost"
           size="sm"
           icon="Copy"
+          maxWidth="100%"
           onPress={() => void copyText(npub)}
           aria-label={`${t("copy")} ${t("npub")}`}
         >

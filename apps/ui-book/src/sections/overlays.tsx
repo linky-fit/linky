@@ -103,7 +103,6 @@ export const overlays: Section = {
             </UI.Button>
           </UI.Row>
           <UI.Card
-            outlined
             position="relative"
             height="$column"
             overflow="hidden"
@@ -174,7 +173,6 @@ export const overlays: Section = {
             </UI.Button>
           </UI.Row>
           <UI.Card
-            outlined
             position="relative"
             height="$device"
             overflow="hidden"

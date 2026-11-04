@@ -15,7 +15,6 @@ import {
   Text,
   TextField,
   TimelineRow,
-  border,
   Pill,
 } from "@linky-fit/ui";
 import type { Tone } from "@linky-fit/ui";
@@ -197,8 +196,6 @@ function DetailPane({
       flexShrink={0}
       minHeight={0}
       backgroundColor="$surface"
-      borderLeftWidth={border.hairline}
-      borderColor="$borderColor"
       $compact={{ width: "100%", flex: 1 }}
     >
       <Stack gap="$lg" padding="$lg">
@@ -602,8 +599,6 @@ export function InspectorApp({
         gap="$sm"
         padding="$sm"
         backgroundColor="$surface"
-        borderBottomWidth={border.hairline}
-        borderColor="$borderColor"
       >
         <Row gap="$sm">
           {title ? (
@@ -690,8 +685,6 @@ export function InspectorApp({
         gap="$sm"
         padding="$sm"
         backgroundColor="$surface"
-        borderBottomWidth={border.hairline}
-        borderColor="$borderColor"
       >
         {appClients.length > 1 && (
           <SelectField

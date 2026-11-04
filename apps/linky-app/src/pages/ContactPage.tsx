@@ -2,6 +2,7 @@ import {
   Avatar,
   Button,
   EmptyState,
+  OptionTile,
   Pill,
   Row,
   Stack,
@@ -33,6 +34,7 @@ import {
 } from "../utils/formatting";
 import { resolveVerifiedNip05Identifier } from "../utils/nostrNip05";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
+import { contactPictureUrl } from "../derivedProfile";
 
 interface Contact {
   id: ContactId;
@@ -120,7 +122,7 @@ export const ContactPage: FC<ContactPageProps> = ({
   const groups = getContactGroups(selectedContact);
   const ln = selectedLnAddress;
   const npub = selectedNpub;
-  const url = npub ? nostrPictureByNpub[npub] : null;
+  const url = contactPictureUrl(npub, nostrPictureByNpub);
   const hasLightningAddress = ln.length > 0;
   const canMessage = Boolean(npub);
   const contactName = name || t("contact");
@@ -183,28 +185,31 @@ export const ContactPage: FC<ContactPageProps> = ({
         ) : null}
       </Stack>
 
-      {canPayThisContact && (
-        <Button
-          icon={isFeedbackContact ? "HeartHandshake" : "HandCoins"}
-          onPress={() => openContactPay(contactId)}
-          disabled={cashuIsBusy || !canStartPay}
-          tooltip={!canStartPay ? t("payInsufficient") : undefined}
-          data-guide="contact-pay"
-        >
-          {payLabel}
-        </Button>
-      )}
-
-      {canMessage && (
-        <Button
-          variant="secondary"
-          icon={isFeedbackContact ? "MessageCircle" : "MessageCircleMore"}
-          onPress={() => navigateTo({ route: "chat", id: contactId })}
-          data-guide="contact-message"
-        >
-          {messageLabel}
-        </Button>
-      )}
+      {canPayThisContact || canMessage ? (
+        <Row gap="$sm" alignItems="stretch" marginTop="$sm">
+          {canMessage ? (
+            <OptionTile
+              flex={1}
+              icon={isFeedbackContact ? "MessageCircle" : "MessageCircleMore"}
+              label={messageLabel}
+              onPress={() => navigateTo({ route: "chat", id: contactId })}
+              data-guide="contact-message"
+            />
+          ) : null}
+          {canPayThisContact ? (
+            <OptionTile
+              flex={1}
+              icon={isFeedbackContact ? "HeartHandshake" : "HandCoins"}
+              label={payLabel}
+              backgroundColor="$accentSoft"
+              onPress={() => openContactPay(contactId)}
+              disabled={cashuIsBusy || !canStartPay}
+              tooltip={!canStartPay ? t("payInsufficient") : undefined}
+              data-guide="contact-pay"
+            />
+          ) : null}
+        </Row>
+      ) : null}
     </Stack>
   );
 };

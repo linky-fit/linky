@@ -148,7 +148,7 @@ function FollowUsPage() {
             {activeCopy.title}
           </Text>
         </Stack>
-        <Card outlined>
+        <Card>
           <SocialLink
             href="https://x.com/LinkyFit"
             iconSrc="/x.svg"

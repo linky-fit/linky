@@ -1,4 +1,4 @@
-import { Stack, ListRow } from "@linky-fit/ui";
+import { ListRow, Section } from "@linky-fit/ui";
 import React from "react";
 import { useTranslation } from "../app/hooks/shell";
 import { useColorModePreference } from "../hooks/useColorMode";
@@ -13,7 +13,7 @@ export function AppearancePage(): React.ReactElement {
   const preference = useColorModePreference();
 
   return (
-    <Stack>
+    <Section grouped>
       {COLOR_MODE_PREFERENCES.map((option) => (
         <ListRow
           key={option}
@@ -23,6 +23,6 @@ export function AppearancePage(): React.ReactElement {
           chevron={false}
         />
       ))}
-    </Stack>
+    </Section>
   );
 }

@@ -1,5 +1,6 @@
 import {
   Button,
+  EmptyState,
   Form,
   Icon,
   IconButton,
@@ -217,7 +218,20 @@ export function OnchainReceiveIntro({
   const { formatDisplayedAmountText: amountText } = useDisplayAmounts();
   const min = config.minReceiveAmount;
   if (min === undefined) {
-    return <Notice tone="warning" title={t("onchainTransferUnavailable")} />;
+    return (
+      <EmptyState
+        icon="Bitcoin"
+        title={t("onchainTransferUnavailable")}
+        action={
+          <Button
+            variant="secondary"
+            onPress={() => navigateTo({ route: "wallet" })}
+          >
+            {t("wallet")}
+          </Button>
+        }
+      />
+    );
   }
   const points: ReadonlyArray<[IconName, string]> = [
     ["Clock", t("onchainReceiveIntroSettlement")],
@@ -274,7 +288,20 @@ export function OnchainTransferNewPage({
     useOnchainTransferCommands();
   const [busy, setBusy] = React.useState(false);
   if (!shown || configState.status === "unavailable") {
-    return <Notice tone="warning" title={t("onchainTransferUnavailable")} />;
+    return (
+      <EmptyState
+        icon="Bitcoin"
+        title={t("onchainTransferUnavailable")}
+        action={
+          <Button
+            variant="secondary"
+            onPress={() => navigateTo({ route: "wallet" })}
+          >
+            {t("wallet")}
+          </Button>
+        }
+      />
+    );
   }
   if (configState.status === "loading") {
     return <LoadingState label={t("loading")} />;

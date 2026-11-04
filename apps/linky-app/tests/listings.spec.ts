@@ -91,9 +91,9 @@ test("a listing and the cash intent reach a contact who saved the author back", 
 
     await test.step("A offers cash", async () => {
       await a.page.goto("/#collaboration/cash");
-      await a.page.getByRole("radio", { name: "Offering cash" }).click();
+      await a.page.getByRole("radio", { name: "I have cash" }).click();
       await expect(
-        a.page.getByRole("radio", { name: "Offering cash" }),
+        a.page.getByRole("radio", { name: "I have cash" }),
       ).toHaveAttribute("aria-checked", "true");
     });
 

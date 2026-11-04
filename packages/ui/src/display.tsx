@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { Image, View, styled } from "tamagui";
-import { Pressable } from "./controls";
+import { IndicatorDot, Pressable } from "./controls";
 import { Icon } from "./icons";
 import type { IconName, IconSize } from "./icons";
 import { Row, Stack, Text } from "./layout";
@@ -34,6 +34,15 @@ const initials = (name: string) =>
     .join("")
     .toUpperCase() || "?";
 
+const initialsTones = ["accent", "info", "warning", "danger"] as const;
+
+/** The same name always gets the same tint, so people stay recognisable without a photo. */
+const initialsTone = (name: string): Tone => {
+  let hash = 0;
+  for (const char of name) hash = (hash * 31 + (char.codePointAt(0) ?? 0)) | 0;
+  return initialsTones[Math.abs(hash) % initialsTones.length] ?? "accent";
+};
+
 export interface AvatarProps {
   /** The initials come from it; without a name the avatar shows "?". */
   name: string;
@@ -47,7 +56,7 @@ export interface AvatarProps {
   icon?: IconName | undefined;
   /** Gets the photo uri that failed to load, e.g. to try another source. */
   onError?: ((uri: string) => void) | undefined;
-  /** Fills the circle with the raised surface, so it stands out against its ring, e.g. in an `AvatarGroup`. */
+  /** Puts a photo on the raised surface while it loads, so it stands out against its ring, e.g. in an `AvatarGroup`. */
   raised?: boolean | undefined;
 }
 
@@ -65,6 +74,8 @@ export function Avatar({
   const [failedUri, setFailedUri] = useState<string>();
   const showPhoto = uri !== undefined && uri !== failedUri;
   const glyph = fallback ?? (size === "xs" ? null : initials(name));
+  const tint = toneColors[initialsTone(name)];
+  const photoFill = raised ? "$surfaceRaised" : "$surface";
   return (
     <View position="relative" flexShrink={0} role="img" aria-label={name}>
       <View
@@ -74,7 +85,7 @@ export function Avatar({
         overflow="hidden"
         alignItems="center"
         justifyContent="center"
-        backgroundColor={raised ? "$surfaceRaised" : "$surface"}
+        backgroundColor={showPhoto ? photoFill : tint.background}
       >
         {showPhoto ? (
           <Image
@@ -89,27 +100,14 @@ export function Avatar({
             }}
           />
         ) : icon ? (
-          <Icon name={icon} size={avatarIconSizes[size]} color="$accentText" />
+          <Icon name={icon} size={avatarIconSizes[size]} color={tint.color} />
         ) : glyph === null ? null : (
-          <Text variant={dimensions.text} bold color="$accentText">
+          <Text variant={dimensions.text} bold color={tint.color}>
             {glyph}
           </Text>
         )}
       </View>
-      {indicator ? (
-        <View
-          position="absolute"
-          top={0}
-          right={0}
-          width="$dot"
-          height="$dot"
-          borderRadius="$pill"
-          borderWidth={border.emphasis}
-          borderColor="$background"
-          backgroundColor={toneColors[indicator].solid}
-          aria-hidden
-        />
-      ) : null}
+      {indicator ? <IndicatorDot tone={indicator} /> : null}
     </View>
   );
 }
@@ -124,8 +122,8 @@ export interface AvatarGroupProps {
 /** Rings each avatar in the page background, so overlapping circles stay apart. */
 const AvatarRing = styled(View, {
   borderRadius: "$pill",
-  borderWidth: border.emphasis,
-  borderColor: "$background",
+  padding: border.emphasis,
+  backgroundColor: "$background",
 });
 
 /** A few people as overlapping avatars, e.g. who pays in a currency. */
@@ -272,6 +270,13 @@ const amountVariant = (value: string, size: AmountProps["size"]) => {
   return size === "xl" && value.length <= XL_MAX_LENGTH ? "headline" : "amount";
 };
 
+/** The unit stays about a third of its figure, so it reads as part of the amount. */
+const unitVariant = {
+  display: "label",
+  amount: "title",
+  headline: "display",
+} as const satisfies Record<ReturnType<typeof amountVariant>, TextVariant>;
+
 export function Amount({ value, unit, caption, size = "lg" }: AmountProps) {
   return (
     <Stack gap="$xs" alignItems="center">
@@ -290,7 +295,11 @@ export function Amount({ value, unit, caption, size = "lg" }: AmountProps) {
           {value}
         </Text>
         {unit ? (
-          <Text variant="caption" bold color="$colorMuted">
+          <Text
+            variant={unitVariant[amountVariant(value, size)]}
+            fontWeight="$semibold"
+            color="$colorMuted"
+          >
             {unit}
           </Text>
         ) : null}

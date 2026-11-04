@@ -133,6 +133,13 @@ const getDateTimeFormatter = (
   return formatter;
 };
 
+/** A full date with the time, e.g. for a transaction's detail. */
+export const formatDateTime = (ms: number, lang?: string): string =>
+  new Intl.DateTimeFormat(normalizeLocale(lang), {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(ms);
+
 export const formatInteger = (value: number, lang?: string): string => {
   const locale = normalizeLocale(lang);
   let formatter = numberFormatters.get(locale);

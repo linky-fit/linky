@@ -45,7 +45,6 @@ function PageCard({
 }) {
   return (
     <Card
-      outlined
       testID={testID}
       gap="$lg"
       padding="$xxl"

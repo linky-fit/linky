@@ -16,8 +16,15 @@ export const messaging: Section = {
         <UI.MessageBubble direction="incoming" time="10:40">
           See you on Saturday.
         </UI.MessageBubble>
-        <UI.MessageBubble direction="outgoing" time="10:42">
+        <UI.MessageBubble direction="outgoing" groupPosition="first">
           Sounds good!
+        </UI.MessageBubble>
+        <UI.MessageBubble
+          direction="outgoing"
+          groupPosition="last"
+          time="10:42"
+        >
+          I'll bring the cake.
         </UI.MessageBubble>
         <UI.MessageBubble direction="outgoing" pending>
           Sending…

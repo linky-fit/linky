@@ -663,7 +663,7 @@ const ChatMessageList = memo(function ChatMessageList({
         width="100%"
         maxWidth="$contentWidth"
         alignSelf="center"
-        gap="$xs"
+        gap="$xxs"
         paddingTop="$lg"
         paddingBottom="$md"
       >

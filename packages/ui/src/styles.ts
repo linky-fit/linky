@@ -4,10 +4,12 @@ import type { IconName } from "./icons";
 import type { TextVariant, Tone } from "./tokens";
 import { border, space, typography } from "./tokens";
 
+/** Keyboard focus: a ring set off from the control, so it never reads as the control's own edge. */
 export const focusRing = {
   outlineColor: "$outlineColor",
   outlineWidth: border.focus,
   outlineStyle: "solid",
+  outlineOffset: border.emphasis,
 } as const;
 
 /** A browser tooltip; native has no hover, so it gets nothing. */
@@ -59,8 +61,6 @@ export const fieldStyle = {
   paddingHorizontal: "$md",
   paddingVertical: "$md",
   borderRadius: "$control",
-  borderWidth: border.hairline,
-  borderColor: "$transparent",
   backgroundColor: "$neutralSoft",
   color: "$color",
   placeholderTextColor: "$placeholderColor",
@@ -68,5 +68,7 @@ export const fieldStyle = {
   selectionColor: "$selectionColor",
   fontFamily: "$body",
   ...textVariant("body"),
-  focusStyle: focusRing,
+  // A field shows focus by its fill, with the caret; a ring, the browser's included, would outline a filled box.
+  focusStyle: { backgroundColor: "$accentSoft", outlineStyle: "none" },
+  focusVisibleStyle: { outlineStyle: "none" },
 } as const;

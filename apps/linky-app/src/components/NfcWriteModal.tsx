@@ -1,4 +1,4 @@
-import { Button, Dialog, Icon, Stack, Text, border } from "@linky-fit/ui";
+import { Button, Dialog, Icon, Stack, Text } from "@linky-fit/ui";
 import React from "react";
 
 import type { Translate } from "../i18n";
@@ -19,8 +19,6 @@ function NfcWriteIllustration(): React.ReactElement {
       alignItems="center"
       justifyContent="center"
       borderRadius="$pill"
-      borderWidth={border.emphasis}
-      borderColor="$info"
       backgroundColor="$infoSoft"
     >
       <Stack

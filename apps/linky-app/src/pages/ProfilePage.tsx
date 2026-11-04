@@ -370,14 +370,23 @@ export function ProfilePage({
             value={currentNpub}
             accessibilityLabel={t("copy")}
             tooltip={t("copy")}
-            badge="Copy"
             onPress={() => void copyText(currentNpub)}
           />
         </Stack>
+        {effectiveMyLightningAddress ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon="Zap"
+            aria-label={t("lightningAddress")}
+            onPress={() => void copyText(effectiveMyLightningAddress)}
+          >
+            {formatShortLightningAddress(effectiveMyLightningAddress)}
+          </Button>
+        ) : null}
         <Button
-          variant="secondary"
-          size="sm"
           icon="Share2"
+          borderRadius="$pill"
           onPress={() => setShareSheetOpen(true)}
         >
           {t("shareProfile")}
@@ -400,17 +409,6 @@ export function ProfilePage({
             onPress={() => void writeCurrentNpubToNfc()}
           >
             {t("uploadProfileToNfc")}
-          </Button>
-        ) : null}
-        {effectiveMyLightningAddress ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            icon="Zap"
-            aria-label={t("lightningAddress")}
-            onPress={() => void copyText(effectiveMyLightningAddress)}
-          >
-            {formatShortLightningAddress(effectiveMyLightningAddress)}
           </Button>
         ) : null}
         {profileStatusText ? (
@@ -501,8 +499,8 @@ export function ProfilePage({
         <Text variant="label" color="$colorSubtle">
           {t("lightningAddress")}
         </Text>
-        <Row alignItems="flex-start" gap="$sm">
-          <Stack flex={1}>
+        <Stack gap="$sm">
+          <Stack>
             <TextField
               ref={(node) => {
                 lnInputRef.current =
@@ -539,7 +537,7 @@ export function ProfilePage({
           </Stack>
           {ownAddressMode || isOwnAddressDraft ? (
             <Button
-              minHeight={size.field}
+              alignSelf="flex-start"
               loading={inlineClaimIsConfirming}
               disabled={
                 !showPurchaseButton ||
@@ -559,7 +557,7 @@ export function ProfilePage({
             </Button>
           ) : (
             <Button
-              minHeight={size.field}
+              alignSelf="flex-start"
               variant="secondary"
               icon="Zap"
               testID="profile-own-ln-address"
@@ -568,7 +566,7 @@ export function ProfilePage({
               {t("claimOwnLightningAddressStart")}
             </Button>
           )}
-        </Row>
+        </Stack>
       </Stack>
 
       <TextField
@@ -576,7 +574,6 @@ export function ProfilePage({
         label={t("status")}
         value={profileEditStatus}
         onChangeText={setProfileEditStatus}
-        placeholder={t("status")}
       />
 
       {canSaveProfileEdits ? saveAction : null}

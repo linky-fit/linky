@@ -15,7 +15,7 @@ export type HistoryEntry =
       readonly transfer: OnchainTransferView;
     };
 
-const entryTime = (entry: HistoryEntry): number =>
+export const historyEntryTime = (entry: HistoryEntry): number =>
   entry.kind === "transaction"
     ? entry.item.createdAtSec
     : entry.transfer.createdAtSec;
@@ -48,6 +48,6 @@ export const withOnchainTransfers = (
       .map((transfer) => ({ kind: "onchainTransfer" as const, transfer })),
   ];
   // Stable, so transactions of one second keep their order.
-  entries.sort((a, b) => entryTime(b) - entryTime(a));
+  entries.sort((a, b) => historyEntryTime(b) - historyEntryTime(a));
   return { pending: unfinishedOnchainTransfers(transfers), entries };
 };

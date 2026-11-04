@@ -536,7 +536,6 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
 
       <TextField
         label={t("contactSearchLabel")}
-        hideLabel
         value={form.npub}
         onChange={(event) => {
           lastSearchedQueryRef.current = "";

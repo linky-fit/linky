@@ -27,9 +27,6 @@ export const layout: Section = {
         <UI.Card>
           <UI.Text>Default card</UI.Text>
         </UI.Card>
-        <UI.Card outlined>
-          <UI.Text>Outlined card</UI.Text>
-        </UI.Card>
         <UI.Card elevated>
           <UI.Text>Elevated card</UI.Text>
         </UI.Card>
