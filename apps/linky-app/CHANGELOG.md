@@ -12,13 +12,17 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ## [Unreleased]
 
+## [26.10.11] - 2026-11-04
+
 ### en-US
 
 - The bottom bar's Proxy payments became Collaboration: bank transfers paid by a friend, cash, goods and services in one place. Say whether you offer or look for cash; contacts who also saved you see it, and the beacon carries it. Add goods or services with a price, and see what your contacts offer or want, visible only between contacts who saved each other.
+- The scanner sits top right on every main tab, and a send from a long-used wallet is fast again.
 
 ### cs-CZ
 
-- Z Proxy plateb v dolní liště je Spolupráce: platební převody za kamaráda, hotovost, zboží a služby na jednom místě. Řekněte, jestli hotovost nabízíte nebo poptáváte; uvidí to kontakty, které si uložily i vás, a vysílá to i maják. Přidejte zboží nebo službu s cenou a podívejte se, co nabízejí nebo shánějí vaše kontakty, jen mezi kontakty, které si uložily navzájem.
+- Z Proxy plateb v dolní liště je Spolupráce: platební převody za kamaráda, hotovost, zboží a služby na jednom místě. Řekněte, jestli hotovost nabízíte nebo poptáváte; uvidí to kontakty, které si uložily i vás, a vysílá to i maják. Přidejte zboží nebo službu s cenou a uvidíte, co nabízejí nebo shánějí vaše kontakty, jen mezi vzájemně uloženými kontakty.
+- Skener je vpravo nahoře na každé hlavní záložce a odeslání z dlouho používané peněženky je zase rychlé.
 
 ## [26.10.10] - 2026-10-31
 
