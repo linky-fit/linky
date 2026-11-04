@@ -47,19 +47,29 @@ export function MasterKeysPage(): React.ReactElement {
   return (
     <Stack gap="$lg">
       {hasSeedMnemonic ? (
-        <Row flexWrap="wrap" gap="$sm" aria-live="polite">
+        <Row
+          flexWrap="wrap"
+          rowGap="$xs"
+          columnGap="$lg"
+          padding="$lg"
+          borderRadius="$card"
+          backgroundColor="$surface"
+          aria-live="polite"
+        >
           {seedWords.map((word, index) => (
             <Row
               key={index}
               flexBasis="40%"
               flexGrow={1}
-              paddingHorizontal="$md"
-              paddingVertical="$sm"
-              borderRadius="$control"
-              backgroundColor="$neutralSoft"
+              paddingVertical="$xs"
               gap="$sm"
             >
-              <Text variant="caption" color="$colorMuted">
+              <Text
+                variant="caption"
+                color="$colorMuted"
+                minWidth="$iconLg"
+                textAlign="right"
+              >
                 {index + 1}
               </Text>
               <Text
@@ -77,29 +87,33 @@ export function MasterKeysPage(): React.ReactElement {
       )}
       <Stack gap="$sm">
         <Button
-          icon="Copy"
-          onPress={copySeed}
-          disabled={!hasSeedMnemonic}
-          data-guide="copy-seed"
-        >
-          {t("copy")}
-        </Button>
-        <Button
-          variant="secondary"
-          icon={isVisible ? "EyeOff" : "Eye"}
-          onPress={() => setIsVisible((current) => !current)}
-          disabled={!hasSeedMnemonic}
-        >
-          {isVisible ? t("masterKeysHide") : t("masterKeysShow")}
-        </Button>
-        <Button
-          variant="secondary"
           icon="ShieldCheck"
           onPress={() => void handleSaveSeed()}
           disabled={!hasSeedMnemonic}
         >
           {t("onboardingBackupSave")}
         </Button>
+        <Row gap="$sm">
+          <Button
+            flex={1}
+            variant="secondary"
+            icon={isVisible ? "EyeOff" : "Eye"}
+            onPress={() => setIsVisible((current) => !current)}
+            disabled={!hasSeedMnemonic}
+          >
+            {isVisible ? t("masterKeysHide") : t("masterKeysShow")}
+          </Button>
+          <Button
+            flex={1}
+            variant="secondary"
+            icon="Copy"
+            onPress={copySeed}
+            disabled={!hasSeedMnemonic}
+            data-guide="copy-seed"
+          >
+            {t("copy")}
+          </Button>
+        </Row>
       </Stack>
     </Stack>
   );

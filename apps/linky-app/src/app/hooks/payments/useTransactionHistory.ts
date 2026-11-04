@@ -486,3 +486,10 @@ export const useTransactionHistory = (): TransactionHistory => {
     t,
   };
 };
+
+/** The amount with its direction's sign, e.g. "−1,200 sat". */
+export const signedAmountText = (
+  history: TransactionHistory,
+  item: TransactionItem,
+): string =>
+  `${item.direction === "in" ? "+" : "−"}${history.formatAmountText(item.amount, item.unit)}`;

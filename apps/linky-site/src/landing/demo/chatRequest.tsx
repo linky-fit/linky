@@ -61,11 +61,7 @@ function RequestScene({ at }: { at: At }) {
   const noteLength = useCues(noteTimes);
   return (
     <>
-      <DemoTopBar
-        title="Pay to contact"
-        leading="ChevronLeft"
-        trailing="Settings"
-      />
+      <DemoTopBar title="Pay" leading="ChevronLeft" trailing="Settings" />
       <DemoBody paddingTop="$lg">
         <Row>
           <Avatar name="Alex Rivers" uri={avatarUri("Alex Rivers")} size="md" />

@@ -69,7 +69,7 @@ export function TransferCard({
   readonly transfer: OperatorTransfer;
 }) {
   return (
-    <Card outlined gap="$sm" testID={`transfer-card-${transfer.id}`}>
+    <Card gap="$sm" testID={`transfer-card-${transfer.id}`}>
       <Row justifyContent="space-between">
         <Text bold>{transferTitle(transfer)}</Text>
         <StatusPill transfer={transfer} />

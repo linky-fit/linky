@@ -167,7 +167,7 @@ export function PayLightningSheet({
       });
     return (
       <Stack gap="$lg" testID="pay-lightning-review-step">
-        <Card outlined gap="$none">
+        <Card backgroundColor="$surfaceRaised" gap="$none">
           <ListRow title={copy.wallet.to} value={recipientOf(quote.target)} />
           <ListRow title={copy.wallet.mint} value={quote.cost.quote.mint} />
           <ListRow title={copy.wallet.receives} value={formatSats(amount)} />

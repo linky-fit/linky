@@ -63,7 +63,7 @@ import type {
 } from "../app/types/appTypes";
 import type { MintIcon } from "../utils/mint";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
-import { CashuTokenPill } from "./CashuTokenPill";
+import { CashuTokenAmount, CashuTokenPill } from "./CashuTokenPill";
 import { ContactPill } from "./ContactPill";
 
 import type { I18nKey, Translate } from "../i18n";
@@ -318,7 +318,18 @@ function ChatMessageComponent({
     parseIdentityChangeMessageContent(content) !== null;
 
   const showDaySeparator = prevDayKey !== dayKey;
-  const showTime = !isIdentityChangeMessage && nextMinuteKey !== minuteKey;
+  const joinsPrevious =
+    !showDaySeparator && continuesRun(previousMessage, message);
+  const joinsNext = continuesRun(message, nextMessage);
+  const groupPosition = joinsPrevious
+    ? joinsNext
+      ? "middle"
+      : "last"
+    : joinsNext
+      ? "first"
+      : "single";
+  const showTime =
+    !isIdentityChangeMessage && (!joinsNext || nextMinuteKey !== minuteKey);
 
   const timeLabel = getChatTimeFormatter(locale).format(d);
 
@@ -411,12 +422,16 @@ function ChatMessageComponent({
     };
   }, [bankOfferPhaseStartedAtSec, bankOfferPhaseTtlSec]);
 
-  const renderCashuTokenPill = React.useCallback(
-    (info: CashuTokenMessageInfo, key?: string) => {
+  const renderCashuToken = React.useCallback(
+    (
+      info: CashuTokenMessageInfo,
+      key?: string,
+      Component: typeof CashuTokenPill = CashuTokenPill,
+    ) => {
       const amountText = formatDisplayedAmountText(info.amount ?? 0);
       const stateKey = cashuTokenStateKey(info, isOut);
       return (
-        <CashuTokenPill
+        <Component
           key={key}
           mintIcon={getMintIconUrl(info.mintUrl)}
           label={amountText}
@@ -513,10 +528,7 @@ function ChatMessageComponent({
         } else {
           replacementCount += 1;
           segments.push(
-            renderCashuTokenPill(
-              inlineTokenInfo,
-              `${messageId}-cashu-${start}`,
-            ),
+            renderCashuToken(inlineTokenInfo, `${messageId}-cashu-${start}`),
           );
         }
       }
@@ -539,7 +551,7 @@ function ChatMessageComponent({
     onOpenNpubContact,
     paymentRequestInfo,
     privateImageInfo,
-    renderCashuTokenPill,
+    renderCashuToken,
   ]);
 
   const unsavedMessageContactNpubs = React.useMemo(() => {
@@ -823,11 +835,13 @@ function ChatMessageComponent({
       status={paymentRequestStatus ?? "requested"}
       title={t("requestPaymentLabel")}
       statusLabel={
-        paymentRequestStatus === "paid"
-          ? t("paymentRequestStatusPaid")
-          : paymentRequestStatus === "declined"
-            ? t("paymentRequestStatusDeclined")
-            : t("paymentRequestStatusRequested")
+        (paymentRequestStatus ?? "requested") === "requested" && !isOut
+          ? ""
+          : paymentRequestStatus === "paid"
+            ? t("paymentRequestStatusPaid")
+            : paymentRequestStatus === "declined"
+              ? t("paymentRequestStatusDeclined")
+              : t("paymentRequestStatusRequested")
       }
       amount={
         paymentRequestInfo.amount === null
@@ -900,7 +914,7 @@ function ChatMessageComponent({
         t={t}
       />
     ) : tokenInfo && isStandaloneTokenMessage ? (
-      renderCashuTokenPill(tokenInfo)
+      renderCashuToken(tokenInfo, undefined, CashuTokenAmount)
     ) : (
       <MessageText>{inlineMessageContent ?? content}</MessageText>
     )))
@@ -950,6 +964,8 @@ function ChatMessageComponent({
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
           direction={isOut ? "outgoing" : "incoming"}
+          groupPosition={groupPosition}
+          timeBelow={Boolean(paymentRequestInfo || bankPaymentOfferInfo)}
           pending={isPending}
           onContextMenu={(event: React.MouseEvent) => {
             event.preventDefault();
@@ -1043,6 +1059,23 @@ function ChatMessageComponent({
   );
 }
 
+const RUN_GAP_SEC = 5 * 60;
+
+/** Whether `next` continues `message`'s run: same sender, same day, a few minutes apart. */
+function continuesRun(
+  message: LocalNostrMessage | null,
+  next: LocalNostrMessage | null,
+): boolean {
+  if (!message || !next || message.direction !== next.direction) return false;
+  const at = message.createdAtSec || 0;
+  const nextAt = next.createdAtSec || 0;
+  return (
+    nextAt - at < RUN_GAP_SEC &&
+    new Date(at * 1000).toDateString() ===
+      new Date(nextAt * 1000).toDateString()
+  );
+}
+
 /** Message text keeps links, pills and line breaks inline. */
 function MessageText({ children }: { children: React.ReactNode }) {
   return (
@@ -1069,6 +1102,7 @@ interface PaymentCardProps {
   testID: string;
   status: keyof typeof statusTones;
   title: string;
+  /** Empty hides the badge, e.g. on a request whose Pay and Decline already say it waits. */
   statusLabel: string;
   /** Null hides the amount, e.g. for a proxy payment this peer did not pay. */
   amount: PaymentCardAmount | null;
@@ -1087,7 +1121,9 @@ function PaymentCard({
     <Stack testID={testID} data-status={status} gap="$sm" minWidth="$qr">
       <Row justifyContent="space-between" gap="$sm">
         <Text eyebrow>{title}</Text>
-        <Pill size="sm" label={statusLabel} tone={statusTones[status]} />
+        {statusLabel ? (
+          <Pill size="sm" label={statusLabel} tone={statusTones[status]} />
+        ) : null}
       </Row>
       {amount ? (
         <Row>

@@ -68,7 +68,8 @@ export function MintsPage() {
             <MintPendingPill amount={pending} size="sm" testID="mint-pending" />
           ) : null}
         </Row>
-        {balance > 0 ? (
+        {/* A share of the whole only means something when other mints hold the rest. */}
+        {balance > 0 && balance < listedBalance ? (
           <Progress
             value={balance}
             max={listedBalance}
@@ -102,6 +103,11 @@ export function MintsPage() {
 
   return (
     <>
+      <FloatingActionButton
+        icon="Plus"
+        label={t("mintAdd")}
+        onPress={() => navigateTo({ route: "mintNew" })}
+      />
       <Stack gap="$sm" paddingBottom={floatingActionButtonClearance}>
         {standardMints.map((mint) => renderMintButton(mint))}
         {testMints.length > 0 ? (
@@ -111,11 +117,6 @@ export function MintsPage() {
           </Stack>
         ) : null}
       </Stack>
-      <FloatingActionButton
-        icon="CirclePlus"
-        label={t("mintAdd")}
-        onPress={() => navigateTo({ route: "mintNew" })}
-      />
     </>
   );
 }

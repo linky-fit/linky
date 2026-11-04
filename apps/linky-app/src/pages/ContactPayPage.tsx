@@ -5,7 +5,6 @@ import {
   IconButton,
   Notice,
   Row,
-  space,
   Stack,
   Text,
 } from "@linky-fit/ui";
@@ -32,6 +31,7 @@ import {
 } from "../hooks/useLnurlPayPreview";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 import { useWalletCommands } from "../app/hooks/wallet/useWalletCommands";
+import { contactPictureUrl } from "../derivedProfile";
 
 interface Contact {
   id: ContactId;
@@ -80,7 +80,7 @@ export const ContactPayPage: FC<ContactPayPageProps> = ({
 
   const ln = (selectedContact?.lnAddress ?? "").trim();
   const npub = normalizeNpubIdentifier(selectedContact?.npub ?? "");
-  const url = npub ? nostrPictureByNpub[npub] : null;
+  const url = contactPictureUrl(npub, nostrPictureByNpub);
   const isRequestFlow = contactPaymentIntent === "request";
   const canUseCashu = payWithCashuEnabled && Boolean(npub);
   const canUseLightning = Boolean(ln);
@@ -152,50 +152,47 @@ export const ContactPayPage: FC<ContactPayPageProps> = ({
       amount={payAmount}
       cashuIsBusy={cashuIsBusy}
       header={
-        <Row>
+        <Stack alignItems="center" gap="$xs">
           <Avatar
             name={selectedContact.name ?? ""}
             uri={url ?? undefined}
             size="md"
           />
-          <Stack flex={1} gap="$xxs">
-            {selectedContact.name && (
-              <Row gap="$sm">
-                <Text variant="title" numberOfLines={1} flexShrink={1}>
-                  {selectedContact.name}
-                </Text>
-                <IconButton
-                  icon={methodIcon}
-                  accessibilityLabel={methodLabel}
-                  size="sm"
-                  variant="secondary"
-                  disabled={!showToggle}
-                  onPress={() =>
-                    setContactPayMethod((prev) =>
-                      prev === "lightning" ? "cashu" : "lightning",
-                    )
-                  }
-                  tooltip={showToggle ? methodLabel : undefined}
-                />
-              </Row>
-            )}
-            {isRequestFlow ? (
-              <Text color="$colorMuted">{t("requestPaymentHint")}</Text>
-            ) : (
-              <Button
-                variant="ghost"
+          {selectedContact.name && (
+            <Row gap="$xs">
+              <Text variant="title" numberOfLines={1} flexShrink={1}>
+                {selectedContact.name}
+              </Text>
+              <IconButton
+                icon={methodIcon}
+                accessibilityLabel={methodLabel}
                 size="sm"
-                alignSelf="flex-start"
-                // Outset by its padding so the label lines up with the name.
-                marginLeft={-space.md}
-                disabled={!canCoverAnything}
-                onPress={() => setPayAmount(String(cashuBalance))}
-              >
-                {availableAmountText}
-              </Button>
-            )}
-          </Stack>
-        </Row>
+                variant={showToggle ? "secondary" : "ghost"}
+                disabled={!showToggle}
+                onPress={() =>
+                  setContactPayMethod((prev) =>
+                    prev === "lightning" ? "cashu" : "lightning",
+                  )
+                }
+                tooltip={showToggle ? methodLabel : undefined}
+              />
+            </Row>
+          )}
+          {isRequestFlow ? (
+            <Text color="$colorMuted" textAlign="center">
+              {t("requestPaymentHint")}
+            </Text>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={!canCoverAnything}
+              onPress={() => setPayAmount(String(cashuBalance))}
+            >
+              {availableAmountText}
+            </Button>
+          )}
+        </Stack>
       }
       note={noteInput}
       notices={

@@ -52,55 +52,48 @@ export function EvoluServersPage(): React.ReactElement {
       {evoluServerUrls.length === 0 ? (
         <EmptyState title={t("evoluServersEmpty")} />
       ) : (
-        <Stack testID="evolu-server-list" gap="$xs">
-          {evoluServerUrls.map((url) => {
-            const status =
-              evoluSyncStatus[
-                deriveEvoluServerState({
-                  evoluHasError,
-                  isOffline: isEvoluServerOffline(url),
-                  state: evoluServerStatusByUrl[url],
-                  syncOwnerId,
-                })
-              ];
-            return (
-              <ListRow
-                key={url}
-                title={url}
-                description={
-                  isEvoluServerRecommended(url) ? (
-                    <Pill size="sm" label={t("relayRecommended")} />
-                  ) : undefined
-                }
-                value={t(status.labelKey)}
-                trailing={
-                  <StatusDot
-                    tone={status.tone}
-                    accessibilityLabel={t(status.labelKey)}
-                  />
-                }
-                onPress={() => navigateTo({ route: "evoluServer", id: url })}
-              />
-            );
-          })}
-        </Stack>
+        <Section grouped>
+          <Stack testID="evolu-server-list" gap="$none">
+            {evoluServerUrls.map((url) => {
+              const status =
+                evoluSyncStatus[
+                  deriveEvoluServerState({
+                    evoluHasError,
+                    isOffline: isEvoluServerOffline(url),
+                    state: evoluServerStatusByUrl[url],
+                    syncOwnerId,
+                  })
+                ];
+              return (
+                <ListRow
+                  key={url}
+                  title={url}
+                  description={
+                    isEvoluServerRecommended(url) ? (
+                      <Pill size="sm" label={t("relayRecommended")} />
+                    ) : undefined
+                  }
+                  value={t(status.labelKey)}
+                  trailing={
+                    <StatusDot
+                      tone={status.tone}
+                      accessibilityLabel={t(status.labelKey)}
+                    />
+                  }
+                  onPress={() => navigateTo({ route: "evoluServer", id: url })}
+                />
+              );
+            })}
+          </Stack>
+        </Section>
       )}
 
-      <Button
-        onPress={requestClearDatabase}
-        disabled={evoluErrorType === "ProtocolQuotaError"}
-        loading={evoluWipeStorageIsBusy}
-        variant={clearDatabaseArmed ? "danger" : "secondary"}
-      >
-        {t("evoluClearDatabase")}
-      </Button>
-
-      <Section title={t("evoluShards")}>
+      <Section grouped title={t("evoluShards")}>
         {evoluShards.map((shard) => (
           <ListRow
             key={shard.scope}
             title={shard.scope}
-            value={`${shard.index} (${shard.visibleOwnerIds.length} ${t("evoluShardVisibleCount").toLowerCase()})`}
+            value={`${shard.index} · ${shard.visibleOwnerIds.length} ${t("evoluShardVisibleCount").toLowerCase()}`}
           />
         ))}
 
@@ -111,7 +104,7 @@ export function EvoluServersPage(): React.ReactElement {
         />
       </Section>
 
-      <Section title={t("evoluRowCounts")}>
+      <Section grouped title={t("evoluRowCounts")}>
         <ListRow
           title={t("evoluData")}
           value={formatEvoluRowCount(t, totalCurrentRows)}
@@ -132,6 +125,15 @@ export function EvoluServersPage(): React.ReactElement {
           onPress={() => navigateTo({ route: "chatStorage" })}
         />
       </Section>
+
+      <Button
+        onPress={requestClearDatabase}
+        disabled={evoluErrorType === "ProtocolQuotaError"}
+        loading={evoluWipeStorageIsBusy}
+        variant={clearDatabaseArmed ? "danger" : "secondary"}
+      >
+        {t("evoluClearDatabase")}
+      </Button>
     </Stack>
   );
 }

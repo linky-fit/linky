@@ -9,7 +9,7 @@ import type {
 } from "../app/lib/paidOverlay";
 import { contactsAtom } from "../app/state/contacts/readModel";
 import { paidOverlayCommandsAtom } from "../app/state/shell/paidOverlay";
-import { deriveDefaultProfile } from "../derivedProfile";
+import { contactPictureUrl } from "../derivedProfile";
 import type { Translate } from "../i18n";
 
 interface PaidOverlayProps {
@@ -39,9 +39,7 @@ export function PaidOverlay({
   const name =
     (npub ? contacts.find((saved) => saved.npub === npub)?.name : null) ??
     contact?.name;
-  const pictureUrl = npub
-    ? nostrPictureByNpub[npub] || deriveDefaultProfile(npub).pictureUrl
-    : null;
+  const pictureUrl = contactPictureUrl(npub, nostrPictureByNpub);
   const direction = details?.direction ?? null;
   const amount =
     details?.amountSat != null && details.amountSat > 0

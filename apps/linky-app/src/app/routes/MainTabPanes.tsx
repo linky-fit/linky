@@ -44,6 +44,7 @@ import {
 import { lastVisibleMessageByContactIdAtom } from "../state/contacts/displayContacts";
 import type { ContactRowLike, ContactsGuideKey } from "../types/appTypes";
 import { getDesktopActiveContactId } from "./desktopRouteSection";
+import { contactPictureUrl } from "../../derivedProfile";
 
 type ActiveBankPaymentOfferContacts = (nowSec: number) => {
   contactIds: ReadonlySet<string>;
@@ -167,7 +168,7 @@ const useContactCardRenderer = () => {
           key={contact.id ?? ""}
           contact={contact}
           nameLabel={formatContactName(contact)}
-          avatarUrl={npub ? nostrPictureByNpub[npub] : null}
+          avatarUrl={contactPictureUrl(npub, nostrPictureByNpub)}
           lastMessage={last ?? null}
           hasAttention={unreadByContactId.has(id)}
           isActive={(contact.id ?? "") === getDesktopActiveContactId(route)}
@@ -236,7 +237,6 @@ const ContactsContent = ({
   onboardingInList,
 }: {
   filterAlwaysOpen: boolean;
-  /** On desktop the checklist sits in the detail pane, so the list keeps its place when a chat opens. */
   onboardingInList: boolean;
 }): React.ReactElement => {
   const { t } = useTranslation();
@@ -260,7 +260,8 @@ const ContactsContent = ({
       filterOpen={contactsFilterOpen || filterAlwaysOpen}
       setContactsSearch={setContactsSearch}
       showGroupFilter={
-        showGroupFilter || (filterAlwaysOpen && contactFilterOptions.length > 0)
+        // A single option filters nothing.
+        contactFilterOptions.length > 1 && (showGroupFilter || filterAlwaysOpen)
       }
       activeGroup={activeGroup}
       setActiveGroup={setActiveGroup}
@@ -283,6 +284,7 @@ const AddContactButton = (): React.ReactElement => {
       label={t("addContact")}
       onPress={openNewContactPage}
       guide="contact-add-button"
+      pinned
     />
   );
 };
@@ -298,13 +300,24 @@ export const ContactsPane = (): React.ReactElement => (
 
 export const DesktopContactsPane = (): React.ReactElement => (
   <>
-    <ContactsContent filterAlwaysOpen onboardingInList={false} />
+    <ContactsContent filterAlwaysOpen onboardingInList />
     <AddContactButton />
   </>
 );
 
-export const WalletPane = (): React.ReactElement => {
+/** `showRecent` is off where the full activity sits beside the wallet. */
+export const WalletPane = ({
+  showRecent = true,
+}: {
+  showRecent?: boolean;
+}): React.ReactElement => {
   const { openWalletScan } = useScanCommands();
   const scanIsOpen = useScanIsOpen();
-  return <WalletPage openScan={openWalletScan} scanIsOpen={scanIsOpen} />;
+  return (
+    <WalletPage
+      openScan={openWalletScan}
+      scanIsOpen={scanIsOpen}
+      showRecent={showRecent}
+    />
+  );
 };

@@ -185,11 +185,7 @@ export function PayPage({
 }) {
   return (
     <>
-      <DemoTopBar
-        title="Pay to contact"
-        leading="ChevronLeft"
-        trailing="Settings"
-      />
+      <DemoTopBar title="Pay" leading="ChevronLeft" trailing="Settings" />
       <DemoBody paddingTop="$lg">
         <Row>
           <Avatar name="Mia Novak" uri={avatarUri("Mia Novak")} size="md" />

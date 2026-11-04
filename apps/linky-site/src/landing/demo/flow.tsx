@@ -1,5 +1,5 @@
 import { Keypad, Row, Stack, SuccessOverlay } from "@linky-fit/ui";
-import { border, shadow } from "@linky-fit/ui/tokens";
+import { shadow } from "@linky-fit/ui/tokens";
 import type { ComponentProps, ReactNode } from "react";
 import "./flow.css";
 import { fill } from "./fill";
@@ -22,8 +22,6 @@ export function Tap({
           width="$controlLg"
           height="$controlLg"
           borderRadius="$pill"
-          borderWidth={border.emphasis}
-          borderColor="$surface"
           backgroundColor="$colorMuted"
         />
       ) : null}

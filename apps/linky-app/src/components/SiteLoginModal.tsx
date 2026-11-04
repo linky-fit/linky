@@ -346,7 +346,7 @@ function IdentityCard({
   const shortNpub = identity.npub ? formatShortNpub(identity.npub) : null;
   const name = identity.name ?? shortNpub ?? "?";
   return (
-    <Card outlined gap="$sm" padding="$md">
+    <Card backgroundColor="$surfaceRaised" gap="$sm" padding="$md">
       <Text eyebrow>{t("siteLoginAs")}</Text>
       <Row>
         <Avatar name={name} uri={identity.picture ?? undefined} />

@@ -1,5 +1,5 @@
 import type { CashIntent } from "@linky-fit/linkstr";
-import { Divider, SegmentedControl, Stack, Text } from "@linky-fit/ui";
+import { EmptyState, SegmentedControl, Stack, Text } from "@linky-fit/ui";
 import React from "react";
 import { useTranslation } from "../app/hooks/shell";
 import { useBeaconSupport } from "../app/hooks/useBeacon";
@@ -79,22 +79,25 @@ export function CashPage(): React.ReactElement {
         ) : null}
       </Stack>
 
-      <CashSection
-        contacts={offering}
-        titleKey="cashOffering"
-        emptyKey="cashOfferingEmpty"
-      />
-      <CashSection
-        contacts={wanting}
-        titleKey="cashWanting"
-        emptyKey="cashWantingEmpty"
-      />
+      {offering.length === 0 && wanting.length === 0 ? (
+        <EmptyState icon="Banknote" title={t("cashNobodyYet")} />
+      ) : (
+        <>
+          <CashSection
+            contacts={offering}
+            titleKey="cashOffering"
+            emptyKey="cashOfferingEmpty"
+          />
+          <CashSection
+            contacts={wanting}
+            titleKey="cashWanting"
+            emptyKey="cashWantingEmpty"
+          />
+        </>
+      )}
 
       {beaconSupported ? (
-        <>
-          <Divider />
-          <NearbyBeaconSection offerOnMount t={t} />
-        </>
+        <NearbyBeaconSection offerOnMount t={t} />
       ) : (
         <Text variant="label" fontWeight="$regular" color="$colorMuted">
           {t("listingsMutualOnly")}

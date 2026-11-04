@@ -8,6 +8,7 @@ export const de = {
   settingsGeneral: "Allgemein",
   tutorial: "Anleitung",
   tutorialIntro: "Lerne Linky Schritt für Schritt.",
+  tutorialTaskDone: "Erledigt",
   settingsPayments: "Zahlungen",
   settingsNetwork: "Netzwerk",
   settingsSecurity: "Sicherheit",
@@ -30,6 +31,7 @@ export const de = {
   back: "Zurück",
   menu: "Menü",
   transactionsTitle: "Transaktionen",
+  transactionWhen: "Wann",
   transactionTitle: "Zahlung",
   recurringPaymentsTitle: "Wiederkehrende Zahlungen",
   recurringPaymentTitle: "Wiederkehrende Zahlung",
@@ -252,6 +254,11 @@ export const de = {
   tokens: "Tokens",
   preferCashu: "Cashu bevorzugen",
   receiveMethod: "Empfangsmethode",
+  receiveMethodUniversalHint:
+    "Ein Code, den Lightning- und Cashu-Wallets bezahlen können",
+  receiveMethodCashuHint: "Eine Cashu-Zahlungsanforderung für Ecash-Wallets",
+  receiveMethodLightningHint:
+    "Eine einfache Lightning-Rechnung für jede Lightning-Wallet",
   payWithCashuDisabled:
     "Cashu-Zahlungen sind in den erweiterten Einstellungen deaktiviert.",
   lightningInvoiceAutoPayLimit: "Limit für automatische Zahlungen",
@@ -383,7 +390,7 @@ export const de = {
   chatStorageSubscribed: "Auf diesem Gerät abonniert",
   chatStorageForget: "Alte Chat-Shards vergessen",
   chatStorageForgetHint:
-    "Alte Nachrichten und der Zustand inaktiver Chats verschwinden aus dem Chat-Verlauf dieses Geräts. Kontakte und Guthaben bleiben vollständig. Evolu 7 beendet nur das lokale Abonnement: Die Daten bleiben auf dem Gerät und dem Relay. Das Löschen auf dem Relay wartet auf Evolus deleteOwner-Unterstützung.",
+    "Alte Nachrichten verschwinden aus dem Chat-Verlauf dieses Geräts; Kontakte und Guthaben bleiben vollständig. Die Daten bleiben vorerst auf dem Gerät und dem Relay gespeichert.",
   chatStorageForgotten: "Alte Chat-Shards auf diesem Gerät vergessen.",
   chatStorageFailed:
     "Alte Chat-Shards konnten nicht vergessen werden. Versuche es erneut.",
@@ -581,6 +588,7 @@ export const de = {
   send: "Senden",
 
   profile: "Profil",
+  profileEditTitle: "Profil bearbeiten",
   status: "Status",
   profileNoName: "Nostr-Profil",
   contactStatusProvides: "Bietet",
@@ -601,6 +609,8 @@ export const de = {
   list: "Liste",
   contactsTitle: "Kontakte",
   contactsSelectHint: "Wähle einen Kontakt zum Schreiben oder Bezahlen",
+  collaborationSelectHint: "Wähle, wie du mit Freunden handeln möchtest",
+  settingsSelectHint: "Wähle eine Einstellung aus",
   contactsSearchPlaceholder: "Kontakte suchen",
   contactsSearchClear: "Suche löschen",
   contactsFilterToggle: "Kontakte suchen und filtern",
@@ -750,7 +760,7 @@ export const de = {
   contact: "Kontakt",
   editContact: "Kontakt bearbeiten",
   contactEditTitle: "Kontakt bearbeiten",
-  contactPayTitle: "Kontakt bezahlen",
+  contactPayTitle: "Bezahlen",
   messagesTitle: "Nachrichten",
   newContact: "Kontakt hinzufügen",
   close: "Schließen",
@@ -805,7 +815,7 @@ export const de = {
 
   topup: "Aufladen",
   topupTitle: "Konto aufladen",
-  topupShowInvoice: "Aufladerechnung anzeigen",
+  topupShowInvoice: "Rechnung anzeigen",
   topupNoAmount: "Beliebiger Betrag",
   topupNoAmountTitle: "Beliebigen Betrag empfangen",
   topupNoAmountMissingAddress:
@@ -822,7 +832,8 @@ export const de = {
   manualPayTitle: "Senden",
   manualPayOpen: "Empfänger eingeben",
   manualPayLabel: "Empfänger",
-  manualPayPlaceholder: "Lightning-Adresse, Rechnung, LNURL, Cashu-Anfrage…",
+  manualPayPlaceholder: "Adresse oder Rechnung",
+  manualPayFormatsHint: "Lightning-Adresse, Rechnung, LNURL oder Cashu-Anfrage",
   manualPayContinue: "Weiter",
   manualPaySuggestions: "Passende Kontakte",
   manualPayLinkyAliasHint: "{address} wird versucht",
@@ -974,6 +985,7 @@ export const de = {
 
   unit: "Einheiten",
   unitCurrent: "Aktiv",
+  unitHidden: "Verborgen",
   unitCycleAction: "Einheit wechseln",
   unitManageInfo:
     "Wähle die Einheiten, zwischen denen du durch Tippen auf Beträge wechselst.",
@@ -1132,7 +1144,7 @@ export const de = {
     "Diese Zahlungsanforderung gehört zu einem nicht gespeicherten Nostr-Kontakt.",
   paymentRequestSelfPayment:
     "{amount} {unit} an dein eigenes Konto — das Guthaben bleibt in deiner Wallet.",
-  availablePrefix: "verfügbar:",
+  availablePrefix: "Verfügbar:",
   payAmount: "Betrag",
   paySend: "Bezahlen",
   paymentRequestConfirmTitle: "Zahlung bestätigen",
@@ -1306,6 +1318,9 @@ export const de = {
   collaboration: "Zusammenarbeit",
   collaborationBody: "Jeder kann etwas. Mit Bitcoin lässt sich alles bezahlen.",
   collaborationProxy: "Banküberweisung",
+  collaborationProxyHint: "Ein Kontakt zahlt deine Überweisung",
+  collaborationCashHint: "Bitcoin gegen Bargeld, persönlich",
+  collaborationListingsHint: "Was Freunde bieten und suchen",
   collaborationContactsPayOne: "{count} Kontakt zahlt",
   collaborationContactsPayFew: "{count} Kontakte zahlen",
   collaborationContactsPayOther: "{count} Kontakte zahlen",
@@ -1317,9 +1332,9 @@ export const de = {
   collaborationListingsOther: "{count} Angebote",
   cash: "Bargeld",
   cashLead: "Bitcoin tauscht man am besten direkt mit Freunden.",
-  cashIntentOffer: "Biete Bargeld an",
+  cashIntentOffer: "Habe Bargeld",
   cashIntentWant: "Suche Bargeld",
-  cashIntentNone: "Gerade nichts",
+  cashIntentNone: "Nichts",
   cashIntentOfferHint:
     "Kontakte sehen, dass du Bargeld hast und dafür Bitcoin möchtest.",
   cashIntentWantHint: "Kontakte sehen, dass du Bargeld gegen Bitcoin suchst.",
@@ -1328,6 +1343,7 @@ export const de = {
   cashOfferingEmpty: "Noch keiner deiner Kontakte.",
   cashWanting: "Suchen Bargeld",
   cashWantingEmpty: "Noch keiner deiner Kontakte.",
+  cashNobodyYet: "Noch bietet oder sucht keiner deiner Kontakte Bargeld.",
   listings: "Waren und Dienste",
   listingsLead: "Was deine Kontakte anbieten und suchen.",
   listingsEmpty:
@@ -1362,6 +1378,9 @@ export const de = {
   keryxNewsletters: "Newsletter (Keryx)",
   keryxNewslettersTitle: "Newsletter",
   keryxAddCompany: "Firma hinzufügen",
+  keryxEmptyTitle: "Noch keine Newsletter",
+  keryxEmptyBody:
+    "Folge einer Firma, um ihre verifizierten Ankündigungen hier zu erhalten.",
   keryxCompany: "Firma",
   keryxAnnouncement: "Mitteilung",
   keryxJoinUrlLabel: "Beitrittslink der Firma",

@@ -14,11 +14,11 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ### en-US
 
-- A fresh look in light and dark: sent messages are solid with the time inside, the tabs are labelled, the wallet shows your recent activity under the balance, and the keypad sits within thumb reach. On a computer, your contacts stay in a column beside the open chat and pages keep a readable width.
+- A fresh look in light and dark, without outlines: messages from one person group together, a payment shows its amount right in the chat, the wallet history is grouped by day with + and − amounts, and every contact keeps one picture everywhere. Settings, the tutorial and empty pages are tidier. On a computer, every section keeps its list beside the open page, and the wallet shows its whole history next to the balance.
 
 ### cs-CZ
 
-- Nový vzhled ve světlém i tmavém režimu: odeslané zprávy jsou plné s časem uvnitř, záložky mají popisky, peněženka ukazuje pod zůstatkem nedávné pohyby a klávesnice je na dosah palce. Na počítači zůstávají kontakty ve sloupci vedle otevřeného chatu a stránky mají čitelnou šířku.
+- Nový vzhled ve světlém i tmavém režimu, bez obrysů: zprávy od jednoho člověka se seskupují, platba ukazuje částku přímo v chatu, historie peněženky je po dnech s částkami + a − a každý kontakt má všude stejný obrázek. Nastavení, tutoriál i prázdné stránky jsou přehlednější. Na počítači má každá sekce seznam vedle otevřené stránky a peněženka ukazuje celou historii vedle zůstatku.
 
 ## [26.10.11] - 2026-11-04
 

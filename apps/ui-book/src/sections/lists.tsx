@@ -35,6 +35,14 @@ export const lists: Section = {
               Fee 2 sats, paid with the default mint.
             </UI.Text>
           ) : null}
+          <UI.ListRow
+            title="Cash"
+            description="Swap bitcoin for cash in person"
+            icon="Banknote"
+            iconTone="warning"
+            active
+            onPress={() => {}}
+          />
           <UI.ListRow title="Remove example" destructive onPress={() => {}} />
         </UI.Stack>
       );

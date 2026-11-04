@@ -17,13 +17,18 @@ export function DesktopNavigation(): React.ReactElement {
   const currentNpub = useAtomValue(currentNpubAtom);
   const { effectiveProfileName, effectiveProfilePicture } =
     useEffectiveProfile();
+  const profileIsOpen =
+    route.kind === "profile" || route.kind === "profileEdit";
 
   return (
     <NavigationRail
       accessibilityLabel={t("menu")}
       header={
         <Pressable
+          padding="$xs"
           borderRadius="$pill"
+          backgroundColor={profileIsOpen ? "$accentSoft" : "$transparent"}
+          aria-current={profileIsOpen ? "page" : undefined}
           aria-label={t("profile")}
           testID="profile-qr-button"
           onPress={() => navigateTo({ route: "profile" })}
@@ -60,7 +65,7 @@ export function DesktopNavigation(): React.ReactElement {
           testID: "open-menu",
         },
       ]}
-      value={getDesktopRouteSection(route)}
+      value={profileIsOpen ? undefined : getDesktopRouteSection(route)}
       onValueChange={(section) =>
         navigateTo({ route: getDesktopSectionRoute(section) })
       }

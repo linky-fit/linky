@@ -1,4 +1,4 @@
-import { ActionTile, Row, Stack, Text } from "@linky-fit/ui";
+import { ListRow, Section, Stack, Text } from "@linky-fit/ui";
 import React from "react";
 import { useProxyPaymentPayerContacts } from "../app/hooks/contacts/useDisplayContacts";
 import { useTranslation } from "../app/hooks/shell";
@@ -6,7 +6,7 @@ import {
   useCashContacts,
   usePeerListings,
 } from "../app/hooks/useCollaboration";
-import { navigateTo } from "../hooks/useRouting";
+import { navigateTo, useRouting } from "../hooks/useRouting";
 import type { I18nKey, Translate } from "../i18n";
 
 type CountKeys = readonly [one: I18nKey, few: I18nKey, other: I18nKey];
@@ -42,48 +42,66 @@ export function CollaborationPage(): React.ReactElement {
   const caption = (count: number, keys: CountKeys): string | undefined =>
     count === 0 ? undefined : countText(count, keys, t);
 
+  const route = useRouting();
+  const destinations = [
+    {
+      key: "proxyPayments",
+      icon: "QrCode",
+      tone: "accent",
+      label: t("collaborationProxy"),
+      description:
+        caption(payers.length, CONTACTS_PAY) ?? t("collaborationProxyHint"),
+      active: route.kind === "proxyPayments",
+      guide: "collaboration-proxy",
+      testID: "open-proxy",
+    },
+    {
+      key: "cash",
+      icon: "Banknote",
+      tone: "warning",
+      label: t("cash"),
+      description:
+        caption(offering.length + wanting.length, CONTACTS_EXCHANGE) ??
+        t("collaborationCashHint"),
+      active: route.kind === "cash",
+      guide: "collaboration-cash",
+      testID: "open-cash",
+    },
+    {
+      key: "listings",
+      icon: "Package",
+      tone: "info",
+      label: t("listings"),
+      description:
+        caption(listings.offered.length + listings.wanted.length, LISTINGS) ??
+        t("collaborationListingsHint"),
+      active:
+        route.kind === "listings" ||
+        route.kind === "listingNew" ||
+        route.kind === "listingEdit",
+      guide: undefined,
+      testID: "open-listings",
+    },
+  ] as const;
+
   return (
-    <Stack gap="$xxxl">
-      <Text variant="title" color="$colorSubtle">
-        {t("collaborationBody")}
-      </Text>
-      <Stack gap="$md">
-        <Row gap="$md" alignItems="stretch">
-          <ActionTile
-            flex={1}
-            icon="QrCode"
-            label={t("collaborationProxy")}
-            caption={caption(payers.length, CONTACTS_PAY)}
-            onPress={() => navigateTo({ route: "proxyPayments" })}
-            data-guide="collaboration-proxy"
-            testID="open-proxy"
-          />
-          <ActionTile
-            flex={1}
-            icon="Banknote"
-            tone="warning"
-            label={t("cash")}
-            caption={caption(
-              offering.length + wanting.length,
-              CONTACTS_EXCHANGE,
-            )}
-            onPress={() => navigateTo({ route: "cash" })}
-            data-guide="collaboration-cash"
-            testID="open-cash"
-          />
-        </Row>
-        <ActionTile
-          icon="Package"
-          tone="info"
-          label={t("listings")}
-          caption={caption(
-            listings.offered.length + listings.wanted.length,
-            LISTINGS,
-          )}
-          onPress={() => navigateTo({ route: "listings" })}
-          testID="open-listings"
-        />
-      </Stack>
+    <Stack gap="$xl">
+      <Text color="$colorSubtle">{t("collaborationBody")}</Text>
+      <Section grouped>
+        {destinations.map((destination) => (
+          <Stack key={destination.key} data-guide={destination.guide}>
+            <ListRow
+              icon={destination.icon}
+              iconTone={destination.tone}
+              title={destination.label}
+              description={destination.description}
+              active={destination.active}
+              onPress={() => navigateTo({ route: destination.key })}
+              testID={destination.testID}
+            />
+          </Stack>
+        ))}
+      </Section>
     </Stack>
   );
 }

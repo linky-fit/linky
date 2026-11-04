@@ -29,6 +29,7 @@ import {
 } from "./useDisplayContacts";
 import { useNostrPictureByNpub } from "./useProfileCache";
 import { useVisibleContacts } from "./useVisibleContacts";
+import { contactPictureUrl } from "../../../derivedProfile";
 
 /** How many unarchived contacts offer each currency in their profile status, most offered first. */
 export const statusFilterSummary = (
@@ -236,7 +237,7 @@ export const useBankPaymentOfferContacts = (spdPayload: string) => {
       return [
         {
           ...contact,
-          pictureUrl: nostrPictureByNpub[normalizedNpub] ?? null,
+          pictureUrl: contactPictureUrl(normalizedNpub, nostrPictureByNpub),
           recentBankPaymentOfferOutcomes:
             recentBankPaymentOfferOutcomesByContactId.get(
               (contact.id ?? "").trim(),

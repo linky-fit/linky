@@ -1,4 +1,12 @@
-import { Button, ListRow, Progress, Row, Stack, Text } from "@linky-fit/ui";
+import {
+  Button,
+  Icon,
+  ListRow,
+  Progress,
+  Section,
+  Stack,
+  Text,
+} from "@linky-fit/ui";
 import type { IconName } from "@linky-fit/ui";
 import React from "react";
 import { useStartContactsGuide } from "../app/hooks/guide/useContactsGuideControls";
@@ -23,6 +31,9 @@ export function TutorialPage(): React.ReactElement {
   const { t } = useTranslation();
   const { contactsOnboardingTasks } = useContactsOnboarding();
   const startContactsGuide = useStartContactsGuide();
+  const nextTaskKey = contactsOnboardingTasks.tasks.find(
+    (task) => !task.done,
+  )?.key;
   const progressText = t("contactsOnboardingProgress")
     .replace(/\{done\}/g, String(contactsOnboardingTasks.done))
     .replace(/\{total\}/g, String(contactsOnboardingTasks.total));
@@ -31,30 +42,45 @@ export function TutorialPage(): React.ReactElement {
     <Stack gap="$lg">
       <Text color="$colorMuted">{t("tutorialIntro")}</Text>
 
-      <Row gap="$sm">
-        <Stack flex={1}>
-          <Progress
-            value={contactsOnboardingTasks.percent}
-            max={100}
-            accessibilityLabel={progressText}
-          />
-        </Stack>
+      <Stack gap="$sm">
         <Text variant="caption" bold color="$colorMuted">
           {progressText}
         </Text>
-      </Row>
+        <Progress
+          value={contactsOnboardingTasks.percent}
+          max={100}
+          accessibilityLabel={progressText}
+        />
+      </Stack>
 
-      <Stack>
+      <Section grouped>
         {contactsOnboardingTasks.tasks.map((task) => (
           <ListRow
             key={task.key}
-            icon={TASK_ICONS[task.key]}
+            leading={
+              task.done ? (
+                <Icon name="CircleCheck" size="sm" color="$accent" />
+              ) : (
+                <Icon
+                  name={TASK_ICONS[task.key]}
+                  size="sm"
+                  color="$colorMuted"
+                />
+              )
+            }
             title={task.label}
+            description={task.done ? t("tutorialTaskDone") : undefined}
             testID={`tutorial-task-${task.key}`}
             trailing={
               <Button
                 size="sm"
-                variant={task.done ? "secondary" : "primary"}
+                variant={
+                  task.key === nextTaskKey
+                    ? "primary"
+                    : task.done
+                      ? "ghost"
+                      : "secondary"
+                }
                 onPress={() => startContactsGuide(task.key, task.done)}
               >
                 {t("contactsOnboardingShowHow")}
@@ -62,7 +88,7 @@ export function TutorialPage(): React.ReactElement {
             }
           />
         ))}
-      </Stack>
+      </Section>
     </Stack>
   );
 }

@@ -1,4 +1,4 @@
-import { Icon, ListRow, Row } from "@linky-fit/ui";
+import { ListRow } from "@linky-fit/ui";
 import type { MintBadgeKind, MintIcon as MintIconSource } from "../utils/mint";
 import { MintBadge } from "./MintBadge";
 import { MintIcon } from "./MintIcon";
@@ -28,14 +28,7 @@ export function MintButton({
     <ListRow
       leading={<MintIcon getMintIconUrl={getMintIconUrl} mint={mint} />}
       title={label}
-      trailing={
-        <Row gap="$sm">
-          {badge !== null ? <MintBadge kind={badge} /> : null}
-          {isSelected ? (
-            <Icon name="Check" size="sm" color="$accentText" />
-          ) : null}
-        </Row>
-      }
+      trailing={badge !== null ? <MintBadge kind={badge} /> : undefined}
       chevron={chevron}
       disabled={disabled}
       selected={isSelected}

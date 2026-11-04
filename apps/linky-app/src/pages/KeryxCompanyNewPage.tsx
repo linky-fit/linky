@@ -71,7 +71,7 @@ export function KeryxCompanyNewPage(): React.ReactElement {
       return (
         <Stack gap="$lg">
           <Text variant="title">{t("keryxConfirmOriginTitle")}</Text>
-          <Card outlined>
+          <Card>
             <Text
               variant="title"
               mono

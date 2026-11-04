@@ -9,6 +9,7 @@ import type { Translate } from "../i18n";
 import { formatMiddleDots } from "../utils/formatting";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 import { useScanCommands } from "../app/hooks/shell/scan";
+import { contactPictureUrl } from "../derivedProfile";
 
 interface ManualPayContact {
   id: ContactId;
@@ -139,7 +140,7 @@ export const ManualPayPage: FC<ManualPayPageProps> = ({
           hint={
             expandedAlias
               ? t("manualPayLinkyAliasHint").replace("{address}", expandedAlias)
-              : undefined
+              : t("manualPayFormatsHint")
           }
         />
         <Button disabled={!query || isSubmitting} onPress={() => void submit()}>
@@ -151,7 +152,7 @@ export const ManualPayPage: FC<ManualPayPageProps> = ({
         <Section title={t("manualPaySuggestions")}>
           {suggestions.map((contact) => {
             const npub = normalizeNpubIdentifier(contact.npub ?? "");
-            const pictureUrl = npub ? nostrPictureByNpub[npub] : null;
+            const pictureUrl = contactPictureUrl(npub, nostrPictureByNpub);
             const name = (contact.name ?? "").trim();
             const subtitle =
               (contact.lnAddress ?? "").trim() || (contact.npub ?? "").trim();

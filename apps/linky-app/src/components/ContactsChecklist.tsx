@@ -84,11 +84,7 @@ export function ContactsChecklist({
           <Text flex={1} bold>
             {nextTask.label}
           </Text>
-          <Button
-            size="sm"
-            variant="accent"
-            onPress={() => onShowHow(nextTask.key)}
-          >
+          <Button size="sm" onPress={() => onShowHow(nextTask.key)}>
             {t("contactsOnboardingShowHow")}
           </Button>
         </Row>

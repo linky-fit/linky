@@ -9,7 +9,7 @@ import { Row, Stack, Text } from "./layout";
 import { Spinner } from "./spinner";
 import { toneColors, toneIcons } from "./styles";
 import type { Tone } from "./tokens";
-import { border, shadow } from "./tokens";
+import { shadow } from "./tokens";
 
 export interface NoticeProps {
   title: string;
@@ -101,10 +101,8 @@ export function Toast({ title, actions, onPress }: ToastProps) {
       minHeight="$control"
       maxWidth="$sheetWidth"
       borderRadius="$control"
-      borderWidth={border.hairline}
-      borderColor="$borderColor"
       backgroundColor="$surface"
-      boxShadow={shadow.raised}
+      boxShadow={shadow.floating}
     >
       <Text variant="label" fontWeight="$regular" flex={1}>
         {title}

@@ -393,7 +393,7 @@ function Steps({
     !inFlight
   ) {
     steps.push(
-      <Card key="payout" gap="$md" outlined>
+      <Card key="payout" gap="$md">
         <Text variant="title">{copy.transfer.payoutTitle}</Text>
         <Text color="$colorMuted">
           {copy.transfer.payoutDescription(
@@ -489,7 +489,7 @@ function Steps({
     !inFlight
   ) {
     steps.push(
-      <Card key="refund" gap="$md" outlined>
+      <Card key="refund" gap="$md">
         <Text variant="title">{copy.transfer.refundTitle}</Text>
         <Text color="$colorMuted">{copy.transfer.refundDescription}</Text>
         <TxidStep

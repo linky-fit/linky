@@ -1,4 +1,11 @@
-import { Avatar, ListRow, Stack, Text } from "@linky-fit/ui";
+import {
+  Avatar,
+  Button,
+  EmptyState,
+  ListRow,
+  Stack,
+  Text,
+} from "@linky-fit/ui";
 import React from "react";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import {
@@ -103,13 +110,31 @@ export function ListingsPage(): React.ReactElement {
     [records],
   );
 
+  const addListing = () => navigateTo({ route: "listingNew" });
+  if (offered.length === 0 && wanted.length === 0 && mine.length === 0) {
+    return (
+      <EmptyState
+        icon="Package"
+        title={t("listingsEmpty")}
+        description={t("listingsMutualOnly")}
+        action={
+          <Button icon="Plus" onPress={addListing}>
+            {t("listingAddNew")}
+          </Button>
+        }
+      />
+    );
+  }
+
   return (
     <>
+      <FloatingActionButton
+        icon="Plus"
+        label={t("listingAddNew")}
+        onPress={addListing}
+      />
       <Stack gap="$xxxl" paddingBottom={floatingActionButtonClearance}>
         <Text color="$colorMuted">{t("listingsLead")}</Text>
-        {offered.length === 0 && wanted.length === 0 ? (
-          <Text color="$colorMuted">{t("listingsEmpty")}</Text>
-        ) : null}
         <PeerSection
           display={display}
           entries={offered}
@@ -153,11 +178,6 @@ export function ListingsPage(): React.ReactElement {
           {t("listingsMutualOnly")}
         </Text>
       </Stack>
-      <FloatingActionButton
-        icon="Plus"
-        label={t("listingAddNew")}
-        onPress={() => navigateTo({ route: "listingNew" })}
-      />
     </>
   );
 }

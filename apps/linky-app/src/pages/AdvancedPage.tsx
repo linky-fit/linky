@@ -42,7 +42,8 @@ import {
 import { useExperimentalFeatures } from "../app/hooks/useExperimentalFeatures";
 import { usePushNotificationsSetting } from "../app/hooks/usePushNotificationsSetting";
 import { useColorModePreference } from "../hooks/useColorMode";
-import { navigateTo } from "../hooks/useRouting";
+import { navigateTo, useRouting } from "../hooks/useRouting";
+import type { Route } from "../types/route";
 import {
   connectionStatus,
   type ConnectionState,
@@ -53,6 +54,7 @@ import { pickFile } from "../utils/pickFile";
 import { RECEIVE_METHOD_LABEL_KEYS } from "../utils/receiveMethod";
 
 export function AdvancedPage(): React.ReactElement {
+  const route = useRouting();
   const { logoutArmed, requestLogout, seedMnemonic } = useIdentitySettings();
   const { dedupeContacts, dedupeContactsIsBusy } = useDedupeContacts();
   const defaultMintDisplay = useDefaultMintDisplay();
@@ -118,13 +120,22 @@ export function AdvancedPage(): React.ReactElement {
     window.location.reload();
   }, []);
 
+  /** Whether the detail pane beside the desktop list shows one of these routes. */
+  const isOpen = (...kinds: Route["kind"][]) => kinds.includes(route.kind);
   const linkRow = (
     icon: IconName,
     title: string,
     onPress: () => void,
     trailing?: React.ReactNode,
+    active = false,
   ) => (
-    <ListRow icon={icon} title={title} onPress={onPress} trailing={trailing} />
+    <ListRow
+      icon={icon}
+      title={title}
+      onPress={onPress}
+      trailing={trailing}
+      active={active}
+    />
   );
   const toggleRow = (
     icon: IconName,
@@ -168,20 +179,33 @@ export function AdvancedPage(): React.ReactElement {
   return (
     <Stack gap="$xl">
       <Section grouped title={t("settingsGeneral")}>
-        {linkRow("Languages", t("language"), () =>
-          navigateTo({ route: "settingsLanguage" }),
+        {linkRow(
+          "Languages",
+          t("language"),
+          () => navigateTo({ route: "settingsLanguage" }),
+          undefined,
+          isOpen("settingsLanguage"),
         )}
         {linkRow(
           "Palette",
           t("appearance"),
           () => navigateTo({ route: "settingsAppearance" }),
           valueText(t(COLOR_MODE_PREFERENCE_LABEL_KEYS[colorModePreference])),
+          isOpen("settingsAppearance"),
         )}
-        {linkRow("Bitcoin", t("unit"), () =>
-          navigateTo({ route: "settingsUnits" }),
+        {linkRow(
+          "Bitcoin",
+          t("unit"),
+          () => navigateTo({ route: "settingsUnits" }),
+          undefined,
+          isOpen("settingsUnits"),
         )}
-        {linkRow("Compass", t("tutorial"), () =>
-          navigateTo({ route: "settingsTutorial" }),
+        {linkRow(
+          "Compass",
+          t("tutorial"),
+          () => navigateTo({ route: "settingsTutorial" }),
+          undefined,
+          isOpen("settingsTutorial"),
         )}
         {linkRow("MessageCircle", t("feedback"), openFeedbackContact)}
         {/* Electron has no Web Push service; the running desktop app notifies. */}
@@ -200,8 +224,12 @@ export function AdvancedPage(): React.ReactElement {
           sendReadReceiptsEnabled,
           toggleSendReadReceipts,
         )}
-        {linkRow("Ban", t("blocked"), () =>
-          navigateTo({ route: "settingsBlocked" }),
+        {linkRow(
+          "Ban",
+          t("blocked"),
+          () => navigateTo({ route: "settingsBlocked" }),
+          undefined,
+          isOpen("settingsBlocked"),
         )}
         {toggleRow(
           "Smartphone",
@@ -217,6 +245,7 @@ export function AdvancedPage(): React.ReactElement {
           t("receiveMethod"),
           () => navigateTo({ route: "settingsReceiveMethod" }),
           valueText(t(RECEIVE_METHOD_LABEL_KEYS[receiveMethod])),
+          isOpen("settingsReceiveMethod"),
         )}
         {toggleRow(
           "Bean",
@@ -229,6 +258,7 @@ export function AdvancedPage(): React.ReactElement {
           t("lightningInvoiceAutoPayLimit"),
           () => navigateTo({ route: "advancedAutoPayLimit" }),
           valueText(getAutoPayLimitLabel(lightningInvoiceAutoPayLimit)),
+          isOpen("advancedAutoPayLimit"),
         )}
       </Section>
 
@@ -242,6 +272,7 @@ export function AdvancedPage(): React.ReactElement {
             relayUrls.length,
             nostrRelayOverallStatus,
           ),
+          isOpen("nostrRelays", "nostrRelay", "nostrRelayNew"),
         )}
         {linkRow(
           "Cloud",
@@ -252,12 +283,22 @@ export function AdvancedPage(): React.ReactElement {
             evoluServerUrls.length,
             evoluOverallStatus,
           ),
+          isOpen(
+            "evoluServers",
+            "evoluServer",
+            "evoluServerNew",
+            "evoluData",
+            "evoluCurrentData",
+            "evoluHistoryData",
+            "chatStorage",
+          ),
         )}
         {linkRow(
           "Landmark",
           "Mint",
           () => navigateTo({ route: "mints" }),
           defaultMintDisplay ? valueText(defaultMintDisplay) : null,
+          isOpen("mints", "mint", "mintNew"),
         )}
         {toggleRow(
           "FlaskConical",
@@ -271,8 +312,18 @@ export function AdvancedPage(): React.ReactElement {
       </Section>
 
       <Section grouped title={t("settingsDebug")}>
-        {linkRow("Coins", t("tokens"), () =>
-          navigateTo({ route: "cashuTokens" }),
+        {linkRow(
+          "Coins",
+          t("tokens"),
+          () => navigateTo({ route: "cashuTokens" }),
+          undefined,
+          isOpen(
+            "cashuTokens",
+            "cashuToken",
+            "cashuTokenNew",
+            "cashuTokenEmit",
+            "cashuProofs",
+          ),
         )}
         {linkRow("Upload", t("exportData"), exportAppData)}
         {linkRow("Download", t("importData"), () => {
@@ -288,8 +339,12 @@ export function AdvancedPage(): React.ReactElement {
           disabled={dedupeContactsIsBusy}
         />
         {linkRow("RotateCw", t("reloadApp"), () => void handleReloadApp())}
-        {linkRow("Bug", t("nostrInspector"), () =>
-          navigateTo({ route: "advancedInspector" }),
+        {linkRow(
+          "Bug",
+          t("nostrInspector"),
+          () => navigateTo({ route: "advancedInspector" }),
+          undefined,
+          isOpen("advancedInspector", "advancedInspectorTimeline"),
         )}
         {toggleRow(
           "FlaskConical",
@@ -308,6 +363,7 @@ export function AdvancedPage(): React.ReactElement {
           title={t("masterKeys")}
           testID="open-master-keys"
           onPress={() => navigateTo({ route: "settingsMasterKeys" })}
+          active={isOpen("settingsMasterKeys")}
           disabled={!hasSeedMnemonic}
         />
         <ListRow
@@ -315,6 +371,7 @@ export function AdvancedPage(): React.ReactElement {
           title={t("nostrIdentity")}
           testID="open-nostr-identity"
           onPress={() => navigateTo({ route: "settingsNostrIdentity" })}
+          active={isOpen("settingsNostrIdentity")}
           disabled={!hasCurrentNsec}
         />
         <ListRow
@@ -332,8 +389,17 @@ export function AdvancedPage(): React.ReactElement {
       {experimentalFeatures ? (
         <>
           <Section grouped title={t("settingsExperimental")}>
-            {linkRow("Megaphone", t("keryxNewsletters"), () =>
-              navigateTo({ route: "keryxCompanies" }),
+            {linkRow(
+              "Megaphone",
+              t("keryxNewsletters"),
+              () => navigateTo({ route: "keryxCompanies" }),
+              undefined,
+              isOpen(
+                "keryxCompanies",
+                "keryxCompany",
+                "keryxCompanyNew",
+                "keryxAnnouncement",
+              ),
             )}
           </Section>
         </>

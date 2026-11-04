@@ -11,10 +11,11 @@ import { readRecurringRunRef } from "@linky-fit/recurring-payment";
 import React from "react";
 import {
   readLnurlSuccessMessage,
+  signedAmountText,
   type TransactionHistory,
 } from "../app/hooks/payments/useTransactionHistory";
 import type { TransactionItem } from "../app/lib/transactionHistory";
-import { deriveDefaultProfile } from "../derivedProfile";
+import { contactPictureUrl } from "../derivedProfile";
 
 interface TransactionRowProps {
   history: TransactionHistory;
@@ -34,6 +35,36 @@ const isUnsuccessfulTransaction = (
   item.hiddenReason !== null ||
   item.isReturned;
 
+/** Who the transaction was with, or a mark for how it moved without a contact. */
+export function TransactionAvatar({
+  history,
+  item,
+  size,
+}: {
+  history: TransactionHistory;
+  item: TransactionItem;
+  size?: "md" | "lg";
+}): React.ReactElement {
+  const contact = item.contactId
+    ? history.contactsById.get(item.contactId)
+    : null;
+  return (
+    <Avatar
+      name={contact?.name || history.buildTitle(item)}
+      uri={
+        contact
+          ? (contactPictureUrl(contact.npub, history.nostrPictureByNpub) ??
+            undefined)
+          : undefined
+      }
+      icon={
+        contact ? undefined : item.category === "lightning" ? "Zap" : "Bean"
+      }
+      size={size}
+    />
+  );
+}
+
 /** A transaction in the payment history: who or what, when, its state and its amount. */
 export function TransactionRow({
   history,
@@ -43,22 +74,12 @@ export function TransactionRow({
   const {
     buildProblemStatusPill,
     buildTitle,
-    contactsById,
-    formatAmountText,
     formatDateText,
     getRequestStatus,
-    nostrPictureByNpub,
     recurringIntervalById,
     t,
   } = history;
-  const contact = item.contactId ? contactsById.get(item.contactId) : null;
   const title = buildTitle(item);
-  const generatedPicture = contact?.npub
-    ? deriveDefaultProfile(contact.npub).pictureUrl
-    : null;
-  const pictureUrl =
-    (contact?.npub ? nostrPictureByNpub[contact.npub] : null) ||
-    generatedPicture;
   const requestStatus = getRequestStatus(item);
   const problemStatusPill = buildProblemStatusPill(item, requestStatus);
   const lnurlMessage = readLnurlSuccessMessage(item);
@@ -73,19 +94,7 @@ export function TransactionRow({
       }
     >
       <ListRow
-        leading={
-          <Avatar
-            name={contact?.name || title}
-            uri={contact ? (pictureUrl ?? undefined) : undefined}
-            icon={
-              contact
-                ? undefined
-                : item.category === "lightning"
-                  ? "Zap"
-                  : "Bean"
-            }
-          />
-        }
+        leading={<TransactionAvatar history={history} item={item} />}
         title={title}
         description={
           <Stack gap="$xxs">
@@ -128,9 +137,10 @@ export function TransactionRow({
           <Text
             variant="label"
             bold
-            color={item.direction === "in" ? "$accentText" : "$dangerText"}
+            color={item.direction === "in" ? "$accentText" : "$colorStrong"}
+            fontVariant={["tabular-nums"]}
           >
-            {formatAmountText(item.amount, item.unit)}
+            {signedAmountText(history, item)}
           </Text>
         }
         chevron={false}

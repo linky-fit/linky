@@ -55,8 +55,6 @@ export function DeviceFrame({ children, ...props }: DeviceFrameProps) {
       padding="$sm"
       borderRadius="$device"
       backgroundColor="$bezel"
-      borderWidth={border.hairline}
-      borderColor="$borderColorHover"
       boxShadow={shadow.floating}
       {...props}
     >

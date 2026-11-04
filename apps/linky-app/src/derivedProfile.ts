@@ -89,3 +89,10 @@ export const deriveDefaultProfile = (
   const lnAddress = deriveDefaultLightningAddress(normalized);
   return { name, lnAddress, pictureUrl };
 };
+
+/** The picture a contact shows everywhere: their Nostr picture, else the avatar their account starts with. */
+export const contactPictureUrl = (
+  npub: string | null | undefined,
+  pictureByNpub: Readonly<Record<string, string | null | undefined>>,
+): string | null =>
+  npub ? pictureByNpub[npub] || buildLoreleiAvatarUrl(npub) : null;

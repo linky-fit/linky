@@ -6,6 +6,7 @@ import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import { contactsAtom } from "../../state/contacts/readModel";
 import { lnAddressPayAtom } from "../../state/wallet/contactPay";
 import { useNostrPictureByNpub } from "../contacts/useProfileCache";
+import { contactPictureUrl } from "../../../derivedProfile";
 
 /** The lightning address pay screen's amount and note, with `useState`-style setters. */
 export const useLnAddressPayDraft = () => {
@@ -52,7 +53,7 @@ export const useKnownLnAddressPayContact = (routeKind: Route["kind"]) => {
   );
   const knownLnAddressPayContactPictureUrl = React.useMemo(() => {
     const npub = normalizeNpubIdentifier(knownLnAddressPayContact?.npub ?? "");
-    return npub ? (nostrPictureByNpub[npub] ?? null) : null;
+    return contactPictureUrl(npub, nostrPictureByNpub);
   }, [knownLnAddressPayContact, nostrPictureByNpub]);
   return { knownLnAddressPayContact, knownLnAddressPayContactPictureUrl };
 };

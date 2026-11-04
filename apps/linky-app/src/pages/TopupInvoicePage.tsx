@@ -83,7 +83,6 @@ export const TopupInvoicePage: FC<TopupInvoicePageProps> = ({
             testID="topup-invoice-qr"
             value={qrValue}
             accessibilityLabel={t("copy")}
-            badge="Copy"
             onPress={handleCopyInvoice}
           />
           <Button

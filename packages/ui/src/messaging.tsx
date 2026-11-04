@@ -8,7 +8,10 @@ import { textVariant } from "./styles";
 import { Icon } from "./icons";
 import type { IconName } from "./icons";
 import { Row, Stack, Text } from "./layout";
-import { border, opacity, space } from "./tokens";
+import { border, opacity, radius, space } from "./tokens";
+
+/** Where a message sits in a run of messages from one sender; the corners facing its neighbours tighten. */
+export type MessageGroupPosition = "single" | "first" | "middle" | "last";
 
 /** Other view props (handlers, a ref, data attributes) reach the message's outer view. */
 export interface MessageBubbleProps extends Omit<
@@ -20,8 +23,12 @@ export interface MessageBubbleProps extends Omit<
   children: ReactNode;
   /** Sits at the bubble's end, beside short text and below long content; a string renders as a muted caption. */
   time?: ReactNode;
-  /** Not yet delivered: dashed outline and dimmed. */
+  /** Not yet delivered: dimmed. */
   pending?: boolean | undefined;
+  /** Puts the time on its own line under the content, e.g. under a card's actions. */
+  timeBelow?: boolean | undefined;
+  /** Defaults to a message on its own. */
+  groupPosition?: MessageGroupPosition | undefined;
   /** Content below the bubble, e.g. reactions. */
   footer?: ReactNode;
   /** Shown beside the bubble on the inner side, outside its width, e.g. an actions button. */
@@ -29,17 +36,34 @@ export interface MessageBubbleProps extends Omit<
   testID?: string | undefined;
 }
 
+/** Each corner is set on its own: a shorthand radius would override the joined corners. */
+const groupedCorners = (outgoing: boolean, position: MessageGroupPosition) => {
+  const joinsAbove = position === "middle" || position === "last";
+  const joinsBelow = position === "first" || position === "middle";
+  const top = joinsAbove ? radius.messageJoin : radius.message;
+  const bottom = joinsBelow ? radius.messageJoin : radius.message;
+  return {
+    borderTopLeftRadius: outgoing ? radius.message : top,
+    borderBottomLeftRadius: outgoing ? radius.message : bottom,
+    borderTopRightRadius: outgoing ? top : radius.message,
+    borderBottomRightRadius: outgoing ? bottom : radius.message,
+  };
+};
+
 export function MessageBubble({
   direction,
   children,
   time,
   pending = false,
+  timeBelow = false,
+  groupPosition = "single",
   footer,
   accessory,
   testID,
   ...props
 }: MessageBubbleProps) {
   const outgoing = direction === "outgoing";
+  const startsGroup = groupPosition === "single" || groupPosition === "first";
   return (
     <Stack
       {...props}
@@ -47,6 +71,7 @@ export function MessageBubble({
       alignItems={outgoing ? "flex-end" : "flex-start"}
       maxWidth="85%"
       gap="$xs"
+      marginTop={startsGroup ? "$sm" : "$none"}
     >
       <Stack position="relative" maxWidth="100%">
         <Theme name={outgoing ? "outgoing" : null}>
@@ -54,16 +79,12 @@ export function MessageBubble({
             testID={testID}
             flexWrap="wrap"
             alignItems="flex-end"
-            justifyContent="flex-end"
             columnGap="$sm"
             rowGap="$none"
             paddingHorizontal="$md"
             paddingVertical="$sm"
-            borderRadius="$message"
+            {...groupedCorners(outgoing, groupPosition)}
             backgroundColor={outgoing ? "$background" : "$bubble"}
-            borderWidth={border.hairline}
-            borderStyle={pending ? "dashed" : "solid"}
-            borderColor={pending ? "$accent" : "$bubbleEdge"}
             opacity={pending ? opacity.dimmed : 1}
           >
             <Stack gap="$xs" flexShrink={1} maxWidth="100%">
@@ -73,13 +94,23 @@ export function MessageBubble({
                 children
               )}
             </Stack>
-            {typeof time === "string" ? (
-              <Text variant="caption" color="$colorMuted" flexShrink={0}>
-                {time}
-              </Text>
-            ) : (
-              time
-            )}
+            {time ? (
+              // Grows into the line's spare width, so the time stays at the end even when it wraps below wide content.
+              <Row
+                flexGrow={1}
+                flexShrink={0}
+                justifyContent="flex-end"
+                {...(timeBelow ? { flexBasis: "100%" } : {})}
+              >
+                {typeof time === "string" ? (
+                  <Text variant="caption" color="$colorMuted">
+                    {time}
+                  </Text>
+                ) : (
+                  time
+                )}
+              </Row>
+            ) : null}
           </Row>
         </Theme>
         {accessory ? (
@@ -147,19 +178,19 @@ export function ReplyPreview({
       <Quote
         onPress={onPress}
         flex={1}
-        flexDirection="column"
         alignItems="stretch"
-        gap="$xxs"
-        paddingLeft="$sm"
-        borderLeftWidth={border.emphasis}
-        borderColor="$accent"
+        flexDirection="row"
+        gap="$sm"
       >
-        <Text variant="caption" bold color="$accentText" numberOfLines={1}>
-          {author}
-        </Text>
-        <Text variant="caption" color="$colorSubtle" numberOfLines={2}>
-          {body}
-        </Text>
+        <QuoteBar />
+        <Stack flex={1} gap="$xxs">
+          <Text variant="caption" bold color="$accentText" numberOfLines={1}>
+            {author}
+          </Text>
+          <Text variant="caption" color="$colorSubtle" numberOfLines={2}>
+            {body}
+          </Text>
+        </Stack>
       </Quote>
       {dismiss ? (
         <IconButton
@@ -170,6 +201,18 @@ export function ReplyPreview({
         />
       ) : null}
     </Row>
+  );
+}
+
+/** The bar beside quoted text, e.g. in a reply. */
+export function QuoteBar({ tone = "accent" }: { tone?: "accent" | "info" }) {
+  return (
+    <View
+      width={border.emphasis}
+      alignSelf="stretch"
+      borderRadius="$pill"
+      backgroundColor={tone === "accent" ? "$accent" : "$info"}
+    />
   );
 }
 
@@ -236,8 +279,6 @@ export function LinkPreview({
         gap="$sm"
         padding="$sm"
         borderRadius="$control"
-        borderWidth={border.hairline}
-        borderColor="$borderColor"
         backgroundColor="$surface"
       >
         {imageUri ? (
