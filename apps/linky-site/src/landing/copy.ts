@@ -3,10 +3,12 @@ import type { SiteLocale } from "../sitePreferences";
 export type CtaMode = "google-play" | "web" | "zapstore";
 
 const screens = [
+  "cash-intent",
   "chat-payment",
   "chat-request",
   "contact-block",
   "contacts",
+  "listings",
   "message-actions",
   "profile-open",
   "profile-share",
