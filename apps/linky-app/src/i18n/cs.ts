@@ -107,6 +107,8 @@ export const cs = {
     "Platbu odešle kterékoli vaše zařízení, na kterém běží Linky, i na pozadí. Pokud ji žádné neodešle do minuty po splatnosti, dostanete připomínku, abyste Linky otevřeli; při otevřené aplikaci uvidíte, jak platba odchází.",
   recurringRepeatAction: "Opakovat pravidelně",
   showTransactions: "Ukázat transakce",
+  walletRecent: "Poslední pohyby",
+  walletSeeAll: "Zobrazit vše",
   feedback: "Zpětná vazba",
   donate: "Přispět",
   data: "Data",
@@ -586,6 +588,7 @@ export const cs = {
 
   list: "Seznam",
   contactsTitle: "Kontakty",
+  contactsSelectHint: "Vyber kontakt, se kterým chceš psát nebo platit",
   contactsSearchPlaceholder: "Vyhledat kontakt",
   contactsSearchClear: "Vymazat vyhledávání",
   contactsFilterToggle: "Hledat a filtrovat kontakty",

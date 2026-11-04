@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ReactNode, Ref } from "react";
-import { Anchor, Image, ScrollView, View } from "tamagui";
+import { Anchor, Image, ScrollView, Theme, View } from "tamagui";
 import type { GetProps, TamaguiElement } from "tamagui";
 import { IconButton, Pressable } from "./controls";
 import type { LabeledAction } from "./controls";
@@ -18,7 +18,8 @@ export interface MessageBubbleProps extends Omit<
   ref?: Ref<TamaguiElement> | undefined;
   direction: "incoming" | "outgoing";
   children: ReactNode;
-  time?: string | undefined;
+  /** Sits at the bubble's end, beside short text and below long content; a string renders as a muted caption. */
+  time?: ReactNode;
   /** Not yet delivered: dashed outline and dimmed. */
   pending?: boolean | undefined;
   /** Content below the bubble, e.g. reactions. */
@@ -47,25 +48,40 @@ export function MessageBubble({
       maxWidth="85%"
       gap="$xs"
     >
-      <Stack
-        testID={testID}
-        position="relative"
-        maxWidth="100%"
-        gap="$sm"
-        paddingHorizontal="$md"
-        paddingVertical="$sm"
-        borderRadius="$control"
-        backgroundColor={outgoing ? "$accentSoft" : "$neutralSoft"}
-        borderWidth={border.hairline}
-        borderStyle="dashed"
-        borderColor={pending ? "$accent" : "$transparent"}
-        opacity={pending ? opacity.dimmed : 1}
-      >
-        {typeof children === "string" ? (
-          <Text userSelect="text">{children}</Text>
-        ) : (
-          children
-        )}
+      <Stack position="relative" maxWidth="100%">
+        <Theme name={outgoing ? "outgoing" : null}>
+          <Row
+            testID={testID}
+            flexWrap="wrap"
+            alignItems="flex-end"
+            justifyContent="flex-end"
+            columnGap="$sm"
+            rowGap="$none"
+            paddingHorizontal="$md"
+            paddingVertical="$sm"
+            borderRadius="$message"
+            backgroundColor={outgoing ? "$background" : "$bubble"}
+            borderWidth={border.hairline}
+            borderStyle={pending ? "dashed" : "solid"}
+            borderColor={pending ? "$accent" : "$bubbleEdge"}
+            opacity={pending ? opacity.dimmed : 1}
+          >
+            <Stack gap="$xs" flexShrink={1} maxWidth="100%">
+              {typeof children === "string" ? (
+                <Text userSelect="text">{children}</Text>
+              ) : (
+                children
+              )}
+            </Stack>
+            {typeof time === "string" ? (
+              <Text variant="caption" color="$colorMuted" flexShrink={0}>
+                {time}
+              </Text>
+            ) : (
+              time
+            )}
+          </Row>
+        </Theme>
         {accessory ? (
           // A zero-width anchor on the bubble's edge lets the accessory overflow outward.
           <Row
@@ -81,11 +97,6 @@ export function MessageBubble({
           </Row>
         ) : null}
       </Stack>
-      {time ? (
-        <Text variant="caption" color="$colorMuted">
-          {time}
-        </Text>
-      ) : null}
       {footer}
     </Stack>
   );
@@ -99,6 +110,7 @@ export function DaySeparator({ label }: { label: string }) {
       color="$colorMuted"
       alignSelf="center"
       flexShrink={0}
+      marginVertical="$sm"
       paddingHorizontal="$md"
       paddingVertical="$xs"
       borderRadius="$pill"
@@ -166,26 +178,30 @@ export interface MessageComposerFrameProps {
   children: ReactNode;
   /** Shown above the input, e.g. a reply preview or attachments. */
   header?: ReactNode;
-  /** Shown below the input, e.g. payment actions. */
-  footer?: ReactNode;
+  /** Beside the input on wide screens and in a row below it on phones, e.g. payment actions; each action fills its share of the phone row. */
+  actions?: ReactNode;
 }
 
 /** Sits flush under the message list, whose content pads the space above the composer, so messages scroll right up to its top edge. */
 export function MessageComposerFrame({
   children,
   header,
-  footer,
+  actions,
 }: MessageComposerFrameProps) {
   return (
     <Stack
       gap="$sm"
-      paddingHorizontal="$xl"
+      paddingHorizontal="$lg"
       paddingBottom="$md"
       backgroundColor="$background"
     >
       {header}
-      {children}
-      {footer}
+      <Stack gap="$sm" $wide={{ flexDirection: "row", alignItems: "flex-end" }}>
+        <Stack minWidth={0} $wide={{ flex: 1 }}>
+          {children}
+        </Stack>
+        {actions ? <Row gap="$sm">{actions}</Row> : null}
+      </Stack>
     </Stack>
   );
 }

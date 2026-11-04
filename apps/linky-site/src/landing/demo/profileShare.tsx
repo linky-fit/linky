@@ -404,20 +404,18 @@ function LinkyComposer({
   return (
     <Stack paddingBottom="$xl">
       <MessageComposerFrame
-        footer={
-          <Row gap="$sm">
-            <Button flex={1} variant="secondary" icon="Request" onPress={noop}>
-              Request
-            </Button>
-            <Button
-              flex={1}
+        actions={
+          <>
+            <IconButton
               variant="secondary"
-              icon="HandCoins"
+              icon="Request"
+              accessibilityLabel="Request"
               onPress={noop}
-            >
+            />
+            <Button icon="HandCoins" borderRadius="$pill" onPress={noop}>
               Pay
             </Button>
-          </Row>
+          </>
         }
       >
         <RichTextInput

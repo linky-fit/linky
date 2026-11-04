@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { getVariableValue, useTheme } from "tamagui";
 import type { RichTextInputProps } from "./rich-text-input";
-import { fieldTrailing } from "./styles";
 import {
   border,
   fontFamily,
@@ -11,6 +10,9 @@ import {
   space,
   typography,
 } from "./tokens";
+
+// Centers an `sm` control in a one-line field.
+const trailingInset = (size.control - size.controlSm) / 2;
 
 /** A contentEditable host: the caller renders and reads its DOM content. */
 export function RichTextInput({
@@ -26,10 +28,9 @@ export function RichTextInput({
   const theme = useTheme();
   const [focused, setFocused] = useState(false);
   const text = {
-    padding: space.md,
-    paddingRight: trailing
-      ? fieldTrailing.textPadding(size.controlSm)
-      : space.md,
+    paddingBlock: (size.control - typography.lineHeight.body) / 2,
+    paddingInline: space.lg,
+    paddingRight: trailing ? size.controlSm + 2 * trailingInset : space.lg,
     fontFamily: fontFamily.body,
     fontSize: typography.size.body,
     lineHeight: `${typography.lineHeight.body}px`,
@@ -56,13 +57,15 @@ export function RichTextInput({
         }}
         style={{
           ...text,
-          minHeight: size.controlLg,
+          minHeight: size.control,
           maxHeight: size.column,
           overflowY: "auto",
           overflowWrap: "anywhere",
           whiteSpace: "pre-wrap",
-          borderRadius: radius.control,
-          background: getVariableValue(theme.neutralSoft),
+          borderRadius: radius.sheet,
+          border: `${border.hairline}px solid ${getVariableValue(theme.borderColor)}`,
+          boxSizing: "border-box",
+          background: getVariableValue(theme.surface),
           color: getVariableValue(theme.color),
           outline: focused
             ? `${border.focus}px solid ${getVariableValue(theme.outlineColor)}`
@@ -89,8 +92,8 @@ export function RichTextInput({
         <div
           style={{
             position: "absolute",
-            right: fieldTrailing.inset,
-            bottom: fieldTrailing.inset,
+            right: trailingInset,
+            bottom: trailingInset,
           }}
         >
           {trailing}

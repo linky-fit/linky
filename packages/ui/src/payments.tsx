@@ -59,15 +59,16 @@ export function Keypad({
           ? labels.delete
           : key;
   return (
-    <Stack role="group" aria-label={accessibilityLabel} gap="$md">
+    <Stack role="group" aria-label={accessibilityLabel} gap="$xs">
       {rows.map((keys) => (
-        <Row key={keys.join("")} gap="$md">
+        <Row key={keys.join("")} gap="$xs">
           {keys.map((key) => (
             <Button
               key={key}
-              variant="secondary"
+              variant="ghost"
               flex={1}
               minHeight="$row"
+              borderRadius="$card"
               disabled={disabled}
               aria-label={keyLabel(key)}
               onPress={() => onKeyPress(key)}
@@ -76,8 +77,9 @@ export function Keypad({
                 <Icon name="Delete" size="lg" color="$colorSubtle" />
               ) : (
                 <Text
-                  variant="heading"
-                  color={key === "C" ? "$colorSubtle" : "$color"}
+                  variant="display"
+                  fontWeight="$semibold"
+                  color={key === "C" ? "$colorMuted" : "$colorStrong"}
                 >
                   {key === "." ? labels.decimal : key}
                 </Text>

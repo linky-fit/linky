@@ -70,17 +70,20 @@ function Composer({ at }: { at: At }) {
   return (
     <Stack paddingBottom="$xl">
       <MessageComposerFrame
-        footer={
-          <Row gap="$sm">
-            <Button flex={1} variant="secondary" icon="Request" onPress={noop}>
-              Request
-            </Button>
-            <Tap on={at("tapPay")} flex={1}>
-              <Button variant="secondary" icon="HandCoins" onPress={noop}>
+        actions={
+          <>
+            <IconButton
+              variant="secondary"
+              icon="Request"
+              accessibilityLabel="Request"
+              onPress={noop}
+            />
+            <Tap on={at("tapPay")}>
+              <Button icon="HandCoins" borderRadius="$pill" onPress={noop}>
                 Pay
               </Button>
             </Tap>
-          </Row>
+          </>
         }
       >
         <RichTextInput

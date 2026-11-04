@@ -112,6 +112,8 @@ export const de = {
     "Jedes deiner Geräte, auf dem Linky läuft, sendet die Zahlung, auch im Hintergrund. Hat es eine Minute nach Fälligkeit keines gesendet, erinnern wir dich, Linky zu öffnen; bei geöffneter App siehst du, wie die Zahlung rausgeht.",
   recurringRepeatAction: "Regelmäßig wiederholen",
   showTransactions: "Transaktionen anzeigen",
+  walletRecent: "Letzte Aktivität",
+  walletSeeAll: "Alle anzeigen",
   feedback: "Feedback",
   donate: "Spenden",
   data: "Daten",
@@ -598,6 +600,7 @@ export const de = {
 
   list: "Liste",
   contactsTitle: "Kontakte",
+  contactsSelectHint: "Wähle einen Kontakt zum Schreiben oder Bezahlen",
   contactsSearchPlaceholder: "Kontakte suchen",
   contactsSearchClear: "Suche löschen",
   contactsFilterToggle: "Kontakte suchen und filtern",

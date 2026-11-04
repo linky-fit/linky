@@ -108,22 +108,20 @@ export function ChatScreen({
       </DemoBody>
       <Stack paddingBottom="$xl">
         <MessageComposerFrame
-          footer={
-            <Row gap="$sm">
-              <Button
-                flex={1}
+          actions={
+            <>
+              <IconButton
                 variant="secondary"
                 icon="Request"
+                accessibilityLabel="Request"
                 onPress={noop}
-              >
-                Request
-              </Button>
-              <Tap on={tapPay} flex={1} data-guide="chat-pay">
-                <Button variant="secondary" icon="HandCoins" onPress={noop}>
+              />
+              <Tap on={tapPay} data-guide="chat-pay">
+                <Button icon="HandCoins" borderRadius="$pill" onPress={noop}>
                   Pay
                 </Button>
               </Tap>
-            </Row>
+            </>
           }
         >
           <RichTextInput

@@ -40,7 +40,14 @@ export const TopupPage: FC = () => {
   };
 
   return (
-    <Stack gap="$md">
+    <Stack
+      gap="$md"
+      flexGrow={1}
+      width="100%"
+      maxWidth="$form"
+      alignSelf="center"
+      $wide={{ justifyContent: "center" }}
+    >
       <AmountKeypad
         amount={topupAmount}
         input={amountInput}
@@ -66,34 +73,35 @@ export const TopupPage: FC = () => {
         {t("topupShowInvoice")}
       </Button>
 
-      <Row>
+      <Row flexWrap="wrap" justifyContent="center" gap="$xs">
         <Button
-          variant="secondary"
+          variant="ghost"
+          size="sm"
           icon="CircleEllipsis"
-          flex={1}
           onPress={() => navigateTo({ route: "topupNoAmount" })}
         >
           {t("topupNoAmount")}
         </Button>
         <Button
-          variant="secondary"
+          variant="ghost"
+          size="sm"
           icon="ClipboardPaste"
-          flex={1}
           onPress={() => void pasteAmountOrScanValue()}
         >
           {t("paste")}
         </Button>
+        {onchainTransfersShown ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon="Bitcoin"
+            onPress={() => navigateTo({ route: "onchainReceive" })}
+            testID="topup-onchain-receive"
+          >
+            {t("onchainReceiveTitle")}
+          </Button>
+        ) : null}
       </Row>
-      {onchainTransfersShown ? (
-        <Button
-          variant="secondary"
-          icon="Bitcoin"
-          onPress={() => navigateTo({ route: "onchainReceive" })}
-          testID="topup-onchain-receive"
-        >
-          {t("onchainReceiveTitle")}
-        </Button>
-      ) : null}
     </Stack>
   );
 };

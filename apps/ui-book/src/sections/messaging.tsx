@@ -51,8 +51,8 @@ export const messaging: Section = {
         <UI.Stack>
           <UI.MessageComposerFrame
             header={<UI.Text variant="caption">Custom editor</UI.Text>}
-            footer={
-              <UI.Button variant="ghost" size="sm" icon="Zap">
+            actions={
+              <UI.Button icon="HandCoins" borderRadius="$pill">
                 Pay
               </UI.Button>
             }

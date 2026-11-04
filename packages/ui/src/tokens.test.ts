@@ -76,8 +76,8 @@ describe.each(Object.entries(themes))(
       ["danger text on danger soft", theme.dangerText, theme.dangerSoft],
       ["warning text on warning soft", theme.warningText, theme.warningSoft],
       ["info text on info soft", theme.infoText, theme.infoSoft],
-      ["body on incoming message", theme.color, theme.neutralSoft],
-      ["body on outgoing message", theme.color, theme.accentSoft],
+      ["body on incoming message", theme.color, theme.bubble],
+      ["body on a soft fill", theme.color, theme.accentSoft],
     ])("keeps %s readable (WCAG AA)", (_name, foreground, background) => {
       expect(
         contrast(foreground, background, theme.background),

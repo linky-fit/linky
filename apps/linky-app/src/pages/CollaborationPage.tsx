@@ -44,7 +44,9 @@ export function CollaborationPage(): React.ReactElement {
 
   return (
     <Stack gap="$xxxl">
-      <Text color="$colorMuted">{t("collaborationBody")}</Text>
+      <Text variant="title" color="$colorSubtle">
+        {t("collaborationBody")}
+      </Text>
       <Stack gap="$md">
         <Row gap="$md" alignItems="stretch">
           <ActionTile
@@ -59,6 +61,7 @@ export function CollaborationPage(): React.ReactElement {
           <ActionTile
             flex={1}
             icon="Banknote"
+            tone="warning"
             label={t("cash")}
             caption={caption(
               offering.length + wanting.length,
@@ -71,6 +74,7 @@ export function CollaborationPage(): React.ReactElement {
         </Row>
         <ActionTile
           icon="Package"
+          tone="info"
           label={t("listings")}
           caption={caption(
             listings.offered.length + listings.wanted.length,

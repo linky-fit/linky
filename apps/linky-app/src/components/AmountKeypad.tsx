@@ -1,4 +1,4 @@
-import { Card, Keypad } from "@linky-fit/ui";
+import { Keypad, Stack } from "@linky-fit/ui";
 import type { ReactNode } from "react";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import { DisplayAmount } from "./DisplayAmount";
@@ -25,14 +25,22 @@ export function AmountKeypad({
   const amountSat = Number.parseInt(amount.trim(), 10);
   return (
     <>
-      <Card testID="amount-display" aria-live="polite">
-        <DisplayAmount
-          amount={Number.isFinite(amountSat) && amountSat > 0 ? amountSat : 0}
-          typedValue={input.inputDisplayValue}
-          size="lg"
-        />
-      </Card>
-      {below}
+      {/* On phones the keys sit at the bottom, in thumb reach, with the amount centred above them. */}
+      <Stack
+        flexGrow={1}
+        justifyContent="center"
+        gap="$md"
+        $wide={{ flexGrow: 0 }}
+      >
+        <Stack testID="amount-display" aria-live="polite" paddingVertical="$xl">
+          <DisplayAmount
+            amount={Number.isFinite(amountSat) && amountSat > 0 ? amountSat : 0}
+            typedValue={input.inputDisplayValue}
+            size="lg"
+          />
+        </Stack>
+        {below}
+      </Stack>
       <Keypad
         accessibilityLabel={`${t("payAmount")} (${displayUnit})`}
         decimal={input.decimalKeyEnabled}

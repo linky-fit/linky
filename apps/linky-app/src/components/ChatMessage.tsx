@@ -974,25 +974,33 @@ function ChatMessageComponent({
               </Stack>
             )
           }
-          footer={
-            (reactions.length > 0 && !isDeleted) || showTime ? (
-              <Stack alignSelf="stretch" gap="$xs">
-                <MessageReactions
-                  reactions={isDeleted ? [] : reactions}
-                  onReact={(emoji) => onReact(message, emoji)}
-                />
+          time={
+            showTime || isSeen ? (
+              <Row gap="$xxs" flexShrink={0}>
                 {showTime ? (
                   <Text
                     variant="caption"
                     color={isPending ? "$warningText" : "$colorMuted"}
-                    textAlign={isOut ? "right" : "left"}
                   >
                     {timeLabel}
                     {message.isEdited ? ` · ${actionLabels.edited}` : ""}
                     {isPending ? ` · ${chatPendingLabel}` : ""}
                   </Text>
                 ) : null}
-              </Stack>
+                {isSeen ? (
+                  <Stack role="img" aria-label={chatSeenLabel}>
+                    <Icon name="CheckCheck" size="sm" color="$colorMuted" />
+                  </Stack>
+                ) : null}
+              </Row>
+            ) : undefined
+          }
+          footer={
+            reactions.length > 0 && !isDeleted ? (
+              <MessageReactions
+                reactions={reactions}
+                onReact={(emoji) => onReact(message, emoji)}
+              />
             ) : null
           }
         >
@@ -1008,16 +1016,7 @@ function ChatMessageComponent({
               </Text>
             </Stack>
           ) : null}
-          {isSeen ? (
-            <Row alignItems="flex-end" gap="$sm">
-              <Stack flexShrink={1}>{messageBody}</Stack>
-              <Stack role="img" aria-label={chatSeenLabel}>
-                <Icon name="CheckCheck" size="sm" color="$accent" />
-              </Stack>
-            </Row>
-          ) : (
-            messageBody
-          )}
+          {messageBody}
           {unsavedMessageContactNpubs.length > 1 ? (
             <Button
               size="sm"

@@ -133,17 +133,36 @@ export const Screen = styled(YStack, {
 export interface SectionProps {
   title?: string | undefined;
   children: ReactNode;
+  /** Sets the rows on a panel, e.g. one group of settings among others. */
+  grouped?: boolean | undefined;
 }
 
-export function Section({ title, children }: SectionProps) {
+export function Section({ title, children, grouped = false }: SectionProps) {
   return (
     <Stack gap="$xs">
       {title ? (
-        <Text eyebrow role="heading" paddingVertical="$sm">
+        <Text
+          eyebrow
+          role="heading"
+          paddingVertical="$sm"
+          paddingHorizontal={grouped ? "$md" : "$none"}
+        >
           {title}
         </Text>
       ) : null}
-      {children}
+      {grouped ? (
+        <Stack
+          gap="$none"
+          paddingVertical="$xs"
+          paddingHorizontal="$md"
+          borderRadius="$card"
+          backgroundColor="$surface"
+        >
+          {children}
+        </Stack>
+      ) : (
+        children
+      )}
     </Stack>
   );
 }

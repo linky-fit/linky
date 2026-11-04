@@ -109,6 +109,8 @@ export const en = {
     "Any of your devices running Linky sends the payment, also in the background. If none has sent it a minute after it is due, you get a reminder to open Linky; with the app open you see the payment go out.",
   recurringRepeatAction: "Repeat regularly",
   showTransactions: "Show transactions",
+  walletRecent: "Recent activity",
+  walletSeeAll: "See all",
   feedback: "Feedback",
   donate: "Donate",
   data: "Data",
@@ -583,6 +585,7 @@ export const en = {
 
   list: "List",
   contactsTitle: "Contacts",
+  contactsSelectHint: "Pick a contact to chat or pay",
   contactsSearchPlaceholder: "Search contacts",
   contactsSearchClear: "Clear search",
   contactsFilterToggle: "Search and filter contacts",

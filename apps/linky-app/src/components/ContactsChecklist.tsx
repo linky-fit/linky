@@ -45,10 +45,19 @@ export function ContactsChecklist({
     .replace(/\{total\}/g, String(tasksTotal));
 
   return (
-    <Stack gap="$sm" paddingVertical="$md">
-      <Row justifyContent="space-between">
-        <Text variant="label" bold color="$colorSubtle">
+    <Stack
+      gap="$sm"
+      marginVertical="$sm"
+      padding="$md"
+      borderRadius="$card"
+      backgroundColor="$surface"
+    >
+      <Row gap="$sm">
+        <Text flex={1} variant="label" bold color="$colorSubtle">
           {t("contactsOnboardingTitle")}
+        </Text>
+        <Text variant="caption" bold color="$colorMuted">
+          {progressText}
         </Text>
         <IconButton
           icon="X"
@@ -58,18 +67,11 @@ export function ContactsChecklist({
         />
       </Row>
 
-      <Row gap="$sm">
-        <Stack flex={1}>
-          <Progress
-            value={progressPercent}
-            max={100}
-            accessibilityLabel={progressText}
-          />
-        </Stack>
-        <Text variant="caption" bold color="$colorMuted">
-          {progressText}
-        </Text>
-      </Row>
+      <Progress
+        value={progressPercent}
+        max={100}
+        accessibilityLabel={progressText}
+      />
 
       {isComplete ? (
         <Notice

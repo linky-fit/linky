@@ -112,6 +112,8 @@ export const pt = {
     "Qualquer aparelho seu com o Linky em execução envia o pagamento, também em segundo plano. Se nenhum o enviar até um minuto após o vencimento, você recebe um lembrete para abrir o Linky; com o aplicativo aberto, vê o pagamento sair.",
   recurringRepeatAction: "Repetir regularmente",
   showTransactions: "Mostrar transações",
+  walletRecent: "Atividade recente",
+  walletSeeAll: "Ver tudo",
   feedback: "Feedback",
   donate: "Doar",
   data: "Dados",
@@ -594,6 +596,7 @@ export const pt = {
 
   list: "Lista",
   contactsTitle: "Contatos",
+  contactsSelectHint: "Escolha um contato para conversar ou pagar",
   contactsSearchPlaceholder: "Buscar contatos",
   contactsSearchClear: "Limpar busca",
   contactsFilterToggle: "Buscar e filtrar contatos",
