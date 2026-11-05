@@ -11,7 +11,6 @@ import { readRecurringRunRef } from "@linky-fit/recurring-payment";
 import React from "react";
 import {
   readLnurlSuccessMessage,
-  signedAmountText,
   type TransactionHistory,
 } from "../app/hooks/payments/useTransactionHistory";
 import type { TransactionItem } from "../app/lib/transactionHistory";
@@ -140,7 +139,7 @@ export function TransactionRow({
             color={item.direction === "in" ? "$accentText" : "$colorStrong"}
             fontVariant={["tabular-nums"]}
           >
-            {signedAmountText(history, item)}
+            {history.formatAmountText(item.amount, item.unit)}
           </Text>
         }
         chevron={false}
