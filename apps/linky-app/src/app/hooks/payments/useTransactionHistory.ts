@@ -3,7 +3,7 @@ import { useAtomValue } from "@linky-fit/linkstr-react";
 import type { Tone } from "@linky-fit/ui";
 import React from "react";
 import type { Translate } from "../../../i18n";
-import { formatInteger, formatTimeAgo } from "../../../utils/formatting";
+import { formatClockTime, formatInteger } from "../../../utils/formatting";
 import { asNonEmptyString } from "../../../utils/validation";
 import { createCashuTokenId } from "../../lib/cashuTokenIdentity";
 import {
@@ -103,7 +103,8 @@ export interface TransactionHistory {
     amount: number | null,
     unit: string | null,
   ) => string;
-  readonly formatDateText: (createdAtSec: number) => string;
+  /** The time of day only: rows sit under their day's heading. */
+  readonly formatTimeText: (createdAtSec: number) => string;
   readonly getRequestStatus: (
     item: TransactionItem,
   ) => TransactionRequestStatus;
@@ -233,8 +234,8 @@ export const useTransactionHistory = (): TransactionHistory => {
     [contactsById, t],
   );
 
-  const formatDateText = React.useCallback(
-    (createdAtSec: number): string => formatTimeAgo(createdAtSec, lang),
+  const formatTimeText = React.useCallback(
+    (createdAtSec: number): string => formatClockTime(createdAtSec, lang),
     [lang],
   );
 
@@ -474,7 +475,7 @@ export const useTransactionHistory = (): TransactionHistory => {
     recurringIntervalById,
     buildTitle,
     formatAmountText,
-    formatDateText,
+    formatTimeText,
     getRequestStatus,
     buildProblemStatusPill,
     buildDetailEntries,

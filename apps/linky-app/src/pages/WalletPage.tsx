@@ -1,8 +1,7 @@
 import { useAtom } from "@linky-fit/linkstr-react";
 import {
+  Avatar,
   Button,
-  EmptyState,
-  Icon,
   IconButton,
   ListRow,
   Row,
@@ -79,29 +78,23 @@ function PendingOnchainTransfers(): React.ReactElement | null {
 function RecurringPayments(): React.ReactElement {
   const { t } = useTranslation();
   const orders = useRecurringPaymentOrders();
+  const addLabel = t("recurringPaymentNewTitle");
   return (
     <Stack gap="$sm">
       <SectionHeading title={t("recurringPaymentsTitle")} />
       <Section grouped>
-        {orders.length > 0 ? (
-          <RecurringPaymentsList orders={orders} />
-        ) : (
-          <Text color="$colorSubtle" paddingTop="$md" paddingBottom="$xs">
-            {t("recurringEmptyHint")}
-          </Text>
-        )}
+        <RecurringPaymentsList orders={orders} />
         <ListRow
-          leading={
-            // As wide as the avatars above, so the label lines up with their names.
-            <Stack width="$avatar" alignItems="center">
-              <Icon name="Plus" color="$accentText" />
-            </Stack>
-          }
+          leading={<Avatar name={addLabel} icon="Plus" tone="accent" />}
           title={
             <Text bold color="$accentText">
-              {t("recurringPaymentNewTitle")}
+              {addLabel}
             </Text>
           }
+          description={
+            orders.length === 0 ? t("recurringEmptyHint") : undefined
+          }
+          accessibilityLabel={addLabel}
           chevron={false}
           onPress={() => navigateTo({ route: "recurringPaymentNew" })}
           testID="recurring-add-button"
@@ -168,7 +161,11 @@ function TransactionHistory(): React.ReactElement {
         }
       />
       {entries.length === 0 ? (
-        <EmptyState icon="History" title={t("paymentsHistoryEmpty")} />
+        <Section grouped>
+          <Text color="$colorSubtle" paddingVertical="$md">
+            {t("paymentsHistoryEmpty")}
+          </Text>
+        </Section>
       ) : (
         visibleDays.map((day) => (
           <Section
@@ -182,7 +179,8 @@ function TransactionHistory(): React.ReactElement {
       )}
       {visibleCount < entries.length ? (
         <Button
-          variant="secondary"
+          variant="ghost"
+          alignSelf="center"
           onPress={() =>
             setVisibleCount((count) => count + TRANSACTION_PAGE_SIZE)
           }

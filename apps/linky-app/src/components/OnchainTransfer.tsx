@@ -20,7 +20,7 @@ import {
   type OnchainTransferView,
 } from "../app/lib/onchainTransfers";
 import { navigateTo } from "../hooks/useRouting";
-import { formatTimeAgo } from "../utils/formatting";
+import { formatClockTime, formatTimeAgo } from "../utils/formatting";
 
 export function OnchainTransferPhasePill({
   transfer,
@@ -63,7 +63,10 @@ export function OnchainTransferHistoryRow({
         description={
           <Row gap="$sm" flexWrap="wrap" alignItems="center">
             <Text variant="caption" color="$colorMuted">
-              {formatTimeAgo(transfer.createdAtSec, lang)}
+              {/* A finished transfer sits under its day's heading; an unfinished one is listed apart. */}
+              {finished
+                ? formatClockTime(transfer.createdAtSec, lang)
+                : formatTimeAgo(transfer.createdAtSec, lang)}
             </Text>
             {phase === "completed" ? null : (
               <OnchainTransferPhasePill transfer={transfer} />

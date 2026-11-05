@@ -133,6 +133,12 @@ const getDateTimeFormatter = (
   return formatter;
 };
 
+/** The time of day, e.g. for a row under a day heading. */
+export const formatClockTime = (unixSeconds: number, lang?: string): string =>
+  getDateTimeFormatter(normalizeLocale(lang), "time").format(
+    unixSeconds * 1000,
+  );
+
 /** A full date with the time, e.g. for a transaction's detail. */
 export const formatDateTime = (ms: number, lang?: string): string =>
   new Intl.DateTimeFormat(normalizeLocale(lang), {

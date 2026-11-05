@@ -5,7 +5,6 @@ import {
 } from "@linky-fit/recurring-payment";
 import { ListRow, opacity, Pill, Row, Stack, Text } from "@linky-fit/ui";
 import type { FC } from "react";
-import React from "react";
 import { useContactSummaries } from "../app/hooks/contacts/useContactSummaries";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import { useWalletInventory } from "../app/hooks/wallet/useWalletInventory";
@@ -13,7 +12,7 @@ import { recurringRecipientLabel } from "../app/hooks/payments/useRecurringPayme
 import { formatRecurringAmountText } from "../app/lib/recurringAmount";
 import { describeRecurringInterval } from "../app/lib/recurringPaymentDisplay";
 import { navigateTo } from "../hooks/useRouting";
-import { normalizeLocale } from "../utils/formatting";
+import { formatChatDayLabel, formatClockTime } from "../utils/formatting";
 import { nowSeconds } from "../utils/time";
 import { ContactSummaryAvatar } from "./ContactSummaryAvatar";
 
@@ -28,17 +27,11 @@ export const RecurringPaymentsList: FC<{
   const { displayCurrency, fiatRates, formatDisplayedAmountParts } =
     useDisplayAmounts();
   const contacts = useContactSummaries();
-  const dateFormatter = React.useMemo(
-    () =>
-      new Intl.DateTimeFormat(normalizeLocale(lang), {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    [lang],
-  );
+  const nextDueText = (atSec: number) =>
+    t("recurringNextAt").replace(
+      "{date}",
+      `${formatChatDayLabel(atSec * 1000, lang, t)} ${formatClockTime(atSec, lang)}`,
+    );
   const nowSec = nowSeconds();
 
   return (
@@ -77,9 +70,7 @@ export const RecurringPaymentsList: FC<{
                     <Text variant="caption" color="$colorMuted">
                       {state === "paused"
                         ? t("recurringStatusPaused")
-                        : dateFormatter.format(
-                            new Date(order.schedule.nextDueAtSec * 1000),
-                          )}
+                        : nextDueText(order.schedule.nextDueAtSec)}
                     </Text>
                     <Pill
                       size="sm"
@@ -102,7 +93,12 @@ export const RecurringPaymentsList: FC<{
                 </Stack>
               }
               trailing={
-                <Text variant="label" bold color="$dangerText">
+                <Text
+                  variant="label"
+                  bold
+                  color="$colorStrong"
+                  fontVariant={["tabular-nums"]}
+                >
                   {formatRecurringAmountText(order.amount, {
                     displayCurrency,
                     fiatRates,

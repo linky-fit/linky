@@ -97,6 +97,7 @@ export const de = {
   recurringEveryNWeeks: "alle {count} Wochen",
   recurringEveryNMonths: "alle {count} Monate",
   recurringNextRun: "Nächste Zahlung",
+  recurringNextAt: "Nächste: {date}",
   recurringLastRun: "Letzte Zahlung",
   recurringRunsCount: "Ausgeführte Zahlungen",
   recurringMintLabel: "Bezahlt von",
@@ -192,7 +193,8 @@ export const de = {
   onboardingNameRequired: "Gib einen Namen ein.",
   onboardingRetry: "Erneut versuchen",
 
-  paymentsHistoryEmpty: "Noch keine Transaktionen.",
+  paymentsHistoryEmpty:
+    "Hier erscheinen Zahlungen, die du sendest und empfängst.",
   paymentsHistoryFee: "Gebühr",
   logout: "Abmelden",
   logoutArmedHint:

@@ -68,16 +68,13 @@ describe("WalletPage", () => {
     const { container } = await renderWallet();
 
     expect(container.textContent).toContain("recurringEmptyHint");
-    expect(container.querySelector("[data-testid='recurring-list']")).toBe(
-      null,
-    );
     await act(async () => {
       button(container, "recurringPaymentNewTitle")?.click();
     });
     expect(navigateTo).toHaveBeenCalledWith({ route: "recurringPaymentNew" });
   });
 
-  it("lists recurring payments instead of the explanation once one exists", async () => {
+  it("drops the explanation once a recurring payment exists", async () => {
     state.orders = [{ id: "rp-1" }];
     const { container } = await renderWallet();
 
