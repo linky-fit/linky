@@ -492,4 +492,6 @@ export const signedAmountText = (
   history: TransactionHistory,
   item: TransactionItem,
 ): string =>
-  `${item.direction === "in" ? "+" : "−"}${history.formatAmountText(item.amount, item.unit)}`;
+  item.amount === null
+    ? ""
+    : `${item.direction === "in" ? "+" : "−"}${history.formatAmountText(item.amount, item.unit)}`;
