@@ -93,6 +93,7 @@ export const en = {
   recurringEveryNWeeks: "every {count} weeks",
   recurringEveryNMonths: "every {count} months",
   recurringNextRun: "Next payment",
+  recurringNextAt: "Next: {date}",
   recurringLastRun: "Last payment",
   recurringRunsCount: "Payments made",
   recurringMintLabel: "Paid from",
@@ -186,7 +187,7 @@ export const en = {
   onboardingNameRequired: "Enter a name.",
   onboardingRetry: "Try again",
 
-  paymentsHistoryEmpty: "No transactions yet.",
+  paymentsHistoryEmpty: "Payments you send and receive show up here.",
   paymentsHistoryFee: "Fee",
 
   logout: "Log out",

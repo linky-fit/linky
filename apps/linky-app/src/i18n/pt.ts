@@ -97,6 +97,7 @@ export const pt = {
   recurringEveryNWeeks: "a cada {count} semanas",
   recurringEveryNMonths: "a cada {count} meses",
   recurringNextRun: "Próximo pagamento",
+  recurringNextAt: "Próximo: {date}",
   recurringLastRun: "Último pagamento",
   recurringRunsCount: "Pagamentos feitos",
   recurringMintLabel: "Pago a partir de",
@@ -191,7 +192,8 @@ export const pt = {
   onboardingNameRequired: "Digite um nome.",
   onboardingRetry: "Tentar de novo",
 
-  paymentsHistoryEmpty: "Nenhuma transação ainda.",
+  paymentsHistoryEmpty:
+    "Os pagamentos que você enviar e receber aparecem aqui.",
   paymentsHistoryFee: "Taxa",
 
   logout: "Sair",

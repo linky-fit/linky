@@ -73,7 +73,7 @@ export function TransactionRow({
   const {
     buildProblemStatusPill,
     buildTitle,
-    formatDateText,
+    formatTimeText,
     getRequestStatus,
     recurringIntervalById,
     t,
@@ -109,7 +109,7 @@ export function TransactionRow({
             ) : null}
             <Row gap="$sm" flexWrap="wrap">
               <Text variant="caption" color="$colorMuted">
-                {formatDateText(item.createdAtSec)}
+                {formatTimeText(item.createdAtSec)}
               </Text>
               {recurringPaymentId ? (
                 <Pill

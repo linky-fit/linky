@@ -92,6 +92,7 @@ export const cs = {
   recurringEveryNWeeks: "každých {count} týdnů",
   recurringEveryNMonths: "každých {count} měsíců",
   recurringNextRun: "Další platba",
+  recurringNextAt: "Další: {date}",
   recurringLastRun: "Poslední platba",
   recurringRunsCount: "Provedeno plateb",
   recurringMintLabel: "Platí se z",
@@ -186,7 +187,7 @@ export const cs = {
   onboardingNameRequired: "Zadejte jméno.",
   onboardingRetry: "Zkusit znovu",
 
-  paymentsHistoryEmpty: "Zatím žádné transakce.",
+  paymentsHistoryEmpty: "Tady se ukážou platby, které pošlete a přijmete.",
   paymentsHistoryFee: "Poplatek",
 
   logout: "Odhlásit se",

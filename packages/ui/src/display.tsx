@@ -56,6 +56,8 @@ export interface AvatarProps {
   fallback?: string | undefined;
   /** An icon instead of the initials without a photo, e.g. for a company without a logo. */
   icon?: IconName | undefined;
+  /** Fixes the tint instead of deriving it from the name, e.g. accent for an add action in a list of people. */
+  tone?: Tone | undefined;
   /** Gets the photo uri that failed to load, e.g. to try another source. */
   onError?: ((uri: string) => void) | undefined;
   /** Puts a photo on the raised surface while it loads, so it stands out against its ring, e.g. in an `AvatarGroup`. */
@@ -69,6 +71,7 @@ export function Avatar({
   indicator,
   fallback,
   icon,
+  tone,
   onError,
   raised = false,
 }: AvatarProps) {
@@ -76,7 +79,7 @@ export function Avatar({
   const [failedUri, setFailedUri] = useState<string>();
   const showPhoto = uri !== undefined && uri !== failedUri;
   const glyph = fallback ?? (size === "xs" ? null : initials(name));
-  const tint = toneColors[initialsTone(name)];
+  const tint = toneColors[tone ?? initialsTone(name)];
   const photoFill = raised ? "$surfaceRaised" : "$surface";
   return (
     <View position="relative" flexShrink={0} role="img" aria-label={name}>
