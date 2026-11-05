@@ -1071,7 +1071,8 @@ export const ChatComposer = memo(function ChatComposer({
                   role="list"
                   maxHeight="$qr"
                   overflowY="auto"
-                  padding="$xs"
+                  paddingVertical="$xs"
+                  paddingHorizontal="$md"
                   borderRadius="$control"
                   backgroundColor="$surfaceRaised"
                   onPointerDown={keepEditorFocus}
@@ -1110,7 +1111,7 @@ export const ChatComposer = memo(function ChatComposer({
                   )}
                   {listingSuggestions.length > 0 ? (
                     <Stack role="group" aria-label={t("chatMentionListings")}>
-                      <Text eyebrow paddingHorizontal="$md" paddingTop="$xs">
+                      <Text eyebrow paddingTop="$xs">
                         {t("chatMentionListings")}
                       </Text>
                       {listingSuggestions.map((suggestion) => (
