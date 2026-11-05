@@ -1,4 +1,5 @@
-import { createIdFromString } from "@linky-fit/linksync";
+import { Pubkey } from "@linky-fit/linkstr";
+import { createId, createIdFromString } from "@linky-fit/linksync";
 import { describe, expect, it } from "vitest";
 import {
   getDesktopActiveContactId,
@@ -8,6 +9,20 @@ import {
 } from "./desktopRouteSection";
 
 describe("desktopRouteSection", () => {
+  it("keeps a listing opened from a message in contacts, beside its chat", () => {
+    const author = Pubkey.make("a".repeat(64));
+    const listing = { kind: "listing", author, listingId: "eggs" } as const;
+    expect(getDesktopRouteSection({ ...listing, messageId: null })).toBe(
+      "collaboration",
+    );
+    expect(
+      getDesktopRouteSection({
+        ...listing,
+        messageId: createId<"Message">(),
+      }),
+    ).toBe("contacts");
+  });
+
   it("keeps token management in settings", () => {
     expect(getDesktopRouteSection({ kind: "cashuTokens" })).toBe("settings");
     expect(getDesktopRouteSection({ kind: "cashuTokenNew" })).toBe("settings");

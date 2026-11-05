@@ -37,9 +37,11 @@ export const getDesktopRouteSection = (route: Route): DesktopRouteSection => {
     case "listings":
     case "listingNew":
     case "listingEdit":
-    case "listing":
     case "bankPaymentNew":
       return "collaboration";
+
+    case "listing":
+      return route.messageId === null ? "collaboration" : "contacts";
 
     case "settings":
     case "settingsLanguage":
