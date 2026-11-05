@@ -1398,6 +1398,7 @@ export const de = {
   otherContacts: "Weitere Kontakte",
   today: "Heute",
   yesterday: "Gestern",
+  tomorrow: "Morgen",
   evoluWipeStorageFailed:
     "Gespeicherte Mnemonik fehlt (Evolu-Speicher kann nicht geleert werden).",
 

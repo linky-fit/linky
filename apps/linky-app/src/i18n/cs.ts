@@ -1388,6 +1388,7 @@ export const cs = {
   otherContacts: "Ostatní kontakty",
   today: "Dnes",
   yesterday: "Včera",
+  tomorrow: "Zítra",
 
   // Error and UI strings
   evoluWipeStorageFailed:

@@ -1380,6 +1380,7 @@ export const en = {
   otherContacts: "Other contacts",
   today: "Today",
   yesterday: "Yesterday",
+  tomorrow: "Tomorrow",
 
   // Error and UI strings
   evoluWipeStorageFailed:

@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  formatChatDayLabel,
+  formatClockTime,
   formatShortLightningAddress,
   formatTimeAgo,
   groupAddress,
@@ -56,5 +58,26 @@ describe("groupAddress", () => {
   it("splits an address into groups of four, the last one shorter", () => {
     expect(groupAddress("bc1q5089abcf3t4")).toBe("bc1q 5089 abcf 3t4");
     expect(groupAddress("bc1q")).toBe("bc1q");
+  });
+});
+
+describe("wallet dates", () => {
+  const t = (key: string) => key;
+
+  it("names the day after today, for a recurring payment's next run", () => {
+    const now = new Date();
+    const tomorrow = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + 1,
+      9,
+    );
+    expect(formatChatDayLabel(tomorrow.getTime(), "en", t)).toBe("tomorrow");
+  });
+
+  it("shows the clock without a leading zero on the hour", () => {
+    const nineOhFive = new Date(2026, 10, 5, 9, 5).getTime() / 1000;
+    expect(formatClockTime(nineOhFive, "en")).toBe("9:05 AM");
+    expect(formatClockTime(nineOhFive, "cs")).toBe("9:05");
   });
 });
