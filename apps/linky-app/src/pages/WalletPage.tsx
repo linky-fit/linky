@@ -2,7 +2,9 @@ import { useAtom } from "@linky-fit/linkstr-react";
 import {
   Button,
   EmptyState,
+  Icon,
   IconButton,
+  ListRow,
   Row,
   Section,
   Stack,
@@ -84,20 +86,27 @@ function RecurringPayments(): React.ReactElement {
         {orders.length > 0 ? (
           <RecurringPaymentsList orders={orders} />
         ) : (
-          <Text color="$colorSubtle" paddingVertical="$md">
+          <Text color="$colorSubtle" paddingTop="$md" paddingBottom="$xs">
             {t("recurringEmptyHint")}
           </Text>
         )}
+        <ListRow
+          leading={
+            // As wide as the avatars above, so the label lines up with their names.
+            <Stack width="$avatar" alignItems="center">
+              <Icon name="Plus" color="$accentText" />
+            </Stack>
+          }
+          title={
+            <Text bold color="$accentText">
+              {t("recurringPaymentNewTitle")}
+            </Text>
+          }
+          chevron={false}
+          onPress={() => navigateTo({ route: "recurringPaymentNew" })}
+          testID="recurring-add-button"
+        />
       </Section>
-      <Button
-        variant="accent"
-        icon="Plus"
-        alignSelf="flex-start"
-        onPress={() => navigateTo({ route: "recurringPaymentNew" })}
-        data-guide="recurring-add-button"
-      >
-        {t("recurringPaymentNewTitle")}
-      </Button>
     </Stack>
   );
 }

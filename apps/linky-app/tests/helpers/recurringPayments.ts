@@ -145,7 +145,7 @@ export const enterAmount = async (
 
 export const openForm = async (page: Page): Promise<void> => {
   await page.goto("/#wallet");
-  await page.locator("[data-guide='recurring-add-button']").click();
+  await page.getByTestId("recurring-add-button").click();
   await expect(page).toHaveURL(/#wallet\/recurring\/new$/);
   await page.getByTestId("recurring-picker-contact").click();
 };
