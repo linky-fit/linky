@@ -68,7 +68,9 @@ import {
   TopupInvoiceRoute,
   TopupNoAmountPage,
   TopupPage,
+  SupportLinkyPage,
   TutorialPage,
+  WhatsNewPage,
   BlockedPage,
   RecurringPaymentFormPage,
   RecurringPaymentPage,
@@ -108,6 +110,10 @@ const RoutePage = (): React.ReactElement => {
       return <SettingsPage />;
     case "settingsTutorial":
       return <TutorialPage />;
+    case "settingsSupport":
+      return <SupportLinkyPage />;
+    case "settingsWhatsNew":
+      return <WhatsNewPage />;
     case "settingsBlocked":
       return <BlockedPage />;
     case "settingsLanguage":

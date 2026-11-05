@@ -110,6 +110,7 @@ interface UseScanNativeCompositionParams {
   contactsOnboardingHasBackedUpKeys: ContactsMessagingCompositionResult["contactsOnboardingHasBackedUpKeys"];
   contactsOnboardingHasPaid: ContactsMessagingCompositionResult["contactsOnboardingHasPaid"];
   contactsOnboardingHasSentMessage: ContactsMessagingCompositionResult["contactsOnboardingHasSentMessage"];
+  contactsOnboardingHasSupported: ContactsMessagingCompositionResult["contactsOnboardingHasSupported"];
   contactsRepository: Pick<ContactsRepository, "insert">;
   currentNpub: string | null;
   currentNsec: string | null;
@@ -140,6 +141,7 @@ export const useScanNativeComposition = ({
   contactsOnboardingHasBackedUpKeys,
   contactsOnboardingHasPaid,
   contactsOnboardingHasSentMessage,
+  contactsOnboardingHasSupported,
   contactsRepository,
   currentNpub,
   currentNsec,
@@ -204,6 +206,7 @@ export const useScanNativeComposition = ({
     contactsOnboardingHasBackedUpKeys,
     contactsOnboardingHasPaid,
     contactsOnboardingHasSentMessage,
+    contactsOnboardingHasSupported,
     openNewContactPage,
     onScannedText: (rawValue) => scannedTextHandlerRef.current(rawValue),
     pushToast,

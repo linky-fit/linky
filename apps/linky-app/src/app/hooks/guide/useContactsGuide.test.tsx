@@ -58,6 +58,7 @@ const Harness = ({
     contactsOnboardingHasBackedUpKeys,
     contactsOnboardingHasPaid: false,
     contactsOnboardingHasSentMessage: false,
+    contactsOnboardingHasSupported: false,
     openNewContactPage: () => {},
     route,
   });
@@ -143,6 +144,27 @@ describe("useContactsGuide replay", () => {
     });
     render({ kind: "settings" }, true);
     expect(getApi().contactsGuide).toBeNull();
+
+    cleanup();
+  });
+});
+
+describe("useContactsGuide support task", () => {
+  it("follows the user from settings into the support page", () => {
+    const { cleanup, getApi, render } = setup();
+
+    render({ kind: "contacts" });
+    act(() => {
+      getApi().startContactsGuide("support");
+    });
+    expect(getApi().contactsGuideActiveStep?.step?.id).toBe("support_1");
+
+    render({ kind: "settings" });
+    expect(getApi().contactsGuideActiveStep?.step?.id).toBe("support_2");
+
+    render({ kind: "settingsSupport" });
+    expect(getApi().contactsGuideActiveStep?.step?.id).toBe("support_3");
+    expect(getApi().contactsGuideActiveStep?.total).toBe(3);
 
     cleanup();
   });

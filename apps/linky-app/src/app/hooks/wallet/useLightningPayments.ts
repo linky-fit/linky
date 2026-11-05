@@ -18,7 +18,12 @@ import {
   postPaySaveContactAtom,
 } from "../../state/shell/confirmations";
 import { useKnownLnAddressPayContact } from "./usePaymentDrafts";
-import { paymentCopy, usePaymentsCommands, type Shortfall } from "./paymentUi";
+import {
+  paymentCopy,
+  usePaymentsCommands,
+  useRememberLinkySupport,
+  type Shortfall,
+} from "./paymentUi";
 
 interface UseLightningPaymentsParams {
   dismissPaymentSending: () => void;
@@ -51,6 +56,7 @@ export const useLightningPayments = ({
   t,
 }: UseLightningPaymentsParams) => {
   const commands = usePaymentsCommands();
+  const rememberLinkySupport = useRememberLinkySupport();
   const [
     pendingLightningInvoiceConfirmation,
     setPendingLightningInvoiceConfirmation,
@@ -181,6 +187,7 @@ export const useLightningPayments = ({
         case "Paid": {
           const { receipt, lightningAddress, successAction } = outcome;
           rememberFirstPayment();
+          rememberLinkySupport(contact);
           showPaidOverlay(
             paymentCopy(
               t("paidSentTo"),
@@ -245,6 +252,7 @@ export const useLightningPayments = ({
       formatDisplayedAmountParts,
       knownLnAddressPayContact,
       rememberFirstPayment,
+      rememberLinkySupport,
       reportShortfall,
       setStatus,
       showPaidOverlay,

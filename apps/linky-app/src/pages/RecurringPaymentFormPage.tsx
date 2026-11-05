@@ -14,6 +14,7 @@ import {
   Button,
   EmptyState,
   ListRow,
+  LoadingState,
   Notice,
   Row,
   SegmentedControl,
@@ -34,6 +35,7 @@ import {
   useContactSummaries,
 } from "../app/hooks/contacts/useContactSummaries";
 import { useRecurringPaymentOrders } from "../app/hooks/payments/useRecurringPaymentOrders";
+import { useLinkyContact } from "../app/hooks/useFeedbackContact";
 import { recurringAmountFromInput } from "../app/lib/recurringAmount";
 import {
   dateTimeLocalToEpoch,
@@ -162,8 +164,11 @@ function RecurringPaymentForm({
   const defaultMintUrl = useRecurringMintUrl();
   const mintUrl = order ? order.mintUrl : defaultMintUrl;
   const contacts = useContactSummaries();
+  const linky = useLinkyContact();
 
   const [contactId, setContactId] = React.useState(initial.contactId);
+  // The Linky team picked before its new row is read back.
+  const [savingLinky, setSavingLinky] = React.useState<string | null>(null);
   const [amount, setAmount] = React.useState(initial.amountSat);
   const [note, setNote] = React.useState(initial.note);
   const [frequency, setFrequency] = React.useState<Frequency>(
@@ -183,6 +188,12 @@ function RecurringPaymentForm({
   });
 
   const contact = contactId ? contacts.get(contactId) : undefined;
+  const pickLinky = () => {
+    const id = linky.ensure();
+    if (id === null) return;
+    if (!linky.saved) setSavingLinky(id);
+    setContactId(id);
+  };
   const interval: RecurringInterval = { unit: frequency, count: 1 };
   const timeZone = currentTimeZone();
 
@@ -223,12 +234,22 @@ function RecurringPaymentForm({
     dateFormatter.format(new Date(epochSec * 1000));
 
   if (!contact) {
+    if (savingLinky !== null && savingLinky === contactId) {
+      return <LoadingState label={t("loading")} />;
+    }
     return (
       <ContactPicker
         contacts={Array.from(contacts.values()).filter(isPayableContact)}
         label={t("recurringChooseContact")}
         emptyTitle={t("recurringNoPayableContacts")}
-        onPick={(picked) => setContactId(picked.id)}
+        onPick={(picked) =>
+          picked.id === linky.contact.id ? pickLinky() : setContactId(picked.id)
+        }
+        pinned={{
+          contact: linky.contact,
+          description: t("supportLinkyPickerHint"),
+          testID: "recurring-picker-linky",
+        }}
         rowTestID="recurring-picker-contact"
       />
     );

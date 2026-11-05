@@ -23,6 +23,7 @@ const TASK_ICONS: Record<ContactsGuideKey, IconName> = {
   message: "MessageCircleMore",
   pay: "HandCoins",
   proxy_payment: "Landmark",
+  support: "HeartHandshake",
   topup: "ArrowDownRight",
 };
 

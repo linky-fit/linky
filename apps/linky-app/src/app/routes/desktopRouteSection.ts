@@ -47,6 +47,8 @@ export const getDesktopRouteSection = (route: Route): DesktopRouteSection => {
     case "settingsAppearance":
     case "settingsUnits":
     case "settingsTutorial":
+    case "settingsSupport":
+    case "settingsWhatsNew":
     case "settingsBlocked":
     case "settingsReceiveMethod":
     case "settingsMasterKeys":
@@ -120,6 +122,8 @@ export const isDesktopSectionEntryRoute = (route: Route): boolean => {
     case "settingsAppearance":
     case "settingsUnits":
     case "settingsTutorial":
+    case "settingsSupport":
+    case "settingsWhatsNew":
     case "settingsBlocked":
     case "settingsReceiveMethod":
     case "settingsMasterKeys":

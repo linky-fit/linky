@@ -1,10 +1,19 @@
-import { useAtom, useAtomSet, useAtomValue } from "@linky-fit/linkstr-react";
+import {
+  RegistryContext,
+  useAtom,
+  useAtomSet,
+  useAtomValue,
+} from "@linky-fit/linkstr-react";
 import { Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import React from "react";
 import type { Translate } from "../../../i18n";
 import type { DisplayAmountParts } from "../../../utils/displayAmounts";
-import { contactsOnboardingHasPaidAtom } from "../../state/contacts/onboarding";
+import {
+  contactsOnboardingHasPaidAtom,
+  contactsOnboardingHasSupportedAtom,
+} from "../../state/contacts/onboarding";
+import { isLinkyContact } from "../useFeedbackContact";
 import { pendingPaymentMintMoveAtom } from "../../state/shell/confirmations";
 import type { FundsCheck } from "../../state/wallet/payments";
 import { paymentsCommandsAtom } from "../../state/wallet/payments";
@@ -28,6 +37,20 @@ export const usePaymentsCommands = () =>
 export const useRememberFirstPayment = () => {
   const setHasPaid = useAtomSet(contactsOnboardingHasPaidAtom);
   return React.useCallback(() => setHasPaid(true), [setHasPaid]);
+};
+
+/** Remembers a payment to the Linky team, which ticks off the support task of the contacts onboarding. */
+export const useRememberLinkySupport = () => {
+  // Read through the registry only on a payment to the team, so the flag is
+  // not seeded for every payment hook.
+  const registry = React.useContext(RegistryContext);
+  return React.useCallback(
+    (contact: { readonly npub?: string | null | undefined } | null) => {
+      if (contact && isLinkyContact(contact))
+        registry.set(contactsOnboardingHasSupportedAtom, true);
+    },
+    [registry],
+  );
 };
 
 export type Shortfall = Exclude<FundsCheck, { readonly _tag: "Covered" }>;

@@ -33,6 +33,7 @@ interface UseContactsGuideParams {
   contactsOnboardingHasBackedUpKeys: boolean;
   contactsOnboardingHasPaid: boolean;
   contactsOnboardingHasSentMessage: boolean;
+  contactsOnboardingHasSupported: boolean;
   openNewContactPage: () => void;
   route: Route;
 }
@@ -64,6 +65,7 @@ export const useContactsGuide = ({
   contactsOnboardingHasBackedUpKeys,
   contactsOnboardingHasPaid,
   contactsOnboardingHasSentMessage,
+  contactsOnboardingHasSupported,
   openNewContactPage,
   route,
 }: UseContactsGuideParams): void => {
@@ -85,6 +87,7 @@ export const useContactsGuide = ({
       linky_name: hasLinkyName,
       message: contactsOnboardingHasSentMessage,
       pay: contactsOnboardingHasPaid,
+      support: contactsOnboardingHasSupported,
       topup: cashuBalance > 0,
     }),
     [
@@ -92,6 +95,7 @@ export const useContactsGuide = ({
       contactsOnboardingHasBackedUpKeys,
       contactsOnboardingHasPaid,
       contactsOnboardingHasSentMessage,
+      contactsOnboardingHasSupported,
       hasLinkyName,
     ],
   );
@@ -143,6 +147,7 @@ export const useContactsGuide = ({
       if (kind === "settingsMasterKeys") {
         navigateTo({ route: "settingsMasterKeys" });
       }
+      if (kind === "settingsSupport") navigateTo({ route: "settingsSupport" });
       if (kind === "advanced") navigateTo({ route: "advanced" });
       if (kind === "topup") navigateTo({ route: "topup" });
       if (kind === "topupInvoice") {
@@ -333,8 +338,14 @@ export const useContactsGuide = ({
       goToStep(3);
     }
 
-    if (id === "backup_keys_1" && transition("contacts", "settings")) {
+    if (
+      (id === "backup_keys_1" || id === "support_1") &&
+      transition("contacts", "settings")
+    ) {
       goToStep(1);
+    }
+    if (id === "support_2" && transition("settings", "settingsSupport")) {
+      goToStep(2);
     }
     if (
       id === "backup_keys_2" &&

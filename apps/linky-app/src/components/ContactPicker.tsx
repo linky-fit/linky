@@ -7,11 +7,20 @@ import {
 import { useTranslation } from "../app/hooks/shell";
 import { ContactSummaryAvatar } from "./ContactSummaryAvatar";
 
+export interface PinnedContactPick {
+  contact: ContactSummary;
+  /** Why the row sits on top, e.g. what picking it supports. */
+  description: string;
+  testID?: string | undefined;
+}
+
 interface ContactPickerProps {
   contacts: Iterable<ContactSummary>;
   label: string;
   emptyTitle: string;
   onPick: (contact: ContactSummary) => void;
+  /** A row above the saved contacts, kept out of the sort and search. */
+  pinned?: PinnedContactPick | undefined;
   rowTestID?: string;
 }
 
@@ -21,6 +30,7 @@ export function ContactPicker({
   label,
   emptyTitle,
   onPick,
+  pinned,
   rowTestID = "contact-picker-contact",
 }: ContactPickerProps): React.ReactElement {
   const { t } = useTranslation();
@@ -29,10 +39,11 @@ export function ContactPicker({
   const shown = Array.from(contacts)
     .filter(
       (candidate) =>
-        !query ||
-        [candidate.name, candidate.lnAddress, candidate.npub].some((value) =>
-          value?.toLowerCase().includes(query),
-        ),
+        candidate.id !== pinned?.contact.id &&
+        (!query ||
+          [candidate.name, candidate.lnAddress, candidate.npub].some((value) =>
+            value?.toLowerCase().includes(query),
+          )),
     )
     .sort((a, b) =>
       contactSummaryLabel(a).localeCompare(contactSummaryLabel(b)),
@@ -48,8 +59,19 @@ export function ContactPicker({
         autoCorrect={false}
         spellCheck={false}
       />
+      {pinned && !query ? (
+        <ListRow
+          testID={pinned.testID}
+          leading={<ContactSummaryAvatar contact={pinned.contact} />}
+          title={contactSummaryLabel(pinned.contact)}
+          description={pinned.description}
+          onPress={() => onPick(pinned.contact)}
+        />
+      ) : null}
       {shown.length === 0 ? (
-        <EmptyState title={emptyTitle} />
+        pinned && !query ? null : (
+          <EmptyState title={emptyTitle} />
+        )
       ) : (
         <Stack gap="$xs">
           {shown.map((candidate) => (

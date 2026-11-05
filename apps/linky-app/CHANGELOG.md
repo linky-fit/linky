@@ -19,6 +19,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - The tab bar on a phone shows only icons, like the side bar on a computer.
 - While you type a message, Pay and Request wait behind a + beside the text field, so they no longer get tapped instead of Send.
 - The wallet is one page: below the balance and the Receive and Send buttons come your recurring payments, with a button to add one, and then the whole transaction history. On a computer it fills the window instead of sharing it with the history. The balance and the two buttons stay in place while the list scrolls.
+- Settings have an About Linky section with the tutorial, feedback, Support Linky and What's new. Support Linky suggests 10 000 sat once, weekly or monthly, with monthly chosen; the Linky team is also the first choice when you add a recurring payment, and the tutorial ends with a regular contribution. What's new lists every released version.
 
 ### cs-CZ
 
@@ -27,6 +28,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - Spodní lišta na telefonu ukazuje jen ikony, stejně jako boční lišta na počítači.
 - Při psaní zprávy čekají Zaplatit a Požádat pod + vedle textového pole, takže se už neťuknou místo Odeslat.
 - Peněženka je jedna stránka: pod zůstatkem a tlačítky Přijmout a Odeslat jsou pravidelné platby s tlačítkem pro přidání a pod nimi celá historie transakcí. Na počítači zabírá celé okno, místo aby se dělila s historií. Zůstatek a obě tlačítka zůstávají na místě, zatímco seznam roluje.
+- V nastavení je sekce O aplikaci s tutoriálem, zpětnou vazbou, Podpořit Linky a Co je nového. Podpořit Linky nabídne 10 000 sat jednorázově, týdně nebo měsíčně, s předvybraným měsíčně; tým Linky je také první volbou při přidání pravidelné platby a tutoriál končí pravidelným příspěvkem. Co je nového vypíše každou vydanou verzi.
 
 ## [26.11.1] - 2026-11-05
 

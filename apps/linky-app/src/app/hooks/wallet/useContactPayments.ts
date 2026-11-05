@@ -13,7 +13,12 @@ import type { useContactsMessagingComposition } from "../composition/useContacts
 import type { useBankPaymentOffers } from "../useBankPaymentOffers";
 
 type BankPaymentOffers = ReturnType<typeof useBankPaymentOffers>;
-import { paymentCopy, usePaymentsCommands, type Shortfall } from "./paymentUi";
+import {
+  paymentCopy,
+  usePaymentsCommands,
+  useRememberLinkySupport,
+  type Shortfall,
+} from "./paymentUi";
 
 /** Resolves true once the token is made and handed to the outbox. */
 type PayContactWithCashuMessage = (args: ContactPayment) => Promise<boolean>;
@@ -74,6 +79,7 @@ export const useContactPayments = ({
   walletOpRunning,
 }: UseContactPaymentsParams) => {
   const commands = usePaymentsCommands();
+  const rememberLinkySupport = useRememberLinkySupport();
 
   const payContactWithCashuMessage =
     React.useCallback<PayContactWithCashuMessage>(
@@ -113,6 +119,7 @@ export const useContactPayments = ({
               },
             );
             rememberFirstPayment();
+            rememberLinkySupport(contact);
             navigateTo({ id: outcome.contactId, route: "chat" });
             return true;
           case "AuthorizationChanged":
@@ -150,6 +157,7 @@ export const useContactPayments = ({
         formatDisplayedAmountParts,
         pushToast,
         rememberFirstPayment,
+        rememberLinkySupport,
         setStatus,
         showPaidOverlay,
         showPaymentSending,
