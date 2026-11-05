@@ -1335,6 +1335,8 @@ export const de = {
     "Nur Kontakte, die dich auch gespeichert haben, sehen dich in der Nähe.",
   beaconIntroContacts:
     "Kontakte, die dich auch gespeichert haben, sehen, dass du in der Nähe bist und was du handeln willst.",
+  beaconIntroAddContacts:
+    "Leute in der Nähe mit geöffnetem Linky erscheinen hier, und du bei ihnen, sodass ihr euch mit einem Tipp gegenseitig hinzufügen könnt.",
   beaconIntroNpub:
     "Solange Linky geöffnet ist, sieht jeder, der in der Nähe scannt, deinen npub, damit man dich hinzufügen kann.",
   beaconIntroBluetooth:

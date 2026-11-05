@@ -16,6 +16,7 @@ const beacon = vi.hoisted(() => ({
 }));
 
 vi.mock("../app/hooks/useBeacon", () => ({
+  useBeaconSupport: () => false,
   useIdentityScan: beacon.useIdentityScan,
   useNearbyIdentities: () => beacon.identities,
 }));

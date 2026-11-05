@@ -1317,6 +1317,8 @@ export const en = {
   beaconMutualOnly: "Only contacts who also saved you can see you nearby.",
   beaconIntroContacts:
     "Contacts who also saved you see that you are nearby and what you want to trade.",
+  beaconIntroAddContacts:
+    "People nearby with Linky open show up here, and you on their phones, so you can add each other with a tap.",
   beaconIntroNpub:
     "While Linky is open, anyone scanning nearby can see your npub, so people can add you.",
   beaconIntroBluetooth:

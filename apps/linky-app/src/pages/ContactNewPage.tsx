@@ -29,12 +29,17 @@ import { useTranslation } from "../app/hooks/shell";
 import { useScanCommands } from "../app/hooks/shell/scan";
 import { contactGroupsAtom } from "../app/state/contacts/readModel";
 import type { Route } from "../types/route";
-import { useIdentityScan, useNearbyIdentities } from "../app/hooks/useBeacon";
+import {
+  useBeaconSupport,
+  useIdentityScan,
+  useNearbyIdentities,
+} from "../app/hooks/useBeacon";
 import { getContactQueryPrefill } from "../app/lib/contactQueryPrefill";
 import type { ContactNewStep } from "../app/types/appTypes";
 import { isLightningAddress } from "../lnurlPay";
 
 import type { Translate } from "../i18n";
+import { BeaconOffer } from "../components/NearbyBeaconSection";
 import { readClipboardText } from "../platform/clipboard";
 import { normalizeContactGroups } from "../utils/contactGroups";
 import {
@@ -369,6 +374,7 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
 
   const searchQuery = form.npub.trim();
   const [rowWidth, setRowWidth] = React.useState<number | null>(null);
+  const beaconSupported = useBeaconSupport();
   useIdentityScan();
   const nearbyCandidates = useNearbyCandidates(
     useNearbyIdentities(),
@@ -599,6 +605,8 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
       {searchError ? <Notice tone="danger" title={searchError} /> : null}
 
       {showSearchLoader ? <LoadingState label={t("contactSearching")} /> : null}
+
+      {beaconSupported ? <BeaconOffer context="contacts" t={t} /> : null}
 
       {showSuggestedPeople ? (
         <Stack flexGrow={1} justifyContent="flex-end" paddingTop="$xxl">
