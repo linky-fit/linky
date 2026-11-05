@@ -203,37 +203,46 @@ export const WalletPage: React.FC<WalletPageProps> = React.memo(
     const { cashuTotalBalance } = useWalletBalance();
     return (
       <Stack gap="$xxl">
-        <Stack alignItems="center" gap="$xs" paddingTop="$xxl">
-          <DisplayAmount
-            amount={cashuTotalBalance}
-            accessibilityLabel={t("cashuBalance")}
-            size="xl"
-          />
-          <WalletPendingReceives />
+        <Stack
+          position="sticky"
+          top="$none"
+          zIndex="$sticky"
+          gap="$xxl"
+          paddingBottom="$sm"
+          backgroundColor="$background"
+        >
+          <Stack alignItems="center" gap="$xs" paddingTop="$xxl">
+            <DisplayAmount
+              amount={cashuTotalBalance}
+              accessibilityLabel={t("cashuBalance")}
+              size="xl"
+            />
+            <WalletPendingReceives />
+          </Stack>
+          <Row gap="$sm">
+            <Button
+              flex={1}
+              icon="ArrowDownRight"
+              minHeight="$controlLg"
+              borderRadius="$pill"
+              onPress={() => navigateTo({ route: "topup" })}
+              data-guide="wallet-topup"
+            >
+              {t("walletReceive")}
+            </Button>
+            <Button
+              flex={1}
+              icon="ArrowUpRight"
+              minHeight="$controlLg"
+              borderRadius="$pill"
+              onPress={openScan}
+              disabled={scanIsOpen}
+              data-guide="wallet-send"
+            >
+              {t("walletSend")}
+            </Button>
+          </Row>
         </Stack>
-        <Row gap="$sm">
-          <Button
-            flex={1}
-            icon="ArrowDownRight"
-            minHeight="$controlLg"
-            borderRadius="$pill"
-            onPress={() => navigateTo({ route: "topup" })}
-            data-guide="wallet-topup"
-          >
-            {t("walletReceive")}
-          </Button>
-          <Button
-            flex={1}
-            icon="ArrowUpRight"
-            minHeight="$controlLg"
-            borderRadius="$pill"
-            onPress={openScan}
-            disabled={scanIsOpen}
-            data-guide="wallet-send"
-          >
-            {t("walletSend")}
-          </Button>
-        </Row>
         <PendingOnchainTransfers />
         <RecurringPayments />
         <TransactionHistory />
