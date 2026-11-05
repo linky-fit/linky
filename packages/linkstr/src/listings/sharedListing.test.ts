@@ -87,6 +87,28 @@ describe("shared listing message", () => {
     );
   });
 
+  it("keeps a multi-line title and unit on the summary line, so the note stays intact", () => {
+    const multiLine = new SharedListing({
+      author,
+      listing: new Listing({
+        ...eggs.listing,
+        title: "Domácí\nvajíčka",
+        unit: "za\r\n10 ks",
+      }),
+    });
+    const text = sharedListingMessageText(multiLine, "Still there?");
+
+    expect(text.split("\n").slice(0, 3)).toEqual([
+      "Still there?",
+      "",
+      "Domácí vajíčka · 90 CZK za 10 ks",
+    ]);
+    expect(parseSharedListingMessage(text)).toEqual({
+      note: "Still there?",
+      shared: multiLine,
+    });
+  });
+
   it("keeps the listing when its image does not decode", () => {
     const text = [
       "Eggs",
