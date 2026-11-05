@@ -93,6 +93,7 @@ export function Topbar({
         return (
           <Pressable
             gap="$sm"
+            flexShrink={1}
             aria-label={contactId ? t("contact") : t("messagesTitle")}
             disabled={!contactId}
             onPress={() => {

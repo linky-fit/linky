@@ -233,11 +233,12 @@ export const buildTopbar = ({
 
   if (!onClick) return null;
 
+  // A bank payment offer is dismissed rather than stepped out of, so it keeps
+  // the close glyph instead of the back chevron.
+  const dismisses = route.kind === "bankPaymentOffer";
   return {
-    // A bank payment offer is dismissed rather than stepped out of, so it keeps
-    // the close glyph instead of the back chevron.
-    icon: route.kind === "bankPaymentOffer" ? "X" : "ChevronLeft",
-    label: t("close"),
+    icon: dismisses ? "X" : "ChevronLeft",
+    label: t(dismisses ? "close" : "back"),
     onClick,
   };
 };

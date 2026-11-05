@@ -125,6 +125,8 @@ export function CodeBlock({
       mono
       variant="caption"
       userSelect="text"
+      // Breaking inside long tokens keeps a wrapped line's indentation; Tamagui has no wordBreak prop.
+      $platform-web={{ wordBreak: "break-all" }}
       padding="$md"
       borderRadius="$control"
       backgroundColor="$neutralSoft"

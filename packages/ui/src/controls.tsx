@@ -456,6 +456,7 @@ export function SegmentedControl<T extends string>({
             justifyContent="center"
             minHeight="$controlSm"
             paddingHorizontal="$md"
+            paddingVertical="$xs"
             borderRadius="$pill"
             backgroundColor={selected ? "$accent" : "$transparent"}
           >

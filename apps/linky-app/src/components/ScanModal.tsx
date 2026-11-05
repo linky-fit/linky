@@ -5,6 +5,7 @@ import {
   IconButton,
   ListRow,
   MediaFrame,
+  OptionTile,
   Progress,
   Row,
   Stack,
@@ -201,17 +202,15 @@ export function ScanModal(): React.ReactElement {
             testID="scan-onchain-send"
           />
         ) : null}
-        <Row gap="$sm">
+        <Row gap="$sm" alignItems="stretch">
           {actions.map((action) => (
-            <Button
+            <OptionTile
               key={action.label}
-              variant="secondary"
+              label={action.label}
               icon={action.icon}
               flex={1}
               onPress={action.onPress}
-            >
-              {action.label}
-            </Button>
+            />
           ))}
         </Row>
       </Stack>
