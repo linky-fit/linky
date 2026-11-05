@@ -439,6 +439,7 @@ export function SegmentedControl<T extends string>({
     <Row
       role="radiogroup"
       aria-label={accessibilityLabel}
+      alignItems="stretch"
       gap="$xs"
       padding="$xs"
       borderRadius="$pill"
