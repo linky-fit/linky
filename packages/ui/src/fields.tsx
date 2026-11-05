@@ -112,7 +112,9 @@ export function TextField({
           {...fieldA11y(fieldId, label, error, hint, invalid)}
           disabled={disabled}
           multiline={multiline}
-          {...(multiline ? { rows: 4, whiteSpace: "pre-wrap" } : {})}
+          {...(multiline
+            ? { rows: 4, whiteSpace: "pre-wrap" }
+            : { textOverflow: "ellipsis" })}
           paddingRight={
             trailing ? fieldTrailing.textPadding(trailingWidth) : "$md"
           }

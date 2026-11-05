@@ -293,7 +293,7 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
   await setSeedLoginStorage(page, await createSeedIdentity());
   const banner = page.getByRole("banner");
   const title = banner.getByRole("heading");
-  const close = banner.getByRole("button", { name: "Schließen", exact: true });
+  const back = banner.getByRole("button", { name: "Zurück", exact: true });
 
   const contactId =
     await test.step("open and close the scanner, then save a contact so diagnostic tables contain real changes", async () => {
@@ -325,7 +325,7 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
     await page.locator("[data-guide='contact-message']").click();
     await expect(page).toHaveURL(new RegExp(`#chat/${contactId}$`));
     await expect(page.locator("[data-guide='chat-input']")).toBeVisible();
-    await close.click();
+    await back.click();
     await expect(page).toHaveURL(/#(?:contacts)?$/);
   });
 
@@ -356,7 +356,7 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
         name: new RegExp(`^${new URL(mintUrl).host}\\b`),
       }),
     ).toHaveAttribute("aria-selected", "true");
-    await close.click();
+    await back.click();
     await expect(page).toHaveURL(/#settings$/);
   });
 
@@ -378,9 +378,9 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
     await expect(
       page.getByRole("button", { name: "Löschen", exact: true }),
     ).toHaveCount(0);
-    await close.click();
+    await back.click();
     await expect(page).toHaveURL(/#nostr-relays$/);
-    await close.click();
+    await back.click();
     await expect(page).toHaveURL(/#settings$/);
   });
 
@@ -401,7 +401,7 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
     await expect(
       page.getByRole("switch", { name: "Offline", exact: true }),
     ).toBeVisible();
-    await close.click();
+    await back.click();
     await expect(page).toHaveURL(/#evolu-servers$/);
     await page
       .getByRole("button", { name: "Chat-Speicher", exact: true })
@@ -417,7 +417,7 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
         exact: true,
       }),
     ).toBeDisabled();
-    await close.click();
+    await back.click();
     await expect(page).toHaveURL(/#evolu-servers$/);
     await page.getByText("Daten", { exact: true }).click();
     await expect(page).toHaveURL(/#evolu-current-data$/);
@@ -431,7 +431,7 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
         exact: true,
       }),
     ).toBeVisible();
-    await close.click();
+    await back.click();
     await expect(page).toHaveURL(/#evolu-servers$/);
     await page.getByText("Verlauf", { exact: true }).click();
     await expect(page).toHaveURL(/#evolu-history-data$/);
@@ -441,7 +441,7 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
         page.getByRole("columnheader", { name, exact: true }),
       ).toBeVisible();
     }
-    await close.click();
+    await back.click();
     await expect(page).toHaveURL(/#evolu-servers$/);
     await page.goto("/#evolu-data");
     await expect(title).toHaveAccessibleName("Speicher");
@@ -457,7 +457,7 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
     await expect(page).toHaveURL(/#profile\/edit$/);
     await expect(title).toHaveAccessibleName("Profil bearbeiten");
     await expect(page.locator("#profileName")).toBeVisible();
-    await close.click();
+    await back.click();
     await expect(page).toHaveURL(/#profile$/);
     await expect(
       banner.getByRole("button", { name: "Bearbeiten", exact: true }),

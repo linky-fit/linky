@@ -194,6 +194,30 @@ describe("buildTopbar", () => {
       "ChevronLeft",
     );
   });
+
+  it("names the chevron back and the bank offer's X close", () => {
+    const args = {
+      backFromContactNew: vi.fn(),
+      closeContactDetail: vi.fn(),
+      contactPayBackToChatId: null,
+      navigateToMainReturn: vi.fn(),
+      t: (key: string) => key,
+    };
+
+    expect(
+      buildTopbar({ ...args, route: { kind: "chat", id: contactId } })?.label,
+    ).toBe("back");
+    expect(
+      buildTopbar({
+        ...args,
+        route: {
+          kind: "bankPaymentOffer",
+          chatId: "chat-1",
+          offerId: "offer-1",
+        },
+      })?.label,
+    ).toBe("close");
+  });
 });
 
 describe("buildTopbarLeading", () => {
