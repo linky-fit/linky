@@ -72,6 +72,38 @@ An event that is dropped is only visible to the inspector, as `ListingsEventDrop
 
 `NoRelayAcceptedEvent` (publish), `NoReadRelaysConfigured` (watch with no read relays).
 
+## Sharing a listing in a chat
+
+A listing travels in a chat as a `SharedListing`, the listing with its `author`, inside one ordinary text message ([chat.md](./chat.md)). `sharedListingMessageText(shared, note)` builds the content to send as a `TextMessageDraft`; `parseSharedListingMessage(text)` reads a message back as `{ note, shared }`, or null when it carries no listing. One message carries one listing, and the note may be empty.
+
+```ts
+import {
+  parseSharedListingMessage,
+  SharedListing,
+  sharedListingMessageText,
+} from "@linky-fit/linkstr";
+
+const content = sharedListingMessageText(
+  new SharedListing({ author, listing }),
+  "Is this still available?",
+);
+const parsed = parseSharedListingMessage(content); // { note: "Is this still available?", shared }
+```
+
+The message is a copy: it keeps what was sent when the author later edits or withdraws the listing, and its `image` is the author's own reference, so passing it on needs no upload and gives the image key to whoever receives it. It is not a reply: a listing id is not a rumor id, so it adds no reply tags. Show the note as the message text: for any other purpose (previews, notifications, copying) use the note, or the listing when the note is empty, never the raw content.
+
+The content is the trimmed note, an empty line when there is a note, then three lines a client that does not know the format still shows sensibly:
+
+```
+Is this still available?
+
+Eggs from the garden · 90 CZK per 10 pieces
+nostr:npub1…
+linky:listing:v1:<base64url of the SharedListing JSON>
+```
+
+The first is the listing as plain text (`sat` for `SAT`), the second the author's npub, and the last the marker: `linky:listing:v1:` and the unpadded base64url of `{ "author": "<hex pubkey>", "listing": { … } }`, the listing as in the document. A text is a shared listing only when its last line is a marker that decodes and the line before it names the same author; anything else, a malformed marker included, is plain text. A malformed `image` decodes as none, as in the document.
+
 ## Wire format
 
 | Kind  | Tags, in order                                                                   | Content                                                                   |
