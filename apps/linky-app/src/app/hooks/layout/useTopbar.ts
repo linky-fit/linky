@@ -1,5 +1,5 @@
 import { ContactId as ContactIdType } from "@linky-fit/linksync";
-import { useAtom, useAtomValue } from "@linky-fit/linkstr-react";
+import { useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
 import type { ContactId } from "../../../evolu";
 import { useRouting } from "../../../hooks/useRouting";
@@ -16,7 +16,6 @@ import {
 } from "../../state/contacts/contactsList";
 import { profileDraftAtom } from "../../state/contacts/profiles";
 import { currentPubkeyAtom } from "../../state/session/session";
-import { hiddenTransactionsShownAtom } from "../../state/shell/topbar";
 import {
   useBackFromContactNew,
   useCloseContactDetail,
@@ -30,10 +29,7 @@ import {
 import { useTranslation } from "../shell";
 import { useNavIntent } from "../shell/navIntents";
 import { useScanCommands } from "../shell/scan";
-import {
-  useOnchainTransfers,
-  usePendingOnchainTransfersLink,
-} from "../useOnchainTransfers";
+import { useOnchainTransfers } from "../useOnchainTransfers";
 import { useChatIdOfMessage } from "../useSharedListing";
 import { useMainMenu } from "./useMainMenuState";
 
@@ -65,16 +61,12 @@ export const useTopbar = () => {
     profileDraftAtom,
     (draft) => draft.editing,
   );
-  const pendingOnchainTransfers = usePendingOnchainTransfersLink();
   const onchainTransfers = useOnchainTransfers();
   const onchainTransferDirection =
     route.kind === "onchainTransfer"
       ? (onchainTransfers.find((transfer) => transfer.id === route.id)
           ?.direction ?? null)
       : null;
-  const [hiddenTransactionsShown, setHiddenTransactionsShown] = useAtom(
-    hiddenTransactionsShownAtom,
-  );
 
   const topbar = buildTopbar({
     backFromContactNew,
@@ -91,7 +83,6 @@ export const useTopbar = () => {
     contactsFilterIsActive:
       contactsSearch.trim() !== "" || activeGroup !== null,
     isProfileEditing,
-    pendingOnchainTransfers,
     route,
     t,
     toggleContactsFilter,
@@ -105,15 +96,12 @@ export const useTopbar = () => {
     deleteEditedContact: () => {
       if (route.kind === "contactEdit") void deleteContact(route.id);
     },
-    hiddenTransactionsShown,
     isProfileEditing,
     openContactScan: openScan,
     openReceiveScan,
     openWalletScan,
     route,
     t,
-    toggleHiddenTransactions: () =>
-      setHiddenTransactionsShown((shown) => !shown),
     openMenu,
   });
 

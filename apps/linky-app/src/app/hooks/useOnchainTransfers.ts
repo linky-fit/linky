@@ -32,7 +32,6 @@ import {
   onchainSendPaymentRequest,
   onchainTransferView,
   planOnchainTransfer,
-  unfinishedOnchainTransfers,
   type NewOnchainTransferDraft,
   type OnchainTransferView,
 } from "../lib/onchainTransfers";
@@ -91,29 +90,6 @@ const NO_ONCHAIN_TRANSFERS: readonly OnchainTransferView[] = [];
 /** The user's transfers with the on-chain operator, with the phase each is in; none while the feature is hidden. */
 export const useOnchainTransfers = (): readonly OnchainTransferView[] =>
   useAtomValue(onchainTransfersAtom) ?? NO_ONCHAIN_TRANSFERS;
-
-/** The label and target of the wallet's link to unfinished transfers: the transfer when one runs, else the history; null when none does. */
-export const usePendingOnchainTransfersLink = (): {
-  readonly label: string;
-  readonly open: () => void;
-} | null => {
-  const { t } = useTranslation();
-  const pending = unfinishedOnchainTransfers(useOnchainTransfers());
-  const [only] = pending;
-  if (only === undefined) return null;
-  return pending.length === 1
-    ? {
-        label: t("onchainTransferPendingOne"),
-        open: () => navigateTo({ route: "onchainTransfer", id: only.id }),
-      }
-    : {
-        label: t("onchainTransferPendingMany").replace(
-          "{count}",
-          String(pending.length),
-        ),
-        open: () => navigateTo({ route: "transactions" }),
-      };
-};
 
 const UNAVAILABLE: OnchainConfigState = { status: "unavailable" };
 

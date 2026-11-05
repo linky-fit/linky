@@ -32,11 +32,11 @@ export const cs = {
   transactionWhen: "Kdy",
   transactionTitle: "Platba",
   recurringPaymentsTitle: "Pravidelné platby",
+  recurringEmptyHint:
+    "Posílejte kontaktu stejnou částku každý den, týden nebo měsíc.",
   recurringPaymentTitle: "Pravidelná platba",
   recurringPaymentNewTitle: "Nová pravidelná platba",
   recurringPaymentEditTitle: "Upravit pravidelnou platbu",
-  recurringEmpty: "Zatím žádné pravidelné platby.",
-  recurringScheduledSection: "Naplánované",
   recurringHistorySection: "Historie",
   recurringInsufficientFundsHint: "nízký zůstatek",
   recurringSentBody: "{amount} {unit} pro {name} odesláno.",
@@ -107,8 +107,6 @@ export const cs = {
     "Platbu odešle kterékoli vaše zařízení, na kterém běží Linky, i na pozadí. Pokud ji žádné neodešle do minuty po splatnosti, dostanete připomínku, abyste Linky otevřeli; při otevřené aplikaci uvidíte, jak platba odchází.",
   recurringRepeatAction: "Opakovat pravidelně",
   showTransactions: "Ukázat transakce",
-  walletRecent: "Poslední pohyby",
-  walletSeeAll: "Zobrazit vše",
   feedback: "Zpětná vazba",
   donate: "Přispět",
   data: "Data",
@@ -1494,8 +1492,6 @@ export const cs = {
   onchainTransferCancelBody:
     "Rušte ji jen tehdy, když jste na ni zatím neposlali žádné peníze.",
   onchainTransferKeep: "Ponechat",
-  onchainTransferPendingOne: "Nevyřízená on-chain transakce",
-  onchainTransferPendingMany: "Nevyřízené on-chain transakce: {count}",
   onchainTransfersInProgress: "Probíhá",
   onchainSendReadyNotification:
     "Připraveno: zaplaťte {total} a do vaší bitcoinové peněženky odešleme {amount}.",

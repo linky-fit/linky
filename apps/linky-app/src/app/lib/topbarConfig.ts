@@ -26,8 +26,6 @@ interface BuildTopbarArgs extends BackActionContext {
 interface BuildTopbarLeadingArgs {
   contactsFilterIsActive: boolean;
   isProfileEditing: boolean;
-  /** The wallet's link to unfinished on-chain transfers; null when none runs. */
-  pendingOnchainTransfers: { label: string; open: () => void } | null;
   route: Route;
   t: Translate;
   toggleContactsFilter: () => void;
@@ -36,7 +34,6 @@ interface BuildTopbarLeadingArgs {
 interface BuildTopbarRightArgs {
   chatEditContactId: ContactId | null;
   deleteEditedContact: () => void;
-  hiddenTransactionsShown: boolean;
   isProfileEditing: boolean;
   /** Opens the scanner for a contact's code. */
   openContactScan: () => void;
@@ -45,7 +42,6 @@ interface BuildTopbarRightArgs {
   openWalletScan: () => void;
   route: Route;
   t: Translate;
-  toggleHiddenTransactions: () => void;
   openMenu: () => void;
 }
 
@@ -141,7 +137,6 @@ export const resolveBackAction = (
             navigateTo({ route: "bankPayment", spdPayload: route.spdPayload })
         : () => navigateTo({ route: "wallet" });
 
-    case "transactions":
     case "manualPay":
     case "lnInvoicePay":
     case "cashuTokens":
@@ -154,7 +149,7 @@ export const resolveBackAction = (
     case "recurringPayment":
     case "onchainTransfer":
     case "transaction":
-      return () => navigateTo({ route: "transactions" });
+      return () => navigateTo({ route: "wallet" });
     case "recurringPaymentEdit":
       return () => navigateTo({ route: "recurringPayment", id: route.id });
 
@@ -253,14 +248,13 @@ export const buildTopbar = ({
 };
 
 /**
- * What a root screen shows where a back button would be: the contacts filter,
- * the profile's pencil and the wallet's unfinished on-chain transfers. The
- * scanner takes the right slot of every root screen.
+ * What a root screen shows where a back button would be: the contacts filter
+ * and the profile's pencil. The scanner takes the right slot of every root
+ * screen.
  */
 export const buildTopbarLeading = ({
   contactsFilterIsActive,
   isProfileEditing,
-  pendingOnchainTransfers,
   route,
   t,
   toggleContactsFilter,
@@ -280,15 +274,6 @@ export const buildTopbarLeading = ({
       icon: "Pencil",
       label: t("edit"),
       onClick: () => navigateTo({ route: "profileEdit" }),
-    };
-  }
-
-  if (route.kind === "wallet" && pendingOnchainTransfers) {
-    return {
-      icon: "Bitcoin",
-      indicator: "warning",
-      label: pendingOnchainTransfers.label,
-      onClick: pendingOnchainTransfers.open,
     };
   }
 
@@ -367,7 +352,6 @@ const SHOWS_MENU_BUTTON: Record<
   settingsUnits: false,
   topupInvoice: false,
   topupNoAmount: false,
-  transactions: false,
   transaction: false,
   recurringPaymentNew: false,
   recurringPayment: false,
@@ -377,14 +361,12 @@ const SHOWS_MENU_BUTTON: Record<
 export const buildTopbarRight = ({
   chatEditContactId,
   deleteEditedContact,
-  hiddenTransactionsShown,
   isProfileEditing,
   openContactScan,
   openReceiveScan,
   openWalletScan,
   route,
   t,
-  toggleHiddenTransactions,
   openMenu,
 }: BuildTopbarRightArgs): TopbarButton | null => {
   // Every root screen opens the scanner on the right. The profile and the
@@ -401,19 +383,6 @@ export const buildTopbarRight = ({
     route.kind === "settings"
   ) {
     return { icon: "ScanLine", label: t("scan"), onClick: openWalletScan };
-  }
-
-  if (route.kind === "transactions") {
-    return {
-      icon: hiddenTransactionsShown ? "Eye" : "EyeOff",
-      isActive: hiddenTransactionsShown,
-      label: t(
-        hiddenTransactionsShown
-          ? "transactionsHideHidden"
-          : "transactionsShowHidden",
-      ),
-      onClick: toggleHiddenTransactions,
-    };
   }
 
   if (route.kind === "nostrRelays") {
@@ -561,7 +530,6 @@ const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
   topup: "topupTitle",
   topupInvoice: "topupInvoiceTitle",
   topupNoAmount: "topupNoAmountTitle",
-  transactions: "transactionsTitle",
   transaction: "transactionTitle",
   recurringPaymentNew: "recurringPaymentNewTitle",
   recurringPayment: "recurringPaymentTitle",

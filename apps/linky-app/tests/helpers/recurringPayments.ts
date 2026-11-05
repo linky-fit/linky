@@ -144,7 +144,7 @@ export const enterAmount = async (
 };
 
 export const openForm = async (page: Page): Promise<void> => {
-  await page.goto("/#wallet/transactions");
+  await page.goto("/#wallet");
   await page.locator("[data-guide='recurring-add-button']").click();
   await expect(page).toHaveURL(/#wallet\/recurring\/new$/);
   await page.getByTestId("recurring-picker-contact").click();
@@ -163,7 +163,7 @@ export const saveOrder = async (
   await page
     .getByRole("button", { name: "Set up recurring payment", exact: true })
     .click();
-  await expect(page).toHaveURL(/#wallet\/transactions$/);
+  await expect(page).toHaveURL(/#wallet$/);
   const card = page.getByTestId("recurring-order-card");
   await expect(card).toHaveCount(1);
   await expect(card).toContainText("daily");
@@ -358,7 +358,7 @@ export const expectPaidHistory = async (
   page: Page,
   hash: string,
 ): Promise<void> => {
-  await page.goto("/#wallet/transactions");
+  await page.goto("/#wallet");
   const pill = page.getByTestId("transaction-recurring-pill");
   await expect(pill).toHaveText("daily");
   await page.getByTestId("transaction-card").filter({ has: pill }).click();

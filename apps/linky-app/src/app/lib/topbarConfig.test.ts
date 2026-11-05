@@ -133,13 +133,10 @@ describe("resolveBackAction", () => {
       backHashFor({ kind: "onchainSend", payoutAddress: "", amount: null }),
     ).toBe("#wallet");
     expect(backHashFor({ kind: "onchainReceive" })).toBe("#wallet/topup");
-    expect(backHashFor({ kind: "onchainTransfer", id })).toBe(
-      "#wallet/transactions",
-    );
+    expect(backHashFor({ kind: "onchainTransfer", id })).toBe("#wallet");
   });
 
   it("walks wallet sub-pages back up one level at a time", () => {
-    expect(backHashFor({ kind: "transactions" })).toBe("#wallet");
     expect(backHashFor({ kind: "topup" })).toBe("#wallet");
     expect(backHashFor({ kind: "topupNoAmount" })).toBe("#wallet/topup");
     expect(backHashFor({ kind: "topupInvoice" })).toBe("#wallet/topup");
@@ -259,7 +256,6 @@ describe("buildTopbarLeading", () => {
   const leadingArgs = {
     contactsFilterIsActive: false,
     isProfileEditing: false,
-    pendingOnchainTransfers: null,
     t,
     toggleContactsFilter: vi.fn(),
   };
@@ -303,22 +299,6 @@ describe("buildTopbarLeading", () => {
     ).toBeNull();
   });
 
-  it("marks unfinished on-chain transfers on the wallet with a dot that opens them", () => {
-    const open = vi.fn();
-    const button = buildTopbarLeading({
-      ...leadingArgs,
-      pendingOnchainTransfers: { label: "Pending", open },
-      route: { kind: "wallet" },
-    });
-    button?.onClick();
-
-    expect(button).toMatchObject({ indicator: "warning", label: "Pending" });
-    expect(open).toHaveBeenCalledOnce();
-    expect(
-      buildTopbarLeading({ ...leadingArgs, route: { kind: "wallet" } }),
-    ).toBeNull();
-  });
-
   it("leaves the other root screens without a leading button", () => {
     expect(
       buildTopbarLeading({ ...leadingArgs, route: { kind: "proxyPayments" } }),
@@ -334,13 +314,11 @@ describe("buildTopbarRight", () => {
   const rightArgs = {
     chatEditContactId: null,
     deleteEditedContact: vi.fn(),
-    hiddenTransactionsShown: false,
     isProfileEditing: false,
     openContactScan: vi.fn(),
     openReceiveScan: vi.fn(),
     openWalletScan: vi.fn(),
     t,
-    toggleHiddenTransactions: vi.fn(),
     openMenu: vi.fn(),
   };
 
@@ -457,25 +435,6 @@ describe("buildTopbarRight", () => {
     expect(button?.icon).toBe("ScanLine");
     expect(openReceiveScan).toHaveBeenCalledOnce();
   });
-
-  it("toggles hidden rows from the transactions page", () => {
-    const toggleHiddenTransactions = vi.fn();
-    const button = buildTopbarRight({
-      ...rightArgs,
-      hiddenTransactionsShown: true,
-      route: { kind: "transactions" },
-      toggleHiddenTransactions,
-    });
-
-    button?.onClick();
-
-    expect(button).toMatchObject({
-      icon: "Eye",
-      isActive: true,
-      label: "transactionsHideHidden",
-    });
-    expect(toggleHiddenTransactions).toHaveBeenCalledOnce();
-  });
 });
 
 describe("resolveBackAction for bank payment editing", () => {
@@ -510,8 +469,6 @@ describe("buildTopbarTitle", () => {
     expect(buildTopbarTitle({ kind: "transaction", id: "tx-1" }, t)).toBe(
       "transactionTitle",
     );
-    expect(backHashFor({ kind: "transaction", id: "tx-1" })).toBe(
-      "#wallet/transactions",
-    );
+    expect(backHashFor({ kind: "transaction", id: "tx-1" })).toBe("#wallet");
   });
 });

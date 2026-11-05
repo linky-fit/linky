@@ -169,7 +169,7 @@ test("shard rotations keep old rows, copy edited rows forward, sync new writes, 
     await topUp(source.page, 32);
     await expect.poll(() => readBalanceSat(source.page)).toBe(32);
     for (const device of devices) {
-      await device.page.goto("/#wallet/transactions");
+      await device.page.goto("/#wallet");
       await expect(device.page.getByTestId("transaction-card")).toHaveCount(1);
     }
 
@@ -223,7 +223,7 @@ test("shard rotations keep old rows, copy edited rows forward, sync new writes, 
       await topUp(source.page, 16);
       await expect.poll(() => readBalanceSat(source.page)).toBe(48);
       for (const device of devices) {
-        await device.page.goto("/#wallet/transactions");
+        await device.page.goto("/#wallet");
         await expect(device.page.getByTestId("transaction-card")).toHaveCount(
           2,
         );
@@ -243,7 +243,7 @@ test("shard rotations keep old rows, copy edited rows forward, sync new writes, 
           await expect(
             device.page.getByTestId("chat-bubble").filter({ hasText: text }),
           ).toBeVisible();
-        await device.page.goto("/#wallet/transactions");
+        await device.page.goto("/#wallet");
         await expect(device.page.getByTestId("transaction-card")).toHaveCount(
           2,
         );
@@ -344,9 +344,8 @@ test("shard rotations keep old rows, copy edited rows forward, sync new writes, 
           .getByTestId("chat-bubble")
           .filter({ hasText: "Also before rotation" }),
       ).toHaveCount(0);
-      await fresh.page.goto("/#wallet/transactions");
-      await expect(fresh.page.getByTestId("transaction-card")).toHaveCount(2);
       await fresh.page.goto("/#wallet");
+      await expect(fresh.page.getByTestId("transaction-card")).toHaveCount(2);
       await expect.poll(() => readBalanceSat(fresh.page)).toBe(48);
       await testInfo.attach("fresh device after forgetting shard 0", {
         body: await fresh.page.screenshot(),

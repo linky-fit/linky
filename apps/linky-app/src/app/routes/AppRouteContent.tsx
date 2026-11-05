@@ -73,7 +73,6 @@ import {
   RecurringPaymentFormPage,
   RecurringPaymentPage,
   TransactionPage,
-  TransactionsPage,
 } from "../../pages";
 import { useRouting } from "../../hooks/useRouting";
 import type { Route } from "../../types/route";
@@ -203,8 +202,6 @@ const RoutePage = (): React.ReactElement => {
       return <OnchainTransferNewPage direction="receive" prefill={null} />;
     case "onchainTransfer":
       return <OnchainTransferPage id={route.id} />;
-    case "transactions":
-      return <TransactionsPage />;
     case "transaction":
       return <TransactionPage id={route.id} />;
     case "recurringPaymentNew":
@@ -312,37 +309,21 @@ const PhoneRouteContent = (): React.ReactElement => {
   );
 };
 
+type DesktopSplitSection = Exclude<DesktopRouteSection, "wallet">;
+
 const desktopSectionTitle = {
   contacts: "contactsTitle",
-  wallet: "wallet",
   collaboration: "collaboration",
   settings: "settings",
-} as const satisfies Record<DesktopRouteSection, I18nKey>;
+} as const satisfies Record<DesktopSplitSection, I18nKey>;
 
 /** What the detail pane shows while nothing in the section's list is open. */
 const DesktopSectionDetail = ({
   section,
 }: {
-  section: DesktopRouteSection;
+  section: DesktopSplitSection;
 }): React.ReactElement => {
   const { t } = useTranslation();
-  if (section === "wallet") {
-    return (
-      <PageBody gutter="detail">
-        <Stack
-          flexGrow={1}
-          width="100%"
-          maxWidth="$readable"
-          alignSelf="center"
-        >
-          <Text variant="heading" color="$colorStrong" role="heading">
-            {t("transactionsTitle")}
-          </Text>
-          <TransactionsPage />
-        </Stack>
-      </PageBody>
-    );
-  }
   const empty = {
     contacts: { icon: "MessageCircle", title: t("contactsSelectHint") },
     collaboration: { icon: "Handshake", title: t("collaborationSelectHint") },
@@ -355,27 +336,98 @@ const DesktopSectionDetail = ({
   );
 };
 
-export const AppRouteContent = (): React.ReactElement => {
+/** A page centred at reading width below its own top bar, or the scanner while it is open. */
+const DesktopRoutePane = (): React.ReactElement => {
+  const route = useRouting();
+  const scanIsOpen = useScanIsOpen();
+  if (scanIsOpen) return <ScanModal />;
+  const isChat = route.kind === "chat";
+  return (
+    <>
+      <Stack
+        width="100%"
+        maxWidth={isChat ? "$contentWidth" : "$readable"}
+        alignSelf="center"
+      >
+        <Topbar desktopDetail />
+      </Stack>
+      {isChat ? (
+        <PageFrame fill>
+          <RoutePage />
+        </PageFrame>
+      ) : (
+        <PageBody gutter="detail">
+          <Stack
+            flexGrow={1}
+            width="100%"
+            maxWidth="$readable"
+            alignSelf="center"
+          >
+            <RoutePage />
+          </Stack>
+        </PageBody>
+      )}
+    </>
+  );
+};
+
+/** The wallet fills the space beside the navigation; its pages open in its place. */
+const DesktopWalletPane = (): React.ReactElement => {
   const route = useRouting();
   const { t } = useTranslation();
   const scanIsOpen = useScanIsOpen();
-  const isDesktopSplitView = useDesktopSplitView();
-
-  if (!isDesktopSplitView) return <PhoneRouteContent />;
-
-  const section = getDesktopRouteSection(route);
-  const secondaryIsOpen = !isDesktopSectionRoot(route) || scanIsOpen;
-
   return (
-    <Row
-      testID="desktop-layout"
+    <Stack
+      role="main"
+      position="relative"
       flex={1}
+      minWidth={0}
       minHeight={0}
-      width="100%"
-      alignItems="stretch"
       gap="$none"
+      overflow="hidden"
     >
-      <DesktopNavigation />
+      {scanIsOpen ? (
+        <Stack
+          flex={1}
+          minHeight={0}
+          width="100%"
+          maxWidth="$readable"
+          alignSelf="center"
+        >
+          <ScanModal />
+        </Stack>
+      ) : route.kind === "wallet" ? (
+        <PageBody gutter="detail" paddingTop="$xl">
+          <Stack
+            flexGrow={1}
+            width="100%"
+            maxWidth="$readable"
+            alignSelf="center"
+          >
+            <Text variant="heading" color="$colorStrong" role="heading">
+              {t("wallet")}
+            </Text>
+            <WalletPane />
+          </Stack>
+        </PageBody>
+      ) : (
+        <DesktopRoutePane />
+      )}
+    </Stack>
+  );
+};
+
+const DesktopSplitPanes = ({
+  section,
+}: {
+  section: DesktopSplitSection;
+}): React.ReactElement => {
+  const route = useRouting();
+  const { t } = useTranslation();
+  const scanIsOpen = useScanIsOpen();
+  const secondaryIsOpen = !isDesktopSectionRoot(route) || scanIsOpen;
+  return (
+    <>
       <Stack
         role="main"
         position="relative"
@@ -404,11 +456,6 @@ export const AppRouteContent = (): React.ReactElement => {
           </Text>
           {section === "contacts" ? (
             <DesktopContactsPane />
-          ) : section === "wallet" ? (
-            <WalletPane
-              desktop
-              showRecent={secondaryIsOpen && route.kind !== "transactions"}
-            />
           ) : section === "collaboration" ? (
             <CollaborationPage />
           ) : (
@@ -430,38 +477,38 @@ export const AppRouteContent = (): React.ReactElement => {
         borderLeftWidth={border.hairline}
         borderColor="$borderColor"
       >
-        {!secondaryIsOpen ? (
-          <DesktopSectionDetail section={section} />
-        ) : scanIsOpen ? (
-          <ScanModal />
+        {secondaryIsOpen ? (
+          <DesktopRoutePane />
         ) : (
-          <>
-            <Stack
-              width="100%"
-              maxWidth={route.kind === "chat" ? "$contentWidth" : "$readable"}
-              alignSelf="center"
-            >
-              <Topbar desktopDetail />
-            </Stack>
-            {route.kind === "chat" ? (
-              <PageFrame fill>
-                <RoutePage />
-              </PageFrame>
-            ) : (
-              <PageBody gutter="detail">
-                <Stack
-                  flexGrow={1}
-                  width="100%"
-                  maxWidth="$readable"
-                  alignSelf="center"
-                >
-                  <RoutePage />
-                </Stack>
-              </PageBody>
-            )}
-          </>
+          <DesktopSectionDetail section={section} />
         )}
       </Stack>
+    </>
+  );
+};
+
+export const AppRouteContent = (): React.ReactElement => {
+  const route = useRouting();
+  const isDesktopSplitView = useDesktopSplitView();
+
+  if (!isDesktopSplitView) return <PhoneRouteContent />;
+
+  const section = getDesktopRouteSection(route);
+  return (
+    <Row
+      testID="desktop-layout"
+      flex={1}
+      minHeight={0}
+      width="100%"
+      alignItems="stretch"
+      gap="$none"
+    >
+      <DesktopNavigation />
+      {section === "wallet" ? (
+        <DesktopWalletPane />
+      ) : (
+        <DesktopSplitPanes section={section} />
+      )}
     </Row>
   );
 };
