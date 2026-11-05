@@ -1,14 +1,21 @@
-import { Pubkey, RelayUrl } from "@linky-fit/linkstr";
+import { PrivateImage, Pubkey, RelayUrl } from "@linky-fit/linkstr";
 import type { ListingRecord } from "@linky-fit/linksync";
-import { createId, OwnerId, PositiveInt } from "@linky-fit/linksync";
+import {
+  createId,
+  NonEmptyString,
+  OwnerId,
+  PositiveInt,
+} from "@linky-fit/linksync";
 import { describe, expect, it } from "vitest";
 import {
   beaconTradeOfCashIntent,
   buildListingsDocument,
+  encodeListingImage,
   formatListingPrice,
   defaultListingUnit,
   filterListingAmountInput,
   listingCurrencyLabel,
+  listingOfRecord,
   listingPriceInput,
   listingPriceUnits,
   listingUnitOfDisplay,
@@ -25,6 +32,7 @@ const record = (overrides: Partial<ListingRecord> = {}): ListingRecord => ({
   amount: "90",
   currency: "CZK",
   unit: "za 10 ks",
+  image: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
   isDeleted: 0,
@@ -38,6 +46,33 @@ const alice = Pubkey.make(
 const bob = Pubkey.make(
   "32e1827635450ebb3c5a7d12c1f8e7b2b514439ac10a67eef3d9fd9c5c68e245",
 );
+
+describe("listingOfRecord", () => {
+  const image = new PrivateImage({
+    url: "https://blossom.example/eggs",
+    fileType: "image/jpeg",
+    encryptionAlgorithm: "aes-gcm",
+    key: "11".repeat(32),
+    nonce: "22".repeat(12),
+    encryptedSha256: "33".repeat(32),
+    originalSha256: "44".repeat(32),
+    encryptedSize: 2048,
+    width: 640,
+    height: 480,
+    storageEncoding: "base64",
+  });
+
+  it("passes the stored image through and leaves out one that does not decode", () => {
+    const listing = (value: string) =>
+      listingOfRecord(record({ image: NonEmptyString.orThrow(value) }));
+    expect(listing(encodeListingImage(image))?.image).toEqual(image);
+    for (const broken of ["not json", '{"url":"x"}']) {
+      expect(listing(broken)?.title).toBe("Domácí vajíčka");
+      expect(listing(broken)).not.toHaveProperty("image");
+    }
+    expect(listingOfRecord(record())).not.toHaveProperty("image");
+  });
+});
 
 describe("buildListingsDocument", () => {
   it("orders listings by creation and drops a row the wire does not accept", () => {

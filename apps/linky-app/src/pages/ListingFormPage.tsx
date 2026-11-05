@@ -1,6 +1,7 @@
-import type { ListingSide } from "@linky-fit/linkstr";
+import { identityFromNsec, type ListingSide } from "@linky-fit/linkstr";
 import {
   createId,
+  NonEmptyString,
   NonEmptyString100,
   NonEmptyString1000,
   PositiveInt,
@@ -23,20 +24,33 @@ import {
   useListingsRepository,
 } from "../app/hooks/useLinksync";
 import {
+  encodeListingImage,
   LISTING_SIDES,
   defaultListingUnit,
   filterListingAmountInput,
   listingCurrencyLabel,
   listingFractionDigits,
+  listingOfRecord,
   listingPriceInput,
   listingPriceUnits,
   listingWireCurrency,
   normalizeListingAmount,
 } from "../app/lib/listings";
+import {
+  getChatAttachmentRejection,
+  uploadPrivateImage,
+} from "../app/lib/privateImageMessage";
 import { runWrite } from "../app/lib/storeWrite";
+import {
+  currentNsecAtom,
+  currentPubkeyAtom,
+} from "../app/state/session/session";
 import { allowedDisplayCurrenciesAtom } from "../app/state/shell/displayPrefs";
+import { ListingImage } from "../components/ListingImage";
 import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey } from "../i18n";
+import { getUnknownErrorMessage } from "../utils/unknown";
+import { pickFile } from "../utils/pickFile";
 import { nowSeconds } from "../utils/time";
 
 const SIDE_KEYS: Record<ListingSide, I18nKey> = {
@@ -57,6 +71,7 @@ export function ListingFormPage({
   const { displayCurrency } = useDisplayAmounts();
   const allowedDisplayCurrencies = useAtomValue(allowedDisplayCurrenciesAtom);
   const repository = useListingsRepository();
+  const ownPubkey = useAtomValue(currentPubkeyAtom);
   const records = useListingRecords();
   const existing = id
     ? (records.find((record) => record.id === id) ?? null)
@@ -74,7 +89,16 @@ export function ListingFormPage({
   const [currency, setCurrency] = React.useState(() =>
     defaultListingUnit(displayCurrency, enabledUnits),
   );
-  const [isSaving, setIsSaving] = React.useState(false);
+  const storedImage = React.useMemo(
+    () => (existing ? (listingOfRecord(existing)?.image ?? null) : null),
+    [existing],
+  );
+  const [pickedImage, setPickedImage] = React.useState<File | null>(null);
+  const [keepsStoredImage, setKeepsStoredImage] = React.useState(true);
+  const image = pickedImage ?? (keepsStoredImage ? storedImage : null);
+  const nsec = useAtomValue(currentNsecAtom);
+  const [saving, setSaving] = React.useState<"image" | "listing" | null>(null);
+  const isSaving = saving !== null;
   const [error, setError] = React.useState<string | null>(null);
   // Add is disabled with gaps; pressing it anyway marks them, and until then an empty form is not an error.
   const [attempted, setAttempted] = React.useState(false);
@@ -118,16 +142,69 @@ export function ListingFormPage({
 
   const back = () => navigateTo({ route: "listings" });
 
+  const pickImage = async () => {
+    const file = await pickFile("image/*");
+    if (!file) return;
+    const rejection = file.type.startsWith("image/")
+      ? getChatAttachmentRejection(file)
+      : "chatAttachmentUnsupported";
+    setError(rejection ? t(rejection) : null);
+    if (!rejection) setPickedImage(file);
+  };
+
+  const removeImage = () => {
+    setPickedImage(null);
+    setKeepsStoredImage(false);
+  };
+
+  /** The `image` column to write: a fresh upload, null to clear, or undefined to leave it as it is. */
+  const imageColumn = async (): Promise<NonEmptyString | null | undefined> => {
+    if (pickedImage === null) {
+      return storedImage !== null && !keepsStoredImage ? null : undefined;
+    }
+    const secretKey = nsec ? identityFromNsec(nsec)?.secretKey : undefined;
+    if (!secretKey) throw new Error("listing-image-no-identity");
+    const uploaded = await uploadPrivateImage(pickedImage, {
+      privateKey: secretKey,
+    });
+    reportAppLog({
+      tag: "listings.imageUploaded",
+      summary: "Listing photo uploaded",
+      payload: {
+        fileType: uploaded.fileType,
+        encryptedSize: uploaded.encryptedSize,
+        width: uploaded.width,
+        height: uploaded.height,
+      },
+    });
+    return NonEmptyString.orThrow(encodeListingImage(uploaded));
+  };
+
   const save = async () => {
     if (!canSave || normalizedAmount === null) return;
-    setIsSaving(true);
+    setSaving(pickedImage ? "image" : "listing");
     setError(null);
+    let imageValue: NonEmptyString | null | undefined;
+    try {
+      imageValue = await imageColumn();
+    } catch (cause) {
+      reportAppLog({
+        tag: "listings.imageUploadFailed",
+        summary: "Listing photo could not be uploaded",
+        payload: { error: getUnknownErrorMessage(cause, "unknown") },
+      });
+      setSaving(null);
+      setError(t("listingImageUploadFailed"));
+      return;
+    }
+    setSaving("listing");
     const columns = {
       side: NonEmptyString100.orThrow(side),
       title: NonEmptyString1000.orThrow(title.trim()),
       amount: NonEmptyString100.orThrow(normalizedAmount),
       currency: NonEmptyString100.orThrow(listingWireCurrency(currency)),
       unit: NonEmptyString100.orThrow(unit.trim()),
+      ...(imageValue === undefined ? {} : { image: imageValue }),
     };
     const outcome = await runWrite(
       existing
@@ -138,7 +215,7 @@ export function ListingFormPage({
             ...columns,
           }),
     );
-    setIsSaving(false);
+    setSaving(null);
     if (!outcome.ok) {
       setError(outcome.error);
       return;
@@ -146,16 +223,24 @@ export function ListingFormPage({
     reportAppLog({
       tag: existing ? "listings.edited" : "listings.added",
       summary: `Listing ${existing ? "edited" : "added"}: ${side}`,
-      payload: { side, currency },
+      payload: { side, currency, hasImage: image !== null },
     });
-    back();
+    if (existing && ownPubkey) {
+      navigateTo({
+        route: "listing",
+        author: ownPubkey,
+        listingId: existing.id,
+      });
+    } else {
+      back();
+    }
   };
 
   const remove = async () => {
     if (!existing) return;
-    setIsSaving(true);
+    setSaving("listing");
     const outcome = await runWrite(repository.remove(existing.id));
-    setIsSaving(false);
+    setSaving(null);
     if (!outcome.ok) {
       setError(outcome.error);
       return;
@@ -229,6 +314,43 @@ export function ListingFormPage({
           />
         </Stack>
       </Row>
+      {image ? (
+        <Stack gap="$sm">
+          <ListingImage source={image} label={t("listingImage")} t={t} />
+          <Row gap="$sm">
+            <Button
+              variant="secondary"
+              size="sm"
+              icon="ImagePlus"
+              disabled={isSaving}
+              onPress={() => void pickImage()}
+              testID="listing-image-replace"
+            >
+              {t("listingImageReplace")}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              icon="Trash2"
+              disabled={isSaving}
+              onPress={removeImage}
+              testID="listing-image-remove"
+            >
+              {t("listingImageRemove")}
+            </Button>
+          </Row>
+        </Stack>
+      ) : (
+        <Button
+          variant="secondary"
+          icon="ImagePlus"
+          disabled={isSaving}
+          onPress={() => void pickImage()}
+          testID="listing-image-add"
+        >
+          {t("listingImageAdd")}
+        </Button>
+      )}
       {error ? (
         <Text variant="caption" color="$dangerText">
           {error}
@@ -242,7 +364,9 @@ export function ListingFormPage({
         onPress={() => void save()}
         testID="listing-save"
       >
-        {t(existing ? "listingSave" : "listingAdd")}
+        {saving === "image"
+          ? t("listingImageUploading")
+          : t(existing ? "listingSave" : "listingAdd")}
       </Button>
       {existing ? (
         <Button

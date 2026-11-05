@@ -1,11 +1,14 @@
+import { Listing, parsePubkey, type Pubkey } from "@linky-fit/linkstr";
 import {
   CashuOperationId,
   ContactId,
   KeryxSubscriptionId,
   ListingId,
+  MessageId,
   OnchainTransferId,
   RecurringPaymentId,
 } from "@linky-fit/linksync";
+import { Schema } from "effect";
 import { UNKNOWN_CONTACT_ID_PREFIX } from "../utils/constants";
 
 const decodeSegment = (value: string): string | null => {
@@ -31,6 +34,26 @@ const parseContactId = (value: string): ContactId | null => {
   return result.ok ? result.value : null;
 };
 
+const LISTINGS_PREFIX = "#collaboration/listings/";
+const isListingWireId = Schema.is(Listing.fields.id);
+
+/** `<npub>/<listing id>`, or `<npub>/<listing id>/m/<message id>` for the copy a message holds. */
+const parseListingDetail = (path: string): Route | null => {
+  const [rawAuthor, rawListingId, rawSub, rawMessageId, ...rest] =
+    path.split("/");
+  const author = parsePubkey(decodeSegment(rawAuthor ?? "") ?? "");
+  const listingId = decodeSegment(rawListingId ?? "");
+  if (!author || !listingId || !isListingWireId(listingId) || rest.length > 0)
+    return null;
+  if (rawSub === undefined) {
+    return { kind: "listing", author, listingId, messageId: null };
+  }
+  const messageId = MessageId.fromUnknown(decodeSegment(rawMessageId ?? ""));
+  return rawSub === "m" && messageId.ok
+    ? { kind: "listing", author, listingId, messageId: messageId.value }
+    : null;
+};
+
 export type Route =
   | { kind: "contacts" }
   | { kind: "settings" }
@@ -52,6 +75,13 @@ export type Route =
   | { kind: "listings" }
   | { kind: "listingNew" }
   | { kind: "listingEdit"; id: ListingId }
+  /** Opened from a message: the copy that message holds, otherwise the author's live listing. */
+  | {
+      kind: "listing";
+      author: Pubkey;
+      listingId: string;
+      messageId: MessageId | null;
+    }
   | { kind: "advanced" }
   | { kind: "advancedAutoPayLimit" }
   | { kind: "advancedInspector" }
@@ -147,8 +177,12 @@ export const parseRouteFromHash = (): Route => {
   if (hash === "#collaboration/cash") return { kind: "cash" };
   if (hash === "#collaboration/listings") return { kind: "listings" };
   if (hash === "#collaboration/listings/new") return { kind: "listingNew" };
+  const listingDetail = hash.startsWith(LISTINGS_PREFIX)
+    ? parseListingDetail(hash.slice(LISTINGS_PREFIX.length))
+    : null;
+  if (listingDetail) return listingDetail;
   const listingId = ListingId.fromUnknown(
-    decodeHashSegment(hash, "#collaboration/listings/"),
+    decodeHashSegment(hash, LISTINGS_PREFIX),
   );
   if (listingId.ok) return { kind: "listingEdit", id: listingId.value };
   if (hash === "#advanced") return { kind: "advanced" };

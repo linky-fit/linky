@@ -65,6 +65,7 @@ import {
   postPaySaveContactAtom,
   siteLoginDoneAtom,
 } from "./state/shell/confirmations";
+import { currentPubkeyAtom } from "./state/session/session";
 import { showProfileQrOnTiltAtom } from "./state/shell/devicePrefs";
 import {
   nfcWritePromptKindAtom,
@@ -313,6 +314,7 @@ export const useAppShellComposition = ({
   const closeContactDetail = useCloseContactDetail();
   const backFromContactNew = useBackFromContactNew();
   const contactPayBackToChatId = useNavIntent("contactPayBackToChat");
+  const ownPubkey = useAtomValue(currentPubkeyAtom);
   const dismissTopModal = useDismissTopModal();
   useNativeBackHandler({
     closeScan,
@@ -322,6 +324,7 @@ export const useAppShellComposition = ({
       closeContactDetail,
       contactPayBackToChatId,
       navigateToMainReturn,
+      ownPubkey,
     }),
     scanIsOpen,
   });

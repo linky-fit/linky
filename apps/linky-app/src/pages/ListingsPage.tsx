@@ -1,11 +1,5 @@
-import {
-  Avatar,
-  Button,
-  EmptyState,
-  ListRow,
-  Stack,
-  Text,
-} from "@linky-fit/ui";
+import { useAtomValue } from "@linky-fit/linkstr-react";
+import { Avatar, EmptyState, ListRow, Stack, Text } from "@linky-fit/ui";
 import React from "react";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import {
@@ -14,6 +8,7 @@ import {
 } from "../app/hooks/useCollaboration";
 import { useListingRecords } from "../app/hooks/useLinksync";
 import { formatListingPrice, listingOfRecord } from "../app/lib/listings";
+import { currentPubkeyAtom } from "../app/state/session/session";
 import type { DisplayAmountOptions } from "../utils/displayAmounts";
 import {
   FloatingActionButton,
@@ -36,7 +31,6 @@ function PeerListingRow({
   entry: PeerListing;
   display: DisplayAmountOptions;
 }): React.ReactElement {
-  const contactId = contact.contact.id;
   return (
     <ListRow
       leading={
@@ -53,11 +47,12 @@ function PeerListingRow({
           {formatListingPrice(listing.amount, listing.currency, display)}
         </Price>
       }
-      chevron={false}
-      onPress={
-        contactId
-          ? () => navigateTo({ route: "chat", id: contactId })
-          : undefined
+      onPress={() =>
+        navigateTo({
+          route: "listing",
+          author: contact.pubkey,
+          listingId: listing.id,
+        })
       }
       testID="peer-listing"
     />
@@ -110,29 +105,31 @@ export function ListingsPage(): React.ReactElement {
     [records],
   );
 
-  const addListing = () => navigateTo({ route: "listingNew" });
+  const ownPubkey = useAtomValue(currentPubkeyAtom);
+  const addButton = (
+    <FloatingActionButton
+      icon="Plus"
+      label={t("listingAddNew")}
+      onPress={() => navigateTo({ route: "listingNew" })}
+      pinned
+    />
+  );
   if (offered.length === 0 && wanted.length === 0 && mine.length === 0) {
     return (
-      <EmptyState
-        icon="Package"
-        title={t("listingsEmpty")}
-        description={t("listingsMutualOnly")}
-        action={
-          <Button icon="Plus" onPress={addListing}>
-            {t("listingAddNew")}
-          </Button>
-        }
-      />
+      <>
+        <EmptyState
+          icon="Package"
+          title={t("listingsEmpty")}
+          description={t("listingsMutualOnly")}
+        />
+        {addButton}
+      </>
     );
   }
 
   return (
     <>
-      <FloatingActionButton
-        icon="Plus"
-        label={t("listingAddNew")}
-        onPress={addListing}
-      />
+      {addButton}
       <Stack gap="$xxxl" paddingBottom={floatingActionButtonClearance}>
         <Text color="$colorMuted">{t("listingsLead")}</Text>
         <PeerSection
@@ -167,7 +164,15 @@ export function ListingsPage(): React.ReactElement {
                   </Price>
                 }
                 onPress={() =>
-                  navigateTo({ route: "listingEdit", id: record.id })
+                  navigateTo(
+                    ownPubkey
+                      ? {
+                          route: "listing",
+                          author: ownPubkey,
+                          listingId: record.id,
+                        }
+                      : { route: "listingEdit", id: record.id },
+                  )
                 }
                 testID="own-listing"
               />

@@ -29,6 +29,7 @@ export { KeryxCompanyPage } from "./KeryxCompanyPage";
 export { LnAddressPayRoute } from "./LnAddressPayPage";
 export { LnInvoicePayRoute } from "./LnInvoicePayPage";
 export { LanguagePage } from "./LanguagePage";
+export { ListingDetailPage } from "./ListingDetailPage";
 export { ListingFormPage } from "./ListingFormPage";
 export { ListingsPage } from "./ListingsPage";
 export { AppearancePage } from "./AppearancePage";

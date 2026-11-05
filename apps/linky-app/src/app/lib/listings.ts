@@ -2,6 +2,7 @@ import {
   LISTING_SAT_CURRENCY,
   Listing,
   ListingsDocument,
+  PrivateImage,
   type CashIntent,
   type ListingSide,
   type Pubkey,
@@ -27,10 +28,20 @@ export const LISTING_SIDES = [
 ] as const satisfies ReadonlyArray<ListingSide>;
 
 const decodeListing = Schema.decodeUnknownOption(Listing);
+const decodeJson = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Unknown),
+);
 
-/** The wire listing of a stored row, or null while the row holds something the wire does not accept. */
-export const listingOfRecord = (record: ListingRecord): Listing | null =>
-  Option.getOrNull(
+/** The `image` column of a listing row. */
+export const encodeListingImage = Schema.encodeSync(
+  Schema.fromJsonString(PrivateImage),
+);
+
+/** The wire listing of a stored row, or null while the row holds something the wire does not accept; an image that does not decode is left out. */
+export const listingOfRecord = (record: ListingRecord): Listing | null => {
+  const image =
+    record.image === null ? Option.none() : decodeJson(record.image);
+  return Option.getOrNull(
     decodeListing({
       id: record.id,
       side: record.side,
@@ -38,8 +49,10 @@ export const listingOfRecord = (record: ListingRecord): Listing | null =>
       amount: record.amount,
       currency: record.currency,
       unit: record.unit,
+      ...(Option.isSome(image) ? { image: image.value } : {}),
     }),
   );
+};
 
 /** The document to publish: every valid stored listing, oldest first, plus the cash intent. */
 export const buildListingsDocument = (
