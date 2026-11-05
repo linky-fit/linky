@@ -248,6 +248,7 @@ export const useAppShellComposition = ({
     contactsOnboardingHasBackedUpKeys:
       messaging.contactsOnboardingHasBackedUpKeys,
     contactsOnboardingHasPaid: messaging.contactsOnboardingHasPaid,
+    contactsOnboardingHasSupported: messaging.contactsOnboardingHasSupported,
     contactsOnboardingHasSentMessage:
       messaging.contactsOnboardingHasSentMessage,
     contactsRepository,

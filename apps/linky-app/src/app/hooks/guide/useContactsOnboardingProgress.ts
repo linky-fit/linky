@@ -3,6 +3,7 @@ import React from "react";
 import type { Route } from "../../../types/route";
 import type { Translate } from "../../../i18n";
 import {
+  contactsOnboardingHasSupportedAtom,
   hasContactGroupsAtom,
   hasLinkyNameAtom,
   hasProxyPaymentSetupAtom,
@@ -49,6 +50,8 @@ export interface ContactsOnboardingExtras {
   /** The user owns a name@linky.fit lightning address. */
   hasLinkyName: boolean;
   hasProxyPaymentSetup: boolean;
+  /** The user supported Linky from this device, once or regularly. */
+  hasSupportedLinky: boolean;
 }
 
 interface ContactsOnboardingProgressInput extends ContactsOnboardingExtras {
@@ -66,6 +69,7 @@ export const useContactsOnboardingExtras = (): ContactsOnboardingExtras => {
   const hasContactGroups = useAtomValue(hasContactGroupsAtom);
   const hasLinkyName = useAtomValue(hasLinkyNameAtom);
   const hasProxyPaymentSetup = useAtomValue(hasProxyPaymentSetupAtom);
+  const hasSupportedLinky = useAtomValue(contactsOnboardingHasSupportedAtom);
   return React.useMemo(
     () => ({
       beaconEnabled,
@@ -73,6 +77,7 @@ export const useContactsOnboardingExtras = (): ContactsOnboardingExtras => {
       hasContactGroups,
       hasLinkyName,
       hasProxyPaymentSetup,
+      hasSupportedLinky,
     }),
     [
       beaconEnabled,
@@ -80,6 +85,7 @@ export const useContactsOnboardingExtras = (): ContactsOnboardingExtras => {
       hasContactGroups,
       hasLinkyName,
       hasProxyPaymentSetup,
+      hasSupportedLinky,
     ],
   );
 };
@@ -95,6 +101,7 @@ export const contactsOnboardingTasksOf = ({
   hasContactGroups,
   hasLinkyName,
   hasProxyPaymentSetup,
+  hasSupportedLinky,
   t,
 }: ContactsOnboardingProgressInput): ContactsOnboardingTasksSummary => {
   const tasks: ContactsOnboardingTask[] = [
@@ -147,6 +154,11 @@ export const contactsOnboardingTasksOf = ({
           },
         ]
       : []),
+    {
+      key: "support",
+      label: t("contactsOnboardingTaskSupport"),
+      done: hasSupportedLinky,
+    },
   ];
 
   const done = tasks.reduce((sum, task) => sum + (task.done ? 1 : 0), 0);
@@ -183,6 +195,7 @@ export const useContactsOnboardingProgress = ({
     hasContactGroups,
     hasLinkyName,
     hasProxyPaymentSetup,
+    hasSupportedLinky,
   } = useContactsOnboardingExtras();
 
   const contactsOnboardingTasks = React.useMemo(
@@ -198,6 +211,7 @@ export const useContactsOnboardingProgress = ({
         hasContactGroups,
         hasLinkyName,
         hasProxyPaymentSetup,
+        hasSupportedLinky,
         t,
       }),
     [
@@ -211,6 +225,7 @@ export const useContactsOnboardingProgress = ({
       hasContactGroups,
       hasLinkyName,
       hasProxyPaymentSetup,
+      hasSupportedLinky,
       t,
     ],
   );

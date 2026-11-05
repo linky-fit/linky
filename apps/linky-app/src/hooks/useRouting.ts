@@ -138,6 +138,8 @@ type NavigationAction =
     }
   | { route: "settingsUnits" }
   | { route: "settingsTutorial" }
+  | { route: "settingsSupport" }
+  | { route: "settingsWhatsNew" }
   | { route: "settingsBlocked" }
   | { route: "settingsReceiveMethod" }
   | { route: "transaction"; id: string }
@@ -181,6 +183,12 @@ export const navigateTo = (action: NavigationAction): void => {
       break;
     case "settingsTutorial":
       window.location.assign("#settings/tutorial");
+      break;
+    case "settingsSupport":
+      window.location.assign("#settings/support");
+      break;
+    case "settingsWhatsNew":
+      window.location.assign("#settings/whats-new");
       break;
     case "settingsBlocked":
       window.location.assign("#settings/blocked");

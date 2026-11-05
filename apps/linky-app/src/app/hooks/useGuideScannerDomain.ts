@@ -51,6 +51,7 @@ interface UseGuideScannerDomainParams {
   contactsOnboardingHasBackedUpKeys: boolean;
   contactsOnboardingHasPaid: boolean;
   contactsOnboardingHasSentMessage: boolean;
+  contactsOnboardingHasSupported: boolean;
   openNewContactPage: () => void;
   onScannedText: (rawValue: string) => Promise<void>;
   pushToast: (message: string) => void;
@@ -106,6 +107,7 @@ export const useGuideScannerDomain = ({
   contactsOnboardingHasBackedUpKeys,
   contactsOnboardingHasPaid,
   contactsOnboardingHasSentMessage,
+  contactsOnboardingHasSupported,
   openNewContactPage,
   onScannedText,
   pushToast,
@@ -118,6 +120,7 @@ export const useGuideScannerDomain = ({
     contactsOnboardingHasBackedUpKeys,
     contactsOnboardingHasPaid,
     contactsOnboardingHasSentMessage,
+    contactsOnboardingHasSupported,
     openNewContactPage,
     route,
   });

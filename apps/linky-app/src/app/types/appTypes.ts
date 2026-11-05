@@ -205,7 +205,8 @@ export type ContactsGuideKey =
   | "linky_name"
   | "groups"
   | "proxy_payment"
-  | "beacon";
+  | "beacon"
+  | "support";
 
 export interface ContactsGuideStep {
   bodyKey: I18nKey;

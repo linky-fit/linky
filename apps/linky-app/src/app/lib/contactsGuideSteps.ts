@@ -290,6 +290,29 @@ export const CONTACTS_GUIDE_STEPS: Record<
       "cash",
     ),
   ],
+  support: [
+    step(
+      "support_1",
+      '[data-testid="open-menu"]',
+      "guideBackupKeysStep1Title",
+      "guideBackupKeysStep1Body",
+      "contacts",
+    ),
+    step(
+      "support_2",
+      '[data-testid="open-support-linky"]',
+      "guideSupportStep2Title",
+      "guideSupportStep2Body",
+      "settings",
+    ),
+    step(
+      "support_3",
+      '[data-guide="support-submit"]',
+      "guideSupportStep3Title",
+      "guideSupportStep3Body",
+      "settingsSupport",
+    ),
+  ],
 };
 
 export interface ActiveContactsGuideStep {

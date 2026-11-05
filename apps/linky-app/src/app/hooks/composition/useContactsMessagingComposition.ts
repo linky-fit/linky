@@ -53,6 +53,7 @@ import { unreadByContactIdAtom } from "../../state/contacts/contactsList";
 import {
   contactsOnboardingHasBackedUpKeysAtom,
   contactsOnboardingHasPaidAtom,
+  contactsOnboardingHasSupportedAtom,
 } from "../../state/contacts/onboarding";
 import { bankPaymentOfferMessagesAtom } from "../../state/messages/bankOffers";
 import { chatDraftAtom } from "../../state/messages/chat";
@@ -184,6 +185,9 @@ export const useContactsMessagingComposition = ({
   const registry = React.useContext(RegistryContext);
 
   const contactsOnboardingHasPaid = useAtomValue(contactsOnboardingHasPaidAtom);
+  const contactsOnboardingHasSupported = useAtomValue(
+    contactsOnboardingHasSupportedAtom,
+  );
   const contactsOnboardingHasBackedUpKeys = useAtomValue(
     contactsOnboardingHasBackedUpKeysAtom,
   );
@@ -762,6 +766,7 @@ export const useContactsMessagingComposition = ({
     contactsOnboardingHasBackedUpKeys,
     contactsOnboardingHasPaid,
     contactsOnboardingHasSentMessage,
+    contactsOnboardingHasSupported,
     dispatchInboxEvent,
     getBankPaymentOfferForSettlement,
     isBankPaymentOfferCanceled,

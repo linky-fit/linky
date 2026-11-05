@@ -3,10 +3,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { epochToDateTimeLocal } from "../app/lib/recurringPaymentDisplay";
 import { contactIdFor } from "../testUtils/recurringOrders";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
+import { FEEDBACK_CONTACT_NPUB } from "../utils/constants";
 import { nowSeconds } from "../utils/time";
 import { RecurringPaymentFormPage } from "./RecurringPaymentFormPage";
 
 const CONTACT_ID = contactIdFor("alice");
+const LINKY_ID = contactIdFor("linky");
+
+const { contactRows, saveNpubContact } = vi.hoisted(() => ({
+  contactRows: new Array<{ id: string; name: string; npub: string }>(),
+  saveNpubContact: vi.fn(),
+}));
 
 vi.mock("../app/hooks/shell", async () =>
   (await import("../testUtils/shellHooks")).shellHooksMock(),
@@ -21,8 +28,15 @@ vi.mock("../app/hooks/payments/useRecurringPaymentsActions", () => ({
 }));
 
 vi.mock("../app/hooks/useLinksync", () => ({
-  useContactRows: () => [{ id: CONTACT_ID, name: "Alice", npub: "npub1alice" }],
+  useContactRows: () => [
+    { id: CONTACT_ID, name: "Alice", npub: "npub1alice" },
+    ...contactRows,
+  ],
   useRecurringPaymentRecords: () => [],
+}));
+
+vi.mock("../app/hooks/contacts/useSaveNpubContact", () => ({
+  useSaveNpubContact: () => saveNpubContact,
 }));
 
 vi.mock("../hooks/useRouting", () => ({ navigateTo: vi.fn() }));
@@ -68,6 +82,54 @@ describe("RecurringPaymentFormPage", () => {
   afterEach(() => {
     document.body.innerHTML = "";
     window.location.hash = "";
+    contactRows.length = 0;
+    saveNpubContact.mockReset();
+  });
+
+  it("offers the Linky team first, ahead of the sorted contacts", async () => {
+    contactRows.push({
+      id: LINKY_ID,
+      name: "Linky",
+      npub: FEEDBACK_CONTACT_NPUB,
+    });
+    const container = await renderForm("#wallet/recurring/new");
+    const rows = Array.from(
+      container.querySelectorAll<HTMLElement>(
+        "[data-testid=recurring-picker-linky], [data-testid=recurring-picker-contact]",
+      ),
+    );
+    expect(rows.map((row) => row.dataset.testid)).toEqual([
+      "recurring-picker-linky",
+      "recurring-picker-contact",
+    ]);
+    const linkyRow = rows[0];
+    if (!linkyRow) throw new Error("Linky row missing");
+    expect(linkyRow.textContent).toContain("supportLinkyPickerHint");
+
+    await click(linkyRow);
+    expect(saveNpubContact).not.toHaveBeenCalled();
+    expect(
+      container.querySelector("[data-testid=recurring-recipient-name]")
+        ?.textContent,
+    ).toBe("Linky");
+  });
+
+  it("saves the Linky team as a contact when it is picked for the first time", async () => {
+    saveNpubContact.mockReturnValue({
+      contact: { id: LINKY_ID, npub: FEEDBACK_CONTACT_NPUB },
+      created: true,
+      npub: FEEDBACK_CONTACT_NPUB,
+    });
+    const container = await renderForm("#wallet/recurring/new");
+    const linkyRow = container.querySelector<HTMLElement>(
+      "[data-testid=recurring-picker-linky]",
+    );
+    if (!linkyRow) throw new Error("Linky row missing");
+    expect(linkyRow.textContent).toContain("appTitle");
+
+    await click(linkyRow);
+    expect(saveNpubContact).toHaveBeenCalledWith(FEEDBACK_CONTACT_NPUB);
+    expect(container.querySelector("[role=status]")).not.toBeNull();
   });
 
   it("saves nothing without an amount or with a first payment in the past", async () => {

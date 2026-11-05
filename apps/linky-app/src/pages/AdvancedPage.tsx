@@ -200,14 +200,6 @@ export function AdvancedPage(): React.ReactElement {
           undefined,
           isOpen("settingsUnits"),
         )}
-        {linkRow(
-          "Compass",
-          t("tutorial"),
-          () => navigateTo({ route: "settingsTutorial" }),
-          undefined,
-          isOpen("settingsTutorial"),
-        )}
-        {linkRow("MessageCircle", t("feedback"), openFeedbackContact)}
         {/* Electron has no Web Push service; the running desktop app notifies. */}
         {isDesktopShell()
           ? null
@@ -236,6 +228,36 @@ export function AdvancedPage(): React.ReactElement {
           t("showProfileQrOnTilt"),
           showProfileQrOnTiltEnabled,
           toggleShowProfileQrOnTilt,
+        )}
+      </Section>
+
+      <Section grouped title={t("settingsAbout")}>
+        {linkRow(
+          "Compass",
+          t("tutorial"),
+          () => navigateTo({ route: "settingsTutorial" }),
+          undefined,
+          isOpen("settingsTutorial"),
+        )}
+        {linkRow("MessageCircle", t("feedback"), openFeedbackContact)}
+        <ListRow
+          icon="HeartHandshake"
+          iconTone="accent"
+          title={
+            <Text bold color="$accentText">
+              {t("supportLinky")}
+            </Text>
+          }
+          testID="open-support-linky"
+          onPress={() => navigateTo({ route: "settingsSupport" })}
+          active={isOpen("settingsSupport")}
+        />
+        {linkRow(
+          "Newspaper",
+          t("whatsNew"),
+          () => navigateTo({ route: "settingsWhatsNew" }),
+          valueText(__APP_VERSION__),
+          isOpen("settingsWhatsNew"),
         )}
       </Section>
 

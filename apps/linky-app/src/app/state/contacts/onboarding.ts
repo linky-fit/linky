@@ -1,6 +1,7 @@
 import {
   CONTACTS_ONBOARDING_HAS_BACKUPED_KEYS_STORAGE_KEY,
   CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY,
+  CONTACTS_ONBOARDING_HAS_SUPPORTED_STORAGE_KEY,
 } from "../../../utils/constants";
 import { Atom } from "effect/reactivity";
 import { parseProfileGeneralStatus } from "../../../nostrStatus";
@@ -26,6 +27,11 @@ export const contactsOnboardingHasPaidAtom = onboardingFlagAtom(
 /** The user copied the recovery seed on this device, a step of the contacts onboarding. */
 export const contactsOnboardingHasBackedUpKeysAtom = onboardingFlagAtom(
   CONTACTS_ONBOARDING_HAS_BACKUPED_KEYS_STORAGE_KEY,
+);
+
+/** The user supported Linky from this device, once or regularly, a step of the contacts onboarding. */
+export const contactsOnboardingHasSupportedAtom = onboardingFlagAtom(
+  CONTACTS_ONBOARDING_HAS_SUPPORTED_STORAGE_KEY,
 );
 
 /** The user owns a name@linky.fit lightning address, a step of the contacts onboarding. */

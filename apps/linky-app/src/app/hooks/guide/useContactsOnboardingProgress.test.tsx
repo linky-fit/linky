@@ -136,6 +136,7 @@ describe("useContactsOnboardingProgress", () => {
       "linky_name",
       "groups",
       "proxy_payment",
+      "support",
     ]);
 
     beacon.supported = true;
@@ -147,7 +148,7 @@ describe("useContactsOnboardingProgress", () => {
         stopGuide={vi.fn()}
       />,
     );
-    expect(keys()?.at(-1)).toBe("beacon");
+    expect(keys()?.slice(-2)).toEqual(["beacon", "support"]);
     await act(async () => root.unmount());
   });
 });

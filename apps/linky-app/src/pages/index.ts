@@ -56,6 +56,8 @@ export { TopupPage } from "./TopupPage";
 export { RecurringPaymentFormPage } from "./RecurringPaymentFormPage";
 export { RecurringPaymentPage } from "./RecurringPaymentPage";
 export { TransactionPage } from "./TransactionPage";
+export { SupportLinkyPage } from "./SupportLinkyPage";
 export { TutorialPage } from "./TutorialPage";
+export { WhatsNewPage } from "./WhatsNewPage";
 export { BlockedPage } from "./BlockedPage";
 export { WalletPage } from "./WalletPage";

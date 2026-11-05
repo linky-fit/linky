@@ -70,6 +70,7 @@ const setup = async () => {
       contactsOnboardingHasBackedUpKeys: true,
       contactsOnboardingHasPaid: true,
       contactsOnboardingHasSentMessage: true,
+      contactsOnboardingHasSupported: true,
       onScannedText,
       openNewContactPage: () => undefined,
       pushToast,
