@@ -12,6 +12,8 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ## [Unreleased]
 
+## [26.11.1] - 2026-11-05
+
 ### en-US
 
 - A fresh look in light and dark, without outlines: messages from one person group together, a payment shows its amount right in the chat, the wallet history is grouped by day with + and − amounts, and every contact keeps one picture everywhere. Settings, the tutorial and empty pages are tidier. On a computer, every section keeps its list beside the open page, and the wallet shows its whole history next to the balance.
