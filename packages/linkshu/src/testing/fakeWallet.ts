@@ -1,12 +1,11 @@
 import type {
-  Keyset,
   OutputDataLike,
   Proof,
   ProofLike,
   ProofState,
   SwapPreview,
 } from "@cashu/cashu-ts";
-import { Amount as CashuAmount, MintInfo } from "@cashu/cashu-ts";
+import { Amount as CashuAmount, Keyset, MintInfo } from "@cashu/cashu-ts";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
 
 export const KEYSET_HEX = "009a1f293253e41e";
@@ -34,12 +33,15 @@ export const fakeMintInfo = (stateCheck = true): MintInfo =>
     },
   });
 
-/** A key chain listing `keysets` that fetches no keys. */
+/** A key chain listing `keysets` whose keys every keyset already holds. */
 export const fakeKeyChain = (
   keysets: ReadonlyArray<Keyset> = [],
 ): LoadedWallet["keyChain"] => ({
   getKeysets: () => [...keysets],
-  ensureKeysetKeys: notUnderTest,
+  ensureKeysetKeys: (id) =>
+    Promise.resolve(
+      keysets.find((keyset) => keyset.id === id) ?? new Keyset(id, "sat", true),
+    ),
 });
 
 /** A wallet whose every call fails; tests override only what they exercise. */

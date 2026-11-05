@@ -523,7 +523,7 @@ const decodeAgainst = (
  * Ids that the refreshed keysets still do not resolve name no keyset of the
  * mint, so the token is undecodable for good.
  */
-const decodeInputs = (
+const decodeProofs = (
   wallet: LoadedWallet,
   parsed: ReceivableToken,
 ): Effect.Effect<
@@ -544,6 +544,30 @@ const decodeInputs = (
       detail: "token proofs name no keyset of the mint",
     });
   });
+
+/**
+ * A loaded wallet holds keys only for the mint's active keysets, and the swap
+ * checks each input's DLEQ against its keyset's keys, so a token signed by a
+ * rotated-out keyset needs those keys fetched first.
+ */
+const decodeInputs = (
+  wallet: LoadedWallet,
+  parsed: ReceivableToken,
+): Effect.Effect<
+  DecodedToken,
+  MintUnreachable | MintRejected | TokenParseFailed
+> =>
+  Effect.tap(decodeProofs(wallet, parsed), (decoded) =>
+    Effect.tryPromise({
+      try: () =>
+        Promise.all(
+          [...new Set(decoded.proofs.map((proof) => proof.id))].map((id) =>
+            wallet.keyChain.ensureKeysetKeys(id),
+          ),
+        ),
+      catch: (error) => classifyMintError(parsed.mint, error),
+    }).pipe(answerWithin(parsed.mint, "loading the token's keyset keys")),
+  );
 
 /**
  * The mint's NUT-07 answer for every input, asked before a receive writes

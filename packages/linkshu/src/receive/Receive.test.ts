@@ -835,6 +835,73 @@ describe("Receive.receive", () => {
     ]);
   });
 
+  describe("a token signed by a rotated-out keyset", () => {
+    const retiredKeysetHex = "00b4ec1f98541dfb";
+    const retiredToken = getEncodedToken({
+      mint,
+      unit: "sat",
+      proofs: [{ ...proof(4, "old-a"), id: retiredKeysetHex }],
+    });
+    const walletWithRetiredKeyset = (
+      ensureKeysetKeys: LoadedWallet["keyChain"]["ensureKeysetKeys"],
+      receive: () => Promise<Proof[]>,
+    ) => {
+      const keysets = [
+        new Keyset(KEYSET_HEX, "sat", true, 0),
+        new Keyset(retiredKeysetHex, "sat", false, 0),
+      ];
+      const { wallet, receiveCounters } = makeWallet({ keysets, receive });
+      return {
+        wallet: {
+          ...wallet,
+          keyChain: { getKeysets: () => keysets, ensureKeysetKeys },
+        },
+        receiveCounters,
+      };
+    };
+
+    it("loads that keyset's keys before the swap checks its proofs", async () => {
+      const loaded = new Set<string>();
+      const { wallet } = walletWithRetiredKeyset(
+        (id) => {
+          loaded.add(id);
+          return Promise.resolve(new Keyset(id, "sat", id === KEYSET_HEX, 0));
+        },
+        () =>
+          loaded.has(retiredKeysetHex)
+            ? Promise.resolve([proof(4, "fresh-a")])
+            : Promise.reject(
+                new Error(
+                  `Undefined key for amount 4 in keyset ${retiredKeysetHex}`,
+                ),
+              ),
+      );
+      const { run } = makeHarness(wallet);
+
+      const exit = await run(receiveAndInspect(retiredToken));
+      assert(Exit.isSuccess(exit));
+      expect(exit.value.receipt._tag).toBe("Success");
+      expect(secretsOf(exit.value.proofs)).toEqual(["fresh-a"]);
+    });
+
+    it("defers the token when the mint does not serve that keyset's keys", async () => {
+      const { wallet, receiveCounters } = walletWithRetiredKeyset(
+        () => Promise.reject(new TypeError("fetch failed")),
+        () => Promise.reject(new Error("must not be called")),
+      );
+      const { run } = makeHarness(wallet);
+
+      const exit = await run(receiveAndInspect(retiredToken));
+      assert(Exit.isSuccess(exit));
+      assert(exit.value.receipt._tag === "Failure");
+      expect(exit.value.receipt.failure._tag).toBe("ReceiveDeferred");
+      expect(exit.value.operations.map((operation) => operation.kind)).toEqual([
+        "deferredReceive",
+      ]);
+      expect(receiveCounters).toEqual([]);
+    });
+  });
+
   it("defers a token whose mint refuses to load, as a rate limit or a captive portal does", async () => {
     const { wallet } = makeWallet({
       receive: () => Promise.reject(new Error("must not be called")),
