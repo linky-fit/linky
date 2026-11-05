@@ -1362,7 +1362,7 @@ export const en = {
   listingPriceMissing: "Add a price.",
   listingUnitMissing: "Add a unit.",
   listingDetailTitle: "Listing",
-  listingNotFound: "This listing is no longer shared.",
+  listingNotFound: "This listing is not available.",
   listingYours: "Your listing",
   listingAuthorNotContact: "Not in your contacts",
   listingReply: "Reply",
