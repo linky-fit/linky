@@ -194,6 +194,10 @@ describe("ChatComposer", () => {
 
     await act(async () => menuButton()?.click());
     expect(menuButton()?.getAttribute("aria-expanded")).toBe("true");
+    // The menu is drawn above the input but must follow the + in tab order.
+    expect(
+      menuButton()?.compareDocumentPosition(menuItem("pay") ?? document.body),
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     await act(async () => menuItem("pay")?.click());
     expect(composer.props.openContactPay).toHaveBeenCalledWith("contact", true);
     expect(menuButton()?.getAttribute("aria-expanded")).toBe("false");
