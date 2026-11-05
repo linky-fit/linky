@@ -884,6 +884,25 @@ describe("Receive.receive", () => {
       expect(secretsOf(exit.value.proofs)).toEqual(["fresh-a"]);
     });
 
+    it("leaves a keyset the mint does not list to the swap, which refuses it", async () => {
+      const { wallet } = makeWallet({
+        keysets: [new Keyset(KEYSET_HEX, "sat", true, 0)],
+        receive: () =>
+          Promise.reject(
+            new Error(`Proof has unrecognised keyset. '${retiredKeysetHex}'`),
+          ),
+      });
+      const { run } = makeHarness(wallet);
+
+      const exit = await run(receiveAndInspect(retiredToken));
+      assert(Exit.isSuccess(exit));
+      assert(exit.value.receipt._tag === "Failure");
+      expect(exit.value.receipt.failure._tag).toBe("MintRejected");
+      expect(
+        exit.value.operations.map(({ kind, status }) => ({ kind, status })),
+      ).toEqual([{ kind: "receive", status: "failed" }]);
+    });
+
     it("defers the token when the mint does not serve that keyset's keys", async () => {
       const { wallet, receiveCounters } = walletWithRetiredKeyset(
         () => Promise.reject(new TypeError("fetch failed")),
