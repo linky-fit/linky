@@ -67,6 +67,18 @@ describe("redactInspectorSecrets", () => {
     });
   });
 
+  it("redacts a shared listing marker inside any text and keeps the rest", () => {
+    const text =
+      "fresh today\n\nEggs · 90 CZK per 10\nnostr:npub1x\nlinky:listing:v1:eyJrZXkiOiIwMSJ9_-";
+
+    expect(redactInspectorSecrets({ draft: { content: text } })).toEqual({
+      draft: {
+        content:
+          "fresh today\n\nEggs · 90 CZK per 10\nnostr:npub1x\nlinky:listing:v1:[redacted listing]",
+      },
+    });
+  });
+
   it("leaves a non-cashu token field untouched", () => {
     const value = { auth: { token: "bearer-abc123" } };
     expect(redactInspectorSecrets(value)).toBe(value);

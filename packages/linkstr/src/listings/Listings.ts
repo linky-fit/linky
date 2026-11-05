@@ -22,6 +22,7 @@ import { inspectPlainOperation } from "../internal/inspectPlainOperation";
 import type { SignedPlainEvent } from "../internal/nostrEvent";
 import { publishPlainEvent, replacementDate } from "../internal/plainDelivery";
 import { decodeVerifiedPlainEvent } from "../internal/plainEvent";
+import { redactInspectorSecrets } from "../internal/redactInspectorSecrets";
 import { resubscribeForever } from "../internal/resubscribe";
 import { acquireStreamQueue } from "../internal/streamQueue";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
@@ -158,7 +159,7 @@ export class Listings extends Context.Service<Listings>()("linkstr/Listings", {
                 {
                   eventId: event?.id ?? null,
                   kind: event?.kind ?? null,
-                  event: routed,
+                  event: redactInspectorSecrets(routed),
                 },
                 { disableChecks: true },
               ),

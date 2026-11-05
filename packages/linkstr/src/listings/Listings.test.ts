@@ -168,20 +168,22 @@ describe("listings codec", () => {
   });
 });
 
+const listingImage = new PrivateImage({
+  url: "https://blossom.test/abc",
+  fileType: "image/jpeg",
+  encryptionAlgorithm: "aes-gcm",
+  key: "a".repeat(64),
+  nonce: "b".repeat(24),
+  encryptedSha256: "c".repeat(64),
+  originalSha256: "d".repeat(64),
+  encryptedSize: 1024,
+  width: 800,
+  height: 600,
+  storageEncoding: "base64",
+});
+
 describe("listing image", () => {
-  const image = new PrivateImage({
-    url: "https://blossom.test/abc",
-    fileType: "image/jpeg",
-    encryptionAlgorithm: "aes-gcm",
-    key: "a".repeat(64),
-    nonce: "b".repeat(24),
-    encryptedSha256: "c".repeat(64),
-    originalSha256: "d".repeat(64),
-    encryptedSize: 1024,
-    width: 800,
-    height: 600,
-    storageEncoding: "base64",
-  });
+  const image = listingImage;
   const decodeDocument = Schema.decodeUnknownSync(ListingsDocument);
   const encodedEggs = Schema.encodeSync(Listing)(eggs);
 
@@ -471,6 +473,25 @@ describe("Listings.watch", () => {
         expect(droppedWith(inspected).map((drop) => drop.reason)).toEqual([
           "unwatched-author",
         ]);
+      }),
+    ));
+
+  it("keeps a listing photo's key and nonce out of the routed inspector event", () =>
+    withWatch(bob, [alice.pubkey], ({ facts, inspected, subscriptions }) =>
+      Effect.gen(function* () {
+        const withImage = new ListingsDocument({
+          listings: [new Listing({ ...eggs, image: listingImage })],
+        });
+        subscriptions[0]?.onEvent(
+          listingsEvent(alice, [bob.pubkey], base, withImage),
+        );
+        yield* eventually(() => facts.length === 1);
+        const routed = inspected.filter(
+          (event) => event._tag === "ProfileWatchRouted",
+        );
+        expect(JSON.stringify(routed)).toContain(listingImage.url);
+        expect(JSON.stringify(routed)).not.toContain(listingImage.key);
+        expect(JSON.stringify(routed)).not.toContain(listingImage.nonce);
       }),
     ));
 

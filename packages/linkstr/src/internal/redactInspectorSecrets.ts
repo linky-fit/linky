@@ -1,4 +1,5 @@
 import { Predicate, Struct } from "effect";
+import { SHARED_LISTING_MARKER_PREFIX } from "../listings/sharedListing";
 
 const isAttachment = (value: Record<string, unknown>): boolean =>
   typeof value["encryptionAlgorithm"] === "string" &&
@@ -15,6 +16,18 @@ const isCashuTokenField = (field: string, value: unknown): boolean =>
 // App message content is the app's own payload and may carry a token or keys.
 const isAppMessage = (value: Record<string, unknown>): boolean =>
   typeof value["app"] === "string" && typeof value["content"] === "string";
+
+// A shared listing marker carries the photo's url, key and nonce.
+const sharedListingMarker = new RegExp(
+  `${SHARED_LISTING_MARKER_PREFIX}[\\w-]+`,
+  "g",
+);
+
+const redactString = (value: string): string =>
+  value.replace(
+    sharedListingMarker,
+    `${SHARED_LISTING_MARKER_PREFIX}[redacted listing]`,
+  );
 
 const redactRecord = (value: Record<string, unknown>): unknown => {
   if (isAttachment(value)) return Struct.omit(value, ["key", "nonce"]);
@@ -44,5 +57,6 @@ export const redactInspectorSecrets = (value: unknown): unknown => {
       : redacted;
   }
   if (Predicate.isObject(value)) return redactRecord(value);
+  if (typeof value === "string") return redactString(value);
   return value;
 };
