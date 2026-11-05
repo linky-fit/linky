@@ -1,5 +1,5 @@
 import type { PrivateImage } from "@linky-fit/linkstr";
-import { Image, LoadingState, Stack, Text } from "@linky-fit/ui";
+import { Icon, Image, LoadingState, Stack, Text } from "@linky-fit/ui";
 import React from "react";
 import { usePrivateImageUrl } from "../hooks/usePrivateImageUrl";
 import type { Translate } from "../i18n";
@@ -50,6 +50,42 @@ export function ListingImage({
         </Text>
       ) : (
         <LoadingState label={t("chatImageDecrypting")} />
+      )}
+    </Stack>
+  );
+}
+
+/** A listing's photo as a small square for a list row, cropped to fill; a placeholder until it is decrypted. */
+export function ListingThumbnail({
+  source,
+  label,
+}: {
+  source: PrivateImage;
+  label: string;
+}): React.ReactElement {
+  const { ref, loaded } = usePrivateImageUrl(source);
+  return (
+    <Stack
+      ref={ref}
+      width="$row"
+      height="$row"
+      borderRadius="$sm"
+      overflow="hidden"
+      alignItems="center"
+      justifyContent="center"
+      backgroundColor="$neutralSoft"
+      testID="listing-thumbnail"
+    >
+      {loaded ? (
+        <Image
+          src={loaded.url}
+          aria-label={label}
+          width="100%"
+          height="100%"
+          objectFit="cover"
+        />
+      ) : (
+        <Icon name="Package" color="$colorMuted" />
       )}
     </Stack>
   );

@@ -17,6 +17,7 @@ import {
 } from "@linky-fit/linksync";
 import { act } from "react";
 import { afterEach, expect, it, vi } from "vitest";
+import { resetHiddenListingsForTests } from "../app/lib/hiddenListings";
 import type { ContactRowLike } from "../app/types/appTypes";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { ListingDetailPage } from "./ListingDetailPage";
@@ -103,15 +104,6 @@ vi.mock("../app/hooks/contacts/useDisplayContacts", () => ({
 vi.mock("../app/hooks/contacts/useSaveNpubContact", () => ({
   useSaveNpubContact: () => saveNpubContact,
 }));
-vi.mock(
-  "../app/hooks/contacts/useContactSummaries",
-  async (importOriginal) => ({
-    ...(await importOriginal<
-      typeof import("../app/hooks/contacts/useContactSummaries")
-    >()),
-    useContactSummaries: () => new Map(),
-  }),
-);
 vi.mock("../app/hooks/profile/useEffectiveProfile", () => ({
   useEffectiveProfile: () => ({
     effectiveProfileName: "Me",
@@ -126,6 +118,7 @@ vi.mock("../hooks/useRouting", () => ({ navigateTo }));
 
 afterEach(() => {
   vi.clearAllMocks();
+  resetHiddenListingsForTests();
   state.contacts = [];
   state.snapshot = null;
 });
@@ -133,20 +126,18 @@ afterEach(() => {
 const byTestId = (container: HTMLElement, testID: string) =>
   container.querySelector<HTMLElement>(`[data-testid="${testID}"]`);
 
-it("shows the user's own listing as theirs, with edit first and share", async () => {
+it("shows the user's own listing as theirs, with edit and nothing to hide", async () => {
   const { container, unmount } = await renderIntoDocument(
     <ListingDetailPage author={ME} listingId={ownId} messageId={null} />,
   );
   expect(container.textContent).toContain("Babysitting");
   expect(container.textContent).toContain("listingSideWant");
   expect(byTestId(container, "listing-author")?.textContent).toContain(
-    "listingYours",
+    "nearbyYou",
   );
-  const buttons = [...container.querySelectorAll("[data-testid]")]
-    .map((element) => element.getAttribute("data-testid"))
-    .filter((id) => id === "listing-edit" || id === "listing-share");
-  expect(buttons).toEqual(["listing-edit", "listing-share"]);
+  expect(byTestId(container, "listing-edit")).not.toBeNull();
   expect(byTestId(container, "listing-reply")).toBeNull();
+  expect(byTestId(container, "listing-hide")).toBeNull();
   expect(byTestId(container, "listing-description")).toBeNull();
   await act(async () => byTestId(container, "listing-edit")?.click());
   expect(navigateTo).toHaveBeenCalledWith({ route: "listingEdit", id: ownId });
@@ -160,6 +151,8 @@ it("replies to a contact's listing in their chat", async () => {
   );
   expect(byTestId(container, "listing-author")?.textContent).toContain("Alice");
   expect(byTestId(container, "listing-edit")).toBeNull();
+  await act(async () => byTestId(container, "listing-author")?.click());
+  expect(navigateTo).toHaveBeenCalledWith({ route: "contact", id: contactId });
   await act(async () => byTestId(container, "listing-reply")?.click());
   expect(attachListingToChat).toHaveBeenCalledExactlyOnceWith(
     contactId,
@@ -182,7 +175,9 @@ it("shows the copy a message holds and offers to save an author who is no contac
   expect(byTestId(container, "listing-description")?.textContent).toBe(
     "Free range.\nPick up in Brno.",
   );
-  expect(container.textContent).toContain("listingAuthorNotContact");
+  expect(byTestId(container, "listing-author")?.textContent).toContain(
+    "npub1short",
+  );
   expect(byTestId(container, "listing-reply")).toBeNull();
   await act(async () => byTestId(container, "listing-add-author")?.click());
   expect(saveNpubContact).toHaveBeenCalledExactlyOnceWith(encodeNpub(PEER));
@@ -212,6 +207,20 @@ it("replies with the very copy the message holds", async () => {
   );
   await act(async () => byTestId(container, "listing-reply")?.click());
   expect(attachListingToChat.mock.calls[0]?.[1]).toBe(state.snapshot);
+  await unmount();
+});
+
+it("hides a contact's listing on this device and shows it again", async () => {
+  state.contacts = [{ id: contactId, name: "Alice", npub: encodeNpub(PEER) }];
+  const { container, unmount } = await renderIntoDocument(
+    <ListingDetailPage author={PEER} listingId="eggs" messageId={null} />,
+  );
+  expect(byTestId(container, "listing-show")).toBeNull();
+  await act(async () => byTestId(container, "listing-hide")?.click());
+  expect(byTestId(container, "listing-hide")).toBeNull();
+  expect(byTestId(container, "listing-reply")).not.toBeNull();
+  await act(async () => byTestId(container, "listing-show")?.click());
+  expect(byTestId(container, "listing-hide")).not.toBeNull();
   await unmount();
 });
 
