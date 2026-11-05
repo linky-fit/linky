@@ -4,6 +4,7 @@ import {
   Button,
   Chip,
   DaySeparator,
+  Divider,
   duration,
   easing,
   Icon,
@@ -934,7 +935,10 @@ function ChatMessageComponent({
       <>
         {sharedListingCard}
         {content ? (
-          <MessageText>{inlineMessageContent ?? content}</MessageText>
+          <>
+            <Divider marginVertical="$xs" />
+            <MessageText>{inlineMessageContent ?? content}</MessageText>
+          </>
         ) : null}
       </>
     ) : isDeclineMessage ? (
@@ -1005,7 +1009,9 @@ function ChatMessageComponent({
           onMouseLeave={() => setHovered(false)}
           direction={isOut ? "outgoing" : "incoming"}
           groupPosition={groupPosition}
-          timeBelow={Boolean(paymentRequestInfo || bankPaymentOfferInfo)}
+          timeBelow={Boolean(
+            paymentRequestInfo || bankPaymentOfferInfo || sharedListing,
+          )}
           pending={isPending}
           onContextMenu={(event: React.MouseEvent) => {
             event.preventDefault();

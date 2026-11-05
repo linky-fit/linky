@@ -1,5 +1,5 @@
 import type { SharedListing } from "@linky-fit/linkstr";
-import { Pill, Pressable, Row, Stack, Text } from "@linky-fit/ui";
+import { Icon, Pill, Pressable, Row, Stack, Text } from "@linky-fit/ui";
 import React from "react";
 import { useTranslation } from "../app/hooks/shell";
 import { useListingPriceText } from "../app/hooks/useCollaboration";
@@ -27,9 +27,14 @@ export function SharedListingCard({
       aria-label={`${listing.title}, ${priceText(listing)}`}
       testID="chat-shared-listing"
     >
-      <Stack flex={1} gap="$sm" minWidth="$qr">
+      <Stack flex={1} gap="$sm" minWidth="$device" maxWidth="100%">
         {listing.image ? (
-          <ListingImage source={listing.image} label={listing.title} t={t} />
+          <ListingImage
+            source={listing.image}
+            label={listing.title}
+            capHeight={false}
+            t={t}
+          />
         ) : null}
         <Row justifyContent="space-between" alignItems="center" gap="$sm">
           <Text eyebrow numberOfLines={1}>
@@ -43,10 +48,15 @@ export function SharedListingCard({
             )}
           />
         </Row>
-        <Text bold>{listing.title}</Text>
-        <Text variant="caption" color="$colorSubtle">
-          {priceText(listing)}
-        </Text>
+        <Row alignItems="center" gap="$sm">
+          <Stack flex={1} gap="$xs">
+            <Text bold>{listing.title}</Text>
+            <Text variant="caption" color="$colorSubtle">
+              {priceText(listing)}
+            </Text>
+          </Stack>
+          <Icon name="ChevronRight" size="sm" color="$colorMuted" />
+        </Row>
       </Stack>
     </Pressable>
   );
