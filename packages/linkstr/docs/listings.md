@@ -90,7 +90,7 @@ const content = sharedListingMessageText(
 const parsed = parseSharedListingMessage(content); // { note: "Is this still available?", shared }
 ```
 
-The message is a copy: it keeps what was sent when the author later edits or withdraws the listing, and its `image` is the author's own reference, so passing it on needs no upload and gives the image key to whoever receives it. It is not a reply: a listing id is not a rumor id, so it adds no reply tags. Show the note as the message text: for any other purpose (previews, notifications, copying) use the note, or the listing when the note is empty, never the raw content.
+The message is a copy: it keeps what was sent when the author later edits or withdraws the listing, and its `image` is the author's own reference, so passing it on needs no upload and gives the image key to whoever receives it. The listing is not what it replies to: a listing id is not a rumor id, so it never goes into reply tags, though the message may still reply to another message. Show the note as the message text: for any other purpose (previews, notifications, copying) use the note, or the listing when the note is empty, never the raw content.
 
 The content is the trimmed note, an empty line when there is a note, then three lines a client that does not know the format still shows sensibly:
 

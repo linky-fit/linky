@@ -51,7 +51,7 @@ interface UseSendChatMessageParams<
   TContact extends ContactIdentityRowLike,
 > {
   appendLocalNostrMessage: AppendLocalNostrMessage;
-  /** Sent with the draft, under it as the note, and never as a reply; never with an image or a given `text`. */
+  /** Sent with the draft, under it as the note; never with an image or a given `text`. */
   attachedListing: SharedListing | null;
   chatDraft: string;
   clearAttachedListing: () => void;
@@ -150,11 +150,8 @@ export const useSendChatMessage = <
           ? await uploadPrivateImage(imageFile, { privateKey: privBytes })
           : null;
         const messageContent = image ? privateImageMessageContent(image) : text;
-        const openReplyContext =
+        const activeReplyContext =
           options?.replyContext ?? readReplyContext() ?? replyContext ?? null;
-        const openReplyToId = (openReplyContext?.replyToId ?? "").trim();
-        // A shared listing is never a reply; sending it still closes the open reply.
-        const activeReplyContext = sharedListing ? null : openReplyContext;
         const activeReplyToId = (activeReplyContext?.replyToId ?? "").trim();
         const replyTo = isRumorId(activeReplyToId)
           ? activeReplyToId
@@ -164,10 +161,10 @@ export const useSendChatMessage = <
         const root =
           replyTo !== undefined && isRumorId(rootId) ? rootId : undefined;
         const clearReplyContextIfCurrent = () => {
-          if (!openReplyToId) return;
+          if (!activeReplyToId) return;
           setReplyContext((previous) => {
             const previousReplyToId = (previous?.replyToId ?? "").trim();
-            return previousReplyToId === openReplyToId ? null : previous;
+            return previousReplyToId === activeReplyToId ? null : previous;
           });
         };
         const createdAtSec = UnixSeconds.make(nowSeconds());

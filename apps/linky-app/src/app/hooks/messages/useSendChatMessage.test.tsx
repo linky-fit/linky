@@ -391,16 +391,7 @@ describe("useSendChatMessage", () => {
         ),
       ),
     );
-    const openReply: ReplyContext = {
-      replyToContent: "parent",
-      replyToId: REPLY_TO,
-      rootMessageId: ROOT,
-    };
-    const harness = await setup({
-      attachedListing: shared,
-      chatDraft: "",
-      replyContext: openReply,
-    });
+    const harness = await setup({ attachedListing: shared, chatDraft: "" });
 
     await act(async () => {
       expect(await harness.getSend()?.()).toBe("enqueued");
@@ -413,16 +404,10 @@ describe("useSendChatMessage", () => {
       shared,
     });
     expect(draft?.replyTo).toBeUndefined();
-    expect(draft?.root).toBeUndefined();
-    expect(harness.appendLocalNostrMessage).toHaveBeenCalledWith(
-      expect.not.objectContaining({ replyToId: expect.anything() }),
-    );
     expect(harness.appendLocalNostrMessage).toHaveBeenCalledWith(
       expect.objectContaining({ content: draft?.content }),
     );
     expect(harness.clearAttachedListing).toHaveBeenCalledOnce();
-    const closeReply = harness.setReplyContext.mock.calls[0]?.[0];
-    expect(closeReply?.(openReply)).toBeNull();
 
     await act(async () => harness.root.unmount());
   });
