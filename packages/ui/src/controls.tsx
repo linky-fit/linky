@@ -275,6 +275,8 @@ export interface ChipProps {
   onPress: () => void;
   disabled?: boolean | undefined;
   accessibilityLabel?: string | undefined;
+  /** Ends the chip with a cross and makes its press remove it, e.g. an applied filter. */
+  removable?: boolean | undefined;
 }
 
 /** A selectable pill: filters, reactions and choices. */
@@ -284,10 +286,12 @@ export function Chip({
   onPress,
   disabled,
   accessibilityLabel,
+  removable = false,
 }: ChipProps) {
+  const color = selected ? "$accentText" : "$colorSubtle";
   return (
     <Pressable
-      aria-pressed={selected}
+      aria-pressed={removable ? undefined : selected}
       aria-label={accessibilityLabel}
       onPress={onPress}
       disabled={disabled}
@@ -298,14 +302,10 @@ export function Chip({
       backgroundColor={selected ? "$accentSoft" : "$neutralSoft"}
       hoverStyle={{ opacity: opacity.dimmed }}
     >
-      <Text
-        variant="caption"
-        bold
-        color={selected ? "$accentText" : "$colorSubtle"}
-        numberOfLines={1}
-      >
+      <Text variant="caption" bold color={color} numberOfLines={1}>
         {label}
       </Text>
+      {removable ? <Icon name="X" size="sm" color={color} /> : null}
     </Pressable>
   );
 }

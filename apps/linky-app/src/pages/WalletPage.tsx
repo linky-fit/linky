@@ -1,12 +1,4 @@
-import {
-  Button,
-  Row,
-  Section,
-  space,
-  Stack,
-  StatusDot,
-  Text,
-} from "@linky-fit/ui";
+import { Button, Row, Section, Stack, StatusDot, Text } from "@linky-fit/ui";
 import React from "react";
 import { useTransactionHistory } from "../app/hooks/payments/useTransactionHistory";
 import { useTranslation } from "../app/hooks/shell";
@@ -21,6 +13,8 @@ import { navigateTo } from "../hooks/useRouting";
 const RECENT_TRANSACTIONS = 4;
 
 interface WalletPageProps {
+  /** Docks Receive and Send at the bottom of a pane taller than the wallet, as in the desktop column. */
+  actionsAtBottom: boolean;
   openScan: () => void;
   scanIsOpen: boolean;
   showRecent: boolean;
@@ -33,31 +27,9 @@ function RecentTransactions(): React.ReactElement {
   const recent = history.entries.slice(0, RECENT_TRANSACTIONS);
   return (
     <Stack gap="$xs">
-      <Row justifyContent="space-between" paddingHorizontal="$md">
-        <Text eyebrow role="heading">
-          {t("walletRecent")}
-        </Text>
-        <Button
-          variant="ghost"
-          size="sm"
-          // Outset by its padding so the label lines up with the amounts below.
-          marginRight={-space.md}
-          onPress={() => navigateTo({ route: "transactions" })}
-        >
-          <Row alignItems="center" gap="$sm">
-            <Text variant="caption" bold color="$accentText" numberOfLines={1}>
-              {t("walletSeeAll")}
-            </Text>
-            {pendingOnchainTransfers ? (
-              <StatusDot
-                tone="accent"
-                accessibilityLabel={pendingOnchainTransfers.label}
-                testID="wallet-pending-onchain"
-              />
-            ) : null}
-          </Row>
-        </Button>
-      </Row>
+      <Text eyebrow role="heading" paddingHorizontal="$md">
+        {t("walletRecent")}
+      </Text>
       {recent.length === 0 ? null : (
         <Section grouped>
           {recent.map((entry) =>
@@ -79,16 +51,60 @@ function RecentTransactions(): React.ReactElement {
           )}
         </Section>
       )}
+      <Button
+        variant="ghost"
+        size="sm"
+        alignSelf="center"
+        onPress={() => navigateTo({ route: "transactions" })}
+      >
+        <Row alignItems="center" gap="$sm">
+          <Text variant="caption" bold color="$accentText" numberOfLines={1}>
+            {t("walletSeeAll")}
+          </Text>
+          {pendingOnchainTransfers ? (
+            <StatusDot
+              tone="accent"
+              accessibilityLabel={pendingOnchainTransfers.label}
+              testID="wallet-pending-onchain"
+            />
+          ) : null}
+        </Row>
+      </Button>
     </Stack>
   );
 }
 
 export const WalletPage: React.FC<WalletPageProps> = React.memo(
-  ({ openScan, scanIsOpen, showRecent }) => {
+  ({ actionsAtBottom, openScan, scanIsOpen, showRecent }) => {
     const { t } = useTranslation();
     const { cashuTotalBalance } = useWalletBalance();
+    const actions = (
+      <Row gap="$sm" width="100%" maxWidth="$form" alignSelf="center">
+        <Button
+          flex={1}
+          icon="ArrowDownRight"
+          minHeight="$controlLg"
+          borderRadius="$pill"
+          onPress={() => navigateTo({ route: "topup" })}
+          data-guide="wallet-topup"
+        >
+          {t("walletReceive")}
+        </Button>
+        <Button
+          flex={1}
+          icon="ArrowUpRight"
+          minHeight="$controlLg"
+          borderRadius="$pill"
+          onPress={openScan}
+          disabled={scanIsOpen}
+          data-guide="wallet-send"
+        >
+          {t("walletSend")}
+        </Button>
+      </Row>
+    );
     return (
-      <Stack gap="$xxxl">
+      <Stack gap="$xxxl" flexGrow={1}>
         <Stack alignItems="center" gap="$xs" paddingTop="$xxl">
           <DisplayAmount
             amount={cashuTotalBalance}
@@ -97,30 +113,13 @@ export const WalletPage: React.FC<WalletPageProps> = React.memo(
           />
           <WalletPendingReceives />
         </Stack>
-        <Row gap="$sm" width="100%" maxWidth="$form" alignSelf="center">
-          <Button
-            flex={1}
-            icon="ArrowDownRight"
-            minHeight="$controlLg"
-            borderRadius="$pill"
-            onPress={() => navigateTo({ route: "topup" })}
-            data-guide="wallet-topup"
-          >
-            {t("walletReceive")}
-          </Button>
-          <Button
-            flex={1}
-            icon="ArrowUpRight"
-            minHeight="$controlLg"
-            borderRadius="$pill"
-            onPress={openScan}
-            disabled={scanIsOpen}
-            data-guide="wallet-send"
-          >
-            {t("walletSend")}
-          </Button>
-        </Row>
+        {actionsAtBottom ? null : actions}
         {showRecent ? <RecentTransactions /> : null}
+        {actionsAtBottom ? (
+          <Stack flexGrow={1} justifyContent="flex-end">
+            {actions}
+          </Stack>
+        ) : null}
       </Stack>
     );
   },

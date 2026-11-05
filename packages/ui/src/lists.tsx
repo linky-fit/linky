@@ -201,18 +201,21 @@ export function ContactRow({
           >
             {name}
           </Text>
+          {badge ? <Pill label={badge} tone="warning" size="sm" /> : null}
           {status ? (
             <Text
               variant="caption"
               color="$colorMuted"
               numberOfLines={1}
-              flexShrink={1}
+              // Takes only the room the name leaves, so a long status never cuts the name.
+              flexBasis={0}
+              flexGrow={1}
+              minWidth={0}
               dir="auto"
             >
               {status}
             </Text>
           ) : null}
-          {badge ? <Pill label={badge} tone="warning" size="sm" /> : null}
         </Row>
       }
       description={preview}

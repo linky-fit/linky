@@ -30,6 +30,8 @@ export function Icon({ name, size = "md", color = "$color" }: IconProps) {
       size={iconSizes[size]}
       color={themed ? getVariableValue(themed) : color}
       strokeWidth={iconStroke}
+      // An icon keeps its size in a row whose text runs out of room.
+      style={{ flexShrink: 0 }}
       aria-hidden
     />
   );

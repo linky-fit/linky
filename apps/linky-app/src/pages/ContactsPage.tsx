@@ -106,6 +106,55 @@ function NearbyContactsSection({ t }: { t: Translate }) {
   );
 }
 
+/** The search and group the closed filter still applies, each removable. */
+function AppliedFilters({
+  activeGroup,
+  contactsSearch,
+  filterOptions,
+  setActiveGroup,
+  setContactsSearch,
+  t,
+}: Pick<
+  ContactsPageProps,
+  | "activeGroup"
+  | "contactsSearch"
+  | "filterOptions"
+  | "setActiveGroup"
+  | "setContactsSearch"
+  | "t"
+>) {
+  const search = contactsSearch.trim();
+  if (!search && activeGroup === null) return null;
+  const groupLabel =
+    filterOptions.find((option) => option.value === activeGroup)?.label ??
+    activeGroup;
+  return (
+    <Row gap="$sm" flexWrap="wrap" paddingVertical="$xs">
+      {search ? (
+        <Chip
+          label={`“${search}”`}
+          selected
+          removable
+          accessibilityLabel={t("contactsSearchClear")}
+          onPress={() => setContactsSearch("")}
+        />
+      ) : null}
+      {groupLabel === null ? null : (
+        <Chip
+          label={groupLabel}
+          selected
+          removable
+          accessibilityLabel={t("contactsFilterRemove").replace(
+            "{filter}",
+            groupLabel,
+          )}
+          onPress={() => setActiveGroup(null)}
+        />
+      )}
+    </Row>
+  );
+}
+
 export const ContactsPage: FC<ContactsPageProps> = React.memo(
   ({
     activeGroup,
@@ -142,6 +191,16 @@ export const ContactsPage: FC<ContactsPageProps> = React.memo(
     return (
       <>
         {onboardingContent}
+        {filterOpen ? null : (
+          <AppliedFilters
+            activeGroup={activeGroup}
+            contactsSearch={contactsSearch}
+            filterOptions={filterOptions}
+            setActiveGroup={setActiveGroup}
+            setContactsSearch={setContactsSearch}
+            t={t}
+          />
+        )}
         {filterOpen && (
           <Stack
             position="sticky"

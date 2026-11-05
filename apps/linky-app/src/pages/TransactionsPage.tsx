@@ -62,6 +62,7 @@ export function TransactionsPage(): React.ReactElement {
         label={t("recurringSave")}
         onPress={() => navigateTo({ route: "recurringPaymentNew" })}
         guide="recurring-add-button"
+        pinned
       />
       {hasScheduled ? (
         <Section grouped title={t("recurringScheduledSection")}>

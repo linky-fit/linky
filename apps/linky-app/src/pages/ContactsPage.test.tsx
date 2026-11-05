@@ -214,4 +214,43 @@ describe("ContactsPage", () => {
     expect(open.container.querySelector('[aria-label="group"]')).not.toBeNull();
     await act(async () => open.root.unmount());
   });
+
+  it("shows the filters a closed filter still applies, each removable", async () => {
+    const setActiveGroup = vi.fn();
+    const setContactsSearch = vi.fn();
+    const { container, root } = await renderIntoDocument(
+      <ContactsPage
+        activeGroup="friends"
+        contactsSearch=" ali "
+        contactsSearchInputRef={{ current: null }}
+        conversationsLabel="Conversations"
+        filterOpen={false}
+        filterOptions={[{ count: 1, label: "Friends", value: "friends" }]}
+        otherContactsLabel="Other contacts"
+        renderContactCard={(contact) => (
+          <div key={contact.id ?? ""}>{contact.name ?? ""}</div>
+        )}
+        setActiveGroup={setActiveGroup}
+        setContactsSearch={setContactsSearch}
+        showGroupFilter={true}
+        t={(key) => key}
+        visibleContacts={{
+          conversations: [],
+          others: [{ id: "contact-1", name: "Alice" }],
+          pinned: [],
+          proxyPayments: [],
+        }}
+      />,
+    );
+
+    const chip = (label: string) =>
+      container.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`);
+    expect(chip("contactsSearchClear")?.textContent).toBe("“ali”");
+    expect(chip("contactsFilterRemove")?.textContent).toBe("Friends");
+    await act(async () => chip("contactsSearchClear")?.click());
+    expect(setContactsSearch).toHaveBeenCalledWith("");
+    await act(async () => chip("contactsFilterRemove")?.click());
+    expect(setActiveGroup).toHaveBeenCalledWith(null);
+    await act(async () => root.unmount());
+  });
 });
