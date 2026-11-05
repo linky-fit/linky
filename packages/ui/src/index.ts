@@ -143,6 +143,7 @@ export type {
 // Messaging and media
 export {
   AttachmentTray,
+  ComposerMenuItem,
   DaySeparator,
   EmojiCatalog,
   EmojiPicker,
@@ -157,6 +158,7 @@ export {
 export type {
   AttachmentDraft,
   AttachmentTrayProps,
+  ComposerMenuItemProps,
   EmojiCatalogGroup,
   EmojiCatalogProps,
   EmojiPickerProps,
@@ -165,6 +167,7 @@ export type {
   LinkPreviewProps,
   MessageBubbleProps,
   MessageComposerFrameProps,
+  MessageComposerMenu,
   ReplyPreviewProps,
 } from "./messaging";
 export {

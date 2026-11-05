@@ -53,15 +53,40 @@ export const messaging: Section = {
     MessageComposerFrame: () => {
       const [message, setMessage] = useState("");
       const [sent, setSent] = useState("");
+      const [menuOpen, setMenuOpen] = useState(false);
       const editor = useRef<HTMLDivElement>(null);
+      const drafting = message.trim() !== "";
       return (
         <UI.Stack>
           <UI.MessageComposerFrame
-            header={<UI.Text variant="caption">Custom editor</UI.Text>}
+            header={
+              <UI.Text variant="caption">Type to move Pay behind the +</UI.Text>
+            }
             actions={
-              <UI.Button icon="HandCoins" borderRadius="$pill">
-                Pay
-              </UI.Button>
+              drafting ? null : (
+                <UI.Button icon="HandCoins" borderRadius="$pill">
+                  Pay
+                </UI.Button>
+              )
+            }
+            menu={
+              drafting
+                ? {
+                    label: "More actions",
+                    open: menuOpen,
+                    onOpenChange: setMenuOpen,
+                    items: (
+                      <>
+                        <UI.ComposerMenuItem
+                          icon="Images"
+                          tone="info"
+                          label="Attach"
+                        />
+                        <UI.ComposerMenuItem icon="HandCoins" label="Pay" />
+                      </>
+                    ),
+                  }
+                : undefined
             }
           >
             <UI.RichTextInput
@@ -93,6 +118,13 @@ export const messaging: Section = {
         </UI.Stack>
       );
     },
+    ComposerMenuItem: () => (
+      <UI.Row gap="$sm">
+        <UI.ComposerMenuItem icon="Images" tone="info" label="Attach" />
+        <UI.ComposerMenuItem icon="Request" tone="neutral" label="Request" />
+        <UI.ComposerMenuItem icon="HandCoins" label="Pay" disabled />
+      </UI.Row>
+    ),
     MessageLink: () => (
       <UI.MessageLink href="https://example.com">example.com</UI.MessageLink>
     ),

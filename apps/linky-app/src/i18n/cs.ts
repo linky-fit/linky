@@ -534,6 +534,8 @@ export const cs = {
   chatPendingShort: "čeká",
   chatSeenShort: "přečteno",
   chatImageAttach: "Přidat obrázek nebo PDF",
+  chatMenuAttach: "Příloha",
+  chatMoreActions: "Další akce",
   chatPdfDecrypting: "Dešifruji PDF…",
   chatPdfLoadFailed: "PDF se nepodařilo načíst.",
   chatPdfMessage: "PDF",

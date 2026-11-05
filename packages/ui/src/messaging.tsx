@@ -1,14 +1,22 @@
 import { useState } from "react";
 import type { ReactNode, Ref } from "react";
-import { Anchor, Image, ScrollView, Theme, View } from "tamagui";
+import {
+  AnimatePresence,
+  Anchor,
+  Image,
+  ScrollView,
+  Theme,
+  View,
+} from "tamagui";
 import type { GetProps, TamaguiElement } from "tamagui";
 import { IconButton, Pressable } from "./controls";
-import type { LabeledAction } from "./controls";
-import { textVariant } from "./styles";
+import type { LabeledAction, PressableProps } from "./controls";
+import { textVariant, toneColors } from "./styles";
 import { Icon } from "./icons";
 import type { IconName } from "./icons";
 import { Row, Stack, Text } from "./layout";
-import { border, opacity, radius, space } from "./tokens";
+import type { Tone } from "./tokens";
+import { border, enterScale, opacity, radius, space } from "./tokens";
 
 /** Where a message sits in a run of messages from one sender; the corners facing its neighbours tighten. */
 export type MessageGroupPosition = "single" | "first" | "middle" | "last";
@@ -213,6 +221,15 @@ export function QuoteBar({ tone = "accent" }: { tone?: "accent" | "info" }) {
   );
 }
 
+export interface MessageComposerMenu {
+  /** Names the + and the menu it opens. */
+  label: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** `ComposerMenuItem`s. */
+  items: ReactNode;
+}
+
 export interface MessageComposerFrameProps {
   /** The text input with its send action inside, e.g. a `RichTextInput` with `trailing`. */
   children: ReactNode;
@@ -220,13 +237,20 @@ export interface MessageComposerFrameProps {
   header?: ReactNode;
   /** Beside the input on wide screens and in a row below it on phones, e.g. payment actions; each action fills its share of the phone row. */
   actions?: ReactNode;
+  /** A + left of the input that opens its items above it, e.g. the actions moved out of the way of a draft. */
+  menu?: MessageComposerMenu | undefined;
 }
+
+// Keeps the input focused, and the iOS keyboard open, while tapping the menu.
+const keepInputFocus = (event: { preventDefault: () => void }) =>
+  event.preventDefault();
 
 /** Sits flush under the message list, whose content pads the space above the composer, so messages scroll right up to its top edge. */
 export function MessageComposerFrame({
   children,
   header,
   actions,
+  menu,
 }: MessageComposerFrameProps) {
   return (
     <Stack
@@ -236,13 +260,100 @@ export function MessageComposerFrame({
       backgroundColor="$background"
     >
       {header}
+      <AnimatePresence>
+        {menu?.open ? (
+          <Row
+            key="menu"
+            role="group"
+            aria-label={menu.label}
+            gap="$sm"
+            padding="$sm"
+            borderRadius="$card"
+            backgroundColor="$surface"
+            transition="base"
+            enterStyle={menuHidden}
+            exitStyle={menuHidden}
+            onPointerDown={keepInputFocus}
+          >
+            {menu.items}
+          </Row>
+        ) : null}
+      </AnimatePresence>
       <Stack gap="$sm" $wide={{ flexDirection: "row", alignItems: "flex-end" }}>
-        <Stack minWidth={0} $wide={{ flex: 1 }}>
-          {children}
-        </Stack>
-        {actions ? <Row gap="$sm">{actions}</Row> : null}
+        <Row gap="$sm" alignItems="flex-end" minWidth={0} $wide={{ flex: 1 }}>
+          {menu ? (
+            <IconButton
+              icon="Plus"
+              variant="secondary"
+              accessibilityLabel={menu.label}
+              aria-expanded={menu.open}
+              // Turned 45°, the + reads as the × that closes the menu.
+              rotate={menu.open ? "45deg" : "0deg"}
+              transition="base"
+              enterStyle={{ opacity: 0, scale: enterScale.pop }}
+              onPointerDown={keepInputFocus}
+              onPress={() => menu.onOpenChange(!menu.open)}
+            />
+          ) : null}
+          <Stack flex={1} minWidth={0}>
+            {children}
+          </Stack>
+        </Row>
+        {actions ? (
+          <Row gap="$sm" transition="base" enterStyle={{ opacity: 0 }}>
+            {actions}
+          </Row>
+        ) : null}
       </Stack>
     </Stack>
+  );
+}
+
+const menuHidden = { opacity: 0, y: space.md } as const;
+
+export interface ComposerMenuItemProps extends Omit<
+  PressableProps,
+  "children" | "icon"
+> {
+  label: string;
+  icon: IconName;
+  tone?: Tone | undefined;
+}
+
+/** One action in a `MessageComposerFrame` menu: a round icon badge over a short label. */
+export function ComposerMenuItem({
+  label,
+  icon,
+  tone = "accent",
+  ...props
+}: ComposerMenuItemProps) {
+  const colors = toneColors[tone];
+  return (
+    <Pressable
+      flex={1}
+      maxWidth="$hero"
+      flexDirection="column"
+      gap="$xs"
+      paddingVertical="$sm"
+      borderRadius="$control"
+      hoverStyle={{ backgroundColor: "$surfaceRaised" }}
+      pressStyle={{ backgroundColor: "$backgroundPress" }}
+      {...props}
+    >
+      <View
+        width="$controlLg"
+        height="$controlLg"
+        alignItems="center"
+        justifyContent="center"
+        borderRadius="$pill"
+        backgroundColor={colors.background}
+      >
+        <Icon name={icon} size="lg" color={colors.color} />
+      </View>
+      <Text variant="caption" textAlign="center" numberOfLines={1}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
