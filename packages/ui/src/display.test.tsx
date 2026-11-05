@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { render } from "../test/render";
 import { Amount, Avatar } from "./display";
 
@@ -25,11 +25,20 @@ describe("Amount", () => {
     return text && getComputedStyle(text).fontSize;
   };
 
-  it("shows a short xl value at headline size", async () => {
-    expect(await fontSize("1 250")).toBe("var(--f-size-headline)");
+  afterEach(() => vi.restoreAllMocks());
+
+  it("shows an xl value that fits at headline size", async () => {
+    expect(await fontSize("1 250")).toBe("80px");
   });
 
-  it("shrinks a long xl value to the amount size", async () => {
-    expect(await fontSize("999 999,99")).toBe("var(--f-size-amount)");
+  it("shrinks an xl value until it fits its width", async () => {
+    // jsdom lays nothing out: the text is five font sizes wide in a 200 px box.
+    vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockImplementation(
+      function (this: HTMLElement) {
+        return parseFloat(getComputedStyle(this).fontSize) * 5;
+      },
+    );
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(200);
+    expect(await fontSize("999 999,99")).toBe("40px");
   });
 });

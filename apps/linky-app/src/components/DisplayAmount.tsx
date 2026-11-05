@@ -70,6 +70,7 @@ export function DisplayAmount({
     testID,
     "aria-label": accessibilityLabel,
     alignSelf: "center",
+    maxWidth: "100%",
   } as const;
 
   if (!cycles || allowedDisplayCurrencies.length <= 1) {

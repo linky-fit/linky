@@ -1,13 +1,15 @@
-import { useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useWindowDimensions } from "react-native";
 import type { ReactNode } from "react";
-import { Image, View, styled } from "tamagui";
+import { Image, View, isWeb, styled } from "tamagui";
+import type { TamaguiElement } from "tamagui";
 import { IndicatorDot, Pressable } from "./controls";
 import { Icon } from "./icons";
 import type { IconName, IconSize } from "./icons";
 import { Row, Stack, Text } from "./layout";
 import { toneColors } from "./styles";
 import type { TextVariant, Tone } from "./tokens";
-import { border, space } from "./tokens";
+import { border, space, typography } from "./tokens";
 
 const avatarSizes = {
   xs: { box: "$iconLg", text: "caption" },
@@ -262,48 +264,74 @@ export interface AmountProps {
   size?: "md" | "lg" | "xl" | undefined;
 }
 
-// Past this many characters the headline-sized value overflows a phone, so "xl" falls back to "lg".
-const XL_MAX_LENGTH = 7;
-
-const amountVariant = (value: string, size: AmountProps["size"]) => {
-  if (size === "md") return "display";
-  return size === "xl" && value.length <= XL_MAX_LENGTH ? "headline" : "amount";
-};
+const amountVariant = {
+  md: "display",
+  lg: "amount",
+  xl: "headline",
+} as const satisfies Record<NonNullable<AmountProps["size"]>, TextVariant>;
 
 /** The unit stays about a third of its figure, so it reads as part of the amount. */
 const unitVariant = {
   display: "label",
   amount: "title",
   headline: "display",
-} as const satisfies Record<ReturnType<typeof amountVariant>, TextVariant>;
+} as const satisfies Record<
+  (typeof amountVariant)[keyof typeof amountVariant],
+  TextVariant
+>;
+
+const scaledText = (variant: TextVariant, scale: number) => ({
+  fontSize: typography.size[variant] * scale,
+  lineHeight: typography.lineHeight[variant] * scale,
+});
+
+/** The factor that shrinks a one-line web text to its width; native text fits itself with `adjustsFontSizeToFit`. */
+const useFitScale = (text: string) => {
+  const ref = useRef<TamaguiElement>(null);
+  const { width } = useWindowDimensions();
+  const key = `${text}@${width}`;
+  const [fit, setFit] = useState({ key, scale: 1 });
+  const scale = fit.key === key ? fit.scale : 1;
+  const shrinkToFit = useCallback(() => {
+    const node = ref.current;
+    if (!isWeb || !(node instanceof HTMLElement)) return;
+    if (node.scrollWidth > node.clientWidth) {
+      setFit({ key, scale: (scale * node.clientWidth) / node.scrollWidth });
+    }
+  }, [key, scale]);
+  useLayoutEffect(shrinkToFit, [shrinkToFit]);
+  return { ref, scale, shrinkToFit };
+};
 
 export function Amount({ value, unit, caption, size = "lg" }: AmountProps) {
+  const variant = amountVariant[size];
+  const { ref, scale, shrinkToFit } = useFitScale(`${value} ${unit ?? ""}`);
   return (
-    <Stack gap="$xs" alignItems="center">
-      <Row
-        gap="$sm"
-        alignItems="baseline"
-        justifyContent="center"
-        flexWrap="wrap"
+    <Stack gap="$xs" alignItems="center" maxWidth="100%">
+      <Text
+        ref={ref}
+        // A narrower column or the web font swapping in resizes the text.
+        onLayout={shrinkToFit}
+        variant={variant}
+        {...scaledText(variant, scale)}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        color="$colorStrong"
+        textAlign="center"
+        fontVariant={["tabular-nums"]}
       >
-        <Text
-          variant={amountVariant(value, size)}
-          color="$colorStrong"
-          textAlign="center"
-          fontVariant={["tabular-nums"]}
-        >
-          {value}
-        </Text>
+        {value}
         {unit ? (
           <Text
-            variant={unitVariant[amountVariant(value, size)]}
+            variant={unitVariant[variant]}
+            {...scaledText(unitVariant[variant], scale)}
             fontWeight="$semibold"
             color="$colorMuted"
           >
-            {unit}
+            {` ${unit}`}
           </Text>
         ) : null}
-      </Row>
+      </Text>
       {caption ? (
         <Text variant="caption" color="$colorMuted" textAlign="center">
           {caption}
