@@ -8,8 +8,6 @@ interface ListingImageProps {
   /** The uploaded photo, or a picked file not uploaded yet. */
   source: PrivateImage | File;
   label: string;
-  /** False lets the photo grow with its width, e.g. inside a chat bubble. */
-  capHeight?: boolean;
   t: Translate;
 }
 
@@ -22,7 +20,6 @@ const aspectRatioOf = (source: PrivateImage | File): number =>
 export function ListingImage({
   source,
   label,
-  capHeight = true,
   t,
 }: ListingImageProps): React.ReactElement {
   const { ref, loaded, failed } = usePrivateImageUrl(source);
@@ -31,7 +28,7 @@ export function ListingImage({
       ref={ref}
       width="100%"
       aspectRatio={aspectRatioOf(source)}
-      {...(capHeight ? { maxHeight: "$device" } : {})}
+      maxHeight="$device"
       borderRadius="$card"
       overflow="hidden"
       alignItems="center"

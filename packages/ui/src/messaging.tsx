@@ -78,7 +78,9 @@ export function MessageBubble({
           <Row
             testID={testID}
             flexWrap="wrap"
-            alignItems="flex-end"
+            // A column keeps the time line out of the bubble's width, so a card sets it alone.
+            flexDirection={timeBelow ? "column" : "row"}
+            alignItems={timeBelow ? "stretch" : "flex-end"}
             columnGap="$sm"
             rowGap="$none"
             paddingHorizontal="$md"
@@ -96,12 +98,7 @@ export function MessageBubble({
             </Stack>
             {time ? (
               // Grows into the line's spare width, so the time stays at the end even when it wraps below wide content.
-              <Row
-                flexGrow={1}
-                flexShrink={0}
-                justifyContent="flex-end"
-                {...(timeBelow ? { flexBasis: "100%" } : {})}
-              >
+              <Row flexGrow={1} flexShrink={0} justifyContent="flex-end">
                 {typeof time === "string" ? (
                   <Text variant="caption" color="$colorMuted">
                     {time}
