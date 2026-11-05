@@ -27,7 +27,7 @@ export function SharedListingCard({
       aria-label={`${listing.title}, ${priceText(listing)}`}
       testID="chat-shared-listing"
     >
-      <Stack flex={1} gap="$sm" minWidth="$device" maxWidth="100%">
+      <Stack flex={1} gap="$sm" minWidth="$qr" maxWidth="100%">
         {listing.image ? (
           <ListingImage
             source={listing.image}
