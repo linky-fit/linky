@@ -4,6 +4,7 @@ import { useWalletCommands } from "../app/hooks/wallet/useWalletCommands";
 import {
   Avatar,
   Button,
+  ComposerMenuItem,
   EmptyState,
   IconButton,
   ListRow,
@@ -843,6 +844,7 @@ export const ChatComposer = memo(function ChatComposer({
   t,
 }: ChatComposerProps) {
   const pendingSendDraftRef = useRef<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [previousDraftProps, setPreviousDraftProps] = useState({
     chatDraft,
     chatSendIsBusy,
@@ -1012,6 +1014,20 @@ export const ChatComposer = memo(function ChatComposer({
   const keepEditorFocus = (event: React.PointerEvent) => event.preventDefault();
   const showSend =
     hasDraftText || chatAttachments.length > 0 || hasListingToSend;
+  const showMenu = showSend && !editContext;
+  // Adjusted while rendering, like the draft above, so a closed menu stays closed when the + returns.
+  if (menuOpen && !showMenu) setMenuOpen(false);
+  const pickFromMenu = (action: () => void) => () => {
+    setMenuOpen(false);
+    action();
+  };
+  const requestPayment = () =>
+    openContactPay(selectedContact.id, true, "request");
+  const startPay = () => openContactPay(selectedContact.id, true);
+  const payIcon = isFeedbackContact ? "HeartHandshake" : "HandCoins";
+  const payLabel = isFeedbackContact ? t("donate") : t("pay");
+  const payDisabled = cashuIsBusy || !canStartPay;
+  const payTooltip = canStartPay ? undefined : t("payInsufficient");
 
   return (
     <Stack
@@ -1138,7 +1154,7 @@ export const ChatComposer = memo(function ChatComposer({
           ) : null
         }
         actions={
-          canPayThisContact ? (
+          canPayThisContact && !showSend ? (
             <>
               {canRequestThisContact ? (
                 <Button
@@ -1146,9 +1162,7 @@ export const ChatComposer = memo(function ChatComposer({
                   icon="Request"
                   borderRadius="$pill"
                   $compact={{ flex: 1 }}
-                  onPress={() =>
-                    openContactPay(selectedContact.id, true, "request")
-                  }
+                  onPress={requestPayment}
                   disabled={cashuIsBusy}
                   data-guide="chat-request"
                 >
@@ -1156,18 +1170,56 @@ export const ChatComposer = memo(function ChatComposer({
                 </Button>
               ) : null}
               <Button
-                icon={isFeedbackContact ? "HeartHandshake" : "HandCoins"}
+                icon={payIcon}
                 borderRadius="$pill"
                 $compact={{ flex: 1 }}
-                onPress={() => openContactPay(selectedContact.id, true)}
-                disabled={cashuIsBusy || !canStartPay}
-                tooltip={!canStartPay ? t("payInsufficient") : undefined}
+                onPress={startPay}
+                disabled={payDisabled}
+                tooltip={payTooltip}
                 data-guide="chat-pay"
               >
-                {isFeedbackContact ? t("donate") : t("pay")}
+                {payLabel}
               </Button>
             </>
           ) : null
+        }
+        menu={
+          showMenu
+            ? {
+                label: t("chatMoreActions"),
+                open: menuOpen,
+                onOpenChange: setMenuOpen,
+                items: (
+                  <>
+                    <ComposerMenuItem
+                      icon="Images"
+                      tone="info"
+                      label={t("chatMenuAttach")}
+                      onPress={pickFromMenu(attachFiles)}
+                      disabled={!canAttach}
+                    />
+                    {canPayThisContact && canRequestThisContact ? (
+                      <ComposerMenuItem
+                        icon="Request"
+                        tone="neutral"
+                        label={t("requestPayment")}
+                        onPress={pickFromMenu(requestPayment)}
+                        disabled={cashuIsBusy}
+                      />
+                    ) : null}
+                    {canPayThisContact ? (
+                      <ComposerMenuItem
+                        icon={payIcon}
+                        label={payLabel}
+                        onPress={pickFromMenu(startPay)}
+                        disabled={payDisabled}
+                        tooltip={payTooltip}
+                      />
+                    ) : null}
+                  </>
+                ),
+              }
+            : undefined
         }
       >
         <ChatMessageEditor

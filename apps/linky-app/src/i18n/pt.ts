@@ -543,6 +543,8 @@ export const pt = {
   chatPendingShort: "pendente",
   chatSeenShort: "visto",
   chatImageAttach: "Adicionar imagem ou PDF",
+  chatMenuAttach: "Anexo",
+  chatMoreActions: "Mais ações",
   chatPdfDecrypting: "Descriptografando PDF…",
   chatPdfLoadFailed: "Não foi possível carregar o PDF.",
   chatPdfMessage: "PDF",

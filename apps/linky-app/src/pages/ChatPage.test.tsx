@@ -167,6 +167,46 @@ describe("ChatComposer", () => {
     },
   );
 
+  it("moves the payment actions behind the + while there is a draft", async () => {
+    const composer = await setup({
+      canPayThisContact: true,
+      canRequestThisContact: true,
+      canStartPay: true,
+      chatDraft: "",
+    });
+    const query = (selector: string) =>
+      composer.container.querySelector<HTMLButtonElement>(selector);
+    const menuButton = () => query('button[aria-label="chatMoreActions"]');
+    const menuItem = (label: string) =>
+      [
+        ...composer.container.querySelectorAll<HTMLButtonElement>(
+          '[role=group][aria-label="chatMoreActions"] button',
+        ),
+      ].find((button) => button.textContent === label);
+    expect(query('[data-guide="chat-pay"]')).not.toBeNull();
+    expect(query('[data-guide="chat-request"]')).not.toBeNull();
+    expect(menuButton()).toBeNull();
+
+    await composer.type("Hello");
+    expect(query('[data-guide="chat-pay"]')).toBeNull();
+    expect(query('[data-guide="chat-request"]')).toBeNull();
+    expect(menuItem("pay")).toBeUndefined();
+
+    await act(async () => menuButton()?.click());
+    expect(menuButton()?.getAttribute("aria-expanded")).toBe("true");
+    await act(async () => menuItem("pay")?.click());
+    expect(composer.props.openContactPay).toHaveBeenCalledWith("contact", true);
+    expect(menuButton()?.getAttribute("aria-expanded")).toBe("false");
+
+    await act(async () => menuButton()?.click());
+    await composer.type("");
+    expect(menuButton()).toBeNull();
+    expect(query('[data-guide="chat-pay"]')).not.toBeNull();
+    await composer.type("Again");
+    expect(menuButton()?.getAttribute("aria-expanded")).toBe("false");
+    await composer.unmount();
+  });
+
   it("clears the sent draft if it has not changed", async () => {
     const composer = await setup({ chatSendIsBusy: true });
     await composer.update({ chatDraft: "" });
