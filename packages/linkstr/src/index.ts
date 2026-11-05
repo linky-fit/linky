@@ -56,6 +56,7 @@ export {
 export * from "./listings/domain";
 export * from "./listings/events";
 export * from "./listings/Listings";
+export * from "./listings/sharedListing";
 export * from "./muteList/MuteList";
 export {
   DEVICE_AUTHORIZATION_KIND,
