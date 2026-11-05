@@ -1,7 +1,7 @@
 import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render } from "../test/render";
-import { Button, IconButton, Pressable } from "./controls";
+import { Button, IconButton, OptionTile, Pressable } from "./controls";
 import { Form, SubmitButton } from "./form";
 
 describe("disabled press targets", () => {
@@ -93,5 +93,18 @@ describe("IconButton indicator", () => {
       return button?.querySelectorAll('[aria-hidden="true"]').length ?? 0;
     };
     expect((await hiddenParts("warning")) - (await hiddenParts())).toBe(1);
+  });
+});
+
+describe("OptionTile", () => {
+  it("is a plain button unless it is a toggle", async () => {
+    const action = (await render(<OptionTile label="Gallery" />)).querySelector(
+      "button",
+    );
+    const toggle = (
+      await render(<OptionTile label="Avatar" selected={false} />)
+    ).querySelector("button");
+    expect(action?.hasAttribute("aria-pressed")).toBe(false);
+    expect(toggle?.getAttribute("aria-pressed")).toBe("false");
   });
 });
