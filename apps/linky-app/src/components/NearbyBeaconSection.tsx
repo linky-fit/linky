@@ -29,11 +29,18 @@ const beaconStatusText = (
     : t("beaconStatusBroadcastingOther").replace("{count}", String(keyCount));
 };
 
-const beaconIntroPoints = (): ReadonlyArray<{
+/** Where the beacon is offered; the intro leads with what it does there. */
+export type BeaconContext = "cash" | "contacts";
+
+const beaconIntroPoints = (
+  context: BeaconContext,
+): ReadonlyArray<{
   icon: IconName;
   key: I18nKey;
 }> => [
-  { icon: "Users", key: "beaconIntroContacts" },
+  context === "contacts"
+    ? { icon: "UserPlus", key: "beaconIntroAddContacts" }
+    : { icon: "Users", key: "beaconIntroContacts" },
   { icon: "ShieldCheck", key: "beaconIntroNpub" },
   {
     icon: "Bell",
@@ -45,11 +52,13 @@ const beaconIntroPoints = (): ReadonlyArray<{
 ];
 
 function BeaconIntro({
+  context,
   open,
   onClose,
   onTurnOn,
   t,
 }: {
+  context: BeaconContext;
   open: boolean;
   onClose: () => void;
   onTurnOn: () => void;
@@ -85,7 +94,7 @@ function BeaconIntro({
           <Icon name="Radio" size="xl" color="$accentText" />
         </Stack>
         <Stack gap="$lg">
-          {beaconIntroPoints().map(({ icon, key }) => (
+          {beaconIntroPoints(context).map(({ icon, key }) => (
             <Row key={key} gap="$md" alignItems="flex-start">
               <Icon name={icon} color="$accentText" />
               <Text flex={1} color="$colorSubtle">
@@ -99,26 +108,20 @@ function BeaconIntro({
   );
 }
 
-// The offer to turn the beacon on shows once per app session, not on every visit.
-let beaconOffered = false;
+// Each place offers to turn the beacon on once per app session, not on every visit.
+const beaconOffered = new Set<BeaconContext>();
 
-/**
- * The beacon switch; the intro shows before the first switch-on, and with
- * `offerOnMount` also once per session when the page opens with the beacon off.
- */
-export function NearbyBeaconSection({
-  offerOnMount = false,
-  t,
-}: {
-  offerOnMount?: boolean;
-  t: Translate;
-}): React.ReactElement {
-  const beacon = useBeacon();
+/** The intro dialog's state: open when the page offers the beacon or before the first switch-on. */
+const useBeaconIntro = (
+  beacon: UseBeacon,
+  context: BeaconContext,
+  offerOnMount: boolean,
+) => {
   const [introOpen, setIntroOpen] = React.useState(false);
 
   React.useEffect(() => {
-    if (!offerOnMount || beacon.enabled || beaconOffered) return;
-    beaconOffered = true;
+    if (!offerOnMount || beacon.enabled || beaconOffered.has(context)) return;
+    beaconOffered.add(context);
     setIntroOpen(true);
     // Only the first render decides; the switch itself reacts to later changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -136,6 +139,51 @@ export function NearbyBeaconSection({
     beacon.markIntroSeen();
     void beacon.setEnabled(true);
   };
+  const close = () => setIntroOpen(false);
+  return { introOpen, setEnabled, turnOn, close };
+};
+
+/**
+ * Offers the beacon once per session when the page opens with it off, with
+ * the intro written for `context`; renders nothing besides the dialog.
+ */
+export function BeaconOffer({
+  context,
+  t,
+}: {
+  context: BeaconContext;
+  t: Translate;
+}): React.ReactElement {
+  const beacon = useBeacon();
+  const intro = useBeaconIntro(beacon, context, true);
+  return (
+    <BeaconIntro
+      context={context}
+      open={intro.introOpen}
+      onClose={intro.close}
+      onTurnOn={intro.turnOn}
+      t={t}
+    />
+  );
+}
+
+/**
+ * The beacon switch; the intro shows before the first switch-on, and with
+ * `offerOnMount` also once per session when the page opens with the beacon off.
+ */
+export function NearbyBeaconSection({
+  offerOnMount = false,
+  t,
+}: {
+  offerOnMount?: boolean;
+  t: Translate;
+}): React.ReactElement {
+  const beacon = useBeacon();
+  const { introOpen, setEnabled, turnOn, close } = useBeaconIntro(
+    beacon,
+    "cash",
+    offerOnMount,
+  );
 
   return (
     <Stack gap="$sm">
@@ -160,8 +208,9 @@ export function NearbyBeaconSection({
         {t("beaconMutualOnly")}
       </Text>
       <BeaconIntro
+        context="cash"
         open={introOpen}
-        onClose={() => setIntroOpen(false)}
+        onClose={close}
         onTurnOn={turnOn}
         t={t}
       />

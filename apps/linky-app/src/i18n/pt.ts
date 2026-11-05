@@ -1316,6 +1316,8 @@ export const pt = {
     "Só contatos que também salvaram você podem ver que você está por perto.",
   beaconIntroContacts:
     "Contatos que também salvaram você veem que você está por perto e o que quer negociar.",
+  beaconIntroAddContacts:
+    "Pessoas por perto com o Linky aberto aparecem aqui, e você no celular delas, para que se adicionem com um toque.",
   beaconIntroNpub:
     "Enquanto o Linky está aberto, qualquer pessoa escaneando por perto vê seu npub para poder adicionar você.",
   beaconIntroBluetooth:

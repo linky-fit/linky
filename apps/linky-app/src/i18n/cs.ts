@@ -1304,6 +1304,8 @@ export const cs = {
   beaconMutualOnly: "V okolí vás uvidí jen kontakty, které si uložily i vás.",
   beaconIntroContacts:
     "Kontakty, které si vás také uložily, uvidí, že jste poblíž, a co chcete obchodovat.",
+  beaconIntroAddContacts:
+    "Lidé poblíž s otevřeným Linky se tu zobrazí a vy u nich, takže si můžete navzájem přidat jedním klepnutím.",
   beaconIntroNpub:
     "Dokud je Linky otevřené, uvidí váš npub kdokoli, kdo skenuje okolí, aby si vás mohl přidat.",
   beaconIntroBluetooth:
