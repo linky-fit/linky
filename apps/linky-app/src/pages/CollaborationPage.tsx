@@ -78,7 +78,8 @@ export function CollaborationPage(): React.ReactElement {
       active:
         route.kind === "listings" ||
         route.kind === "listingNew" ||
-        route.kind === "listingEdit",
+        route.kind === "listingEdit" ||
+        route.kind === "listing",
       guide: undefined,
       testID: "open-listings",
     },

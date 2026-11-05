@@ -33,7 +33,6 @@ import {
   isPayableContact,
   useRecurringContactSummaries,
   useRecurringPaymentOrders,
-  type RecurringContactSummary,
 } from "../app/hooks/payments/useRecurringPaymentOrders";
 import { recurringAmountFromInput } from "../app/lib/recurringAmount";
 import {
@@ -42,6 +41,7 @@ import {
   nextFullHourSec,
 } from "../app/lib/recurringPaymentDisplay";
 import { AmountKeypad } from "../components/AmountKeypad";
+import { ContactPicker } from "../components/ContactPicker";
 import { PaymentNoteInput } from "../components/PaymentNoteInput";
 import { RecurringContactAvatar } from "../components/RecurringContactAvatar";
 import { useAmountInputKeypad } from "../components/useAmountInputKeypad";
@@ -164,7 +164,6 @@ function RecurringPaymentForm({
   const contacts = useRecurringContactSummaries();
 
   const [contactId, setContactId] = React.useState(initial.contactId);
-  const [search, setSearch] = React.useState("");
   const [amount, setAmount] = React.useState(initial.amountSat);
   const [note, setNote] = React.useState(initial.note);
   const [frequency, setFrequency] = React.useState<Frequency>(
@@ -223,29 +222,14 @@ function RecurringPaymentForm({
   const formatDate = (epochSec: number) =>
     dateFormatter.format(new Date(epochSec * 1000));
 
-  const payableContacts = React.useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return Array.from(contacts.values())
-      .filter(isPayableContact)
-      .filter(
-        (candidate) =>
-          !query ||
-          [candidate.name, candidate.lnAddress, candidate.npub].some((value) =>
-            value?.toLowerCase().includes(query),
-          ),
-      )
-      .sort((a, b) =>
-        contactSummaryLabel(a).localeCompare(contactSummaryLabel(b)),
-      );
-  }, [contacts, search]);
-
   if (!contact) {
     return (
       <ContactPicker
-        contacts={payableContacts}
+        contacts={Array.from(contacts.values()).filter(isPayableContact)}
+        label={t("recurringChooseContact")}
+        emptyTitle={t("recurringNoPayableContacts")}
         onPick={(picked) => setContactId(picked.id)}
-        onSearch={setSearch}
-        search={search}
+        rowTestID="recurring-picker-contact"
       />
     );
   }
@@ -366,55 +350,6 @@ function RecurringPaymentForm({
       >
         {order ? t("recurringSaveChanges") : t("recurringSave")}
       </Button>
-    </Stack>
-  );
-}
-
-interface ContactPickerProps {
-  contacts: ReadonlyArray<RecurringContactSummary>;
-  onPick: (contact: RecurringContactSummary) => void;
-  onSearch: (value: string) => void;
-  search: string;
-}
-
-function ContactPicker({
-  contacts,
-  onPick,
-  onSearch,
-  search,
-}: ContactPickerProps): React.ReactElement {
-  const { t } = useTranslation();
-  return (
-    <Stack gap="$md">
-      <TextField
-        label={t("recurringChooseContact")}
-        value={search}
-        onChangeText={onSearch}
-        placeholder={t("recurringSearchContacts")}
-        autoCapitalize="none"
-        autoCorrect={false}
-        spellCheck={false}
-      />
-      {contacts.length === 0 ? (
-        <EmptyState title={t("recurringNoPayableContacts")} />
-      ) : (
-        <Stack gap="$xs">
-          {contacts.map((candidate) => (
-            <ListRow
-              key={candidate.id}
-              testID="recurring-picker-contact"
-              leading={<RecurringContactAvatar contact={candidate} />}
-              title={contactSummaryLabel(candidate)}
-              description={
-                candidate.name && candidate.lnAddress
-                  ? candidate.lnAddress
-                  : undefined
-              }
-              onPress={() => onPick(candidate)}
-            />
-          ))}
-        </Stack>
-      )}
     </Stack>
   );
 }

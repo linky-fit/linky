@@ -58,6 +58,7 @@ import {
   OnchainTransferNewPage,
   OnchainTransferPage,
   ProfileRoute,
+  ListingDetailPage,
   ListingFormPage,
   ListingsPage,
   ProxyPaymentsPage,
@@ -142,6 +143,14 @@ const RoutePage = (): React.ReactElement => {
       return <ListingFormPage />;
     case "listingEdit":
       return <ListingFormPage id={route.id} />;
+    case "listing":
+      return (
+        <ListingDetailPage
+          author={route.author}
+          listingId={route.listingId}
+          messageId={route.messageId}
+        />
+      );
     case "advancedAutoPayLimit":
       return <AdvancedAutoPayLimitPage />;
     case "advancedInspector":

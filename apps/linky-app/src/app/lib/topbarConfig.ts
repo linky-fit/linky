@@ -1,3 +1,4 @@
+import type { Pubkey } from "@linky-fit/linkstr";
 import type { OnchainTransferDirection } from "@linky-fit/onchain-transfer";
 import type { ContactId } from "../../evolu";
 import { navigateTo, returnFromBankPaymentOffer } from "../../hooks/useRouting";
@@ -12,6 +13,7 @@ export interface BackActionContext {
   closeContactDetail: () => void;
   contactPayBackToChatId: ContactId | null;
   navigateToMainReturn: () => void;
+  ownPubkey: Pubkey | null;
 }
 
 interface BuildTopbarArgs extends BackActionContext {
@@ -60,6 +62,7 @@ export const resolveBackAction = (
     closeContactDetail,
     contactPayBackToChatId,
     navigateToMainReturn,
+    ownPubkey,
   }: BackActionContext,
 ): (() => void) | null => {
   switch (route.kind) {
@@ -93,8 +96,15 @@ export const resolveBackAction = (
       return () => navigateTo({ route: "collaboration" });
 
     case "listingNew":
-    case "listingEdit":
+    case "listing":
       return () => navigateTo({ route: "listings" });
+
+    case "listingEdit": {
+      const listingId = route.id;
+      return ownPubkey
+        ? () => navigateTo({ route: "listing", author: ownPubkey, listingId })
+        : () => navigateTo({ route: "listings" });
+    }
 
     case "advancedInspectorTimeline":
     case "advancedPushDebug":
@@ -213,23 +223,15 @@ export const resolveBackAction = (
 };
 
 export const buildTopbar = ({
-  backFromContactNew,
-  closeContactDetail,
-  contactPayBackToChatId,
-  navigateToMainReturn,
   route,
   t,
+  ...context
 }: BuildTopbarArgs): TopbarButton | null => {
   // Profile and settings are bottom-nav roots: no back chevron, although the
   // hardware back button still returns to the main screen.
   if (route.kind === "profile" || route.kind === "settings") return null;
 
-  const onClick = resolveBackAction(route, {
-    backFromContactNew,
-    closeContactDetail,
-    contactPayBackToChatId,
-    navigateToMainReturn,
-  });
+  const onClick = resolveBackAction(route, context);
 
   if (!onClick) return null;
 
@@ -323,6 +325,7 @@ const SHOWS_MENU_BUTTON: Record<
   listings: false,
   listingNew: false,
   listingEdit: false,
+  listing: false,
   contactNew: false,
   contactPay: true,
   chatStorage: false,
@@ -507,6 +510,7 @@ const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
   listings: "listings",
   listingNew: "listingNewTitle",
   listingEdit: "listingEditTitle",
+  listing: "listingDetailTitle",
   contact: "contact",
   contactEdit: "contactEditTitle",
   contactNew: "newContact",

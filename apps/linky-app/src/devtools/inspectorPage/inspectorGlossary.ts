@@ -74,6 +74,12 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "The Android app registered this identity with the push service, or failed to. `transport` is `fcm` where Google Play Services exist and `unifiedpush` otherwise (e.g. GrapheneOS with a distributor such as ntfy). Fires on enabling notifications and on each revalidation when the app comes to the foreground.",
   "recurring.remindersSynced":
     "The app told the push service when to remind this identity of upcoming recurring payments (a minute after each due time still ahead), or failed to. It syncs again when a due time passes, which cancels that reminder because this running app sends the payment. The server stores only the times, never notes, amounts or recipients; the notes due at each time stay on the device.",
+  "listings.imageUploaded":
+    "The photo picked for a listing was resized, encrypted and uploaded to Blossom before the listing was saved. The payload has its type, size and dimensions; the url and key stay out of the log.",
+  "listings.imageUploadFailed":
+    "The photo picked for a listing could not be prepared or uploaded, so the listing was not saved and the form stayed open.",
+  "listings.attached":
+    "The user replied to or shared a listing: the chat with the contact link opens with the listing attached. The pubkey link is the listing's author.",
   "contacts.npubSaved":
     "A Nostr contact was saved after the duplicate check. The contact link identifies the new row; the insert itself runs in the background.",
   "contacts.sharedProfileOpened":

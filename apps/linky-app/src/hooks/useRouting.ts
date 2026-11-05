@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { encodeNpub, type Pubkey } from "@linky-fit/linkstr";
 import type {
   KeryxSubscriptionId,
+  MessageId,
   OnchainTransferId,
 } from "@linky-fit/linksync";
 import type { CashuOperationId, ContactId } from "../evolu";
@@ -128,6 +130,12 @@ type NavigationAction =
   | { route: "listings" }
   | { route: "listingNew" }
   | { route: "listingEdit"; id: string }
+  | {
+      route: "listing";
+      author: Pubkey;
+      listingId: string;
+      messageId?: MessageId;
+    }
   | { route: "settingsUnits" }
   | { route: "settingsTutorial" }
   | { route: "settingsBlocked" }
@@ -221,6 +229,11 @@ export const navigateTo = (action: NavigationAction): void => {
     case "listingEdit":
       window.location.assign(
         `#collaboration/listings/${encodeURIComponent(action.id)}`,
+      );
+      break;
+    case "listing":
+      window.location.assign(
+        `#collaboration/listings/${encodeNpub(action.author)}/${encodeURIComponent(action.listingId)}${action.messageId ? `/m/${encodeURIComponent(action.messageId)}` : ""}`,
       );
       break;
     case "advanced":

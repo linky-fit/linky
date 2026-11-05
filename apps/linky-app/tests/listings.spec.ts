@@ -1,12 +1,14 @@
 /**
  * Listings — two real app instances that saved each other.
  *
- * A adds a listing and says they offer cash; both reach B through A's kind
- * 34133 event on the relay, decrypted through B's key slot. B's own page
+ * A adds a listing with a photo and says they offer cash; both reach B through
+ * A's kind 34133 event on the relay, decrypted through B's key slot, and B's
+ * detail page decrypts the photo from the stubbed Blossom server. B's own page
  * stays empty until then, which proves the content came from the relay.
  *
  * Needs the docker stack up — see playwright.config.ts.
  */
+import { createHash } from "node:crypto";
 import {
   expect,
   test,
@@ -37,6 +39,27 @@ interface Account {
   page: Page;
 }
 
+/** Encrypted uploads by url, served back to either browser. */
+const blobs = new Map<string, Buffer>();
+
+const stubBlossom = (page: Page) =>
+  page.route("https://blossom.primal.net/**", async (route) => {
+    const request = route.request();
+    const headers = { "Access-Control-Allow-Origin": "*" };
+    if (request.method() === "PUT") {
+      const body = request.postDataBuffer();
+      if (!body) throw new Error("Empty upload");
+      const sha256 = createHash("sha256").update(body).digest("hex");
+      const url = `https://blossom.primal.net/${sha256}`;
+      blobs.set(url, body);
+      await route.fulfill({ headers, json: { url, sha256 } });
+      return;
+    }
+    const body = blobs.get(request.url());
+    if (!body) return route.fallback();
+    await route.fulfill({ headers, body, contentType: "text/plain" });
+  });
+
 const bootAccount = async (
   browser: Browser,
   label: string,
@@ -52,6 +75,7 @@ const bootAccount = async (
   await setSeedLoginStorage(page, identity);
   await stubFiatRates(page);
   await stubThirdPartyAssets(page);
+  await stubBlossom(page);
   await page.goto("/#wallet");
   await waitForNetworkReady(page);
   await expectNoBootErrorPanel(page, label);
@@ -76,11 +100,33 @@ test("a listing and the cash intent reach a contact who saved the author back", 
       await expect(b.page.getByTestId("peer-listing")).toHaveCount(0);
     });
 
-    await test.step("A adds a listing priced in the display unit", async () => {
+    await test.step("A adds a listing with a photo, priced in the display unit", async () => {
       await a.page.goto("/#collaboration/listings/new");
       await a.page.getByTestId("listing-title").fill("Eggs from the garden");
       await a.page.getByTestId("listing-amount").fill("90");
       await a.page.getByTestId("listing-unit").fill("per 10 pieces");
+      const png = await a.page.evaluate(() => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 64;
+        canvas.height = 48;
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("No canvas context");
+        context.fillStyle = "#e0a030";
+        context.fillRect(0, 0, 64, 48);
+        return canvas.toDataURL("image/png").split(",")[1];
+      });
+      const fileChooser = a.page.waitForEvent("filechooser");
+      await a.page.getByTestId("listing-image-add").click();
+      await (
+        await fileChooser
+      ).setFiles({
+        name: "eggs.png",
+        mimeType: "image/png",
+        buffer: Buffer.from(png ?? "", "base64"),
+      });
+      await expect(
+        a.page.getByTestId("listing-image").locator("img"),
+      ).toBeVisible();
       await a.page.getByTestId("listing-save").click();
       await a.page.waitForURL(/#collaboration\/listings$/);
       const own = a.page.getByTestId("own-listing");
@@ -105,6 +151,12 @@ test("a listing and the cash intent reach a contact who saved the author back", 
       await expect(peer).toContainText("per 10 pieces");
       await expect(peer).toContainText("90 sat");
 
+      await peer.click();
+      await expect(
+        b.page.getByRole("img", { name: "Eggs from the garden" }),
+      ).toBeVisible();
+      await expect(b.page.getByTestId("listing-reply")).toBeVisible();
+
       await b.page.goto("/#collaboration/cash");
       await expect(
         b.page.getByRole("heading", { name: "Offer cash" }).locator(".."),
@@ -122,6 +174,7 @@ test("a listing and the cash intent reach a contact who saved the author back", 
     await test.step("A withdraws the listing and B stops seeing it", async () => {
       await a.page.goto("/#collaboration/listings");
       await a.page.getByTestId("own-listing").click();
+      await a.page.getByTestId("listing-edit").click();
       await a.page.waitForURL(/#collaboration\/listings\/[^/]+$/);
       await a.page.getByRole("button", { name: "Remove listing" }).click();
       await a.page.waitForURL(/#collaboration\/listings$/);

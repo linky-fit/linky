@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { encodeNpub, Pubkey } from "@linky-fit/linkstr";
 import { createIdFromString } from "@linky-fit/linksync";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Route } from "../../types/route";
@@ -32,6 +33,7 @@ const baseContext: BackActionContext = {
   closeContactDetail,
   contactPayBackToChatId: null,
   navigateToMainReturn,
+  ownPubkey: null,
 };
 
 const backHashFor = (
@@ -72,6 +74,22 @@ describe("resolveBackAction", () => {
     expect(backHashFor({ kind: "cash" })).toBe("#collaboration");
     expect(backHashFor({ kind: "listings" })).toBe("#collaboration");
     expect(backHashFor({ kind: "listingNew" })).toBe("#collaboration/listings");
+    const listingId = createIdFromString<"Listing">("listing-1");
+    const ownPubkey = Pubkey.make("a".repeat(64));
+    expect(
+      backHashFor({
+        kind: "listing",
+        author: ownPubkey,
+        listingId,
+        messageId: null,
+      }),
+    ).toBe("#collaboration/listings");
+    expect(
+      backHashFor(
+        { kind: "listingEdit", id: listingId },
+        { ...baseContext, ownPubkey },
+      ),
+    ).toBe(`#collaboration/listings/${encodeNpub(ownPubkey)}/${listingId}`);
     expect(backHashFor({ kind: "advancedAutoPayLimit" })).toBe("#settings");
     expect(backHashFor({ kind: "advancedInspector" })).toBe("#settings");
     expect(backHashFor({ kind: "advancedInspectorTimeline" })).toBe(
@@ -185,6 +203,7 @@ describe("buildTopbar", () => {
       closeContactDetail: vi.fn(),
       contactPayBackToChatId: null,
       navigateToMainReturn: vi.fn(),
+      ownPubkey: null,
       t: (key: string) => key,
     };
 
@@ -201,6 +220,7 @@ describe("buildTopbar", () => {
       closeContactDetail: vi.fn(),
       contactPayBackToChatId: null,
       navigateToMainReturn: vi.fn(),
+      ownPubkey: null,
       t: (key: string) => key,
     };
 

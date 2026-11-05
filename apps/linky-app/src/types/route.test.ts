@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { encodeNpub, Pubkey } from "@linky-fit/linkstr";
 import { createId, keryxSubscriptionIdFor } from "@linky-fit/linksync";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseRouteFromHash } from "./route";
@@ -152,6 +153,44 @@ describe("parseRouteFromHash", () => {
 
     replaceHash("#collaboration/listings/new");
     expect(parseRouteFromHash()).toEqual({ kind: "listingNew" });
+  });
+
+  it("parses a listing detail, from the list or from a message, before the edit route", () => {
+    const author = Pubkey.make("a".repeat(64));
+    const npub = encodeNpub(author);
+    replaceHash(`#collaboration/listings/${npub}/eggs`);
+    expect(parseRouteFromHash()).toEqual({
+      kind: "listing",
+      author,
+      listingId: "eggs",
+      messageId: null,
+    });
+
+    const messageId = createId<"Message">();
+    replaceHash(`#collaboration/listings/${npub}/eggs/m/${messageId}`);
+    expect(parseRouteFromHash()).toEqual({
+      kind: "listing",
+      author,
+      listingId: "eggs",
+      messageId,
+    });
+
+    const listingId = createId<"Listing">();
+    replaceHash(`#collaboration/listings/${listingId}`);
+    expect(parseRouteFromHash()).toEqual({
+      kind: "listingEdit",
+      id: listingId,
+    });
+
+    for (const hash of [
+      `#collaboration/listings/not-an-npub/eggs`,
+      `#collaboration/listings/${npub}/${"x".repeat(65)}`,
+      `#collaboration/listings/${npub}/eggs/m/`,
+      `#collaboration/listings/${npub}/eggs/x/${messageId}`,
+    ]) {
+      replaceHash(hash);
+      expect(parseRouteFromHash().kind).not.toBe("listing");
+    }
   });
 
   it("parses the manual bank payment entry before the payload routes", () => {

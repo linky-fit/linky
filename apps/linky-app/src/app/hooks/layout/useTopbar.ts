@@ -15,6 +15,7 @@ import {
   contactsSearchAtom,
 } from "../../state/contacts/contactsList";
 import { profileDraftAtom } from "../../state/contacts/profiles";
+import { currentPubkeyAtom } from "../../state/session/session";
 import { hiddenTransactionsShownAtom } from "../../state/shell/topbar";
 import {
   useBackFromContactNew,
@@ -48,6 +49,7 @@ export const useTopbar = () => {
   const backFromContactNew = useBackFromContactNew();
   const deleteContact = useDeleteContact();
   const contactPayBackToChatId = useNavIntent("contactPayBackToChat");
+  const ownPubkey = useAtomValue(currentPubkeyAtom);
   const { navigateToMainReturn, openMenu } = useMainMenu();
   const { openReceiveScan, openScan, openWalletScan } = useScanCommands();
   const toggleContactsFilter = useToggleContactsFilter();
@@ -75,6 +77,7 @@ export const useTopbar = () => {
     closeContactDetail,
     contactPayBackToChatId,
     navigateToMainReturn,
+    ownPubkey,
     route,
     t,
   });
