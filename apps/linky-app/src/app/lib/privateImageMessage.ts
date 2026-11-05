@@ -1,6 +1,7 @@
 import {
   makeBlossomUploadAuthHeader,
   NostrSecretKey,
+  PrivateImage,
   UnixSeconds,
 } from "@linky-fit/linkstr";
 import { sha256 } from "@noble/hashes/sha2.js";
@@ -92,10 +93,6 @@ interface UploadDescriptor {
 
 interface BlossomUploadAuth {
   privateKey: Uint8Array;
-}
-
-interface PrivateImageSendResult {
-  content: string;
 }
 
 const textEncoder = new TextEncoder();
@@ -379,17 +376,17 @@ export const serializePrivateImageMessage = (
   )}`;
 };
 
-export const createPrivateImageSendPayload = async (
+/** Encrypts and uploads `file`, resized when it is an image; the reference anyone holding it decrypts the file with. */
+export const uploadPrivateImage = async (
   file: File,
   auth: BlossomUploadAuth,
-): Promise<PrivateImageSendResult> => {
+): Promise<PrivateImage> => {
   const prepared = await encryptImageBytes(file);
   const upload = await uploadToBlossom(prepared, auth);
   if (upload.sha256 !== prepared.encryptedSha256) {
     throw new Error("upload-hash-mismatch");
   }
-
-  const payload: PrivateImageMessagePayload = {
+  return new PrivateImage({
     encryptedSha256: prepared.encryptedSha256,
     encryptedSize: prepared.encryptedSize,
     encryptionAlgorithm: "aes-gcm",
@@ -398,18 +395,27 @@ export const createPrivateImageSendPayload = async (
     nonce: prepared.nonce,
     originalSha256: prepared.originalSha256,
     storageEncoding: "base64",
-    type: PRIVATE_IMAGE_MESSAGE_TYPE,
     url: upload.url,
     ...(prepared.width !== undefined && prepared.height !== undefined
       ? { width: prepared.width, height: prepared.height }
       : {}),
     ...(prepared.fileName !== undefined ? { fileName: prepared.fileName } : {}),
-  };
-
-  return {
-    content: serializePrivateImageMessage(payload),
-  };
+  });
 };
+
+/** The stored message content of an uploaded image. */
+export const privateImageMessageContent = ({
+  width,
+  height,
+  fileName,
+  ...image
+}: PrivateImage): string =>
+  serializePrivateImageMessage({
+    ...image,
+    type: PRIVATE_IMAGE_MESSAGE_TYPE,
+    ...(width !== undefined && height !== undefined ? { width, height } : {}),
+    ...(fileName !== undefined ? { fileName } : {}),
+  });
 
 const parsePrivateImageRecord = (
   parsed: Record<string, unknown>,
@@ -543,8 +549,21 @@ const readBodyExactly = async (
 const hasPdfMagic = (bytes: Uint8Array): boolean =>
   textDecoder.decode(bytes.subarray(0, PDF_MAGIC.length)) === PDF_MAGIC;
 
+/** What decrypting needs, which a message payload and a wire `PrivateImage` both hold. */
+export type PrivateImageSource = Pick<
+  PrivateImageMessagePayload,
+  | "encryptedSha256"
+  | "encryptedSize"
+  | "fileType"
+  | "key"
+  | "nonce"
+  | "originalSha256"
+  | "storageEncoding"
+  | "url"
+>;
+
 export const decryptPrivateImageMessage = async (
-  payload: PrivateImageMessagePayload,
+  payload: PrivateImageSource,
 ): Promise<Blob> => {
   const response = await fetch(payload.url);
   if (!response.ok) throw new Error("chat-image-download-failed");

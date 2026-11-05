@@ -3,7 +3,6 @@ import {
   ImageMessageDraft,
   MessageText,
   OutboxRef,
-  PrivateImage,
   Pubkey,
   RumorId,
   TextMessageDraft,
@@ -17,9 +16,9 @@ import { nowSeconds } from "../../../utils/time";
 import { makeLocalId } from "../../../utils/validation";
 import {
   chatAttachmentErrorKey,
-  createPrivateImageSendPayload,
   getChatAttachmentRejection,
-  parsePrivateImageMessage,
+  privateImageMessageContent,
+  uploadPrivateImage,
 } from "../../lib/privateImageMessage";
 import type {
   AppendLocalNostrMessage,
@@ -33,7 +32,6 @@ import type { Translate } from "../../../i18n";
 const isPubkey = Schema.is(Pubkey);
 const isRumorId = Schema.is(RumorId);
 const decodeMessageText = Schema.decodeUnknownResult(MessageText);
-const decodePrivateImage = Schema.decodeUnknownResult(PrivateImage);
 
 export type { ReplyContext };
 
@@ -135,13 +133,10 @@ export const useSendChatMessage = <
         const { contactPubHex, myPubHex, privBytes } = identity;
 
         const clientId = ClientId.make(makeLocalId());
-        const imagePayload = imageFile
-          ? await createPrivateImageSendPayload(imageFile, {
-              privateKey: privBytes,
-            })
+        const image = imageFile
+          ? await uploadPrivateImage(imageFile, { privateKey: privBytes })
           : null;
-        const messageContent = imagePayload?.content ?? text;
-        const mediaInfo = parsePrivateImageMessage(messageContent);
+        const messageContent = image ? privateImageMessageContent(image) : text;
         const activeReplyContext =
           options?.replyContext ?? readReplyContext() ?? replyContext ?? null;
         const activeReplyToId = (activeReplyContext?.replyToId ?? "").trim();
@@ -162,14 +157,10 @@ export const useSendChatMessage = <
         const createdAtSec = UnixSeconds.make(nowSeconds());
 
         let draft: TextMessageDraft | ImageMessageDraft;
-        if (imageFile) {
-          const image = decodePrivateImage(mediaInfo);
-          if (Result.isFailure(image)) {
-            throw new Error("invalid private image");
-          }
+        if (image) {
           draft = new ImageMessageDraft({
             to: contactPubHex,
-            image: image.success,
+            image,
             clientId,
             sentAt: createdAtSec,
             ...(replyTo === undefined ? {} : { replyTo }),
