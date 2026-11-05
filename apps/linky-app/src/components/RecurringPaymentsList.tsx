@@ -70,9 +70,7 @@ export const RecurringPaymentsList: FC = () => {
           >
             <ListRow
               leading={
-                <ContactSummaryAvatar
-                  contact={contacts.get(order.contactId)}
-                />
+                <ContactSummaryAvatar contact={contacts.get(order.contactId)} />
               }
               title={recurringRecipientLabel(order, contacts)}
               description={
