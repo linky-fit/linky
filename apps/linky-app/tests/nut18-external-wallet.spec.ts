@@ -209,7 +209,11 @@ for (const scenario of scenarios) {
         const wrapId = external.inbox.find(
           (message) => message.content === text,
         )!.wrapId;
-        expect(publishedRelays.get(wrapId)).toContain(external.relayUrl);
+        // The relay hands the wrap to the inbox before Playwright reports the
+        // frame that carried it, so both relays are polled.
+        await expect
+          .poll(() => publishedRelays.get(wrapId)?.has(external.relayUrl))
+          .toBe(true);
         await expect
           .poll(() => publishedRelays.get(wrapId)?.has(NOSTR_RELAY_URL))
           .toBe(true);
