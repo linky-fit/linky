@@ -201,7 +201,7 @@ export interface NavigationRailProps<T extends string> {
   header?: ReactNode;
 }
 
-/** The full-height column of main sections on wide screens; like the TabBar each item shows its icon over its label. */
+/** The full-height column of main sections on wide screens: an icon tile per section, named by its tooltip. */
 export function NavigationRail<T extends string>({
   accessibilityLabel,
   items,
@@ -217,33 +217,27 @@ export function NavigationRail<T extends string>({
         key={item.value}
         aria-current={active ? "page" : undefined}
         aria-label={item.label}
+        tooltip={item.label}
         testID={item.testID}
         disabled={item.disabled}
         onPress={() => onValueChange(item.value)}
-        flexDirection="column"
         justifyContent="center"
-        gap="$xs"
-        paddingVertical="$sm"
+        width="$avatar"
+        height="$avatar"
         borderRadius="$control"
-        hoverStyle={{ backgroundColor: "$neutralSoft" }}
+        backgroundColor={active ? "$accentSoft" : "$transparent"}
+        hoverStyle={{
+          backgroundColor: active ? "$accentSoft" : "$neutralSoft",
+        }}
+        transition="fast"
       >
-        <Row
-          justifyContent="center"
-          width="$controlLg"
-          height="$controlSm"
-          borderRadius="$pill"
-          backgroundColor={active ? "$accentSoft" : "$transparent"}
-          transition="fast"
-        >
-          {item.leading ??
-            (item.icon ? (
-              <Icon
-                name={item.icon}
-                color={active ? "$accentText" : "$colorMuted"}
-              />
-            ) : null)}
-        </Row>
-        <NavLabel label={item.label} active={active} />
+        {item.leading ??
+          (item.icon ? (
+            <Icon
+              name={item.icon}
+              color={active ? "$accentText" : "$colorMuted"}
+            />
+          ) : null)}
       </Pressable>
     );
   };
@@ -251,20 +245,16 @@ export function NavigationRail<T extends string>({
     <Stack
       role="navigation"
       aria-label={accessibilityLabel}
-      width="$hero"
       flexShrink={0}
-      gap="$xs"
+      alignItems="center"
+      gap="$sm"
       paddingTop="$lg"
       paddingHorizontal="$sm"
       paddingBottom="$md"
       backgroundColor="$surface"
     >
-      {header ? (
-        <Stack alignItems="center" marginBottom="$xl">
-          {header}
-        </Stack>
-      ) : null}
-      <Stack flex={1} gap="$xs">
+      {header ? <Stack marginBottom="$lg">{header}</Stack> : null}
+      <Stack flex={1} gap="$sm">
         {items.map(renderItem)}
       </Stack>
       {footerItems.map(renderItem)}

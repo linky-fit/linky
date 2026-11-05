@@ -305,16 +305,19 @@ export const DesktopContactsPane = (): React.ReactElement => (
   </>
 );
 
-/** `showRecent` is off where the full activity sits beside the wallet. */
+/** `showRecent` is off where the full activity sits beside the wallet; `desktop` docks the actions at the column's bottom. */
 export const WalletPane = ({
+  desktop = false,
   showRecent = true,
 }: {
+  desktop?: boolean;
   showRecent?: boolean;
 }): React.ReactElement => {
   const { openWalletScan } = useScanCommands();
   const scanIsOpen = useScanIsOpen();
   return (
     <WalletPage
+      actionsAtBottom={desktop}
       openScan={openWalletScan}
       scanIsOpen={scanIsOpen}
       showRecent={showRecent}

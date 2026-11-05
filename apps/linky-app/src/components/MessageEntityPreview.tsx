@@ -36,13 +36,7 @@ interface MessageEntityPreviewProps {
   onOpenNpubContact?: (npub: string) => void;
 }
 
-const PreviewText = ({ children }: { children: string }) => (
-  <Text variant="caption" color="$colorMuted" numberOfLines={1} flexShrink={1}>
-    {children}
-  </Text>
-);
-
-/** One line of a message with its contacts and tokens shown as pills. */
+/** One line of a message with its contacts and tokens shown as pills inline, cut off at its end. */
 export const MessageEntityPreview: React.FC<MessageEntityPreviewProps> = ({
   content,
   direction,
@@ -59,14 +53,7 @@ export const MessageEntityPreview: React.FC<MessageEntityPreviewProps> = ({
   const segments: React.ReactNode[] = [];
   let cursor = 0;
 
-  const pushText = (text: string) =>
-    segments.push(<PreviewText key={segments.length}>{text}</PreviewText>);
-
-  if (direction) {
-    segments.push(
-      <MessageDirectionIcon key="direction" direction={direction} />,
-    );
-  }
+  const pushText = (text: string) => segments.push(text);
 
   if (standaloneTokenInfo) {
     const icon = getMintIconUrl(standaloneTokenInfo.mintUrl);
@@ -130,8 +117,16 @@ export const MessageEntityPreview: React.FC<MessageEntityPreviewProps> = ({
   }
 
   return (
-    <Row gap="$xs" overflow="hidden">
-      {segments}
+    <Row gap="$xs">
+      {direction ? <MessageDirectionIcon direction={direction} /> : null}
+      <Text
+        variant="caption"
+        color="$colorMuted"
+        numberOfLines={1}
+        flexShrink={1}
+      >
+        {segments}
+      </Text>
     </Row>
   );
 };

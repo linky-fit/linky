@@ -146,6 +146,13 @@ export const controls: Section = {
             onPress={() => setChip(!chip)}
           />
           <UI.Chip label="Disabled" disabled onPress={() => setChip(!chip)} />
+          <UI.Chip
+            label="Removable"
+            selected
+            removable
+            accessibilityLabel="Remove filter Removable"
+            onPress={() => setChip(!chip)}
+          />
         </UI.Row>
       );
     },

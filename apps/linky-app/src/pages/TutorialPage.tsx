@@ -69,7 +69,6 @@ export function TutorialPage(): React.ReactElement {
               )
             }
             title={task.label}
-            description={task.done ? t("tutorialTaskDone") : undefined}
             testID={`tutorial-task-${task.key}`}
             trailing={
               <Button

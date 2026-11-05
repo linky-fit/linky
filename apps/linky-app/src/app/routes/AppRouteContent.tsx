@@ -397,6 +397,7 @@ export const AppRouteContent = (): React.ReactElement => {
             <DesktopContactsPane />
           ) : section === "wallet" ? (
             <WalletPane
+              desktop
               showRecent={secondaryIsOpen && route.kind !== "transactions"}
             />
           ) : section === "collaboration" ? (
