@@ -48,6 +48,7 @@ const ownRecord: ListingRecord = {
   amount: NonEmptyString100.orThrow("200"),
   currency: NonEmptyString100.orThrow("CZK"),
   unit: NonEmptyString100.orThrow("per hour"),
+  description: null,
   image: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
@@ -146,6 +147,7 @@ it("shows the user's own listing as theirs, with edit first and share", async ()
     .filter((id) => id === "listing-edit" || id === "listing-share");
   expect(buttons).toEqual(["listing-edit", "listing-share"]);
   expect(byTestId(container, "listing-reply")).toBeNull();
+  expect(byTestId(container, "listing-description")).toBeNull();
   await act(async () => byTestId(container, "listing-edit")?.click());
   expect(navigateTo).toHaveBeenCalledWith({ route: "listingEdit", id: ownId });
   await unmount();
@@ -167,12 +169,19 @@ it("replies to a contact's listing in their chat", async () => {
 });
 
 it("shows the copy a message holds and offers to save an author who is no contact", async () => {
-  const copy = new Listing({ ...peerListing, title: "Eggs as discussed" });
+  const copy = new Listing({
+    ...peerListing,
+    title: "Eggs as discussed",
+    description: "Free range.\nPick up in Brno.",
+  });
   state.snapshot = new SharedListing({ author: PEER, listing: copy });
   const { container, unmount } = await renderIntoDocument(
     <ListingDetailPage author={PEER} listingId="eggs" messageId={messageId} />,
   );
   expect(container.textContent).toContain("Eggs as discussed");
+  expect(byTestId(container, "listing-description")?.textContent).toBe(
+    "Free range.\nPick up in Brno.",
+  );
   expect(container.textContent).toContain("listingAuthorNotContact");
   expect(byTestId(container, "listing-reply")).toBeNull();
   await act(async () => byTestId(container, "listing-add-author")?.click());

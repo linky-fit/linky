@@ -648,20 +648,28 @@ describe("ChatMessage bank payment offer actions", () => {
 
 describe("ChatMessage shared listing", () => {
   const author = makeIdentity().pubkey;
+  const listing = new Listing({
+    id: "eggs",
+    side: "offer",
+    title: "Garden eggs",
+    amount: ListingAmount.make("90"),
+    currency: ListingCurrency.make("CZK"),
+    unit: "per 10",
+  });
   const shared = new SharedListing({
     author,
     listing: new Listing({
-      id: "eggs",
-      side: "offer",
-      title: "Garden eggs",
-      amount: ListingAmount.make("90"),
-      currency: ListingCurrency.make("CZK"),
-      unit: "per 10",
+      ...listing,
+      description: "Free range.\nPick up in Brno.",
     }),
   });
   const content = sharedListingMessageText(shared, "Still available?");
   const card = (container: HTMLElement) =>
     container.querySelector<HTMLElement>('[data-testid="chat-shared-listing"]');
+  const description = (container: HTMLElement) =>
+    container.querySelector<HTMLElement>(
+      '[data-testid="chat-shared-listing-description"]',
+    );
 
   it("shows the card under the author's first name and the note without the lines for older clients", async () => {
     const container = await renderChatMessage(content, {
@@ -674,9 +682,21 @@ describe("ChatMessage shared listing", () => {
     expect(card(container)?.textContent).toContain("chatListingOf");
     expect(card(container)?.textContent).toContain("Garden eggs");
     expect(card(container)?.textContent).toContain("listingSideOffer");
+    expect(description(container)?.textContent).toBe(
+      "Free range.\nPick up in Brno.",
+    );
     expect(container.textContent).toContain("Still available?");
     expect(container.textContent).not.toContain("linky:listing:v1:");
     expect(container.textContent).not.toContain(encodeNpub(author));
+  });
+
+  it("shows no description line for a listing without one", async () => {
+    const container = await renderChatMessage(
+      sharedListingMessageText(new SharedListing({ author, listing }), ""),
+    );
+
+    expect(card(container)).not.toBeNull();
+    expect(description(container)).toBeNull();
   });
 
   it("calls the author's own listing theirs, whoever sent it", async () => {

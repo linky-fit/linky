@@ -1358,6 +1358,8 @@ export const cs = {
   listingSideWant: "Hledám",
   listingTitle: "Název",
   listingTitlePlaceholder: "Třeba Domácí vajíčka nebo Hlídání dětí",
+  listingDescription: "Popis (nepovinný)",
+  listingDescriptionPlaceholder: "Stav, vyzvednutí, cokoli, co se hodí vědět",
   listingPrice: "Cena",
   listingUnit: "Jednotka",
   listingCurrency: "Měna",

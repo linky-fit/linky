@@ -1,4 +1,8 @@
-import { identityFromNsec, type ListingSide } from "@linky-fit/linkstr";
+import {
+  identityFromNsec,
+  LISTING_DESCRIPTION_MAX_LENGTH,
+  type ListingSide,
+} from "@linky-fit/linkstr";
 import {
   createId,
   NonEmptyString,
@@ -83,6 +87,7 @@ export function ListingFormPage({
   );
   const [side, setSide] = React.useState<ListingSide>("offer");
   const [title, setTitle] = React.useState("");
+  const [description, setDescription] = React.useState("");
   const [amount, setAmount] = React.useState("");
   const [unit, setUnit] = React.useState("");
   // A new listing takes the display unit; an edit keeps the currency it was priced in.
@@ -110,6 +115,7 @@ export function ListingFormPage({
     loadedId.current = existing.id;
     if (isSide(existing.side)) setSide(existing.side);
     setTitle(existing.title);
+    setDescription(existing.description ?? "");
     setUnit(existing.unit);
     const price = listingPriceInput(
       existing.amount,
@@ -198,6 +204,10 @@ export function ListingFormPage({
       return;
     }
     setSaving("listing");
+    const trimmedDescription = description.trim();
+    const descriptionValue = trimmedDescription
+      ? NonEmptyString1000.orThrow(trimmedDescription)
+      : null;
     const columns = {
       side: NonEmptyString100.orThrow(side),
       title: NonEmptyString1000.orThrow(title.trim()),
@@ -208,11 +218,17 @@ export function ListingFormPage({
     };
     const outcome = await runWrite(
       existing
-        ? repository.update(existing.id, columns)
+        ? repository.update(existing.id, {
+            ...columns,
+            description: descriptionValue,
+          })
         : repository.insert({
             id: createId<"Listing">(),
             createdAtSec: PositiveInt.orThrow(nowSeconds()),
             ...columns,
+            ...(descriptionValue === null
+              ? {}
+              : { description: descriptionValue }),
           }),
     );
     setSaving(null);
@@ -272,6 +288,15 @@ export function ListingFormPage({
         maxLength={120}
         error={fieldError(titleMissing, "listingTitleMissing")}
         testID="listing-title"
+      />
+      <TextField
+        multiline
+        label={t("listingDescription")}
+        placeholder={t("listingDescriptionPlaceholder")}
+        value={description}
+        onChangeText={setDescription}
+        maxLength={LISTING_DESCRIPTION_MAX_LENGTH}
+        testID="listing-description"
       />
       <Row gap="$sm" alignItems="flex-start">
         <Stack flex={1} minWidth={0}>

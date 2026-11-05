@@ -37,7 +37,7 @@ export const encodeListingImage = Schema.encodeSync(
   Schema.fromJsonString(PrivateImage),
 );
 
-/** The wire listing of a stored row, or null while the row holds something the wire does not accept; an image that does not decode is left out. */
+/** The wire listing of a stored row, or null while the row holds something the wire does not accept; a description or image that does not decode is left out. */
 export const listingOfRecord = (record: ListingRecord): Listing | null => {
   const image =
     record.image === null ? Option.none() : decodeJson(record.image);
@@ -49,6 +49,9 @@ export const listingOfRecord = (record: ListingRecord): Listing | null => {
       amount: record.amount,
       currency: record.currency,
       unit: record.unit,
+      ...(record.description === null
+        ? {}
+        : { description: record.description }),
       ...(Option.isSome(image) ? { image: image.value } : {}),
     }),
   );
