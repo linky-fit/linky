@@ -12,7 +12,7 @@ interface SharedListingCardProps {
   shared: SharedListing;
 }
 
-/** The listing a chat message carries: photo, side, title and price; a tap opens its detail. */
+/** The listing a chat message carries: photo, side, title, price and the start of its description; a tap opens its detail. */
 export function SharedListingCard({
   authorLabel,
   onOpen,
@@ -50,6 +50,16 @@ export function SharedListingCard({
             <Text variant="caption" color="$colorSubtle">
               {priceText(listing)}
             </Text>
+            {listing.description ? (
+              <Text
+                variant="caption"
+                color="$colorMuted"
+                numberOfLines={2}
+                testID="chat-shared-listing-description"
+              >
+                {listing.description}
+              </Text>
+            ) : null}
           </Stack>
           <Icon name="ChevronRight" size="sm" color="$colorMuted" />
         </Row>

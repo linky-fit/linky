@@ -1366,6 +1366,8 @@ export const de = {
   listingSideWant: "Suche",
   listingTitle: "Bezeichnung",
   listingTitlePlaceholder: "Z. B. Eier aus dem Garten oder Babysitten",
+  listingDescription: "Beschreibung (optional)",
+  listingDescriptionPlaceholder: "Zustand, Abholung, alles Wissenswerte",
   listingPrice: "Preis",
   listingUnit: "Einheit",
   listingCurrency: "Währung",

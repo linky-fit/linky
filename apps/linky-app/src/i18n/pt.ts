@@ -1371,6 +1371,8 @@ export const pt = {
   listingSideWant: "Procuro",
   listingTitle: "Título",
   listingTitlePlaceholder: "Por ex. Ovos caipiras ou Cuidar de crianças",
+  listingDescription: "Descrição (opcional)",
+  listingDescriptionPlaceholder: "Estado, retirada, tudo o que vale saber",
   listingPrice: "Preço",
   listingUnit: "Unidade",
   listingCurrency: "Moeda",

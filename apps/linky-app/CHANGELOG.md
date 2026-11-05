@@ -14,11 +14,11 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ### en-US
 
-- Goods and services: every listing opens its own page, and a listing can have a photo. Reply to a contact's listing, or send any listing to someone in a chat, from its page or by typing @ in a message. The chat shows it as a card, so even someone who does not see the listing can open it. The add button floats in the corner, like Add contact.
+- Goods and services: every listing opens its own page, and a listing can have a photo and a description. Reply to a contact's listing, or send any listing to someone in a chat, from its page or by typing @ in a message. The chat shows it as a card with the start of the description, so even someone who does not see the listing can open it. The add button floats in the corner, like Add contact.
 
 ### cs-CZ
 
-- Zboží a služby: každá nabídka má vlastní stránku a může mít fotku. Odpovězte na nabídku kontaktu nebo kteroukoli nabídku pošlete do chatu, z její stránky nebo napsáním @ ve zprávě. V chatu se ukáže jako karta, takže ji otevře i ten, kdo nabídku sám nevidí. Tlačítko pro přidání plave v rohu jako u Přidat kontakt.
+- Zboží a služby: každá nabídka má vlastní stránku a může mít fotku a popis. Odpovězte na nabídku kontaktu nebo kteroukoli nabídku pošlete do chatu, z její stránky nebo napsáním @ ve zprávě. V chatu se ukáže jako karta se začátkem popisu, takže ji otevře i ten, kdo nabídku sám nevidí. Tlačítko pro přidání plave v rohu jako u Přidat kontakt.
 
 ## [26.11.1] - 2026-11-05
 

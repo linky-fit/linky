@@ -74,7 +74,7 @@ const useLiveListing = (
   }, [author, isOwn, listingId, peers, records]);
 };
 
-/** One listing with its photo, price and author, and what the user can do with it. */
+/** One listing with its photo, price, description and author, and what the user can do with it. */
 export function ListingDetailPage({
   author,
   listingId,
@@ -161,6 +161,15 @@ export function ListingDetailPage({
           <Text color="$colorMuted">{listing.unit}</Text>
         </Row>
       </Stack>
+      {listing.description ? (
+        <Text
+          whiteSpace="pre-wrap"
+          wordWrap="break-word"
+          testID="listing-description"
+        >
+          {listing.description}
+        </Text>
+      ) : null}
       <Section grouped>
         <ListRow
           leading={

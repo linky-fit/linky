@@ -1,12 +1,25 @@
+import {
+  createId,
+  createIdFromString,
+  NonEmptyString100,
+  NonEmptyString1000,
+  OwnerId,
+  PositiveInt,
+  type ListingRecord,
+} from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { ListingFormPage } from "./ListingFormPage";
 
-const { insert, navigateTo } = vi.hoisted(() => ({
-  insert: vi.fn(() => Effect.void),
+const { insert, navigateTo, records, update } = vi.hoisted(() => ({
+  insert: vi.fn<(row: object) => Effect.Effect<void>>(() => Effect.void),
   navigateTo: vi.fn(),
+  records: new Array<ListingRecord>(),
+  update: vi.fn<(id: string, columns: object) => Effect.Effect<void>>(
+    () => Effect.void,
+  ),
 }));
 
 vi.mock("../hooks/useRouting", () => ({ navigateTo }));
@@ -19,8 +32,8 @@ vi.mock("../app/hooks/shell", async () =>
 );
 
 vi.mock("../app/hooks/useLinksync", () => ({
-  useListingRecords: () => [],
-  useListingsRepository: () => ({ insert }),
+  useListingRecords: () => records,
+  useListingsRepository: () => ({ insert, update }),
 }));
 
 // The enabled display currencies, in Settings: sats off, bitcoin and koruna on.
@@ -29,9 +42,16 @@ vi.mock("@linky-fit/linkstr-react", async (importOriginal) => ({
   useAtomValue: () => ["btc", "czk"],
 }));
 
-const input = (container: HTMLElement, testId: string): HTMLInputElement => {
+type Field = HTMLInputElement | HTMLTextAreaElement;
+
+const input = (container: HTMLElement, testId: string): Field => {
   const element = container.querySelector(`[data-testid="${testId}"]`);
-  if (!(element instanceof HTMLInputElement)) throw new Error(testId);
+  if (
+    !(element instanceof HTMLInputElement) &&
+    !(element instanceof HTMLTextAreaElement)
+  ) {
+    throw new Error(testId);
+  }
   return element;
 };
 
@@ -41,10 +61,10 @@ const button = (container: HTMLElement, testId: string): HTMLButtonElement => {
   return element;
 };
 
-const type = async (element: HTMLInputElement, value: string) => {
+const type = async (element: Field, value: string) => {
   await act(async () => {
     Object.getOwnPropertyDescriptor(
-      HTMLInputElement.prototype,
+      Object.getPrototypeOf(element),
       "value",
     )?.set?.call(element, value);
     element.dispatchEvent(new Event("input", { bubbles: true }));
@@ -72,7 +92,9 @@ describe("ListingFormPage", () => {
   afterEach(() => {
     document.body.innerHTML = "";
     insert.mockClear();
+    update.mockClear();
     navigateTo.mockClear();
+    records.length = 0;
   });
 
   it("marks the empty fields when the disabled Add is pressed and saves once they are filled", async () => {
@@ -92,6 +114,10 @@ describe("ListingFormPage", () => {
     await type(input(container, "listing-amount"), "90");
     expect(alerts(container)).toEqual(["listingUnitMissing"]);
     await type(input(container, "listing-unit"), "za 10 ks");
+    await type(
+      input(container, "listing-description"),
+      "  Z volného chovu.\nVyzvednutí v Brně.\n",
+    );
     expect(alerts(container)).toEqual([]);
     expect(isDisabled(button(container, "listing-save"))).toBe(false);
 
@@ -103,6 +129,7 @@ describe("ListingFormPage", () => {
         amount: "90",
         currency: "CZK",
         unit: "za 10 ks",
+        description: "Z volného chovu.\nVyzvednutí v Brně.",
       }),
     );
     expect(navigateTo).toHaveBeenCalledWith({ route: "listings" });
@@ -139,6 +166,38 @@ describe("ListingFormPage", () => {
     });
     expect(insert).toHaveBeenCalledWith(
       expect.objectContaining({ amount: "50000", currency: "SAT" }),
+    );
+    expect(insert.mock.calls[0]?.[0]).not.toHaveProperty("description");
+  });
+
+  it("loads a stored description into the edit and clears it", async () => {
+    const id = createIdFromString<"Listing">("eggs");
+    records.push({
+      id,
+      createdAtSec: PositiveInt.orThrow(100),
+      side: NonEmptyString100.orThrow("offer"),
+      title: NonEmptyString1000.orThrow("Domácí vajíčka"),
+      amount: NonEmptyString100.orThrow("90"),
+      currency: NonEmptyString100.orThrow("CZK"),
+      unit: NonEmptyString100.orThrow("za 10 ks"),
+      description: NonEmptyString1000.orThrow("Z volného chovu."),
+      image: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      isDeleted: 0,
+      ownerId: OwnerId.orThrow(createId()),
+    });
+    const { container } = await renderIntoDocument(<ListingFormPage id={id} />);
+    const description = input(container, "listing-description");
+    expect(description.value).toBe("Z volného chovu.");
+
+    await type(description, " ");
+    await act(async () => {
+      button(container, "listing-save").click();
+    });
+    expect(update).toHaveBeenCalledWith(
+      id,
+      expect.objectContaining({ description: null }),
     );
   });
 });

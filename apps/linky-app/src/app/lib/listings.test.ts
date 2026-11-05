@@ -3,6 +3,7 @@ import type { ListingRecord } from "@linky-fit/linksync";
 import {
   createId,
   NonEmptyString,
+  NonEmptyString1000,
   OwnerId,
   PositiveInt,
 } from "@linky-fit/linksync";
@@ -32,6 +33,7 @@ const record = (overrides: Partial<ListingRecord> = {}): ListingRecord => ({
   amount: "90",
   currency: "CZK",
   unit: "za 10 ks",
+  description: null,
   image: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
@@ -48,6 +50,16 @@ const bob = Pubkey.make(
 );
 
 describe("listingOfRecord", () => {
+  it("passes the stored description through and leaves it out when there is none", () => {
+    const description = NonEmptyString1000.orThrow(
+      "Volný chov.\nVyzvednutí v Brně.",
+    );
+    expect(listingOfRecord(record({ description }))?.description).toBe(
+      description,
+    );
+    expect(listingOfRecord(record())).not.toHaveProperty("description");
+  });
+
   const image = new PrivateImage({
     url: "https://blossom.example/eggs",
     fileType: "image/jpeg",

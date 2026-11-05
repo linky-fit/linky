@@ -1351,6 +1351,8 @@ export const en = {
   listingSideWant: "Looking for",
   listingTitle: "Title",
   listingTitlePlaceholder: "E.g. Eggs from the garden or Babysitting",
+  listingDescription: "Description (optional)",
+  listingDescriptionPlaceholder: "Condition, pick-up, anything worth knowing",
   listingPrice: "Price",
   listingUnit: "Unit",
   listingCurrency: "Currency",
