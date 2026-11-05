@@ -1,8 +1,10 @@
+import { useContext } from "react";
 import type { ReactNode } from "react";
 import { Pressable } from "./controls";
 import { Avatar, Pill } from "./display";
 import { Icon } from "./icons";
 import type { IconName } from "./icons";
+import { GroupedSectionContext } from "./grouped-section";
 import { Row, Stack, Text } from "./layout";
 import { View } from "tamagui";
 import { toneColors } from "./styles";
@@ -68,6 +70,7 @@ export function ListRow({
   const Frame = onPress ? Pressable : Row;
   const background = active ? "$accentSoft" : "$transparent";
   const highlight = onPress && !active ? "$neutralSoft" : background;
+  const grouped = useContext(GroupedSectionContext);
   return (
     <Frame
       testID={testID}
@@ -81,7 +84,7 @@ export function ListRow({
       marginHorizontal={-space.md}
       paddingHorizontal="$md"
       paddingVertical="$sm"
-      borderRadius="$control"
+      borderRadius={grouped ? "$none" : "$control"}
       backgroundColor={background}
       hoverStyle={{ backgroundColor: highlight }}
       pressStyle={{ backgroundColor: highlight }}

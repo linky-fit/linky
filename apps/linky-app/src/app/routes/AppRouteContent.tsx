@@ -381,7 +381,8 @@ export const AppRouteContent = (): React.ReactElement => {
           width="100%"
           position="relative"
           paddingTop="$xl"
-          paddingBottom="$lg"
+          // The contacts list scrolls on its own, so it runs to the column's bottom edge.
+          paddingBottom={section === "contacts" ? "$none" : "$lg"}
           paddingHorizontal="$xl"
         >
           <Text

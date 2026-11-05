@@ -88,7 +88,7 @@ describe("MintMoveFundsForm", () => {
   it("sweeps the whole balance it opens with, fees coming out of it", async () => {
     const { container, estimateMintMove, moveMintFunds, unmount } =
       await renderForm(4);
-    expect(amountShown(container)).toBe(`${AVAILABLE}sat`);
+    expect(amountShown(container)).toBe(`${AVAILABLE} sat`);
 
     await press(container, ["mintMoveEstimate"]);
     const sweep = { sourceMint: SOURCE_MINT, targetMint: TARGET_MINT };
@@ -181,7 +181,7 @@ describe("MintMoveFundsForm", () => {
   it("cannot estimate more than the balance", async () => {
     const { container, unmount } = await renderForm(4);
     await press(container, ["5"]);
-    expect(amountShown(container)).toBe(`${AVAILABLE}5sat`);
+    expect(amountShown(container)).toBe(`${AVAILABLE}5 sat`);
     expect(
       buttonNamed(container, "mintMoveEstimate").getAttribute("aria-disabled"),
     ).toBe("true");

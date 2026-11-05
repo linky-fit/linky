@@ -112,7 +112,7 @@ describe("CashuPaymentRequestConfirmModal", () => {
       }),
     );
 
-    expect(view.dialogText()).toContain("100,000sat~100 EUR");
+    expect(view.dialogText()).toContain("100,000 sat~100 EUR");
     expect(view.dialogText()).toContain("fees up to 4 sat (~0 EUR)");
     expect(view.dialogText()).toContain("at most 100,004 sat (~100 EUR)");
     expect(view.dialogText()).toContain(

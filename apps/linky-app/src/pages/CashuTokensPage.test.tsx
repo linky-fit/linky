@@ -80,7 +80,7 @@ describe("pending tokens", () => {
       [
         ...container.querySelectorAll('[data-testid="cashu-token-balance"]'),
       ].map((node) => node.textContent),
-    ).toEqual(["0sat", "21sat"]);
+    ).toEqual(["0 sat", "21 sat"]);
     await click(container, "21 sat");
     expect(navigateTo).toHaveBeenLastCalledWith({
       route: "cashuToken",

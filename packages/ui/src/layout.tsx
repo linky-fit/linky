@@ -9,6 +9,7 @@ import {
   YStack,
 } from "tamagui";
 import type { GetProps } from "tamagui";
+import { GroupedSectionContext } from "./grouped-section";
 import { textVariant } from "./styles";
 import { letterSpacing, shadow, space } from "./tokens";
 
@@ -150,14 +151,13 @@ export function Section({ title, children, grouped = false }: SectionProps) {
       {grouped ? (
         <Stack
           gap="$none"
-          paddingVertical="$xs"
           paddingHorizontal="$md"
           borderRadius="$card"
           backgroundColor="$surface"
           // Row highlights reach the card's edge; the card's corners clip them.
           overflow="hidden"
         >
-          {children}
+          <GroupedSectionContext value>{children}</GroupedSectionContext>
         </Stack>
       ) : (
         children
