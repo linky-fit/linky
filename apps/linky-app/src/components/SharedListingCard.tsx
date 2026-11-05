@@ -24,17 +24,13 @@ export function SharedListingCard({
     <Pressable
       onPress={onOpen}
       alignItems="stretch"
+      width="100%"
       aria-label={`${listing.title}, ${priceText(listing)}`}
       testID="chat-shared-listing"
     >
-      <Stack flex={1} gap="$sm" minWidth="$qr" maxWidth="100%">
+      <Stack flex={1} gap="$sm">
         {listing.image ? (
-          <ListingImage
-            source={listing.image}
-            label={listing.title}
-            capHeight={false}
-            t={t}
-          />
+          <ListingImage source={listing.image} label={listing.title} t={t} />
         ) : null}
         <Row justifyContent="space-between" alignItems="center" gap="$sm">
           <Text eyebrow numberOfLines={1}>

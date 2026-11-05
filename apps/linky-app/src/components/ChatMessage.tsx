@@ -932,7 +932,7 @@ function ChatMessageComponent({
     (bankOfferCard ??
     paymentRequestCard ??
     (sharedListingCard ? (
-      <>
+      <Stack width="$qr" maxWidth="100%">
         {sharedListingCard}
         {content ? (
           <>
@@ -940,7 +940,7 @@ function ChatMessageComponent({
             <MessageText>{inlineMessageContent ?? content}</MessageText>
           </>
         ) : null}
-      </>
+      </Stack>
     ) : isDeclineMessage ? (
       <Pill label={t("paymentRequestDeclinedMessage")} tone="neutral" />
     ) : privateImageInfo && isPrivatePdfPayload(privateImageInfo) ? (
