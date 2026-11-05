@@ -10,6 +10,7 @@ import { decrypt, encrypt, getConversationKey } from "nostr-tools/nip44";
 import { nsecEncode } from "nostr-tools/nip19";
 import {
   encodeImageMessageRumor,
+  encodeTextMessageRumor,
   encodeTokenMessageRumor,
 } from "../chat/codec";
 import {
@@ -17,6 +18,7 @@ import {
   ImageMessageDraft,
   MessageText,
   PrivateImage,
+  TextMessageDraft,
   TokenMessageDraft,
 } from "../chat/domain";
 import { encodeAppMessageRumor } from "../appMessages/codec";
@@ -26,6 +28,12 @@ import { ClientId, Pubkey, RelayUrl, UnixSeconds } from "../domain/primitives";
 import { WrapInbox } from "../inbox/WrapInbox";
 import { wrapRumorFor } from "../internal/giftWrap";
 import type { SignedWrapEvent } from "../internal/nostrEvent";
+import { Listing, ListingAmount, ListingCurrency } from "../listings/domain";
+import {
+  SHARED_LISTING_MARKER_PREFIX,
+  SharedListing,
+  sharedListingMessageText,
+} from "../listings/sharedListing";
 import { NostrConnectRequest } from "../nostrConnect/domain";
 import { NostrConnect } from "../nostrConnect/NostrConnect";
 import { OutboxRef } from "../outbox/domain";
@@ -399,6 +407,74 @@ describe("inspector emission never carries attachment keys", () => {
       const serialized = JSON.stringify(event);
       expect(serialized, eventLabel(event)).not.toContain(attachmentKey);
       expect(serialized, eventLabel(event)).not.toContain(attachmentNonce);
+    }
+  });
+});
+
+const sharedListingText = (to: Pubkey) =>
+  new TextMessageDraft({
+    to,
+    content: MessageText.make(
+      sharedListingMessageText(
+        new SharedListing({
+          author: sender.pubkey,
+          listing: new Listing({
+            id: "eggs",
+            side: "offer",
+            title: "Eggs",
+            amount: ListingAmount.make("90"),
+            currency: ListingCurrency.make("CZK"),
+            unit: "per 10",
+            image,
+          }),
+        }),
+        "fresh today",
+      ),
+    ),
+  });
+const incomingSharedListingWrap = wrapRumorFor(
+  encodeTextMessageRumor(
+    sharedListingText(me.pubkey),
+    sender.pubkey,
+    UnixSeconds.make(1_754_000_003),
+    ClientId.make("incoming-shared-listing"),
+  ),
+  sender.secretKey,
+  me.pubkey,
+);
+
+describe("inspector emission never carries a shared listing's photo keys", () => {
+  it("redacts the marker on every send, outbox, and inbox row and keeps the readable text", async () => {
+    const collected = await collectWrapEmissions(incomingSharedListingWrap, {
+      _tag: "chat.text",
+      draft: sharedListingText(peer),
+    });
+    expectNoIdentitySecrets(collected);
+    const marker = sharedListingText(peer)
+      .content.split("\n")
+      .at(-1)
+      ?.slice(SHARED_LISTING_MARKER_PREFIX.length);
+    expect(marker).toBeTruthy();
+
+    const mentioningListing = collected.filter((event) =>
+      JSON.stringify(event).includes(
+        `${SHARED_LISTING_MARKER_PREFIX}[redacted listing]`,
+      ),
+    );
+    expect(mentioningListing.map(eventLabel)).toEqual(
+      expect.arrayContaining([
+        "PlainOperationSucceeded:outbox.enqueue",
+        "OperationSucceeded:chat.sendText",
+        "InboxRouted",
+        "PlainOperationSucceeded:inbox.fetchWrapEvent",
+      ]),
+    );
+    for (const event of collected) {
+      const serialized = JSON.stringify(event);
+      expect(serialized, eventLabel(event)).not.toContain(marker);
+    }
+    for (const event of mentioningListing) {
+      expect(JSON.stringify(event), eventLabel(event)).toContain("fresh today");
     }
   });
 });
