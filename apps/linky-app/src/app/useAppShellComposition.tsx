@@ -1,4 +1,3 @@
-import { useChatIdOfMessage } from "./hooks/useSharedListing";
 import { useAtom, useAtomSet, useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
 import { reportAppLog } from "../devtools/inspector/appLog";
@@ -46,6 +45,7 @@ import {
   useTransactionsRepository,
 } from "./hooks/useLinksync";
 import { useLnurlAuth } from "./hooks/useLnurlAuth";
+import { useChatIdOfMessage } from "./hooks/useSharedListing";
 import { useSiteLogin } from "./hooks/useSiteLogin";
 import { useStatusToasts } from "./hooks/useStatusToasts";
 import { useStoragePersistRequestEffect } from "./hooks/useStoragePersistRequestEffect";
