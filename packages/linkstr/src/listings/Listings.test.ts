@@ -1,6 +1,7 @@
-import { Effect, Exit, Layer, Result, Stream } from "effect";
+import { Effect, Exit, Layer, Result, Schema, Stream } from "effect";
 import type { Event as NostrToolsEvent, Filter } from "nostr-tools";
 import { getConversationKey } from "nostr-tools/nip44";
+import { PrivateImage } from "../chat/domain";
 import { RelayUrl, UnixSeconds } from "../domain/primitives";
 import type { Pubkey } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
@@ -164,6 +165,44 @@ describe("listings codec", () => {
     expect(
       () => new Listing({ ...eggs, amount: ListingAmount.make("1.234") }),
     ).toThrow();
+  });
+});
+
+describe("listing image", () => {
+  const image = new PrivateImage({
+    url: "https://blossom.test/abc",
+    fileType: "image/jpeg",
+    encryptionAlgorithm: "aes-gcm",
+    key: "a".repeat(64),
+    nonce: "b".repeat(24),
+    encryptedSha256: "c".repeat(64),
+    originalSha256: "d".repeat(64),
+    encryptedSize: 1024,
+    width: 800,
+    height: 600,
+    storageEncoding: "base64",
+  });
+  const decodeDocument = Schema.decodeUnknownSync(ListingsDocument);
+  const encodedEggs = Schema.encodeSync(Listing)(eggs);
+
+  it("carries the image to every reader and leaves it out when absent", () => {
+    const withImage = new ListingsDocument({
+      listings: [new Listing({ ...eggs, image })],
+    });
+    const event = listingsEvent(alice, [bob.pubkey], base, withImage);
+    expect(
+      documentOf(decodeListingsEvent(event, bob.secretKey))?.listings[0]?.image,
+    ).toEqual(image);
+    expect("image" in encodedEggs).toBe(false);
+  });
+
+  it("keeps a listing whose image is malformed, without the image", () => {
+    const decoded = decodeDocument({
+      listings: [{ ...encodedEggs, image: { url: "https://blossom.test" } }],
+    });
+    expect(decoded.listings).toHaveLength(1);
+    expect(decoded.listings[0]?.title).toBe(eggs.title);
+    expect(decoded.listings[0] && "image" in decoded.listings[0]).toBe(false);
   });
 });
 

@@ -41,7 +41,9 @@ const share = (contacts: ReadonlyArray<Pubkey>) =>
   );
 ```
 
-A `Listing` has the author's own stable `id` (so a reader can tell an edit from a new entry), a `side` (`offer` or `want`), a trimmed `title` of at most `LISTING_TITLE_MAX_LENGTH` characters, a decimal `amount` with up to two fraction digits as the author typed it, a `currency` (an ISO 4217 code, or `LISTING_SAT_CURRENCY` for whole satoshis) and a `unit` of at most `LISTING_UNIT_MAX_LENGTH` characters saying what the amount buys, in the author's words ("per hour", "per kg"), shown as written. `cash` is `null` when the author has no cash intent.
+A `Listing` has the author's own stable `id` (so a reader can tell an edit from a new entry), a `side` (`offer` or `want`), a trimmed `title` of at most `LISTING_TITLE_MAX_LENGTH` characters, a decimal `amount` with up to two fraction digits as the author typed it, a `currency` (an ISO 4217 code, or `LISTING_SAT_CURRENCY` for whole satoshis) and a `unit` of at most `LISTING_UNIT_MAX_LENGTH` characters saying what the amount buys, in the author's words ("per hour", "per kg"), shown as written. A listing may carry one `image`: a `PrivateImage`, the same encrypted Blossom reference an image message carries ([chat.md](./chat.md#images-and-files)), uploaded by the author before publishing. A malformed `image` decodes as none, so the listing and the document still arrive. `cash` is `null` when the author has no cash intent.
+
+The image key goes to every reader of the document and into every copy of the listing they keep or pass on, and it cannot be revoked: removing the image or the reader stops new copies, not the ones already read. A reader whose release does not know `image` drops the field; an author device on such a release republishes the document without the images it does not know about, until a newer device publishes again.
 
 When one event would pass `LISTINGS_MAX_EVENT_BYTES`, the slots are split over several chunk events, each with the whole document; see [Wire format](#wire-format). Publishes of one identity run one at a time and a second publish within the same second is dated one second later, so a relay never keeps an older event over a newer one. It succeeds with one receipt per chunk and fails with `NoRelayAcceptedEvent` when no write relay accepted one of the chunks; publish again then, since the readers of that chunk still see the previous version.
 
@@ -82,7 +84,7 @@ An event with every slot would pass the 64 KiB message cap common relays set at 
 
 Every recipient gets one `slot` tag. Its `<id>` is the first 32 hex characters of `sha256("linky/listings/slot/v1:" ‖ conversationKey)`, and `<key>` is the content key, as 64 hex characters, NIP-44 v2 encrypted under the same `conversationKey`: the NIP-44 conversation key of the author and that recipient (`getConversationKey(authorSecret, recipientPubkey)`, equal from either side). A reader derives the conversation key with the author's pubkey, computes the id, takes the tag that carries it, decrypts the content key and then the content. `listingsSlotId(conversationKey)` is exported for other implementations. Slot order carries no meaning. The author needs no slot: the document is theirs to keep locally.
 
-The content key is drawn fresh for every publish, so a recipient who is no longer listed cannot read any later version, and the content is one NIP-44 v2 payload of the JSON document:
+The content key is drawn fresh for every publish, so a recipient who is no longer listed cannot read any later version, and the content is one NIP-44 v2 payload of the JSON document, `image` left out when the listing has none:
 
 ```json
 {
@@ -94,7 +96,8 @@ The content key is drawn fresh for every publish, so a recipient who is no longe
       "title": "Eggs from the garden",
       "amount": "90",
       "currency": "CZK" | … | "SAT",
-      "unit": "per 10 pieces"
+      "unit": "per 10 pieces",
+      "image": { "url": "https://…", "key": "…", "nonce": "…", … }
     }
   ]
 }

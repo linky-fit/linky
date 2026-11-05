@@ -1,4 +1,5 @@
 import { Effect, Schema } from "effect";
+import { PrivateImage } from "../chat/domain";
 import { Pubkey } from "../domain/primitives";
 
 /** Whether the author offers the listing or looks for it. */
@@ -46,6 +47,10 @@ export class Listing extends Schema.Class<Listing>("Listing")({
   amount: ListingAmount,
   currency: ListingCurrency,
   unit: ListingUnit,
+  /** A malformed image decodes as none, so it never costs the listing or the document. */
+  image: Schema.optionalKey(
+    PrivateImage.pipe(Schema.catchDecoding(() => Effect.succeedNone)),
+  ),
 }) {}
 
 /** Everything one author shares with the contacts that can read it; the newest replaces the whole document. */

@@ -125,6 +125,8 @@ export const LinkySchema = {
     currency: NonEmptyString100,
     // What the amount buys, in the user's words ("za hodinu").
     unit: NonEmptyString100,
+    // JSON of linkstr's `PrivateImage`; validated by the consumer.
+    image: nullOr(NonEmptyString),
   },
   /**
    * Contacts scope: the user's instruction to pay a contact on a schedule.

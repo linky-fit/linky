@@ -1,4 +1,5 @@
 import {
+  NonEmptyString,
   NonEmptyString100,
   NonEmptyString1000,
   PositiveInt,
@@ -33,6 +34,18 @@ describe("listings repository", () => {
     expect(runNow(listings.all)).toMatchObject([{ amount: "95" }]);
     runNow(listings.remove(row.id));
     expect(runNow(listings.all)).toEqual([]);
+  });
+
+  it("keeps the optional image and clears it with null", () => {
+    const { store } = linkyStore();
+    const listings = makeListingsRepository(store);
+    const row = listing();
+    runNow(listings.insert(row));
+    expect(runNow(listings.all)).toMatchObject([{ image: null }]);
+    runNow(listings.update(row.id, { image: NonEmptyString.orThrow("{}") }));
+    expect(runNow(listings.all)).toMatchObject([{ image: "{}" }]);
+    runNow(listings.update(row.id, { image: null }));
+    expect(runNow(listings.all)).toMatchObject([{ image: null }]);
   });
 
   it("skips a row still arriving column by column", () => {
