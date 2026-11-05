@@ -7,6 +7,7 @@ import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
 import { peerListingsAtom } from "../state/contacts/listings";
 import type { ContactRowLike } from "../types/appTypes";
 import type { MessageMentionListing } from "../lib/messageMentions";
+import { hiddenListingKey, useHiddenListingKeys } from "../lib/hiddenListings";
 import { formatListingPrice, listingOfRecord } from "../lib/listings";
 import { currentPubkeyAtom } from "../state/session/session";
 import {
@@ -71,21 +72,27 @@ export const useSharingContacts = (): ReadonlyArray<SharingContact> => {
   }, [contactInfo, contacts, lang, peers]);
 };
 
-/** Contacts' listings: what they offer and what they want. */
+/** Contacts' listings: what they offer and what they want, and the ones hidden on this device. */
 export const usePeerListings = (): {
   offered: ReadonlyArray<PeerListing>;
   wanted: ReadonlyArray<PeerListing>;
+  hidden: ReadonlyArray<PeerListing>;
 } => {
   const sharing = useSharingContacts();
+  const hiddenKeys = useHiddenListingKeys();
   return React.useMemo(() => {
     const entries = sharing.flatMap((contact) =>
       contact.listings.map((listing): PeerListing => ({ contact, listing })),
     );
+    const isHidden = ({ contact, listing }: PeerListing) =>
+      hiddenKeys.has(hiddenListingKey(contact.pubkey, listing.id));
+    const shown = entries.filter((entry) => !isHidden(entry));
     return {
-      offered: entries.filter(({ listing }) => listing.side === "offer"),
-      wanted: entries.filter(({ listing }) => listing.side === "want"),
+      offered: shown.filter(({ listing }) => listing.side === "offer"),
+      wanted: shown.filter(({ listing }) => listing.side === "want"),
+      hidden: entries.filter(isHidden),
     };
-  }, [sharing]);
+  }, [hiddenKeys, sharing]);
 };
 
 /** Contacts by cash intent. */
@@ -109,6 +116,7 @@ export const useMentionListings = (): ReadonlyArray<MessageMentionListing> => {
   const records = useListingRecords();
   const sharing = useSharingContacts();
   const peers = useAtomValue(peerListingsAtom);
+  const hiddenKeys = useHiddenListingKeys();
   return React.useMemo(() => {
     const dated: Array<MessageMentionListing & { readonly at: number }> = [];
     if (ownPubkey) {
@@ -126,6 +134,8 @@ export const useMentionListings = (): ReadonlyArray<MessageMentionListing> => {
       const at = peers[contact.pubkey]?.updatedAt ?? 0;
       // A document lists oldest first, and the sort below keeps equal times in order.
       for (const listing of [...contact.listings].reverse()) {
+        if (hiddenKeys.has(hiddenListingKey(contact.pubkey, listing.id)))
+          continue;
         dated.push({
           at,
           authorName: contact.name,
@@ -136,7 +146,7 @@ export const useMentionListings = (): ReadonlyArray<MessageMentionListing> => {
     return dated
       .sort((left, right) => right.at - left.at)
       .map(({ authorName, shared }) => ({ authorName, shared }));
-  }, [ownPubkey, peers, records, sharing]);
+  }, [hiddenKeys, ownPubkey, peers, records, sharing]);
 };
 
 /** `90 Kč · per 10 pieces`, priced in the viewer's display unit. */

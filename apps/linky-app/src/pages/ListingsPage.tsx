@@ -1,5 +1,5 @@
 import { useAtomValue } from "@linky-fit/linkstr-react";
-import { Avatar, EmptyState, ListRow, Stack, Text } from "@linky-fit/ui";
+import { Avatar, EmptyState, Icon, ListRow, Stack, Text } from "@linky-fit/ui";
 import React from "react";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import {
@@ -14,6 +14,7 @@ import {
   FloatingActionButton,
   floatingActionButtonClearance,
 } from "../components/FloatingActionButton";
+import { ListingThumbnail } from "../components/ListingImage";
 import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey, Translate } from "../i18n";
 import { firstName } from "../utils/formatting";
@@ -34,11 +35,15 @@ function PeerListingRow({
   return (
     <ListRow
       leading={
-        <Avatar
-          name={contact.name}
-          uri={contact.pictureUrl ?? undefined}
-          size="md"
-        />
+        listing.image ? (
+          <ListingThumbnail source={listing.image} label={listing.title} />
+        ) : (
+          <Avatar
+            name={contact.name}
+            uri={contact.pictureUrl ?? undefined}
+            size="md"
+          />
+        )
       }
       title={listing.title}
       description={`${firstName(contact.name)} · ${listing.unit}`}
@@ -87,12 +92,55 @@ function PeerSection({
   );
 }
 
+/** The listings hidden on this device, folded under one row until the user opens it. */
+function HiddenSection({
+  display,
+  entries,
+  t,
+}: {
+  display: DisplayAmountOptions;
+  entries: ReadonlyArray<PeerListing>;
+  t: Translate;
+}): React.ReactElement | null {
+  const [open, setOpen] = React.useState(false);
+  if (entries.length === 0) return null;
+  return (
+    <Stack gap="$sm">
+      <ListRow
+        icon="EyeOff"
+        title={t("listingsHidden")}
+        value={entries.length}
+        chevron={false}
+        trailing={
+          <Icon
+            name={open ? "ChevronUp" : "ChevronDown"}
+            size="sm"
+            color="$colorMuted"
+          />
+        }
+        expanded={open}
+        onPress={() => setOpen((current) => !current)}
+        testID="hidden-listings"
+      />
+      {open
+        ? entries.map((entry) => (
+            <PeerListingRow
+              key={`${entry.contact.pubkey}:${entry.listing.id}`}
+              entry={entry}
+              display={display}
+            />
+          ))
+        : null}
+    </Stack>
+  );
+}
+
 /** The contacts' listings, what the user shares, and the way to add more. */
 export function ListingsPage(): React.ReactElement {
   const { lang, t } = useTranslation();
   const { displayCurrency, fiatRates } = useDisplayAmounts();
   const display: DisplayAmountOptions = { displayCurrency, fiatRates, lang };
-  const { offered, wanted } = usePeerListings();
+  const { offered, wanted, hidden } = usePeerListings();
   const records = useListingRecords();
   const mine = React.useMemo(
     () =>
@@ -114,7 +162,12 @@ export function ListingsPage(): React.ReactElement {
       pinned
     />
   );
-  if (offered.length === 0 && wanted.length === 0 && mine.length === 0) {
+  if (
+    offered.length === 0 &&
+    wanted.length === 0 &&
+    hidden.length === 0 &&
+    mine.length === 0
+  ) {
     return (
       <>
         <EmptyState
@@ -152,6 +205,14 @@ export function ListingsPage(): React.ReactElement {
             {mine.map(({ record, listing }) => (
               <ListRow
                 key={record.id}
+                leading={
+                  listing.image ? (
+                    <ListingThumbnail
+                      source={listing.image}
+                      label={listing.title}
+                    />
+                  ) : undefined
+                }
                 title={listing.title}
                 description={`${t(listing.side === "offer" ? "listingSideOffer" : "listingSideWant")} · ${listing.unit}`}
                 trailing={
@@ -179,6 +240,7 @@ export function ListingsPage(): React.ReactElement {
             ))}
           </Stack>
         ) : null}
+        <HiddenSection display={display} entries={hidden} t={t} />
         <Text variant="label" fontWeight="$regular" color="$colorMuted">
           {t("listingsMutualOnly")}
         </Text>
