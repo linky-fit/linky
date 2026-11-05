@@ -116,7 +116,7 @@ const dateTimeFormatters = new Map<string, Intl.DateTimeFormat>();
 
 const getDateTimeFormatter = (
   locale: string,
-  format: "dayMonth" | "time" | "weekday",
+  format: "clock" | "dayMonth" | "time" | "weekday",
 ): Intl.DateTimeFormat => {
   const key = `${locale}:${format}`;
   let formatter = dateTimeFormatters.get(key);
@@ -125,9 +125,11 @@ const getDateTimeFormatter = (
   const options: Intl.DateTimeFormatOptions =
     format === "time"
       ? { hour: "2-digit", minute: "2-digit" }
-      : format === "dayMonth"
-        ? { day: "2-digit", month: "2-digit" }
-        : { weekday: "short" };
+      : format === "clock"
+        ? { hour: "numeric", minute: "2-digit" }
+        : format === "dayMonth"
+          ? { day: "2-digit", month: "2-digit" }
+          : { weekday: "short" };
   formatter = new Intl.DateTimeFormat(locale, options);
   dateTimeFormatters.set(key, formatter);
   return formatter;
@@ -135,7 +137,7 @@ const getDateTimeFormatter = (
 
 /** The time of day, e.g. for a row under a day heading. */
 export const formatClockTime = (unixSeconds: number, lang?: string): string =>
-  getDateTimeFormatter(normalizeLocale(lang), "time").format(
+  getDateTimeFormatter(normalizeLocale(lang), "clock").format(
     unixSeconds * 1000,
   );
 
@@ -252,6 +254,7 @@ export const formatChatDayLabel = (
   const diffDays = Math.round((startOfToday - startOfThatDay) / 86_400_000);
   if (diffDays === 0) return t("today");
   if (diffDays === 1) return t("yesterday");
+  if (diffDays === -1) return t("tomorrow");
 
   const locale = normalizeLocale(lang);
   const weekday = getDateTimeFormatter(locale, "weekday").format(d);

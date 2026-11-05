@@ -1402,6 +1402,7 @@ export const pt = {
   otherContacts: "Outros contatos",
   today: "Hoje",
   yesterday: "Ontem",
+  tomorrow: "Amanhã",
 
   // Error and UI strings
   evoluWipeStorageFailed:
