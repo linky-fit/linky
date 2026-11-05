@@ -1,4 +1,5 @@
 import {
+  Icon,
   ListRow,
   Row,
   Section,
@@ -241,8 +242,7 @@ export function AdvancedPage(): React.ReactElement {
         )}
         {linkRow("MessageCircle", t("feedback"), openFeedbackContact)}
         <ListRow
-          icon="HeartHandshake"
-          iconTone="accent"
+          leading={<Icon name="HeartHandshake" size="sm" color="$accentText" />}
           title={
             <Text bold color="$accentText">
               {t("supportLinky")}
