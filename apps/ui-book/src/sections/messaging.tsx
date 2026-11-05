@@ -56,6 +56,7 @@ export const messaging: Section = {
       const [menuOpen, setMenuOpen] = useState(false);
       const editor = useRef<HTMLDivElement>(null);
       const drafting = message.trim() !== "";
+      if (menuOpen && !drafting) setMenuOpen(false);
       return (
         <UI.Stack>
           <UI.MessageComposerFrame

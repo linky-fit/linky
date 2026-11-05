@@ -1,13 +1,6 @@
 import { useState } from "react";
 import type { ReactNode, Ref } from "react";
-import {
-  AnimatePresence,
-  Anchor,
-  Image,
-  ScrollView,
-  Theme,
-  View,
-} from "tamagui";
+import { Anchor, Image, ScrollView, Theme, View } from "tamagui";
 import type { GetProps, TamaguiElement } from "tamagui";
 import { IconButton, Pressable } from "./controls";
 import type { LabeledAction, PressableProps } from "./controls";
@@ -260,10 +253,39 @@ export function MessageComposerFrame({
       backgroundColor="$background"
     >
       {header}
-      <AnimatePresence>
+      {/* Reversed so the menu, drawn above the input, follows the + in tab order. */}
+      <Stack flexDirection="column-reverse" gap="$sm">
+        <Stack
+          gap="$sm"
+          $wide={{ flexDirection: "row", alignItems: "flex-end" }}
+        >
+          <Row gap="$sm" alignItems="flex-end" minWidth={0} $wide={{ flex: 1 }}>
+            {menu ? (
+              <IconButton
+                icon="Plus"
+                variant="secondary"
+                accessibilityLabel={menu.label}
+                aria-expanded={menu.open}
+                // Turned 45°, the + reads as the × that closes the menu.
+                rotate={menu.open ? "45deg" : "0deg"}
+                transition="base"
+                enterStyle={{ opacity: 0, scale: enterScale.pop }}
+                onPointerDown={keepInputFocus}
+                onPress={() => menu.onOpenChange(!menu.open)}
+              />
+            ) : null}
+            <Stack flex={1} minWidth={0}>
+              {children}
+            </Stack>
+          </Row>
+          {actions ? (
+            <Row gap="$sm" transition="base" enterStyle={{ opacity: 0 }}>
+              {actions}
+            </Row>
+          ) : null}
+        </Stack>
         {menu?.open ? (
           <Row
-            key="menu"
             role="group"
             aria-label={menu.label}
             gap="$sm"
@@ -271,45 +293,16 @@ export function MessageComposerFrame({
             borderRadius="$card"
             backgroundColor="$surface"
             transition="base"
-            enterStyle={menuHidden}
-            exitStyle={menuHidden}
+            enterStyle={{ opacity: 0, y: space.md }}
             onPointerDown={keepInputFocus}
           >
             {menu.items}
-          </Row>
-        ) : null}
-      </AnimatePresence>
-      <Stack gap="$sm" $wide={{ flexDirection: "row", alignItems: "flex-end" }}>
-        <Row gap="$sm" alignItems="flex-end" minWidth={0} $wide={{ flex: 1 }}>
-          {menu ? (
-            <IconButton
-              icon="Plus"
-              variant="secondary"
-              accessibilityLabel={menu.label}
-              aria-expanded={menu.open}
-              // Turned 45°, the + reads as the × that closes the menu.
-              rotate={menu.open ? "45deg" : "0deg"}
-              transition="base"
-              enterStyle={{ opacity: 0, scale: enterScale.pop }}
-              onPointerDown={keepInputFocus}
-              onPress={() => menu.onOpenChange(!menu.open)}
-            />
-          ) : null}
-          <Stack flex={1} minWidth={0}>
-            {children}
-          </Stack>
-        </Row>
-        {actions ? (
-          <Row gap="$sm" transition="base" enterStyle={{ opacity: 0 }}>
-            {actions}
           </Row>
         ) : null}
       </Stack>
     </Stack>
   );
 }
-
-const menuHidden = { opacity: 0, y: space.md } as const;
 
 export interface ComposerMenuItemProps extends Omit<
   PressableProps,
