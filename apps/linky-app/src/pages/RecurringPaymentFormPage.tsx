@@ -31,9 +31,9 @@ import {
 import {
   contactSummaryLabel,
   isPayableContact,
-  useRecurringContactSummaries,
-  useRecurringPaymentOrders,
-} from "../app/hooks/payments/useRecurringPaymentOrders";
+  useContactSummaries,
+} from "../app/hooks/contacts/useContactSummaries";
+import { useRecurringPaymentOrders } from "../app/hooks/payments/useRecurringPaymentOrders";
 import { recurringAmountFromInput } from "../app/lib/recurringAmount";
 import {
   dateTimeLocalToEpoch,
@@ -43,7 +43,7 @@ import {
 import { AmountKeypad } from "../components/AmountKeypad";
 import { ContactPicker } from "../components/ContactPicker";
 import { PaymentNoteInput } from "../components/PaymentNoteInput";
-import { RecurringContactAvatar } from "../components/RecurringContactAvatar";
+import { ContactSummaryAvatar } from "../components/ContactSummaryAvatar";
 import { useAmountInputKeypad } from "../components/useAmountInputKeypad";
 import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey } from "../i18n";
@@ -161,7 +161,7 @@ function RecurringPaymentForm({
     useRecurringPaymentsActions();
   const defaultMintUrl = useRecurringMintUrl();
   const mintUrl = order ? order.mintUrl : defaultMintUrl;
-  const contacts = useRecurringContactSummaries();
+  const contacts = useContactSummaries();
 
   const [contactId, setContactId] = React.useState(initial.contactId);
   const [amount, setAmount] = React.useState(initial.amountSat);
@@ -281,7 +281,7 @@ function RecurringPaymentForm({
   return (
     <Stack gap="$lg">
       <Row gap="$md" alignItems="center">
-        <RecurringContactAvatar contact={contact} size="md" />
+        <ContactSummaryAvatar contact={contact} size="md" />
         <Stack flex={1} gap="$xxs" alignItems="flex-start">
           <Text
             variant="title"

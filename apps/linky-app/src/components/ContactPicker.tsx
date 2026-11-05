@@ -2,16 +2,16 @@ import { EmptyState, ListRow, Stack, TextField } from "@linky-fit/ui";
 import React from "react";
 import {
   contactSummaryLabel,
-  type RecurringContactSummary,
-} from "../app/hooks/payments/useRecurringPaymentOrders";
+  type ContactSummary,
+} from "../app/hooks/contacts/useContactSummaries";
 import { useTranslation } from "../app/hooks/shell";
-import { RecurringContactAvatar } from "./RecurringContactAvatar";
+import { ContactSummaryAvatar } from "./ContactSummaryAvatar";
 
 interface ContactPickerProps {
-  contacts: Iterable<RecurringContactSummary>;
+  contacts: Iterable<ContactSummary>;
   label: string;
   emptyTitle: string;
-  onPick: (contact: RecurringContactSummary) => void;
+  onPick: (contact: ContactSummary) => void;
   rowTestID?: string;
 }
 
@@ -56,7 +56,7 @@ export function ContactPicker({
             <ListRow
               key={candidate.id}
               testID={rowTestID}
-              leading={<RecurringContactAvatar contact={candidate} />}
+              leading={<ContactSummaryAvatar contact={candidate} />}
               title={contactSummaryLabel(candidate)}
               description={
                 candidate.name && candidate.lnAddress

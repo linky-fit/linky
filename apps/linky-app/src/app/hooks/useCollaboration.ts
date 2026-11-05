@@ -1,22 +1,18 @@
-import {
-  encodeNpub,
-  parsePubkey,
-  SharedListing,
-  type Listing,
-} from "@linky-fit/linkstr";
+import { parsePubkey, SharedListing, type Listing } from "@linky-fit/linkstr";
 import type { Pubkey } from "@linky-fit/linkstr";
 import { useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
 import { isDeletedContact } from "../../utils/contactName";
-import { formatShortNpub } from "../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
 import { peerListingsAtom } from "../state/contacts/listings";
-import { profileCacheAtom } from "../state/contacts/profiles";
 import type { ContactRowLike } from "../types/appTypes";
 import type { MessageMentionListing } from "../lib/messageMentions";
 import { formatListingPrice, listingOfRecord } from "../lib/listings";
 import { currentPubkeyAtom } from "../state/session/session";
-import { useContacts } from "./contacts/useDisplayContacts";
+import {
+  useContacts,
+  useNpubMessageContactInfo,
+} from "./contacts/useDisplayContacts";
 import { useDisplayAmounts, useTranslation } from "./shell";
 import { useListingRecords } from "./useLinksync";
 
@@ -43,10 +39,7 @@ export interface PeerListing {
 export const useSharingContacts = (): ReadonlyArray<SharingContact> => {
   const contacts = useContacts();
   const peers = useAtomValue(peerListingsAtom);
-  const pictures = useAtomValue(
-    profileCacheAtom,
-    (cache) => cache.pictureByNpub,
-  );
+  const contactInfo = useNpubMessageContactInfo();
   const { lang } = useTranslation();
   return React.useMemo(() => {
     const collator = new Intl.Collator(lang, {
@@ -59,24 +52,23 @@ export const useSharingContacts = (): ReadonlyArray<SharingContact> => {
         if (isDeletedContact(contact)) return [];
         const npub = normalizeNpubIdentifier(contact.npub ?? "");
         const pubkey = npub ? parsePubkey(npub) : null;
-        if (!pubkey) return [];
+        if (!npub || !pubkey) return [];
         const peer = peers[pubkey];
-        if (!peer) return [];
+        const info = peer ? contactInfo(npub) : null;
+        if (!peer || !info) return [];
         return [
           {
             contact,
             pubkey,
-            name:
-              (contact.name ?? "").trim() ||
-              formatShortNpub(encodeNpub(pubkey)),
-            pictureUrl: pictures[encodeNpub(pubkey)] ?? null,
+            name: info.displayName,
+            pictureUrl: info.pictureUrl,
             cash: peer.document.cash,
             listings: peer.document.listings,
           },
         ];
       })
       .sort((left, right) => collator.compare(left.name, right.name));
-  }, [contacts, lang, peers, pictures]);
+  }, [contactInfo, contacts, lang, peers]);
 };
 
 /** Contacts' listings: what they offer and what they want. */

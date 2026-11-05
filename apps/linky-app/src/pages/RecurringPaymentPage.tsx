@@ -10,11 +10,11 @@ import {
   Text,
 } from "@linky-fit/ui";
 import React from "react";
+import { useContactSummaries } from "../app/hooks/contacts/useContactSummaries";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import { useRecurringPaymentsActions } from "../app/hooks/payments/useRecurringPaymentsActions";
 import {
   recurringRecipientLabel,
-  useRecurringContactSummaries,
   useRecurringPaymentOrders,
 } from "../app/hooks/payments/useRecurringPaymentOrders";
 import { formatRecurringAmountText } from "../app/lib/recurringAmount";
@@ -22,7 +22,7 @@ import {
   describeRecurringInterval,
   recurringLastRunLabel,
 } from "../app/lib/recurringPaymentDisplay";
-import { RecurringContactAvatar } from "../components/RecurringContactAvatar";
+import { ContactSummaryAvatar } from "../components/ContactSummaryAvatar";
 import { navigateTo } from "../hooks/useRouting";
 import { formatTimeAgo, normalizeLocale } from "../utils/formatting";
 import { formatMintHost } from "../utils/mint";
@@ -44,7 +44,7 @@ export function RecurringPaymentPage({
     setRecurringPaymentPaused,
   } = useRecurringPaymentsActions();
   const orders = useRecurringPaymentOrders();
-  const contacts = useRecurringContactSummaries();
+  const contacts = useContactSummaries();
   const order = orders.find((candidate) => candidate.id === id) ?? null;
   const dateFormatter = React.useMemo(
     () =>
@@ -79,7 +79,7 @@ export function RecurringPaymentPage({
   return (
     <Stack gap="$lg">
       <Stack alignItems="center" gap="$sm">
-        <RecurringContactAvatar
+        <ContactSummaryAvatar
           contact={contacts.get(order.contactId)}
           size="lg"
         />

@@ -2,16 +2,16 @@ import { Avatar } from "@linky-fit/ui";
 import type { AvatarSize } from "@linky-fit/ui";
 import type { FC } from "react";
 import { useNostrPictureByNpub } from "../app/hooks/contacts/useProfileCache";
-import type { RecurringContactSummary } from "../app/hooks/payments/useRecurringPaymentOrders";
+import type { ContactSummary } from "../app/hooks/contacts/useContactSummaries";
 import { contactPictureUrl } from "../derivedProfile";
 
-interface RecurringContactAvatarProps {
-  contact: RecurringContactSummary | undefined;
+interface ContactSummaryAvatarProps {
+  contact: ContactSummary | undefined;
   size?: AvatarSize | undefined;
 }
 
 /** Contact picture, generated avatar, or a lightning icon for LN-only contacts. */
-export const RecurringContactAvatar: FC<RecurringContactAvatarProps> = ({
+export const ContactSummaryAvatar: FC<ContactSummaryAvatarProps> = ({
   contact,
   size,
 }) => {
