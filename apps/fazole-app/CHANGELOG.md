@@ -10,6 +10,14 @@ Každá vydaná verze musí obsahovat nejprve `en-US` a potom `cs-CZ`.
 
 ## [Unreleased]
 
+### en-US
+
+- The tab bar on a phone shows only icons, like the side bar on a computer.
+
+### cs-CZ
+
+- Spodní lišta na telefonu ukazuje jen ikony, stejně jako boční lišta na počítači.
+
 ## [26.10.4] - 2026-10-30
 
 ### en-US
