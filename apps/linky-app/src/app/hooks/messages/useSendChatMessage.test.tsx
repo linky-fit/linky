@@ -4,6 +4,7 @@ import {
   ImageMessageDraft,
   OutboxJobId,
   OutboxRef,
+  PrivateImage,
   RumorId,
   TextMessageDraft,
   UnixSeconds,
@@ -28,17 +29,15 @@ import type { ChatSendOutcome, ReplyContext } from "./useSendChatMessage";
 type EnqueueOutbox = (
   input: EnqueueOutboxInput,
 ) => Promise<Exit.Exit<EnqueueReceipt, { readonly _tag: string }>>;
-type CreatePrivateImageSendPayload = (
+type UploadPrivateImage = (
   file: File,
-  auth: { privateKey: Uint8Array; pubkey: string },
-) => Promise<{ content: string }>;
+  auth: { privateKey: Uint8Array },
+) => Promise<PrivateImage>;
 
-const { createPrivateImageSendPayloadMock, enqueueOutboxMock } = vi.hoisted(
-  () => ({
-    createPrivateImageSendPayloadMock: vi.fn<CreatePrivateImageSendPayload>(),
-    enqueueOutboxMock: vi.fn<EnqueueOutbox>(),
-  }),
-);
+const { uploadPrivateImageMock, enqueueOutboxMock } = vi.hoisted(() => ({
+  uploadPrivateImageMock: vi.fn<UploadPrivateImage>(),
+  enqueueOutboxMock: vi.fn<EnqueueOutbox>(),
+}));
 
 vi.mock("@linky-fit/linkstr-react", () => ({
   useLinkstrCommands: () => ({ enqueueOutbox: enqueueOutboxMock }),
@@ -49,7 +48,7 @@ vi.mock("../../lib/privateImageMessage", async (importOriginal) => {
     await importOriginal<typeof import("../../lib/privateImageMessage")>();
   return {
     ...actual,
-    createPrivateImageSendPayload: createPrivateImageSendPayloadMock,
+    uploadPrivateImage: uploadPrivateImageMock,
   };
 });
 
@@ -154,7 +153,7 @@ const setup = async (options: SetupOptions = {}) => {
 
 describe("useSendChatMessage", () => {
   afterEach(() => {
-    createPrivateImageSendPayloadMock.mockReset();
+    uploadPrivateImageMock.mockReset();
     enqueueOutboxMock.mockReset();
     vi.restoreAllMocks();
   });
@@ -282,7 +281,7 @@ describe("useSendChatMessage", () => {
   });
 
   it("sends an uploaded image draft as a reply while keeping the text draft", async () => {
-    const image: PrivateImageMessagePayload = {
+    const uploaded = {
       encryptedSha256: "44".repeat(32),
       encryptedSize: 128,
       encryptionAlgorithm: "aes-gcm",
@@ -292,14 +291,15 @@ describe("useSendChatMessage", () => {
       nonce: "66".repeat(12),
       originalSha256: "77".repeat(32),
       storageEncoding: "base64",
-      type: "linky.private_image.v1",
       url: "https://blossom.example/image",
       width: 640,
+    } as const;
+    const image: PrivateImageMessagePayload = {
+      ...uploaded,
+      type: "linky.private_image.v1",
     };
     const compactContent = serializePrivateImageMessage(image);
-    createPrivateImageSendPayloadMock.mockResolvedValue({
-      content: compactContent,
-    });
+    uploadPrivateImageMock.mockResolvedValue(new PrivateImage(uploaded));
     enqueueOutboxMock.mockImplementation(async (input) =>
       Exit.succeed(
         receipt(
