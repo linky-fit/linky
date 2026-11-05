@@ -36,6 +36,7 @@ import {
   operatorTransferUpdate,
 } from "./app/lib/onchainOperator";
 import { getOnchainTransferUpdateCopyForLanguage } from "./app/lib/onchainTransferPushCopy";
+import { chatMessagePlainText } from "./app/lib/chatMessageDisplay";
 import { extractCashuTokenFromText } from "./app/lib/tokenText";
 import {
   getBankPaymentReimbursementCopyForLanguage,
@@ -285,7 +286,7 @@ function buildChatPushMessage(
   }
   if (body._tag !== "TextBody") return null;
   return {
-    body: truncateNotificationBody(body.text),
+    body: truncateNotificationBody(chatMessagePlainText(body.text)),
     isCashu: false,
     isPaymentNotice: false,
     senderPub: event.from,

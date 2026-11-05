@@ -4,7 +4,9 @@
  * A adds a listing with a photo and says they offer cash; both reach B through
  * A's kind 34133 event on the relay, decrypted through B's key slot, and B's
  * detail page decrypts the photo from the stubbed Blossom server. B's own page
- * stays empty until then, which proves the content came from the relay.
+ * stays empty until then, which proves the content came from the relay. B
+ * replies to the listing in A's chat; A gets the copy as their own listing and
+ * opens it from the message, and back returns to the chat.
  *
  * Needs the docker stack up — see playwright.config.ts.
  */
@@ -169,6 +171,59 @@ test("a listing and the cash intent reach a contact who saved the author back", 
       await expect(b.page.getByTestId("open-cash")).toContainText(
         "1 contact exchanges",
       );
+    });
+
+    await test.step("B replies to the listing in A's chat", async () => {
+      await b.page.goto("/#collaboration/listings");
+      await b.page.getByTestId("peer-listing").click();
+      await b.page.getByTestId("listing-reply").click();
+      await b.page.waitForURL(/#chat\/[^/]+$/);
+      await expect(b.page.getByTestId("chat-compose")).toContainText(
+        "Eggs from the garden",
+      );
+      await b.page
+        .locator('[data-guide="chat-input"]')
+        .fill("Are there any left?");
+      await b.page.locator('[data-guide="chat-send"]').click();
+      const sent = b.page.locator(
+        '[data-testid="chat-message"][data-direction="out"]',
+      );
+      await expect(sent.getByTestId("chat-shared-listing")).toContainText(
+        "Eggs from the garden",
+      );
+      await expect(sent).toContainText("Are there any left?");
+      await expect(b.page.getByTestId("chat-compose")).not.toContainText(
+        "Eggs from the garden",
+      );
+    });
+
+    await test.step("A opens the copy from the message as their own listing", async () => {
+      await a.page.goto("/#contacts");
+      await a.page.locator("[data-guide='contact-card']").first().click();
+      await a.page.waitForURL(/#chat\/[^/]+$/);
+      const chatUrl = a.page.url();
+      const received = a.page.locator(
+        '[data-testid="chat-message"][data-direction="in"]',
+      );
+      await expect(received).toContainText("Are there any left?", {
+        timeout: 60_000,
+      });
+      await expect(received).not.toContainText("linky:listing:v1:");
+      const card = received.getByTestId("chat-shared-listing");
+      await expect(card).toContainText("Your listing");
+
+      await card.click();
+      await a.page.waitForURL(
+        /#collaboration\/listings\/npub1[^/]+\/[^/]+\/m\//,
+      );
+      await expect(
+        a.page.getByRole("heading", { name: "Eggs from the garden" }),
+      ).toBeVisible();
+      await expect(
+        a.page.getByRole("img", { name: "Eggs from the garden" }),
+      ).toBeVisible();
+      await a.page.getByRole("button", { name: "Back" }).click();
+      await a.page.waitForURL(chatUrl);
     });
 
     await test.step("A withdraws the listing and B stops seeing it", async () => {

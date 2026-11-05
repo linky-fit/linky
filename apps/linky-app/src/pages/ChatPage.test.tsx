@@ -7,7 +7,11 @@ import {
   derivePubkey,
   encodeNprofile,
   encodeNpub,
+  Listing,
+  ListingAmount,
+  ListingCurrency,
   NostrSecretKey,
+  SharedListing,
   type Pubkey,
 } from "@linky-fit/linkstr";
 import { act, createRef, memo, type ComponentProps } from "react";
@@ -68,6 +72,10 @@ type Props = ComponentProps<typeof ChatComposer>;
 const setup = async (overrides: Partial<Props> = {}) => {
   vi.stubGlobal("matchMedia", () => ({ matches: false }));
   let props: Props = {
+    attachedListing: null,
+    mentionListings: [],
+    onAttachListing: vi.fn(),
+    onRemoveListing: vi.fn(),
     canPayThisContact: false,
     canRequestThisContact: false,
     canStartPay: false,
@@ -184,6 +192,68 @@ describe("ChatComposer", () => {
     expect(composer.editor.textContent).toBe("");
     await composer.unmount();
   });
+
+  const shared = new SharedListing({
+    author: derivePubkey(NostrSecretKey.make(new Uint8Array(32).fill(3))),
+    listing: new Listing({
+      id: "eggs",
+      side: "offer",
+      title: "Garden eggs",
+      amount: ListingAmount.make("90"),
+      currency: ListingCurrency.make("CZK"),
+      unit: "per 10",
+    }),
+  });
+
+  it("sends an attached listing without text and lets the user remove it", async () => {
+    const composer = await setup({ attachedListing: shared, chatDraft: "" });
+    expect(composer.container.textContent).toContain("Garden eggs");
+    await act(async () => composer.sendButton()?.click());
+    expect(composer.props.sendChatMessage).toHaveBeenCalledOnce();
+
+    const remove = composer.container.querySelector<HTMLButtonElement>(
+      '[aria-label="chatListingRemove"]',
+    );
+    await act(async () => remove?.click());
+    expect(composer.props.onRemoveListing).toHaveBeenCalledOnce();
+    await composer.unmount();
+  });
+
+  it("offers matching listings after the contacts and attaches the pick in place of the @query", async () => {
+    const composer = await setup({
+      chatDraft: "",
+      mentionContacts: [
+        { groupName: null, name: "Garry", npub: "npub1garry", statusNames: [] },
+      ],
+      mentionListings: [
+        { authorName: "Alice Novak", shared },
+        {
+          authorName: null,
+          shared: new SharedListing({
+            ...shared,
+            listing: new Listing({ ...shared.listing, title: "Bike" }),
+          }),
+        },
+      ],
+    });
+    await composer.type("Hi @gar");
+    const rows = Array.from(
+      composer.container.querySelectorAll<HTMLElement>("[role=list] button"),
+    );
+    expect(rows.map((row) => row.textContent)).toEqual([
+      expect.stringContaining("Garry"),
+      expect.stringContaining("Garden eggs"),
+    ]);
+    expect(rows[1]?.textContent).toContain("Alice");
+    expect(rows[1]?.textContent).not.toContain("Novak");
+
+    await act(async () => rows[1]?.click());
+    expect(composer.props.onAttachListing).toHaveBeenCalledExactlyOnceWith(
+      shared,
+    );
+    expect(composer.editor.textContent).toBe("Hi ");
+    await composer.unmount();
+  });
 });
 
 describe("ChatNearbyBanner", () => {
@@ -236,6 +306,10 @@ describe("ChatPage message rows", () => {
     reactionsByMessageId: ReadonlyMap<string, LocalNostrReaction[]>,
     cashuIsBusy: boolean,
   ): PageProps => ({
+    attachedListing: null,
+    mentionListings: [],
+    onAttachListing: vi.fn(),
+    onRemoveListing: vi.fn(),
     addChatAttachments: vi.fn(),
     bankPaymentOfferMessages: [],
     cashuBalance: 100,

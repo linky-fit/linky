@@ -2,10 +2,16 @@ import {
   ClientId,
   EnqueueReceipt,
   ImageMessageDraft,
+  Listing,
+  ListingAmount,
+  ListingCurrency,
   OutboxJobId,
   OutboxRef,
   PrivateImage,
+  parseSharedListingMessage,
+  Pubkey,
   RumorId,
+  SharedListing,
   TextMessageDraft,
   UnixSeconds,
 } from "@linky-fit/linkstr";
@@ -85,6 +91,7 @@ interface SendOptions {
 type SendChatMessage = (options?: SendOptions) => Promise<ChatSendOutcome>;
 
 interface SetupOptions {
+  attachedListing?: SharedListing;
   chatDraft?: string;
   replyContext?: ReplyContext | null;
 }
@@ -96,6 +103,7 @@ const setup = async (options: SetupOptions = {}) => {
     operations.push("append");
     return { id: "pending-message", written: NO_WRITE };
   });
+  const clearAttachedListing = vi.fn();
   const setChatDraft = vi.fn();
   const setChatSendIsBusy = vi.fn();
   const setReplyContext = vi.fn();
@@ -110,8 +118,10 @@ const setup = async (options: SetupOptions = {}) => {
   const Harness = () => {
     const send = useSendChatMessage({
       appendLocalNostrMessage,
+      attachedListing: options.attachedListing ?? null,
       chatDraft: options.chatDraft ?? "hello",
       chatSendIsBusy: false,
+      clearAttachedListing,
       currentNsec: CURRENT_NSEC,
       route: { kind: "chat" },
       replyContext,
@@ -139,6 +149,7 @@ const setup = async (options: SetupOptions = {}) => {
 
   return {
     appendLocalNostrMessage,
+    clearAttachedListing,
     getSend: () => sendChatMessage,
     operations,
     root,
@@ -356,6 +367,47 @@ describe("useSendChatMessage", () => {
       "pending-message",
       { rumorId: MESSAGE_ID },
     );
+
+    await act(async () => harness.root.unmount());
+  });
+
+  it("sends an attached listing under the note, as no reply, and detaches it", async () => {
+    const shared = new SharedListing({
+      author: Pubkey.make(CONTACT_PUBKEY),
+      listing: new Listing({
+        id: "eggs",
+        side: "offer",
+        title: "Garden eggs",
+        amount: ListingAmount.make("90"),
+        currency: ListingCurrency.make("CZK"),
+        unit: "per 10",
+      }),
+    });
+    enqueueOutboxMock.mockImplementation(async (input) =>
+      Exit.succeed(
+        receipt(
+          input.op.draft.clientId ?? ClientId.make("fallback"),
+          input.ref,
+        ),
+      ),
+    );
+    const harness = await setup({ attachedListing: shared, chatDraft: "" });
+
+    await act(async () => {
+      expect(await harness.getSend()?.()).toBe("enqueued");
+    });
+
+    const input = enqueueOutboxMock.mock.calls[0]?.[0];
+    const draft = input?.op._tag === "chat.text" ? input.op.draft : undefined;
+    expect(parseSharedListingMessage(draft?.content ?? "")).toEqual({
+      note: "",
+      shared,
+    });
+    expect(draft?.replyTo).toBeUndefined();
+    expect(harness.appendLocalNostrMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ content: draft?.content }),
+    );
+    expect(harness.clearAttachedListing).toHaveBeenCalledOnce();
 
     await act(async () => harness.root.unmount());
   });

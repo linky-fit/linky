@@ -1,10 +1,21 @@
+import {
+  Listing,
+  ListingAmount,
+  ListingCurrency,
+  Pubkey,
+  SharedListing,
+  sharedListingMessageText,
+} from "@linky-fit/linkstr";
 import { encode } from "cbor-x";
 import { getPublicKey } from "nostr-tools";
 import { describe, expect, it } from "vitest";
 import { createLinkyBankPaymentOfferEvent } from "../../testUtils/bankPaymentOfferEvent";
 import { createSecretKey } from "../../testUtils/nostrKeys";
 import { encodeBase64Url } from "../../utils/base64";
-import { formatChatMessagePreviewText } from "./chatMessageDisplay";
+import {
+  chatMessagePlainText,
+  formatChatMessagePreviewText,
+} from "./chatMessageDisplay";
 
 const translatePreview = (key: string): string => {
   switch (key) {
@@ -92,5 +103,41 @@ describe("formatChatMessagePreviewText", () => {
     expect(preview(1_700_000_050)).toBe(
       "bankPaymentOfferTitle: bankPaymentOfferStatusSettled",
     );
+  });
+});
+
+describe("a shared listing", () => {
+  const shared = new SharedListing({
+    author: Pubkey.make(getPublicKey(createSecretKey(1))),
+    listing: new Listing({
+      id: "eggs",
+      side: "offer",
+      title: "Garden eggs",
+      amount: ListingAmount.make("90"),
+      currency: ListingCurrency.make("CZK"),
+      unit: "per 10",
+    }),
+  });
+  const preview = (content: string) =>
+    formatChatMessagePreviewText({
+      content,
+      formatDisplayedAmountText: (sat) => `${sat} sat`,
+      t: (key) => `${key} {title}`,
+    });
+
+  it("previews as the note, without the lines for older clients", () => {
+    const content = sharedListingMessageText(shared, "Still there?");
+    expect(preview(content)).toBe("Still there?");
+    expect(chatMessagePlainText(content)).toBe("Still there?");
+  });
+
+  it("previews as its title when sent without a note", () => {
+    const content = sharedListingMessageText(shared, "");
+    expect(preview(content)).toBe("chatListingMessage Garden eggs");
+    expect(chatMessagePlainText(content)).toBe("Garden eggs");
+  });
+
+  it("leaves other text as it is", () => {
+    expect(chatMessagePlainText("Hello")).toBe("Hello");
   });
 });

@@ -1,9 +1,19 @@
+import {
+  Listing,
+  ListingAmount,
+  ListingCurrency,
+  Pubkey,
+  SharedListing,
+} from "@linky-fit/linkstr";
 import { describe, expect, it } from "vitest";
 import {
   applyMessageMentionSuggestion,
+  getListingMentionSuggestions,
   getMessageMentionQuery,
   getMessageMentionSuggestions,
+  removeMessageMentionQuery,
   type MessageMentionContact,
+  type MessageMentionListing,
 } from "./messageMentions";
 
 const contacts: MessageMentionContact[] = [
@@ -91,5 +101,55 @@ describe("message mentions", () => {
       "Karel Novák",
       "Karel Svoboda",
     ]);
+  });
+});
+
+describe("listing mentions", () => {
+  const listing = (title: string): MessageMentionListing => ({
+    authorName: null,
+    shared: new SharedListing({
+      author: Pubkey.make("a".repeat(64)),
+      listing: new Listing({
+        id: title,
+        side: "offer",
+        title,
+        amount: ListingAmount.make("1"),
+        currency: ListingCurrency.make("CZK"),
+        unit: "per piece",
+      }),
+    }),
+  });
+  const titles = (suggestions: readonly MessageMentionListing[]) =>
+    suggestions.map(({ shared }) => shared.listing.title);
+  const listings = ["Eggs", "Bike", "Easter eggs", "Egg cups", "Eggplant"].map(
+    listing,
+  );
+
+  it("offers at most three listings whose title contains the query", () => {
+    expect(titles(getListingMentionSuggestions(listings, "EGG"))).toEqual([
+      "Eggs",
+      "Easter eggs",
+      "Egg cups",
+    ]);
+    expect(titles(getListingMentionSuggestions(listings, "bi"))).toEqual([
+      "Bike",
+    ]);
+  });
+
+  it("offers the first listings for a bare @", () => {
+    expect(titles(getListingMentionSuggestions(listings, ""))).toEqual([
+      "Eggs",
+      "Bike",
+      "Easter eggs",
+    ]);
+  });
+
+  it("removes the @query a listing pick replaces", () => {
+    const value = "Hi @eg and bye";
+    const query = getMessageMentionQuery(value, 6);
+    expect(query && removeMessageMentionQuery(value, query)).toEqual({
+      caret: 3,
+      value: "Hi  and bye",
+    });
   });
 });

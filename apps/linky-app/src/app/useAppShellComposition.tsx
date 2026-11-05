@@ -1,3 +1,4 @@
+import { useChatIdOfMessage } from "./hooks/useSharedListing";
 import { useAtom, useAtomSet, useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
 import { reportAppLog } from "../devtools/inspector/appLog";
@@ -315,6 +316,9 @@ export const useAppShellComposition = ({
   const backFromContactNew = useBackFromContactNew();
   const contactPayBackToChatId = useNavIntent("contactPayBackToChat");
   const ownPubkey = useAtomValue(currentPubkeyAtom);
+  const sharedListingChatId = useChatIdOfMessage(
+    route.kind === "listing" ? route.messageId : null,
+  );
   const dismissTopModal = useDismissTopModal();
   useNativeBackHandler({
     closeScan,
@@ -325,6 +329,7 @@ export const useAppShellComposition = ({
       contactPayBackToChatId,
       navigateToMainReturn,
       ownPubkey,
+      sharedListingChatId,
     }),
     scanIsOpen,
   });

@@ -8,6 +8,7 @@ import {
 import React from "react";
 import type { Route } from "../../../types/route";
 import { mergeBankPaymentOffersIntoChatMessages } from "../../lib/bankPaymentOfferRows";
+import { chatMessagePlainText } from "../../lib/chatMessageDisplay";
 import { buildLinkyPaymentRequestDeclineMessage } from "../../lib/paymentRequestMessage";
 import {
   getChatAttachmentRejection,
@@ -37,6 +38,7 @@ import {
   useConversationsRepository,
   useUnknownSendersRepository,
 } from "../useLinksync";
+import { useAttachedListing } from "../useSharedListing";
 import { useChatScroll } from "./chatScroll";
 import { useDeleteChatMessage } from "./useDeleteChatMessage";
 import { useEditChatMessage } from "./useEditChatMessage";
@@ -191,10 +193,13 @@ export const useChatSend = <TContact extends ContactIdentityRowLike>(
     [registry],
   );
 
+  const listing = useAttachedListing(String(selectedContact?.id ?? ""));
   const sendChatMessage = useSendChatMessage({
     appendLocalNostrMessage: chatWrites.appendLocalNostrMessage,
+    attachedListing: listing.attached,
     chatDraft,
     chatSendIsBusy,
+    clearAttachedListing: listing.clear,
     currentNsec,
     route,
     replyContext,
@@ -350,7 +355,7 @@ export const useChatDelete = <TContact extends ContactIdentityRowLike>(
   });
 };
 
-/** Copies a message, a private image as its preview text. */
+/** Copies a message, a private image as its preview text and a shared listing as its note or title. */
 export const useCopyChatMessage = () => {
   const { t } = useTranslation();
   const copyText = useCopyText();
@@ -360,7 +365,7 @@ export const useCopyChatMessage = () => {
       const privateImage = parsePrivateImageMessage(content);
       const copyContent = privateImage
         ? privateImagePreviewText(t, privateImage)
-        : content;
+        : chatMessagePlainText(content);
       void copyText(copyContent);
     },
     [copyText, t],

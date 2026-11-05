@@ -1,3 +1,4 @@
+import type { SharedListing } from "@linky-fit/linkstr";
 import { Atom } from "effect/reactivity";
 
 /** The message being replied to. */
@@ -27,3 +28,8 @@ export const editContextAtom = Atom.keepAlive(
 );
 /** True while a message or an edit is being sent; the composer refuses another. */
 export const chatSendBusyAtom = Atom.keepAlive(Atom.make(false));
+
+/** The listing attached to each chat's composer, by chat id; sending or dismissing it clears it. */
+export const attachedListingsAtom = Atom.keepAlive(
+  Atom.make<Readonly<Record<string, SharedListing>>>({}),
+);

@@ -5,12 +5,15 @@ import {
   OutboxRef,
   Pubkey,
   RumorId,
+  sharedListingMessageText,
   TextMessageDraft,
+  type SharedListing,
   UnixSeconds,
 } from "@linky-fit/linkstr";
 import { useLinkstrCommands } from "@linky-fit/linkstr-react";
 import { Cause, Result, Exit, Schema } from "effect";
 import React from "react";
+import { reportAppLog } from "../../../devtools/inspector/appLog";
 import { appendPushDebugLog } from "../../../utils/pushDebugLog";
 import { nowSeconds } from "../../../utils/time";
 import { makeLocalId } from "../../../utils/validation";
@@ -48,7 +51,10 @@ interface UseSendChatMessageParams<
   TContact extends ContactIdentityRowLike,
 > {
   appendLocalNostrMessage: AppendLocalNostrMessage;
+  /** Sent with the draft, under it as the note; never with an image or a given `text`. */
+  attachedListing: SharedListing | null;
   chatDraft: string;
+  clearAttachedListing: () => void;
   chatSendIsBusy: boolean;
   currentNsec: string | null;
   route: TRoute;
@@ -73,8 +79,10 @@ export const useSendChatMessage = <
   TContact extends ContactIdentityRowLike,
 >({
   appendLocalNostrMessage,
+  attachedListing,
   chatDraft,
   chatSendIsBusy,
+  clearAttachedListing,
   currentNsec,
   route,
   replyContext,
@@ -101,7 +109,12 @@ export const useSendChatMessage = <
       if (!selectedContact) return "failed";
 
       const imageFile = options?.imageFile ?? null;
-      const text = (options?.text ?? chatDraft).trim();
+      const sharedListing =
+        imageFile || options?.text !== undefined ? null : attachedListing;
+      const note = (options?.text ?? chatDraft).trim();
+      const text = sharedListing
+        ? sharedListingMessageText(sharedListing, note)
+        : note;
       if (!text && !imageFile) return "failed";
 
       if (!currentNsec) {
@@ -208,6 +221,7 @@ export const useSendChatMessage = <
         triggerChatScrollToBottom(pendingId);
         const clearDraft = options?.clearDraft !== false;
         if (clearDraft) setChatDraft("");
+        if (sharedListing) clearAttachedListing();
         if (options?.clearReplyContext ?? clearDraft) {
           clearReplyContextIfCurrent();
         }
@@ -225,6 +239,23 @@ export const useSendChatMessage = <
         }
 
         updateLocalNostrMessage(pendingId, { rumorId: exit.value.rumorId });
+        if (sharedListing) {
+          reportAppLog({
+            tag: "listings.sharedSent",
+            summary: `Shared listing sent: ${sharedListing.listing.side}`,
+            links: {
+              contact: String(selectedContact.id),
+              message: pendingId,
+              pubkey: sharedListing.author,
+              rumor: exit.value.rumorId,
+            },
+            payload: {
+              hasImage: sharedListing.listing.image !== undefined,
+              hasNote: note !== "",
+              listingId: sharedListing.listing.id,
+            },
+          });
+        }
 
         appendPushDebugLog("client", "chat send enqueued", {
           clientId,
@@ -249,8 +280,10 @@ export const useSendChatMessage = <
     },
     [
       appendLocalNostrMessage,
+      attachedListing,
       chatDraft,
       chatSendIsBusy,
+      clearAttachedListing,
       currentNsec,
       readReplyContext,
       replyContext,

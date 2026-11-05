@@ -1,3 +1,4 @@
+import { useChatIdOfMessage } from "../useSharedListing";
 import { ContactId as ContactIdType } from "@linky-fit/linksync";
 import { useAtom, useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
@@ -50,6 +51,9 @@ export const useTopbar = () => {
   const deleteContact = useDeleteContact();
   const contactPayBackToChatId = useNavIntent("contactPayBackToChat");
   const ownPubkey = useAtomValue(currentPubkeyAtom);
+  const sharedListingChatId = useChatIdOfMessage(
+    route.kind === "listing" ? route.messageId : null,
+  );
   const { navigateToMainReturn, openMenu } = useMainMenu();
   const { openReceiveScan, openScan, openWalletScan } = useScanCommands();
   const toggleContactsFilter = useToggleContactsFilter();
@@ -79,6 +83,7 @@ export const useTopbar = () => {
     navigateToMainReturn,
     ownPubkey,
     route,
+    sharedListingChatId,
     t,
   });
 
