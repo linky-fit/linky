@@ -397,19 +397,30 @@ const DesktopWalletPane = (): React.ReactElement => {
           <ScanModal />
         </Stack>
       ) : route.kind === "wallet" ? (
-        <PageBody gutter="detail" paddingTop="$xl">
-          <Stack
-            flexGrow={1}
-            width="100%"
-            maxWidth="$readable"
-            alignSelf="center"
-          >
-            <Text variant="heading" color="$colorStrong" role="heading">
+        <>
+          <Stack paddingHorizontal="$xxl" paddingTop="$xl">
+            <Text
+              variant="heading"
+              color="$colorStrong"
+              role="heading"
+              width="100%"
+              maxWidth="$readable"
+              alignSelf="center"
+            >
               {t("wallet")}
             </Text>
-            <WalletPane />
           </Stack>
-        </PageBody>
+          <PageBody gutter="detail" paddingTop="$none">
+            <Stack
+              flexGrow={1}
+              width="100%"
+              maxWidth="$readable"
+              alignSelf="center"
+            >
+              <WalletPane />
+            </Stack>
+          </PageBody>
+        </>
       ) : (
         <DesktopRoutePane />
       )}
