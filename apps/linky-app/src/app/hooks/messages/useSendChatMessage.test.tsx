@@ -371,7 +371,7 @@ describe("useSendChatMessage", () => {
     await act(async () => harness.root.unmount());
   });
 
-  it("sends an attached listing under the note, as no reply, and detaches it", async () => {
+  it("sends an attached listing under the note, replying like any message, and detaches it", async () => {
     const shared = new SharedListing({
       author: Pubkey.make(CONTACT_PUBKEY),
       listing: new Listing({
@@ -391,7 +391,15 @@ describe("useSendChatMessage", () => {
         ),
       ),
     );
-    const harness = await setup({ attachedListing: shared, chatDraft: "" });
+    const harness = await setup({
+      attachedListing: shared,
+      chatDraft: "",
+      replyContext: {
+        replyToContent: "parent",
+        replyToId: REPLY_TO,
+        rootMessageId: ROOT,
+      },
+    });
 
     await act(async () => {
       expect(await harness.getSend()?.()).toBe("enqueued");
@@ -403,7 +411,7 @@ describe("useSendChatMessage", () => {
       note: "",
       shared,
     });
-    expect(draft?.replyTo).toBeUndefined();
+    expect(draft?.replyTo).toBe(REPLY_TO);
     expect(harness.appendLocalNostrMessage).toHaveBeenCalledWith(
       expect.objectContaining({ content: draft?.content }),
     );
