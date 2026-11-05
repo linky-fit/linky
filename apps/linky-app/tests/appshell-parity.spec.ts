@@ -455,7 +455,7 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
       .getByRole("button", { name: "Bearbeiten", exact: true })
       .click();
     await expect(page).toHaveURL(/#profile\/edit$/);
-    await expect(title).toHaveAccessibleName("Profil");
+    await expect(title).toHaveAccessibleName("Profil bearbeiten");
     await expect(page.locator("#profileName")).toBeVisible();
     await close.click();
     await expect(page).toHaveURL(/#profile$/);
