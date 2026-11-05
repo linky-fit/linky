@@ -1,5 +1,12 @@
 import type { CashIntent } from "@linky-fit/linkstr";
-import { EmptyState, SegmentedControl, Stack, Text } from "@linky-fit/ui";
+import {
+  Avatar,
+  EmptyState,
+  ListRow,
+  SegmentedControl,
+  Stack,
+  Text,
+} from "@linky-fit/ui";
 import React from "react";
 import { useTranslation } from "../app/hooks/shell";
 import { useBeaconSupport } from "../app/hooks/useBeacon";
@@ -9,7 +16,7 @@ import {
   type SharingContact,
 } from "../app/hooks/useCollaboration";
 import { NearbyBeaconSection } from "../components/NearbyBeaconSection";
-import { PeopleRow } from "../components/PeopleRow";
+import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey } from "../i18n";
 
 type CashChoice = CashIntent | "none";
@@ -42,7 +49,24 @@ function CashSection({
       {contacts.length === 0 ? (
         <Text color="$colorMuted">{t(emptyKey)}</Text>
       ) : (
-        <PeopleRow people={contacts} />
+        contacts.map(({ contact, name, pictureUrl, pubkey }) => {
+          const contactId = contact.id;
+          return (
+            <ListRow
+              key={pubkey}
+              leading={
+                <Avatar name={name} uri={pictureUrl ?? undefined} size="md" />
+              }
+              title={name}
+              onPress={
+                contactId
+                  ? () => navigateTo({ route: "chat", id: contactId })
+                  : undefined
+              }
+              testID="cash-contact"
+            />
+          );
+        })
       )}
     </Stack>
   );
