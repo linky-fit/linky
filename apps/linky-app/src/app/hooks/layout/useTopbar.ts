@@ -1,4 +1,3 @@
-import { useChatIdOfMessage } from "../useSharedListing";
 import { ContactId as ContactIdType } from "@linky-fit/linksync";
 import { useAtom, useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
@@ -35,6 +34,7 @@ import {
   useOnchainTransfers,
   usePendingOnchainTransfersLink,
 } from "../useOnchainTransfers";
+import { useChatIdOfMessage } from "../useSharedListing";
 import { useMainMenu } from "./useMainMenuState";
 
 const parseContactId = (value: unknown): ContactId | null => {
