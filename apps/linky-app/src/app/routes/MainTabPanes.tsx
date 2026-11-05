@@ -32,6 +32,7 @@ import { useMintIcons } from "../hooks/mint/useMintInfo";
 import { useTranslation } from "../hooks/shell";
 import { useScanCommands, useScanIsOpen } from "../hooks/shell/scan";
 import { useActiveBankPaymentOfferContacts } from "../hooks/useBankPaymentOffers";
+import { useChatIdOfMessage } from "../hooks/useSharedListing";
 import { useCashuTokenMessageInfo } from "../hooks/wallet/useWalletInventory";
 import { useTokenContactSend } from "../hooks/wallet/useWalletTokens";
 import {
@@ -134,6 +135,11 @@ const useContactCardRenderer = () => {
   const { pendingCashuTokenContactPickId, sendCashuTokenToContact } =
     useTokenContactSend();
   const openContactDetail = useOpenContactDetail();
+  const sharedListingChatId = useChatIdOfMessage(
+    route.kind === "listing" ? route.messageId : null,
+  );
+  const activeContactId =
+    getDesktopActiveContactId(route) ?? sharedListingChatId;
 
   const formatContactName = React.useMemo(
     () => createContactNameFormatter(Array.from(displayContactById.values())),
@@ -171,7 +177,7 @@ const useContactCardRenderer = () => {
           avatarUrl={contactPictureUrl(npub, nostrPictureByNpub)}
           lastMessage={last ?? null}
           hasAttention={unreadByContactId.has(id)}
-          isActive={(contact.id ?? "") === getDesktopActiveContactId(route)}
+          isActive={(contact.id ?? "") === activeContactId}
           isUnknownContact={Boolean(contact.isUnknownContact)}
           statusText={npub ? (nostrStatusByNpub[npub] ?? null) : null}
           tokenInfo={lastText ? tokenInfoFor(lastText) : null}
@@ -183,6 +189,7 @@ const useContactCardRenderer = () => {
       );
     },
     [
+      activeContactId,
       displayContactById,
       formatContactName,
       getMintIconUrl,
@@ -192,7 +199,6 @@ const useContactCardRenderer = () => {
       markMintIconFailed,
       nostrPictureByNpub,
       nostrStatusByNpub,
-      route,
       tokenInfoFor,
       unreadByContactId,
     ],
