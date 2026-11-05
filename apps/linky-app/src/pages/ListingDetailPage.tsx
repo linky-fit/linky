@@ -120,7 +120,7 @@ export function ListingDetailPage({
     ? ownProfile.effectiveProfilePicture
     : authorInfo?.pictureUrl;
   const shareTargets = Array.from(contactSummaries.values()).filter(
-    (candidate) => candidate.npub !== null,
+    (candidate) => !candidate.deleted && candidate.npub !== null,
   );
 
   const shareButton = (
