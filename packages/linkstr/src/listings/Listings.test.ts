@@ -477,7 +477,7 @@ describe("Listings.watch", () => {
     ));
 
   it("keeps a listing photo's key and nonce out of the routed inspector event", () =>
-    withWatch(bob, [alice.pubkey], ({ facts, inspected, subscriptions }) =>
+    withWatch(bob, [alice.pubkey], ({ inspected, subscriptions }) =>
       Effect.gen(function* () {
         const withImage = new ListingsDocument({
           listings: [new Listing({ ...eggs, image: listingImage })],
@@ -485,13 +485,13 @@ describe("Listings.watch", () => {
         subscriptions[0]?.onEvent(
           listingsEvent(alice, [bob.pubkey], base, withImage),
         );
-        yield* eventually(() => facts.length === 1);
-        const routed = inspected.filter(
-          (event) => event._tag === "ProfileWatchRouted",
+        const routed = () =>
+          inspected.filter((event) => event._tag === "ProfileWatchRouted");
+        yield* eventually(() =>
+          JSON.stringify(routed()).includes(listingImage.url),
         );
-        expect(JSON.stringify(routed)).toContain(listingImage.url);
-        expect(JSON.stringify(routed)).not.toContain(listingImage.key);
-        expect(JSON.stringify(routed)).not.toContain(listingImage.nonce);
+        expect(JSON.stringify(routed())).not.toContain(listingImage.key);
+        expect(JSON.stringify(routed())).not.toContain(listingImage.nonce);
       }),
     ));
 
