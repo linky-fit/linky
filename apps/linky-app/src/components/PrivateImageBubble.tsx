@@ -1,6 +1,7 @@
 import { useDivRef } from "../hooks/useDivRef";
 import { useImageZoom } from "../hooks/useImageZoom";
 import { useLatest } from "../hooks/useLatest";
+import { usePrivateImageUrl } from "../hooks/usePrivateImageUrl";
 import {
   Image,
   ImageAttachment,
@@ -14,10 +15,7 @@ import {
   sharePrivateImageBlob,
 } from "../app/lib/privateImageFile";
 import { isCancelledShareError } from "../platform/fileExport";
-import {
-  decryptPrivateImageMessage,
-  type PrivateImageMessagePayload,
-} from "../app/lib/privateImageMessage";
+import type { PrivateImageMessagePayload } from "../app/lib/privateImageMessage";
 
 import type { Translate } from "../i18n";
 import { AttachmentViewer } from "./AttachmentViewer";
@@ -35,13 +33,14 @@ export function PrivateImageBubble({
   rumorId,
   t,
 }: PrivateImageBubbleProps) {
-  const placeholderRef = React.useRef<HTMLDivElement | null>(null);
-  const [shouldLoad, setShouldLoad] = React.useState(
-    typeof IntersectionObserver === "undefined",
-  );
-  const [imageUrl, setImageUrl] = React.useState<string | null>(null);
-  const [imageBlob, setImageBlob] = React.useState<Blob | null>(null);
-  const [failed, setFailed] = React.useState(false);
+  const {
+    ref: placeholderNodeRef,
+    shouldLoad,
+    loaded,
+    failed,
+  } = usePrivateImageUrl(payload);
+  const imageUrl = loaded?.url ?? null;
+  const imageBlob = loaded?.blob ?? null;
   const [viewerOpen, setViewerOpen] = React.useState(false);
   const [viewerErrorText, setViewerErrorText] = React.useState<string | null>(
     null,
@@ -50,55 +49,11 @@ export function PrivateImageBubble({
   const onBlobChangeRef = useLatest(onBlobChange);
   const viewerStageRef = React.useRef<HTMLDivElement | null>(null);
   const zoom = useImageZoom(viewerStageRef, viewerOpen);
-  const placeholderNodeRef = useDivRef(placeholderRef);
   const viewerStageNodeRef = useDivRef(viewerStageRef);
 
   React.useEffect(() => {
-    if (shouldLoad || typeof IntersectionObserver === "undefined") return;
-    const element = placeholderRef.current;
-    if (!element) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (!entries.some((entry) => entry.isIntersecting)) return;
-        setShouldLoad(true);
-        observer.disconnect();
-      },
-      { rootMargin: "240px" },
-    );
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [shouldLoad]);
-
-  React.useEffect(() => {
-    if (!shouldLoad) return;
-    let cancelled = false;
-    let objectUrl: string | null = null;
-
-    setImageUrl(null);
-    setImageBlob(null);
-    onBlobChangeRef.current(null);
-    setFailed(false);
-    setViewerOpen(false);
-    setViewerErrorText(null);
-
-    void decryptPrivateImageMessage(payload)
-      .then((blob) => {
-        if (cancelled) return;
-        objectUrl = URL.createObjectURL(blob);
-        setImageBlob(blob);
-        onBlobChangeRef.current(blob);
-        setImageUrl(objectUrl);
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
-      });
-
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [payload, shouldLoad, onBlobChangeRef]);
+    onBlobChangeRef.current(imageBlob);
+  }, [imageBlob, onBlobChangeRef]);
 
   const openViewer = () => {
     zoom.reset();
