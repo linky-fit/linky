@@ -1,11 +1,12 @@
 /**
  * Listings — two real app instances that saved each other.
  *
- * A adds a listing with a photo and says they offer cash; both reach B through
- * A's kind 34133 event on the relay, decrypted through B's key slot, and B's
- * detail page decrypts the photo from the stubbed Blossom server. B's own page
- * stays empty until then, which proves the content came from the relay. B
- * replies to the listing in A's chat; A gets the copy as their own listing and
+ * A adds a listing with a description and a photo and says they offer cash;
+ * both reach B through A's kind 34133 event on the relay, decrypted through
+ * B's key slot, and B's detail page shows the description and decrypts the
+ * photo from the stubbed Blossom server. B's own page stays empty until then,
+ * which proves the content came from the relay. B replies to the listing in
+ * A's chat; A gets the copy, description included, as their own listing and
  * opens it from the message, and back returns to the chat.
  *
  * Needs the docker stack up — see playwright.config.ts.
@@ -102,11 +103,14 @@ test("a listing and the cash intent reach a contact who saved the author back", 
       await expect(b.page.getByTestId("peer-listing")).toHaveCount(0);
     });
 
-    await test.step("A adds a listing with a photo, priced in the display unit", async () => {
+    await test.step("A adds a listing with a description and a photo, priced in the display unit", async () => {
       await a.page.goto("/#collaboration/listings/new");
       await a.page.getByTestId("listing-title").fill("Eggs from the garden");
       await a.page.getByTestId("listing-amount").fill("90");
       await a.page.getByTestId("listing-unit").fill("per 10 pieces");
+      await a.page
+        .getByTestId("listing-description")
+        .fill("Free range.\nPick up in Brno.");
       const png = await a.page.evaluate(() => {
         const canvas = document.createElement("canvas");
         canvas.width = 64;
@@ -157,6 +161,9 @@ test("a listing and the cash intent reach a contact who saved the author back", 
       await expect(
         b.page.getByRole("img", { name: "Eggs from the garden" }),
       ).toBeVisible();
+      await expect(b.page.getByTestId("listing-description")).toHaveText(
+        "Free range.\nPick up in Brno.",
+      );
       await expect(b.page.getByTestId("listing-reply")).toBeVisible();
 
       await b.page.goto("/#collaboration/cash");
@@ -211,6 +218,7 @@ test("a listing and the cash intent reach a contact who saved the author back", 
       await expect(received).not.toContainText("linky:listing:v1:");
       const card = received.getByTestId("chat-shared-listing");
       await expect(card).toContainText("Your listing");
+      await expect(card).toContainText("Free range.");
 
       await card.click();
       await a.page.waitForURL(
