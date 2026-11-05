@@ -548,7 +548,8 @@ const decodeProofs = (
 /**
  * A loaded wallet holds keys only for the mint's active keysets, and the swap
  * checks each input's DLEQ against its keyset's keys, so a token signed by a
- * rotated-out keyset needs those keys fetched first.
+ * rotated-out keyset needs those keys fetched first. Ids the mint does not
+ * list are left to the swap, which refuses them.
  */
 const decodeInputs = (
   wallet: LoadedWallet,
@@ -559,12 +560,15 @@ const decodeInputs = (
 > =>
   Effect.tap(decodeProofs(wallet, parsed), (decoded) =>
     Effect.tryPromise({
-      try: () =>
-        Promise.all(
-          [...new Set(decoded.proofs.map((proof) => proof.id))].map((id) =>
-            wallet.keyChain.ensureKeysetKeys(id),
-          ),
-        ),
+      try: () => {
+        const named = new Set<string>(decoded.proofs.map((proof) => proof.id));
+        return Promise.all(
+          wallet.keyChain
+            .getKeysets()
+            .filter((keyset) => named.has(keyset.id))
+            .map((keyset) => wallet.keyChain.ensureKeysetKeys(keyset.id)),
+        );
+      },
       catch: (error) => classifyMintError(parsed.mint, error),
     }).pipe(answerWithin(parsed.mint, "loading the token's keyset keys")),
   );
