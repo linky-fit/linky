@@ -318,17 +318,18 @@ export interface OptionTileProps extends Omit<
   /** A large icon above the label; use `leading` for anything else, e.g. an avatar. */
   icon?: IconName | undefined;
   leading?: ReactNode;
+  /** Makes the tile a toggle announced as pressed or not; leave it out for an action tile. */
   selected?: boolean | undefined;
   /** Shown below the label, e.g. a caption. */
   children?: ReactNode;
 }
 
-/** A selectable tile in a row or grid of choices: a picture above a short label. */
+/** A tile with a picture above a short label, for a choice in a row or grid or for an action. */
 export function OptionTile({
   label,
   icon,
   leading,
-  selected = false,
+  selected,
   children,
   ...props
 }: OptionTileProps) {
