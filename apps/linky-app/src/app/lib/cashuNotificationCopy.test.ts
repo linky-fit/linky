@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { getRecurringReminderCopyForLanguage } from "./cashuNotificationCopy";
+import {
+  Listing,
+  ListingAmount,
+  ListingCurrency,
+  Pubkey,
+  SharedListing,
+  sharedListingMessageText,
+} from "@linky-fit/linkstr";
+import { translations } from "../../i18n";
+import {
+  getChatTextNotificationCopyForLanguage,
+  getRecurringReminderCopyForLanguage,
+} from "./cashuNotificationCopy";
 
 describe("getRecurringReminderCopyForLanguage", () => {
   it("names the one payment due by its note", () => {
@@ -48,5 +60,41 @@ describe("getRecurringReminderCopyForLanguage", () => {
     expect(
       getRecurringReminderCopyForLanguage("pt-BR", ["Aluguel"]).title,
     ).toBe("Pronto para enviar: Aluguel");
+  });
+});
+
+describe("getChatTextNotificationCopyForLanguage", () => {
+  const shared = new SharedListing({
+    author: Pubkey.make("a".repeat(64)),
+    listing: new Listing({
+      id: "eggs",
+      side: "offer",
+      title: "Garden eggs",
+      amount: ListingAmount.make("90"),
+      currency: ListingCurrency.make("CZK"),
+      unit: "per 10",
+    }),
+  });
+
+  it.each(Object.entries(translations))(
+    "names a listing sent without a note like the %s conversation preview",
+    (lang, dictionary) => {
+      expect(
+        getChatTextNotificationCopyForLanguage(
+          lang,
+          sharedListingMessageText(shared, ""),
+        ),
+      ).toBe(dictionary.chatListingMessage.replace("{title}", "Garden eggs"));
+    },
+  );
+
+  it("shows a listing's note, and a plain text as it is", () => {
+    expect(
+      getChatTextNotificationCopyForLanguage(
+        "en",
+        sharedListingMessageText(shared, "Still there?"),
+      ),
+    ).toBe("Still there?");
+    expect(getChatTextNotificationCopyForLanguage("en", "Hello")).toBe("Hello");
   });
 });

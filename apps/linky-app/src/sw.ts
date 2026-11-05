@@ -36,11 +36,11 @@ import {
   operatorTransferUpdate,
 } from "./app/lib/onchainOperator";
 import { getOnchainTransferUpdateCopyForLanguage } from "./app/lib/onchainTransferPushCopy";
-import { chatMessagePlainText } from "./app/lib/chatMessageDisplay";
 import { extractCashuTokenFromText } from "./app/lib/tokenText";
 import {
   getBankPaymentReimbursementCopyForLanguage,
   getChatAttachmentCopyForLanguage,
+  getChatTextNotificationCopyForLanguage,
   getReceivedMoneyCopyForLanguage,
   getRecurringReminderCopyForLanguage,
 } from "./app/lib/cashuNotificationCopy";
@@ -286,7 +286,12 @@ function buildChatPushMessage(
   }
   if (body._tag !== "TextBody") return null;
   return {
-    body: truncateNotificationBody(chatMessagePlainText(body.text)),
+    body: truncateNotificationBody(
+      getChatTextNotificationCopyForLanguage(
+        self.navigator.language,
+        body.text,
+      ),
+    ),
     isCashu: false,
     isPaymentNotice: false,
     senderPub: event.from,

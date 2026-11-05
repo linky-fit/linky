@@ -1,3 +1,5 @@
+import { parseSharedListingMessage } from "@linky-fit/linkstr";
+
 export const getReceivedMoneyCopyForLanguage = (
   language: string | null | undefined,
 ): string => {
@@ -29,6 +31,30 @@ export const getChatAttachmentCopyForLanguage = (
     return kind === "pdf" ? "PDF" : "Imagem";
   }
   return kind === "pdf" ? "PDF" : "Image";
+};
+
+const chatListingCopyFor = (language: string | null | undefined): string => {
+  const normalized = (language ?? "").trim().toLowerCase();
+  if (normalized.startsWith("cs")) return "Nabídka: {title}";
+  if (normalized.startsWith("de")) return "Angebot: {title}";
+  if (normalized.startsWith("pt")) return "Anúncio: {title}";
+  return "Listing: {title}";
+};
+
+/** A chat text as a notification shows it: a shared listing's note, else `Listing: <title>`, else the text. */
+export const getChatTextNotificationCopyForLanguage = (
+  language: string | null | undefined,
+  text: string,
+): string => {
+  const sharedListing = parseSharedListingMessage(text);
+  if (sharedListing === null) return text;
+  return (
+    sharedListing.note ||
+    chatListingCopyFor(language).replace(
+      "{title}",
+      sharedListing.shared.listing.title,
+    )
+  );
 };
 
 interface RecurringReminderCopy {
