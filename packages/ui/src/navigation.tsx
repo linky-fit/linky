@@ -107,7 +107,7 @@ export interface TabBarProps<T extends string> {
   onValueChange: (value: T) => void;
 }
 
-/** The bar of main sections docked at the bottom of phone screens: each tab shows its icon over its label. */
+/** The bar of main sections docked at the bottom of phone screens: an icon tab per section, named by its accessible label. */
 export function TabBar<T extends string>({
   accessibilityLabel,
   items,
@@ -140,13 +140,8 @@ export function TabBar<T extends string>({
               testID={item.testID}
               disabled={item.disabled}
               onPress={() => onValueChange(item.value)}
-              // Tabs share the spare width on top of their own, so a long label gets the room it needs.
-              flexGrow={1}
-              flexBasis="auto"
-              minWidth={0}
-              flexDirection="column"
+              flex={1}
               justifyContent="center"
-              gap="$xxs"
               minHeight="$control"
             >
               <Row
@@ -165,28 +160,11 @@ export function TabBar<T extends string>({
                     />
                   ) : null)}
               </Row>
-              <NavLabel label={item.label} active={active} />
             </Pressable>
           );
         })}
       </Row>
     </Row>
-  );
-}
-
-function NavLabel({ label, active }: { label: string; active: boolean }) {
-  return (
-    <Text
-      variant="caption"
-      fontWeight="$semibold"
-      color={active ? "$colorStrong" : "$colorMuted"}
-      textAlign="center"
-      numberOfLines={1}
-      maxWidth="100%"
-      aria-hidden
-    >
-      {label}
-    </Text>
   );
 }
 
