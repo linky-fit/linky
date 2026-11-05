@@ -18,6 +18,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - Cashu tokens issued before their mint changed its keys are received instead of failing.
 - The tab bar on a phone shows only icons, like the side bar on a computer.
 - While you type a message, Pay and Request wait behind a + beside the text field, so they no longer get tapped instead of Send.
+- The wallet is one page: below the balance and the Receive and Send buttons come your recurring payments, with a button to add one, and then the whole transaction history. On a computer it fills the window instead of sharing it with the history.
 
 ### cs-CZ
 
@@ -25,6 +26,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - Cashu tokeny vydané před změnou klíčů mintu se přijmou, místo aby selhaly.
 - Spodní lišta na telefonu ukazuje jen ikony, stejně jako boční lišta na počítači.
 - Při psaní zprávy čekají Zaplatit a Požádat pod + vedle textového pole, takže se už neťuknou místo Odeslat.
+- Peněženka je jedna stránka: pod zůstatkem a tlačítky Přijmout a Odeslat jsou pravidelné platby s tlačítkem pro přidání a pod nimi celá historie transakcí. Na počítači zabírá celé okno, místo aby se dělila s historií.
 
 ## [26.11.1] - 2026-11-05
 

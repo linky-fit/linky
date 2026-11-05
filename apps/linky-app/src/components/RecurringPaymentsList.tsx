@@ -1,25 +1,15 @@
 import {
   recurringAmountSat,
   recurringOrderState,
+  type RecurringPaymentOrder,
 } from "@linky-fit/recurring-payment";
-import {
-  EmptyState,
-  ListRow,
-  opacity,
-  Pill,
-  Row,
-  Stack,
-  Text,
-} from "@linky-fit/ui";
+import { ListRow, opacity, Pill, Row, Stack, Text } from "@linky-fit/ui";
 import type { FC } from "react";
 import React from "react";
 import { useContactSummaries } from "../app/hooks/contacts/useContactSummaries";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import { useWalletInventory } from "../app/hooks/wallet/useWalletInventory";
-import {
-  recurringRecipientLabel,
-  useRecurringPaymentOrders,
-} from "../app/hooks/payments/useRecurringPaymentOrders";
+import { recurringRecipientLabel } from "../app/hooks/payments/useRecurringPaymentOrders";
 import { formatRecurringAmountText } from "../app/lib/recurringAmount";
 import { describeRecurringInterval } from "../app/lib/recurringPaymentDisplay";
 import { navigateTo } from "../hooks/useRouting";
@@ -27,15 +17,16 @@ import { normalizeLocale } from "../utils/formatting";
 import { nowSeconds } from "../utils/time";
 import { ContactSummaryAvatar } from "./ContactSummaryAvatar";
 
-/** Every recurring payment with its interval pill, amount, and next due date. */
-export const RecurringPaymentsList: FC = () => {
+/** Rows of recurring payments with their interval pill, amount, and next due date. */
+export const RecurringPaymentsList: FC<{
+  orders: readonly RecurringPaymentOrder[];
+}> = ({ orders }) => {
   const mintBalances = useWalletInventory().balances.perMint;
   const mintBalanceSat = (mintUrl: string) =>
     mintBalances.find((entry) => entry.mint === mintUrl)?.amount ?? 0;
   const { lang, t } = useTranslation();
   const { displayCurrency, fiatRates, formatDisplayedAmountParts } =
     useDisplayAmounts();
-  const orders = useRecurringPaymentOrders();
   const contacts = useContactSummaries();
   const dateFormatter = React.useMemo(
     () =>
@@ -48,13 +39,10 @@ export const RecurringPaymentsList: FC = () => {
       }),
     [lang],
   );
-  if (orders.length === 0) {
-    return <EmptyState title={t("recurringEmpty")} />;
-  }
   const nowSec = nowSeconds();
 
   return (
-    <Stack gap="$xs">
+    <>
       {orders.map((order) => {
         const state = recurringOrderState(order, nowSec);
         const amountSat = recurringAmountSat(order.amount, fiatRates);
@@ -131,6 +119,6 @@ export const RecurringPaymentsList: FC = () => {
           </Stack>
         );
       })}
-    </Stack>
+    </>
   );
 };

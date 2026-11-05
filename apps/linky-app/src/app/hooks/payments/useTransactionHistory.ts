@@ -10,7 +10,6 @@ import {
   withOnchainTransfers,
   type HistoryEntry,
 } from "../../lib/onchainTransferHistory";
-import type { OnchainTransferView } from "../../lib/onchainTransfers";
 import { describeRecurringInterval } from "../../lib/recurringPaymentDisplay";
 import {
   buildTransactionHistory,
@@ -95,8 +94,6 @@ export interface TransactionHistory {
   readonly entries: readonly HistoryEntry[];
   /** Every transaction by id, the hidden ones too, so a detail page finds its own. */
   readonly transactionsById: ReadonlyMap<string, TransactionItem>;
-  readonly pendingOnchainTransfers: readonly OnchainTransferView[];
-  readonly hasScheduled: boolean;
   readonly contactsById: ReadonlyMap<string, ContactSummary>;
   readonly nostrPictureByNpub: Readonly<Record<string, string | null>>;
   /** Interval label of each live recurring payment, e.g. "monthly"; a deleted one has none. */
@@ -183,7 +180,7 @@ export const useTransactionHistory = (): TransactionHistory => {
     [allTransactions],
   );
   const onchainTransfers = useOnchainTransfers();
-  const { pending: pendingOnchainTransfers, entries } = React.useMemo(
+  const entries = React.useMemo(
     () =>
       withOnchainTransfers(
         showHiddenTransactions
@@ -472,8 +469,6 @@ export const useTransactionHistory = (): TransactionHistory => {
   return {
     entries,
     transactionsById,
-    pendingOnchainTransfers,
-    hasScheduled: recurringOrders.length > 0,
     contactsById,
     nostrPictureByNpub,
     recurringIntervalById,

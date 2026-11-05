@@ -33,11 +33,11 @@ export const de = {
   transactionWhen: "Wann",
   transactionTitle: "Zahlung",
   recurringPaymentsTitle: "Wiederkehrende Zahlungen",
+  recurringEmptyHint:
+    "Zahle einem Kontakt jeden Tag, jede Woche oder jeden Monat denselben Betrag.",
   recurringPaymentTitle: "Wiederkehrende Zahlung",
   recurringPaymentNewTitle: "Neue wiederkehrende Zahlung",
   recurringPaymentEditTitle: "Wiederkehrende Zahlung bearbeiten",
-  recurringEmpty: "Noch keine wiederkehrenden Zahlungen.",
-  recurringScheduledSection: "Geplant",
   recurringHistorySection: "Verlauf",
   recurringInsufficientFundsHint: "geringes Guthaben",
   recurringSentBody: "{amount} {unit} an {name} gesendet.",
@@ -112,8 +112,6 @@ export const de = {
     "Jedes deiner Geräte, auf dem Linky läuft, sendet die Zahlung, auch im Hintergrund. Hat es eine Minute nach Fälligkeit keines gesendet, erinnern wir dich, Linky zu öffnen; bei geöffneter App siehst du, wie die Zahlung rausgeht.",
   recurringRepeatAction: "Regelmäßig wiederholen",
   showTransactions: "Transaktionen anzeigen",
-  walletRecent: "Letzte Aktivität",
-  walletSeeAll: "Alle anzeigen",
   feedback: "Feedback",
   donate: "Spenden",
   data: "Daten",
@@ -1510,8 +1508,6 @@ export const de = {
   onchainTransferCancelBody:
     "Brich nur ab, wenn du dafür noch kein Geld gesendet hast.",
   onchainTransferKeep: "Behalten",
-  onchainTransferPendingOne: "Offene On-Chain-Transaktion",
-  onchainTransferPendingMany: "{count} offene On-Chain-Transaktionen",
   onchainTransfersInProgress: "Läuft",
   onchainSendReadyNotification:
     "Bereit: Zahle {total}, um {amount} an deine Bitcoin-Wallet zu senden.",

@@ -147,7 +147,7 @@ export function RecurringPaymentPage({
           icon="Trash2"
           onPress={() => {
             void requestDeleteRecurringPayment(order).then((deleted) => {
-              if (deleted) navigateTo({ route: "transactions" });
+              if (deleted) navigateTo({ route: "wallet" });
             });
           }}
         >

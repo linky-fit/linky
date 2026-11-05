@@ -6,9 +6,9 @@ const SW_BUILD_TAG = "linky-sw-2026-08-14T00:00-linkstr-wrap-fetch";
 const NOTIFICATION_OPEN_HASH_PARAM = "notificationOpen";
 const RECURRING_REMINDER_TYPE = "recurring_reminder";
 
-/** Where a tap lands: a reminder opens the scheduled payments, everything else the inbox. */
+/** Where a tap lands: a reminder opens the wallet with its recurring payments, everything else the inbox. */
 const notificationOpenRoute = (data: PushNotificationData): string =>
-  data.type === RECURRING_REMINDER_TYPE ? "#wallet/transactions" : "#contacts";
+  data.type === RECURRING_REMINDER_TYPE ? "#wallet" : "#contacts";
 
 import { buildPushNotificationTitle } from "./utils/pushNotificationTitle";
 import { getUnknownErrorMessage, isRecord } from "./utils/unknown";

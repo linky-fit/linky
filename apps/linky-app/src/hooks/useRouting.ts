@@ -140,7 +140,6 @@ type NavigationAction =
   | { route: "settingsTutorial" }
   | { route: "settingsBlocked" }
   | { route: "settingsReceiveMethod" }
-  | { route: "transactions" }
   | { route: "transaction"; id: string }
   | {
       route: "recurringPaymentNew";
@@ -279,9 +278,6 @@ export const navigateTo = (action: NavigationAction): void => {
       break;
     case "wallet":
       window.location.assign("#wallet");
-      break;
-    case "transactions":
-      window.location.assign("#wallet/transactions");
       break;
     case "transaction":
       window.location.assign(

@@ -29,7 +29,7 @@ const transaction = (
 });
 
 describe("withOnchainTransfers", () => {
-  it("pins unfinished transfers and places finished ones among the transactions by time", () => {
+  it("leaves unfinished transfers out and places finished ones among the transactions by time", () => {
     const running = onchainTransferViewFixture({
       createdAtSec: 50,
       phase: "sent",
@@ -41,13 +41,7 @@ describe("withOnchainTransfers", () => {
     const newer = transaction("newer", 30);
     const older = transaction("older", 10);
 
-    const { pending, entries } = withOnchainTransfers(
-      [newer, older],
-      [running, done],
-    );
-
-    expect(pending).toEqual([running]);
-    expect(entries).toEqual([
+    expect(withOnchainTransfers([newer, older], [running, done])).toEqual([
       { kind: "transaction", item: newer },
       { kind: "onchainTransfer", transfer: done },
       { kind: "transaction", item: older },
@@ -62,7 +56,7 @@ describe("withOnchainTransfers", () => {
     const payment = transaction("payment", 20, transfer.id);
     const sameAmount = transaction("same-amount", 20, "another-request");
 
-    const { entries } = withOnchainTransfers([payment, sameAmount], [transfer]);
+    const entries = withOnchainTransfers([payment, sameAmount], [transfer]);
 
     expect(entries.map((entry) => entry.kind)).toEqual([
       "transaction",
@@ -79,7 +73,7 @@ describe("withOnchainTransfers", () => {
     const pending = transaction("pending", 20, transfer.id, "pending");
     const failed = transaction("failed", 15, transfer.id, "error");
 
-    const { entries } = withOnchainTransfers([pending, failed], [transfer]);
+    const entries = withOnchainTransfers([pending, failed], [transfer]);
 
     expect(entries).toEqual([
       { kind: "transaction", item: pending },

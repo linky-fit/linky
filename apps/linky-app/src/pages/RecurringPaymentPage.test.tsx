@@ -132,7 +132,7 @@ describe("RecurringPaymentPage", () => {
 
     await click(deleteButton(container));
     await vi.waitFor(() =>
-      expect(navigateTo).toHaveBeenCalledWith({ route: "transactions" }),
+      expect(navigateTo).toHaveBeenCalledWith({ route: "wallet" }),
     );
     expect(Effect.runSync(repository.all)).toHaveLength(0);
   });

@@ -84,7 +84,7 @@ describe("parseRouteFromHash", () => {
 
   it("opens one transaction of the history by its id", () => {
     replaceHash("#wallet/transactions");
-    expect(parseRouteFromHash()).toEqual({ kind: "transactions" });
+    expect(parseRouteFromHash()).toEqual({ kind: "wallet" });
 
     replaceHash("#wallet/transactions/tx%3A1");
     expect(parseRouteFromHash()).toEqual({ kind: "transaction", id: "tx:1" });
