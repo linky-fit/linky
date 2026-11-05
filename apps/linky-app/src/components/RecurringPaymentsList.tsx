@@ -13,11 +13,11 @@ import {
 } from "@linky-fit/ui";
 import type { FC } from "react";
 import React from "react";
+import { useContactSummaries } from "../app/hooks/contacts/useContactSummaries";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import { useWalletInventory } from "../app/hooks/wallet/useWalletInventory";
 import {
   recurringRecipientLabel,
-  useRecurringContactSummaries,
   useRecurringPaymentOrders,
 } from "../app/hooks/payments/useRecurringPaymentOrders";
 import { formatRecurringAmountText } from "../app/lib/recurringAmount";
@@ -25,7 +25,7 @@ import { describeRecurringInterval } from "../app/lib/recurringPaymentDisplay";
 import { navigateTo } from "../hooks/useRouting";
 import { normalizeLocale } from "../utils/formatting";
 import { nowSeconds } from "../utils/time";
-import { RecurringContactAvatar } from "./RecurringContactAvatar";
+import { ContactSummaryAvatar } from "./ContactSummaryAvatar";
 
 /** Every recurring payment with its interval pill, amount, and next due date. */
 export const RecurringPaymentsList: FC = () => {
@@ -36,7 +36,7 @@ export const RecurringPaymentsList: FC = () => {
   const { displayCurrency, fiatRates, formatDisplayedAmountParts } =
     useDisplayAmounts();
   const orders = useRecurringPaymentOrders();
-  const contacts = useRecurringContactSummaries();
+  const contacts = useContactSummaries();
   const dateFormatter = React.useMemo(
     () =>
       new Intl.DateTimeFormat(normalizeLocale(lang), {
@@ -70,7 +70,7 @@ export const RecurringPaymentsList: FC = () => {
           >
             <ListRow
               leading={
-                <RecurringContactAvatar
+                <ContactSummaryAvatar
                   contact={contacts.get(order.contactId)}
                 />
               }

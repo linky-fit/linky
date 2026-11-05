@@ -92,20 +92,23 @@ vi.mock("../app/hooks/useLinksync", () => ({
 }));
 vi.mock("../app/hooks/contacts/useDisplayContacts", () => ({
   useContacts: () => state.contacts,
-}));
-vi.mock("../app/hooks/contacts/useProfileCache", () => ({
-  useNostrPictureByNpub: () => ({}),
+  useNpubMessageContactInfo: () => (npub: string) => ({
+    displayName:
+      state.contacts.find((contact) => contact.npub === npub)?.name ??
+      "npub1short",
+    pictureUrl: null,
+  }),
 }));
 vi.mock("../app/hooks/contacts/useSaveNpubContact", () => ({
   useSaveNpubContact: () => saveNpubContact,
 }));
 vi.mock(
-  "../app/hooks/payments/useRecurringPaymentOrders",
+  "../app/hooks/contacts/useContactSummaries",
   async (importOriginal) => ({
     ...(await importOriginal<
-      typeof import("../app/hooks/payments/useRecurringPaymentOrders")
+      typeof import("../app/hooks/contacts/useContactSummaries")
     >()),
-    useRecurringContactSummaries: () => new Map(),
+    useContactSummaries: () => new Map(),
   }),
 );
 vi.mock("../app/hooks/profile/useEffectiveProfile", () => ({
@@ -129,7 +132,7 @@ afterEach(() => {
 const byTestId = (container: HTMLElement, testID: string) =>
   container.querySelector<HTMLElement>(`[data-testid="${testID}"]`);
 
-it("shows the user's own listing as theirs, with share and edit", async () => {
+it("shows the user's own listing as theirs, with edit first and share", async () => {
   const { container, unmount } = await renderIntoDocument(
     <ListingDetailPage author={ME} listingId={ownId} messageId={null} />,
   );
@@ -138,7 +141,10 @@ it("shows the user's own listing as theirs, with share and edit", async () => {
   expect(byTestId(container, "listing-author")?.textContent).toContain(
     "listingYours",
   );
-  expect(byTestId(container, "listing-share")).not.toBeNull();
+  const buttons = [...container.querySelectorAll("[data-testid]")]
+    .map((element) => element.getAttribute("data-testid"))
+    .filter((id) => id === "listing-edit" || id === "listing-share");
+  expect(buttons).toEqual(["listing-edit", "listing-share"]);
   expect(byTestId(container, "listing-reply")).toBeNull();
   await act(async () => byTestId(container, "listing-edit")?.click());
   expect(navigateTo).toHaveBeenCalledWith({ route: "listingEdit", id: ownId });
@@ -171,6 +177,32 @@ it("shows the copy a message holds and offers to save an author who is no contac
   expect(byTestId(container, "listing-reply")).toBeNull();
   await act(async () => byTestId(container, "listing-add-author")?.click());
   expect(saveNpubContact).toHaveBeenCalledExactlyOnceWith(encodeNpub(PEER));
+  await unmount();
+});
+
+it.each([
+  ["another author", { author: ME, listingId: "eggs" }],
+  ["another listing", { author: PEER, listingId: "milk" }],
+])(
+  "shows not found when the message's copy is of %s than the route names",
+  async (_, route) => {
+    state.snapshot = new SharedListing({ author: PEER, listing: peerListing });
+    const { container, unmount } = await renderIntoDocument(
+      <ListingDetailPage {...route} messageId={messageId} />,
+    );
+    expect(container.textContent).toContain("listingNotFound");
+    await unmount();
+  },
+);
+
+it("replies with the very copy the message holds", async () => {
+  state.contacts = [{ id: contactId, name: "Alice", npub: encodeNpub(PEER) }];
+  state.snapshot = new SharedListing({ author: PEER, listing: peerListing });
+  const { container, unmount } = await renderIntoDocument(
+    <ListingDetailPage author={PEER} listingId="eggs" messageId={messageId} />,
+  );
+  await act(async () => byTestId(container, "listing-reply")?.click());
+  expect(attachListingToChat.mock.calls[0]?.[1]).toBe(state.snapshot);
   await unmount();
 });
 

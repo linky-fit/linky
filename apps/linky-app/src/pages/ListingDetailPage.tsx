@@ -19,10 +19,12 @@ import {
   Text,
 } from "@linky-fit/ui";
 import React from "react";
-import { useNostrPictureByNpub } from "../app/hooks/contacts/useProfileCache";
-import { useContacts } from "../app/hooks/contacts/useDisplayContacts";
+import { useContactSummaries } from "../app/hooks/contacts/useContactSummaries";
+import {
+  useContacts,
+  useNpubMessageContactInfo,
+} from "../app/hooks/contacts/useDisplayContacts";
 import { useSaveNpubContact } from "../app/hooks/contacts/useSaveNpubContact";
-import { useRecurringContactSummaries } from "../app/hooks/payments/useRecurringPaymentOrders";
 import { useEffectiveProfile } from "../app/hooks/profile/useEffectiveProfile";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import { useListingRecords } from "../app/hooks/useLinksync";
@@ -35,10 +37,8 @@ import { peerListingsAtom } from "../app/state/contacts/listings";
 import { currentPubkeyAtom } from "../app/state/session/session";
 import { ContactPicker } from "../components/ContactPicker";
 import { ListingImage } from "../components/ListingImage";
-import { contactPictureUrl } from "../derivedProfile";
 import { navigateTo } from "../hooks/useRouting";
 import { isDeletedContact } from "../utils/contactName";
-import { formatShortNpub } from "../utils/formatting";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 
 interface ListingDetailPageProps {
@@ -87,7 +87,13 @@ export function ListingDetailPage({
   const isOwn = author === ownPubkey;
   const live = useLiveListing(author, listingId, isOwn);
   const snapshot = useSharedListingOfMessage(messageId);
-  const listing = messageId ? (snapshot?.listing ?? null) : live;
+  const snapshotMatchesRoute =
+    snapshot?.author === author && snapshot.listing.id === listingId;
+  const shared = messageId
+    ? snapshotMatchesRoute
+      ? snapshot
+      : null
+    : live && new SharedListing({ author, listing: live });
   const authorNpub = encodeNpub(author);
   const contact =
     useContacts().find(
@@ -96,30 +102,30 @@ export function ListingDetailPage({
         normalizeNpubIdentifier(candidate.npub ?? "") === authorNpub,
     ) ?? null;
   const contactId = asContactId(contact?.id);
-  const pictureByNpub = useNostrPictureByNpub();
+  const authorInfo = useNpubMessageContactInfo()(authorNpub);
   const saveNpubContact = useSaveNpubContact();
-  const contactSummaries = useRecurringContactSummaries();
+  const contactSummaries = useContactSummaries();
   const attachListingToChat = useAttachListingToChat();
   const [sharing, setSharing] = React.useState(false);
 
-  if (!listing) {
+  if (!shared) {
     return <EmptyState icon="Package" title={t("listingNotFound")} />;
   }
 
-  const shared = new SharedListing({ author, listing });
+  const { listing } = shared;
   const authorName = isOwn
     ? (ownProfile.effectiveProfileName ?? "")
-    : (contact?.name ?? "").trim() || formatShortNpub(authorNpub);
+    : (authorInfo?.displayName ?? "");
   const authorPicture = isOwn
     ? ownProfile.effectiveProfilePicture
-    : contactPictureUrl(authorNpub, pictureByNpub);
+    : authorInfo?.pictureUrl;
   const shareTargets = Array.from(contactSummaries.values()).filter(
     (candidate) => candidate.npub !== null,
   );
 
   const shareButton = (
     <Button
-      variant={isOwn ? "primary" : "secondary"}
+      variant="secondary"
       icon="Share2"
       onPress={() => setSharing(true)}
       testID="listing-share"
@@ -180,10 +186,8 @@ export function ListingDetailPage({
       <Stack gap="$sm">
         {isOwn ? (
           <>
-            {shareButton}
             {live ? (
               <Button
-                variant="secondary"
                 icon="Pencil"
                 onPress={() =>
                   navigateTo({ route: "listingEdit", id: listingId })
@@ -193,6 +197,7 @@ export function ListingDetailPage({
                 {t("edit")}
               </Button>
             ) : null}
+            {shareButton}
           </>
         ) : (
           <>
