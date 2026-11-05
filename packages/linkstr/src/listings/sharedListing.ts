@@ -24,9 +24,11 @@ const decodeMarker = Schema.decodeUnknownOption(SharedListingMarker);
 
 const authorLine = (author: Pubkey): string => `nostr:${encodeNpub(author)}`;
 
+const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim();
+
 /** `Eggs · 90 CZK per 10 pieces`: the listing for a reader that does not decode the marker. */
 const summaryLine = ({ title, amount, currency, unit }: Listing): string =>
-  `${title} · ${amount} ${currency === LISTING_SAT_CURRENCY ? "sat" : currency} ${unit}`;
+  `${oneLine(title)} · ${amount} ${currency === LISTING_SAT_CURRENCY ? "sat" : currency} ${oneLine(unit)}`;
 
 /** The content of the kind 14 text that shares `shared`, under the sender's `note`. */
 export const sharedListingMessageText = (

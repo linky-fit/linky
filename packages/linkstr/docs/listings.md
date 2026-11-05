@@ -102,7 +102,7 @@ nostr:npub1…
 linky:listing:v1:<base64url of the SharedListing JSON>
 ```
 
-The first is the listing as plain text (`sat` for `SAT`), the second the author's npub, and the last the marker: `linky:listing:v1:` and the unpadded base64url of `{ "author": "<hex pubkey>", "listing": { … } }`, the listing as in the document. A text is a shared listing only when its last line is a marker that decodes and the line before it names the same author; anything else, a malformed marker included, is plain text. A malformed `image` decodes as none, as in the document.
+The first is the listing as plain text on one line (`sat` for `SAT`, whitespace runs in the title and unit collapsed to one space), the second the author's npub, and the last the marker: `linky:listing:v1:` and the unpadded base64url of `{ "author": "<hex pubkey>", "listing": { … } }`, the listing as in the document. A text is a shared listing only when its last line is a marker that decodes and the line before it names the same author; anything else, a malformed marker included, is plain text. A malformed `image` decodes as none, as in the document.
 
 ## Wire format
 
