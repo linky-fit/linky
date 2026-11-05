@@ -170,6 +170,22 @@ export const localMessagesAtom = Atom.keepAlive(
   }),
 );
 
+const storedMessageFamily = Atom.family((messageId: string) =>
+  Atom.readable(
+    (get) =>
+      get(localMessagesAtom).find((message) => message.id === messageId) ??
+      null,
+  ),
+);
+
+const noStoredMessageAtom = Atom.readable((): LocalNostrMessage | null => null);
+
+/** The local message with id `messageId`; null without an id or while there is none. */
+export const storedMessageAtom = (
+  messageId: string | null,
+): Atom.Atom<LocalNostrMessage | null> =>
+  messageId === null ? noStoredMessageAtom : storedMessageFamily(messageId);
+
 export interface StoredReactions {
   /** Keys of reactions whose removal is stored, possibly before they arrived. */
   readonly deletedKeys: ReadonlySet<string>;

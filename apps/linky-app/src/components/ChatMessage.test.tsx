@@ -1,8 +1,17 @@
 import { PaymentRequestId } from "@linky-fit/linkshu/payment-request";
-import { act } from "react";
+import { act, type ComponentProps } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
-import { BankOfferId } from "@linky-fit/linkstr";
+import {
+  BankOfferId,
+  encodeNpub,
+  Listing,
+  ListingAmount,
+  ListingCurrency,
+  parseSharedListingMessage,
+  SharedListing,
+  sharedListingMessageText,
+} from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import type { BankPaymentOfferInfo } from "@linky-fit/proxy-payment";
 import type { CashuPaymentRequestMessageInfo } from "../app/lib/paymentRequestMessage";
@@ -77,6 +86,10 @@ interface RenderChatMessageOptions {
   contactsGroupAssignment?: MessageContactsGroupAssignment | null;
   onSettleBankPaymentOffer?: (message: LocalNostrMessage) => Promise<void>;
   paymentRequestInfo?: CashuPaymentRequestMessageInfo | null;
+  onOpenSharedListing?: ComponentProps<
+    typeof ChatMessage
+  >["onOpenSharedListing"];
+  ownPubkey?: string | null;
 }
 
 const buttonWithText = (container: ParentNode, text: string) =>
@@ -150,6 +163,8 @@ const renderChatMessage = async (
       onMintIconError={() => undefined}
       onOpenBankPaymentOfferDetails={() => undefined}
       onOpenNpubContact={() => undefined}
+      onOpenSharedListing={options.onOpenSharedListing ?? (() => undefined)}
+      ownPubkey={options.ownPubkey ?? null}
       onPayPaymentRequest={() => undefined}
       onReact={() => undefined}
       onReply={() => undefined}
@@ -164,6 +179,7 @@ const renderChatMessage = async (
       reactions={[]}
       replyQuoteText={null}
       settleBankPaymentOfferBusy={false}
+      sharedListing={parseSharedListingMessage(content)}
     />,
   );
 
@@ -627,5 +643,59 @@ describe("ChatMessage bank payment offer actions", () => {
         '[data-testid="chat-bank-payment-offer-currency"]',
       )?.textContent,
     ).toBe("CZK");
+  });
+});
+
+describe("ChatMessage shared listing", () => {
+  const author = makeIdentity().pubkey;
+  const shared = new SharedListing({
+    author,
+    listing: new Listing({
+      id: "eggs",
+      side: "offer",
+      title: "Garden eggs",
+      amount: ListingAmount.make("90"),
+      currency: ListingCurrency.make("CZK"),
+      unit: "per 10",
+    }),
+  });
+  const content = sharedListingMessageText(shared, "Still available?");
+  const card = (container: HTMLElement) =>
+    container.querySelector<HTMLElement>('[data-testid="chat-shared-listing"]');
+
+  it("shows the card under the author's first name and the note without the lines for older clients", async () => {
+    const container = await renderChatMessage(content, {
+      getNpubMessageContactInfo: (npub) => ({
+        ...contactInfo(npub, true),
+        displayName: "Alice Novak",
+      }),
+    });
+
+    expect(card(container)?.textContent).toContain("chatListingOf");
+    expect(card(container)?.textContent).toContain("Garden eggs");
+    expect(card(container)?.textContent).toContain("listingSideOffer");
+    expect(container.textContent).toContain("Still available?");
+    expect(container.textContent).not.toContain("linky:listing:v1:");
+    expect(container.textContent).not.toContain(encodeNpub(author));
+  });
+
+  it("calls the author's own listing theirs, whoever sent it", async () => {
+    const container = await renderChatMessage(content, { ownPubkey: author });
+
+    expect(card(container)?.textContent).toContain("listingYours");
+  });
+
+  it("opens the copy the message holds", async () => {
+    const onOpenSharedListing = vi.fn();
+    const container = await renderChatMessage(content, {
+      onOpenSharedListing,
+    });
+
+    await act(async () => card(container)?.click());
+
+    expect(onOpenSharedListing).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ id: "message-1" }),
+      parseSharedListingMessage(content),
+    );
   });
 });

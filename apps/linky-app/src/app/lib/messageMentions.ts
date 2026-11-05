@@ -1,9 +1,17 @@
+import type { SharedListing } from "@linky-fit/linkstr";
+
 export interface MessageMentionContact {
   groupName: string | null;
   groupNames?: readonly string[];
   name: string;
   npub: string;
   statusNames: string[];
+}
+
+/** A listing the `@` suggestions offer to attach; `authorName` is null for the user's own. */
+export interface MessageMentionListing {
+  readonly authorName: string | null;
+  readonly shared: SharedListing;
 }
 
 interface MessageMentionQuery {
@@ -88,6 +96,32 @@ export const getMessageMentionSuggestions = (
 
   return [...groupSuggestions, ...contactSuggestions].slice(0, 8);
 };
+
+const LISTING_SUGGESTION_LIMIT = 3;
+
+/** The first listings, newest first, whose title contains `query`. */
+export const getListingMentionSuggestions = (
+  listings: readonly MessageMentionListing[],
+  query: string,
+): MessageMentionListing[] => {
+  const normalizedQuery = normalizeSearchText(query);
+  return listings
+    .filter((candidate) =>
+      normalizeSearchText(candidate.shared.listing.title).includes(
+        normalizedQuery,
+      ),
+    )
+    .slice(0, LISTING_SUGGESTION_LIMIT);
+};
+
+/** The draft without the `@query`, for a pick that attaches instead of inserting text. */
+export const removeMessageMentionQuery = (
+  value: string,
+  mention: MessageMentionQuery,
+): { caret: number; value: string } => ({
+  caret: mention.start,
+  value: `${value.slice(0, mention.start)}${value.slice(mention.end)}`,
+});
 
 export const applyMessageMentionSuggestion = (
   value: string,

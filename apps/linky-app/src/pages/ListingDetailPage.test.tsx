@@ -4,6 +4,7 @@ import {
   ListingAmount,
   ListingCurrency,
   Pubkey,
+  SharedListing,
 } from "@linky-fit/linkstr";
 import {
   createId,
@@ -16,7 +17,6 @@ import {
 } from "@linky-fit/linksync";
 import { act } from "react";
 import { afterEach, expect, it, vi } from "vitest";
-import type { SharedListing } from "../app/lib/sharedListing";
 import type { ContactRowLike } from "../app/types/appTypes";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { ListingDetailPage } from "./ListingDetailPage";
@@ -114,10 +114,10 @@ vi.mock("../app/hooks/profile/useEffectiveProfile", () => ({
     effectiveProfilePicture: null,
   }),
 }));
-vi.mock("../app/hooks/useSharedListingOfMessage", () => ({
+vi.mock("../app/hooks/useSharedListing", () => ({
+  useAttachListingToChat: () => attachListingToChat,
   useSharedListingOfMessage: () => state.snapshot,
 }));
-vi.mock("../app/lib/sharedListing", () => ({ attachListingToChat }));
 vi.mock("../hooks/useRouting", () => ({ navigateTo }));
 
 afterEach(() => {
@@ -153,16 +153,16 @@ it("replies to a contact's listing in their chat", async () => {
   expect(byTestId(container, "listing-author")?.textContent).toContain("Alice");
   expect(byTestId(container, "listing-edit")).toBeNull();
   await act(async () => byTestId(container, "listing-reply")?.click());
-  expect(attachListingToChat).toHaveBeenCalledExactlyOnceWith(contactId, {
-    author: PEER,
-    listing: peerListing,
-  });
+  expect(attachListingToChat).toHaveBeenCalledExactlyOnceWith(
+    contactId,
+    new SharedListing({ author: PEER, listing: peerListing }),
+  );
   await unmount();
 });
 
 it("shows the copy a message holds and offers to save an author who is no contact", async () => {
   const copy = new Listing({ ...peerListing, title: "Eggs as discussed" });
-  state.snapshot = { author: PEER, listing: copy };
+  state.snapshot = new SharedListing({ author: PEER, listing: copy });
   const { container, unmount } = await renderIntoDocument(
     <ListingDetailPage author={PEER} listingId="eggs" messageId={messageId} />,
   );

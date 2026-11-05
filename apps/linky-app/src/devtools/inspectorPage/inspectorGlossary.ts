@@ -79,7 +79,9 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "listings.imageUploadFailed":
     "The photo picked for a listing could not be prepared or uploaded, so the listing was not saved and the form stayed open.",
   "listings.attached":
-    "The user replied to or shared a listing: the chat with the contact link opens with the listing attached. The pubkey link is the listing's author.",
+    "The user replied to or shared a listing, or picked one from the composer's @ suggestions: it is attached to the composer of the chat in the contact link, replacing any other. The pubkey link is the listing's author.",
+  "listings.sharedSent":
+    "A message carrying a shared listing was enqueued. Message, rumor and contact links tie it to the send; the pubkey link is the listing's author. The payload says whether it had a note or a photo, never the photo's url or key.",
   "contacts.npubSaved":
     "A Nostr contact was saved after the duplicate check. The contact link identifies the new row; the insert itself runs in the background.",
   "contacts.sharedProfileOpened":

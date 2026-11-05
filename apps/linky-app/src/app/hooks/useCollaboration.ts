@@ -1,4 +1,9 @@
-import { encodeNpub, parsePubkey, type Listing } from "@linky-fit/linkstr";
+import {
+  encodeNpub,
+  parsePubkey,
+  SharedListing,
+  type Listing,
+} from "@linky-fit/linkstr";
 import type { Pubkey } from "@linky-fit/linkstr";
 import { useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
@@ -8,8 +13,12 @@ import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
 import { peerListingsAtom } from "../state/contacts/listings";
 import { profileCacheAtom } from "../state/contacts/profiles";
 import type { ContactRowLike } from "../types/appTypes";
+import type { MessageMentionListing } from "../lib/messageMentions";
+import { formatListingPrice, listingOfRecord } from "../lib/listings";
+import { currentPubkeyAtom } from "../state/session/session";
 import { useContacts } from "./contacts/useDisplayContacts";
-import { useTranslation } from "./shell";
+import { useDisplayAmounts, useTranslation } from "./shell";
+import { useListingRecords } from "./useLinksync";
 
 /** A saved contact who shares with this identity, with what they share. */
 export interface SharingContact {
@@ -99,5 +108,56 @@ export const useCashContacts = (): {
       wanting: sharing.filter(({ cash }) => cash === "want"),
     }),
     [sharing],
+  );
+};
+
+/** The user's own and the sharing contacts' listings, newest first, as the `@` suggestions offer them. */
+export const useMentionListings = (): ReadonlyArray<MessageMentionListing> => {
+  const ownPubkey = useAtomValue(currentPubkeyAtom);
+  const records = useListingRecords();
+  const sharing = useSharingContacts();
+  const peers = useAtomValue(peerListingsAtom);
+  return React.useMemo(() => {
+    const dated: Array<MessageMentionListing & { readonly at: number }> = [];
+    if (ownPubkey) {
+      for (const record of records) {
+        const listing = listingOfRecord(record);
+        if (listing === null) continue;
+        dated.push({
+          at: record.createdAtSec,
+          authorName: null,
+          shared: new SharedListing({ author: ownPubkey, listing }),
+        });
+      }
+    }
+    for (const contact of sharing) {
+      const at = peers[contact.pubkey]?.updatedAt ?? 0;
+      // A document lists oldest first, and the sort below keeps equal times in order.
+      for (const listing of [...contact.listings].reverse()) {
+        dated.push({
+          at,
+          authorName: contact.name,
+          shared: new SharedListing({ author: contact.pubkey, listing }),
+        });
+      }
+    }
+    return dated
+      .sort((left, right) => right.at - left.at)
+      .map(({ authorName, shared }) => ({ authorName, shared }));
+  }, [ownPubkey, peers, records, sharing]);
+};
+
+/** `90 Kč · per 10 pieces`, priced in the viewer's display unit. */
+export const useListingPriceText = (): ((listing: Listing) => string) => {
+  const { lang } = useTranslation();
+  const { displayCurrency, fiatRates } = useDisplayAmounts();
+  return React.useCallback(
+    (listing) =>
+      `${formatListingPrice(listing.amount, listing.currency, {
+        displayCurrency,
+        fiatRates,
+        lang,
+      })} · ${listing.unit}`,
+    [displayCurrency, fiatRates, lang],
   );
 };

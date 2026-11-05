@@ -2,7 +2,10 @@ import { ContactRow, Row, Stack, Text } from "@linky-fit/ui";
 import type { MintIcon } from "../utils/mint";
 import React from "react";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
-import { formatChatMessagePreviewText } from "../app/lib/chatMessageDisplay";
+import {
+  chatMessagePlainText,
+  formatChatMessagePreviewText,
+} from "../app/lib/chatMessageDisplay";
 import { hasMessageEntityPreview } from "../app/lib/messageEntityPreview";
 import type { CashuTokenMessageInfo } from "../app/lib/tokenMessageInfo";
 import type { ContactRowLike, LocalNostrMessage } from "../app/types/appTypes";
@@ -73,9 +76,10 @@ export const ContactCard: React.FC<ContactCardProps> = React.memo(
       ? formatContactMessageTimestamp(lastMessage.createdAtSec)
       : "";
 
-    const previewContent = hasMessageEntityPreview(lastText) ? (
+    const entityText = chatMessagePlainText(lastText);
+    const previewContent = hasMessageEntityPreview(entityText) ? (
       <MessageEntityPreview
-        content={lastText}
+        content={entityText}
         direction={previewDirection}
         getCashuTokenMessageInfo={() => tokenInfo}
         getMintIconUrl={getMintIconUrl}

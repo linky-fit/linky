@@ -13,6 +13,7 @@ import {
   ReplyPreview,
   Row,
   Stack,
+  Text,
 } from "@linky-fit/ui";
 import { useDivRef } from "../hooks/useDivRef";
 import { useLatest } from "../hooks/useLatest";
@@ -25,8 +26,14 @@ import {
   useState,
   type FC,
 } from "react";
-import { parsePubkey } from "@linky-fit/linkstr";
+import {
+  parsePubkey,
+  parseSharedListingMessage,
+  type SharedListing,
+  type SharedListingMessage,
+} from "@linky-fit/linkstr";
 import { useAtomValue } from "@linky-fit/linkstr-react";
+import { MessageId } from "@linky-fit/linksync";
 import {
   useChatContact,
   useMentionContacts,
@@ -82,9 +89,12 @@ import {
 } from "../app/lib/messageEditorDom";
 import {
   applyMessageMentionSuggestion,
+  getListingMentionSuggestions,
   getMessageMentionQuery,
   getMessageMentionSuggestions,
+  removeMessageMentionQuery,
   type MessageMentionContact,
+  type MessageMentionListing,
   type MessageMentionSuggestion,
 } from "../app/lib/messageMentions";
 import {
@@ -116,6 +126,12 @@ import {
   type NpubMessageContactInfo,
 } from "../components/ChatMessage";
 import { ChatMessageEditor } from "../components/ChatMessageEditor";
+import { useAttachedListing } from "../app/hooks/useSharedListing";
+import {
+  useListingPriceText,
+  useMentionListings,
+} from "../app/hooks/useCollaboration";
+import { firstName } from "../utils/formatting";
 import { navigateTo } from "../hooks/useRouting";
 import type { Translate } from "../i18n";
 import { formatChatDayLabel, normalizeLocale } from "../utils/formatting";
@@ -137,6 +153,11 @@ interface Contact {
 }
 
 interface ChatPageProps {
+  /** The listing the next message carries, under the draft as its note. */
+  attachedListing: SharedListing | null;
+  onAttachListing: (shared: SharedListing) => void;
+  onRemoveListing: () => void;
+  mentionListings: readonly MessageMentionListing[];
   cashuBalance: number;
   cashuBalanceAfterMelt: number;
   addChatAttachments: (files: readonly File[]) => void;
@@ -210,6 +231,7 @@ interface ParsedChatMessage {
   isCashuToken: boolean;
   paymentRequestInfo: CashuPaymentRequestMessageInfo | null;
   privateImageInfo: ReturnType<typeof parsePrivateImageMessage>;
+  sharedListing: SharedListingMessage | null;
 }
 
 // Content never changes in place, so a conversation's rows keep their parsed parts across renders.
@@ -224,6 +246,7 @@ const parseChatMessageContent = boundedMemo(
       isCashuToken,
       paymentRequestInfo: parseCashuPaymentRequestMessage(content),
       privateImageInfo: parsePrivateImageMessage(content),
+      sharedListing: parseSharedListingMessage(content),
     };
   },
   5_000,
@@ -268,6 +291,19 @@ const openBankPaymentOfferDetails = (
   if (!offerId || !chatId) return;
   setBankPaymentOfferMinimized(chatId, offerId, false);
   navigateTo({ route: "bankPaymentOffer", chatId, offerId });
+};
+
+const openSharedListing = (
+  message: LocalNostrMessage,
+  { shared }: SharedListingMessage,
+) => {
+  const messageId = MessageId.fromUnknown(message.id);
+  navigateTo({
+    route: "listing",
+    author: shared.author,
+    listingId: shared.listing.id,
+    ...(messageId.ok ? { messageId: messageId.value } : {}),
+  });
 };
 
 interface ChatMessageViewModel extends ParsedChatMessage {
@@ -598,7 +634,8 @@ const ChatMessageList = memo(function ChatMessageList({
           !parsed.paymentRequestInfo &&
           !parsed.privateImageInfo &&
           !parsed.bankPaymentOfferInfo &&
-          !parsed.declineInfo,
+          !parsed.declineInfo &&
+          !parsed.sharedListing,
         canDelete:
           Boolean(rumorId) &&
           !isDeleted &&
@@ -701,6 +738,9 @@ const ChatMessageList = memo(function ChatMessageList({
               canOpenBankPaymentOfferDetails={canOpenBankPaymentOfferDetails}
               canSettleBankPaymentOffer={viewModel.canSettleBankPaymentOffer}
               onOpenBankPaymentOfferDetails={openBankPaymentOfferDetails}
+              onOpenSharedListing={openSharedListing}
+              ownPubkey={chatOwnPubkeyHex}
+              sharedListing={viewModel.sharedListing}
               onDeclinePaymentRequest={onDeclinePaymentRequest}
               onPayPaymentRequest={onPayPaymentRequest}
               onSettleBankPaymentOffer={onSettleBankPaymentOffer}
@@ -734,6 +774,10 @@ const ChatMessageList = memo(function ChatMessageList({
 });
 
 interface ChatComposerProps {
+  attachedListing: ChatPageProps["attachedListing"];
+  mentionListings: ChatPageProps["mentionListings"];
+  onAttachListing: ChatPageProps["onAttachListing"];
+  onRemoveListing: ChatPageProps["onRemoveListing"];
   canPayThisContact: boolean;
   canRequestThisContact: boolean;
   canStartPay: boolean;
@@ -765,6 +809,10 @@ interface ChatComposerProps {
 }
 
 export const ChatComposer = memo(function ChatComposer({
+  attachedListing,
+  mentionListings,
+  onAttachListing,
+  onRemoveListing,
   canPayThisContact,
   canRequestThisContact,
   canStartPay,
@@ -820,11 +868,22 @@ export const ChatComposer = memo(function ChatComposer({
         : [],
     [mentionContacts, mentionQuery, npub],
   );
+  const listingSuggestions = useMemo(
+    () =>
+      mentionQuery && !editContext
+        ? getListingMentionSuggestions(mentionListings, mentionQuery.query)
+        : [],
+    [editContext, mentionListings, mentionQuery],
+  );
+  const listingPriceText = useListingPriceText();
   const hasDraftText = Boolean(draft.trim());
   const hasRecipient = Boolean(npub || hasUnknownPubkeyHex);
   const hasAttachmentsToSend = chatAttachments.length > 0 && !editContext;
+  const hasListingToSend = attachedListing !== null && !editContext;
   const canSendChat =
-    !chatSendIsBusy && hasRecipient && (hasDraftText || hasAttachmentsToSend);
+    !chatSendIsBusy &&
+    hasRecipient &&
+    (hasDraftText || hasAttachmentsToSend || hasListingToSend);
   const canAttach = hasRecipient && !editContext;
 
   // Adjust before committing the render so a completed send cannot clear newer input.
@@ -880,7 +939,7 @@ export const ChatComposer = memo(function ChatComposer({
         removeChatAttachment(file);
       }
     }
-    if (!hasDraftText) return;
+    if (!hasDraftText && !hasListingToSend) return;
     if (draft === chatDraft) {
       void sendChatMessage();
       return;
@@ -895,20 +954,15 @@ export const ChatComposer = memo(function ChatComposer({
     draft,
     hasAttachmentsToSend,
     hasDraftText,
+    hasListingToSend,
     removeChatAttachment,
     sendChatImage,
     sendChatMessage,
     setChatDraft,
   ]);
 
-  const selectMentionSuggestion = useCallback(
-    (suggestion: MessageMentionSuggestion) => {
-      if (!mentionQuery) return;
-      const next = applyMessageMentionSuggestion(
-        draft,
-        mentionQuery,
-        suggestion,
-      );
+  const replaceMentionQuery = useCallback(
+    (next: { caret: number; value: string }) => {
       setDraft(next.value);
       setComposeCaret(next.caret);
       window.requestAnimationFrame(() => {
@@ -918,14 +972,34 @@ export const ChatComposer = memo(function ChatComposer({
         setMessageEditorCaret(input, next.caret);
       });
     },
-    [composeInputRef, draft, mentionQuery],
+    [composeInputRef],
   );
 
+  const selectMentionSuggestion = (suggestion: MessageMentionSuggestion) => {
+    if (!mentionQuery) return;
+    replaceMentionQuery(
+      applyMessageMentionSuggestion(draft, mentionQuery, suggestion),
+    );
+  };
+
+  const selectListingSuggestion = ({ shared }: MessageMentionListing) => {
+    if (!mentionQuery) return;
+    replaceMentionQuery(removeMessageMentionQuery(draft, mentionQuery));
+    onAttachListing(shared);
+  };
+
   useEffect(() => {
-    if (!replyContext && !editContext) return;
+    if (!replyContext && !editContext && !attachedListing) return;
     if (!npub && !hasUnknownPubkeyHex) return;
     focusComposeInput();
-  }, [editContext, focusComposeInput, hasUnknownPubkeyHex, npub, replyContext]);
+  }, [
+    attachedListing,
+    editContext,
+    focusComposeInput,
+    hasUnknownPubkeyHex,
+    npub,
+    replyContext,
+  ]);
 
   const attachFiles = () => {
     void pickFiles({ accept: "image/*,application/pdf,.pdf", multiple: true })
@@ -936,7 +1010,8 @@ export const ChatComposer = memo(function ChatComposer({
   };
   // Keeps the editor focused, and the iOS keyboard open, while tapping composer controls.
   const keepEditorFocus = (event: React.PointerEvent) => event.preventDefault();
-  const showSend = hasDraftText || chatAttachments.length > 0;
+  const showSend =
+    hasDraftText || chatAttachments.length > 0 || hasListingToSend;
 
   return (
     <Stack
@@ -950,8 +1025,10 @@ export const ChatComposer = memo(function ChatComposer({
         header={
           replyContext ||
           editContext ||
+          hasListingToSend ||
           chatAttachments.length > 0 ||
-          mentionSuggestions.length > 0 ? (
+          mentionSuggestions.length > 0 ||
+          listingSuggestions.length > 0 ? (
             <>
               {replyContext ? (
                 <ReplyPreview
@@ -967,6 +1044,16 @@ export const ChatComposer = memo(function ChatComposer({
                   dismiss={{ label: t("close"), onPress: onCancelEdit }}
                 />
               ) : null}
+              {attachedListing && hasListingToSend ? (
+                <ReplyPreview
+                  author={attachedListing.listing.title}
+                  body={listingPriceText(attachedListing.listing)}
+                  dismiss={{
+                    label: t("chatListingRemove"),
+                    onPress: onRemoveListing,
+                  }}
+                />
+              ) : null}
               {chatAttachments.length > 0 ? (
                 <ChatAttachmentPreview
                   accessibilityLabel={t("chatAttachments")}
@@ -978,7 +1065,8 @@ export const ChatComposer = memo(function ChatComposer({
                   removeLabel={t("chatAttachmentRemove")}
                 />
               ) : null}
-              {mentionSuggestions.length > 0 ? (
+              {mentionSuggestions.length > 0 ||
+              listingSuggestions.length > 0 ? (
                 <Stack
                   role="list"
                   maxHeight="$qr"
@@ -1020,6 +1108,29 @@ export const ChatComposer = memo(function ChatComposer({
                       />
                     ),
                   )}
+                  {listingSuggestions.length > 0 ? (
+                    <Stack role="group" aria-label={t("chatMentionListings")}>
+                      <Text eyebrow paddingHorizontal="$md" paddingTop="$xs">
+                        {t("chatMentionListings")}
+                      </Text>
+                      {listingSuggestions.map((suggestion) => (
+                        <ListRow
+                          key={`listing-${suggestion.shared.author}-${suggestion.shared.listing.id}`}
+                          icon="Package"
+                          title={suggestion.shared.listing.title}
+                          description={
+                            suggestion.authorName === null
+                              ? t("listingYours")
+                              : firstName(suggestion.authorName)
+                          }
+                          value={listingPriceText(suggestion.shared.listing)}
+                          chevron={false}
+                          onPress={() => selectListingSuggestion(suggestion)}
+                          testID="chat-mention-listing"
+                        />
+                      ))}
+                    </Stack>
+                  ) : null}
                 </Stack>
               ) : null}
             </>
@@ -1303,6 +1414,10 @@ export const ChatNearbyBanner = memo(function ChatNearbyBanner({
 });
 
 export const ChatPage: FC<ChatPageProps> = ({
+  attachedListing,
+  mentionListings,
+  onAttachListing,
+  onRemoveListing,
   cashuBalance,
   cashuBalanceAfterMelt,
   addChatAttachments,
@@ -1479,6 +1594,10 @@ export const ChatPage: FC<ChatPageProps> = ({
       />
 
       <ChatComposer
+        attachedListing={attachedListing}
+        mentionListings={mentionListings}
+        onAttachListing={onAttachListing}
+        onRemoveListing={onRemoveListing}
         canPayThisContact={canPayThisContact}
         canRequestThisContact={canRequestThisContact}
         canStartPay={canStartPay}
@@ -1541,8 +1660,14 @@ export const ChatRoute: FC<{ route: Route }> = ({ route }) => {
   const onOpenNpubContact = useOpenNpubMessageContact();
   const openContactPay = useOpenContactPay();
   const receivedSatByRequestId = useReceivedSatByRequestId();
+  const listing = useAttachedListing(selectedContact?.id ?? "");
+  const mentionListings = useMentionListings();
   return (
     <ChatPage
+      attachedListing={listing.attached}
+      mentionListings={mentionListings}
+      onAttachListing={listing.attach}
+      onRemoveListing={listing.clear}
       addChatAttachments={composer.addChatAttachments}
       bankPaymentOfferMessages={bankPaymentOfferMessages}
       cashuBalance={cashuBalance}

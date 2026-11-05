@@ -34,6 +34,7 @@ const baseContext: BackActionContext = {
   contactPayBackToChatId: null,
   navigateToMainReturn,
   ownPubkey: null,
+  sharedListingChatId: null,
 };
 
 const backHashFor = (
@@ -84,6 +85,17 @@ describe("resolveBackAction", () => {
         messageId: null,
       }),
     ).toBe("#collaboration/listings");
+    expect(
+      backHashFor(
+        {
+          kind: "listing",
+          author: ownPubkey,
+          listingId,
+          messageId: createIdFromString<"Message">("message-1"),
+        },
+        { ...baseContext, sharedListingChatId: contactId },
+      ),
+    ).toBe(`#chat/${contactId}`);
     expect(
       backHashFor(
         { kind: "listingEdit", id: listingId },
@@ -204,6 +216,7 @@ describe("buildTopbar", () => {
       contactPayBackToChatId: null,
       navigateToMainReturn: vi.fn(),
       ownPubkey: null,
+      sharedListingChatId: null,
       t: (key: string) => key,
     };
 
@@ -221,6 +234,7 @@ describe("buildTopbar", () => {
       contactPayBackToChatId: null,
       navigateToMainReturn: vi.fn(),
       ownPubkey: null,
+      sharedListingChatId: null,
       t: (key: string) => key,
     };
 

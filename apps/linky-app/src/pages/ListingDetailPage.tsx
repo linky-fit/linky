@@ -1,4 +1,9 @@
-import { encodeNpub, type Listing, type Pubkey } from "@linky-fit/linkstr";
+import {
+  encodeNpub,
+  SharedListing,
+  type Listing,
+  type Pubkey,
+} from "@linky-fit/linkstr";
 import { useAtomValue } from "@linky-fit/linkstr-react";
 import { ContactId, type MessageId } from "@linky-fit/linksync";
 import {
@@ -21,12 +26,11 @@ import { useRecurringContactSummaries } from "../app/hooks/payments/useRecurring
 import { useEffectiveProfile } from "../app/hooks/profile/useEffectiveProfile";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import { useListingRecords } from "../app/hooks/useLinksync";
-import { useSharedListingOfMessage } from "../app/hooks/useSharedListingOfMessage";
-import { formatListingPrice, listingOfRecord } from "../app/lib/listings";
 import {
-  attachListingToChat,
-  type SharedListing,
-} from "../app/lib/sharedListing";
+  useAttachListingToChat,
+  useSharedListingOfMessage,
+} from "../app/hooks/useSharedListing";
+import { formatListingPrice, listingOfRecord } from "../app/lib/listings";
 import { peerListingsAtom } from "../app/state/contacts/listings";
 import { currentPubkeyAtom } from "../app/state/session/session";
 import { ContactPicker } from "../components/ContactPicker";
@@ -95,13 +99,14 @@ export function ListingDetailPage({
   const pictureByNpub = useNostrPictureByNpub();
   const saveNpubContact = useSaveNpubContact();
   const contactSummaries = useRecurringContactSummaries();
+  const attachListingToChat = useAttachListingToChat();
   const [sharing, setSharing] = React.useState(false);
 
   if (!listing) {
     return <EmptyState icon="Package" title={t("listingNotFound")} />;
   }
 
-  const shared: SharedListing = { author, listing };
+  const shared = new SharedListing({ author, listing });
   const authorName = isOwn
     ? (ownProfile.effectiveProfileName ?? "")
     : (contact?.name ?? "").trim() || formatShortNpub(authorNpub);

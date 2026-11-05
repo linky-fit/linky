@@ -17,6 +17,7 @@ import {
   TextField,
 } from "@linky-fit/ui";
 import type { Tone } from "@linky-fit/ui";
+import { encodeNpub, type SharedListingMessage } from "@linky-fit/linkstr";
 import React from "react";
 import {
   useDisplayAmounts,
@@ -61,6 +62,7 @@ import type {
   ChatReactionChip,
   LocalNostrMessage,
 } from "../app/types/appTypes";
+import { firstName } from "../utils/formatting";
 import type { MintIcon } from "../utils/mint";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 import { CashuTokenAmount, CashuTokenPill } from "./CashuTokenPill";
@@ -74,6 +76,7 @@ import { MessageActionsMenu } from "./MessageActionsMenu";
 import { MessageReactions } from "./MessageReactions";
 import { PrivateFileBubble } from "./PrivateFileBubble";
 import { PrivateImageBubble } from "./PrivateImageBubble";
+import { SharedListingCard } from "./SharedListingCard";
 
 export interface NpubMessageContactInfo {
   displayName: string;
@@ -146,6 +149,12 @@ interface ChatMessageProps {
   ) => void;
   onReact: (message: LocalNostrMessage, emoji: string) => void;
   onReply: (message: LocalNostrMessage) => void;
+  onOpenSharedListing: (
+    message: LocalNostrMessage,
+    sharedListing: SharedListingMessage,
+  ) => void;
+  /** The active identity, whose shared listings read "Your listing". */
+  ownPubkey: string | null;
   payPaymentRequestBusy: boolean;
   payPaymentRequestDisabled: boolean;
   paymentRequestInfo: CashuPaymentRequestMessageInfo | null;
@@ -154,6 +163,8 @@ interface ChatMessageProps {
   reactions: readonly ChatReactionChip[];
   replyQuoteText: string | null;
   settleBankPaymentOfferBusy: boolean;
+  /** Set when the message carries a listing; its note is then the message text. */
+  sharedListing: SharedListingMessage | null;
 }
 
 const SWIPE_REPLY_THRESHOLD = 48;
@@ -249,7 +260,9 @@ function ChatMessageComponent({
   onPayPaymentRequest,
   onReact,
   onReply,
+  onOpenSharedListing,
   onSettleBankPaymentOffer,
+  ownPubkey,
   payPaymentRequestBusy,
   payPaymentRequestDisabled,
   paymentRequestInfo,
@@ -258,6 +271,7 @@ function ChatMessageComponent({
   reactions,
   replyQuoteText,
   settleBankPaymentOfferBusy,
+  sharedListing,
 }: ChatMessageProps) {
   const { t } = useTranslation();
   const { formatDisplayedAmountParts, formatDisplayedAmountText } =
@@ -291,7 +305,7 @@ function ChatMessageComponent({
 
   const isOut = message.direction === "out";
   const isPending = isOut && (message.status ?? "sent") === "pending";
-  const content = message.content;
+  const content = sharedListing ? sharedListing.note : message.content;
   const privateImageInfo = React.useMemo(
     () => parsePrivateImageMessage(content),
     [content],
@@ -829,6 +843,25 @@ function ChatMessageComponent({
     </PaymentCard>
   ) : null;
 
+  const sharedListingCard = sharedListing ? (
+    <SharedListingCard
+      authorLabel={
+        sharedListing.shared.author === ownPubkey
+          ? t("listingYours")
+          : t("chatListingOf").replace(
+              "{name}",
+              firstName(
+                getNpubMessageContactInfo(
+                  encodeNpub(sharedListing.shared.author),
+                )?.displayName ?? "",
+              ),
+            )
+      }
+      onOpen={() => onOpenSharedListing(message, sharedListing)}
+      shared={sharedListing.shared}
+    />
+  ) : null;
+
   const paymentRequestCard = paymentRequestInfo ? (
     <PaymentCard
       testID="chat-payment-request-card"
@@ -897,7 +930,14 @@ function ChatMessageComponent({
   ) : (
     (bankOfferCard ??
     paymentRequestCard ??
-    (isDeclineMessage ? (
+    (sharedListingCard ? (
+      <>
+        {sharedListingCard}
+        {content ? (
+          <MessageText>{inlineMessageContent ?? content}</MessageText>
+        ) : null}
+      </>
+    ) : isDeclineMessage ? (
       <Pill label={t("paymentRequestDeclinedMessage")} tone="neutral" />
     ) : privateImageInfo && isPrivatePdfPayload(privateImageInfo) ? (
       <PrivateFileBubble

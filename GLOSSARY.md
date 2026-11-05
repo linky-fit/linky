@@ -338,6 +338,10 @@ _Avoid_: offer (taken by proxy payments), ad, classified, product
 The one addressable Nostr event (kind 34133) in which a user shares their cash intent and listings; its content is readable only by the contacts the user chose, each through their own key slot. A contact's document reaching the user proves the contact saved them.
 _Avoid_: listings event, catalog, shop
 
+**Shared listing**:
+The copy of a listing, with its author, that one chat message carries, under the sender's optional note. It is what was discussed: it stays as sent when the author edits or withdraws the listing.
+_Avoid_: forwarded offer, listing link
+
 **Mutual contact**:
 A contact who also saved the user. Nothing records this; it shows itself in what only a mutual contact can decode: a beacon sighting or a listings document.
 _Avoid_: friend, follower, mutual follow

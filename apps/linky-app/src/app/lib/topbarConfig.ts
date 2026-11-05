@@ -14,6 +14,8 @@ export interface BackActionContext {
   contactPayBackToChatId: ContactId | null;
   navigateToMainReturn: () => void;
   ownPubkey: Pubkey | null;
+  /** The chat holding the message a listing detail shows its copy from. */
+  sharedListingChatId: string | null;
 }
 
 interface BuildTopbarArgs extends BackActionContext {
@@ -63,6 +65,7 @@ export const resolveBackAction = (
     contactPayBackToChatId,
     navigateToMainReturn,
     ownPubkey,
+    sharedListingChatId,
   }: BackActionContext,
 ): (() => void) | null => {
   switch (route.kind) {
@@ -96,8 +99,12 @@ export const resolveBackAction = (
       return () => navigateTo({ route: "collaboration" });
 
     case "listingNew":
-    case "listing":
       return () => navigateTo({ route: "listings" });
+
+    case "listing":
+      return route.messageId && sharedListingChatId
+        ? () => navigateTo({ route: "chat", id: sharedListingChatId })
+        : () => navigateTo({ route: "listings" });
 
     case "listingEdit": {
       const listingId = route.id;

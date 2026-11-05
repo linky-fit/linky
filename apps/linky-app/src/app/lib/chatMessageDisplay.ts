@@ -1,6 +1,7 @@
 import type { Translate } from "../../i18n";
 import { formatShortNpub, previewTokenText } from "../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
+import { parseSharedListingMessage } from "@linky-fit/linkstr";
 import { decodeBankPaymentOffer } from "@linky-fit/proxy-payment";
 import {
   getBankPaymentOfferStatusLabel,
@@ -32,6 +33,14 @@ const formatInlinePreviewEntities = (content: string): string => {
   });
 };
 
+/** The text a message shows as plain text: a shared listing's note, or its title when it has none. */
+export const chatMessagePlainText = (content: string): string => {
+  const sharedListing = parseSharedListingMessage(content);
+  return sharedListing
+    ? sharedListing.note || sharedListing.shared.listing.title
+    : content;
+};
+
 interface FormatChatMessagePreviewArgs {
   content: string;
   /** A deleted message previews as its placeholder, whatever `content` holds. */
@@ -49,6 +58,15 @@ export const formatChatMessagePreviewText = ({
   t,
 }: FormatChatMessagePreviewArgs): string => {
   if (deleted) return t("chatMessageDeleted");
+  const sharedListing = parseSharedListingMessage(content);
+  if (sharedListing) {
+    return sharedListing.note
+      ? formatInlinePreviewEntities(sharedListing.note)
+      : t("chatListingMessage").replace(
+          "{title}",
+          sharedListing.shared.listing.title,
+        );
+  }
   const privateImage = parsePrivateImageMessage(content);
   if (privateImage) {
     return privateImagePreviewText(t, privateImage);
