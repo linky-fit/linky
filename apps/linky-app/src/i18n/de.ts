@@ -1377,7 +1377,7 @@ export const de = {
   listingPriceMissing: "Gib einen Preis ein.",
   listingUnitMissing: "Gib eine Einheit ein.",
   listingDetailTitle: "Angebot",
-  listingNotFound: "Dieses Angebot wird nicht mehr geteilt.",
+  listingNotFound: "Dieses Angebot ist nicht verfügbar.",
   listingYours: "Dein Angebot",
   listingAuthorNotContact: "Nicht in deinen Kontakten",
   listingReply: "Antworten",

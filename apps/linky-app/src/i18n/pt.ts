@@ -1382,7 +1382,7 @@ export const pt = {
   listingPriceMissing: "Adicione um preço.",
   listingUnitMissing: "Adicione uma unidade.",
   listingDetailTitle: "Anúncio",
-  listingNotFound: "Este anúncio não é mais compartilhado.",
+  listingNotFound: "Este anúncio não está disponível.",
   listingYours: "Seu anúncio",
   listingAuthorNotContact: "Não está nos seus contatos",
   listingReply: "Responder",
