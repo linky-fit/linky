@@ -28,6 +28,7 @@ import {
 } from "./codec";
 import {
   emptyListingsDocument,
+  LISTING_DESCRIPTION_MAX_LENGTH,
   Listing,
   ListingAmount,
   ListingCurrency,
@@ -205,6 +206,34 @@ describe("listing image", () => {
     expect(decoded.listings).toHaveLength(1);
     expect(decoded.listings[0]?.title).toBe(eggs.title);
     expect(decoded.listings[0] && "image" in decoded.listings[0]).toBe(false);
+  });
+});
+
+describe("listing description", () => {
+  const encodedEggs = Schema.encodeSync(Listing)(eggs);
+  const descriptionOf = (description: unknown) =>
+    Schema.decodeUnknownSync(Listing)({ ...encodedEggs, description });
+
+  it("carries the description to every reader and leaves it out when absent", () => {
+    const withDescription = new ListingsDocument({
+      listings: [descriptionOf("Free range.\nPick up in Brno.")],
+    });
+    const event = listingsEvent(alice, [bob.pubkey], base, withDescription);
+    expect(
+      documentOf(decodeListingsEvent(event, bob.secretKey))?.listings[0]
+        ?.description,
+    ).toBe("Free range.\nPick up in Brno.");
+    expect("description" in encodedEggs).toBe(false);
+  });
+
+  it.each([
+    ["empty", "   "],
+    ["too long", "a".repeat(LISTING_DESCRIPTION_MAX_LENGTH + 1)],
+    ["not text", 42],
+  ])("keeps a listing whose description is %s, without it", (_, value) => {
+    const listing = descriptionOf(value);
+    expect(listing.title).toBe(eggs.title);
+    expect("description" in listing).toBe(false);
   });
 });
 

@@ -100,7 +100,7 @@ Insert `mintUrl`, `rail` and the initial `progress` with every new payment. `min
 
 `makeListingsRepository(store)` over `listing` in the `contacts` scope, which is never forgotten: one row per thing the user offers to, or wants from, their contacts. `all` returns `ListingRecord`s, whose creation time, kind, side, title, amount, currency and unit are present; a row still arriving column by column is skipped (`normalizeListing`).
 
-Adding a listing is `insert` with every column; editing is `update`; withdrawing it is `remove`. `side`, `unit`, `amount` and `currency` stay strings here and are validated into `@linky-fit/linkstr`'s `Listing` by the consumer that publishes them, and so is the optional `image`, the JSON of linkstr's `PrivateImage`, left out of an insert when the listing has none; the row id is the listing's stable id on the wire. The cash intent is the `cashIntent` setting, not a row.
+Adding a listing is `insert` with every column; editing is `update`; withdrawing it is `remove`. `side`, `unit`, `amount` and `currency` stay strings here and are validated into `@linky-fit/linkstr`'s `Listing` by the consumer that publishes them, and so are the optional `description`, the author's text, and `image`, the JSON of linkstr's `PrivateImage`, each left out of an insert when the listing has none; the row id is the listing's stable id on the wire. The cash intent is the `cashIntent` setting, not a row.
 
 ## Keryx subscriptions
 

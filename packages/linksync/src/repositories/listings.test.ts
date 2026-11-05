@@ -48,6 +48,24 @@ describe("listings repository", () => {
     expect(runNow(listings.all)).toMatchObject([{ image: null }]);
   });
 
+  it("keeps the optional description and clears it with null", () => {
+    const { store } = linkyStore();
+    const listings = makeListingsRepository(store);
+    const row = listing();
+    runNow(listings.insert(row));
+    expect(runNow(listings.all)).toMatchObject([{ description: null }]);
+    runNow(
+      listings.update(row.id, {
+        description: NonEmptyString1000.orThrow("Line one\nline two"),
+      }),
+    );
+    expect(runNow(listings.all)).toMatchObject([
+      { description: "Line one\nline two" },
+    ]);
+    runNow(listings.update(row.id, { description: null }));
+    expect(runNow(listings.all)).toMatchObject([{ description: null }]);
+  });
+
   it("skips a row still arriving column by column", () => {
     const { store } = linkyStore();
     const listings = makeListingsRepository(store);

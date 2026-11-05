@@ -36,6 +36,15 @@ export type ListingCurrency = typeof ListingCurrency.Type;
 
 export const LISTING_TITLE_MAX_LENGTH = 120;
 
+export const LISTING_DESCRIPTION_MAX_LENGTH = 500;
+
+/** More about the listing in the author's words; line breaks are kept. */
+export const ListingDescription = Schema.Trimmed.check(
+  Schema.isNonEmpty(),
+  Schema.isMaxLength(LISTING_DESCRIPTION_MAX_LENGTH),
+);
+export type ListingDescription = typeof ListingDescription.Type;
+
 /** One thing the author offers or wants; `id` is the author's own stable key for it. */
 export class Listing extends Schema.Class<Listing>("Listing")({
   id: Schema.Trimmed.check(Schema.isNonEmpty(), Schema.isMaxLength(64)),
@@ -47,6 +56,10 @@ export class Listing extends Schema.Class<Listing>("Listing")({
   amount: ListingAmount,
   currency: ListingCurrency,
   unit: ListingUnit,
+  /** A malformed or too long description decodes as none, so it never costs the listing or the document. */
+  description: Schema.optionalKey(
+    ListingDescription.pipe(Schema.catchDecoding(() => Effect.succeedNone)),
+  ),
   /** A malformed image decodes as none, so it never costs the listing or the document. */
   image: Schema.optionalKey(
     PrivateImage.pipe(Schema.catchDecoding(() => Effect.succeedNone)),

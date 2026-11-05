@@ -35,6 +35,7 @@ const eggs = new SharedListing({
     amount: ListingAmount.make("90"),
     currency: ListingCurrency.make("CZK"),
     unit: "za 10 ks",
+    description: "Z volného chovu.\nVyzvednutí v Brně.",
     image,
   }),
 });
@@ -56,7 +57,7 @@ describe("shared listing message", () => {
     expect(lines).toHaveLength(5);
   });
 
-  it("reads back the note and the listing, image included", () => {
+  it("reads back the note and the listing, description and image included", () => {
     const parsed = parseSharedListingMessage(
       sharedListingMessageText(eggs, "Line one\nline two"),
     );
