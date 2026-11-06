@@ -311,8 +311,18 @@ export const DesktopContactsPane = (): React.ReactElement => (
   </>
 );
 
-export const WalletPane = (): React.ReactElement => {
+export const WalletPane = ({
+  showHistory,
+}: {
+  showHistory: boolean;
+}): React.ReactElement => {
   const { openWalletScan } = useScanCommands();
   const scanIsOpen = useScanIsOpen();
-  return <WalletPage openScan={openWalletScan} scanIsOpen={scanIsOpen} />;
+  return (
+    <WalletPage
+      openScan={openWalletScan}
+      scanIsOpen={scanIsOpen}
+      showHistory={showHistory}
+    />
+  );
 };

@@ -75,6 +75,7 @@ import {
   RecurringPaymentFormPage,
   RecurringPaymentPage,
   TransactionPage,
+  WalletHistoryPage,
 } from "../../pages";
 import { useRouting } from "../../hooks/useRouting";
 import type { Route } from "../../types/route";
@@ -102,7 +103,9 @@ const RoutePage = (): React.ReactElement => {
     case "contacts":
       return <ContactsPane />;
     case "wallet":
-      return <WalletPane />;
+      return <WalletPane showHistory={false} />;
+    case "walletHistory":
+      return <WalletHistoryPage />;
     case "settings":
     case "advanced":
       return <AdvancedPage />;
@@ -402,7 +405,7 @@ const DesktopWalletPane = (): React.ReactElement => {
         >
           <ScanModal />
         </Stack>
-      ) : route.kind === "wallet" ? (
+      ) : route.kind === "wallet" || route.kind === "walletHistory" ? (
         <>
           <Stack paddingHorizontal="$xxl" paddingTop="$xl">
             <Text
@@ -423,7 +426,7 @@ const DesktopWalletPane = (): React.ReactElement => {
               maxWidth="$readable"
               alignSelf="center"
             >
-              <WalletPane />
+              <WalletPane showHistory />
             </Stack>
           </PageBody>
         </>

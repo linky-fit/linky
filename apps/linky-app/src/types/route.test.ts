@@ -56,6 +56,11 @@ describe("parseRouteFromHash", () => {
     expect(parseRouteFromHash()).toEqual({ kind: "wallet" });
   });
 
+  it("parses the wallet history route", () => {
+    replaceHash("#wallet/history");
+    expect(parseRouteFromHash()).toEqual({ kind: "walletHistory" });
+  });
+
   it("parses the on-chain send, receive and transfer routes", () => {
     const id = createId<"OnchainTransfer">();
     replaceHash("#wallet/onchain/send?address=bc1q&amount=100000");

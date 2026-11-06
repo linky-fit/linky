@@ -858,6 +858,7 @@ export const pt = {
   topupQrModeUniversal: "Universal",
   topupQrModeLightning: "Lightning",
   walletReceive: "Receber",
+  walletHistory: "Histórico",
   walletSend: "Enviar",
   manualPayTitle: "Enviar",
   manualPayOpen: "Digitar destinatário",

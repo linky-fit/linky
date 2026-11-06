@@ -43,10 +43,14 @@ vi.mock("../components/RecurringPaymentsList", () => ({
 }));
 vi.mock("../hooks/useRouting", () => ({ navigateTo: vi.fn() }));
 
-const renderWallet = () =>
+const renderWallet = (showHistory = true) =>
   renderIntoDocument(
     <RegistryContext.Provider value={AtomRegistry.make()}>
-      <WalletPage openScan={vi.fn()} scanIsOpen={false} />
+      <WalletPage
+        openScan={vi.fn()}
+        scanIsOpen={false}
+        showHistory={showHistory}
+      />
     </RegistryContext.Provider>,
   );
 
@@ -64,6 +68,24 @@ afterEach(() => {
 });
 
 describe("WalletPage", () => {
+  it("opens the history from its own button when it is not shown in place", async () => {
+    const { container } = await renderWallet(false);
+
+    expect(container.textContent).not.toContain("transactionsTitle");
+    expect(button(container, "recurringPaymentNewTitle")).toBeUndefined();
+    await act(async () => {
+      button(container, "walletHistory")?.click();
+    });
+    expect(navigateTo).toHaveBeenCalledWith({ route: "walletHistory" });
+  });
+
+  it("shows the history in place without the button to open it", async () => {
+    const { container } = await renderWallet();
+
+    expect(container.textContent).toContain("transactionsTitle");
+    expect(button(container, "walletHistory")).toBeUndefined();
+  });
+
   it("explains recurring payments while there are none, with the button to add one", async () => {
     const { container } = await renderWallet();
 

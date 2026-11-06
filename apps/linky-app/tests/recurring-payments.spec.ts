@@ -46,11 +46,12 @@ test("a due payment goes out at once and is linked from history", async ({
   await expect(detailValue(a.page, "Paid from")).toHaveText(MINT_HOST);
   expect((await readOrder(a.page)).rail).toBe("cashu");
   await test.step("nothing is paid before the due time", async () => {
-    await a.page.goto("/#wallet");
+    await a.page.goto("/#wallet/history");
     await expect(a.page.getByTestId("recurring-order-card")).toHaveCount(1);
     await expect(a.page.getByTestId("transaction-recurring-pill")).toHaveCount(
       0,
     );
+    await a.page.goto("/#wallet");
     expect(await readBalanceSat(a.page)).toBe(FUNDING_SAT);
     expect(await readBalanceSat(b.page)).toBe(0);
   });
@@ -98,7 +99,7 @@ test("a due payment carries its note to the contact and both histories", async (
     await expectPaidHistory(a.page, hash);
   });
   await test.step("the payer's history row shows the note", async () => {
-    await a.page.goto("/#wallet");
+    await a.page.goto("/#wallet/history");
     await expect(a.page.getByTestId("recurring-order-note")).toHaveText(note);
     await expect(
       a.page
@@ -107,7 +108,7 @@ test("a due payment carries its note to the contact and both histories", async (
     ).toContainText(note);
   });
   await test.step("the contact's received payment shows the note", async () => {
-    await b.page.goto("/#wallet");
+    await b.page.goto("/#wallet/history");
     await expect(
       b.page.getByTestId("transaction-card").filter({ hasText: note }),
     ).toHaveCount(1);
@@ -151,7 +152,7 @@ test("a run two devices pay at once goes out once", async ({ bootAccount }) => {
     await expect
       .poll(() => readBalanceSat(a2.page), { timeout: 60_000 })
       .toBe(FUNDING_SAT);
-    await a2.page.goto("/#wallet");
+    await a2.page.goto("/#wallet/history");
     await openForm(a.page);
   });
   const hash = await saveOrder(a.page);
@@ -231,7 +232,7 @@ test("a contact with only a Lightning address is paid by melting the envelope", 
     await a.page
       .getByRole("button", { name: "Click once more to delete.", exact: true })
       .click();
-    await expect(a.page).toHaveURL(/#wallet$/);
+    await expect(a.page).toHaveURL(/#wallet\/history$/);
     await expect(a.page.getByTestId("recurring-order-card")).toHaveCount(0);
   });
 });
@@ -296,11 +297,13 @@ test("a fiat recurring amount stays fixed in CZK and shows only the display unit
     await expect(a.page.getByTestId("recurring-detail-amount")).toHaveText(
       "1 CZK",
     );
-    await a.page.goto("/#wallet");
+    await a.page.goto("/#wallet/history");
     const card = a.page.getByTestId("recurring-order-card");
     await expect(card).toContainText("1 CZK");
     await expect(card).not.toContainText("sat");
+    await a.page.goto("/#wallet");
     await a.page.getByTitle("Switch unit", { exact: true }).click();
+    await a.page.goto("/#wallet/history");
     await expect(card).toContainText(`~${FIXTURE_AMOUNT_SAT} sat`);
     await expect(card).not.toContainText("CZK");
   });

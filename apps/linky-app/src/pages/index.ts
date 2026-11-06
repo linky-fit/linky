@@ -60,4 +60,4 @@ export { SupportLinkyPage } from "./SupportLinkyPage";
 export { TutorialPage } from "./TutorialPage";
 export { WhatsNewPage } from "./WhatsNewPage";
 export { BlockedPage } from "./BlockedPage";
-export { WalletPage } from "./WalletPage";
+export { WalletHistoryPage, WalletPage } from "./WalletPage";

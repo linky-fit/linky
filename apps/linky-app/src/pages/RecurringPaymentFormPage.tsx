@@ -296,7 +296,7 @@ function RecurringPaymentForm({
       setIsSaving(false);
     }
     if (order) navigateTo({ route: "recurringPayment", id: order.id });
-    else navigateTo({ route: "wallet" });
+    else navigateTo({ route: "walletHistory" });
   };
 
   return (

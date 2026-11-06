@@ -192,13 +192,24 @@ function TransactionHistory(): React.ReactElement {
   );
 }
 
+/** The recurring payments and the transactions, which a phone opens from the wallet. */
+export function WalletHistoryPage(): React.ReactElement {
+  return (
+    <Stack gap="$xxl">
+      <RecurringPayments />
+      <TransactionHistory />
+    </Stack>
+  );
+}
+
 interface WalletPageProps {
   openScan: () => void;
   scanIsOpen: boolean;
+  showHistory: boolean;
 }
 
 export const WalletPage: React.FC<WalletPageProps> = React.memo(
-  ({ openScan, scanIsOpen }) => {
+  ({ openScan, scanIsOpen, showHistory }) => {
     const { t } = useTranslation();
     const { cashuTotalBalance } = useWalletBalance();
     return (
@@ -242,10 +253,20 @@ export const WalletPage: React.FC<WalletPageProps> = React.memo(
               {t("walletSend")}
             </Button>
           </Row>
+          {showHistory ? null : (
+            <Button
+              variant="secondary"
+              icon="History"
+              minHeight="$controlLg"
+              borderRadius="$pill"
+              onPress={() => navigateTo({ route: "walletHistory" })}
+            >
+              {t("walletHistory")}
+            </Button>
+          )}
         </Stack>
         <PendingOnchainTransfers />
-        <RecurringPayments />
-        <TransactionHistory />
+        {showHistory ? <WalletHistoryPage /> : null}
       </Stack>
     );
   },

@@ -14,6 +14,7 @@ export const getDesktopSectionRoute = (
 export const getDesktopRouteSection = (route: Route): DesktopRouteSection => {
   switch (route.kind) {
     case "wallet":
+    case "walletHistory":
     case "transaction":
     case "recurringPaymentNew":
     case "recurringPayment":

@@ -157,7 +157,8 @@ type NavigationAction =
   | { route: "onchainTransfer"; id: OnchainTransferId }
   | { route: "topupNoAmount" }
   | { route: "topupInvoice" }
-  | { route: "wallet" };
+  | { route: "wallet" }
+  | { route: "walletHistory" };
 
 /** Leaves the app for another page, such as the site a login came from. */
 export const navigateAwayTo = (url: string): void => {
@@ -286,6 +287,9 @@ export const navigateTo = (action: NavigationAction): void => {
       break;
     case "wallet":
       window.location.assign("#wallet");
+      break;
+    case "walletHistory":
+      window.location.assign("#wallet/history");
       break;
     case "transaction":
       window.location.assign(
