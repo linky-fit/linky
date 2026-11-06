@@ -147,11 +147,13 @@ export const resolveBackAction = (
     case "onchainSend":
       return () => navigateTo({ route: "wallet" });
 
+    case "walletHistory":
+    case "onchainTransfer":
+      return () => navigateTo({ route: "wallet" });
     case "recurringPaymentNew":
     case "recurringPayment":
-    case "onchainTransfer":
     case "transaction":
-      return () => navigateTo({ route: "wallet" });
+      return () => navigateTo({ route: "walletHistory" });
     case "recurringPaymentEdit":
       return () => navigateTo({ route: "recurringPayment", id: route.id });
 
@@ -357,6 +359,7 @@ const SHOWS_MENU_BUTTON: Record<
   topupInvoice: false,
   topupNoAmount: false,
   transaction: false,
+  walletHistory: false,
   recurringPaymentNew: false,
   recurringPayment: false,
   recurringPaymentEdit: false,
@@ -541,6 +544,7 @@ const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
   recurringPayment: "recurringPaymentTitle",
   recurringPaymentEdit: "recurringPaymentEditTitle",
   wallet: "wallet",
+  walletHistory: "walletHistory",
 };
 
 /** The title of the route; an on-chain transfer is titled by its direction once that is known. */

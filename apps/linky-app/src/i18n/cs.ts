@@ -835,6 +835,7 @@ export const cs = {
 
   wallet: "Peněženka",
   walletReceive: "Přijmout",
+  walletHistory: "Historie",
   walletSend: "Odeslat",
 
   topup: "Dobít",

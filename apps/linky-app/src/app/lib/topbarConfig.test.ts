@@ -138,6 +138,10 @@ describe("resolveBackAction", () => {
 
   it("walks wallet sub-pages back up one level at a time", () => {
     expect(backHashFor({ kind: "topup" })).toBe("#wallet");
+    expect(backHashFor({ kind: "walletHistory" })).toBe("#wallet");
+    expect(backHashFor({ kind: "recurringPaymentNew" })).toBe(
+      "#wallet/history",
+    );
     expect(backHashFor({ kind: "topupNoAmount" })).toBe("#wallet/topup");
     expect(backHashFor({ kind: "topupInvoice" })).toBe("#wallet/topup");
     expect(backHashFor({ kind: "cashuTokens" })).toBe("#wallet");
@@ -469,6 +473,8 @@ describe("buildTopbarTitle", () => {
     expect(buildTopbarTitle({ kind: "transaction", id: "tx-1" }, t)).toBe(
       "transactionTitle",
     );
-    expect(backHashFor({ kind: "transaction", id: "tx-1" })).toBe("#wallet");
+    expect(backHashFor({ kind: "transaction", id: "tx-1" })).toBe(
+      "#wallet/history",
+    );
   });
 });
