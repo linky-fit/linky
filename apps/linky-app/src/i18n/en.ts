@@ -435,8 +435,6 @@ export const en = {
   transactionFailed: "failed",
   transactionDuplicate: "duplicate",
   transactionReturned: "returned",
-  transactionsShowHidden: "Show hidden transactions",
-  transactionsHideHidden: "Hide failed and duplicate transactions",
   transactionReceivedFromContact: "Received from contact",
   transactionSentToContact: "Sent to contact",
   transactionTopupInvoice: "Top-up via Lightning",

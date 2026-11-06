@@ -17,8 +17,8 @@ import {
 } from "./paymentRequestMessage";
 import { createCashuTokenId } from "./cashuTokenIdentity";
 
-/** Why a row stays out of the default history: no money moved, or another row records the same event. */
-export type TransactionHiddenReason = "duplicate" | "failed";
+/** Why a row stays out of the history: another row records the same event. */
+export type TransactionHiddenReason = "duplicate";
 
 export interface TransactionItem {
   amount: number | null;
@@ -251,8 +251,6 @@ const markHidden = (
   }
 
   return items.map((item): TransactionItem => {
-    if (item.status === "error" || item.status === "declined")
-      return { ...item, hiddenReason: "failed" };
     const eventKey = eventKeyById.get(item.id);
     if (eventKey !== undefined && recordByEventKey.get(eventKey) !== item)
       return { ...item, hiddenReason: "duplicate" };
@@ -264,7 +262,7 @@ const markHidden = (
  * The history view over the repository's records and the wallet's
  * operations: sorted, pending rows settled by their operation, requests
  * paired with their fulfillment, emitted tokens folded into their spend.
- * Rows that are noise keep a `hiddenReason` instead of being dropped.
+ * Duplicate rows keep a `hiddenReason` instead of being dropped.
  */
 export const buildTransactionHistory = (
   records: readonly TransactionRecord[],

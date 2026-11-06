@@ -134,7 +134,7 @@ describe("buildTransactionHistory", () => {
     );
     expect(transactions[0]).toMatchObject({
       status: "error",
-      hiddenReason: "failed",
+      hiddenReason: null,
     });
   });
 
@@ -152,7 +152,7 @@ describe("buildTransactionHistory", () => {
     expect(transactions[0]).toMatchObject({ status: "ok", hiddenReason: null });
   });
 
-  it("hides failures but keeps a returned send visible", () => {
+  it("keeps failures and a returned send visible", () => {
     const send = operation({
       id: OperationId.make("op-send"),
       kind: "send",
@@ -174,7 +174,7 @@ describe("buildTransactionHistory", () => {
       transactions.map((item) => [item.hiddenReason, item.isReturned]),
     ).toEqual([
       [null, true],
-      ["failed", false],
+      [null, false],
     ]);
   });
 

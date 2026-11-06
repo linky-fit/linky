@@ -439,8 +439,6 @@ export const cs = {
   transactionFailed: "chyba",
   transactionDuplicate: "duplikát",
   transactionReturned: "vráceno",
-  transactionsShowHidden: "Zobrazit skryté transakce",
-  transactionsHideHidden: "Skrýt chybné a duplicitní transakce",
   transactionReceivedFromContact: "Přijato od kontaktu",
   transactionSentToContact: "Odesláno kontaktu",
   transactionTopupInvoice: "Dobití přes Lightning",

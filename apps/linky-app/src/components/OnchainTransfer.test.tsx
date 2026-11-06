@@ -33,7 +33,13 @@ describe("OnchainTransferHistoryRow", () => {
     const row = await renderRow({ direction: "receive", phase: "completed" });
     expect(row.text).toContain("onchainReceiveHistoryTitle");
     expect(row.text).toContain("100000 sat");
+    expect(row.text).not.toContain("−");
     expect(row.phase).toBeUndefined();
+  });
+
+  it("puts a minus before a completed send's amount", async () => {
+    const row = await renderRow({ direction: "send", phase: "completed" });
+    expect(row.text).toContain("− 101000 sat");
   });
 
   it("puts the outcome beside the title, with the refunded amount", async () => {

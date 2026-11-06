@@ -448,8 +448,6 @@ export const pt = {
   transactionFailed: "falhou",
   transactionDuplicate: "duplicada",
   transactionReturned: "devolvida",
-  transactionsShowHidden: "Mostrar transações ocultas",
-  transactionsHideHidden: "Ocultar transações falhas e duplicadas",
   transactionReceivedFromContact: "Recebido de contato",
   transactionSentToContact: "Enviado a contato",
   transactionTopupInvoice: "Recarga via Lightning",

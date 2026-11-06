@@ -7,7 +7,6 @@ import { WalletHistoryPage, WalletPage } from "./WalletPage";
 
 const state = vi.hoisted(() => ({
   orders: new Array<{ id: string }>(),
-  hiddenReasons: new Array<string | null>(),
 }));
 
 vi.mock("../app/hooks/shell", async () =>
@@ -20,12 +19,6 @@ vi.mock("../app/hooks/payments/useTransactionHistory", () => ({
   useTransactionHistory: () => ({
     entries: [],
     t: (key: string) => key,
-    transactionsById: new Map(
-      state.hiddenReasons.map((hiddenReason, index) => [
-        `tx-${index}`,
-        { hiddenReason },
-      ]),
-    ),
   }),
 }));
 vi.mock("../app/hooks/useOnchainTransfers", () => ({
@@ -65,7 +58,6 @@ const button = (container: HTMLElement, label: string) =>
 
 afterEach(() => {
   state.orders = [];
-  state.hiddenReasons = [];
   vi.mocked(navigateTo).mockClear();
 });
 
@@ -115,19 +107,5 @@ describe("WalletHistoryPage", () => {
       null,
     );
     expect(button(container, "recurringPaymentNewTitle")).toBeDefined();
-  });
-
-  it("offers the hidden-transactions toggle only when some are hidden", async () => {
-    state.hiddenReasons = [null];
-    const { container, unmount } = await renderHistory();
-    expect(button(container, "transactionsShowHidden")).toBeUndefined();
-    await unmount();
-
-    state.hiddenReasons = [null, "failed"];
-    const rendered = await renderHistory();
-    await act(async () => {
-      button(rendered.container, "transactionsShowHidden")?.click();
-    });
-    expect(button(rendered.container, "transactionsHideHidden")).toBeDefined();
   });
 });
