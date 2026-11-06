@@ -192,7 +192,7 @@ function TransactionHistory(): React.ReactElement {
   );
 }
 
-/** The recurring payments and the transactions, which a phone opens from the wallet. */
+/** The recurring payments and the transactions, opened from the wallet's History button. */
 export function WalletHistoryPage(): React.ReactElement {
   return (
     <Stack gap="$xxl">
@@ -205,23 +205,15 @@ export function WalletHistoryPage(): React.ReactElement {
 interface WalletPageProps {
   openScan: () => void;
   scanIsOpen: boolean;
-  showHistory: boolean;
 }
 
 export const WalletPage: React.FC<WalletPageProps> = React.memo(
-  ({ openScan, scanIsOpen, showHistory }) => {
+  ({ openScan, scanIsOpen }) => {
     const { t } = useTranslation();
     const { cashuTotalBalance } = useWalletBalance();
     return (
-      <Stack gap="$xxl">
-        <Stack
-          position="sticky"
-          top="$none"
-          zIndex="$sticky"
-          gap="$xxl"
-          paddingBottom="$sm"
-          backgroundColor="$background"
-        >
+      <Stack flexGrow={1} gap="$xxl" justifyContent="space-between">
+        <Stack gap="$xxl">
           <Stack alignItems="center" gap="$xs" paddingTop="$xxl">
             <DisplayAmount
               amount={cashuTotalBalance}
@@ -229,44 +221,40 @@ export const WalletPage: React.FC<WalletPageProps> = React.memo(
               size="xl"
             />
             <WalletPendingReceives />
-          </Stack>
-          <Row gap="$sm">
             <Button
-              flex={1}
-              icon="ArrowDownRight"
-              minHeight="$controlLg"
-              borderRadius="$pill"
-              onPress={() => navigateTo({ route: "topup" })}
-              data-guide="wallet-topup"
-            >
-              {t("walletReceive")}
-            </Button>
-            <Button
-              flex={1}
-              icon="ArrowUpRight"
-              minHeight="$controlLg"
-              borderRadius="$pill"
-              onPress={openScan}
-              disabled={scanIsOpen}
-              data-guide="wallet-send"
-            >
-              {t("walletSend")}
-            </Button>
-          </Row>
-          {showHistory ? null : (
-            <Button
-              variant="secondary"
+              variant="ghost"
+              size="sm"
               icon="History"
-              minHeight="$controlLg"
-              borderRadius="$pill"
               onPress={() => navigateTo({ route: "walletHistory" })}
             >
               {t("walletHistory")}
             </Button>
-          )}
+          </Stack>
+          <PendingOnchainTransfers />
         </Stack>
-        <PendingOnchainTransfers />
-        {showHistory ? <WalletHistoryPage /> : null}
+        <Row gap="$sm">
+          <Button
+            flex={1}
+            icon="ArrowDownRight"
+            minHeight="$controlLg"
+            borderRadius="$pill"
+            onPress={() => navigateTo({ route: "topup" })}
+            data-guide="wallet-topup"
+          >
+            {t("walletReceive")}
+          </Button>
+          <Button
+            flex={1}
+            icon="ArrowUpRight"
+            minHeight="$controlLg"
+            borderRadius="$pill"
+            onPress={openScan}
+            disabled={scanIsOpen}
+            data-guide="wallet-send"
+          >
+            {t("walletSend")}
+          </Button>
+        </Row>
       </Stack>
     );
   },

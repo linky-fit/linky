@@ -103,7 +103,7 @@ const RoutePage = (): React.ReactElement => {
     case "contacts":
       return <ContactsPane />;
     case "wallet":
-      return <WalletPane showHistory={false} />;
+      return <WalletPane />;
     case "walletHistory":
       return <WalletHistoryPage />;
     case "settings":
@@ -318,19 +318,20 @@ const PhoneRouteContent = (): React.ReactElement => {
   );
 };
 
-type DesktopSplitSection = Exclude<DesktopRouteSection, "wallet">;
+type DesktopListSection = Exclude<DesktopRouteSection, "wallet">;
 
 const desktopSectionTitle = {
   contacts: "contactsTitle",
+  wallet: "wallet",
   collaboration: "collaboration",
   settings: "settings",
-} as const satisfies Record<DesktopSplitSection, I18nKey>;
+} as const satisfies Record<DesktopRouteSection, I18nKey>;
 
 /** What the detail pane shows while nothing in the section's list is open. */
 const DesktopSectionDetail = ({
   section,
 }: {
-  section: DesktopSplitSection;
+  section: DesktopListSection;
 }): React.ReactElement => {
   const { t } = useTranslation();
   const empty = {
@@ -380,11 +381,9 @@ const DesktopRoutePane = (): React.ReactElement => {
   );
 };
 
-/** The wallet fills the space beside the navigation; its pages open in its place. */
+/** The wallet alone fills the space beside the navigation until one of its pages opens beside it. */
 const DesktopWalletPane = (): React.ReactElement => {
-  const route = useRouting();
   const { t } = useTranslation();
-  const scanIsOpen = useScanIsOpen();
   return (
     <Stack
       role="main"
@@ -395,44 +394,28 @@ const DesktopWalletPane = (): React.ReactElement => {
       gap="$none"
       overflow="hidden"
     >
-      {scanIsOpen ? (
-        <Stack
-          flex={1}
-          minHeight={0}
+      <Stack paddingHorizontal="$xxl" paddingTop="$xl">
+        <Text
+          variant="heading"
+          color="$colorStrong"
+          role="heading"
           width="100%"
           maxWidth="$readable"
           alignSelf="center"
         >
-          <ScanModal />
+          {t("wallet")}
+        </Text>
+      </Stack>
+      <PageBody gutter="detail" paddingTop="$none">
+        <Stack
+          flexGrow={1}
+          width="100%"
+          maxWidth="$readable"
+          alignSelf="center"
+        >
+          <WalletPane />
         </Stack>
-      ) : route.kind === "wallet" || route.kind === "walletHistory" ? (
-        <>
-          <Stack paddingHorizontal="$xxl" paddingTop="$xl">
-            <Text
-              variant="heading"
-              color="$colorStrong"
-              role="heading"
-              width="100%"
-              maxWidth="$readable"
-              alignSelf="center"
-            >
-              {t("wallet")}
-            </Text>
-          </Stack>
-          <PageBody gutter="detail" paddingTop="$none">
-            <Stack
-              flexGrow={1}
-              width="100%"
-              maxWidth="$readable"
-              alignSelf="center"
-            >
-              <WalletPane showHistory />
-            </Stack>
-          </PageBody>
-        </>
-      ) : (
-        <DesktopRoutePane />
-      )}
+      </PageBody>
     </Stack>
   );
 };
@@ -440,12 +423,13 @@ const DesktopWalletPane = (): React.ReactElement => {
 const DesktopSplitPanes = ({
   section,
 }: {
-  section: DesktopSplitSection;
+  section: DesktopRouteSection;
 }): React.ReactElement => {
   const route = useRouting();
   const { t } = useTranslation();
   const scanIsOpen = useScanIsOpen();
   const secondaryIsOpen = !isDesktopSectionRoot(route) || scanIsOpen;
+  if (section === "wallet" && !secondaryIsOpen) return <DesktopWalletPane />;
   return (
     <>
       <Stack
@@ -476,6 +460,8 @@ const DesktopSplitPanes = ({
           </Text>
           {section === "contacts" ? (
             <DesktopContactsPane />
+          ) : section === "wallet" ? (
+            <WalletPane />
           ) : section === "collaboration" ? (
             <CollaborationPage />
           ) : (
@@ -497,7 +483,7 @@ const DesktopSplitPanes = ({
         borderLeftWidth={border.hairline}
         borderColor="$borderColor"
       >
-        {secondaryIsOpen ? (
+        {secondaryIsOpen || section === "wallet" ? (
           <DesktopRoutePane />
         ) : (
           <DesktopSectionDetail section={section} />
@@ -524,11 +510,7 @@ export const AppRouteContent = (): React.ReactElement => {
       gap="$none"
     >
       <DesktopNavigation />
-      {section === "wallet" ? (
-        <DesktopWalletPane />
-      ) : (
-        <DesktopSplitPanes section={section} />
-      )}
+      <DesktopSplitPanes section={section} />
     </Row>
   );
 };

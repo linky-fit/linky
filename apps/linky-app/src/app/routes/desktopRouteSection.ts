@@ -109,6 +109,7 @@ export const isDesktopSectionEntryRoute = (route: Route): boolean => {
     case "contact":
     case "chat":
     case "profile":
+    case "walletHistory":
     case "topup":
     case "onchainSend":
     case "manualPay":
