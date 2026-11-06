@@ -16,6 +16,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 - Goods and services: every listing opens its own page, and a listing can have a photo and a description. Reply to a contact's listing, or send any listing to someone in a chat, from its page or by typing @ in a message. The chat shows it as a card with the start of the description, so even someone who does not see the listing can open it. The add button floats in the corner, like Add contact.
 - Cashu tokens issued before their mint changed its keys are received instead of failing.
+- Restoring an account that uses a custom Nostr identity no longer keeps reloading the page, and no longer switches the account back to the identity from the recovery seed.
 - The tab bar on a phone shows only icons, like the side bar on a computer.
 - While you type a message, Pay and Request wait behind a + beside the text field, so they no longer get tapped instead of Send.
 - The wallet is one page: below the balance and the Receive and Send buttons come your recurring payments, with a button to add one, and then the whole transaction history. On a computer it fills the window instead of sharing it with the history. The balance and the two buttons stay in place while the list scrolls.
@@ -25,6 +26,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 - Zboží a služby: každá nabídka má vlastní stránku a může mít fotku a popis. Odpovězte na nabídku kontaktu nebo kteroukoli nabídku pošlete do chatu, z její stránky nebo napsáním @ ve zprávě. V chatu se ukáže jako karta se začátkem popisu, takže ji otevře i ten, kdo nabídku sám nevidí. Tlačítko pro přidání plave v rohu jako u Přidat kontakt.
 - Cashu tokeny vydané před změnou klíčů mintu se přijmou, místo aby selhaly.
+- Obnova účtu, který používá vlastní Nostr identitu, už stránku nekonečně nenačítá znovu a nepřepne účet zpět na identitu z obnovovacích klíčů.
 - Spodní lišta na telefonu ukazuje jen ikony, stejně jako boční lišta na počítači.
 - Při psaní zprávy čekají Zaplatit a Požádat pod + vedle textového pole, takže se už neťuknou místo Odeslat.
 - Peněženka je jedna stránka: pod zůstatkem a tlačítky Přijmout a Odeslat jsou pravidelné platby s tlačítkem pro přidání a pod nimi celá historie transakcí. Na počítači zabírá celé okno, místo aby se dělila s historií. Zůstatek a obě tlačítka zůstávají na místě, zatímco seznam roluje.
