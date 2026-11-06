@@ -1,8 +1,6 @@
-import { useAtom } from "@linky-fit/linkstr-react";
 import {
   Avatar,
   Button,
-  IconButton,
   ListRow,
   Row,
   Section,
@@ -20,7 +18,6 @@ import {
   type HistoryEntry,
 } from "../app/lib/onchainTransferHistory";
 import { unfinishedOnchainTransfers } from "../app/lib/onchainTransfers";
-import { hiddenTransactionsShownAtom } from "../app/state/shell/topbar";
 import { DisplayAmount } from "../components/DisplayAmount";
 import { OnchainTransferHistoryRow } from "../components/OnchainTransfer";
 import { RecurringPaymentsList } from "../components/RecurringPaymentsList";
@@ -45,19 +42,12 @@ const groupByDay = (entries: readonly HistoryEntry[]) => {
 };
 
 /** A section title above the eyebrow labels of its own groups, e.g. the history's days. */
-function SectionHeading({
-  title,
-  trailing,
-}: {
-  title: string;
-  trailing?: React.ReactNode;
-}): React.ReactElement {
+function SectionHeading({ title }: { title: string }): React.ReactElement {
   return (
     <Row alignItems="center" minHeight="$controlSm">
       <Text variant="title" bold color="$colorStrong" role="heading" flex={1}>
         {title}
       </Text>
-      {trailing}
     </Row>
   );
 }
@@ -106,17 +96,9 @@ function RecurringPayments(): React.ReactElement {
 
 function TransactionHistory(): React.ReactElement {
   const history = useTransactionHistory();
-  const { entries, t, transactionsById } = history;
+  const { entries, t } = history;
   const { lang } = useTranslation();
   const [visibleCount, setVisibleCount] = React.useState(TRANSACTION_PAGE_SIZE);
-  const [hiddenShown, setHiddenShown] = useAtom(hiddenTransactionsShownAtom);
-  const hasHidden = React.useMemo(
-    () =>
-      Array.from(transactionsById.values()).some(
-        (item) => item.hiddenReason !== null,
-      ),
-    [transactionsById],
-  );
   const visibleDays = React.useMemo(
     () => groupByDay(entries.slice(0, visibleCount)),
     [entries, visibleCount],
@@ -138,28 +120,7 @@ function TransactionHistory(): React.ReactElement {
 
   return (
     <Stack gap="$sm">
-      <SectionHeading
-        title={t("transactionsTitle")}
-        trailing={
-          hasHidden || hiddenShown ? (
-            <IconButton
-              size="sm"
-              icon={hiddenShown ? "Eye" : "EyeOff"}
-              accessibilityLabel={t(
-                hiddenShown
-                  ? "transactionsHideHidden"
-                  : "transactionsShowHidden",
-              )}
-              tooltip={t(
-                hiddenShown
-                  ? "transactionsHideHidden"
-                  : "transactionsShowHidden",
-              )}
-              onPress={() => setHiddenShown(!hiddenShown)}
-            />
-          ) : null
-        }
-      />
+      <SectionHeading title={t("transactionsTitle")} />
       {entries.length === 0 ? (
         <Section grouped>
           <Text color="$colorSubtle" paddingVertical="$md">

@@ -21,6 +21,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - While you type a message, Pay and Request wait behind a + beside the text field, so they no longer get tapped instead of Send.
 - The wallet shows just the balance, with a small History button below it and Receive and Send at the bottom. History opens your recurring payments, with a button to add one, and the whole transaction history. On a computer the wallet fills the window until you open History or another wallet page, which then opens beside it.
 - Settings have an About Linky section with the tutorial, feedback, Support Linky and What's new. Support Linky suggests 10 000 sat once, weekly or monthly, with monthly chosen; the Linky team is also the first choice when you add a recurring payment, and the tutorial ends with a regular contribution. What's new lists every released version.
+- The transaction history puts a minus before every payment out and always lists failed payments, so the button that hid them is gone.
 
 ### cs-CZ
 
@@ -31,6 +32,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - Při psaní zprávy čekají Zaplatit a Požádat pod + vedle textového pole, takže se už neťuknou místo Odeslat.
 - Peněženka ukazuje jen zůstatek, pod ním malé tlačítko Historie a dole Přijmout a Odeslat. Historie otevře pravidelné platby s tlačítkem pro přidání a celou historii transakcí. Na počítači zabírá peněženka celé okno, dokud neotevřete Historii nebo jinou stránku peněženky; ta se pak otevře vedle ní.
 - V nastavení je sekce O aplikaci s tutoriálem, zpětnou vazbou, Podpořit Linky a Co je nového. Podpořit Linky nabídne 10 000 sat jednorázově, týdně nebo měsíčně, s předvybraným měsíčně; tým Linky je také první volbou při přidání pravidelné platby a tutoriál končí pravidelným příspěvkem. Co je nového vypíše každou vydanou verzi.
+- Historie transakcí má před každou odchozí platbou minus a vždy ukazuje i nepovedené platby, takže tlačítko pro jejich skrytí zmizelo.
 
 ## [26.11.1] - 2026-11-05
 

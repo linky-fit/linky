@@ -91,7 +91,9 @@ export function OnchainTransferHistoryRow({
                     : "$accentText"
               }
             >
-              {formatDisplayedAmountText(amount)}
+              {phase === "completed" && direction === "send"
+                ? `− ${formatDisplayedAmountText(amount)}`
+                : formatDisplayedAmountText(amount)}
             </Text>
           )
         }

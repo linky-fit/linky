@@ -1,5 +1,4 @@
 import { getLightningInvoicePreview } from "@linky-fit/linkshu";
-import { useAtomValue } from "@linky-fit/linkstr-react";
 import type { Tone } from "@linky-fit/ui";
 import React from "react";
 import type { Translate } from "../../../i18n";
@@ -21,7 +20,6 @@ import {
   type TransactionItem,
 } from "../../lib/transactionHistory";
 import { calculateTransactionHistoryFee } from "../../lib/transactionHistoryFee";
-import { hiddenTransactionsShownAtom } from "../../state/shell/topbar";
 import { useNostrPictureByNpub } from "../contacts/useProfileCache";
 import { useDisplayAmounts, useTranslation } from "../shell";
 import {
@@ -123,7 +121,6 @@ export const useTransactionHistory = (): TransactionHistory => {
   const { lang, t } = useTranslation();
   const { formatDisplayedAmountText } = useDisplayAmounts();
   const nostrPictureByNpub = useNostrPictureByNpub();
-  const showHiddenTransactions = useAtomValue(hiddenTransactionsShownAtom);
 
   const contactRows = useContactRows();
   const cashuOperations = useWalletOperations();
@@ -184,12 +181,10 @@ export const useTransactionHistory = (): TransactionHistory => {
   const entries = React.useMemo(
     () =>
       withOnchainTransfers(
-        showHiddenTransactions
-          ? allTransactions
-          : allTransactions.filter((item) => item.hiddenReason === null),
+        allTransactions.filter((item) => item.hiddenReason === null),
         onchainTransfers,
       ),
-    [allTransactions, onchainTransfers, showHiddenTransactions],
+    [allTransactions, onchainTransfers],
   );
 
   const declinedRequestIds = React.useMemo(
@@ -483,11 +478,20 @@ export const useTransactionHistory = (): TransactionHistory => {
   };
 };
 
-/** The amount with its direction's sign, e.g. "−1,200 sat". */
+/** The amount with its direction's sign, e.g. "− ~25 Kč"; the space keeps the sign apart from "~". */
 export const signedAmountText = (
-  history: TransactionHistory,
-  item: TransactionItem,
+  history: Pick<TransactionHistory, "formatAmountText">,
+  item: Pick<TransactionItem, "amount" | "direction" | "unit">,
 ): string =>
   item.amount === null
     ? ""
-    : `${item.direction === "in" ? "+" : "−"}${history.formatAmountText(item.amount, item.unit)}`;
+    : `${item.direction === "in" ? "+" : "−"} ${history.formatAmountText(item.amount, item.unit)}`;
+
+/** The amount as the history list shows it: only a payment out carries its sign. */
+export const historyAmountText = (
+  history: Pick<TransactionHistory, "formatAmountText">,
+  item: Pick<TransactionItem, "amount" | "direction" | "unit">,
+): string =>
+  item.direction === "in"
+    ? history.formatAmountText(item.amount, item.unit)
+    : signedAmountText(history, item);
