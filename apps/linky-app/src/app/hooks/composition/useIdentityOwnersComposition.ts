@@ -1,4 +1,4 @@
-import { useAtomSet, useAtomValue } from "@linky-fit/linkstr-react";
+import { useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
 import { useLatest } from "../../../hooks/useLatest";
 import type { Lang, Translate } from "../../../i18n";
@@ -9,7 +9,6 @@ import {
 } from "../../../utils/storage";
 import { platformAtom } from "../../state/platform";
 import { identityCommandsAtom } from "../../state/session/identity";
-import { sessionAtom } from "../../state/session/session";
 import { stopBeaconForIdentityChange } from "../../lib/beaconStore";
 import { toSyncedNostrIdentity } from "../../lib/syncedNostrIdentity";
 import {
@@ -39,7 +38,6 @@ export const useIdentityOwnersComposition = ({
   t,
 }: UseIdentityOwnersCompositionParams) => {
   const { lifecycle } = useAtomValue(platformAtom);
-  const setSession = useAtomSet(sessionAtom);
   const identityRepository = useIdentityRepository();
   const inboxCursors = useInboxCursorsRepository();
   const appOwnerId: string = useAppOwnerId();
@@ -98,26 +96,8 @@ export const useIdentityOwnersComposition = ({
       identitySource: activeSyncedNostrIdentity.source,
       nsec: activeSyncedNostrIdentity.nsec,
       switchedAtSec: activeSyncedNostrIdentity.switchedAtSec,
-    }).then(() => {
-      setSession((session) =>
-        session._tag === "SignedIn"
-          ? {
-              ...session,
-              secrets: {
-                ...session.secrets,
-                nsec: activeSyncedNostrIdentity.nsec,
-              },
-            }
-          : session,
-      );
-      lifecycle.reload();
-    });
-  }, [
-    activeSyncedNostrIdentity,
-    lifecycle,
-    setSession,
-    syncedNostrIdentityMatchesLocal,
-  ]);
+    }).then(() => lifecycle.reload());
+  }, [activeSyncedNostrIdentity, lifecycle, syncedNostrIdentityMatchesLocal]);
 
   return {
     ...profileAuth,

@@ -15,7 +15,7 @@ import {
 } from "../../../testUtils/appRegistry";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import { platformAtom } from "../../state/platform";
-import { sessionAtom } from "../../state/session/session";
+import { sessionAtom, sessionSecrets } from "../../state/session/session";
 import { useIdentityOwnersComposition } from "./useIdentityOwnersComposition";
 
 const mocks = vi.hoisted(() => {
@@ -78,6 +78,7 @@ const mount = async () => {
   );
   await act(async () => {});
   await unmount();
+  return registry;
 };
 
 describe("an identity switch synced from another device", () => {
@@ -95,9 +96,11 @@ describe("an identity switch synced from another device", () => {
       isDeleted: null,
     };
 
-    await mount();
+    const registry = await mount();
 
     expect(mocks.calls).toEqual(["stopBeacon", "persistIdentity", "reload"]);
+    // The page still runs on the seed's identity until the reload, so its re-derivation cannot write that identity back.
+    expect(sessionSecrets(registry.get(sessionAtom))?.nsec).toBe(localNsec);
   });
 
   it("leaves the beacon alone while the synced identity matches", async () => {
