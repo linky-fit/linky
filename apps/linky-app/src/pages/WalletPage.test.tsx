@@ -3,7 +3,7 @@ import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { navigateTo } from "../hooks/useRouting";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
-import { WalletPage } from "./WalletPage";
+import { WalletHistoryPage, WalletPage } from "./WalletPage";
 
 const state = vi.hoisted(() => ({
   orders: new Array<{ id: string }>(),
@@ -43,16 +43,15 @@ vi.mock("../components/RecurringPaymentsList", () => ({
 }));
 vi.mock("../hooks/useRouting", () => ({ navigateTo: vi.fn() }));
 
-const renderWallet = (showHistory = true) =>
+const renderInRegistry = (element: React.ReactElement) =>
   renderIntoDocument(
     <RegistryContext.Provider value={AtomRegistry.make()}>
-      <WalletPage
-        openScan={vi.fn()}
-        scanIsOpen={false}
-        showHistory={showHistory}
-      />
+      {element}
     </RegistryContext.Provider>,
   );
+const renderWallet = () =>
+  renderInRegistry(<WalletPage openScan={vi.fn()} scanIsOpen={false} />);
+const renderHistory = () => renderInRegistry(<WalletHistoryPage />);
 
 const button = (container: HTMLElement, label: string) =>
   Array.from(container.querySelectorAll("button")).find(
@@ -68,8 +67,8 @@ afterEach(() => {
 });
 
 describe("WalletPage", () => {
-  it("opens the history from its own button when it is not shown in place", async () => {
-    const { container } = await renderWallet(false);
+  it("opens the history from its own button instead of listing it", async () => {
+    const { container } = await renderWallet();
 
     expect(container.textContent).not.toContain("transactionsTitle");
     expect(button(container, "recurringPaymentNewTitle")).toBeUndefined();
@@ -78,16 +77,11 @@ describe("WalletPage", () => {
     });
     expect(navigateTo).toHaveBeenCalledWith({ route: "walletHistory" });
   });
+});
 
-  it("shows the history in place without the button to open it", async () => {
-    const { container } = await renderWallet();
-
-    expect(container.textContent).toContain("transactionsTitle");
-    expect(button(container, "walletHistory")).toBeUndefined();
-  });
-
+describe("WalletHistoryPage", () => {
   it("explains recurring payments while there are none, with the button to add one", async () => {
-    const { container } = await renderWallet();
+    const { container } = await renderHistory();
 
     expect(container.textContent).toContain("recurringEmptyHint");
     await act(async () => {
@@ -98,7 +92,7 @@ describe("WalletPage", () => {
 
   it("drops the explanation once a recurring payment exists", async () => {
     state.orders = [{ id: "rp-1" }];
-    const { container } = await renderWallet();
+    const { container } = await renderHistory();
 
     expect(container.textContent).not.toContain("recurringEmptyHint");
     expect(container.querySelector("[data-testid='recurring-list']")).not.toBe(
@@ -109,12 +103,12 @@ describe("WalletPage", () => {
 
   it("offers the hidden-transactions toggle only when some are hidden", async () => {
     state.hiddenReasons = [null];
-    const { container, unmount } = await renderWallet();
+    const { container, unmount } = await renderHistory();
     expect(button(container, "transactionsShowHidden")).toBeUndefined();
     await unmount();
 
     state.hiddenReasons = [null, "failed"];
-    const rendered = await renderWallet();
+    const rendered = await renderHistory();
     await act(async () => {
       button(rendered.container, "transactionsShowHidden")?.click();
     });
