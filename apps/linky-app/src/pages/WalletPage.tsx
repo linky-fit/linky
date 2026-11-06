@@ -203,14 +203,20 @@ export function WalletHistoryPage(): React.ReactElement {
 }
 
 interface WalletPageProps {
+  closeScan: () => void;
   openScan: () => void;
   scanIsOpen: boolean;
 }
 
 export const WalletPage: React.FC<WalletPageProps> = React.memo(
-  ({ openScan, scanIsOpen }) => {
+  ({ closeScan, openScan, scanIsOpen }) => {
     const { t } = useTranslation();
     const { cashuTotalBalance } = useWalletBalance();
+    // On a computer the scanner sits beside the wallet and would hide the page opened from it.
+    const openInsteadOfScan = (route: "walletHistory" | "topup") => () => {
+      closeScan();
+      navigateTo({ route });
+    };
     return (
       <Stack flexGrow={1} gap="$xxl" justifyContent="space-between">
         <Stack gap="$xxl">
@@ -225,7 +231,7 @@ export const WalletPage: React.FC<WalletPageProps> = React.memo(
               variant="ghost"
               size="sm"
               icon="History"
-              onPress={() => navigateTo({ route: "walletHistory" })}
+              onPress={openInsteadOfScan("walletHistory")}
             >
               {t("walletHistory")}
             </Button>
@@ -238,7 +244,7 @@ export const WalletPage: React.FC<WalletPageProps> = React.memo(
             icon="ArrowDownRight"
             minHeight="$controlLg"
             borderRadius="$pill"
-            onPress={() => navigateTo({ route: "topup" })}
+            onPress={openInsteadOfScan("topup")}
             data-guide="wallet-topup"
           >
             {t("walletReceive")}

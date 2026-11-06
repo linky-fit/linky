@@ -49,8 +49,11 @@ const renderInRegistry = (element: React.ReactElement) =>
       {element}
     </RegistryContext.Provider>,
   );
+const closeScan = vi.fn();
 const renderWallet = () =>
-  renderInRegistry(<WalletPage openScan={vi.fn()} scanIsOpen={false} />);
+  renderInRegistry(
+    <WalletPage closeScan={closeScan} openScan={vi.fn()} scanIsOpen />,
+  );
 const renderHistory = () => renderInRegistry(<WalletHistoryPage />);
 
 const button = (container: HTMLElement, label: string) =>
@@ -76,6 +79,19 @@ describe("WalletPage", () => {
       button(container, "walletHistory")?.click();
     });
     expect(navigateTo).toHaveBeenCalledWith({ route: "walletHistory" });
+  });
+
+  it("closes the open scanner before it opens History or Receive", async () => {
+    const { container } = await renderWallet();
+
+    for (const label of ["walletHistory", "walletReceive"]) {
+      closeScan.mockClear();
+      await act(async () => {
+        button(container, label)?.click();
+      });
+      expect(closeScan).toHaveBeenCalledOnce();
+    }
+    expect(navigateTo).toHaveBeenCalledWith({ route: "topup" });
   });
 });
 
