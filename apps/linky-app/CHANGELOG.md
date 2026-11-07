@@ -14,25 +14,21 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ### en-US
 
-- Goods and services: every listing opens its own page, and a listing can have a photo and a description. Reply to a contact's listing, or send any listing to someone in a chat, from its page or by typing @ in a message. The chat shows it as a card with the start of the description, so even someone who does not see the listing can open it. The add button floats in the corner, like Add contact.
-- Cashu tokens issued before their mint changed its keys are received instead of failing.
-- Restoring an account that uses a custom Nostr identity no longer keeps reloading the page, and no longer switches the account back to the identity from the recovery seed.
-- The tab bar on a phone shows only icons, like the side bar on a computer.
-- While you type a message, Pay and Request wait behind a + beside the text field, so they no longer get tapped instead of Send.
-- The wallet shows just the balance, with a small History button below it and Receive and Send at the bottom. History opens your recurring payments, with a button to add one, and the whole transaction history. On a computer the wallet fills the window until you open History or another wallet page, which then opens beside it.
-- Settings have an About Linky section with the tutorial, feedback, Support Linky and What's new. Support Linky suggests 10 000 sat once, weekly or monthly, with monthly chosen; the Linky team is also the first choice when you add a recurring payment, and the tutorial ends with a regular contribution. What's new lists every released version.
-- The transaction history puts a minus before every payment out and always lists failed payments, so the button that hid them is gone.
+### cs-CZ
+
+## [26.11.2] - 2026-11-07
+
+### en-US
+
+- Higher contrast throughout the UI.
+- In Goods & services, add photos and multiple descriptions to listings, and share listings in messages.
+- Settings now offer a direct way to support Linky regularly and a What's new section.
 
 ### cs-CZ
 
-- Zboží a služby: každá nabídka má vlastní stránku a může mít fotku a popis. Odpovězte na nabídku kontaktu nebo kteroukoli nabídku pošlete do chatu, z její stránky nebo napsáním @ ve zprávě. V chatu se ukáže jako karta se začátkem popisu, takže ji otevře i ten, kdo nabídku sám nevidí. Tlačítko pro přidání plave v rohu jako u Přidat kontakt.
-- Cashu tokeny vydané před změnou klíčů mintu se přijmou, místo aby selhaly.
-- Obnova účtu, který používá vlastní Nostr identitu, už stránku nekonečně nenačítá znovu a nepřepne účet zpět na identitu z obnovovacích klíčů.
-- Spodní lišta na telefonu ukazuje jen ikony, stejně jako boční lišta na počítači.
-- Při psaní zprávy čekají Zaplatit a Požádat pod + vedle textového pole, takže se už neťuknou místo Odeslat.
-- Peněženka ukazuje jen zůstatek, pod ním malé tlačítko Historie a dole Přijmout a Odeslat. Historie otevře pravidelné platby s tlačítkem pro přidání a celou historii transakcí. Na počítači zabírá peněženka celé okno, dokud neotevřete Historii nebo jinou stránku peněženky; ta se pak otevře vedle ní.
-- V nastavení je sekce O aplikaci s tutoriálem, zpětnou vazbou, Podpořit Linky a Co je nového. Podpořit Linky nabídne 10 000 sat jednorázově, týdně nebo měsíčně, s předvybraným měsíčně; tým Linky je také první volbou při přidání pravidelné platby a tutoriál končí pravidelným příspěvkem. Co je nového vypíše každou vydanou verzi.
-- Historie transakcí má před každou odchozí platbou minus a vždy ukazuje i nepovedené platby, takže tlačítko pro jejich skrytí zmizelo.
+- Výraznější kontrasty v UI
+- Ve zboží a službách můžete vkládat fotky a více popisků. Inzeráty můžete také sdílet ve zprávě.
+- V nastavení je nově přímá možnost pravidelné podpory Linky a také body, co je v aplikaci nového.
 
 ## [26.11.1] - 2026-11-05
 
