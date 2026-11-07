@@ -365,7 +365,7 @@ export const ChatMessageEditor = React.forwardRef<
         if (editor) onCaretChange(getMessageEditorCaret(editor));
       }}
       onKeyDown={(event) => {
-        if (event.key === "Enter" && event.metaKey) {
+        if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
           event.preventDefault();
           onSendShortcut();
         }

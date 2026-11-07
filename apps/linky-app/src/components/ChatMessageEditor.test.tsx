@@ -79,6 +79,43 @@ describe("ChatMessageEditor", () => {
     },
   );
 
+  it.each([
+    { modifier: "metaKey", sends: true },
+    { modifier: "ctrlKey", sends: true },
+    { modifier: "shiftKey", sends: false },
+  ])("sends on Enter with $modifier: $sends", async ({ modifier, sends }) => {
+    const onSendShortcut = vi.fn();
+    const { container, root } = await renderIntoDocument(
+      <ChatMessageEditor
+        disabled={false}
+        getCashuTokenMessageInfo={() => null}
+        getMintIconUrl={() => ({ url: null })}
+        getNpubMessageContactInfo={() => null}
+        onCaretChange={() => undefined}
+        onChange={() => undefined}
+        onPasteImages={() => undefined}
+        onSendShortcut={onSendShortcut}
+        placeholder="Message"
+        removeContactLabel="Remove contact from message"
+        value="Draft"
+      />,
+    );
+    const editor = container.querySelector<HTMLDivElement>("[role=textbox]");
+    if (!editor) throw new Error("Missing editor");
+    const keydown = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      key: "Enter",
+      [modifier]: true,
+    });
+    await act(async () => {
+      editor.dispatchEvent(keydown);
+    });
+    expect(onSendShortcut).toHaveBeenCalledTimes(sends ? 1 : 0);
+    expect(keydown.defaultPrevented).toBe(sends);
+    await act(async () => root.unmount());
+  });
+
   it("removes one contact pill from the draft when clicked", async () => {
     const onChange = vi.fn();
 
