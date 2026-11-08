@@ -485,7 +485,12 @@ export const makeNpubCashCommands = (deps: NpubCashDeps): NpubCashCommands => {
       kv.setItem(
         ledgerKey,
         JSON.stringify(
-          settleUpstreamQuotes(ledger, settled, listing.nextOffset),
+          settleUpstreamQuotes(
+            ledger,
+            settled,
+            listing.nextOffset,
+            settled.length < fresh.length,
+          ),
         ),
       );
     };

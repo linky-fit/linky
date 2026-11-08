@@ -214,13 +214,16 @@ export const isUpstreamQuoteSettled = (
  * Records the quotes this sweep finished with. The cursor only moves when
  * the listing was read to its end: on a capped listing the unread pages
  * hold older paid quotes, which the next sweep reads from `nextOffset`.
+ * While a listed quote is `unresolved` (a transient failure), neither
+ * moves, so the next sweep reads it again.
  */
 export const settleUpstreamQuotes = (
   ledger: UpstreamQuoteLedger,
   settled: readonly SettledUpstreamQuote[],
   nextOffset: number | null,
+  unresolved: boolean,
 ): UpstreamQuoteLedger => {
-  const listingComplete = nextOffset === null;
+  const listingComplete = !unresolved && nextOffset === null;
   const all = [...ledger.settled, ...settled];
   const newestPaidAt = Math.max(
     ledger.since === null ? 0 : ledger.since + UPSTREAM_QUOTE_LOOKBACK_SEC,
@@ -232,7 +235,7 @@ export const settleUpstreamQuotes = (
       : ledger.since;
   return {
     since,
-    offset: nextOffset ?? 0,
+    offset: unresolved ? ledger.offset : (nextOffset ?? 0),
     settled: all
       .filter((entry) => since === null || entry.paidAt > since)
       .slice(-MAX_LEDGER_ENTRIES),

@@ -163,6 +163,7 @@ describe("upstream quote ledger", () => {
         { quoteId: "newest", paidAt },
       ],
       null,
+      false,
     );
     expect(ledger.since).toBe(paidAt - UPSTREAM_QUOTE_LOOKBACK_SEC);
     expect(ledger.settled.map((entry) => entry.quoteId)).toEqual([
@@ -178,6 +179,7 @@ describe("upstream quote ledger", () => {
       { since: paidAt, offset: 0, settled: [] },
       [{ quoteId: "late", paidAt: paidAt + 10 }],
       null,
+      false,
     );
     expect(ledger.since).toBe(paidAt);
     expect(ledger.settled).toEqual([{ quoteId: "late", paidAt: paidAt + 10 }]);
@@ -188,6 +190,7 @@ describe("upstream quote ledger", () => {
       { since: paidAt - 3600, offset: 0, settled: [] },
       [{ quoteId: "q", paidAt }],
       1000,
+      false,
     );
     expect(ledger).toMatchObject({ since: paidAt - 3600, offset: 1000 });
     expect(isUpstreamQuoteSettled(ledger, "q")).toBe(true);
@@ -196,6 +199,7 @@ describe("upstream quote ledger", () => {
       ledger,
       [{ quoteId: "older", paidAt: paidAt - 1800 }],
       null,
+      false,
     );
     expect(finished).toMatchObject({
       since: paidAt - UPSTREAM_QUOTE_LOOKBACK_SEC,
@@ -203,11 +207,28 @@ describe("upstream quote ledger", () => {
     });
   });
 
+  it("reads the same entries again while a listed quote is unresolved", () => {
+    const resuming = { since: paidAt - 3600, offset: 1000, settled: [] };
+
+    const capped = settleUpstreamQuotes(
+      resuming,
+      [{ quoteId: "q", paidAt }],
+      2000,
+      true,
+    );
+    expect(capped).toMatchObject({ since: paidAt - 3600, offset: 1000 });
+    expect(isUpstreamQuoteSettled(capped, "q")).toBe(true);
+
+    const complete = settleUpstreamQuotes(resuming, [], null, true);
+    expect(complete).toMatchObject({ since: paidAt - 3600, offset: 1000 });
+  });
+
   it("round-trips through storage and tolerates junk", () => {
     const ledger = settleUpstreamQuotes(
       EMPTY_UPSTREAM_QUOTE_LEDGER,
       [{ quoteId: "q", paidAt }],
       50,
+      false,
     );
     expect(parseUpstreamQuoteLedger(JSON.stringify(ledger))).toEqual(ledger);
     expect(parseUpstreamQuoteLedger(null)).toEqual(EMPTY_UPSTREAM_QUOTE_LEDGER);
