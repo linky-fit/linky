@@ -21,10 +21,11 @@ vi.mock("undici/index.js", () => ({
 
 const run = async (
   query: Record<string, string>,
+  headers: Record<string, string> = { host: "linky.fit" },
 ): Promise<Record<string, unknown>> => {
   let body = "";
   await handler(
-    { method: "GET", query, headers: { host: "linky.fit" } },
+    { method: "GET", query, headers },
     {
       setHeader: () => {},
       status: () => ({
@@ -56,27 +57,52 @@ beforeEach(() => {
 });
 
 describe("linky.fit lnurlp proxy", () => {
-  it("rewrites the callback and the LUD-16 identifier, keeping other entries in order", async () => {
+  it("rewrites the callback and the LUD-16 identifier, keeping other fields and entries", async () => {
     upstreamReturns({
       tag: "payRequest",
       callback: "https://npub.linky.fit/.well-known/lnurlp/Alice",
+      minSendable: 1000,
+      maxSendable: 100000000,
+      allowsNostr: true,
+      nostrPubkey: "f".repeat(64),
       metadata: JSON.stringify([
         ["text/plain", "Neat!"],
         ["text/identifier", "Alice@npub.linky.fit"],
-        ["image/png;base64", "iVBOR"],
+        ["x-extension", { any: "json" }, 3],
       ]),
     });
 
-    const payRequest = await run({ user: "Alice" });
-
-    expect(payRequest.callback).toBe(
-      "https://linky.fit/.well-known/lnurlp/Alice",
+    const payRequest = await run(
+      { user: "Alice" },
+      { host: "staging.linky.fit" },
     );
+
+    expect(payRequest).toMatchObject({
+      callback: "https://staging.linky.fit/.well-known/lnurlp/Alice",
+      minSendable: 1000,
+      maxSendable: 100000000,
+      allowsNostr: true,
+      nostrPubkey: "f".repeat(64),
+    });
     expect(metadataOf(payRequest)).toEqual([
       ["text/plain", "Neat!"],
-      ["text/identifier", "alice@linky.fit"],
-      ["image/png;base64", "iVBOR"],
+      ["text/identifier", "alice@staging.linky.fit"],
+      ["x-extension", { any: "json" }, 3],
     ]);
+  });
+
+  it("leaves the identifier when the public host cannot be parsed", async () => {
+    const metadata = JSON.stringify([
+      ["text/identifier", "alice@npub.linky.fit"],
+    ]);
+    upstreamReturns({ tag: "payRequest", metadata });
+
+    const payRequest = await run(
+      { user: "alice" },
+      { host: "linky.fit", "x-forwarded-proto": "https, https" },
+    );
+
+    expect(payRequest.metadata).toBe(metadata);
   });
 
   it("adds no identifier when the upstream sends none", async () => {
@@ -86,14 +112,16 @@ describe("linky.fit lnurlp proxy", () => {
     expect((await run({ user: "alice" })).metadata).toBe(metadata);
   });
 
-  it.each([undefined, "not json", JSON.stringify({ text: "plain" })])(
-    "leaves metadata %s unchanged",
-    async (metadata) => {
-      upstreamReturns({ tag: "payRequest", metadata });
+  it.each([
+    undefined,
+    "not json",
+    JSON.stringify({ text: "plain" }),
+    JSON.stringify(["text/identifier", "alice@npub.linky.fit"]),
+  ])("leaves metadata %s unchanged", async (metadata) => {
+    upstreamReturns({ tag: "payRequest", metadata });
 
-      expect((await run({ user: "alice" })).metadata).toBe(metadata);
-    },
-  );
+    expect((await run({ user: "alice" })).metadata).toBe(metadata);
+  });
 
   it("passes the invoice response through untouched", async () => {
     const invoice = {
@@ -103,9 +131,13 @@ describe("linky.fit lnurlp proxy", () => {
     };
     upstreamReturns(invoice);
 
-    expect(await run({ user: "alice", amount: "21000" })).toEqual(invoice);
-    expect(undiciFetch.mock.calls[0]?.[0].href).toBe(
-      "https://npub.linky.fit/.well-known/lnurlp/alice?amount=21000",
-    );
+    const zapRequest = JSON.stringify({ kind: 9734, tags: [] });
+    expect(
+      await run({ user: "alice", amount: "21000", nostr: zapRequest }),
+    ).toEqual(invoice);
+    const upstreamUrl = undiciFetch.mock.calls[0]?.[0];
+    expect(upstreamUrl?.pathname).toBe("/.well-known/lnurlp/alice");
+    expect(upstreamUrl?.searchParams.get("amount")).toBe("21000");
+    expect(upstreamUrl?.searchParams.get("nostr")).toBe(zapRequest);
   });
 });
