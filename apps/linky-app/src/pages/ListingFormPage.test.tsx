@@ -38,11 +38,17 @@ vi.mock("../app/hooks/useLinksync", () => ({
   useListingsRepository: () => ({ insert, update }),
 }));
 
-// The enabled display currencies, in Settings: sats off, bitcoin and koruna on.
-vi.mock("@linky-fit/linkstr-react", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@linky-fit/linkstr-react")>()),
-  useAtomValue: () => ["btc", "czk"],
-}));
+// The contact groups, and the enabled display currencies in Settings: sats off, bitcoin and koruna on.
+vi.mock("@linky-fit/linkstr-react", async (importOriginal) => {
+  const { contactGroupsAtom } = await import("../app/state/contacts/readModel");
+  return {
+    ...(await importOriginal<typeof import("@linky-fit/linkstr-react")>()),
+    useAtomValue: (atom: unknown) =>
+      atom === contactGroupsAtom
+        ? { groupNames: ["Sousedé", "Rodina"] }
+        : ["btc", "czk"],
+  };
+});
 
 type Field = HTMLInputElement | HTMLTextAreaElement;
 
@@ -96,6 +102,7 @@ const storedEggs = (id: ListingId): ListingRecord => ({
   priceByAgreement: null,
   description: NonEmptyString1000.orThrow("Z volného chovu."),
   image: null,
+  audience: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
   isDeleted: 0,
@@ -150,7 +157,46 @@ describe("ListingFormPage", () => {
         description: "Z volného chovu.\nVyzvednutí v Brně.",
       }),
     );
+    // Only the contacts see a new listing unless the user picks otherwise.
+    expect(insert.mock.calls[0]?.[0]).not.toHaveProperty("audience");
     expect(navigateTo).toHaveBeenCalledWith({ route: "listings" });
+  });
+
+  it("saves the network or the first group as the audience", async () => {
+    const { container } = await renderIntoDocument(<ListingFormPage />);
+    await type(input(container, "listing-title"), "Kolo");
+    await type(input(container, "listing-amount"), "900");
+    await type(input(container, "listing-unit"), "kus");
+    const audience = (label: string) => {
+      const option = Array.from(
+        container.querySelectorAll('[role="radio"]'),
+      ).find((element) => element.textContent === label);
+      if (!(option instanceof HTMLElement)) throw new Error(label);
+      return option;
+    };
+
+    await act(async () => {
+      audience("listingAudienceGroup").click();
+    });
+    expect(container.textContent).toContain("Sousedé");
+    await act(async () => {
+      button(container, "listing-save").click();
+    });
+    expect(insert).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        audience: '{"kind":"group","group":"Sousedé"}',
+      }),
+    );
+
+    await act(async () => {
+      audience("listingAudienceNetwork").click();
+    });
+    await act(async () => {
+      button(container, "listing-save").click();
+    });
+    expect(insert).toHaveBeenLastCalledWith(
+      expect.objectContaining({ audience: '{"kind":"network"}' }),
+    );
   });
 
   it("keeps the price numeric and prices bitcoin in sats when only bitcoin is enabled", async () => {
@@ -243,7 +289,7 @@ describe("ListingFormPage", () => {
     });
     expect(update).toHaveBeenCalledWith(
       id,
-      expect.objectContaining({ description: null }),
+      expect.objectContaining({ description: null, audience: null }),
     );
   });
 });

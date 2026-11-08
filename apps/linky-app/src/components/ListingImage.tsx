@@ -55,15 +55,32 @@ export function ListingImage({
   );
 }
 
-/** A listing's photo as a small square for a list row, cropped to fill; a placeholder until it is decrypted. */
+/** A listing's photo as a small square for a list row, cropped to fill; a placeholder for a listing without one and until it is decrypted. */
 export function ListingThumbnail({
   source,
   label,
 }: {
-  source: PrivateImage;
+  source: PrivateImage | null;
   label: string;
 }): React.ReactElement {
-  const { ref, loaded } = usePrivateImageUrl(source);
+  return source ? (
+    <LoadedThumbnail source={source} label={label} />
+  ) : (
+    <ThumbnailFrame testID="listing-placeholder">
+      <Icon name="Package" color="$colorMuted" />
+    </ThumbnailFrame>
+  );
+}
+
+function ThumbnailFrame({
+  children,
+  ref,
+  testID,
+}: {
+  children: React.ReactNode;
+  ref?: ReturnType<typeof usePrivateImageUrl>["ref"] | undefined;
+  testID: string;
+}): React.ReactElement {
   return (
     <Stack
       ref={ref}
@@ -74,8 +91,23 @@ export function ListingThumbnail({
       alignItems="center"
       justifyContent="center"
       backgroundColor="$neutralSoft"
-      testID="listing-thumbnail"
+      testID={testID}
     >
+      {children}
+    </Stack>
+  );
+}
+
+function LoadedThumbnail({
+  source,
+  label,
+}: {
+  source: PrivateImage;
+  label: string;
+}): React.ReactElement {
+  const { ref, loaded } = usePrivateImageUrl(source);
+  return (
+    <ThumbnailFrame ref={ref} testID="listing-thumbnail">
       {loaded ? (
         <Image
           src={loaded.url}
@@ -87,6 +119,6 @@ export function ListingThumbnail({
       ) : (
         <Icon name="Package" color="$colorMuted" />
       )}
-    </Stack>
+    </ThumbnailFrame>
   );
 }

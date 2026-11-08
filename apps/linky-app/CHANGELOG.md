@@ -16,11 +16,13 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 - In Goods & services, a listing can be free (price 0) or leave the price to be agreed (no price).
 - Listings you hide in Goods & services stay hidden on all your devices.
+- In Goods & services, choose who sees each listing: your contacts, your network (their contacts too) or one contact group. The seller's photo and name sit under the title, and a listing from someone you don't know shows the contacts it came through instead.
 
 ### cs-CZ
 
 - Ve zboží a službách může být nabídka zdarma (cena 0) nebo s cenou dohodou (bez ceny).
 - Inzeráty skryté ve zboží a službách zůstanou skryté na všech vašich zařízeních.
+- Ve zboží a službách vyberete, kdo nabídku uvidí: kontakty, síť (i kontakty vašich kontaktů) nebo jedna skupina. Fotka a jméno inzerenta jsou pod názvem a u nabídky od neznámého člověka uvidíte kontakty, přes které k vám přišla.
 
 ## [26.11.2] - 2026-11-07
 

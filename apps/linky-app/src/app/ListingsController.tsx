@@ -26,7 +26,11 @@ import {
   useContactRows,
   useListingRecords,
 } from "./hooks/useLinksync";
-import { buildListingsDocument } from "./lib/listings";
+import { getContactGroups } from "../utils/contactGroups";
+import {
+  buildListingsDraft,
+  type ListingsRecipient,
+} from "./lib/listingAudience";
 import { blockListAtom } from "./state/contacts/blockList";
 import {
   loadPeerListings,
@@ -39,28 +43,35 @@ import { currentPubkeyAtom } from "./state/session/session";
 const PUBLISHED_STORAGE_PREFIX = "linky.listings.published.v1.";
 const noRelays: ReadonlyArray<RelayUrl> = [];
 
-/** The contacts who get a key slot: saved, not blocked, with a pubkey. */
-const useRecipients = (ownPubkey: Pubkey | null): ReadonlyArray<Pubkey> => {
+/** The contacts who get a key slot: saved, not blocked, with a pubkey; with their groups, which decide the group listings they read. */
+const useRecipients = (
+  ownPubkey: Pubkey | null,
+): ReadonlyArray<ListingsRecipient> => {
   const rows = useContactRows();
   const blockList = useAtomValue(blockListAtom);
   return React.useMemo(() => {
     const hidden = new Set<string>(blockList);
     if (ownPubkey) hidden.add(ownPubkey);
-    const recipients = new Set<Pubkey>();
+    const recipients = new Map<Pubkey, Set<string>>();
     for (const row of rows) {
       if (isDeletedContact(row)) continue;
       const npub = normalizeNpubIdentifier(row.npub ?? "");
       const pubkey = npub ? parsePubkey(npub) : null;
-      if (pubkey && !hidden.has(pubkey)) recipients.add(pubkey);
+      if (!pubkey || hidden.has(pubkey)) continue;
+      const groups = recipients.get(pubkey) ?? new Set<string>();
+      for (const group of getContactGroups(row)) groups.add(group);
+      recipients.set(pubkey, groups);
     }
-    return [...recipients].sort();
+    return [...recipients.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([pubkey, groups]) => ({ pubkey, groups: [...groups].sort() }));
   }, [blockList, ownPubkey, rows]);
 };
 
 /** Follows the recipients' listings events and keeps the per-identity cache. */
 const useListingsWatch = (
   ownPubkey: Pubkey,
-  recipients: ReadonlyArray<Pubkey>,
+  recipients: ReadonlyArray<ListingsRecipient>,
 ): void => {
   const kv = useAtomValue(platformAtom).kv;
   const setPeerListings = useAtomSet(peerListingsAtom);
@@ -112,28 +123,38 @@ const useListingsWatch = (
     return () => setHandler(null);
   }, [kv, ownPubkey, setHandler, setPeerListings]);
 
+  const watched = React.useMemo(
+    () => recipients.map(({ pubkey }) => pubkey),
+    [recipients],
+  );
   React.useEffect(() => {
-    setWatched(recipients);
+    setWatched(watched);
     return () => setWatched([]);
-  }, [recipients, setWatched]);
+  }, [watched, setWatched]);
 };
 
 const useListingsPublisher = (
   ownPubkey: Pubkey,
-  recipients: ReadonlyArray<Pubkey>,
+  recipients: ReadonlyArray<ListingsRecipient>,
 ): void => {
   const records = useListingRecords();
   const { cashIntent } = useCashIntent();
-  const document = React.useMemo(
-    () => buildListingsDocument(records, cashIntent),
-    [cashIntent, records],
+  const peerDocuments = useAtomValue(peerListingsAtom);
+  const draft = React.useMemo(
+    () =>
+      buildListingsDraft({
+        records,
+        cash: cashIntent,
+        recipients,
+        peerDocuments,
+      }),
+    [cashIntent, peerDocuments, recipients, records],
   );
   usePublishWhenChanged({
     kv: useAtomValue(platformAtom).kv,
     storageKey: PUBLISHED_STORAGE_PREFIX + ownPubkey,
     hydrated: useAccountHydrated(),
-    document,
-    recipients,
+    draft,
     relays: useAtomValue(linkstrConfigAtom)?.writeRelays ?? noRelays,
     publish: useLinkstrCommands().publishListings,
   });
@@ -146,7 +167,7 @@ const ListingsSync = ({ ownPubkey }: { ownPubkey: Pubkey }): null => {
   return null;
 };
 
-/** Mounted once in the authenticated shell: watches contacts' listings and publishes the own ones. */
+/** Mounted once in the authenticated shell: watches contacts' listings and publishes the own ones, with the contacts' network listings passed on. */
 export const ListingsController = () => {
   const ownPubkey = useAtomValue(currentPubkeyAtom);
   return ownPubkey ? <ListingsSync ownPubkey={ownPubkey} /> : null;

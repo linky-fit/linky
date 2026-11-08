@@ -1,8 +1,6 @@
 import {
   isEmptyListingsDocument,
-  ListingsDraft,
-  type ListingsDocument,
-  type Pubkey,
+  type ListingsDraft,
   type RelayUrl,
 } from "@linky-fit/linkstr";
 import { Cause, Exit } from "effect";
@@ -25,8 +23,7 @@ interface PublishWhenChangedInput {
   readonly kv: KeyValuePort;
   readonly storageKey: string;
   readonly hydrated: boolean;
-  readonly document: ListingsDocument;
-  readonly recipients: ReadonlyArray<Pubkey>;
+  readonly draft: ListingsDraft;
   readonly relays: ReadonlyArray<RelayUrl>;
   readonly publish: (
     draft: ListingsDraft,
@@ -34,7 +31,7 @@ interface PublishWhenChangedInput {
 }
 
 /**
- * Publishes `document` whenever it, the recipient set or the write relays
+ * Publishes `draft` whenever it or the write relays
  * differ from the last accepted publish, whose fingerprint is kept under
  * `storageKey`, and once a week even when nothing changed.
  */
@@ -42,8 +39,7 @@ export const usePublishWhenChanged = ({
   kv,
   storageKey,
   hydrated,
-  document,
-  recipients,
+  draft,
   relays,
   publish,
 }: PublishWhenChangedInput): void => {
@@ -55,39 +51,46 @@ export const usePublishWhenChanged = ({
     // Before hydration the rows are empty, which must not look like a withdrawal.
     if (!hydrated || inFlight.current) return;
     const fingerprint = listingsPublishFingerprint({
-      document,
-      recipients,
+      draft,
       relays,
       refreshPeriod: Math.floor(nowSeconds() / REFRESH_SECONDS),
     });
     const published = kv.getItem(storageKey);
     if (published === fingerprint) return;
     // Nothing to share and nothing shared before: stay silent on the relays.
-    if (published === null && isEmptyListingsDocument(document)) return;
+    if (
+      published === null &&
+      isEmptyListingsDocument(draft.document) &&
+      draft.audiences.length === 0
+    ) {
+      return;
+    }
     let timeout: ReturnType<typeof setTimeout> | null = null;
     let cancelled = false;
     const attempt = async () => {
       timeout = null;
       inFlight.current = true;
       kv.setItem(storageKey, UNSETTLED);
-      const exit = await publish(new ListingsDraft({ document, recipients }));
+      const exit = await publish(draft);
       inFlight.current = false;
       if (Exit.isSuccess(exit)) {
         kv.setItem(storageKey, fingerprint);
         reportAppLog({
           tag: "listings.published",
-          summary: `Listings published to ${recipients.length} contacts`,
+          summary: `Listings published to ${draft.recipients.length} contacts`,
           payload: {
-            cash: document.cash,
-            listings: document.listings.length,
-            recipients: recipients.length,
+            cash: draft.document.cash,
+            listings: draft.document.listings.length,
+            passedOn: draft.document.passedOn?.length ?? 0,
+            audiences: draft.audiences.length,
+            recipients: draft.recipients.length,
           },
         });
       } else {
         reportAppLog({
           tag: "listings.publishFailed",
           summary: `Listings publish failed: ${Cause.pretty(exit.cause)}`,
-          payload: { recipients: recipients.length },
+          payload: { recipients: draft.recipients.length },
         });
       }
       if (cancelled) setSettled((count) => count + 1);
@@ -100,14 +103,5 @@ export const usePublishWhenChanged = ({
       cancelled = true;
       if (timeout !== null) clearTimeout(timeout);
     };
-  }, [
-    document,
-    hydrated,
-    kv,
-    publish,
-    recipients,
-    relays,
-    settled,
-    storageKey,
-  ]);
+  }, [draft, hydrated, kv, publish, relays, settled, storageKey]);
 };
