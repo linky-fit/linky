@@ -17,6 +17,7 @@ import {
   claimMintQuote,
   QUOTE_ISSUED,
   QUOTE_UNPAID,
+  QuoteIssuedElsewhere,
   UnpaidMintQuote,
 } from "../internal/quoteClaim";
 import { decodeMintQuote, emitQuoteState } from "../internal/quotes";
@@ -226,17 +227,29 @@ export class Topup extends Context.Service<Topup>()("linkshu/Topup", {
       wallet: LoadedWallet,
       pending: PendingTopup,
       mintConfig: MintProofsConfig | undefined,
-    ): Effect.Effect<TopupReceipt, QuoteClaimError> =>
-      Effect.map(
-        claimMintQuote(claimContext(wallet, mintConfig), pending),
-        (claimed) =>
-          new TopupReceipt({
-            operationId: claimed.operationId,
-            tokenText: claimed.tokenText,
-            mint: pending.mint,
-            amount: claimed.amount,
-            quoteId: pending.quoteId,
-          }),
+    ): Effect.Effect<TopupReceipt, QuoteClaimError | QuoteAlreadyIssued> =>
+      claimMintQuote(claimContext(wallet, mintConfig), pending).pipe(
+        Effect.map(
+          (claimed) =>
+            new TopupReceipt({
+              operationId: claimed.operationId,
+              tokenText: claimed.tokenText,
+              mint: pending.mint,
+              amount: claimed.amount,
+              quoteId: pending.quoteId,
+            }),
+        ),
+        Effect.catchIf(
+          (error) => error instanceof QuoteIssuedElsewhere,
+          (error) =>
+            Effect.andThen(
+              records.settle(pending, "failed", error.detail),
+              new QuoteAlreadyIssued({
+                quoteId: pending.quoteId,
+                mint: pending.mint,
+              }),
+            ),
+        ),
       );
 
     const complete = (

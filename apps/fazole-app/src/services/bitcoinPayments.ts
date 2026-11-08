@@ -133,6 +133,7 @@ export const createBitcoinPayments = ({
         scheduleResume();
         return;
       case "MintRejected":
+      case "QuoteAlreadyIssued":
         console.warn("[fazole] mint rejected a payment quote", outcome.failure);
         return;
     }

@@ -51,6 +51,7 @@ export const TopupError = Schema.Union([
   MintUnreachable,
   MintRejected,
   QuoteExpired,
+  QuoteAlreadyIssued,
   CounterLockTimeout,
 ]);
 export type TopupError = typeof TopupError.Type;
