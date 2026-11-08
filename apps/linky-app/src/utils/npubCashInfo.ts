@@ -6,7 +6,6 @@ import {
 import { Schema } from "effect";
 import { JsonValue } from "../types/json";
 import {
-  isNpubCashDisabled,
   NPUB_CASH_REQUEST_TIMEOUT_MS,
   NPUB_CASH_SERVER_BASE_URL,
 } from "./npubCashServer";
@@ -22,24 +21,14 @@ interface NpubCashProfileInfo {
   ownedLightningAddresses: string[];
 }
 
+/** Reads `GET /api/v2/user/info`: `{ data: { user: { name?, mintUrl } } }`. */
 export const parseNpubCashProfileInfo = (
   value: JsonValue,
 ): NpubCashProfileInfo => {
-  const root = asRecord(value);
-  const wrapped = asRecord(root?.data);
-
-  const mintUrl =
-    asNonEmptyString(root?.mintUrl) ??
-    asNonEmptyString(wrapped?.mintUrl) ??
-    asNonEmptyString(wrapped?.mintURL) ??
-    null;
-
+  const user = asRecord(asRecord(asRecord(value)?.data)?.user);
+  const mintUrl = asNonEmptyString(user?.mintUrl) ?? null;
   const username =
-    normalizeOwnLightningUsername(
-      asNonEmptyString(root?.username) ??
-        asNonEmptyString(wrapped?.username) ??
-        "",
-    ) || null;
+    normalizeOwnLightningUsername(asNonEmptyString(user?.name) ?? "") || null;
 
   const ownedLightningAddresses = username
     ? [getOwnLightningAddressFromUsername(username)]
@@ -59,8 +48,7 @@ export const parseNpubCashProfileInfo = (
 export const fetchOwnedLightningAddress = async (
   secretKey: NostrSecretKey,
 ): Promise<string | null> => {
-  if (isNpubCashDisabled()) return null;
-  const url = `${NPUB_CASH_SERVER_BASE_URL}/api/v1/info`;
+  const url = `${NPUB_CASH_SERVER_BASE_URL}/api/v2/user/info`;
   const response = await fetch(url, {
     headers: {
       Authorization: makeNip98AuthHeader(

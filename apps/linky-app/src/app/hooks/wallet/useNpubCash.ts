@@ -13,8 +13,6 @@ import type { Route } from "../../../types/route";
 import type { DisplayAmountParts } from "../../../utils/displayAmounts";
 import { normalizeMintUrl } from "../../../utils/mint";
 import { parseNpubCashProfileInfo } from "../../../utils/npubCashInfo";
-import { isNpubCashDisabled } from "../../../utils/npubCashServer";
-import { asRecord } from "../../../utils/validation";
 import type { PaidOverlayDetails } from "../../lib/paidOverlay";
 import { touchReceivingMint } from "../../lib/receivingMint";
 import {
@@ -88,15 +86,6 @@ const isUrl = (value: string): boolean => {
   }
 };
 
-const readInfoMintUrl = (info: unknown): string => {
-  const root = asRecord(info);
-  if (!root) return "";
-  const direct = String(root.mintUrl ?? "").trim();
-  if (direct) return direct;
-  const wrapped = asRecord(root.data);
-  return wrapped ? String(wrapped.mintUrl ?? wrapped.mintURL ?? "").trim() : "";
-};
-
 /**
  * The hosted npub.cash integration: the default mint kept there, the
  * lightning addresses it owns for the user, and the payments to them,
@@ -148,7 +137,7 @@ export const useNpubCash = ({
 
   React.useEffect(() => {
     setOwnedProfileLightningAddresses([]);
-    if (isNpubCashDisabled() || !currentNpub || !currentNsec) {
+    if (!currentNpub || !currentNsec) {
       setOwnedProfileLightningAddressesLoading(false);
       return;
     }
@@ -243,7 +232,7 @@ export const useNpubCash = ({
   }, [routeKind, setIsProfileEditing]);
 
   React.useEffect(() => {
-    if (isNpubCashDisabled() || !networkEnabled) return;
+    if (!networkEnabled) return;
     if (!currentNpub || !currentNsec) return;
     const controller = new AbortController();
 
@@ -258,7 +247,7 @@ export const useNpubCash = ({
       try {
         const info = await fetchNpubCashInfo(currentNsec, controller.signal);
         if (info === null || controller.signal.aborted) return;
-        const mintUrl = readInfoMintUrl(info);
+        const { mintUrl } = parseNpubCashProfileInfo(info);
         if (mintUrl) suggestDefaultMint(mintUrl);
         npubCashInfoLoadedForNpubRef.current = currentNpub;
         npubCashInfoLoadedAtMsRef.current = Date.now();
