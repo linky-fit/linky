@@ -1410,7 +1410,7 @@ export const cs = {
   listingImageRemove: "Odebrat fotku",
   listingImageUploading: "Nahrávám fotku…",
   listingImageUploadFailed: "Fotku se nepodařilo nahrát. Zkuste to znovu.",
-  listingVia: "přes {names}",
+  listingVia: "přes",
   listingViaLead: "K vám se dostala přes vaše kontakty. Zeptejte se jich:",
   listingAudience: "Kdo ji uvidí",
   listingAudienceNetwork: "V síti",

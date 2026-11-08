@@ -1402,7 +1402,7 @@ export const en = {
   listingImageRemove: "Remove photo",
   listingImageUploading: "Uploading photo…",
   listingImageUploadFailed: "The photo could not be uploaded. Try again.",
-  listingVia: "via {names}",
+  listingVia: "via",
   listingViaLead: "It reached you through your contacts. Ask them:",
   listingAudience: "Who sees it",
   listingAudienceNetwork: "Network",
