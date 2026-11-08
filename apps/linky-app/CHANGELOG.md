@@ -14,7 +14,11 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ### en-US
 
+- In Goods & services, a listing can be free (price 0) or leave the price to be agreed (no price).
+
 ### cs-CZ
+
+- Ve zboží a službách může být nabídka zdarma (cena 0) nebo s cenou dohodou (bez ceny).
 
 ## [26.11.2] - 2026-11-07
 

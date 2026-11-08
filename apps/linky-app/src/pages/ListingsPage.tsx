@@ -32,6 +32,7 @@ function PeerListingRow({
   entry: PeerListing;
   display: DisplayAmountOptions;
 }): React.ReactElement {
+  const { t } = useTranslation();
   return (
     <ListRow
       leading={
@@ -47,11 +48,7 @@ function PeerListingRow({
       }
       title={listing.title}
       description={`${firstName(contact.name)} · ${listing.unit}`}
-      trailing={
-        <Price>
-          {formatListingPrice(listing.amount, listing.currency, display)}
-        </Price>
-      }
+      trailing={<Price>{formatListingPrice(listing, display, t)}</Price>}
       onPress={() =>
         navigateTo({
           route: "listing",
@@ -216,13 +213,7 @@ export function ListingsPage(): React.ReactElement {
                 title={listing.title}
                 description={`${t(listing.side === "offer" ? "listingSideOffer" : "listingSideWant")} · ${listing.unit}`}
                 trailing={
-                  <Price>
-                    {formatListingPrice(
-                      listing.amount,
-                      listing.currency,
-                      display,
-                    )}
-                  </Price>
+                  <Price>{formatListingPrice(listing, display, t)}</Price>
                 }
                 onPress={() =>
                   navigateTo(

@@ -5,6 +5,8 @@ import {
   NonEmptyString1000,
   OwnerId,
   PositiveInt,
+  sqliteTrue,
+  type ListingId,
   type ListingRecord,
 } from "@linky-fit/linksync";
 import { Effect } from "effect";
@@ -83,6 +85,23 @@ const pressDisabled = async (element: HTMLButtonElement) => {
   });
 };
 
+const storedEggs = (id: ListingId): ListingRecord => ({
+  id,
+  createdAtSec: PositiveInt.orThrow(100),
+  side: NonEmptyString100.orThrow("offer"),
+  title: NonEmptyString1000.orThrow("Domácí vajíčka"),
+  amount: NonEmptyString100.orThrow("90"),
+  currency: NonEmptyString100.orThrow("CZK"),
+  unit: NonEmptyString100.orThrow("za 10 ks"),
+  priceByAgreement: null,
+  description: NonEmptyString1000.orThrow("Z volného chovu."),
+  image: null,
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+  isDeleted: 0,
+  ownerId: OwnerId.orThrow(createId()),
+});
+
 const alerts = (container: HTMLElement) =>
   Array.from(container.querySelectorAll('[role="alert"]')).map(
     (element) => element.textContent,
@@ -105,7 +124,6 @@ describe("ListingFormPage", () => {
     await pressDisabled(button(container, "listing-save"));
     expect(alerts(container)).toEqual([
       "listingTitleMissing",
-      "listingPriceMissing",
       "listingUnitMissing",
     ]);
     expect(insert).not.toHaveBeenCalled();
@@ -170,23 +188,51 @@ describe("ListingFormPage", () => {
     expect(insert.mock.calls[0]?.[0]).not.toHaveProperty("description");
   });
 
+  it("saves no price as one to be agreed and zero as free", async () => {
+    const { container } = await renderIntoDocument(<ListingFormPage />);
+    await type(input(container, "listing-title"), "Hlídání dětí");
+    await type(input(container, "listing-unit"), "za hodinu");
+    await act(async () => {
+      button(container, "listing-save").click();
+    });
+    expect(insert).toHaveBeenLastCalledWith(
+      expect.objectContaining({ amount: "0", priceByAgreement: 1 }),
+    );
+
+    await type(input(container, "listing-amount"), "0");
+    await act(async () => {
+      button(container, "listing-save").click();
+    });
+    expect(insert).toHaveBeenLastCalledWith(
+      expect.objectContaining({ amount: "0" }),
+    );
+    expect(insert.mock.lastCall?.[0]).not.toHaveProperty("priceByAgreement");
+  });
+
+  it("opens a listing priced by agreement without a price and drops the flag once one is typed", async () => {
+    const id = createIdFromString<"Listing">("babysitting");
+    records.push({
+      ...storedEggs(id),
+      amount: NonEmptyString100.orThrow("0"),
+      priceByAgreement: sqliteTrue,
+    });
+    const { container } = await renderIntoDocument(<ListingFormPage id={id} />);
+    const amount = input(container, "listing-amount");
+    expect(amount.value).toBe("");
+
+    await type(amount, "250");
+    await act(async () => {
+      button(container, "listing-save").click();
+    });
+    expect(update).toHaveBeenCalledWith(
+      id,
+      expect.objectContaining({ amount: "250", priceByAgreement: null }),
+    );
+  });
+
   it("loads a stored description into the edit and clears it", async () => {
     const id = createIdFromString<"Listing">("eggs");
-    records.push({
-      id,
-      createdAtSec: PositiveInt.orThrow(100),
-      side: NonEmptyString100.orThrow("offer"),
-      title: NonEmptyString1000.orThrow("Domácí vajíčka"),
-      amount: NonEmptyString100.orThrow("90"),
-      currency: NonEmptyString100.orThrow("CZK"),
-      unit: NonEmptyString100.orThrow("za 10 ks"),
-      description: NonEmptyString1000.orThrow("Z volného chovu."),
-      image: null,
-      createdAt: "2026-01-01T00:00:00.000Z",
-      updatedAt: "2026-01-01T00:00:00.000Z",
-      isDeleted: 0,
-      ownerId: OwnerId.orThrow(createId()),
-    });
+    records.push(storedEggs(id));
     const { container } = await renderIntoDocument(<ListingFormPage id={id} />);
     const description = input(container, "listing-description");
     expect(description.value).toBe("Z volného chovu.");

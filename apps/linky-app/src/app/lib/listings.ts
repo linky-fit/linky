@@ -1,6 +1,7 @@
 import {
   LISTING_SAT_CURRENCY,
   Listing,
+  listingPriceKind,
   ListingsDocument,
   PrivateImage,
   type CashIntent,
@@ -20,6 +21,7 @@ import {
   type DisplayAmountOptions,
   type DisplayCurrency,
 } from "../../utils/displayAmounts";
+import type { Translate } from "../../i18n";
 import type { BeaconTrade } from "./beaconSettings";
 
 export const LISTING_SIDES = [
@@ -49,6 +51,7 @@ export const listingOfRecord = (record: ListingRecord): Listing | null => {
       amount: record.amount,
       currency: record.currency,
       unit: record.unit,
+      ...(record.priceByAgreement === 1 ? { priceByAgreement: true } : {}),
       ...(record.description === null
         ? {}
         : { description: record.description }),
@@ -208,7 +211,7 @@ export const filterListingAmountInput = (
   return text;
 };
 
-/** A typed amount normalized for the wire; null when it is not a price. Sats are whole; bitcoin becomes whole sats. */
+/** A typed amount normalized for the wire, zero for a free listing; null when it is not a price. Sats are whole; bitcoin becomes whole sats. */
 export const normalizeListingAmount = (
   input: string,
   currency: string,
@@ -224,13 +227,11 @@ export const normalizeListingAmount = (
     const sats =
       Number(match[1]) * SATS_PER_BTC +
       Number((match[2] ?? "").padEnd(BTC_FRACTION_DIGITS, "0"));
-    return sats > 0 ? String(sats) : null;
+    return String(sats);
   }
   const pattern =
     currency === LISTING_SAT_CURRENCY ? /^\d{1,12}$/ : /^\d{1,12}(\.\d{1,2})?$/;
-  if (!pattern.test(text)) return null;
-  if (Number(text) <= 0) return null;
-  return text;
+  return pattern.test(text) ? text : null;
 };
 
 const numberFormatters = new Map<string, Intl.NumberFormat>();
@@ -257,13 +258,18 @@ const formatInListingCurrency = (
 /**
  * The price in the viewer's display unit: exact when the listing is priced in
  * it, otherwise converted at the current rates and marked `~`; without rates
- * for the listing's currency it stays as the author priced it.
+ * for the listing's currency it stays as the author priced it. A listing
+ * without a price reads as free or by agreement.
  */
 export const formatListingPrice = (
-  amount: string,
-  currency: string,
+  listing: Pick<Listing, "amount" | "currency" | "priceByAgreement">,
   options: DisplayAmountOptions,
+  t: Translate,
 ): string => {
+  const kind = listingPriceKind(listing);
+  if (kind === "free") return t("listingPriceFree");
+  if (kind === "by-agreement") return t("listingPriceByAgreement");
+  const { amount, currency } = listing;
   const listingCurrency =
     currency === LISTING_SAT_CURRENCY ? "sat" : parseDisplayCurrency(currency);
   if (listingCurrency === "sat") {

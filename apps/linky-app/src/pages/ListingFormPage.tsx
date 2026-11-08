@@ -1,6 +1,7 @@
 import {
   identityFromNsec,
   LISTING_DESCRIPTION_MAX_LENGTH,
+  listingPriceKind,
   type ListingSide,
 } from "@linky-fit/linkstr";
 import {
@@ -9,6 +10,7 @@ import {
   NonEmptyString100,
   NonEmptyString1000,
   PositiveInt,
+  sqliteTrue,
   type ListingId,
 } from "@linky-fit/linksync";
 import {
@@ -65,7 +67,7 @@ const SIDE_KEYS: Record<ListingSide, I18nKey> = {
 const isSide = (side: string): side is ListingSide =>
   LISTING_SIDES.some((value) => value === side);
 
-/** Adds a listing, or edits the one with `id`. The price is in one of the display units enabled in Settings, bitcoin stored as sats. */
+/** Adds a listing, or edits the one with `id`. The price is in one of the display units enabled in Settings, bitcoin stored as sats; zero makes the listing free and no price leaves it to be agreed. */
 export function ListingFormPage({
   id = null,
 }: {
@@ -122,7 +124,10 @@ export function ListingFormPage({
       existing.currency,
       enabledUnits,
     );
-    setAmount(price.amount);
+    const listing = listingOfRecord(existing);
+    const byAgreement =
+      listing !== null && listingPriceKind(listing) === "by-agreement";
+    setAmount(byAgreement ? "" : price.amount);
     setCurrency(price.unit);
   }, [enabledUnits, existing]);
 
@@ -138,11 +143,15 @@ export function ListingFormPage({
     setAmount(filterListingAmountInput(amount, next));
   };
 
-  const normalizedAmount = normalizeListingAmount(amount, currency);
+  // Without a typed price the listing is stored as zero, flagged to be agreed.
+  const priceByAgreement = amount.trim().length === 0;
+  const normalizedAmount = priceByAgreement
+    ? "0"
+    : normalizeListingAmount(amount, currency);
   const titleMissing = title.trim().length === 0;
   const unitMissing = unit.trim().length === 0;
-  const amountMissing = normalizedAmount === null;
-  const canSave = !titleMissing && !unitMissing && !amountMissing;
+  const amountInvalid = normalizedAmount === null;
+  const canSave = !titleMissing && !unitMissing && !amountInvalid;
   const fieldError = (missing: boolean, key: I18nKey): string | undefined =>
     attempted && missing ? t(key) : undefined;
 
@@ -216,11 +225,13 @@ export function ListingFormPage({
       unit: NonEmptyString100.orThrow(unit.trim()),
       ...(imageValue === undefined ? {} : { image: imageValue }),
     };
+    const priceByAgreementValue = priceByAgreement ? sqliteTrue : null;
     const outcome = await runWrite(
       existing
         ? repository.update(existing.id, {
             ...columns,
             description: descriptionValue,
+            priceByAgreement: priceByAgreementValue,
           })
         : repository.insert({
             id: createId<"Listing">(),
@@ -229,6 +240,9 @@ export function ListingFormPage({
             ...(descriptionValue === null
               ? {}
               : { description: descriptionValue }),
+            ...(priceByAgreementValue === null
+              ? {}
+              : { priceByAgreement: priceByAgreementValue }),
           }),
     );
     setSaving(null);
@@ -302,7 +316,7 @@ export function ListingFormPage({
         <Stack flex={1} minWidth={0}>
           <TextField
             label={t("listingPrice")}
-            placeholder={t("listingPrice")}
+            placeholder={t("listingPriceByAgreement")}
             inputMode={
               listingFractionDigits(currency) > 0 ? "decimal" : "numeric"
             }
@@ -310,7 +324,7 @@ export function ListingFormPage({
             onChangeText={(text) =>
               setAmount(filterListingAmountInput(text, currency))
             }
-            error={fieldError(amountMissing, "listingPriceMissing")}
+            error={fieldError(amountInvalid, "listingPriceInvalid")}
             trailing={
               <Button
                 variant="ghost"

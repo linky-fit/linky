@@ -125,6 +125,8 @@ export const LinkySchema = {
     currency: NonEmptyString100,
     // What the amount buys, in the user's words ("za hodinu").
     unit: NonEmptyString100,
+    // 1 when a zero `amount` means the price is to be agreed rather than free.
+    priceByAgreement: nullOr(SqliteBoolean),
     // More about the listing, line breaks kept; validated by the consumer.
     description: nullOr(NonEmptyString1000),
     // JSON of linkstr's `PrivateImage`; validated by the consumer.

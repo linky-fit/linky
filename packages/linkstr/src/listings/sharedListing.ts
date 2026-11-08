@@ -1,7 +1,7 @@
 import { Option, Schema } from "effect";
 import { Pubkey } from "../domain/primitives";
 import { encodeNpub } from "../identity/codec";
-import { LISTING_SAT_CURRENCY, Listing } from "./domain";
+import { LISTING_SAT_CURRENCY, Listing, listingPriceKind } from "./domain";
 
 /** A listing with its author, as a chat message carries a copy of it. */
 export class SharedListing extends Schema.Class<SharedListing>("SharedListing")(
@@ -26,9 +26,16 @@ const authorLine = (author: Pubkey): string => `nostr:${encodeNpub(author)}`;
 
 const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim();
 
+const priceText = (listing: Listing): string => {
+  const kind = listingPriceKind(listing);
+  if (kind === "free") return "free";
+  if (kind === "by-agreement") return "price by agreement";
+  return `${listing.amount} ${listing.currency === LISTING_SAT_CURRENCY ? "sat" : listing.currency}`;
+};
+
 /** `Eggs · 90 CZK per 10 pieces`: the listing for a reader that does not decode the marker. */
-const summaryLine = ({ title, amount, currency, unit }: Listing): string =>
-  `${oneLine(title)} · ${amount} ${currency === LISTING_SAT_CURRENCY ? "sat" : currency} ${oneLine(unit)}`;
+const summaryLine = (listing: Listing): string =>
+  `${oneLine(listing.title)} · ${priceText(listing)} ${oneLine(listing.unit)}`;
 
 /** The content of the kind 14 text that shares `shared`, under the sender's `note`. */
 export const sharedListingMessageText = (

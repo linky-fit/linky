@@ -1,4 +1,10 @@
-import { PrivateImage, Pubkey, RelayUrl } from "@linky-fit/linkstr";
+import {
+  ListingAmount,
+  ListingCurrency,
+  PrivateImage,
+  Pubkey,
+  RelayUrl,
+} from "@linky-fit/linkstr";
 import type { ListingRecord } from "@linky-fit/linksync";
 import {
   createId,
@@ -8,6 +14,7 @@ import {
   PositiveInt,
 } from "@linky-fit/linksync";
 import { describe, expect, it } from "vitest";
+import type { DisplayAmountOptions } from "../../utils/displayAmounts";
 import {
   beaconTradeOfCashIntent,
   buildListingsDocument,
@@ -33,6 +40,7 @@ const record = (overrides: Partial<ListingRecord> = {}): ListingRecord => ({
   amount: "90",
   currency: "CZK",
   unit: "za 10 ks",
+  priceByAgreement: null,
   description: null,
   image: null,
   createdAt: "2026-01-01T00:00:00.000Z",
@@ -83,6 +91,16 @@ describe("listingOfRecord", () => {
       expect(listing(broken)).not.toHaveProperty("image");
     }
     expect(listingOfRecord(record())).not.toHaveProperty("image");
+  });
+
+  it("publishes the price-by-agreement flag only when the row sets it", () => {
+    expect(
+      listingOfRecord(record({ amount: "0", priceByAgreement: 1 }))
+        ?.priceByAgreement,
+    ).toBe(true);
+    expect(listingOfRecord(record({ amount: "0" }))).not.toHaveProperty(
+      "priceByAgreement",
+    );
   });
 });
 
@@ -144,7 +162,8 @@ describe("listing amounts", () => {
   it("normalizes typed amounts and rejects what is not a price", () => {
     expect(normalizeListingAmount(" 1 800 ", "CZK")).toBe("1800");
     expect(normalizeListingAmount("12,5", "EUR")).toBe("12.5");
-    expect(normalizeListingAmount("0", "CZK")).toBeNull();
+    expect(normalizeListingAmount("0", "CZK")).toBe("0");
+    expect(normalizeListingAmount(",", "CZK")).toBeNull();
     expect(normalizeListingAmount("1.234", "CZK")).toBeNull();
     expect(normalizeListingAmount("abc", "CZK")).toBeNull();
     expect(normalizeListingAmount("21000", "SAT")).toBe("21000");
@@ -156,7 +175,7 @@ describe("listing amounts", () => {
     expect(normalizeListingAmount("0.00123456", "BTC")).toBe("123456");
     expect(normalizeListingAmount("1,5", "BTC")).toBe("150000000");
     expect(normalizeListingAmount("0.000000001", "BTC")).toBeNull();
-    expect(normalizeListingAmount("0", "BTC")).toBeNull();
+    expect(normalizeListingAmount("0", "BTC")).toBe("0");
     expect(listingWireCurrency("BTC")).toBe("SAT");
     expect(listingWireCurrency("CZK")).toBe("CZK");
   });
@@ -229,18 +248,44 @@ describe("listing amounts", () => {
       lang: "cs",
     };
     const squash = (text: string) => text.replace(/\s/g, " ");
-    expect(squash(formatListingPrice("90", "CZK", czk))).toBe("90 Kč");
-    expect(squash(formatListingPrice("1800", "CZK", czk))).toBe("1 800 Kč");
-    expect(
-      formatListingPrice("12.50", "EUR", { ...czk, lang: "en" as const }),
-    ).toBe("~313 CZK");
-    expect(squash(formatListingPrice("2000", "CZK", sat))).toBe("~100 000 sat");
-    expect(squash(formatListingPrice("21000", "SAT", sat))).toBe("21 000 sat");
-    expect(squash(formatListingPrice("200000", "SAT", czk))).toBe("~4 000 Kč");
-    expect(formatListingPrice("5", "XXX", sat)).toContain("5");
+    const price = (
+      amount: string,
+      currency: string,
+      options: DisplayAmountOptions,
+    ) =>
+      formatListingPrice(
+        {
+          amount: ListingAmount.make(amount),
+          currency: ListingCurrency.make(currency),
+        },
+        options,
+        (key) => key,
+      );
+    expect(squash(price("90", "CZK", czk))).toBe("90 Kč");
+    expect(squash(price("1800", "CZK", czk))).toBe("1 800 Kč");
+    expect(price("12.50", "EUR", { ...czk, lang: "en" as const })).toBe(
+      "~313 CZK",
+    );
+    expect(squash(price("2000", "CZK", sat))).toBe("~100 000 sat");
+    expect(squash(price("21000", "SAT", sat))).toBe("21 000 sat");
+    expect(squash(price("200000", "SAT", czk))).toBe("~4 000 Kč");
+    expect(price("5", "XXX", sat)).toContain("5");
     // Without rates the author's price stands.
+    expect(squash(price("12.50", "EUR", { ...sat, fiatRates: null }))).toBe(
+      "12,50 EUR",
+    );
+  });
+
+  it("shows a zero price as free, or as by agreement when the author left it open", () => {
+    const czk = { displayCurrency: "czk" as const, fiatRates: null };
+    const listing = {
+      amount: ListingAmount.make("0"),
+      currency: ListingCurrency.make("CZK"),
+    };
+    const t = (key: string) => key;
+    expect(formatListingPrice(listing, czk, t)).toBe("listingPriceFree");
     expect(
-      squash(formatListingPrice("12.50", "EUR", { ...sat, fiatRates: null })),
-    ).toBe("12,50 EUR");
+      formatListingPrice({ ...listing, priceByAgreement: true }, czk, t),
+    ).toBe("listingPriceByAgreement");
   });
 });

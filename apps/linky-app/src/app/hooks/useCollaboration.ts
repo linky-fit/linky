@@ -151,15 +151,11 @@ export const useMentionListings = (): ReadonlyArray<MessageMentionListing> => {
 
 /** `90 Kč · per 10 pieces`, priced in the viewer's display unit. */
 export const useListingPriceText = (): ((listing: Listing) => string) => {
-  const { lang } = useTranslation();
+  const { lang, t } = useTranslation();
   const { displayCurrency, fiatRates } = useDisplayAmounts();
   return React.useCallback(
     (listing) =>
-      `${formatListingPrice(listing.amount, listing.currency, {
-        displayCurrency,
-        fiatRates,
-        lang,
-      })} · ${listing.unit}`,
-    [displayCurrency, fiatRates, lang],
+      `${formatListingPrice(listing, { displayCurrency, fiatRates, lang }, t)} · ${listing.unit}`,
+    [displayCurrency, fiatRates, lang, t],
   );
 };
