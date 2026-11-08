@@ -1,0 +1,55 @@
+FROM oven/bun:1.4.4-alpine AS build
+
+WORKDIR /app
+
+COPY package.json bun.lock ./
+COPY patches patches
+COPY apps/desktop/package.json apps/desktop/package.json
+COPY apps/fazole-app/package.json apps/fazole-app/package.json
+COPY apps/fazole-site/package.json apps/fazole-site/package.json
+COPY apps/linkshu-cli/package.json apps/linkshu-cli/package.json
+COPY apps/native-shell/package.json apps/native-shell/package.json
+COPY apps/npubcash-v1/package.json apps/npubcash-v1/package.json
+COPY apps/push/package.json apps/push/package.json
+COPY apps/onchain-operator/package.json apps/onchain-operator/package.json
+COPY apps/linky-site/package.json apps/linky-site/package.json
+COPY apps/ui-book/package.json apps/ui-book/package.json
+COPY apps/linky-app/package.json apps/linky-app/package.json
+COPY packages/identity/package.json packages/identity/package.json
+COPY packages/keryx/package.json packages/keryx/package.json
+COPY packages/linkauth/package.json packages/linkauth/package.json
+COPY packages/linkshu/package.json packages/linkshu/package.json
+COPY packages/linksync/package.json packages/linksync/package.json
+COPY packages/config/package.json packages/config/package.json
+COPY packages/linkstr/package.json packages/linkstr/package.json
+COPY packages/linkstr-react/package.json packages/linkstr-react/package.json
+COPY packages/domain/package.json packages/domain/package.json
+COPY packages/proxy-payment/package.json packages/proxy-payment/package.json
+COPY packages/ui/package.json packages/ui/package.json
+COPY packages/recurring-payment/package.json packages/recurring-payment/package.json
+COPY packages/onchain-transfer/package.json packages/onchain-transfer/package.json
+COPY tools/nostr-error-tracker/package.json tools/nostr-error-tracker/package.json
+
+RUN bun install --frozen-lockfile
+
+COPY apps/npubcash-v1 apps/npubcash-v1
+
+RUN bun run --filter @linky-fit/npubcash-v1 build
+
+FROM oven/bun:1.4.4-alpine AS runtime
+
+WORKDIR /app
+
+COPY --from=build /app/apps/npubcash-v1/dist/index.js /app/index.js
+
+ARG GIT_COMMIT_SHA=unknown
+
+ENV NODE_ENV=production
+ENV NPUBCASH_V1_PORT=8788
+ENV BUILD_COMMIT_SHA=${GIT_COMMIT_SHA}
+
+USER bun
+
+EXPOSE 8788
+
+CMD ["bun", "/app/index.js"]

@@ -18,6 +18,7 @@ COPY apps/fazole-app/package.json apps/fazole-app/
 COPY apps/fazole-site/package.json apps/fazole-site/
 COPY apps/linkshu-cli/package.json apps/linkshu-cli/
 COPY apps/native-shell/package.json apps/native-shell/
+COPY apps/npubcash-v1/package.json apps/npubcash-v1/
 COPY apps/push/package.json apps/push/
 COPY apps/onchain-operator/package.json apps/onchain-operator/
 COPY apps/linky-site/package.json apps/linky-site/

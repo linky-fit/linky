@@ -1,0 +1,33 @@
+{
+  "name": "@linky-fit/npubcash-v1",
+  "private": true,
+  "version": "0.1.0",
+  "license": "0BSD",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "build": "bun build ./src/index.ts --outdir ./dist --target bun",
+    "eslint": "eslint --fix .",
+    "prettier": "prettier --write .",
+    "test": "bun test src",
+    "test:integration": "bun test tests",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@cashu/cashu-ts": "^4.0.0",
+    "@noble/hashes": "^2.0.1",
+    "effect": "^4.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "nostr-tools": "^2.25.2"
+  },
+  "devDependencies": {
+    "@linky-fit/config": "workspace:*",
+    "@types/bun": "^1.4.4",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/node": "^24.10.1",
+    "eslint": "^9.39.1",
+    "prettier": "^3.4.2",
+    "typescript": "~5.9.3"
+  }
+}
