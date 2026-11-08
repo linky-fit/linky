@@ -29,6 +29,7 @@ A mobile-first PWA for contacts, private Nostr messaging and Lightning/Cashu pay
 - [`apps/native-shell`](./apps/native-shell/README.md): Android and iOS builds, signing, push setup
 - [`apps/desktop`](./apps/desktop/README.md): macOS desktop shell
 - [`apps/push`](./apps/push/README.md): Web Push and FCM service at `push.linky.fit`
+- [`apps/npubcash-v1`](./apps/npubcash-v1/README.md): temporary npub.cash v1 API for old apps beside upstream v3 at `npub.linky.fit` (#694)
 - [`apps/onchain-operator`](./apps/onchain-operator/README.md): the on-chain operator's console for on-chain transfers, deployed by hand to operator.twoballers.dev
 
 ## Fazole
