@@ -131,6 +131,9 @@ export const LinkySchema = {
     description: nullOr(NonEmptyString1000),
     // JSON of linkstr's `PrivateImage`; validated by the consumer.
     image: nullOr(NonEmptyString),
+    // Who sees the listing, JSON validated by the consumer: null for the
+    // contacts, {"kind":"network"} or {"kind":"group","group":"<groupName>"}.
+    audience: nullOr(NonEmptyString1000),
   },
   /**
    * Contacts scope: the user's instruction to pay a contact on a schedule.
