@@ -1,3 +1,4 @@
+import { Option, Schema } from "effect";
 import {
   getFirstQueryValue,
   getNpubcashBaseUrl,
@@ -10,7 +11,24 @@ import {
 } from "../_npubcash.js";
 import { safeFetch } from "../_safeFetch.js";
 
-const rewriteLnurlCallback = (
+const LnurlMetadata = Schema.fromJsonString(
+  Schema.Array(Schema.Tuple([Schema.String, Schema.String])),
+);
+
+const rewriteIdentifier = (metadata: unknown, identifier: string): unknown => {
+  const entries = Option.getOrNull(
+    Schema.decodeUnknownOption(LnurlMetadata)(metadata),
+  );
+  if (!entries?.some(([type]) => type === "text/identifier")) return metadata;
+  return JSON.stringify(
+    entries.map(([type, value]) => [
+      type,
+      type === "text/identifier" ? identifier : value,
+    ]),
+  );
+};
+
+const rewritePayRequest = (
   payRequestText: string,
   publicOrigin: string,
   user: string,
@@ -20,6 +38,10 @@ const rewriteLnurlCallback = (
   return JSON.stringify({
     ...payload,
     callback: `${publicOrigin}/.well-known/lnurlp/${encodeURIComponent(user)}`,
+    metadata: rewriteIdentifier(
+      payload.metadata,
+      `${user.toLowerCase()}@${new URL(publicOrigin).host}`,
+    ),
   });
 };
 
@@ -50,7 +72,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     sendPublicProxyResult(res, {
       ...proxyResult,
       text: isPayRequest
-        ? rewriteLnurlCallback(proxyResult.text, getPublicOrigin(req), user)
+        ? rewritePayRequest(proxyResult.text, getPublicOrigin(req), user)
         : proxyResult.text,
     });
   } catch {
