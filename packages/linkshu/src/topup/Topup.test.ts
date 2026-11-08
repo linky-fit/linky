@@ -478,6 +478,40 @@ describe("Topup", () => {
     expect((await onlyTopup(storage)).status).toBe("done");
   });
 
+  it.each([
+    { counter: 1, restored: [] },
+    { counter: 1, restored: mintedProofs, spent: true },
+    { counter: null, restored: [] },
+  ])(
+    "closes an operation whose issued quote holds none of its outputs (counter $counter)",
+    async ({ counter, restored, spent }) => {
+      const storage = freshStorage();
+      await writePendingTopup(storage, { counter });
+      const resuming = makeWallet({
+        states: [quoteResponse("ISSUED")],
+        restore: () =>
+          Promise.resolve({ proofs: restored, lastCounterWithSignature: 2 }),
+      });
+      const wallet: LoadedWallet =
+        spent === true
+          ? {
+              ...resuming.wallet,
+              checkProofsStates: answerProofStates(() => "SPENT"),
+            }
+          : resuming.wallet;
+
+      const resumed = await makeHarness(wallet, storage).run(
+        Effect.result(resumeAndAwait),
+      );
+
+      assert(Exit.isSuccess(resumed));
+      assert(resumed.value._tag === "Failure");
+      expect(resumed.value.failure._tag).toBe("QuoteAlreadyIssued");
+      expect(resuming.mintCounters).toEqual([]);
+      expect((await onlyTopup(storage)).status).toBe("failed");
+    },
+  );
+
   it("resolves to the stored proofs when they landed before the crash", async () => {
     const storage = freshStorage();
     const first = makeWallet({ states: [quoteResponse("PAID")] });

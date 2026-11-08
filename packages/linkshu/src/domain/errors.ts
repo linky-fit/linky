@@ -177,9 +177,9 @@ export class PaymentPending extends Schema.TaggedError<PaymentPending>()(
 ) {}
 
 /**
- * The mint already issued this quote's proofs and no attempt of this wallet
- * reserved counter slots for it, so another wallet holds them; nothing to
- * mint or reclaim here.
+ * The mint already issued this quote's proofs and none of the counter slots
+ * this wallet reserved for it hold unspent ones, so another wallet holds
+ * them; nothing to mint or reclaim here.
  */
 export class QuoteAlreadyIssued extends Schema.TaggedError<QuoteAlreadyIssued>()(
   "QuoteAlreadyIssued",

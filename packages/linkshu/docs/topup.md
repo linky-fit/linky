@@ -93,12 +93,14 @@ A lightning-address server can create a mint quote for the wallet and pay its in
 
 A pending topup already recorded for the quote is minted through the same claim. Otherwise the mint's `UNPAID` answer is a `MintRejected`, and already issued without a local record is `QuoteAlreadyIssued` (another wallet minted it).
 
+A claim that finds the quote already issued restores the outputs its record reserved (NUT-09). When the record reserved none, or none of the restored proofs is unspent, another wallet minted the quote: `result` and `adopt` fail with `QuoteAlreadyIssued` and the operation closes `failed`. A mint call refused because the quote is already issued stays a `MintRejected` with the operation `pending`, so a lost response is still reclaimed on resume.
+
 ## Errors
 
 | Tag                  | Raised by                  | When                                                                          | Operation                                                        |
 | -------------------- | -------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | `QuoteExpired`       | `result`                   | mint confirms `UNPAID` past the deadline                                      | `failed`; offer a new topup                                      |
-| `QuoteAlreadyIssued` | `adopt`                    | mint already issued the quote and no local operation claims it                | none; nothing to mint here                                       |
+| `QuoteAlreadyIssued` | `result`, `adopt`          | mint already issued the quote and none of this wallet's outputs hold it       | `failed`, or none for `adopt` without one; nothing to mint here  |
 | `MintRejected`       | `start`, `result`, `adopt` | unknown quote, unpaid adopted quote, locked quote without key, mint rejection | a locked pending topup stays `pending` for a resume with the key |
 
 `MintUnreachable` (from `result`: keep showing the invoice, the operation stays `pending`) and `CounterLockTimeout` (stays `pending`; resume later) are in [errors.md](./errors.md).

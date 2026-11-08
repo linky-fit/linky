@@ -62,6 +62,9 @@ export class UnpaidMintQuote extends MintRejected {
 }
 type MintUrlLike = ConstructorParameters<typeof MintRejected>[0]["mint"];
 
+/** The mint issued the quote, but none of this wallet's reserved outputs hold unspent proofs. */
+export class QuoteIssuedElsewhere extends MintRejected {}
+
 /** The durable record's claim-relevant slice; flows carry their own extras. */
 export interface ClaimableQuote extends QuoteRecord {
   readonly unit: CurrencyUnit;
@@ -156,11 +159,10 @@ const reclaimIssued = <R extends ClaimableQuote>(
   Effect.gen(function* () {
     const counter = record.counter;
     if (counter === null) {
-      return yield* new MintRejected({
+      return yield* new QuoteIssuedElsewhere({
         mint: record.mint,
         code: null,
-        detail:
-          "quote already issued by an attempt that reserved no counters; run restore to recover the proofs",
+        detail: "quote already issued before this wallet reserved outputs",
       });
     }
     const restored = yield* Effect.tryPromise({
@@ -207,10 +209,10 @@ const reclaimIssued = <R extends ClaimableQuote>(
     const states = yield* checkProofStates(ctx.wallet, record.mint, unstored);
     const spendable = unspentProofs(unstored, states);
     if (spendable.length === 0) {
-      return yield* new MintRejected({
+      return yield* new QuoteIssuedElsewhere({
         mint: record.mint,
         code: null,
-        detail: "quote already issued and its proofs are no longer unspent",
+        detail: "quote already issued and no reserved output is unspent",
       });
     }
     // Only unspent, unstored proofs reach here, so storing them cannot
