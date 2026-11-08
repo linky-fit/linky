@@ -56,6 +56,8 @@ export class Listing extends Schema.Class<Listing>("Listing")({
   amount: ListingAmount,
   currency: ListingCurrency,
   unit: ListingUnit,
+  /** The author left the price to be agreed; it counts only with a zero `amount`, which releases that do not know this field show instead. */
+  priceByAgreement: Schema.optionalKey(Schema.Literal(true)),
   /** A malformed or too long description decodes as none, so it never costs the listing or the document. */
   description: Schema.optionalKey(
     ListingDescription.pipe(Schema.catchDecoding(() => Effect.succeedNone)),
@@ -65,6 +67,19 @@ export class Listing extends Schema.Class<Listing>("Listing")({
     PrivateImage.pipe(Schema.catchDecoding(() => Effect.succeedNone)),
   ),
 }) {}
+
+/** What a listing asks for: its `amount`, nothing, or a price the two parties agree on. */
+export type ListingPriceKind = "amount" | "free" | "by-agreement";
+
+export const listingPriceKind = ({
+  amount,
+  priceByAgreement,
+}: Pick<Listing, "amount" | "priceByAgreement">): ListingPriceKind =>
+  Number(amount) > 0
+    ? "amount"
+    : priceByAgreement === true
+      ? "by-agreement"
+      : "free";
 
 /** Everything one author shares with the contacts that can read it; the newest replaces the whole document. */
 export class ListingsDocument extends Schema.Class<ListingsDocument>(

@@ -49,6 +49,7 @@ const ownRecord: ListingRecord = {
   amount: NonEmptyString100.orThrow("200"),
   currency: NonEmptyString100.orThrow("CZK"),
   unit: NonEmptyString100.orThrow("per hour"),
+  priceByAgreement: null,
   description: null,
   image: null,
   createdAt: "2026-01-01T00:00:00.000Z",

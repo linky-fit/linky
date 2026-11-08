@@ -88,6 +88,36 @@ describe("shared listing message", () => {
     );
   });
 
+  it("writes a free listing and one priced by agreement in words", () => {
+    const priced = (fields: Partial<Listing>) =>
+      new SharedListing({
+        author,
+        listing: new Listing({
+          ...eggs.listing,
+          amount: ListingAmount.make("0"),
+          ...fields,
+        }),
+      });
+    const summary = (shared: SharedListing) =>
+      sharedListingMessageText(shared, "").split("\n")[0];
+    const byAgreement = priced({ priceByAgreement: true });
+
+    expect(summary(priced({}))).toBe("Domácí vajíčka · free za 10 ks");
+    expect(summary(byAgreement)).toBe(
+      "Domácí vajíčka · price by agreement za 10 ks",
+    );
+    expect(
+      parseSharedListingMessage(sharedListingMessageText(byAgreement, ""))
+        ?.shared,
+    ).toEqual(byAgreement);
+    // A price the author typed later wins over a stale flag.
+    expect(
+      summary(
+        priced({ amount: ListingAmount.make("90"), priceByAgreement: true }),
+      ),
+    ).toBe("Domácí vajíčka · 90 CZK za 10 ks");
+  });
+
   it("keeps a multi-line title and unit on the summary line, so the note stays intact", () => {
     const multiLine = new SharedListing({
       author,

@@ -193,11 +193,11 @@ export function ListingDetailPage({
         </Row>
         <Row gap="$sm" alignItems="baseline" flexWrap="wrap">
           <Text variant="title" bold testID="listing-price">
-            {formatListingPrice(listing.amount, listing.currency, {
-              displayCurrency,
-              fiatRates,
-              lang,
-            })}
+            {formatListingPrice(
+              listing,
+              { displayCurrency, fiatRates, lang },
+              t,
+            )}
           </Text>
           <Text color="$colorMuted">{listing.unit}</Text>
         </Row>

@@ -331,7 +331,7 @@ Whether the user offers cash for bitcoin, wants cash for bitcoin, or neither; a 
 _Avoid_: cash status, cash offer, trade (that is the beacon's encoding of it)
 
 **Listing**:
-One thing the user offers to, or wants from, their mutual contacts: goods or a service with a title, a price and a unit. Listings live in a synced table and are shared in the listings document.
+One thing the user offers to, or wants from, their mutual contacts: goods or a service with a title, a price and a unit; a price of zero makes it free, and no price leaves it to be agreed ("dohodou"). Listings live in a synced table and are shared in the listings document.
 _Avoid_: offer (taken by proxy payments), ad, classified, product
 
 **Listings document**:
