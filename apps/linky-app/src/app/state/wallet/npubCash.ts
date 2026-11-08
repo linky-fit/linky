@@ -16,6 +16,7 @@ import {
   LOCAL_NPUB_CASH_CLAIM_LAST_ATTEMPT_STORAGE_KEY_PREFIX,
   LOCAL_NPUB_CASH_CLAIM_LOCK_STORAGE_KEY_PREFIX,
   LOCAL_NPUB_CASH_UPSTREAM_QUOTES_STORAGE_KEY_PREFIX,
+  LOCAL_NPUB_LINKY_QUOTES_STORAGE_KEY_PREFIX,
 } from "../../../utils/constants";
 import { isHiddenTestMint, normalizeMintUrl } from "../../../utils/mint";
 import {
@@ -78,13 +79,14 @@ export interface NpubCashClaimEvents {
 export interface NpubCashCommands {
   /**
    * Collects payments made to the user's lightning addresses, on both hosts
-   * that resolve the same npub: Linky's own server hands proofs over as
-   * tokens (received like a pasted token), upstream npub.cash only lists
-   * paid mint quotes, which linkshu adopts on upstream's mint. Runs in one
-   * tab at a time, at most every 25 s (5 s while `fast`), and never while
-   * another wallet operation runs. Claimed tokens wait in a device-local
-   * inbox until linkshu holds or settles them; upstream quotes stay listed
-   * until adopted; the next poll retries both.
+   * that resolve the same npub. Both list paid mint quotes (v2), which
+   * linkshu adopts on the quote's mint; Linky's own server also still hands
+   * over proofs its v1 compatibility service minted, as tokens (received
+   * like a pasted token). Runs in one tab at a time, at most every 25 s
+   * (5 s while `fast`), and never while another wallet operation runs.
+   * Claimed tokens wait in a device-local inbox until linkshu holds or
+   * settles them; quotes stay listed until adopted; the next poll retries
+   * both.
    */
   readonly claim: (
     options: { readonly fast: boolean },
@@ -175,6 +177,7 @@ const reportClaimsUnsaved = (count: number): void => {
 };
 
 const reportUpstreamQuotesListed = (
+  server: string,
   listing: UpstreamPaidQuotesListing,
   fresh: readonly UpstreamPaidQuote[],
   since: number | null,
@@ -185,12 +188,12 @@ const reportUpstreamQuotesListed = (
       at: Date.now(),
       channel: "cashu",
       tag: "npubCash.upstreamQuotesListed",
-      summary: `npub.cash lists ${listing.paid.length} paid quotes, ${fresh.length} new`,
+      summary: `${new URL(server).host} lists ${listing.paid.length} paid quotes, ${fresh.length} new`,
       links: { quote: fresh.map((quote) => quote.quoteId) },
-      context: { server: NPUB_CASH_UPSTREAM_BASE_URL },
+      context: { server },
       payload: {
         since,
-        complete: listing.complete,
+        nextOffset: listing.nextOffset,
         paid: listing.paid.length,
         fresh: fresh.map(({ quoteId, mint, amountSat, locked }) => ({
           quoteId,
@@ -369,7 +372,10 @@ export const makeNpubCashCommands = (deps: NpubCashDeps): NpubCashCommands => {
     const url = `${NPUB_CASH_SERVER_BASE_URL}/api/v1/claim`;
     const response = await fetch(url, {
       method: "GET",
-      headers: { Authorization: await authHeader(url, "GET") },
+      headers: {
+        Authorization: await authHeader(url, "GET"),
+        "X-Linky-Client": "v2",
+      },
       signal: AbortSignal.timeout(NPUB_CASH_REQUEST_TIMEOUT_MS),
     });
     if (!response.ok) return [];
@@ -458,30 +464,33 @@ export const makeNpubCashCommands = (deps: NpubCashDeps): NpubCashCommands => {
     return definitive;
   };
 
-  const sweepUpstreamPaidQuotes = async (events: NpubCashClaimEvents) => {
-    const ledgerKey = ownerKey(
-      LOCAL_NPUB_CASH_UPSTREAM_QUOTES_STORAGE_KEY_PREFIX,
-    );
-    const ledger = parseUpstreamQuoteLedger(kv.getItem(ledgerKey));
-    const listing = await listUpstreamPaidQuotes({
-      baseUrl: NPUB_CASH_UPSTREAM_BASE_URL,
-      since: ledger.since,
-      makeNip98AuthHeader: authHeader,
-    });
-    if (listing === null) return;
-    const fresh = listing.paid.filter(
-      (quote) => !isUpstreamQuoteSettled(ledger, quote.quoteId),
-    );
-    reportUpstreamQuotesListed(listing, fresh, ledger.since);
-    const settled: SettledUpstreamQuote[] = [];
-    for (const quote of fresh) {
-      if (await adoptUpstreamQuote(quote, events)) settled.push(quote);
-    }
-    kv.setItem(
-      ledgerKey,
-      JSON.stringify(settleUpstreamQuotes(ledger, settled, listing.complete)),
-    );
-  };
+  const sweepPaidQuotes =
+    (baseUrl: string, ledgerPrefix: string) =>
+    async (events: NpubCashClaimEvents) => {
+      const ledgerKey = ownerKey(ledgerPrefix);
+      const ledger = parseUpstreamQuoteLedger(kv.getItem(ledgerKey));
+      const listing = await listUpstreamPaidQuotes({
+        baseUrl,
+        since: ledger.since,
+        offset: ledger.offset,
+        makeNip98AuthHeader: authHeader,
+      });
+      if (listing === null) return;
+      const fresh = listing.paid.filter(
+        (quote) => !isUpstreamQuoteSettled(ledger, quote.quoteId),
+      );
+      reportUpstreamQuotesListed(baseUrl, listing, fresh, ledger.since);
+      const settled: SettledUpstreamQuote[] = [];
+      for (const quote of fresh) {
+        if (await adoptUpstreamQuote(quote, events)) settled.push(quote);
+      }
+      kv.setItem(
+        ledgerKey,
+        JSON.stringify(
+          settleUpstreamQuotes(ledger, settled, listing.nextOffset),
+        ),
+      );
+    };
 
   return {
     claim: async ({ fast }, events) => {
@@ -516,7 +525,14 @@ export const makeNpubCashCommands = (deps: NpubCashDeps): NpubCashCommands => {
               // Each host on its own: one being down must not starve the other.
               for (const collect of [
                 collectFromLinkyServer,
-                sweepUpstreamPaidQuotes,
+                sweepPaidQuotes(
+                  NPUB_CASH_SERVER_BASE_URL,
+                  LOCAL_NPUB_LINKY_QUOTES_STORAGE_KEY_PREFIX,
+                ),
+                sweepPaidQuotes(
+                  NPUB_CASH_UPSTREAM_BASE_URL,
+                  LOCAL_NPUB_CASH_UPSTREAM_QUOTES_STORAGE_KEY_PREFIX,
+                ),
               ]) {
                 try {
                   await collect(events);
