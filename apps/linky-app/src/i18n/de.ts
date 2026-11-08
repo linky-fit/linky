@@ -1418,7 +1418,7 @@ export const de = {
   listingImageUploading: "Foto wird hochgeladen…",
   listingImageUploadFailed:
     "Das Foto konnte nicht hochgeladen werden. Versuche es erneut.",
-  listingVia: "über {names}",
+  listingVia: "über",
   listingViaLead: "Es hat dich über deine Kontakte erreicht. Frag sie:",
   listingAudience: "Wer es sieht",
   listingAudienceNetwork: "Netzwerk",

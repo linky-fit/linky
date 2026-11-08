@@ -30,7 +30,6 @@ import {
 import { ListingThumbnail } from "../components/ListingImage";
 import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey, Translate } from "../i18n";
-import { firstName } from "../utils/formatting";
 
 const Price = ({ children }: { children: string }) => (
   <Text variant="label" bold>
@@ -38,32 +37,32 @@ const Price = ({ children }: { children: string }) => (
   </Text>
 );
 
-/** The names of the contacts a listing came through: `Jana`, `Jana, Petr`, `Jana, Petr +2`. */
-const viaNames = (via: PeerListing["via"]): string => {
-  const names = via.slice(0, 2).map(({ name }) => firstName(name));
-  const more = via.length - names.length;
-  return `${names.join(", ")}${more > 0 ? ` +${more}` : ""}`;
-};
-
-/** The second line of a row: who it is from, with their photo, then the unit. */
+/** The second line of a row: whose it is, or "via" and the contacts it came through, as avatars only, then the unit; names are on the detail. */
 function ListingByline({
+  prefix,
   people,
-  label,
+  unit,
   testID,
 }: {
+  prefix?: string | undefined;
   people: ReadonlyArray<{ name: string; uri: string | undefined }>;
-  label: string;
+  unit: string;
   testID: string;
 }): React.ReactElement {
   return (
     <Row gap="$xs" alignItems="center" testID={testID}>
+      {prefix ? (
+        <Text variant="caption" color="$colorMuted" flexShrink={0}>
+          {prefix}
+        </Text>
+      ) : null}
       {people.length === 1 && people[0] ? (
         <Avatar name={people[0].name} uri={people[0].uri} size="xs" />
       ) : (
-        <AvatarGroup people={people} size="xs" max={3} />
+        <AvatarGroup people={people} size="xs" max={4} />
       )}
       <Text variant="caption" color="$colorMuted" numberOfLines={1} flex={1}>
-        {label}
+        {unit}
       </Text>
     </Row>
   );
@@ -93,7 +92,7 @@ function PeerListingRow({
             people={[
               { name: seller.name, uri: seller.pictureUrl ?? undefined },
             ]}
-            label={`${firstName(seller.name)} · ${listing.unit}`}
+            unit={listing.unit}
             testID="listing-seller"
           />
         ) : (
@@ -102,7 +101,8 @@ function PeerListingRow({
               name,
               uri: pictureUrl ?? undefined,
             }))}
-            label={`${t("listingVia").replace("{names}", viaNames(via))} · ${listing.unit}`}
+            prefix={t("listingVia")}
+            unit={listing.unit}
             testID="listing-via"
           />
         )

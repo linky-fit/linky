@@ -1423,7 +1423,7 @@ export const pt = {
   listingImageRemove: "Remover foto",
   listingImageUploading: "Enviando foto…",
   listingImageUploadFailed: "Não foi possível enviar a foto. Tente novamente.",
-  listingVia: "via {names}",
+  listingVia: "via",
   listingViaLead: "Chegou até você pelos seus contatos. Pergunte a eles:",
   listingAudience: "Quem vê",
   listingAudienceNetwork: "Rede",
