@@ -37,18 +37,18 @@ See `.env.example`. `NPUBCASH_V1_SEED` must be backed up like a wallet seed and 
 
 - `l_users` into v3's `l_users`, names lowercased; a user without a mint gets `NPUBCASH_V1_MINT_URL`.
 - Unfulfilled `l_transactions` into `mint_quotes` as `UNPAID`, owner mapped from the npub or name to a hex pubkey. `expires_at` is a day past the invoice's expiry: v3 checks an expired `UNPAID` quote once more before giving up, and nobody can pay an expired invoice.
-- `ready` and `inflight` `l_claims_3` rows into `ready` claims, one per transaction, keyed by its quote id (`fork:<transaction>` without one, `fork-claim:<id>` without a transaction). `spent` rows are skipped: the fork sets it only when the mint reports the proofs spent.
+- `ready` and `inflight` `l_claims_3` rows into `ready` claims, one per transaction, keyed by its quote id (`fork:<transaction>` without one, `fork-claim:<id>` without a transaction). `spent` rows are skipped: since its migration `1794043600000_reoffer-unconfirmed-claims` the fork sets it only when the mint reports the proofs spent, and `plan` reports a fork database without that migration.
 - `l_service_revenue_claims` into `ready` claims owned by `NPUBCASH_V1_OPERATOR_PUBKEY` at `NPUBCASH_V1_MINT_URL`, one per quote, so fork-issued payment tokens whose fee was collected still set their name.
 
 Proofs keep only `id`, `amount`, `secret` and `C`.
 
 Modes:
 
-- `plan` prints what `apply` would copy and every problem (unresolved owner, name v3 rejects, name clash, unreadable invoice, unknown claim status). Read-only.
-- `audit` runs `plan`, then asks the mints for each quote's state, the unspent value of the imported proofs, and whether their keysets are still listed. Read-only.
-- `apply` writes everything in one transaction. It refuses when the plan has problems, when anything else is connected to either database (stop the fork, v3 and this service first), or when v3's database already holds users, quotes or claims.
+- `plan` prints what `apply` would copy and every problem (fork migration missing, unresolved owner, name v3 rejects, name clash, unreadable invoice or mint URL, amount differing from the invoice, unknown claim status). Read-only.
+- `audit` runs `plan`, then asks the mints for each quote's state, the unspent value of the imported proofs, and whether their keysets are still listed. A quote counts as lost only when the mint issued it and the fork holds no proofs for it. Read-only.
+- `apply` writes everything in one transaction. It refuses when the plan has problems, when anything else holds a connection to either database, or when v3's database already holds users, quotes or claims. An idle connection pool may hold no connection, so stop the fork, v3 and this service containers first. v3 and this service must each have started once on the new database, so their tables exist.
 
-It takes this service's environment plus `NPUBCASH_FORK_DATABASE_URL`:
+It loads this service's configuration, plus `NPUBCASH_FORK_DATABASE_URL`:
 
 ```bash
 docker compose run --rm --no-deps -e NPUBCASH_FORK_DATABASE_URL=postgres://… npubcash-v1 bun /app/cutover.js plan

@@ -22,6 +22,7 @@ export const ForkSnapshot = Schema.Struct({
       quote_id: Schema.NullOr(Schema.String),
       amount: Schema.NullOr(Schema.Number),
       zap_request: Schema.Unknown,
+      has_fork_proofs: Schema.Boolean,
     }),
   ),
   claims: Schema.Array(
@@ -42,6 +43,8 @@ export const ForkSnapshot = Schema.Struct({
     }),
   ),
   claimStatuses: Schema.Array(Schema.String),
+  /** Fork migration 1794043600000 reopened every `spent` row; until it runs, `spent` rows may hold unspent proofs. */
+  spentClaimsReoffered: Schema.Boolean,
 });
 export type ForkSnapshot = typeof ForkSnapshot.Type;
 type ForkClaim = ForkSnapshot["claims"][number];
@@ -61,6 +64,8 @@ export interface V3Quote {
   expires_at: string;
   serialized_zap_request: string | null;
   fork_transaction_id: number;
+  /** The fork holds proofs for it, so the mint reporting it `ISSUED` loses nothing. */
+  fork_has_proofs: boolean;
 }
 
 export interface V1Claim {
@@ -86,7 +91,7 @@ export interface PlanOptions {
 }
 
 // The fork's claim handout states; `spent` means the mint reported every proof spent.
-const UNSETTLED_CLAIM_STATUSES = ["ready", "inflight"];
+export const UNSETTLED_CLAIM_STATUSES = ["ready", "inflight"];
 const KNOWN_CLAIM_STATUSES = [...UNSETTLED_CLAIM_STATUSES, "spent"];
 const HEX_PUBKEY = /^[0-9a-f]{64}$/;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -110,7 +115,17 @@ export function buildPlan(
     if (!pubkey) problems.push(`${source}: owner "${user}" has no pubkey`);
     return pubkey;
   };
+  const checkMintUrl = (url: string, source: string) => {
+    if (!URL.canParse(url)) {
+      problems.push(`${source}: unreadable mint URL "${url}"`);
+    }
+  };
 
+  if (!fork.spentClaimsReoffered) {
+    problems.push(
+      "the fork has not run migration 1794043600000_reoffer-unconfirmed-claims, so its spent rows may hold unspent proofs",
+    );
+  }
   for (const status of fork.claimStatuses) {
     if (!KNOWN_CLAIM_STATUSES.includes(status)) {
       problems.push(`l_claims_3 has rows in unknown status "${status}"`);
@@ -139,6 +154,12 @@ export function buildPlan(
     if (!invoice) problems.push(`${source}: unreadable invoice`);
     if (!row.quote_id) problems.push(`${source}: no cashu quote id`);
     if (amount === null || amount <= 0) problems.push(`${source}: no amount`);
+    if (invoice?.amountSat != null && amount !== invoice.amountSat) {
+      problems.push(
+        `${source}: amount ${amount} differs from the invoice's ${invoice.amountSat}`,
+      );
+    }
+    checkMintUrl(row.mint_url, source);
     if (!pubkey || !invoice || !row.quote_id || !amount) return [];
     return [
       {
@@ -151,6 +172,7 @@ export function buildPlan(
         serialized_zap_request:
           row.zap_request === null ? null : JSON.stringify(row.zap_request),
         fork_transaction_id: row.id,
+        fork_has_proofs: row.has_fork_proofs,
       },
     ];
   });
@@ -172,6 +194,7 @@ export function buildPlan(
       problems.push(`${source}: proofs of several mints`);
       return [];
     }
+    checkMintUrl(first.mint_url, source);
     const pubkey = ownerOf(first.user, source);
     if (!pubkey) return [];
     return [

@@ -30,6 +30,7 @@ const snapshot = (overrides: Partial<ForkSnapshot> = {}): ForkSnapshot => ({
   claims: [],
   revenue: [],
   claimStatuses: ["ready", "inflight", "spent"],
+  spentClaimsReoffered: true,
   ...overrides,
 });
 
@@ -56,6 +57,7 @@ describe("buildPlan", () => {
             quote_id: "q7",
             amount: null,
             zap_request: zapRequest,
+            has_fork_proofs: false,
           },
           {
             id: 8,
@@ -65,6 +67,7 @@ describe("buildPlan", () => {
             quote_id: "q8",
             amount: 21,
             zap_request: null,
+            has_fork_proofs: true,
           },
         ],
       }),
@@ -81,6 +84,7 @@ describe("buildPlan", () => {
         expires_at: new Date((1496314658 + 60) * 1000 + DAY_MS).toISOString(),
         serialized_zap_request: JSON.stringify(zapRequest),
         fork_transaction_id: 7,
+        fork_has_proofs: false,
       },
       {
         mint_url: "https://cashu.cz",
@@ -91,6 +95,7 @@ describe("buildPlan", () => {
         expires_at: new Date((1496314658 + 3600) * 1000 + DAY_MS).toISOString(),
         serialized_zap_request: null,
         fork_transaction_id: 8,
+        fork_has_proofs: true,
       },
     ]);
   });
@@ -189,6 +194,7 @@ describe("buildPlan", () => {
             quote_id: "q1",
             amount: null,
             zap_request: null,
+            has_fork_proofs: false,
           },
           {
             id: 2,
@@ -198,6 +204,17 @@ describe("buildPlan", () => {
             quote_id: null,
             amount: null,
             zap_request: null,
+            has_fork_proofs: false,
+          },
+          {
+            id: 4,
+            user: "alice",
+            mint_url: "cashu.cz",
+            mint_pr: INVOICE,
+            quote_id: "q4",
+            amount: 21,
+            zap_request: null,
+            has_fork_proofs: false,
           },
         ],
         claims: [
@@ -219,10 +236,12 @@ describe("buildPlan", () => {
           },
         ],
         claimStatuses: ["ready", "withdrawn"],
+        spentClaimsReoffered: false,
       }),
       options,
     );
     expect(plan.problems).toEqual([
+      "the fork has not run migration 1794043600000_reoffer-unconfirmed-claims, so its spent rows may hold unspent proofs",
       'l_claims_3 has rows in unknown status "withdrawn"',
       `user ${operator}: v3 rejects the name "a-b"`,
       'name "alice" belongs to several users',
@@ -230,6 +249,8 @@ describe("buildPlan", () => {
       "transaction 2: unreadable invoice",
       "transaction 2: no cashu quote id",
       "transaction 2: no amount",
+      "transaction 4: amount 21 differs from the invoice's 250000",
+      'transaction 4: unreadable mint URL "cashu.cz"',
       "transaction 3: proofs of several owners",
     ]);
   });
