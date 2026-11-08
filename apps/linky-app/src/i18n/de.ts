@@ -1381,7 +1381,7 @@ export const de = {
   listingsWanted: "Gesucht",
   listingsMine: "Deine Angebote",
   listingsMutualOnly:
-    "Deine Angebote sehen nur Kontakte, die dich ebenfalls gespeichert haben.",
+    "Deine Angebote sehen nur Kontakte, die dich ebenfalls gespeichert haben, bei Netzwerk-Angeboten auch deren Kontakte.",
   listingAddNew: "Angebot hinzufügen",
   listingNewTitle: "Angebot hinzufügen",
   listingEditTitle: "Angebot bearbeiten",
@@ -1418,6 +1418,19 @@ export const de = {
   listingImageUploading: "Foto wird hochgeladen…",
   listingImageUploadFailed:
     "Das Foto konnte nicht hochgeladen werden. Versuche es erneut.",
+  listingVia: "über {names}",
+  listingViaLead: "Es hat dich über deine Kontakte erreicht. Frag sie:",
+  listingAudience: "Wer es sieht",
+  listingAudienceNetwork: "Netzwerk",
+  listingAudienceContacts: "Kontakte",
+  listingAudienceGroup: "Gruppe",
+  listingAudienceNobody: "Niemand",
+  listingAudienceNetworkHint: "Deine Kontakte und deren Kontakte sehen es.",
+  listingAudienceContactsHint: "Nur deine Kontakte sehen es.",
+  listingAudienceGroupHint: "Nur die Kontakte der gewählten Gruppe sehen es.",
+  listingAudienceGroupPick: "Kontaktgruppe",
+  listingAudienceNoGroups:
+    "Du hast noch keine Gruppe. Füge sie einem Kontakt beim Bearbeiten hinzu.",
   otherContacts: "Weitere Kontakte",
   today: "Heute",
   yesterday: "Gestern",

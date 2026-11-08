@@ -1,5 +1,14 @@
 import { useAtomValue } from "@linky-fit/linkstr-react";
-import { Avatar, EmptyState, Icon, ListRow, Stack, Text } from "@linky-fit/ui";
+import {
+  Avatar,
+  AvatarGroup,
+  EmptyState,
+  Icon,
+  ListRow,
+  Row,
+  Stack,
+  Text,
+} from "@linky-fit/ui";
 import React from "react";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import {
@@ -8,6 +17,10 @@ import {
 } from "../app/hooks/useCollaboration";
 import { useListingRecords } from "../app/hooks/useLinksync";
 import { formatListingPrice, listingOfRecord } from "../app/lib/listings";
+import {
+  listingAudienceLabel,
+  listingAudienceOfRecord,
+} from "../app/lib/listingAudience";
 import { currentPubkeyAtom } from "../app/state/session/session";
 import type { DisplayAmountOptions } from "../utils/displayAmounts";
 import {
@@ -25,34 +38,80 @@ const Price = ({ children }: { children: string }) => (
   </Text>
 );
 
+/** The names of the contacts a listing came through: `Jana`, `Jana, Petr`, `Jana, Petr +2`. */
+const viaNames = (via: PeerListing["via"]): string => {
+  const names = via.slice(0, 2).map(({ name }) => firstName(name));
+  const more = via.length - names.length;
+  return `${names.join(", ")}${more > 0 ? ` +${more}` : ""}`;
+};
+
+/** The second line of a row: who it is from, with their photo, then the unit. */
+function ListingByline({
+  people,
+  label,
+  testID,
+}: {
+  people: ReadonlyArray<{ name: string; uri: string | undefined }>;
+  label: string;
+  testID: string;
+}): React.ReactElement {
+  return (
+    <Row gap="$xs" alignItems="center" testID={testID}>
+      {people.length === 1 && people[0] ? (
+        <Avatar name={people[0].name} uri={people[0].uri} size="xs" />
+      ) : (
+        <AvatarGroup people={people} size="xs" max={3} />
+      )}
+      <Text variant="caption" color="$colorMuted" numberOfLines={1} flex={1}>
+        {label}
+      </Text>
+    </Row>
+  );
+}
+
 function PeerListingRow({
-  entry: { contact, listing },
+  entry: { author, listing, seller, via },
   display,
+  t,
 }: {
   entry: PeerListing;
   display: DisplayAmountOptions;
+  t: Translate;
 }): React.ReactElement {
-  const { t } = useTranslation();
   return (
     <ListRow
       leading={
-        listing.image ? (
-          <ListingThumbnail source={listing.image} label={listing.title} />
+        <ListingThumbnail
+          source={listing.image ?? null}
+          label={listing.title}
+        />
+      }
+      title={listing.title}
+      description={
+        seller ? (
+          <ListingByline
+            people={[
+              { name: seller.name, uri: seller.pictureUrl ?? undefined },
+            ]}
+            label={`${firstName(seller.name)} · ${listing.unit}`}
+            testID="listing-seller"
+          />
         ) : (
-          <Avatar
-            name={contact.name}
-            uri={contact.pictureUrl ?? undefined}
-            size="md"
+          <ListingByline
+            people={via.map(({ name, pictureUrl }) => ({
+              name,
+              uri: pictureUrl ?? undefined,
+            }))}
+            label={`${t("listingVia").replace("{names}", viaNames(via))} · ${listing.unit}`}
+            testID="listing-via"
           />
         )
       }
-      title={listing.title}
-      description={`${firstName(contact.name)} · ${listing.unit}`}
       trailing={<Price>{formatListingPrice(listing, display, t)}</Price>}
       onPress={() =>
         navigateTo({
           route: "listing",
-          author: contact.pubkey,
+          author,
           listingId: listing.id,
         })
       }
@@ -80,9 +139,10 @@ function PeerSection({
       </Text>
       {entries.map((entry) => (
         <PeerListingRow
-          key={`${entry.contact.pubkey}:${entry.listing.id}`}
+          key={`${entry.author}:${entry.listing.id}`}
           entry={entry}
           display={display}
+          t={t}
         />
       ))}
     </Stack>
@@ -122,9 +182,10 @@ function HiddenSection({
       {open
         ? entries.map((entry) => (
             <PeerListingRow
-              key={`${entry.contact.pubkey}:${entry.listing.id}`}
+              key={`${entry.author}:${entry.listing.id}`}
               entry={entry}
               display={display}
+              t={t}
             />
           ))
         : null}
@@ -132,7 +193,7 @@ function HiddenSection({
   );
 }
 
-/** The contacts' listings, what the user shares, and the way to add more. */
+/** Others' listings, what the user shares, and the way to add more. */
 export function ListingsPage(): React.ReactElement {
   const { lang, t } = useTranslation();
   const { displayCurrency, fiatRates } = useDisplayAmounts();
@@ -145,7 +206,9 @@ export function ListingsPage(): React.ReactElement {
         .sort((left, right) => left.createdAtSec - right.createdAtSec)
         .flatMap((record) => {
           const listing = listingOfRecord(record);
-          return listing === null ? [] : [{ record, listing }];
+          return listing === null
+            ? []
+            : [{ record, listing, audience: listingAudienceOfRecord(record) }];
         }),
     [records],
   );
@@ -199,19 +262,17 @@ export function ListingsPage(): React.ReactElement {
             <Text variant="title" role="heading">
               {t("listingsMine")}
             </Text>
-            {mine.map(({ record, listing }) => (
+            {mine.map(({ record, listing, audience }) => (
               <ListRow
                 key={record.id}
                 leading={
-                  listing.image ? (
-                    <ListingThumbnail
-                      source={listing.image}
-                      label={listing.title}
-                    />
-                  ) : undefined
+                  <ListingThumbnail
+                    source={listing.image ?? null}
+                    label={listing.title}
+                  />
                 }
                 title={listing.title}
-                description={`${t(listing.side === "offer" ? "listingSideOffer" : "listingSideWant")} · ${listing.unit}`}
+                description={`${t(listing.side === "offer" ? "listingSideOffer" : "listingSideWant")} · ${listingAudienceLabel(audience, t)}`}
                 trailing={
                   <Price>{formatListingPrice(listing, display, t)}</Price>
                 }

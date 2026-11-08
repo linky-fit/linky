@@ -1,6 +1,9 @@
 import {
   ListingAmount,
   ListingCurrency,
+  ListingsAudience,
+  ListingsDocument,
+  ListingsDraft,
   PrivateImage,
   Pubkey,
   RelayUrl,
@@ -17,7 +20,6 @@ import { describe, expect, it } from "vitest";
 import type { DisplayAmountOptions } from "../../utils/displayAmounts";
 import {
   beaconTradeOfCashIntent,
-  buildListingsDocument,
   encodeListingImage,
   formatListingPrice,
   defaultListingUnit,
@@ -43,6 +45,7 @@ const record = (overrides: Partial<ListingRecord> = {}): ListingRecord => ({
   priceByAgreement: null,
   description: null,
   image: null,
+  audience: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
   isDeleted: 0,
@@ -104,25 +107,11 @@ describe("listingOfRecord", () => {
   });
 });
 
-describe("buildListingsDocument", () => {
-  it("orders listings by creation and drops a row the wire does not accept", () => {
-    const later = record({
-      createdAtSec: PositiveInt.orThrow(200),
-      title: "Med",
-    });
-    const broken = record({ amount: "1.234" });
-    const document = buildListingsDocument([later, record(), broken], "want");
-    expect(document.cash).toBe("want");
-    expect(document.listings.map(({ title }) => title)).toEqual([
-      "Domácí vajíčka",
-      "Med",
-    ]);
-  });
-
+describe("listingsPublishFingerprint", () => {
   it("fingerprints a publication, ignoring recipient and relay order", () => {
+    const document = new ListingsDocument({ cash: "want" });
     const publication = {
-      document: buildListingsDocument([record()], null),
-      recipients: [alice, bob],
+      draft: new ListingsDraft({ document, recipients: [alice, bob] }),
       relays: [
         RelayUrl.make("wss://a.example"),
         RelayUrl.make("wss://b.example"),
@@ -133,13 +122,27 @@ describe("buildListingsDocument", () => {
     expect(
       listingsPublishFingerprint({
         ...publication,
-        recipients: [bob, alice],
+        draft: new ListingsDraft({ document, recipients: [bob, alice] }),
         relays: [...publication.relays].reverse(),
       }),
     ).toBe(fingerprint);
     for (const changed of [
-      { document: buildListingsDocument([], "offer") },
-      { recipients: [alice] },
+      {
+        draft: new ListingsDraft({
+          document: new ListingsDocument({ cash: "offer" }),
+          recipients: [alice, bob],
+        }),
+      },
+      { draft: new ListingsDraft({ document, recipients: [alice] }) },
+      {
+        draft: new ListingsDraft({
+          document,
+          recipients: [alice, bob],
+          audiences: [
+            new ListingsAudience({ listings: [], recipients: [alice] }),
+          ],
+        }),
+      },
       { relays: [RelayUrl.make("wss://a.example")] },
       { refreshPeriod: 2 },
     ]) {

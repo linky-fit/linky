@@ -1,5 +1,5 @@
 /**
- * Listings — two real app instances that saved each other.
+ * Listings — real app instances that saved each other.
  *
  * A adds a listing with a description and a photo and says they offer cash;
  * both reach B through A's kind 34133 event on the relay, decrypted through
@@ -7,7 +7,9 @@
  * photo from the stubbed Blossom server. B's own page stays empty until then,
  * which proves the content came from the relay. B replies to the listing in
  * A's chat; A gets the copy, description included, as their own listing and
- * opens it from the message, and back returns to the chat.
+ * opens it from the message, and back returns to the chat. A network listing
+ * travels one hop further: B passes it on in their own event, and C, who knows
+ * only B, sees it through B and never sees A.
  *
  * Needs the docker stack up — see playwright.config.ts.
  */
@@ -252,5 +254,82 @@ test("a listing and the cash intent reach a contact who saved the author back", 
     for (const account of [a, b]) account.errors.assertClean();
   } finally {
     await Promise.all([a.context.close(), b.context.close()]);
+  }
+});
+
+test("a network listing reaches a contact's contact through them, without its author", async ({
+  browser,
+}) => {
+  const a = await bootAccount(browser, "A");
+  const b = await bootAccount(browser, "B");
+  const c = await bootAccount(browser, "C");
+
+  try {
+    await test.step("A and B save each other, and so do B and C", async () => {
+      await addContactByNpub(a.page, b.identity.npub);
+      await addContactByNpub(b.page, a.identity.npub);
+      await addContactByNpub(b.page, c.identity.npub);
+      await addContactByNpub(c.page, b.identity.npub);
+    });
+
+    await test.step("A adds a listing for the network", async () => {
+      await a.page.goto("/#collaboration/listings/new");
+      await a.page.getByTestId("listing-title").fill("Old bike");
+      await a.page.getByTestId("listing-amount").fill("900");
+      await a.page.getByTestId("listing-unit").fill("piece");
+      await a.page.getByRole("radio", { name: "Network" }).click();
+      await a.page.getByTestId("listing-save").click();
+      await a.page.waitForURL(/#collaboration\/listings$/);
+      await expect(a.page.getByTestId("own-listing")).toContainText("Network");
+    });
+
+    await test.step("B sees A as the seller", async () => {
+      await b.page.goto("/#collaboration/listings");
+      const peer = b.page.getByTestId("peer-listing");
+      await expect(peer).toHaveCount(1, { timeout: 60_000 });
+      await expect(peer.getByTestId("listing-seller")).toBeVisible();
+      await expect(peer.getByTestId("listing-placeholder")).toBeVisible();
+    });
+
+    await test.step("C sees it through B and asks B about it", async () => {
+      await c.page.goto("/#collaboration/listings");
+      const peer = c.page.getByTestId("peer-listing");
+      await expect(peer).toHaveCount(1, { timeout: 60_000 });
+      await expect(peer).toContainText("Old bike");
+      await expect(peer.getByTestId("listing-via")).toBeVisible();
+      await expect(peer.getByTestId("listing-seller")).toHaveCount(0);
+
+      await peer.click();
+      await expect(c.page.getByTestId("listing-author")).toHaveCount(0);
+      await c.page.getByTestId("listing-ask-via").click();
+      await c.page.waitForURL(/#chat\/[^/]+$/);
+      await expect(c.page.getByTestId("chat-compose")).toContainText(
+        "Old bike",
+      );
+    });
+
+    await test.step("A narrows it to the contacts and C stops seeing it", async () => {
+      await a.page.goto("/#collaboration/listings");
+      await a.page.getByTestId("own-listing").click();
+      await a.page.getByTestId("listing-edit").click();
+      await a.page.getByRole("radio", { name: "Contacts" }).click();
+      await a.page.getByTestId("listing-save").click();
+      await expect(a.page.getByTestId("listing-audience")).toHaveText(
+        "Contacts",
+      );
+
+      await c.page.goto("/#collaboration/listings");
+      await expect(c.page.getByTestId("peer-listing")).toHaveCount(0, {
+        timeout: 60_000,
+      });
+    });
+
+    for (const account of [a, b, c]) account.errors.assertClean();
+  } finally {
+    await Promise.all([
+      a.context.close(),
+      b.context.close(),
+      c.context.close(),
+    ]);
   }
 });
