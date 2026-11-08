@@ -17,6 +17,7 @@ import {
   Button,
   Row,
   SegmentedControl,
+  SelectField,
   Stack,
   Text,
   TextField,
@@ -46,7 +47,14 @@ import {
   getChatAttachmentRejection,
   uploadPrivateImage,
 } from "../app/lib/privateImageMessage";
+import {
+  LISTING_AUDIENCE_KINDS,
+  listingAudienceColumn,
+  listingAudienceOfRecord,
+  type ListingAudience,
+} from "../app/lib/listingAudience";
 import { runWrite } from "../app/lib/storeWrite";
+import { contactGroupsAtom } from "../app/state/contacts/readModel";
 import {
   currentNsecAtom,
   currentPubkeyAtom,
@@ -66,6 +74,20 @@ const SIDE_KEYS: Record<ListingSide, I18nKey> = {
 
 const isSide = (side: string): side is ListingSide =>
   LISTING_SIDES.some((value) => value === side);
+
+type AudienceKind = ListingAudience["kind"];
+
+const AUDIENCE_KEYS: Record<AudienceKind, { label: I18nKey; hint: I18nKey }> = {
+  network: {
+    label: "listingAudienceNetwork",
+    hint: "listingAudienceNetworkHint",
+  },
+  contacts: {
+    label: "listingAudienceContacts",
+    hint: "listingAudienceContactsHint",
+  },
+  group: { label: "listingAudienceGroup", hint: "listingAudienceGroupHint" },
+};
 
 /** Adds a listing, or edits the one with `id`. The price is in one of the display units enabled in Settings, bitcoin stored as sats; zero makes the listing free and no price leaves it to be agreed. */
 export function ListingFormPage({
@@ -88,6 +110,16 @@ export function ListingFormPage({
     [allowedDisplayCurrencies],
   );
   const [side, setSide] = React.useState<ListingSide>("offer");
+  const { groupNames } = useAtomValue(contactGroupsAtom);
+  const [audienceKind, setAudienceKind] =
+    React.useState<AudienceKind>("contacts");
+  const [group, setGroup] = React.useState<string | null>(null);
+  // An edited listing keeps its group even when no contact is in it any more.
+  const groupChoices =
+    group !== null && !groupNames.includes(group)
+      ? [...groupNames, group]
+      : groupNames;
+  const chosenGroup = group ?? groupNames[0] ?? null;
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [amount, setAmount] = React.useState("");
@@ -116,6 +148,9 @@ export function ListingFormPage({
     if (!existing || loadedId.current === existing.id) return;
     loadedId.current = existing.id;
     if (isSide(existing.side)) setSide(existing.side);
+    const audience = listingAudienceOfRecord(existing);
+    if (audience !== null) setAudienceKind(audience.kind);
+    if (audience?.kind === "group") setGroup(audience.group);
     setTitle(existing.title);
     setDescription(existing.description ?? "");
     setUnit(existing.unit);
@@ -151,7 +186,13 @@ export function ListingFormPage({
   const titleMissing = title.trim().length === 0;
   const unitMissing = unit.trim().length === 0;
   const amountInvalid = normalizedAmount === null;
-  const canSave = !titleMissing && !unitMissing && !amountInvalid;
+  const groupMissing = audienceKind === "group" && chosenGroup === null;
+  const canSave =
+    !titleMissing && !unitMissing && !amountInvalid && !groupMissing;
+  const audience: ListingAudience =
+    audienceKind === "group"
+      ? { kind: "group", group: chosenGroup ?? "" }
+      : { kind: audienceKind };
   const fieldError = (missing: boolean, key: I18nKey): string | undefined =>
     attempted && missing ? t(key) : undefined;
 
@@ -217,6 +258,7 @@ export function ListingFormPage({
     const descriptionValue = trimmedDescription
       ? NonEmptyString1000.orThrow(trimmedDescription)
       : null;
+    const audienceValue = listingAudienceColumn(audience);
     const columns = {
       side: NonEmptyString100.orThrow(side),
       title: NonEmptyString1000.orThrow(title.trim()),
@@ -232,6 +274,7 @@ export function ListingFormPage({
             ...columns,
             description: descriptionValue,
             priceByAgreement: priceByAgreementValue,
+            audience: audienceValue,
           })
         : repository.insert({
             id: createId<"Listing">(),
@@ -243,6 +286,7 @@ export function ListingFormPage({
             ...(priceByAgreementValue === null
               ? {}
               : { priceByAgreement: priceByAgreementValue }),
+            ...(audienceValue === null ? {} : { audience: audienceValue }),
           }),
     );
     setSaving(null);
@@ -253,7 +297,12 @@ export function ListingFormPage({
     reportAppLog({
       tag: existing ? "listings.edited" : "listings.added",
       summary: `Listing ${existing ? "edited" : "added"}: ${side}`,
-      payload: { side, currency, hasImage: image !== null },
+      payload: {
+        side,
+        currency,
+        hasImage: image !== null,
+        audience: audience.kind,
+      },
     });
     if (existing && ownPubkey) {
       navigateTo({
@@ -353,6 +402,37 @@ export function ListingFormPage({
           />
         </Stack>
       </Row>
+      <Stack gap="$sm">
+        <Text variant="label">{t("listingAudience")}</Text>
+        <SegmentedControl
+          accessibilityLabel={t("listingAudience")}
+          value={audienceKind}
+          options={LISTING_AUDIENCE_KINDS.map((value) => ({
+            value,
+            label: t(AUDIENCE_KEYS[value].label),
+          }))}
+          onValueChange={setAudienceKind}
+        />
+        {audienceKind === "group" && chosenGroup !== null ? (
+          <SelectField
+            label={t("listingAudienceGroupPick")}
+            value={chosenGroup}
+            options={groupChoices.map((name) => ({ value: name, label: name }))}
+            onValueChange={setGroup}
+          />
+        ) : null}
+        <Text
+          variant="caption"
+          color={groupMissing ? "$dangerText" : "$colorMuted"}
+          testID="listing-audience-hint"
+        >
+          {t(
+            groupMissing
+              ? "listingAudienceNoGroups"
+              : AUDIENCE_KEYS[audienceKind].hint,
+          )}
+        </Text>
+      </Stack>
       {image ? (
         <Stack gap="$sm">
           <ListingImage source={image} label={t("listingImage")} t={t} />

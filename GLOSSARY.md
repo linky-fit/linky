@@ -334,8 +334,16 @@ _Avoid_: cash status, cash offer, trade (that is the beacon's encoding of it)
 One thing the user offers to, or wants from, their mutual contacts: goods or a service with a title, a price and a unit; a price of zero makes it free, and no price leaves it to be agreed ("dohodou"). Listings live in a synced table and are shared in the listings document.
 _Avoid_: offer (taken by proxy payments), ad, classified, product
 
+**Listing audience**:
+Who sees one of the user's listings: the **contacts** (the default), the **network** (the contacts and the contacts' contacts) or one contact **group**, whose members alone see it.
+_Avoid_: visibility, privacy, reach
+
+**Passed-on listing**:
+A contact's network listing that the user's listings document carries on to the user's own contacts, with its author; it is never passed on further. A reader who does not have its author as a contact sees neither the author's name nor photo, only the contacts it came through.
+_Avoid_: relayed listing (relay is a Nostr server), forwarded listing, shared listing (that is the chat copy)
+
 **Listings document**:
-The one addressable Nostr event (kind 34133) in which a user shares their cash intent and listings; its content is readable only by the contacts the user chose, each through their own key slot. A contact's document reaching the user proves the contact saved them.
+The one addressable Nostr event (kind 34133) in which a user shares their cash intent, listings and passed-on listings; its content is readable only by the contacts the user chose, each through their own key slot, and a group's listings only by its members. A contact's document reaching the user proves the contact saved them.
 _Avoid_: listings event, catalog, shop
 
 **Shared listing**:

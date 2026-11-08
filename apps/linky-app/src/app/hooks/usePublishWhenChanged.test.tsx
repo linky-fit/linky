@@ -1,12 +1,12 @@
 import {
   emptyListingsDocument,
   ListingsDocument,
+  ListingsDraft,
   Pubkey,
   RelayUrl,
-  type ListingsDraft,
 } from "@linky-fit/linkstr";
 import { Exit } from "effect";
-import { act } from "react";
+import React, { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { KeyValuePort } from "../../platform/ports";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
@@ -38,12 +38,15 @@ const publisherOf = (
     document: ListingsDocument;
     relays?: ReadonlyArray<RelayUrl>;
   }) {
+    const draft = React.useMemo(
+      () => new ListingsDraft({ document, recipients: [alice] }),
+      [document],
+    );
     usePublishWhenChanged({
       kv,
       storageKey: "linky.listings.published.test",
       hydrated: true,
-      document,
-      recipients: [alice],
+      draft,
       relays,
       publish,
     });

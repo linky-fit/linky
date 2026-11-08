@@ -10,6 +10,8 @@ import {
   Avatar,
   Button,
   EmptyState,
+  Icon,
+  ListRow,
   Pill,
   Pressable,
   Row,
@@ -34,7 +36,15 @@ import {
   useIsListingHidden,
 } from "../app/lib/hiddenListings";
 import { formatListingPrice, listingOfRecord } from "../app/lib/listings";
-import { peerListingsAtom } from "../app/state/contacts/listings";
+import {
+  listingAudienceLabel,
+  listingAudienceOfRecord,
+  type ListingAudience,
+} from "../app/lib/listingAudience";
+import {
+  useAllPeerListings,
+  type PeerListing,
+} from "../app/hooks/useCollaboration";
 import { currentPubkeyAtom } from "../app/state/session/session";
 import { ListingImage } from "../components/ListingImage";
 import { navigateTo } from "../hooks/useRouting";
@@ -54,25 +64,34 @@ const asContactId = (id: unknown): ContactId | null => {
   return result.ok ? result.value : null;
 };
 
-/** The author's live listing: the own row, or what the author's document shares. */
+/** The author's live listing: the own row with who sees it, or what reaches the user from the author or through contacts. */
 const useLiveListing = (
   author: Pubkey,
   listingId: string,
   isOwn: boolean,
-): Listing | null => {
+): {
+  listing: Listing;
+  audience: ListingAudience | null;
+  via: PeerListing["via"];
+} | null => {
   const records = useListingRecords();
-  const peers = useAtomValue(peerListingsAtom);
+  const entries = useAllPeerListings();
   return React.useMemo(() => {
     if (isOwn) {
       const record = records.find((candidate) => candidate.id === listingId);
-      return record ? listingOfRecord(record) : null;
+      const listing = record ? listingOfRecord(record) : null;
+      return record && listing
+        ? { listing, audience: listingAudienceOfRecord(record), via: [] }
+        : null;
     }
-    return (
-      peers[author]?.document.listings.find(
-        (listing) => listing.id === listingId,
-      ) ?? null
+    const entry = entries.find(
+      (candidate) =>
+        candidate.author === author && candidate.listing.id === listingId,
     );
-  }, [author, isOwn, listingId, peers, records]);
+    return entry
+      ? { listing: entry.listing, audience: null, via: entry.via }
+      : null;
+  }, [author, entries, isOwn, listingId, records]);
 };
 
 /** The author's avatar with their first name under it, beside the title; opens the contact when there is one. */
@@ -129,7 +148,9 @@ export function ListingDetailPage({
   const ownPubkey = useAtomValue(currentPubkeyAtom);
   const ownProfile = useEffectiveProfile();
   const isOwn = author === ownPubkey;
-  const live = useLiveListing(author, listingId, isOwn);
+  const liveEntry = useLiveListing(author, listingId, isOwn);
+  const live = liveEntry?.listing ?? null;
+  const via = messageId ? [] : (liveEntry?.via ?? []);
   const snapshot = useSharedListingOfMessage(messageId);
   const snapshotMatchesRoute =
     snapshot?.author === author && snapshot.listing.id === listingId;
@@ -139,12 +160,16 @@ export function ListingDetailPage({
       : null
     : live && new SharedListing({ author, listing: live });
   const authorNpub = encodeNpub(author);
-  const contact =
-    useContacts().find(
-      (candidate) =>
-        !isDeletedContact(candidate) &&
-        normalizeNpubIdentifier(candidate.npub ?? "") === authorNpub,
-    ) ?? null;
+  const contacts = useContacts();
+  const contactsByNpub = React.useMemo(() => {
+    const byNpub = new Map<string, (typeof contacts)[number]>();
+    for (const candidate of contacts) {
+      const npub = normalizeNpubIdentifier(candidate.npub ?? "");
+      if (npub && !isDeletedContact(candidate)) byNpub.set(npub, candidate);
+    }
+    return byNpub;
+  }, [contacts]);
+  const contact = contactsByNpub.get(authorNpub) ?? null;
   const contactId = asContactId(contact?.id);
   const authorInfo = useNpubMessageContactInfo()(authorNpub);
   const saveNpubContact = useSaveNpubContact();
@@ -162,6 +187,8 @@ export function ListingDetailPage({
   const authorPicture = isOwn
     ? ownProfile.effectiveProfilePicture
     : authorInfo?.pictureUrl;
+  // Someone the user does not know stays anonymous; the contacts it came through stand in for them.
+  const anonymous = !isOwn && contactId === null && via.length > 0;
 
   return (
     <Stack gap="$lg">
@@ -180,16 +207,18 @@ export function ListingDetailPage({
           <Text variant="heading" role="heading" flex={1}>
             {listing.title}
           </Text>
-          <ListingAuthor
-            name={authorName}
-            pictureUrl={authorPicture}
-            label={isOwn ? t("nearbyYou") : firstName(authorName)}
-            onPress={
-              contactId && !isOwn
-                ? () => navigateTo({ route: "contact", id: contactId })
-                : undefined
-            }
-          />
+          {anonymous ? null : (
+            <ListingAuthor
+              name={authorName}
+              pictureUrl={authorPicture}
+              label={isOwn ? t("nearbyYou") : firstName(authorName)}
+              onPress={
+                contactId && !isOwn
+                  ? () => navigateTo({ route: "contact", id: contactId })
+                  : undefined
+              }
+            />
+          )}
         </Row>
         <Row gap="$sm" alignItems="baseline" flexWrap="wrap">
           <Text variant="title" bold testID="listing-price">
@@ -201,6 +230,14 @@ export function ListingDetailPage({
           </Text>
           <Text color="$colorMuted">{listing.unit}</Text>
         </Row>
+        {isOwn && liveEntry ? (
+          <Row gap="$xs" alignItems="center" testID="listing-audience">
+            <Icon name="Eye" size="sm" color="$colorMuted" />
+            <Text variant="caption" color="$colorMuted">
+              {listingAudienceLabel(liveEntry.audience, t)}
+            </Text>
+          </Row>
+        ) : null}
       </Stack>
       {listing.description ? (
         <Text
@@ -226,7 +263,37 @@ export function ListingDetailPage({
           ) : null
         ) : (
           <>
-            {contactId ? (
+            {anonymous ? (
+              <Stack gap="$xs" testID="listing-via-contacts">
+                <Text variant="caption" color="$colorMuted">
+                  {t("listingViaLead")}
+                </Text>
+                {via.map((source) => {
+                  const viaContactId = asContactId(
+                    contactsByNpub.get(encodeNpub(source.pubkey))?.id,
+                  );
+                  return viaContactId ? (
+                    <ListRow
+                      key={source.pubkey}
+                      leading={
+                        <Avatar
+                          name={source.name}
+                          uri={source.pictureUrl ?? undefined}
+                          size="sm"
+                        />
+                      }
+                      title={source.name}
+                      trailing={
+                        <Icon name="Reply" size="sm" color="$colorMuted" />
+                      }
+                      chevron={false}
+                      onPress={() => attachListingToChat(viaContactId, shared)}
+                      testID="listing-ask-via"
+                    />
+                  ) : null;
+                })}
+              </Stack>
+            ) : contactId ? (
               <Button
                 icon="Reply"
                 onPress={() => attachListingToChat(contactId, shared)}

@@ -4,11 +4,13 @@ import { useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
 import { isDeletedContact } from "../../utils/contactName";
 import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
+import { blockListAtom } from "../state/contacts/blockList";
 import { peerListingsAtom } from "../state/contacts/listings";
 import type { ContactRowLike } from "../types/appTypes";
 import type { MessageMentionListing } from "../lib/messageMentions";
 import { hiddenListingKey, useHiddenListingKeys } from "../lib/hiddenListings";
 import { formatListingPrice, listingOfRecord } from "../lib/listings";
+import { peerListingEntries, type ListingSource } from "../lib/listingAudience";
 import { currentPubkeyAtom } from "../state/session/session";
 import {
   useContacts,
@@ -27,9 +29,21 @@ export interface SharingContact {
   readonly listings: ReadonlyArray<Listing>;
 }
 
+/** The author as the user knows them: a saved contact, with the name and photo shown for them. */
+export interface ListingSeller {
+  readonly contact: ContactRowLike;
+  readonly name: string;
+  readonly pictureUrl: string | null;
+}
+
+/** Someone else's listing as the lists show it. */
 export interface PeerListing {
-  readonly contact: SharingContact;
+  readonly author: Pubkey;
   readonly listing: Listing;
+  /** Null when the author is not a contact: then neither their name nor photo is shown, only `via`. */
+  readonly seller: ListingSeller | null;
+  /** The contacts who passed the listing on; empty when the author shares it with the user. */
+  readonly via: ReadonlyArray<ListingSource>;
 }
 
 /**
@@ -72,27 +86,69 @@ export const useSharingContacts = (): ReadonlyArray<SharingContact> => {
   }, [contactInfo, contacts, lang, peers]);
 };
 
-/** Contacts' listings: what they offer and what they want, and the ones hidden on this device. */
+/** Every listing others share with the user: the contacts' own, then those passed on through them from the contacts' contacts. */
+export const useAllPeerListings = (): ReadonlyArray<PeerListing> => {
+  const sharing = useSharingContacts();
+  const peers = useAtomValue(peerListingsAtom);
+  const ownPubkey = useAtomValue(currentPubkeyAtom);
+  const blockList = useAtomValue(blockListAtom);
+  const contacts = useContacts();
+  const contactInfo = useNpubMessageContactInfo();
+  return React.useMemo(() => {
+    const sources = sharing.flatMap((contact): ListingSource[] => {
+      const peer = peers[contact.pubkey];
+      return peer
+        ? [
+            {
+              pubkey: contact.pubkey,
+              name: contact.name,
+              pictureUrl: contact.pictureUrl,
+              updatedAt: peer.updatedAt,
+              document: peer.document,
+            },
+          ]
+        : [];
+    });
+    const sellers = new Map<string, ListingSeller>();
+    for (const contact of contacts) {
+      if (isDeletedContact(contact)) continue;
+      const npub = normalizeNpubIdentifier(contact.npub ?? "");
+      const pubkey = npub ? parsePubkey(npub) : null;
+      const info = npub ? contactInfo(npub) : null;
+      if (!pubkey || !info) continue;
+      sellers.set(pubkey, {
+        contact,
+        name: info.displayName,
+        pictureUrl: info.pictureUrl,
+      });
+    }
+    return peerListingEntries(sources, ownPubkey, new Set(blockList)).map(
+      (entry): PeerListing => ({
+        ...entry,
+        seller: sellers.get(entry.author) ?? null,
+      }),
+    );
+  }, [blockList, contactInfo, contacts, ownPubkey, peers, sharing]);
+};
+
+/** Others' listings: what they offer and what they want, and the ones hidden on this device. */
 export const usePeerListings = (): {
   offered: ReadonlyArray<PeerListing>;
   wanted: ReadonlyArray<PeerListing>;
   hidden: ReadonlyArray<PeerListing>;
 } => {
-  const sharing = useSharingContacts();
+  const entries = useAllPeerListings();
   const hiddenKeys = useHiddenListingKeys();
   return React.useMemo(() => {
-    const entries = sharing.flatMap((contact) =>
-      contact.listings.map((listing): PeerListing => ({ contact, listing })),
-    );
-    const isHidden = ({ contact, listing }: PeerListing) =>
-      hiddenKeys.has(hiddenListingKey(contact.pubkey, listing.id));
+    const isHidden = ({ author, listing }: PeerListing) =>
+      hiddenKeys.has(hiddenListingKey(author, listing.id));
     const shown = entries.filter((entry) => !isHidden(entry));
     return {
       offered: shown.filter(({ listing }) => listing.side === "offer"),
       wanted: shown.filter(({ listing }) => listing.side === "want"),
       hidden: entries.filter(isHidden),
     };
-  }, [hiddenKeys, sharing]);
+  }, [entries, hiddenKeys]);
 };
 
 /** Contacts by cash intent. */

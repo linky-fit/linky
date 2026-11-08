@@ -2,11 +2,10 @@ import {
   LISTING_SAT_CURRENCY,
   Listing,
   listingPriceKind,
-  ListingsDocument,
+  ListingsDraft,
   PrivateImage,
   type CashIntent,
   type ListingSide,
-  type Pubkey,
   type RelayUrl,
 } from "@linky-fit/linkstr";
 import type { ListingRecord } from "@linky-fit/linksync";
@@ -60,24 +59,8 @@ export const listingOfRecord = (record: ListingRecord): Listing | null => {
   );
 };
 
-/** The document to publish: every valid stored listing, oldest first, plus the cash intent. */
-export const buildListingsDocument = (
-  records: ReadonlyArray<ListingRecord>,
-  cash: CashIntent | null,
-): ListingsDocument =>
-  new ListingsDocument({
-    cash,
-    listings: [...records]
-      .sort((left, right) => left.createdAtSec - right.createdAtSec)
-      .flatMap((record) => {
-        const listing = listingOfRecord(record);
-        return listing === null ? [] : [listing];
-      }),
-  });
-
 export interface ListingsPublication {
-  readonly document: ListingsDocument;
-  readonly recipients: ReadonlyArray<Pubkey>;
+  readonly draft: ListingsDraft;
   readonly relays: ReadonlyArray<RelayUrl>;
   /** Changes on a schedule, so relays that dropped the events get them again. */
   readonly refreshPeriod: number;
@@ -85,14 +68,17 @@ export interface ListingsPublication {
 
 /** What a publish depends on, as text: equal text means the relays already hold it. */
 export const listingsPublishFingerprint = ({
-  document,
-  recipients,
+  draft,
   relays,
   refreshPeriod,
 }: ListingsPublication): string =>
   JSON.stringify({
-    document: Schema.encodeSync(ListingsDocument)(document),
-    recipients: [...recipients].sort(),
+    draft: Schema.encodeSync(ListingsDraft)(
+      new ListingsDraft({
+        ...draft,
+        recipients: [...draft.recipients].sort(),
+      }),
+    ),
     relays: [...relays].sort(),
     refreshPeriod,
   });

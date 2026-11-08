@@ -15,6 +15,7 @@ import {
   PositiveInt,
   type ListingRecord,
 } from "@linky-fit/linksync";
+import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { act } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { resetHiddenListingsForTests } from "../app/lib/hiddenListings";
@@ -28,6 +29,7 @@ const ME = Pubkey.make(
 const PEER = Pubkey.make(
   "32e1827635450ebb3c5a7d12c1f8e7b2b514439ac10a67eef3d9fd9c5c68e245",
 );
+const STRANGER = makeIdentity().pubkey;
 const ownId = createIdFromString<"Listing">("own-listing");
 const contactId = createIdFromString<"Contact">("peer-contact");
 const messageId = createId<"Message">();
@@ -41,6 +43,8 @@ const peerListing = new Listing({
   unit: "per 10",
 });
 
+const bike = new Listing({ ...peerListing, id: "bike", title: "Old bike" });
+
 const ownRecord: ListingRecord = {
   id: ownId,
   createdAtSec: PositiveInt.orThrow(100),
@@ -52,6 +56,7 @@ const ownRecord: ListingRecord = {
   priceByAgreement: null,
   description: null,
   image: null,
+  audience: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
   isDeleted: 0,
@@ -75,7 +80,15 @@ vi.mock("@linky-fit/linkstr-react", () => ({
     atom === currentPubkeyAtom
       ? ME
       : atom === peerListingsAtom
-        ? { [PEER]: { document: { listings: [peerListing] }, updatedAt: 1 } }
+        ? {
+            [PEER]: {
+              document: {
+                listings: [peerListing],
+                passedOn: [{ author: STRANGER, listing: bike }],
+              },
+              updatedAt: 1,
+            },
+          }
         : null,
 }));
 vi.mock("../app/state/session/session", () => ({
@@ -137,6 +150,9 @@ it("shows the user's own listing as theirs, with edit and nothing to hide", asyn
     "nearbyYou",
   );
   expect(byTestId(container, "listing-edit")).not.toBeNull();
+  expect(byTestId(container, "listing-audience")?.textContent).toBe(
+    "listingAudienceContacts",
+  );
   expect(byTestId(container, "listing-reply")).toBeNull();
   expect(byTestId(container, "listing-hide")).toBeNull();
   expect(byTestId(container, "listing-description")).toBeNull();
@@ -158,6 +174,25 @@ it("replies to a contact's listing in their chat", async () => {
   expect(attachListingToChat).toHaveBeenCalledExactlyOnceWith(
     contactId,
     new SharedListing({ author: PEER, listing: peerListing }),
+  );
+  await unmount();
+});
+
+it("keeps the author of a listing from the network anonymous and asks the contact it came through", async () => {
+  state.contacts = [{ id: contactId, name: "Alice", npub: encodeNpub(PEER) }];
+  const { container, unmount } = await renderIntoDocument(
+    <ListingDetailPage author={STRANGER} listingId="bike" messageId={null} />,
+  );
+  expect(container.textContent).toContain("Old bike");
+  expect(byTestId(container, "listing-author")).toBeNull();
+  expect(byTestId(container, "listing-add-author")).toBeNull();
+  expect(byTestId(container, "listing-via-contacts")?.textContent).toContain(
+    "Alice",
+  );
+  await act(async () => byTestId(container, "listing-ask-via")?.click());
+  expect(attachListingToChat).toHaveBeenCalledExactlyOnceWith(
+    contactId,
+    new SharedListing({ author: STRANGER, listing: bike }),
   );
   await unmount();
 });
