@@ -28,10 +28,14 @@ import { ClientId, Pubkey, RelayUrl, UnixSeconds } from "../domain/primitives";
 import { WrapInbox } from "../inbox/WrapInbox";
 import { wrapRumorFor } from "../internal/giftWrap";
 import type { SignedWrapEvent } from "../internal/nostrEvent";
-import { Listing, ListingAmount, ListingCurrency } from "../listings/domain";
+import {
+  Listing,
+  ListingAmount,
+  ListingCurrency,
+  SharedListing,
+} from "../listings/domain";
 import {
   SHARED_LISTING_MARKER_PREFIX,
-  SharedListing,
   sharedListingMessageText,
 } from "../listings/sharedListing";
 import { NostrConnectRequest } from "../nostrConnect/domain";
