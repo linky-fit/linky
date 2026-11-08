@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "start": "bun run src/index.ts",
-    "build": "bun build ./src/index.ts --outdir ./dist --target bun",
+    "build": "bun build ./src/index.ts ./src/cutover.ts --outdir ./dist --target bun",
+    "cutover": "bun run src/cutover.ts",
     "eslint": "eslint --fix .",
     "prettier": "prettier --write .",
     "test": "bun test src",
@@ -19,6 +20,7 @@
     "@noble/hashes": "^2.0.1",
     "effect": "^4.0.0",
     "jsonwebtoken": "^9.0.2",
+    "light-bolt11-decoder": "^3.2.0",
     "nostr-tools": "^2.25.2"
   },
   "devDependencies": {
