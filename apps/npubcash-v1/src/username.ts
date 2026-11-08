@@ -31,6 +31,9 @@ const PaymentTokenPayload = Schema.Struct({
 });
 const decodePaymentTokenPayload = Schema.decodeUnknownSync(PaymentTokenPayload);
 
+export const isValidUsername = (name: string) =>
+  USERNAME.test(name) && name.length >= 3;
+
 export const usernameFeeSats = (name: string) =>
   SPECIAL_USERNAME_FEE_SATS[name] ?? DEFAULT_USERNAME_FEE_SATS;
 
@@ -48,7 +51,7 @@ export async function putUsername(
 ): Promise<Response> {
   if (!username) return failure(400, "Missing parameters");
   const name = username.toLowerCase().trim();
-  if (!USERNAME.test(name) || name.length < 3) {
+  if (!isValidUsername(name)) {
     return failure(400, "Invalid username");
   }
   if ((await deps.db.user(pubkey))?.name) {

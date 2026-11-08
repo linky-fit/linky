@@ -40,7 +40,7 @@ FROM oven/bun:1.4.4-alpine AS runtime
 
 WORKDIR /app
 
-COPY --from=build /app/apps/npubcash-v1/dist/index.js /app/index.js
+COPY --from=build /app/apps/npubcash-v1/dist/ /app/
 
 ARG GIT_COMMIT_SHA=unknown
 
