@@ -12,19 +12,30 @@ import {
 import { safeFetch } from "../_safeFetch.js";
 
 const LnurlMetadata = Schema.fromJsonString(
-  Schema.Array(Schema.Tuple([Schema.String, Schema.String])),
+  Schema.Array(Schema.Array(Schema.Unknown)),
 );
 
-const rewriteIdentifier = (metadata: unknown, identifier: string): unknown => {
+const IDENTIFIER_TYPE = "text/identifier";
+
+// Safe only while upstream invoices carry no description hash committing to the metadata.
+const rewriteIdentifier = (
+  metadata: unknown,
+  user: string,
+  publicOrigin: string,
+): unknown => {
   const entries = Option.getOrNull(
     Schema.decodeUnknownOption(LnurlMetadata)(metadata),
   );
-  if (!entries?.some(([type]) => type === "text/identifier")) return metadata;
+  const host = URL.parse(publicOrigin)?.host;
+  if (!host || !entries?.some(([type]) => type === IDENTIFIER_TYPE)) {
+    return metadata;
+  }
   return JSON.stringify(
-    entries.map(([type, value]) => [
-      type,
-      type === "text/identifier" ? identifier : value,
-    ]),
+    entries.map((entry) =>
+      entry[0] === IDENTIFIER_TYPE
+        ? [IDENTIFIER_TYPE, `${user.toLowerCase()}@${host}`]
+        : entry,
+    ),
   );
 };
 
@@ -38,10 +49,7 @@ const rewritePayRequest = (
   return JSON.stringify({
     ...payload,
     callback: `${publicOrigin}/.well-known/lnurlp/${encodeURIComponent(user)}`,
-    metadata: rewriteIdentifier(
-      payload.metadata,
-      `${user.toLowerCase()}@${new URL(publicOrigin).host}`,
-    ),
+    metadata: rewriteIdentifier(payload.metadata, user, publicOrigin),
   });
 };
 
