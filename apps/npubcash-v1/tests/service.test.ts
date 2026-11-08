@@ -255,6 +255,20 @@ describe("worker and claim", () => {
     await tick();
     expect((await claimOf(quoteId))?.status).toBe("issued_elsewhere");
   });
+
+  test("keeps the proofs of a mint that finished after a concurrent caller saw ISSUED", async () => {
+    const key = { mint_url: mintUrl, quote_id: "raced-quote" };
+    await db.insertClaim({
+      ...key,
+      pubkey: getPublicKey(generateSecretKey()),
+      amount: 1,
+      output_amounts: [1],
+      status: "minting",
+    });
+    await db.moveClaim(key, "minting", "issued_elsewhere");
+    await db.storeProofs(key, [{ id: "00", amount: 1, secret: "s", C: "c" }]);
+    expect((await claimOf(key.quote_id))?.status).toBe("ready");
+  });
 });
 
 describe("info", () => {
