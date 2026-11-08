@@ -115,6 +115,44 @@ services:
       <<: *cashu-mint-environment
       MINT_PRIVATE_KEY: LOCAL_DEV_ONLY_TARGET_MINT_KEY
 
+  # Upstream npubcash-server v3 at the commit npub.linky.fit runs (#694): the
+  # hosted lightning address API (`/api/v2`, LNURL) on SQLite. FakeWallet
+  # settles every invoice it requests, so asking its LNURL endpoint for an
+  # invoice pays the address.
+  npubcash-server:
+    image: linky-npubcash-server:c7d2ed8
+    build: https://github.com/cashubtc/npubcash-server.git#c7d2ed817d22c32d779b57ba42c06b759bc7437a
+    ports:
+      - "${LINKY_E2E_NPUBCASH_PORT:-3400}:8000"
+    environment:
+      # Plain http; production redirects it to https.
+      NODE_ENV: development
+      API_MODE: API_ONLY
+      DATABASE_URL: /data/npubcash.db
+      MINTURL: http://localhost:${LINKY_E2E_MINT_PORT:-3338}
+      MNEMONIC: abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,abandon,about
+      MINT_QUOTE_ACTIVE_POLL_MS: "1000"
+    volumes:
+      - npubcash-server-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000/api/v2/info >/dev/null || exit 1"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 3s
+
+  # The browser and npubcash-server must name a mint by the same URL, and the
+  # browser only reaches it at its host-published localhost port. This
+  # forwards those ports inside npubcash-server's network namespace.
+  npubcash-mint-ports:
+    image: docker.io/alpine/socat:1.8.0.3
+    network_mode: service:npubcash-server
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        socat TCP-LISTEN:${LINKY_E2E_MINT_PORT:-3338},fork,reuseaddr TCP:cashu-mint:3338 &
+        socat TCP-LISTEN:${LINKY_E2E_TARGET_MINT_PORT:-3339},fork,reuseaddr TCP:cashu-mint-target:3338
+
   # Production build of the web app for the `local-stack` Playwright project;
   # not used by `bun run dev`. Endpoints are build args because Vite inlines
   # import.meta.env; the browser runs on the host, so these are host-published
@@ -131,7 +169,8 @@ services:
         VITE_NOSTR_RELAYS: ws://localhost:${LINKY_E2E_NOSTR_PORT:-7777}
         VITE_EVOLU_SERVER_URLS: ws://localhost:${LINKY_E2E_EVOLU_PORT:-4001}
         VITE_MAIN_MINT_URL: http://localhost:${LINKY_E2E_MINT_PORT:-3338}
-        VITE_NPUB_CASH_DISABLED: "true"
+        VITE_NPUB_CASH_SERVER_URL: http://localhost:${LINKY_E2E_NPUBCASH_PORT:-3400}
+        VITE_NPUB_CASH_UPSTREAM_URL: ""
         VITE_PUSH_SERVER_URL: http://localhost:8787
         # Installs window.__linkyE2E, the seed/read hooks the Playwright suites use.
         VITE_E2E: "1"
@@ -240,5 +279,6 @@ volumes:
   evolu-relay-quota-data:
   cashu-mint-data:
   cashu-mint-target-data:
+  npubcash-server-data:
   bitcoind-data:
   electrs-data:

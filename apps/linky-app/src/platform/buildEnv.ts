@@ -6,14 +6,15 @@ export const isDevBuild: boolean = import.meta.env.DEV;
 export const isE2eBuild = import.meta.env.VITE_E2E === "1";
 export const allowInsecureLocalhostRelays =
   import.meta.env.VITE_ALLOW_INSECURE_LOCALHOST_RELAYS === "1";
-export const npubCashDisabled =
-  import.meta.env.VITE_NPUB_CASH_DISABLED === "true";
 
 export const envNostrRelays = import.meta.env.VITE_NOSTR_RELAYS;
 export const envNostrSearchRelays = import.meta.env.VITE_NOSTR_SEARCH_RELAYS;
 export const envEvoluServerUrls = import.meta.env.VITE_EVOLU_SERVER_URLS;
 export const envMainMintUrl = import.meta.env.VITE_MAIN_MINT_URL;
 export const envPushServerUrl = import.meta.env.VITE_PUSH_SERVER_URL;
+export const envNpubCashServerUrl = import.meta.env.VITE_NPUB_CASH_SERVER_URL;
+export const envNpubCashUpstreamUrl = import.meta.env
+  .VITE_NPUB_CASH_UPSTREAM_URL;
 export const envNotificationServerUrl = import.meta.env
   .VITE_NOTIFICATION_SERVER_URL;
 /** The on-chain operator's npub; on-chain transfers stay hidden without one. */

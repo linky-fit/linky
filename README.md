@@ -81,7 +81,7 @@ Tools: [`apps/linkshu-cli`](./apps/linkshu-cli/README.md) (terminal Cashu wallet
 
 ## Development
 
-Requirements: Bun and Docker (local Nostr relay, Evolu relay and FakeWallet Cashu mint). Android builds need Java 17.
+Requirements: Bun and Docker (local Nostr relay, Evolu relay, FakeWallet Cashu mint and npubcash-server). Android builds need Java 17.
 
 ```bash
 bun install
@@ -93,6 +93,8 @@ bun run check-code    # typecheck, eslint --fix, prettier --write
 bun run test-changed  # unit tests in the workspaces this branch reaches
 bun run check-changed # check-code in the workspaces this branch reaches
 ```
+
+The stack's npubcash-server (upstream v3, the commit `npub.linky.fit` runs) serves the hosted lightning address on http://localhost:3400. The FakeWallet mint settles every invoice, so asking it for one pays the address: `curl "$(curl -s localhost:3400/.well-known/lnurlp/<npub> | jq -r .callback)?amount=21000"`. The v1 compatibility service does not run locally.
 
 Bitcoin regtest for on-chain transfers (Docker profile `bitcoin`, not started by `bun run dev` or the e2e stack): bitcoind RPC on `localhost:18443` (`linky`/`linky`), Esplora API on http://localhost:3002, block explorer on http://localhost:3003.
 

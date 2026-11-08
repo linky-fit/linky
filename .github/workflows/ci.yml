@@ -191,6 +191,8 @@ jobs:
               --set 'evolu-relay.cache-to=type=gha,scope=evolu-relay,mode=max' \
               --set 'linky-app.cache-from=type=gha,scope=linky-app' \
               --set 'linky-app.cache-to=type=gha,scope=linky-app,mode=max' \
+              --set 'npubcash-server.cache-from=type=gha,scope=npubcash-server' \
+              --set 'npubcash-server.cache-to=type=gha,scope=npubcash-server,mode=max' \
               --load &
             bake=$!
             status=0

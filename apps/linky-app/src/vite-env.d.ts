@@ -9,7 +9,10 @@ interface ImportMetaEnv {
   readonly VITE_NOSTR_SEARCH_RELAYS?: string;
   readonly VITE_EVOLU_SERVER_URLS?: string;
   readonly VITE_MAIN_MINT_URL?: string;
-  readonly VITE_NPUB_CASH_DISABLED?: string;
+  /** Linky's npubcash-server; production's when unset. */
+  readonly VITE_NPUB_CASH_SERVER_URL?: string;
+  /** The npub.cash host swept beside it; production's when unset, none when empty. */
+  readonly VITE_NPUB_CASH_UPSTREAM_URL?: string;
   readonly VITE_PUSH_SERVER_URL?: string;
   readonly VITE_NOTIFICATION_SERVER_URL?: string;
   /** The on-chain operator's npub; unset hides on-chain transfers. */
