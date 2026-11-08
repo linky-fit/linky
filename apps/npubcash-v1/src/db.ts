@@ -150,7 +150,10 @@ export class Database {
       WHERE mint_url = ${key.mint_url} AND quote_id = ${key.quote_id} AND status = 'unpaid'`;
   }
 
-  /** Stores the proofs and marks v3's quote `ISSUED` together, so a crash leaves neither. */
+  /**
+   * Stores the proofs and marks v3's quote `ISSUED` together, so a crash leaves neither.
+   * Overrides `issued_elsewhere`, which a concurrent caller sets when it sees our own mint finish first.
+   */
   async storeProofs(
     key: ClaimKey,
     proofs: readonly StoredProof[],
@@ -158,7 +161,8 @@ export class Database {
     await this.sql.begin(async (tx) => {
       await tx`
         UPDATE v1_claims SET proofs = ${proofs}, status = 'ready'
-        WHERE mint_url = ${key.mint_url} AND quote_id = ${key.quote_id} AND status = 'minting'`;
+        WHERE mint_url = ${key.mint_url} AND quote_id = ${key.quote_id}
+          AND status IN ('minting', 'issued_elsewhere')`;
       await tx`
         UPDATE mint_quotes SET state = 'ISSUED', paid_at = COALESCE(paid_at, NOW())
         WHERE mint_url = ${key.mint_url} AND quote_id = ${key.quote_id} AND state <> 'ISSUED'`;
