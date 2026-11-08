@@ -86,6 +86,11 @@ export class Listings extends Context.Service<Listings>()("linkstr/Listings", {
           inspectPlainOperation(inspector, "listings.publish", {
             cash: draft.document.cash,
             listings: draft.document.listings.length,
+            passedOn: draft.document.passedOn?.length ?? 0,
+            audiences: draft.audiences.map((audience) => ({
+              listings: audience.listings.length,
+              recipients: audience.recipients.length,
+            })),
             recipients: draft.recipients.length,
           }),
         ),

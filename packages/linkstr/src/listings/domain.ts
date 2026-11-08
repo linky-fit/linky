@@ -2,6 +2,10 @@ import { Effect, Schema } from "effect";
 import { PrivateImage } from "../chat/domain";
 import { Pubkey } from "../domain/primitives";
 
+/** How far a listing may travel: `network` lets its readers pass it on to their own contacts, once. */
+export const ListingReach = Schema.Literal("network");
+export type ListingReach = typeof ListingReach.Type;
+
 /** Whether the author offers the listing or looks for it. */
 export const ListingSide = Schema.Literals(["offer", "want"]);
 export type ListingSide = typeof ListingSide.Type;
@@ -66,6 +70,10 @@ export class Listing extends Schema.Class<Listing>("Listing")({
   image: Schema.optionalKey(
     PrivateImage.pipe(Schema.catchDecoding(() => Effect.succeedNone)),
   ),
+  /** `network`: the readers may pass the listing on to their own contacts; any other value decodes as none. */
+  audience: Schema.optionalKey(
+    ListingReach.pipe(Schema.catchDecoding(() => Effect.succeedNone)),
+  ),
 }) {}
 
 /** What a listing asks for: its `amount`, nothing, or a price the two parties agree on. */
@@ -81,6 +89,11 @@ export const listingPriceKind = ({
       ? "by-agreement"
       : "free";
 
+/** A listing with its author, as a chat message or a passed-on listing carries a copy of it. */
+export class SharedListing extends Schema.Class<SharedListing>("SharedListing")(
+  { author: Pubkey, listing: Listing },
+) {}
+
 /** Everything one author shares with the contacts that can read it; the newest replaces the whole document. */
 export class ListingsDocument extends Schema.Class<ListingsDocument>(
   "ListingsDocument",
@@ -93,18 +106,44 @@ export class ListingsDocument extends Schema.Class<ListingsDocument>(
     Schema.withDecodingDefaultType(Effect.succeed([])),
     Schema.withConstructorDefault(Effect.succeed([])),
   ),
+  /**
+   * Contacts' `network` listings the author passes on to their own contacts,
+   * each with its original author; never passed on again. A malformed list
+   * decodes as empty, so it never costs the document.
+   */
+  passedOn: Schema.optionalKey(
+    Schema.Array(SharedListing).pipe(
+      Schema.catchDecoding(() => Effect.succeedNone),
+    ),
+  ),
 }) {}
 
 /** A document with no cash intent and no listings, which is what an author publishes to withdraw everything. */
 export const emptyListingsDocument = new ListingsDocument({});
 
 export const isEmptyListingsDocument = (document: ListingsDocument): boolean =>
-  document.cash === null && document.listings.length === 0;
+  document.cash === null &&
+  document.listings.length === 0 &&
+  (document.passedOn ?? []).length === 0;
+
+/** Listings only some of the recipients may read, on top of the document. */
+export class ListingsAudience extends Schema.Class<ListingsAudience>(
+  "ListingsAudience",
+)({
+  listings: Schema.Array(Listing),
+  /** Who reads these listings; a pubkey missing from the draft's `recipients` reads nothing. */
+  recipients: Schema.Array(Pubkey),
+}) {}
 
 export class ListingsDraft extends Schema.Class<ListingsDraft>("ListingsDraft")(
   {
     document: ListingsDocument,
     /** The contacts given a key slot; nobody else can read the content. The author needs no slot. */
     recipients: Schema.Array(Pubkey),
+    /** Listings for some recipients only, such as a group of contacts; each reader gets the document's listings followed by those of their audiences. */
+    audiences: Schema.Array(ListingsAudience).pipe(
+      Schema.withDecodingDefaultType(Effect.succeed([])),
+      Schema.withConstructorDefault(Effect.succeed([])),
+    ),
   },
 ) {}
