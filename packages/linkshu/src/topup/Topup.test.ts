@@ -512,6 +512,29 @@ describe("Topup", () => {
     },
   );
 
+  it("keeps the operation when the mint has not confirmed its restored outputs spent", async () => {
+    const storage = freshStorage();
+    await writePendingTopup(storage, { counter: 1 });
+    const resuming = makeWallet({
+      states: [quoteResponse("ISSUED")],
+      restore: () =>
+        Promise.resolve({ proofs: mintedProofs, lastCounterWithSignature: 2 }),
+    });
+    const wallet: LoadedWallet = {
+      ...resuming.wallet,
+      checkProofsStates: answerProofStates(() => "PENDING"),
+    };
+
+    const resumed = await makeHarness(wallet, storage).run(
+      Effect.result(resumeAndAwait),
+    );
+
+    assert(Exit.isSuccess(resumed));
+    assert(resumed.value._tag === "Failure");
+    expect(resumed.value.failure._tag).toBe("MintRejected");
+    expect(await pendingTopups(storage)).toHaveLength(1);
+  });
+
   it("resolves to the stored proofs when they landed before the crash", async () => {
     const storage = freshStorage();
     const first = makeWallet({ states: [quoteResponse("PAID")] });

@@ -93,7 +93,7 @@ A lightning-address server can create a mint quote for the wallet and pay its in
 
 A pending topup already recorded for the quote is minted through the same claim. Otherwise the mint's `UNPAID` answer is a `MintRejected`, and already issued without a local record is `QuoteAlreadyIssued` (another wallet minted it).
 
-A claim that finds the quote already issued restores the outputs its record reserved (NUT-09). When the record reserved none, or none of the restored proofs is unspent, another wallet minted the quote: `result` and `adopt` fail with `QuoteAlreadyIssued` and the operation closes `failed`. A mint call refused because the quote is already issued stays a `MintRejected` with the operation `pending`, so a lost response is still reclaimed on resume.
+A claim that finds the quote already issued restores the outputs its record reserved (NUT-09). When the record reserved none, or the restore finds nothing or only proofs the mint reports spent, another wallet minted the quote: `result` and `adopt` fail with `QuoteAlreadyIssued` and the operation closes `failed`. A mint call refused because the quote is already issued stays a `MintRejected` with the operation `pending`, so a lost response is still reclaimed on resume.
 
 ## Errors
 
