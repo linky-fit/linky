@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { SQL } from "bun";
 import { nip19 } from "nostr-tools";
 import { buildPlan } from "../src/cutover/plan";
-import { applyPlan, readFork } from "../src/cutover/run";
+import { applyPlan, assertNoOtherClients, readFork } from "../src/cutover/run";
 import { Database } from "../src/db";
 
 // Needs only a Postgres server; no mint.
@@ -50,18 +50,22 @@ beforeAll(async () => {
       id BIGINT PRIMARY KEY, "user" TEXT NOT NULL, mint_url TEXT NOT NULL, proof JSONB NOT NULL,
       status TEXT NOT NULL, transaction_id BIGINT REFERENCES l_transactions(id));
     CREATE TABLE l_service_revenue_claims (
-      id SERIAL PRIMARY KEY, quote_id TEXT NOT NULL, amount BIGINT NOT NULL, proof JSONB NOT NULL);`);
+      id SERIAL PRIMARY KEY, quote_id TEXT NOT NULL, amount BIGINT NOT NULL, proof JSONB NOT NULL);
+    CREATE TABLE pgmigrations (id SERIAL PRIMARY KEY, name TEXT NOT NULL);
+    INSERT INTO pgmigrations (name) VALUES ('1794043600000_reoffer-unconfirmed-claims');`);
   await fork`
     INSERT INTO l_users (pubkey, name, mint_url)
     VALUES (${alice}, 'alice', 'https://cashu.cz/'), (${bob}, NULL, 'https://cashu.cz/')`;
   await fork`
     INSERT INTO l_transactions (id, "user", mint_url, mint_pr, cashu_quote_id, amount, fulfilled)
     VALUES (1, 'alice', 'https://cashu.cz/', ${INVOICE}, 'q1', 250000, NULL),
-           (2, ${nip19.npubEncode(bob)}, 'https://cashu.cz/', ${INVOICE}, 'q2', 8, true)`;
+           (2, ${nip19.npubEncode(bob)}, 'https://cashu.cz/', ${INVOICE}, 'q2', 8, true),
+           (3, 'alice', 'https://cashu.cz/', ${INVOICE}, 'q3', 250000, false)`;
   await fork`
     INSERT INTO l_claims_3 (id, "user", mint_url, proof, status, transaction_id)
     VALUES (1, ${nip19.npubEncode(bob)}, 'https://cashu.cz/', ${forkProof(8, "s1")}, 'inflight', 2),
-           (2, ${nip19.npubEncode(bob)}, 'https://cashu.cz/', ${forkProof(4, "s2")}, 'spent', 2)`;
+           (2, ${nip19.npubEncode(bob)}, 'https://cashu.cz/', ${forkProof(4, "s2")}, 'spent', 2),
+           (3, 'alice', 'https://cashu.cz/', ${forkProof(250000, "s3")}, 'spent', 3)`;
   await fork`
     INSERT INTO l_service_revenue_claims (quote_id, amount, proof)
     VALUES ('fee1', 5000, ${forkProof(4096, "f1")}), ('fee1', 5000, ${forkProof(904, "f2")})`;
@@ -94,8 +98,7 @@ describe("cutover", () => {
   test("refuses while another client uses the fork database", async () => {
     const forkProcess = new SQL({ url: urlOf(forkName), max: 1 });
     await forkProcess`SELECT 1`;
-    const plan = buildPlan(await readFork(fork), options);
-    await expect(applyPlan(fork, v3, plan)).rejects.toThrow(
+    await expect(assertNoOtherClients(fork, v3)).rejects.toThrow(
       "fork database has 1",
     );
     await forkProcess.close();
@@ -104,7 +107,16 @@ describe("cutover", () => {
   test("copies users, open quotes and unsettled proofs into v3", async () => {
     const plan = buildPlan(await readFork(fork), options);
     expect(plan.problems).toEqual([]);
-    await applyPlan(fork, v3, plan);
+    expect(
+      plan.quotes.map(({ quote_id, fork_has_proofs }) => ({
+        quote_id,
+        fork_has_proofs,
+      })),
+    ).toEqual([
+      { quote_id: "q1", fork_has_proofs: false },
+      { quote_id: "q3", fork_has_proofs: true },
+    ]);
+    await applyPlan(v3, plan);
 
     expect(
       await v3`SELECT pubkey, name, mint_url FROM l_users ORDER BY pubkey`,
@@ -115,16 +127,16 @@ describe("cutover", () => {
     expect(
       await v3`
         SELECT quote_id, pubkey, amount, state, last_polled_at IS NOT NULL AS polled
-        FROM mint_quotes`,
-    ).toEqual([
-      {
-        quote_id: "q1",
+        FROM mint_quotes ORDER BY quote_id`,
+    ).toEqual(
+      ["q1", "q3"].map((quote_id) => ({
+        quote_id,
         pubkey: alice,
         amount: 250000,
         state: "UNPAID",
         polled: true,
-      },
-    ]);
+      })),
+    );
 
     const service = new Database(urlOf(v3Name));
     expect(await service.readyClaimsOf(bob, 100)).toEqual([
@@ -149,7 +161,7 @@ describe("cutover", () => {
 
   test("refuses a second run", async () => {
     const plan = buildPlan(await readFork(fork), options);
-    await expect(applyPlan(fork, v3, plan)).rejects.toThrow(
+    await expect(applyPlan(v3, plan)).rejects.toThrow(
       "v3 database already holds users, quotes or claims",
     );
   });
