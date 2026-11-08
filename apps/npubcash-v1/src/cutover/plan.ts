@@ -140,6 +140,7 @@ export function buildPlan(
     if (lowered !== null && !isValidUsername(lowered)) {
       problems.push(`user ${pubkey}: v3 rejects the name "${name}"`);
     }
+    if (mint_url !== null) checkMintUrl(mint_url, `user ${pubkey}`);
     return { pubkey, name: lowered, mint_url: mint_url ?? forkMintUrl };
   });
   for (const name of duplicates(users.flatMap(({ name }) => name ?? []))) {

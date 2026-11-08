@@ -183,7 +183,7 @@ describe("buildPlan", () => {
         users: [
           { pubkey: alice, name: "alice", mint_url: null },
           { pubkey: bob, name: "ALICE", mint_url: null },
-          { pubkey: operator, name: "a-b", mint_url: null },
+          { pubkey: operator, name: "a-b", mint_url: "cashu" },
         ],
         openQuotes: [
           {
@@ -244,6 +244,7 @@ describe("buildPlan", () => {
       "the fork has not run migration 1794043600000_reoffer-unconfirmed-claims, so its spent rows may hold unspent proofs",
       'l_claims_3 has rows in unknown status "withdrawn"',
       `user ${operator}: v3 rejects the name "a-b"`,
+      `user ${operator}: unreadable mint URL "cashu"`,
       'name "alice" belongs to several users',
       'transaction 1: owner "carol" has no pubkey',
       "transaction 2: unreadable invoice",
