@@ -32,8 +32,10 @@ import {
   Listing,
   ListingAmount,
   ListingCurrency,
+  ListingsAudience,
   ListingsDocument,
   ListingsDraft,
+  SharedListing,
 } from "./domain";
 import { ListingsEventDropped } from "./events";
 import type { ListingsUpdated } from "./events";
@@ -234,6 +236,91 @@ describe("listing description", () => {
     const listing = descriptionOf(value);
     expect(listing.title).toBe(eggs.title);
     expect("description" in listing).toBe(false);
+  });
+});
+
+describe("listing audiences", () => {
+  const honey = new Listing({ ...eggs, id: "honey", title: "Med" });
+  const audienceEvents = (recipients: ReadonlyArray<Pubkey>) =>
+    encodeListingsEvents(
+      new ListingsDraft({
+        document,
+        recipients,
+        audiences: [
+          new ListingsAudience({ listings: [honey], recipients: [bob.pubkey] }),
+        ],
+      }),
+      alice.secretKey,
+    ).map((template) =>
+      signPlainEvent(template, UnixSeconds.make(base), alice.secretKey),
+    );
+
+  it("lets only the audience read its listings, after the document's", () => {
+    const [event] = audienceEvents([bob.pubkey, carol.pubkey]);
+    if (event === undefined) throw new Error("a publish has a chunk");
+    expect(event.content).not.toContain("Med");
+    expect(
+      documentOf(decodeListingsEvent(event, bob.secretKey))?.listings,
+    ).toEqual([eggs, honey]);
+    expect(documentOf(decodeListingsEvent(event, carol.secretKey))).toEqual(
+      document,
+    );
+  });
+
+  it("gives an audience member outside the recipients nothing", () => {
+    const [event] = audienceEvents([carol.pubkey]);
+    if (event === undefined) throw new Error("a publish has a chunk");
+    expect(documentOf(decodeListingsEvent(event, bob.secretKey))).toEqual(
+      emptyListingsDocument,
+    );
+  });
+
+  it("keeps the content key where a reader without parts looks for it", () => {
+    const [event] = audienceEvents([bob.pubkey]);
+    if (event === undefined) throw new Error("a publish has a chunk");
+    const withoutParts = signPlainEvent(
+      {
+        kind: event.kind,
+        content: event.content,
+        tags: event.tags
+          .filter((tag) => tag[0] !== "part")
+          .map((tag) => (tag[0] === "slot" ? tag.slice(0, 3) : tag)),
+      },
+      UnixSeconds.make(base),
+      alice.secretKey,
+    );
+    expect(
+      documentOf(decodeListingsEvent(withoutParts, bob.secretKey)),
+    ).toEqual(document);
+  });
+});
+
+describe("network listings", () => {
+  const decodeDocument = Schema.decodeUnknownSync(ListingsDocument);
+  const encodedEggs = Schema.encodeSync(Listing)(eggs);
+
+  it("carries the reach and the passed-on listings to the reader", () => {
+    const passedOn = new SharedListing({ author: carol.pubkey, listing: eggs });
+    const networked = new ListingsDocument({
+      listings: [new Listing({ ...eggs, audience: "network" })],
+      passedOn: [passedOn],
+    });
+    const event = listingsEvent(alice, [bob.pubkey], base, networked);
+    const read = documentOf(decodeListingsEvent(event, bob.secretKey));
+    expect(read?.listings[0]?.audience).toBe("network");
+    expect(read?.passedOn).toEqual([passedOn]);
+  });
+
+  it("drops an unknown reach and a malformed passed-on list, keeping the rest", () => {
+    const decoded = decodeDocument({
+      listings: [{ ...encodedEggs, audience: "everyone" }],
+      passedOn: [{ author: "nope", listing: encodedEggs }],
+    });
+    expect(decoded.listings[0]?.title).toBe(eggs.title);
+    expect(decoded.listings[0] && "audience" in decoded.listings[0]).toBe(
+      false,
+    );
+    expect("passedOn" in decoded).toBe(false);
   });
 });
 

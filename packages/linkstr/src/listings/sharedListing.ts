@@ -1,12 +1,12 @@
 import { Option, Schema } from "effect";
-import { Pubkey } from "../domain/primitives";
+import type { Pubkey } from "../domain/primitives";
 import { encodeNpub } from "../identity/codec";
-import { LISTING_SAT_CURRENCY, Listing, listingPriceKind } from "./domain";
-
-/** A listing with its author, as a chat message carries a copy of it. */
-export class SharedListing extends Schema.Class<SharedListing>("SharedListing")(
-  { author: Pubkey, listing: Listing },
-) {}
+import {
+  LISTING_SAT_CURRENCY,
+  SharedListing,
+  listingPriceKind,
+} from "./domain";
+import type { Listing } from "./domain";
 
 /** What a text message carrying a shared listing holds: the sender's note, possibly empty, and the copy. */
 export interface SharedListingMessage {

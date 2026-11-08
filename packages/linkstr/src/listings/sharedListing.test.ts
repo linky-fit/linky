@@ -2,11 +2,15 @@ import { describe, expect, it } from "vitest";
 import { PrivateImage } from "../chat/domain";
 import { encodeNpub } from "../identity/codec";
 import { makeIdentity } from "../testing";
-import { Listing, ListingAmount, ListingCurrency } from "./domain";
+import {
+  Listing,
+  ListingAmount,
+  ListingCurrency,
+  SharedListing,
+} from "./domain";
 import {
   parseSharedListingMessage,
   SHARED_LISTING_MARKER_PREFIX,
-  SharedListing,
   sharedListingMessageText,
 } from "./sharedListing";
 
