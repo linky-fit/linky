@@ -2,11 +2,18 @@ import { describe, expect, it } from "vitest";
 import { parseNpubCashProfileInfo } from "./npubCashInfo";
 
 describe("parseNpubCashProfileInfo", () => {
-  it("parses direct mint url and username from the hosted info response", () => {
+  it("reads the mint url and the bought name from the v2 user info", () => {
     expect(
       parseNpubCashProfileInfo({
-        mintUrl: "https://minibits.cash/Bitcoin",
-        username: "Alice42",
+        error: false,
+        data: {
+          user: {
+            pubkey: "ab".repeat(32),
+            name: "Alice42",
+            mintUrl: "https://minibits.cash/Bitcoin",
+            lockQuote: false,
+          },
+        },
       }),
     ).toEqual({
       mintUrl: "https://minibits.cash/Bitcoin",
@@ -14,16 +21,12 @@ describe("parseNpubCashProfileInfo", () => {
     });
   });
 
-  it("parses wrapped data responses and keeps missing usernames empty", () => {
+  it("owns no address while the user has no name", () => {
     expect(
       parseNpubCashProfileInfo({
-        data: {
-          mintURL: "https://cashu.cz",
-        },
+        error: false,
+        data: { user: { mintUrl: "https://cashu.cz", lockQuote: false } },
       }),
-    ).toEqual({
-      mintUrl: "https://cashu.cz",
-      ownedLightningAddresses: [],
-    });
+    ).toEqual({ mintUrl: "https://cashu.cz", ownedLightningAddresses: [] });
   });
 });
