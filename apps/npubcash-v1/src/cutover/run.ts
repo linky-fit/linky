@@ -49,11 +49,7 @@ export async function readFork(fork: SQL): Promise<ForkSnapshot> {
   });
 }
 
-/**
- * Refuses while the fork, v3 or this service holds a connection; call it before `readFork`.
- * An idle pool may hold none, so stopping those containers is what guarantees nothing writes.
- * The caller passes single-connection clients.
- */
+/** Call before `readFork` with single-connection clients; an idle pool holds none, so stop the containers too. */
 export async function assertNoOtherClients(fork: SQL, v3: SQL) {
   for (const [sql, label] of [
     [fork, "fork database"],
