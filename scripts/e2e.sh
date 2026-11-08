@@ -20,6 +20,7 @@ export LINKY_E2E_EVOLU_QUOTA_PORT=$((port + 3))
 export LINKY_E2E_MINT_PORT=$((port + 4))
 export LINKY_E2E_TARGET_MINT_PORT=$((port + 5))
 export LINKY_E2E_SITE_PORT=$((port + 6))
+export LINKY_E2E_NPUBCASH_PORT=$((port + 7))
 export LINKSHU_MINT_URL="http://localhost:$LINKY_E2E_MINT_PORT"
 export LINKSHU_TARGET_MINT_URL="http://localhost:$LINKY_E2E_TARGET_MINT_PORT"
 

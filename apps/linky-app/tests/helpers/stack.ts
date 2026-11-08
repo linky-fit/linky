@@ -5,3 +5,4 @@ export const EVOLU_QUOTA_RELAY_URL = `ws://localhost:${process.env.LINKY_E2E_EVO
 
 export const isNostrRelay = (url: string | URL): boolean =>
   String(url).replace(/\/$/, "") === NOSTR_RELAY_URL;
+export const NPUBCASH_SERVER_URL = `http://localhost:${process.env.LINKY_E2E_NPUBCASH_PORT ?? 3400}`;

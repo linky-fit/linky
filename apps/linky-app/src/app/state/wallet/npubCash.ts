@@ -26,7 +26,6 @@ import {
 } from "../../../utils/npubCashClaimInbox";
 import { extractUniqueClaimTokens } from "../../../utils/npubCashClaimResponse";
 import {
-  isNpubCashDisabled,
   NPUB_CASH_REQUEST_TIMEOUT_MS,
   NPUB_CASH_SERVER_BASE_URL,
   NPUB_CASH_UPSTREAM_BASE_URL,
@@ -121,20 +120,19 @@ export const updateNpubCashMint = async ({
   readonly currentNsec: string | null;
   readonly mint: string;
 }): Promise<void> => {
-  if (isNpubCashDisabled()) return;
   if (!currentNpub) throw new Error("Missing npub");
   if (!currentNsec) throw new Error("Missing nsec");
   const cleaned = normalizeMintUrl(mint);
   if (!cleaned) return;
-  const url = `${NPUB_CASH_SERVER_BASE_URL}/api/v1/info/mint`;
-  const payload = { mintUrl: cleaned };
+  const url = `${NPUB_CASH_SERVER_BASE_URL}/api/v2/user/mint`;
+  const payload = { mint_url: cleaned };
   const response = await fetch(url, {
-    method: "PUT",
+    method: "PATCH",
     headers: {
       Authorization: await makeNpubCashAuthHeader(
         currentNsec,
         url,
-        "PUT",
+        "PATCH",
         payload,
       ),
       "Content-Type": "application/json",
@@ -149,7 +147,7 @@ export const fetchNpubCashInfo = async (
   currentNsec: string | null,
   signal: AbortSignal,
 ): Promise<JsonValue | null> => {
-  const url = `${NPUB_CASH_SERVER_BASE_URL}/api/v1/info`;
+  const url = `${NPUB_CASH_SERVER_BASE_URL}/api/v2/user/info`;
   const response = await fetch(url, {
     method: "GET",
     headers: {
@@ -496,7 +494,7 @@ export const makeNpubCashCommands = (deps: NpubCashDeps): NpubCashCommands => {
     claim: async ({ fast }, events) => {
       // Not while paying or receiving: a claim response consumed then could
       // skip its tokens.
-      if (isNpubCashDisabled() || deps.isWalletBusy()) return;
+      if (deps.isWalletBusy()) return;
       if (!deps.currentNpub || !deps.currentNsec || session.inFlight) return;
       try {
         await withTabLockIfFree({
@@ -529,10 +527,14 @@ export const makeNpubCashCommands = (deps: NpubCashDeps): NpubCashCommands => {
                   NPUB_CASH_SERVER_BASE_URL,
                   LOCAL_NPUB_LINKY_QUOTES_STORAGE_KEY_PREFIX,
                 ),
-                sweepPaidQuotes(
-                  NPUB_CASH_UPSTREAM_BASE_URL,
-                  LOCAL_NPUB_CASH_UPSTREAM_QUOTES_STORAGE_KEY_PREFIX,
-                ),
+                ...(NPUB_CASH_UPSTREAM_BASE_URL === null
+                  ? []
+                  : [
+                      sweepPaidQuotes(
+                        NPUB_CASH_UPSTREAM_BASE_URL,
+                        LOCAL_NPUB_CASH_UPSTREAM_QUOTES_STORAGE_KEY_PREFIX,
+                      ),
+                    ]),
               ]) {
                 try {
                   await collect(events);
