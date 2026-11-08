@@ -4,8 +4,8 @@ import { NPUB_CASH_REQUEST_TIMEOUT_MS } from "./npubCashServer";
 import { asRecord, isHttpUrl } from "./validation";
 
 /**
- * Upstream npub.cash (v2 API) holds no proofs. It lists the mint quotes it
- * created for the owner's address and which of them were paid; the wallet
+ * Upstream npubcash-server (v2 API) holds no proofs. It lists the mint quotes
+ * it created for the owner's address and which of them were paid; the wallet
  * mints those itself. This is the read side of that sweep: the listing
  * request, its lenient parse, and the cursor/ledger that keeps it idempotent.
  */
@@ -110,17 +110,19 @@ export const upstreamQuotesRequest = (
 
 export interface UpstreamPaidQuotesListing {
   readonly paid: readonly UpstreamPaidQuote[];
-  /** False when the sweep hit its page cap before the listing ended. */
-  readonly complete: boolean;
+  /** Where the next sweep resumes when this one hit its page cap; null once the listing ended. */
+  readonly nextOffset: number | null;
 }
 
+/** Reads the listing newest first from `offset`, at most `MAX_PAGES_PER_SWEEP` pages. */
 export const listUpstreamPaidQuotes = async (args: {
   baseUrl: string;
   since: number | null;
+  offset: number;
   makeNip98AuthHeader: (url: string, method: string) => Promise<string>;
 }): Promise<UpstreamPaidQuotesListing | null> => {
   const paid: UpstreamPaidQuote[] = [];
-  let offset = 0;
+  let offset = args.offset;
   for (let page = 0; page < MAX_PAGES_PER_SWEEP; page += 1) {
     const request = upstreamQuotesRequest(args.baseUrl, args.since, offset);
     const auth = await args.makeNip98AuthHeader(request.signUrl, "GET");
@@ -140,9 +142,9 @@ export const listUpstreamPaidQuotes = async (args: {
       parsed.count === 0 ||
       parsed.count < UPSTREAM_QUOTES_PAGE_SIZE ||
       (parsed.total !== null && offset >= parsed.total);
-    if (listingEnded) return { paid, complete: true };
+    if (listingEnded) return { paid, nextOffset: null };
   }
-  return { paid, complete: false };
+  return { paid, nextOffset: offset };
 };
 
 /**
@@ -161,11 +163,18 @@ export interface SettledUpstreamQuote {
 
 export interface UpstreamQuoteLedger {
   readonly since: number | null;
+  /**
+   * Entries of the listing since `since` that earlier capped sweeps already
+   * read. The listing only grows at its newest end, so resuming here skips
+   * nothing unread.
+   */
+  readonly offset: number;
   readonly settled: readonly SettledUpstreamQuote[];
 }
 
 export const EMPTY_UPSTREAM_QUOTE_LEDGER: UpstreamQuoteLedger = {
   since: null,
+  offset: 0,
   settled: [],
 };
 
@@ -179,6 +188,7 @@ export const parseUpstreamQuoteLedger = (
       return EMPTY_UPSTREAM_QUOTE_LEDGER;
     }
     const since = Reflect.get(parsed, "since");
+    const offset = asPositiveInt(Reflect.get(parsed, "offset")) ?? 0;
     const list = Reflect.get(parsed, "settled");
     const settled: SettledUpstreamQuote[] = [];
     if (Array.isArray(list)) {
@@ -189,7 +199,7 @@ export const parseUpstreamQuoteLedger = (
         if (quoteId && paidAt !== null) settled.push({ quoteId, paidAt });
       }
     }
-    return { since: asPositiveInt(since), settled };
+    return { since: asPositiveInt(since), offset, settled };
   } catch {
     return EMPTY_UPSTREAM_QUOTE_LEDGER;
   }
@@ -203,13 +213,14 @@ export const isUpstreamQuoteSettled = (
 /**
  * Records the quotes this sweep finished with. The cursor only moves when
  * the listing was read to its end: on a capped listing the unread pages
- * may hold older paid quotes the cursor would otherwise skip forever.
+ * hold older paid quotes, which the next sweep reads from `nextOffset`.
  */
 export const settleUpstreamQuotes = (
   ledger: UpstreamQuoteLedger,
   settled: readonly SettledUpstreamQuote[],
-  listingComplete: boolean,
+  nextOffset: number | null,
 ): UpstreamQuoteLedger => {
+  const listingComplete = nextOffset === null;
   const all = [...ledger.settled, ...settled];
   const newestPaidAt = Math.max(
     ledger.since === null ? 0 : ledger.since + UPSTREAM_QUOTE_LOOKBACK_SEC,
@@ -221,6 +232,7 @@ export const settleUpstreamQuotes = (
       : ledger.since;
   return {
     since,
+    offset: nextOffset ?? 0,
     settled: all
       .filter((entry) => since === null || entry.paidAt > since)
       .slice(-MAX_LEDGER_ENTRIES),

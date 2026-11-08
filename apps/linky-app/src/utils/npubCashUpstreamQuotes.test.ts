@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   EMPTY_UPSTREAM_QUOTE_LEDGER,
   isUpstreamQuoteSettled,
+  listUpstreamPaidQuotes,
   parseUpstreamQuoteLedger,
   parseUpstreamQuotesPage,
   settleUpstreamQuotes,
@@ -101,6 +102,55 @@ describe("upstreamQuotesRequest", () => {
   });
 });
 
+describe("listUpstreamPaidQuotes", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  /** A listing of `total` paid quotes, served in pages of 50. */
+  const stubListing = (total: number): string[] => {
+    const urls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        urls.push(url);
+        const offset = Number(new URL(url).searchParams.get("offset"));
+        const count = Math.max(0, Math.min(50, total - offset));
+        const quotes = Array.from({ length: count }, (_, index) =>
+          quote({ quoteId: `q-${offset + index}` }),
+        );
+        return Response.json({
+          error: false,
+          data: { quotes },
+          metadata: { total },
+        });
+      }),
+    );
+    return urls;
+  };
+
+  const list = (offset: number) =>
+    listUpstreamPaidQuotes({
+      baseUrl: "https://npub.linky.fit",
+      since: null,
+      offset,
+      makeNip98AuthHeader: async () => "Nostr auth",
+    });
+
+  it("stops at its page cap with the offset to resume from, then reads the rest", async () => {
+    const urls = stubListing(1_020);
+
+    const capped = await list(0);
+    expect(capped?.paid).toHaveLength(1_000);
+    expect(capped?.nextOffset).toBe(1_000);
+
+    const rest = await list(1_000);
+    expect(rest?.paid.map((paid) => paid.quoteId)).toEqual(
+      Array.from({ length: 20 }, (_, index) => `q-${1_000 + index}`),
+    );
+    expect(rest?.nextOffset).toBeNull();
+    expect(urls).toHaveLength(21);
+  });
+});
+
 describe("upstream quote ledger", () => {
   const paidAt = 1_700_000_000;
 
@@ -112,7 +162,7 @@ describe("upstream quote ledger", () => {
         { quoteId: "recent", paidAt: paidAt - 60 },
         { quoteId: "newest", paidAt },
       ],
-      true,
+      null,
     );
     expect(ledger.since).toBe(paidAt - UPSTREAM_QUOTE_LOOKBACK_SEC);
     expect(ledger.settled.map((entry) => entry.quoteId)).toEqual([
@@ -125,29 +175,39 @@ describe("upstream quote ledger", () => {
 
   it("never moves the cursor backwards", () => {
     const ledger = settleUpstreamQuotes(
-      { since: paidAt, settled: [] },
+      { since: paidAt, offset: 0, settled: [] },
       [{ quoteId: "late", paidAt: paidAt + 10 }],
-      true,
+      null,
     );
     expect(ledger.since).toBe(paidAt);
     expect(ledger.settled).toEqual([{ quoteId: "late", paidAt: paidAt + 10 }]);
   });
 
-  it("holds the cursor when the listing was cut short", () => {
+  it("holds the cursor and resumes past the read entries when the listing was cut short", () => {
     const ledger = settleUpstreamQuotes(
-      { since: paidAt - 3600, settled: [] },
+      { since: paidAt - 3600, offset: 0, settled: [] },
       [{ quoteId: "q", paidAt }],
-      false,
+      1000,
     );
-    expect(ledger.since).toBe(paidAt - 3600);
+    expect(ledger).toMatchObject({ since: paidAt - 3600, offset: 1000 });
     expect(isUpstreamQuoteSettled(ledger, "q")).toBe(true);
+
+    const finished = settleUpstreamQuotes(
+      ledger,
+      [{ quoteId: "older", paidAt: paidAt - 1800 }],
+      null,
+    );
+    expect(finished).toMatchObject({
+      since: paidAt - UPSTREAM_QUOTE_LOOKBACK_SEC,
+      offset: 0,
+    });
   });
 
   it("round-trips through storage and tolerates junk", () => {
     const ledger = settleUpstreamQuotes(
       EMPTY_UPSTREAM_QUOTE_LEDGER,
       [{ quoteId: "q", paidAt }],
-      true,
+      50,
     );
     expect(parseUpstreamQuoteLedger(JSON.stringify(ledger))).toEqual(ledger);
     expect(parseUpstreamQuoteLedger(null)).toEqual(EMPTY_UPSTREAM_QUOTE_LEDGER);

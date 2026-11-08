@@ -402,4 +402,20 @@ describe("npub.cash claim", () => {
       }),
     );
   });
+
+  it("lists paid quotes on both hosts and tells the v1 claim this client sweeps them", async () => {
+    stubClaimServer([]);
+    const { claim } = await renderClaim(vi.fn<ReceiveCashuToken>());
+
+    await claim();
+
+    const calls = vi.mocked(fetch).mock.calls;
+    const listed = calls
+      .map(([url]) => new URL(String(url)))
+      .filter((url) => url.pathname === "/api/v2/wallet/quotes")
+      .map((url) => url.origin);
+    expect(listed).toEqual(["https://npub.linky.fit", "https://npub.cash"]);
+    const v1Claim = calls.find(([url]) => String(url).endsWith("/api/v1/claim"));
+    expect(v1Claim?.[1]?.headers).toMatchObject({ "X-Linky-Client": "v2" });
+  });
 });
