@@ -29,7 +29,7 @@ import { advanceCounterTo, readCounter, withCounterLock } from "./counters";
 import type { CounterScope } from "./counters";
 import { isRecoverableOutputCollision } from "./outputCollisions";
 import { insertProofs, knownSecretsOf, toNewProofs } from "./proofs";
-import { checkProofStates, unspentProofs } from "./proofStates";
+import { answerAt, checkProofStates, unspentProofs } from "./proofStates";
 import type { QuoteRecord, QuoteRecordStore } from "./quoteRecords";
 
 /**
@@ -209,10 +209,18 @@ const reclaimIssued = <R extends ClaimableQuote>(
     const states = yield* checkProofStates(ctx.wallet, record.mint, unstored);
     const spendable = unspentProofs(unstored, states);
     if (spendable.length === 0) {
-      return yield* new QuoteIssuedElsewhere({
+      if (unstored.every((_, index) => answerAt(states, index) === "spent")) {
+        return yield* new QuoteIssuedElsewhere({
+          mint: record.mint,
+          code: null,
+          detail: "quote already issued and no reserved output is unspent",
+        });
+      }
+      return yield* new MintRejected({
         mint: record.mint,
         code: null,
-        detail: "quote already issued and no reserved output is unspent",
+        detail:
+          "quote already issued and the mint has not confirmed its reserved outputs spent",
       });
     }
     // Only unspent, unstored proofs reach here, so storing them cannot
