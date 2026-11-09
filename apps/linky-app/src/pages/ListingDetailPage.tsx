@@ -4,8 +4,12 @@ import {
   type Listing,
   type Pubkey,
 } from "@linky-fit/linkstr";
-import { useAtomValue } from "@linky-fit/linkstr-react";
-import { ContactId, type MessageId } from "@linky-fit/linksync";
+import { useAtomSuspense, useAtomValue } from "@linky-fit/linkstr-react";
+import {
+  ContactId,
+  hiddenListingIdsOf,
+  type MessageId,
+} from "@linky-fit/linksync";
 import {
   Avatar,
   Button,
@@ -29,11 +33,8 @@ import {
   useAttachListingToChat,
   useSharedListingOfMessage,
 } from "../app/hooks/useSharedListing";
-import {
-  setListingHidden,
-  useIsListingHidden,
-} from "../app/lib/hiddenListings";
 import { formatListingPrice, listingOfRecord } from "../app/lib/listings";
+import { contactsCommandsAtom } from "../app/state/contacts/commands";
 import { peerListingsAtom } from "../app/state/contacts/listings";
 import { currentPubkeyAtom } from "../app/state/session/session";
 import { ListingImage } from "../components/ListingImage";
@@ -149,7 +150,10 @@ export function ListingDetailPage({
   const authorInfo = useNpubMessageContactInfo()(authorNpub);
   const saveNpubContact = useSaveNpubContact();
   const attachListingToChat = useAttachListingToChat();
-  const hidden = useIsListingHidden(author, listingId);
+  const { setListingHidden } = useAtomSuspense(contactsCommandsAtom).value;
+  const hidden = contact
+    ? hiddenListingIdsOf(contact).includes(listingId)
+    : false;
 
   if (!shared) {
     return <EmptyState icon="Package" title={t("listingNotFound")} />;
@@ -243,14 +247,19 @@ export function ListingDetailPage({
                 {t("addContact")}
               </Button>
             )}
-            <Button
-              variant="ghost"
-              icon={hidden ? "Eye" : "EyeOff"}
-              onPress={() => setListingHidden(author, listingId, !hidden)}
-              testID={hidden ? "listing-show" : "listing-hide"}
-            >
-              {t(hidden ? "listingShow" : "listingHide")}
-            </Button>
+            {/* Only a contact's listings are listed, so only those can be hidden. */}
+            {contactId ? (
+              <Button
+                variant="ghost"
+                icon={hidden ? "Eye" : "EyeOff"}
+                onPress={() =>
+                  void setListingHidden(contactId, listingId, !hidden)
+                }
+                testID={hidden ? "listing-show" : "listing-hide"}
+              >
+                {t(hidden ? "listingShow" : "listingHide")}
+              </Button>
+            ) : null}
           </>
         )}
       </Stack>

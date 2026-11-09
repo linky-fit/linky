@@ -39,6 +39,12 @@ export interface ContactsCommands {
   readonly deleteContact: (id: ContactId) => Promise<WriteOutcome>;
   /** Restores a deleted contact and takes over what its npub sent while unknown. */
   readonly restoreContact: (id: ContactId) => Promise<WriteOutcome>;
+  /** Hides one of the contact's listings on every device, or shows it again. */
+  readonly setListingHidden: (
+    id: ContactId,
+    listingId: string,
+    hidden: boolean,
+  ) => Promise<WriteOutcome>;
 }
 
 const makeContactsCommands = ({
@@ -98,6 +104,21 @@ const makeContactsCommands = ({
     );
     if (unknownContactId)
       void messages.reassignContactMessages(unknownContactId, id);
+    return outcome;
+  },
+  setListingHidden: async (id, listingId, hidden) => {
+    const outcome = await runWrite(
+      contacts.setListingHidden(id, listingId, hidden),
+    );
+    if (outcome.ok)
+      reportAppLog({
+        tag: hidden ? "listings.hidden" : "listings.shown",
+        summary: hidden
+          ? "Hid a contact's listing"
+          : "Showed a contact's listing again",
+        links: { contact: id },
+        payload: { listingId },
+      });
     return outcome;
   },
 });

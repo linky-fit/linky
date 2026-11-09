@@ -71,6 +71,7 @@ const contact = (
   groupName: null,
   groupNamesJson: null,
   archivedAtSec: null,
+  hiddenListingIdsJson: null,
   chatLastSeenAtSec: null,
   chatPeerSeenSinceSec: null,
   chatPeerSeenAtSec: null,
