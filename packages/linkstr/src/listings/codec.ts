@@ -96,8 +96,16 @@ const chunkTemplates = (
 
 /** Kept free beside the content and the parts, for the slots of a chunk. */
 const SLOTS_ROOM_BYTES = 12_000;
-/** Slots spread over chunks by hash, so a chunk may hold several even at one chunk per slot. */
-const SLOTS_ROOM_MIN_SLOTS = 8;
+
+/** The bytes of the fullest chunk's slots when the publish is split as far as it goes, one chunk per slot. */
+const fullestChunkSlotsBytes = (slots: NostrTags): number => {
+  const bytes = new Map<number, number>();
+  for (const slot of slots) {
+    const chunk = listingsChunkOf(slot[1] ?? "", slots.length);
+    bytes.set(chunk, (bytes.get(chunk) ?? 0) + JSON.stringify(slot).length + 1);
+  }
+  return Math.max(0, ...bytes.values());
+};
 
 const encryptedLength = (plaintext: string, key: Uint8Array): number => {
   try {
@@ -203,16 +211,9 @@ export const encodeListingsEvents = (
         : []),
     ];
   });
-  const slotBytes = Math.max(
-    0,
-    ...slots.map((slot) => JSON.stringify(slot).length + 1),
-  );
   const reservedBytes =
     JSON.stringify(parts).length +
-    Math.max(
-      SLOTS_ROOM_BYTES,
-      Math.min(slots.length, SLOTS_ROOM_MIN_SLOTS) * slotBytes,
-    );
+    Math.max(SLOTS_ROOM_BYTES, fullestChunkSlotsBytes(slots));
   const content = encrypt(
     encodeDocument(withinBudget(draft.document, reservedBytes, contentKey)),
     contentKey,
