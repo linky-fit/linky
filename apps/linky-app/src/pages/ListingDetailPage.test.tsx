@@ -68,13 +68,13 @@ const state = vi.hoisted(
     snapshot: null,
   }),
 );
-const { attachListingToChat, navigateTo, saveNpubContact, setListingHidden } =
-  vi.hoisted(() => ({
+const { attachListingToChat, navigateTo, setListingHidden } = vi.hoisted(
+  () => ({
     attachListingToChat: vi.fn(),
     navigateTo: vi.fn(),
-    saveNpubContact: vi.fn(),
     setListingHidden: vi.fn(),
-  }));
+  }),
+);
 
 vi.mock("@linky-fit/linkstr-react", () => ({
   useAtomSuspense: () => ({ value: { setListingHidden } }),
@@ -126,9 +126,6 @@ vi.mock("../app/hooks/contacts/useDisplayContacts", () => ({
       "npub1short",
     pictureUrl: null,
   }),
-}));
-vi.mock("../app/hooks/contacts/useSaveNpubContact", () => ({
-  useSaveNpubContact: () => saveNpubContact,
 }));
 vi.mock("../app/hooks/profile/useEffectiveProfile", () => ({
   useEffectiveProfile: () => ({
@@ -196,20 +193,23 @@ it("shows who offers a listing from the network and asks the contact it came thr
   );
   expect(container.textContent).toContain("Old bike");
   expect(byTestId(container, "listing-author")?.textContent).toContain("Carol");
-  await act(async () => byTestId(container, "listing-add-author")?.click());
-  expect(saveNpubContact).toHaveBeenCalledExactlyOnceWith(encodeNpub(STRANGER));
+  await act(async () => byTestId(container, "listing-contact-author")?.click());
+  expect(attachListingToChat).toHaveBeenLastCalledWith(
+    `unknown:${STRANGER}`,
+    new SharedListing({ author: STRANGER, listing: bike }),
+  );
   expect(byTestId(container, "listing-via-contacts")?.textContent).toContain(
     "Alice",
   );
   await act(async () => byTestId(container, "listing-ask-via")?.click());
-  expect(attachListingToChat).toHaveBeenCalledExactlyOnceWith(
+  expect(attachListingToChat).toHaveBeenLastCalledWith(
     contactId,
     new SharedListing({ author: STRANGER, listing: bike }),
   );
   await unmount();
 });
 
-it("shows the copy a message holds and offers to save an author who is no contact", async () => {
+it("shows the copy a message holds and offers to write to an author who is no contact", async () => {
   const copy = new Listing({
     ...peerListing,
     title: "Eggs as discussed",
@@ -226,8 +226,11 @@ it("shows the copy a message holds and offers to save an author who is no contac
   expect(byTestId(container, "listing-author")?.textContent).toContain("Carol");
   expect(byTestId(container, "listing-reply")).toBeNull();
   expect(byTestId(container, "listing-hide")).toBeNull();
-  await act(async () => byTestId(container, "listing-add-author")?.click());
-  expect(saveNpubContact).toHaveBeenCalledExactlyOnceWith(encodeNpub(PEER));
+  await act(async () => byTestId(container, "listing-contact-author")?.click());
+  expect(attachListingToChat).toHaveBeenCalledExactlyOnceWith(
+    `unknown:${PEER}`,
+    state.snapshot,
+  );
   await unmount();
 });
 
