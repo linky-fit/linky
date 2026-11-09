@@ -335,8 +335,8 @@ One thing the user offers to, or wants from, their mutual contacts: goods or a s
 _Avoid_: offer (taken by proxy payments), ad, classified, product
 
 **Listing audience**:
-Who sees one of the user's listings: the **contacts** (the default), the **network** (the contacts and the contacts' contacts) or one contact **group**, whose members alone see it.
-_Avoid_: visibility, privacy, reach
+Who sees one of the user's listings: the **contacts** (the default), the **network** (the contacts and the contacts' contacts) or one contact **group**, whose members alone see it. On the wire, a network listing carries `reach: "network"`.
+_Avoid_: visibility, privacy, reach (except as that wire field)
 
 **Passed-on listing**:
 A contact's network listing that the user's listings document carries on to the user's own contacts, with its author's public key; it is never passed on further. The user passes on what they did not hide, unless they turned passing on off in Settings, which also keeps their contacts from learning who else they have as a contact. A reader who does not have its author as a contact sees, in the list, only the contacts it came through; its detail shows the author too, whom the reader can write to as an unknown sender without adding them.
