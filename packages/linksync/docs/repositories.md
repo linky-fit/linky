@@ -10,10 +10,9 @@ Every write ends with the rotation check. A pointer write the port rejects does 
 
 ## Contacts
 
-`makeContactsRepository(store)` is a `TableRepository` over `contact`: profile fields, the user's overrides, the archive state and the contact's listings the user hid. Read cursors live in [conversations](#conversations). Contacts are never forgotten, so the archive state and the hidden listings reach every device however old they are.
+`makeContactsRepository(store)` is a `TableRepository` over `contact`: profile fields, the user's overrides and the archive state. Read cursors live in [conversations](#conversations). Contacts are never forgotten, so the archive state reaches every device however old it is.
 
 - `archive(id, atSec)` sets `archivedAtSec`; an incoming message newer than it is the consumer's signal to unarchive.
-- `setListingHidden(id, listingId, hidden)` adds the listing id to the contact's `hiddenListingIdsJson` or takes it out; `hiddenListingIdsOf(contact)` reads the ids back. The column holds the whole list, so two devices changing the same contact's hidden listings at once keep the later write.
 - `unarchive(id)` clears `archivedAtSec` on the contact and on its direct conversation, where older app versions archive; the conversation's fresh copy in the active shard hides any older archived copy. Copy a conversation's archive onto the contact only while the contact has none, and an unarchive is never undone by an older copy.
 
 ```ts
@@ -34,6 +33,10 @@ const all = await Effect.runPromise(contacts.all);
 ```
 
 The repository returns one row per id; deduplicating unsaved peers by npub is the consumer's.
+
+## Hidden listings
+
+`makeHiddenListingsRepository(store)` is a `TableRepository` over `hiddenListing`, in the `contacts` scope: someone else's listings the user hid, whether or not the author is a contact. `setHidden(author, listingId, hidden)` hides a listing or shows it again and writes nothing when it is already in that state. Each listing has one row, `hiddenListingIdFor(author, listingId)`, so hiding it on two devices lands on one row, and showing it removes the row. `hiddenListingKeysOf(rows)` turns the rows into a set to test with `hiddenListingKey(author, listingId)`.
 
 ## Conversations
 

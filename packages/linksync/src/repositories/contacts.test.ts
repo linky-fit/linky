@@ -1,7 +1,7 @@
 import { NonEmptyString1000, PositiveInt } from "@evolu/common";
 import { createId } from "../model/ids";
 import { linkyStore, runNow } from "../testing/linky";
-import { hiddenListingIdsOf, makeContactsRepository } from "./contacts";
+import { makeContactsRepository } from "./contacts";
 import { makeConversationsRepository } from "./conversations";
 
 const name = (value: string) => NonEmptyString1000.orThrow(value);
@@ -50,26 +50,6 @@ describe("contacts repository", () => {
     expect(runNow(contacts.byId(id))).toMatchObject({ archivedAtSec: null });
     expect(runNow(conversations.byId(chat.id))).toMatchObject({
       archivedAtSec: null,
-    });
-  });
-
-  it("hides a contact's listings and shows them again", () => {
-    const { store } = linkyStore();
-    const contacts = makeContactsRepository(store);
-    const id = createId<"Contact">();
-    runNow(contacts.insert({ id }));
-    runNow(contacts.setListingHidden(id, "bike", true));
-    runNow(contacts.setListingHidden(id, "lessons", true));
-    runNow(contacts.setListingHidden(id, "bike", true));
-    expect(hiddenListingIdsOf(runNow(contacts.byId(id)) ?? {})).toEqual([
-      "bike",
-      "lessons",
-    ]);
-
-    runNow(contacts.setListingHidden(id, "bike", false));
-    runNow(contacts.setListingHidden(id, "lessons", false));
-    expect(runNow(contacts.byId(id))).toMatchObject({
-      hiddenListingIdsJson: null,
     });
   });
 

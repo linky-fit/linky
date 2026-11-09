@@ -1,5 +1,5 @@
-import { NonEmptyString, type PositiveInt } from "@evolu/common";
-import { Effect, Option, Schema } from "effect";
+import type { PositiveInt } from "@evolu/common";
+import { Effect } from "effect";
 import type { RowNotFound, ShardDbError } from "../core";
 import type { ContactId } from "../model/ids";
 import type { LinkyDbSchema } from "../model/schema";
@@ -18,28 +18,9 @@ export interface ContactsRepository extends TableRepository<
   readonly unarchive: (
     id: ContactId,
   ) => Effect.Effect<void, ShardDbError | RowNotFound>;
-  /** Hides one of the contact's listings, or shows it again; a listing already in that state writes nothing. */
-  readonly setListingHidden: (
-    id: ContactId,
-    listingId: string,
-    hidden: boolean,
-  ) => Effect.Effect<void, ShardDbError | RowNotFound>;
 }
 
-const HiddenListingIds = Schema.fromJsonString(Schema.Array(Schema.String));
-const decodeHiddenListingIds = Schema.decodeUnknownOption(HiddenListingIds);
-const encodeHiddenListingIds = Schema.encodeSync(HiddenListingIds);
-
-/** The ids of the contact's listings the user hid; an unreadable column hides none. */
-export const hiddenListingIdsOf = (contact: {
-  readonly hiddenListingIdsJson?: string | null | undefined;
-}): ReadonlyArray<string> =>
-  Option.getOrElse(
-    decodeHiddenListingIds(contact.hiddenListingIdsJson ?? "[]"),
-    () => [],
-  );
-
-/** Profiles, the user's overrides, the archive state and the hidden listings. Read cursors live in `conversations`. */
+/** Profiles, the user's overrides and the archive state. Read cursors live in `conversations`. */
 export const makeContactsRepository = (
   store: LinkyStore,
 ): ContactsRepository => {
@@ -55,21 +36,6 @@ export const makeContactsRepository = (
         if (conversation.archivedAtSec !== null)
           yield* conversations.update(conversation.id, { archivedAtSec: null });
         yield* contacts.update(id, { archivedAtSec: null });
-      }),
-    setListingHidden: (id, listingId, hidden) =>
-      Effect.gen(function* () {
-        const contact = yield* contacts.byId(id);
-        const current = contact === null ? [] : hiddenListingIdsOf(contact);
-        if (current.includes(listingId) === hidden) return;
-        const next = hidden
-          ? [...current, listingId]
-          : current.filter((candidate) => candidate !== listingId);
-        yield* contacts.update(id, {
-          hiddenListingIdsJson:
-            next.length === 0
-              ? null
-              : NonEmptyString.orThrow(encodeHiddenListingIds(next)),
-        });
       }),
   };
 };

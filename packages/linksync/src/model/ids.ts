@@ -1,5 +1,6 @@
 import {
   createIdFromString,
+  type HiddenListingId,
   type KeryxSubscriptionId,
   type MessageId,
   type ReactionId,
@@ -35,3 +36,10 @@ export const inboxCursorSettingIdFor = (pubkey: Pubkey): SettingId =>
 /** Pairing a company's join origin on any device lands on one subscription row. */
 export const keryxSubscriptionIdFor = (origin: string): KeryxSubscriptionId =>
   createIdFromString<"KeryxSubscription">(`keryxSubscription/${origin}`);
+
+/** Hiding one author's listing on any device lands on one row. */
+export const hiddenListingIdFor = (
+  author: Pubkey,
+  listingId: string,
+): HiddenListingId =>
+  createIdFromString<"HiddenListing">(`hiddenListing/${author}/${listingId}`);
