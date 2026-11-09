@@ -354,6 +354,51 @@ describe("network listings", () => {
     expect(kept).toEqual(passedOn.slice(0, kept.length));
   });
 
+  it("keeps every chunk under the cap when one reader is in many audiences", () => {
+    const passedOn = Array.from(
+      { length: 200 },
+      (_, index) =>
+        new SharedListing({
+          author: carol.pubkey,
+          listing: new Listing({
+            ...eggs,
+            id: `long-${index}`,
+            description: "x".repeat(LISTING_DESCRIPTION_MAX_LENGTH),
+          }),
+        }),
+    );
+    // Slots spread over chunks by a hash of random keys, so several runs make an overfull chunk likely.
+    for (let run = 0; run < 8; run++) {
+      const recipients = Array.from(
+        { length: 120 },
+        () => makeIdentity().pubkey,
+      );
+      const audiences = Array.from(
+        { length: 40 },
+        (_, index) =>
+          new ListingsAudience({
+            listings: [new Listing({ ...eggs, id: `group-${index}` })],
+            recipients: recipients.slice(0, 1),
+          }),
+      );
+      const events = encodeListingsEvents(
+        new ListingsDraft({
+          document: new ListingsDocument({ listings: [eggs], passedOn }),
+          recipients,
+          audiences,
+        }),
+        alice.secretKey,
+      ).map((template) =>
+        signPlainEvent(template, UnixSeconds.make(base), alice.secretKey),
+      );
+      for (const event of events) {
+        expect(JSON.stringify(event).length).toBeLessThanOrEqual(
+          LISTINGS_MAX_EVENT_BYTES,
+        );
+      }
+    }
+  });
+
   it("drops an unknown reach and a malformed passed-on list, keeping the rest", () => {
     const decoded = decodeDocument({
       listings: [{ ...encodedEggs, reach: "everyone" }],

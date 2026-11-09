@@ -96,6 +96,8 @@ const chunkTemplates = (
 
 /** Kept free beside the content and the parts, for the slots of a chunk. */
 const SLOTS_ROOM_BYTES = 12_000;
+/** Slots spread over chunks by hash, so a chunk may hold several even at one chunk per slot. */
+const SLOTS_ROOM_MIN_SLOTS = 8;
 
 const encryptedLength = (plaintext: string, key: Uint8Array): number => {
   try {
@@ -108,12 +110,13 @@ const encryptedLength = (plaintext: string, key: Uint8Array): number => {
 
 /**
  * The document with as many of its passed-on listings, first ones first, as
- * leave every chunk room for its slots; the author's own listings are never
- * cut, so passing listings on cannot keep them from the relays.
+ * leave every chunk `reservedBytes` for its parts and slots; the author's own
+ * listings are never cut, so passing listings on cannot keep them from the
+ * relays.
  */
 const withinBudget = (
   document: ListingsDocument,
-  partsBytes: number,
+  reservedBytes: number,
   contentKey: Uint8Array,
 ): ListingsDocument => {
   const passedOn = document.passedOn ?? [];
@@ -124,9 +127,8 @@ const withinBudget = (
     });
   const fits = (count: number) =>
     encryptedLength(encodeDocument(keeping(count)), contentKey) +
-      partsBytes +
-      SIGNED_EVENT_OVERHEAD_BYTES +
-      SLOTS_ROOM_BYTES <=
+      reservedBytes +
+      SIGNED_EVENT_OVERHEAD_BYTES <=
     LISTINGS_MAX_EVENT_BYTES;
   if (passedOn.length === 0 || fits(passedOn.length)) return document;
   let low = 0;
@@ -201,9 +203,15 @@ export const encodeListingsEvents = (
         : []),
     ];
   });
-  const partsBytes = JSON.stringify(parts).length;
+  const slotBytes = Math.max(
+    0,
+    ...slots.map((slot) => JSON.stringify(slot).length + 1),
+  );
+  const reservedBytes =
+    JSON.stringify(parts).length +
+    Math.max(SLOTS_ROOM_BYTES, SLOTS_ROOM_MIN_SLOTS * slotBytes);
   const content = encrypt(
-    encodeDocument(withinBudget(draft.document, partsBytes, contentKey)),
+    encodeDocument(withinBudget(draft.document, reservedBytes, contentKey)),
     contentKey,
   );
   let templates = chunkTemplates(slots, parts, content, 1);
