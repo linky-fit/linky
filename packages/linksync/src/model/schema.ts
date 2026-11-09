@@ -14,6 +14,7 @@ import {
   CashuProofId,
   ContactId,
   ConversationId,
+  HiddenListingId,
   KeryxSubscriptionId,
   ListingId,
   MessageId,
@@ -93,7 +94,7 @@ export const LinkySchema = {
     source: nullOr(NonEmptyString100),
     switchedAtSec: nullOr(PositiveInt),
   },
-  /** Contacts scope: the profile, the user's overrides, the archive state and the hidden listings. */
+  /** Contacts scope: the profile, the user's overrides and the archive state. */
   contact: {
     id: ContactId,
     name: nullOr(NonEmptyString1000),
@@ -108,7 +109,8 @@ export const LinkySchema = {
     groupName: nullOr(NonEmptyString1000),
     groupNamesJson: nullOr(NonEmptyString1000),
     archivedAtSec: nullOr(PositiveInt),
-    // JSON array of the ids of the contact's listings the user hid; see `hiddenListingIdsOf`.
+    // Written only by nightly builds before `hiddenListing`: JSON array of the
+    // contact's listing ids the user hid, read once to move them there.
     hiddenListingIdsJson: nullOr(NonEmptyString),
   },
   /**
@@ -136,6 +138,14 @@ export const LinkySchema = {
     // Who sees the listing, JSON validated by the consumer: null for the
     // contacts, {"kind":"network"} or {"kind":"group","group":"<groupName>"}.
     audience: nullOr(NonEmptyString1000),
+  },
+  /** Contacts scope: someone else's listing the user hid; a removed row shows it again. */
+  hiddenListing: {
+    // `hiddenListingIdFor(authorPubkey, listingId)`, so hiding on two devices lands on one row.
+    id: HiddenListingId,
+    // Hex pubkey (64 chars) of the listing's author, a contact or not.
+    authorPubkey: NonEmptyString100,
+    listingId: NonEmptyString1000,
   },
   /**
    * Contacts scope: the user's instruction to pay a contact on a schedule.
@@ -369,6 +379,7 @@ export type CashuOperationRow = Row<LinkyDbSchema["cashuOperation"]>;
 export type TransactionRow = Row<LinkyDbSchema["transaction"]>;
 export type RecurringPaymentRow = Row<LinkyDbSchema["recurringPayment"]>;
 export type ListingRow = Row<LinkyDbSchema["listing"]>;
+export type HiddenListingRow = Row<LinkyDbSchema["hiddenListing"]>;
 export type KeryxSubscriptionRow = Row<LinkyDbSchema["keryxSubscription"]>;
 export type OnchainTransferRow = Row<LinkyDbSchema["onchainTransfer"]>;
 export type OnchainTransferMessageRow = Row<
@@ -395,6 +406,7 @@ export const linkyTableColumns: TableColumns<LinkyDbSchema> = {
   transaction: columnNames(LinkySchema.transaction),
   recurringPayment: columnNames(LinkySchema.recurringPayment),
   listing: columnNames(LinkySchema.listing),
+  hiddenListing: columnNames(LinkySchema.hiddenListing),
   keryxSubscription: columnNames(LinkySchema.keryxSubscription),
   onchainTransfer: columnNames(LinkySchema.onchainTransfer),
   onchainTransferMessage: columnNames(LinkySchema.onchainTransferMessage),

@@ -1,7 +1,13 @@
-export { hiddenListingIdsOf, makeContactsRepository } from "./contacts";
+export { makeContactsRepository } from "./contacts";
 export type { ContactsRepository } from "./contacts";
 export { makeConversationsRepository } from "./conversations";
 export type { ConversationsRepository, PeerSeenWindow } from "./conversations";
+export {
+  hiddenListingKey,
+  hiddenListingKeysOf,
+  makeHiddenListingsRepository,
+} from "./hiddenListings";
+export type { HiddenListingsRepository } from "./hiddenListings";
 export { makeIdentityRepository } from "./identity";
 export type { IdentityRepository } from "./identity";
 export { makeInboxCursorsRepository } from "./inboxCursors";
