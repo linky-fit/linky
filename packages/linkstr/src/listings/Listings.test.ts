@@ -356,7 +356,7 @@ describe("network listings", () => {
 
   it("drops an unknown reach and a malformed passed-on list, keeping the rest", () => {
     const decoded = decodeDocument({
-      listings: [{ ...encodedEggs, audience: "everyone" }],
+      listings: [{ ...encodedEggs, reach: "everyone" }],
       passedOn: [{ author: "nope", listing: encodedEggs }],
     });
     expect(decoded.listings[0]?.title).toBe(eggs.title);
