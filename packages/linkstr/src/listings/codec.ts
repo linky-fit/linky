@@ -65,7 +65,7 @@ const decodePartKeys = Schema.decodeUnknownOption(PartKeys);
 export const LISTINGS_CHUNKS_TAG = "chunks";
 /** Under the 64 KiB message cap common relays set, with room for the `EVENT` envelope, id, pubkey and signature. */
 export const LISTINGS_MAX_EVENT_BYTES = 60_000;
-const SIGNED_EVENT_OVERHEAD_BYTES = 400;
+const SIGNED_EVENT_OVERHEAD_BYTES = 500;
 
 /** The chunk of a publish split into `chunks` that carries the slot `slotId`. */
 export const listingsChunkOf = (slotId: string, chunks: number): number =>
@@ -97,14 +97,27 @@ const chunkTemplates = (
 /** Kept free beside the content and the parts, for the slots of a chunk. */
 const SLOTS_ROOM_BYTES = 12_000;
 
-/** The bytes of the fullest chunk's slots when the publish is split as far as it goes, one chunk per slot. */
-const fullestChunkSlotsBytes = (slots: NostrTags): number => {
-  const bytes = new Map<number, number>();
-  for (const slot of slots) {
-    const chunk = listingsChunkOf(slot[1] ?? "", slots.length);
-    bytes.set(chunk, (bytes.get(chunk) ?? 0) + JSON.stringify(slot).length + 1);
+/**
+ * The slot bytes of the fullest chunk under the split that keeps it lightest,
+ * over every chunk count the encoder may reach; that split fits once the
+ * content and the parts leave this much room, so the encoder stops there or
+ * sooner.
+ */
+const lightestSplitSlotsBytes = (slots: NostrTags): number => {
+  const sized = slots.map((slot) => ({
+    id: slot[1] ?? "",
+    bytes: JSON.stringify(slot).length + 1,
+  }));
+  let lightest = 0;
+  for (let chunks = 1; chunks <= sized.length; chunks++) {
+    const loads = Array.from({ length: chunks }, () => 0);
+    for (const { id, bytes } of sized) {
+      loads[listingsChunkOf(id, chunks)] += bytes;
+    }
+    const fullest = Math.max(...loads);
+    if (chunks === 1 || fullest < lightest) lightest = fullest;
   }
-  return Math.max(0, ...bytes.values());
+  return lightest;
 };
 
 const encryptedLength = (plaintext: string, key: Uint8Array): number => {
@@ -213,7 +226,7 @@ export const encodeListingsEvents = (
   });
   const reservedBytes =
     JSON.stringify(parts).length +
-    Math.max(SLOTS_ROOM_BYTES, fullestChunkSlotsBytes(slots));
+    Math.max(SLOTS_ROOM_BYTES, lightestSplitSlotsBytes(slots));
   const content = encrypt(
     encodeDocument(withinBudget(draft.document, reservedBytes, contentKey)),
     contentKey,

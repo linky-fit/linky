@@ -360,16 +360,21 @@ describe("network listings", () => {
     expect(kept).toEqual(passedOn.slice(0, kept.length));
   });
 
-  it("keeps every chunk under the cap when one reader is in many audiences", () => {
-    // Fixed keys whose slots share a chunk at every chunk count.
+  /** A publish under fixed keys, one reader in `groups` audiences, and what the first reader gets. */
+  const publishToGroups = (
+    recipientSeeds: ReadonlyArray<string>,
+    groups: number,
+    passedOnCount: number,
+  ) => {
     const secretOf = (seed: string) =>
       NostrSecretKey.make(sha256(new TextEncoder().encode(seed)));
     const author = secretOf("author");
-    const recipients = [0, 1, 2].map((index) =>
-      Pubkey.make(getPublicKey(secretOf(`r-2-${index}`))),
+    const readers = recipientSeeds.map(secretOf);
+    const recipients = readers.map((reader) =>
+      Pubkey.make(getPublicKey(reader)),
     );
     const passedOn = Array.from(
-      { length: 60 },
+      { length: passedOnCount },
       (_, index) =>
         new SharedListing({
           author: carol.pubkey,
@@ -381,7 +386,7 @@ describe("network listings", () => {
         }),
     );
     const audiences = Array.from(
-      { length: 80 },
+      { length: groups },
       (_, index) =>
         new ListingsAudience({
           listings: [new Listing({ ...eggs, id: `group-${index}` })],
@@ -398,12 +403,45 @@ describe("network listings", () => {
     ).map((template) =>
       signPlainEvent(template, UnixSeconds.make(base), author),
     );
+    const [reader] = readers;
+    const read = events
+      .map((event) =>
+        reader === undefined
+          ? null
+          : documentOf(decodeListingsEvent(event, reader)),
+      )
+      .find((candidate) => (candidate?.listings.length ?? 0) > 0);
+    return { events, passedOn: read?.passedOn ?? [] };
+  };
+
+  it("keeps every chunk under the cap when one reader is in many audiences", () => {
+    // Fixed keys that put at least two slots in one chunk at every chunk count.
+    const { events, passedOn } = publishToGroups(
+      [0, 1, 2].map((index) => `r-2-${index}`),
+      80,
+      60,
+    );
     for (const event of events) {
       expect(JSON.stringify(event).length).toBeLessThanOrEqual(
         LISTINGS_MAX_EVENT_BYTES,
       );
     }
+    expect(passedOn.length).toBeGreaterThan(0);
   });
+
+  it("passes listings on when only the widest split has a crowded chunk", () => {
+    const { events, passedOn } = publishToGroups(
+      Array.from({ length: 120 }, (_, index) => `g80-run3-r-${index}`),
+      80,
+      40,
+    );
+    for (const event of events) {
+      expect(JSON.stringify(event).length).toBeLessThanOrEqual(
+        LISTINGS_MAX_EVENT_BYTES,
+      );
+    }
+    expect(passedOn.length).toBeGreaterThan(0);
+  }, 15_000);
 
   it("drops an unknown reach and a malformed passed-on list, keeping the rest", () => {
     const decoded = decodeDocument({
