@@ -150,7 +150,7 @@ function PeerSection({
   );
 }
 
-/** The listings hidden on this device, folded under one row until the user opens it. */
+/** The listings the user hid, folded under one row until the user opens it. */
 function HiddenSection({
   display,
   entries,

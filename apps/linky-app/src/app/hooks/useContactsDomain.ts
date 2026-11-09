@@ -1,5 +1,9 @@
 import type { ContactsRepository } from "@linky-fit/linksync";
-import { useAtom, useAtomValue } from "@linky-fit/linkstr-react";
+import {
+  useAtom,
+  useAtomSuspense,
+  useAtomValue,
+} from "@linky-fit/linkstr-react";
 import React from "react";
 import { isStatusFilterValue } from "../../nostrStatus";
 import type { Route } from "../../types/route";
@@ -12,6 +16,7 @@ import {
 } from "../state/contacts/readModel";
 import { useConversationArchiveMigration } from "../migrations/useConversationArchiveMigration";
 import { useHiddenListingsMigration } from "../migrations/useHiddenListingsMigration";
+import { hiddenListingsRepositoryAtom } from "../state/session/store";
 
 interface UseContactsDomainParams {
   accountHydrated: boolean;
@@ -39,6 +44,8 @@ export const useContactsDomain = ({
   useHiddenListingsMigration({
     contactRows,
     contactsRepository,
+    hiddenListingsRepository: useAtomSuspense(hiddenListingsRepositoryAtom)
+      .value,
     hydrated: accountHydrated,
   });
 
