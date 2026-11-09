@@ -3,7 +3,7 @@
 // Hidden listings were kept in this device's localStorage, so other devices
 // never saw them. Once the account is hydrated, each one moves onto its
 // author's contact row and the stored keys are dropped; a key whose author is
-// no contact is dropped with them, since only contacts' listings are listed.
+// no contact is dropped with them, since a hide lives on the author's row.
 
 import { parsePubkey } from "@linky-fit/linkstr";
 import type { ContactId, ContactRow } from "@linky-fit/linksync";
