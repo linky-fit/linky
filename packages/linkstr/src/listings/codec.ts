@@ -224,7 +224,14 @@ export const encodeListingsEvents = (
         : []),
     ];
   });
+  const emptyTemplate = chunkTemplates(
+    [],
+    [],
+    "",
+    Math.max(2, slots.length),
+  ).at(-1);
   const reservedBytes =
+    JSON.stringify(emptyTemplate).length +
     JSON.stringify(parts).length +
     Math.max(SLOTS_ROOM_BYTES, lightestSplitSlotsBytes(slots));
   const content = encrypt(
