@@ -71,7 +71,7 @@ export class Listing extends Schema.Class<Listing>("Listing")({
     PrivateImage.pipe(Schema.catchDecoding(() => Effect.succeedNone)),
   ),
   /** `network`: the readers may pass the listing on to their own contacts; any other value decodes as none. */
-  audience: Schema.optionalKey(
+  reach: Schema.optionalKey(
     ListingReach.pipe(Schema.catchDecoding(() => Effect.succeedNone)),
   ),
 }) {}

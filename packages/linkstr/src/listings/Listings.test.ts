@@ -275,6 +275,17 @@ describe("listing audiences", () => {
     );
   });
 
+  it("gives every slot part keys of one length, so a relay cannot tell the members", () => {
+    const [event] = audienceEvents([bob.pubkey, carol.pubkey]);
+    if (event === undefined) throw new Error("a publish has a chunk");
+    const lengths = event.tags
+      .filter((tag) => tag[0] === "slot")
+      .map((tag) => tag[3]?.length);
+    expect(lengths).toHaveLength(2);
+    expect(new Set(lengths).size).toBe(1);
+    expect(lengths[0]).toBeGreaterThan(0);
+  });
+
   it("keeps the content key where a reader without parts looks for it", () => {
     const [event] = audienceEvents([bob.pubkey]);
     if (event === undefined) throw new Error("a publish has a chunk");
@@ -302,13 +313,45 @@ describe("network listings", () => {
   it("carries the reach and the passed-on listings to the reader", () => {
     const passedOn = new SharedListing({ author: carol.pubkey, listing: eggs });
     const networked = new ListingsDocument({
-      listings: [new Listing({ ...eggs, audience: "network" })],
+      listings: [new Listing({ ...eggs, reach: "network" })],
       passedOn: [passedOn],
     });
     const event = listingsEvent(alice, [bob.pubkey], base, networked);
     const read = documentOf(decodeListingsEvent(event, bob.secretKey));
-    expect(read?.listings[0]?.audience).toBe("network");
+    expect(read?.listings[0]?.reach).toBe("network");
     expect(read?.passedOn).toEqual([passedOn]);
+  });
+
+  it("passes on only as many listings as leave room for the slots, first ones first", () => {
+    const long = (index: number) =>
+      new SharedListing({
+        author: carol.pubkey,
+        listing: new Listing({
+          ...eggs,
+          id: `long-${index}`,
+          description: "x".repeat(LISTING_DESCRIPTION_MAX_LENGTH),
+        }),
+      });
+    const passedOn = Array.from({ length: 200 }, (_, index) => long(index));
+    const events = chunkEvents(
+      alice,
+      [bob.pubkey],
+      base,
+      new ListingsDocument({ listings: [eggs], passedOn }),
+    );
+    for (const event of events) {
+      expect(JSON.stringify(event).length).toBeLessThanOrEqual(
+        LISTINGS_MAX_EVENT_BYTES,
+      );
+    }
+    const [event] = events;
+    if (event === undefined) throw new Error("a publish has a chunk");
+    const read = documentOf(decodeListingsEvent(event, bob.secretKey));
+    expect(read?.listings).toEqual([eggs]);
+    const kept = read?.passedOn ?? [];
+    expect(kept.length).toBeGreaterThan(0);
+    expect(kept.length).toBeLessThan(passedOn.length);
+    expect(kept).toEqual(passedOn.slice(0, kept.length));
   });
 
   it("drops an unknown reach and a malformed passed-on list, keeping the rest", () => {
@@ -317,9 +360,7 @@ describe("network listings", () => {
       passedOn: [{ author: "nope", listing: encodedEggs }],
     });
     expect(decoded.listings[0]?.title).toBe(eggs.title);
-    expect(decoded.listings[0] && "audience" in decoded.listings[0]).toBe(
-      false,
-    );
+    expect(decoded.listings[0] && "reach" in decoded.listings[0]).toBe(false);
     expect("passedOn" in decoded).toBe(false);
   });
 });

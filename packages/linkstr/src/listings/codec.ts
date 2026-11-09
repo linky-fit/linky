@@ -16,7 +16,7 @@ import type { ListingsDropReason } from "./events";
 export const LISTINGS_KIND = 34133;
 export const LISTINGS_D_TAG = "listings";
 export const LISTINGS_VALUE = "listings";
-/** `["slot", <slot id>, <content key wrapped for one recipient>, <audience keys wrapped for them, when they have any>]`. */
+/** `["slot", <slot id>, <content key wrapped for one recipient>, <audience keys wrapped for them, on every slot when the event has parts>]`. */
 export const LISTINGS_SLOT_TAG = "slot";
 /** `["part", <listings of one audience, under that audience's key>]`, in audience order. */
 export const LISTINGS_PART_TAG = "part";
@@ -94,6 +94,53 @@ const chunkTemplates = (
     content,
   }));
 
+/** Kept free beside the content and the parts, for the slots of a chunk. */
+const SLOTS_ROOM_BYTES = 12_000;
+
+const encryptedLength = (plaintext: string, key: Uint8Array): number => {
+  try {
+    return encrypt(plaintext, key).length;
+  } catch {
+    // NIP-44 refuses plaintext over 64 KiB, which no event fits anyway.
+    return Number.POSITIVE_INFINITY;
+  }
+};
+
+/**
+ * The document with as many of its passed-on listings, first ones first, as
+ * leave every chunk room for its slots; the author's own listings are never
+ * cut, so passing listings on cannot keep them from the relays.
+ */
+const withinBudget = (
+  document: ListingsDocument,
+  partsBytes: number,
+  contentKey: Uint8Array,
+): ListingsDocument => {
+  const passedOn = document.passedOn ?? [];
+  const keeping = (count: number) =>
+    new ListingsDocument({
+      ...document,
+      passedOn: passedOn.slice(0, count),
+    });
+  const fits = (count: number) =>
+    encryptedLength(encodeDocument(keeping(count)), contentKey) +
+      partsBytes +
+      SIGNED_EVENT_OVERHEAD_BYTES +
+      SLOTS_ROOM_BYTES <=
+    LISTINGS_MAX_EVENT_BYTES;
+  if (passedOn.length === 0 || fits(passedOn.length)) return document;
+  let low = 0;
+  let high = passedOn.length - 1;
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2);
+    if (fits(middle)) low = middle;
+    else high = middle - 1;
+  }
+  return low === 0
+    ? new ListingsDocument({ cash: document.cash, listings: document.listings })
+    : keeping(low);
+};
+
 const fitsRelays = (template: PlainEventTemplate): boolean =>
   JSON.stringify(template).length + SIGNED_EVENT_OVERHEAD_BYTES <=
   LISTINGS_MAX_EVENT_BYTES;
@@ -104,7 +151,9 @@ const fitsRelays = (template: PlainEventTemplate): boolean =>
  * A recipient dropped from `recipients` cannot read the next version, because
  * the key is new every time. Each audience's listings travel as a part under
  * a fresh key of its own, which only the slots of its recipients carry, so a
- * reader on a release without parts reads the document alone. The slots are
+ * reader on a release without parts reads the document alone. Passed-on
+ * listings beyond what leaves room for the slots are left out, last first.
+ * The slots are
  * split over as few chunks as keep every event under
  * `LISTINGS_MAX_EVENT_BYTES`; each chunk carries the whole document and every
  * part and must be published, empty ones included, with one `created_at`.
@@ -124,23 +173,39 @@ export const encodeListingsEvents = (
     LISTINGS_PART_TAG,
     encrypt(encodePart(audience.listings), hexToBytes(partKeys[index] ?? "")),
   ]);
-  const slots: NostrTags = [...new Set(draft.recipients)].map((recipient) => {
+  const recipients = [...new Set(draft.recipients)];
+  const readable = recipients.map((recipient) =>
+    encodePartKeys(
+      audiences.flatMap((audience, index) =>
+        audience.recipients.includes(recipient)
+          ? [[index, partKeys[index] ?? ""] as const]
+          : [],
+      ),
+    ),
+  );
+  // Padded to one length, so the slots of an audience's members look like everyone else's.
+  const readableLength = Math.max(0, ...readable.map((json) => json.length));
+  const slots: NostrTags = recipients.map((recipient, index) => {
     const conversationKey = getConversationKey(secretKey, recipient);
-    const readable = audiences.flatMap((audience, index) =>
-      audience.recipients.includes(recipient)
-        ? [[index, partKeys[index] ?? ""] as const]
-        : [],
-    );
     return [
       LISTINGS_SLOT_TAG,
       listingsSlotId(conversationKey),
       encrypt(contentKeyHex, conversationKey),
-      ...(readable.length > 0
-        ? [encrypt(encodePartKeys(readable), conversationKey)]
+      ...(parts.length > 0
+        ? [
+            encrypt(
+              (readable[index] ?? "").padEnd(readableLength),
+              conversationKey,
+            ),
+          ]
         : []),
     ];
   });
-  const content = encrypt(encodeDocument(draft.document), contentKey);
+  const partsBytes = JSON.stringify(parts).length;
+  const content = encrypt(
+    encodeDocument(withinBudget(draft.document, partsBytes, contentKey)),
+    contentKey,
+  );
   let templates = chunkTemplates(slots, parts, content, 1);
   for (
     let chunks = 2;
