@@ -43,7 +43,7 @@ const share = (contacts: ReadonlyArray<Pubkey>) =>
 
 A `Listing` has the author's own stable `id` (so a reader can tell an edit from a new entry), a `side` (`offer` or `want`), a trimmed `title` of at most `LISTING_TITLE_MAX_LENGTH` characters, a decimal `amount` with up to two fraction digits as the author typed it, a `currency` (an ISO 4217 code, or `LISTING_SAT_CURRENCY` for whole satoshis) and a `unit` of at most `LISTING_UNIT_MAX_LENGTH` characters saying what the amount buys, in the author's words ("per hour", "per kg"), shown as written. A zero `amount` means the listing is free, unless the listing carries `priceByAgreement: true`: then the price is left to the two parties to agree on. `listingPriceKind(listing)` tells the three apart (`amount`, `free`, `by-agreement`); the flag counts only with a zero amount, so a price typed later wins over it. A reader whose release does not know `priceByAgreement` shows a listing priced by agreement as costing zero. A listing may carry a `description`: trimmed text of at most `LISTING_DESCRIPTION_MAX_LENGTH` characters in the author's words, line breaks kept; an empty, too long or malformed one decodes as none. It may also carry one `image`: a `PrivateImage`, the same encrypted Blossom reference an image message carries ([chat.md](./chat.md#images-and-files)), uploaded by the author before publishing. A malformed `image` decodes as none, so the listing and the document still arrive. `cash` is `null` when the author has no cash intent.
 
-A listing may carry `audience: "network"`, which lets its readers pass it on to their own contacts; any other value decodes as none, and without it the listing is for the readers alone. A document may carry `passedOn`: the network listings of the author's contacts that the author passes on, each a `SharedListing` with its original author ([Passing listings on](#passing-listings-on)). A malformed `passedOn` decodes as none.
+A listing may carry `reach: "network"`, which lets its readers pass it on to their own contacts; any other value decodes as none, and without it the listing is for the readers alone. A document may carry `passedOn`: the network listings of the author's contacts that the author passes on, each a `SharedListing` with its original author ([Passing listings on](#passing-listings-on)). A malformed `passedOn` decodes as none.
 
 The image key goes to every reader of the document and into every copy of the listing they keep or pass on, and it cannot be revoked: removing the image or the reader stops new copies, not the ones already read. A reader whose release does not know `description` or `image` drops the field; an author device on such a release republishes the document without the descriptions and images it does not know about, until a newer device publishes again.
 
@@ -80,7 +80,7 @@ An event that is dropped is only visible to the inspector, as `ListingsEventDrop
 
 ## Passing listings on
 
-A reader who wants the author's `network` listings to reach their own contacts copies them into `passedOn` of their own document, with the author, and publishes it as usual; they are never passed on again from there, so a listing travels at most from the author's contacts to their contacts. Linkstr only carries the copies: the reader's app chooses what to pass on, and shows a passed-on listing whose author it does not know through the contacts it came from. Nothing proves that a copy is the author's: the contact who passed it on vouches for it. Passing a listing on gives its image key to everyone the copy reaches.
+A reader who wants the author's `network` listings to reach their own contacts copies them into `passedOn` of their own document, with the author, and publishes it as usual; they are never passed on again from there, so a listing travels at most from the author's contacts to their contacts. `passedOn` has no fixed limit, but a publish keeps only as many of them, first ones first, as leave every chunk room for its slots, so order them by what matters most; the author's own listings are never cut. A passed-on copy names its author's pubkey, so everyone it reaches learns who offers it. Linkstr only carries the copies: the reader's app chooses what to pass on, and shows a passed-on listing whose author it does not know through the contacts it came from. Nothing proves that a copy is the author's: the contact who passed it on vouches for it. Passing a listing on gives its image key to everyone the copy reaches.
 
 ## Sharing a listing in a chat
 
@@ -126,9 +126,9 @@ An event with every slot would pass the 64 KiB message cap common relays set at 
 
 Every recipient gets one `slot` tag. Its `<id>` is the first 32 hex characters of `sha256("linky/listings/slot/v1:" ‖ conversationKey)`, and `<key>` is the content key, as 64 hex characters, NIP-44 v2 encrypted under the same `conversationKey`: the NIP-44 conversation key of the author and that recipient (`getConversationKey(authorSecret, recipientPubkey)`, equal from either side). A reader derives the conversation key with the author's pubkey, computes the id, takes the tag that carries it, decrypts the content key and then the content. `listingsSlotId(conversationKey)` is exported for other implementations. Slot order carries no meaning. The author needs no slot: the document is theirs to keep locally.
 
-Each audience gets a `part` tag, in audience order: the JSON array of its listings, NIP-44 v2 encrypted under a random 32-byte key of its own. The slot of a recipient in one or more audiences has a fourth element: the JSON `[[<part index>, "<part key as 64 hex>"], …]` of the parts they may open, NIP-44 v2 encrypted under the same `conversationKey`; other slots have none. A reader opens the parts their slot names and appends their listings; a part that does not open or decode is left out. Readers that know no parts ignore both.
+Each audience gets a `part` tag, in audience order: the JSON array of its listings, NIP-44 v2 encrypted under a random 32-byte key of its own. When the event has parts, every slot has a fourth element: the JSON `[[<part index>, "<part key as 64 hex>"], …]` of the parts that recipient may open, `[]` for none, padded with trailing spaces to one length across the publish and NIP-44 v2 encrypted under the same `conversationKey`, so the slots do not tell an audience's members from the others. A reader opens the parts their slot names and appends their listings; a part that does not open or decode is left out. Readers that know no parts ignore both.
 
-The content key and the part keys are drawn fresh for every publish, so a recipient who is no longer listed, or no longer in an audience, cannot read any later version of it, and the content is one NIP-44 v2 payload of the JSON document, `priceByAgreement`, `description`, `image`, `audience` and `passedOn` left out when there are none:
+The content key and the part keys are drawn fresh for every publish, so a recipient who is no longer listed, or no longer in an audience, cannot read any later version of it, and the content is one NIP-44 v2 payload of the JSON document, `priceByAgreement`, `description`, `image`, `reach` and `passedOn` left out when there are none:
 
 ```json
 {
@@ -144,7 +144,7 @@ The content key and the part keys are drawn fresh for every publish, so a recipi
       "priceByAgreement": true,
       "description": "Free range.\nPick up in Brno.",
       "image": { "url": "https://…", "key": "…", "nonce": "…", … },
-      "audience": "network"
+      "reach": "network"
     }
   ],
   "passedOn": [{ "author": "<hex pubkey>", "listing": { … } }]
