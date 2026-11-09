@@ -1,9 +1,15 @@
 import { Effect, Exit, Layer, Result, Schema, Stream } from "effect";
+import { sha256 } from "@noble/hashes/sha2.js";
+import { getPublicKey } from "nostr-tools";
 import type { Event as NostrToolsEvent, Filter } from "nostr-tools";
 import { getConversationKey } from "nostr-tools/nip44";
 import { PrivateImage } from "../chat/domain";
-import { RelayUrl, UnixSeconds } from "../domain/primitives";
-import type { Pubkey } from "../domain/primitives";
+import {
+  NostrSecretKey,
+  Pubkey,
+  RelayUrl,
+  UnixSeconds,
+} from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import type { InspectorEvent } from "../inspector/events";
 import {
@@ -355,8 +361,15 @@ describe("network listings", () => {
   });
 
   it("keeps every chunk under the cap when one reader is in many audiences", () => {
+    // Fixed keys whose slots share a chunk at every chunk count.
+    const secretOf = (seed: string) =>
+      NostrSecretKey.make(sha256(new TextEncoder().encode(seed)));
+    const author = secretOf("author");
+    const recipients = [0, 1, 2].map((index) =>
+      Pubkey.make(getPublicKey(secretOf(`r-2-${index}`))),
+    );
     const passedOn = Array.from(
-      { length: 200 },
+      { length: 60 },
       (_, index) =>
         new SharedListing({
           author: carol.pubkey,
@@ -367,35 +380,28 @@ describe("network listings", () => {
           }),
         }),
     );
-    // Slots spread over chunks by a hash of random keys, so several runs make an overfull chunk likely.
-    for (let run = 0; run < 8; run++) {
-      const recipients = Array.from(
-        { length: 120 },
-        () => makeIdentity().pubkey,
-      );
-      const audiences = Array.from(
-        { length: 40 },
-        (_, index) =>
-          new ListingsAudience({
-            listings: [new Listing({ ...eggs, id: `group-${index}` })],
-            recipients: recipients.slice(0, 1),
-          }),
-      );
-      const events = encodeListingsEvents(
-        new ListingsDraft({
-          document: new ListingsDocument({ listings: [eggs], passedOn }),
-          recipients,
-          audiences,
+    const audiences = Array.from(
+      { length: 80 },
+      (_, index) =>
+        new ListingsAudience({
+          listings: [new Listing({ ...eggs, id: `group-${index}` })],
+          recipients: recipients.slice(0, 1),
         }),
-        alice.secretKey,
-      ).map((template) =>
-        signPlainEvent(template, UnixSeconds.make(base), alice.secretKey),
+    );
+    const events = encodeListingsEvents(
+      new ListingsDraft({
+        document: new ListingsDocument({ listings: [eggs], passedOn }),
+        recipients,
+        audiences,
+      }),
+      author,
+    ).map((template) =>
+      signPlainEvent(template, UnixSeconds.make(base), author),
+    );
+    for (const event of events) {
+      expect(JSON.stringify(event).length).toBeLessThanOrEqual(
+        LISTINGS_MAX_EVENT_BYTES,
       );
-      for (const event of events) {
-        expect(JSON.stringify(event).length).toBeLessThanOrEqual(
-          LISTINGS_MAX_EVENT_BYTES,
-        );
-      }
     }
   });
 

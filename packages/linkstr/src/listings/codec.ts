@@ -209,7 +209,10 @@ export const encodeListingsEvents = (
   );
   const reservedBytes =
     JSON.stringify(parts).length +
-    Math.max(SLOTS_ROOM_BYTES, SLOTS_ROOM_MIN_SLOTS * slotBytes);
+    Math.max(
+      SLOTS_ROOM_BYTES,
+      Math.min(slots.length, SLOTS_ROOM_MIN_SLOTS) * slotBytes,
+    );
   const content = encrypt(
     encodeDocument(withinBudget(draft.document, reservedBytes, contentKey)),
     contentKey,
