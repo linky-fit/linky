@@ -9,7 +9,8 @@
  * A's chat; A gets the copy, description included, as their own listing and
  * opens it from the message, and back returns to the chat. A network listing
  * travels one hop further: B passes it on in their own event, and C, who knows
- * only B, sees it through B and never sees A.
+ * only B, sees it listed through B, sees A on its detail and can write to A
+ * without adding them.
  *
  * Needs the docker stack up — see playwright.config.ts.
  */
