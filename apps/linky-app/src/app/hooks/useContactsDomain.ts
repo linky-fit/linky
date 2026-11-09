@@ -11,6 +11,7 @@ import {
   conversationRowsAtom,
 } from "../state/contacts/readModel";
 import { useConversationArchiveMigration } from "../migrations/useConversationArchiveMigration";
+import { useHiddenListingsMigration } from "../migrations/useHiddenListingsMigration";
 
 interface UseContactsDomainParams {
   accountHydrated: boolean;
@@ -33,6 +34,11 @@ export const useContactsDomain = ({
     contactRows,
     contactsRepository,
     conversationRows,
+    hydrated: accountHydrated,
+  });
+  useHiddenListingsMigration({
+    contactRows,
+    contactsRepository,
     hydrated: accountHydrated,
   });
 

@@ -1,4 +1,5 @@
 import { parsePubkey, SharedListing, type Listing } from "@linky-fit/linkstr";
+import { hiddenListingIdsOf } from "@linky-fit/linksync";
 import type { Pubkey } from "@linky-fit/linkstr";
 import { useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
@@ -7,7 +8,6 @@ import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
 import { peerListingsAtom } from "../state/contacts/listings";
 import type { ContactRowLike } from "../types/appTypes";
 import type { MessageMentionListing } from "../lib/messageMentions";
-import { hiddenListingKey, useHiddenListingKeys } from "../lib/hiddenListings";
 import { formatListingPrice, listingOfRecord } from "../lib/listings";
 import { currentPubkeyAtom } from "../state/session/session";
 import {
@@ -72,27 +72,26 @@ export const useSharingContacts = (): ReadonlyArray<SharingContact> => {
   }, [contactInfo, contacts, lang, peers]);
 };
 
-/** Contacts' listings: what they offer and what they want, and the ones hidden on this device. */
+/** Contacts' listings: what they offer and what they want, and the ones the user hid. */
 export const usePeerListings = (): {
   offered: ReadonlyArray<PeerListing>;
   wanted: ReadonlyArray<PeerListing>;
   hidden: ReadonlyArray<PeerListing>;
 } => {
   const sharing = useSharingContacts();
-  const hiddenKeys = useHiddenListingKeys();
   return React.useMemo(() => {
     const entries = sharing.flatMap((contact) =>
       contact.listings.map((listing): PeerListing => ({ contact, listing })),
     );
     const isHidden = ({ contact, listing }: PeerListing) =>
-      hiddenKeys.has(hiddenListingKey(contact.pubkey, listing.id));
+      hiddenListingIdsOf(contact.contact).includes(listing.id);
     const shown = entries.filter((entry) => !isHidden(entry));
     return {
       offered: shown.filter(({ listing }) => listing.side === "offer"),
       wanted: shown.filter(({ listing }) => listing.side === "want"),
       hidden: entries.filter(isHidden),
     };
-  }, [hiddenKeys, sharing]);
+  }, [sharing]);
 };
 
 /** Contacts by cash intent. */
@@ -116,7 +115,6 @@ export const useMentionListings = (): ReadonlyArray<MessageMentionListing> => {
   const records = useListingRecords();
   const sharing = useSharingContacts();
   const peers = useAtomValue(peerListingsAtom);
-  const hiddenKeys = useHiddenListingKeys();
   return React.useMemo(() => {
     const dated: Array<MessageMentionListing & { readonly at: number }> = [];
     if (ownPubkey) {
@@ -132,10 +130,10 @@ export const useMentionListings = (): ReadonlyArray<MessageMentionListing> => {
     }
     for (const contact of sharing) {
       const at = peers[contact.pubkey]?.updatedAt ?? 0;
+      const hidden = hiddenListingIdsOf(contact.contact);
       // A document lists oldest first, and the sort below keeps equal times in order.
       for (const listing of [...contact.listings].reverse()) {
-        if (hiddenKeys.has(hiddenListingKey(contact.pubkey, listing.id)))
-          continue;
+        if (hidden.includes(listing.id)) continue;
         dated.push({
           at,
           authorName: contact.name,
@@ -146,7 +144,7 @@ export const useMentionListings = (): ReadonlyArray<MessageMentionListing> => {
     return dated
       .sort((left, right) => right.at - left.at)
       .map(({ authorName, shared }) => ({ authorName, shared }));
-  }, [hiddenKeys, ownPubkey, peers, records, sharing]);
+  }, [ownPubkey, peers, records, sharing]);
 };
 
 /** `90 Kč · per 10 pieces`, priced in the viewer's display unit. */

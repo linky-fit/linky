@@ -93,7 +93,7 @@ export const LinkySchema = {
     source: nullOr(NonEmptyString100),
     switchedAtSec: nullOr(PositiveInt),
   },
-  /** Contacts scope: the profile, the user's overrides and the archive state. */
+  /** Contacts scope: the profile, the user's overrides, the archive state and the hidden listings. */
   contact: {
     id: ContactId,
     name: nullOr(NonEmptyString1000),
@@ -108,6 +108,8 @@ export const LinkySchema = {
     groupName: nullOr(NonEmptyString1000),
     groupNamesJson: nullOr(NonEmptyString1000),
     archivedAtSec: nullOr(PositiveInt),
+    // JSON array of the ids of the contact's listings the user hid; see `hiddenListingIdsOf`.
+    hiddenListingIdsJson: nullOr(NonEmptyString),
   },
   /**
    * Contacts scope: one thing the user offers to, or wants from, the

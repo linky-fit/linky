@@ -10,9 +10,10 @@ Every write ends with the rotation check. A pointer write the port rejects does 
 
 ## Contacts
 
-`makeContactsRepository(store)` is a `TableRepository` over `contact`: profile fields, the user's overrides and the archive state. Read cursors live in [conversations](#conversations). Contacts are never forgotten, so the archive state reaches every device however old it is.
+`makeContactsRepository(store)` is a `TableRepository` over `contact`: profile fields, the user's overrides, the archive state and the contact's listings the user hid. Read cursors live in [conversations](#conversations). Contacts are never forgotten, so the archive state and the hidden listings reach every device however old they are.
 
 - `archive(id, atSec)` sets `archivedAtSec`; an incoming message newer than it is the consumer's signal to unarchive.
+- `setListingHidden(id, listingId, hidden)` adds the listing id to the contact's `hiddenListingIdsJson` or takes it out; `hiddenListingIdsOf(contact)` reads the ids back. The column holds the whole list, so two devices changing the same contact's hidden listings at once keep the later write.
 - `unarchive(id)` clears `archivedAtSec` on the contact and on its direct conversation, where older app versions archive; the conversation's fresh copy in the active shard hides any older archived copy. Copy a conversation's archive onto the contact only while the contact has none, and an unarchive is never undone by an older copy.
 
 ```ts

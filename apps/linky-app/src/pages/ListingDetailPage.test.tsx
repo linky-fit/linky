@@ -17,7 +17,6 @@ import {
 } from "@linky-fit/linksync";
 import { act } from "react";
 import { afterEach, expect, it, vi } from "vitest";
-import { resetHiddenListingsForTests } from "../app/lib/hiddenListings";
 import type { ContactRowLike } from "../app/types/appTypes";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { ListingDetailPage } from "./ListingDetailPage";
@@ -64,13 +63,16 @@ const state = vi.hoisted(
     snapshot: null,
   }),
 );
-const { attachListingToChat, navigateTo, saveNpubContact } = vi.hoisted(() => ({
-  attachListingToChat: vi.fn(),
-  navigateTo: vi.fn(),
-  saveNpubContact: vi.fn(),
-}));
+const { attachListingToChat, navigateTo, saveNpubContact, setListingHidden } =
+  vi.hoisted(() => ({
+    attachListingToChat: vi.fn(),
+    navigateTo: vi.fn(),
+    saveNpubContact: vi.fn(),
+    setListingHidden: vi.fn(),
+  }));
 
 vi.mock("@linky-fit/linkstr-react", () => ({
+  useAtomSuspense: () => ({ value: { setListingHidden } }),
   useAtomValue: (atom: unknown) =>
     atom === currentPubkeyAtom
       ? ME
@@ -119,7 +121,6 @@ vi.mock("../hooks/useRouting", () => ({ navigateTo }));
 
 afterEach(() => {
   vi.clearAllMocks();
-  resetHiddenListingsForTests();
   state.contacts = [];
   state.snapshot = null;
 });
@@ -180,6 +181,7 @@ it("shows the copy a message holds and offers to save an author who is no contac
     "npub1short",
   );
   expect(byTestId(container, "listing-reply")).toBeNull();
+  expect(byTestId(container, "listing-hide")).toBeNull();
   await act(async () => byTestId(container, "listing-add-author")?.click());
   expect(saveNpubContact).toHaveBeenCalledExactlyOnceWith(encodeNpub(PEER));
   await unmount();
@@ -211,17 +213,41 @@ it("replies with the very copy the message holds", async () => {
   await unmount();
 });
 
-it("hides a contact's listing on this device and shows it again", async () => {
+it("hides a contact's listing on the contact", async () => {
   state.contacts = [{ id: contactId, name: "Alice", npub: encodeNpub(PEER) }];
   const { container, unmount } = await renderIntoDocument(
     <ListingDetailPage author={PEER} listingId="eggs" messageId={null} />,
   );
   expect(byTestId(container, "listing-show")).toBeNull();
   await act(async () => byTestId(container, "listing-hide")?.click());
+  expect(setListingHidden).toHaveBeenCalledExactlyOnceWith(
+    contactId,
+    "eggs",
+    true,
+  );
+  await unmount();
+});
+
+it("shows a listing the contact row marks hidden again", async () => {
+  state.contacts = [
+    {
+      id: contactId,
+      name: "Alice",
+      npub: encodeNpub(PEER),
+      hiddenListingIdsJson: '["eggs"]',
+    },
+  ];
+  const { container, unmount } = await renderIntoDocument(
+    <ListingDetailPage author={PEER} listingId="eggs" messageId={null} />,
+  );
   expect(byTestId(container, "listing-hide")).toBeNull();
   expect(byTestId(container, "listing-reply")).not.toBeNull();
   await act(async () => byTestId(container, "listing-show")?.click());
-  expect(byTestId(container, "listing-hide")).not.toBeNull();
+  expect(setListingHidden).toHaveBeenCalledExactlyOnceWith(
+    contactId,
+    "eggs",
+    false,
+  );
   await unmount();
 });
 
