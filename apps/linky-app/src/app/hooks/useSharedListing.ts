@@ -3,7 +3,7 @@ import {
   type SharedListing,
 } from "@linky-fit/linkstr";
 import { useAtom, useAtomSet, useAtomValue } from "@linky-fit/linkstr-react";
-import type { ContactId, MessageId } from "@linky-fit/linksync";
+import type { MessageId } from "@linky-fit/linksync";
 import React from "react";
 import { reportAppLog } from "../../devtools/inspector/appLog";
 import { navigateTo } from "../../hooks/useRouting";
@@ -63,16 +63,16 @@ export const useAttachedListing = (chatId: string) => {
   return { attached: attachedListings[chatId] ?? null, attach, clear };
 };
 
-/** Opens the chat with a contact with a listing attached to its composer. */
+/** Opens the chat `chatId`, a contact's or an unknown peer's, with a listing attached to its composer. */
 export const useAttachListingToChat = (): ((
-  contactId: ContactId,
+  chatId: string,
   shared: SharedListing,
 ) => void) => {
   const setAttachedListings = useAtomSet(attachedListingsAtom);
   return React.useCallback(
-    (contactId, shared) => {
-      setAttachedListings(withAttached(contactId, shared));
-      navigateTo({ route: "chat", id: contactId });
+    (chatId, shared) => {
+      setAttachedListings(withAttached(chatId, shared));
+      navigateTo({ route: "chat", id: chatId });
     },
     [setAttachedListings],
   );
