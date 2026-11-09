@@ -10,6 +10,7 @@ import {
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import type { ListingRecord } from "@linky-fit/linksync";
 import {
+  hiddenListingKey,
   createId,
   NonEmptyString1000,
   OwnerId,
@@ -87,9 +88,10 @@ describe("listing audience column", () => {
     const draft = buildListingsDraft({
       records: [record({ audience: unknown })],
       cash: null,
-      recipients: [{ pubkey: bob, groups: [], hiddenListingIds: [] }],
+      recipients: [{ pubkey: bob, groups: [] }],
       peerDocuments: {},
       passOn: true,
+      hidden: new Set(),
     });
     expect(draft.document.listings).toEqual([]);
     expect(draft.audiences).toEqual([]);
@@ -109,9 +111,10 @@ describe("buildListingsDraft", () => {
         record({ amount: "1.234" }),
       ],
       cash: "want",
-      recipients: [{ pubkey: bob, groups: [], hiddenListingIds: [] }],
+      recipients: [{ pubkey: bob, groups: [] }],
       peerDocuments: {},
       passOn: true,
+      hidden: new Set(),
     });
     expect(draft.document.cash).toBe("want");
     expect(
@@ -137,11 +140,12 @@ describe("buildListingsDraft", () => {
       ],
       cash: null,
       recipients: [
-        { pubkey: bob, groups: ["Rodina"], hiddenListingIds: [] },
-        { pubkey: carol, groups: ["Práce"], hiddenListingIds: [] },
+        { pubkey: bob, groups: ["Rodina"] },
+        { pubkey: carol, groups: ["Práce"] },
       ],
       peerDocuments: {},
       passOn: true,
+      hidden: new Set(),
     });
     expect(draft.document.listings).toEqual([]);
     expect(draft.audiences).toHaveLength(1);
@@ -155,7 +159,7 @@ describe("buildListingsDraft", () => {
     const draft = buildListingsDraft({
       records: [],
       cash: null,
-      recipients: [{ pubkey: bob, groups: [], hiddenListingIds: [] }],
+      recipients: [{ pubkey: bob, groups: [] }],
       peerDocuments: {
         [bob]: peer(
           10,
@@ -173,6 +177,7 @@ describe("buildListingsDraft", () => {
         ),
       },
       passOn: true,
+      hidden: new Set(),
     });
     expect(draft.document.passedOn).toEqual([
       new SharedListing({ author: bob, listing: listing("kolo", "network") }),
@@ -184,8 +189,8 @@ describe("buildListingsDraft", () => {
       records: [],
       cash: null,
       recipients: [
-        { pubkey: bob, groups: [], hiddenListingIds: ["b2"] },
-        { pubkey: carol, groups: [], hiddenListingIds: [] },
+        { pubkey: bob, groups: [] },
+        { pubkey: carol, groups: [] },
       ],
       peerDocuments: {
         [bob]: peer(
@@ -202,6 +207,7 @@ describe("buildListingsDraft", () => {
         ),
       },
       passOn: true,
+      hidden: new Set([hiddenListingKey(bob, "b2")]),
     });
     expect(draft.document.passedOn?.map(({ listing: { id } }) => id)).toEqual([
       "c2",
@@ -215,7 +221,7 @@ describe("buildListingsDraft", () => {
     const draft = buildListingsDraft({
       records: [],
       cash: null,
-      recipients: [{ pubkey: bob, groups: [], hiddenListingIds: [] }],
+      recipients: [{ pubkey: bob, groups: [] }],
       peerDocuments: {
         [bob]: peer(
           10,
@@ -223,6 +229,7 @@ describe("buildListingsDraft", () => {
         ),
       },
       passOn: false,
+      hidden: new Set(),
     });
     expect(draft.document.passedOn).toBeUndefined();
   });
@@ -238,40 +245,6 @@ describe("group listings from the contact rows", () => {
       groupName === null ? null : NonEmptyString1000.orThrow(groupName),
     groupNamesJson: null,
     archivedAtSec: null,
-    hiddenListingIdsJson: null,
-  });
-
-  it("never passes on a listing the user hid on its author's contact row", () => {
-    const author = makeIdentity();
-    const contact = makeIdentity();
-    const [recipient] = listingsRecipients(
-      [
-        {
-          ...contactRow(contact, null),
-          hiddenListingIdsJson: NonEmptyString1000.orThrow('["b2"]'),
-        },
-      ],
-      [],
-      author.pubkey,
-    );
-    expect(recipient?.hiddenListingIds).toEqual(["b2"]);
-    const draft = buildListingsDraft({
-      records: [],
-      cash: null,
-      recipients: recipient ? [recipient] : [],
-      peerDocuments: {
-        [contact.pubkey]: peer(
-          10,
-          new ListingsDocument({
-            listings: ["b1", "b2"].map((id) => listing(id, "network")),
-          }),
-        ),
-      },
-      passOn: true,
-    });
-    expect(draft.document.passedOn?.map(({ listing: { id } }) => id)).toEqual([
-      "b1",
-    ]);
   });
 
   it("gives the group's listings to its unblocked members only", () => {
@@ -300,6 +273,7 @@ describe("group listings from the contact rows", () => {
       recipients,
       peerDocuments: {},
       passOn: true,
+      hidden: new Set(),
     });
     // Linkstr's codec tests prove that an audience opens for its recipients only.
     expect(draft.recipients).toEqual([member.pubkey, outsider.pubkey].sort());

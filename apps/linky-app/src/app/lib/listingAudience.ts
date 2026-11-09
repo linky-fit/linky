@@ -9,7 +9,7 @@ import {
   type Pubkey,
 } from "@linky-fit/linkstr";
 import {
-  hiddenListingIdsOf,
+  hiddenListingKey,
   NonEmptyString1000,
   type ContactRow,
   type ListingRecord,
@@ -83,59 +83,38 @@ export const listingAudienceLabel = (
             : "listingAudienceContacts",
         );
 
-/** A saved contact who gets a key slot, with the groups they are in and their listings the user hid. */
+/** A saved contact who gets a key slot, with the groups they are in. */
 export interface ListingsRecipient {
   readonly pubkey: Pubkey;
   readonly groups: ReadonlyArray<string>;
-  readonly hiddenListingIds: ReadonlyArray<string>;
 }
 
 /**
  * The contacts who get a key slot: saved, not blocked, not the user, with a
- * pubkey; with their groups, which decide the group listings they read, and
- * the listings of theirs the user hid, which are never passed on.
+ * pubkey; with their groups, which decide the group listings they read.
  */
 export const listingsRecipients = (
   rows: ReadonlyArray<
-    Pick<
-      ContactRow,
-      | "npub"
-      | "groupName"
-      | "groupNamesJson"
-      | "archivedAtSec"
-      | "hiddenListingIdsJson"
-    >
+    Pick<ContactRow, "npub" | "groupName" | "groupNamesJson" | "archivedAtSec">
   >,
   blocked: ReadonlyArray<string>,
   ownPubkey: Pubkey | null,
 ): ReadonlyArray<ListingsRecipient> => {
   const excluded = new Set<string>(blocked);
   if (ownPubkey) excluded.add(ownPubkey);
-  const recipients = new Map<
-    Pubkey,
-    { groups: Set<string>; hiddenListingIds: Set<string> }
-  >();
+  const recipients = new Map<Pubkey, Set<string>>();
   for (const row of rows) {
     if (isDeletedContact(row)) continue;
     const npub = normalizeNpubIdentifier(row.npub ?? "");
     const pubkey = npub ? parsePubkey(npub) : null;
     if (!pubkey || excluded.has(pubkey)) continue;
-    const recipient = recipients.get(pubkey) ?? {
-      groups: new Set<string>(),
-      hiddenListingIds: new Set<string>(),
-    };
-    for (const group of getContactGroups(row)) recipient.groups.add(group);
-    for (const id of hiddenListingIdsOf(row))
-      recipient.hiddenListingIds.add(id);
-    recipients.set(pubkey, recipient);
+    const groups = recipients.get(pubkey) ?? new Set<string>();
+    for (const group of getContactGroups(row)) groups.add(group);
+    recipients.set(pubkey, groups);
   }
   return [...recipients.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
-    .map(([pubkey, { groups, hiddenListingIds }]) => ({
-      pubkey,
-      groups: [...groups].sort(),
-      hiddenListingIds: [...hiddenListingIds].sort(),
-    }));
+    .map(([pubkey, groups]) => ({ pubkey, groups: [...groups].sort() }));
 };
 
 interface ListingsDraftInput {
@@ -148,6 +127,8 @@ interface ListingsDraftInput {
   >;
   /** Whether the user passes the contacts' network listings on at all. */
   readonly passOn: boolean;
+  /** The listings the user hid, as `hiddenListingKey`s; never passed on. */
+  readonly hidden: ReadonlySet<string>;
 }
 
 const byKey =
@@ -163,23 +144,24 @@ const byKey =
 const passedOnListings = (
   recipients: ReadonlyArray<ListingsRecipient>,
   peerDocuments: ListingsDraftInput["peerDocuments"],
+  hidden: ReadonlySet<string>,
 ): Array<SharedListing> => {
   const queues = recipients
-    .flatMap(({ pubkey, hiddenListingIds }) => {
+    .flatMap(({ pubkey }) => {
       const peer = peerDocuments[pubkey];
-      return peer ? [{ pubkey, hiddenListingIds, ...peer }] : [];
+      return peer ? [{ pubkey, ...peer }] : [];
     })
     .sort(
       (left, right) =>
         right.updatedAt - left.updatedAt ||
         left.pubkey.localeCompare(right.pubkey),
     )
-    .map(({ pubkey, hiddenListingIds, document }) =>
+    .map(({ pubkey, document }) =>
       document.listings
         .filter(
           (listing) =>
             listing.reach === "network" &&
-            !hiddenListingIds.includes(listing.id),
+            !hidden.has(hiddenListingKey(pubkey, listing.id)),
         )
         .reverse()
         .map((listing) => new SharedListing({ author: pubkey, listing })),
@@ -202,6 +184,7 @@ export const buildListingsDraft = ({
   recipients,
   peerDocuments,
   passOn,
+  hidden,
 }: ListingsDraftInput): ListingsDraft => {
   const everyone: Array<Listing> = [];
   const byGroup = new Map<string, Array<Listing>>();
@@ -222,7 +205,9 @@ export const buildListingsDraft = ({
       everyone.push(listing);
     }
   }
-  const passedOn = passOn ? passedOnListings(recipients, peerDocuments) : [];
+  const passedOn = passOn
+    ? passedOnListings(recipients, peerDocuments, hidden)
+    : [];
   return new ListingsDraft({
     document: new ListingsDocument({
       cash,

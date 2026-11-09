@@ -9,6 +9,7 @@ import {
 import {
   createId,
   createIdFromString,
+  hiddenListingKey,
   NonEmptyString100,
   NonEmptyString1000,
   OwnerId,
@@ -66,10 +67,12 @@ const state = vi.hoisted(
   (): {
     blocked: string[];
     contacts: ContactRowLike[];
+    hidden: Set<string>;
     snapshot: SharedListing | null;
   } => ({
     blocked: [],
     contacts: [],
+    hidden: new Set(),
     snapshot: null,
   }),
 );
@@ -82,7 +85,6 @@ const { attachListingToChat, navigateTo, setListingHidden } = vi.hoisted(
 );
 
 vi.mock("@linky-fit/linkstr-react", () => ({
-  useAtomSuspense: () => ({ value: { setListingHidden } }),
   useAtomValue: (atom: unknown) =>
     atom === currentPubkeyAtom
       ? ME
@@ -126,6 +128,10 @@ import { contactGroupsAtom } from "../app/state/contacts/readModel";
 vi.mock("../app/hooks/shell", async () =>
   (await import("../testUtils/shellHooks")).shellHooksMock(),
 );
+vi.mock("../app/hooks/useHiddenListings", () => ({
+  useHiddenListingKeys: () => state.hidden,
+  useSetListingHidden: () => setListingHidden,
+}));
 vi.mock("../app/hooks/useLinksync", () => ({
   useListingRecords: () => [ownRecord],
 }));
@@ -154,6 +160,7 @@ afterEach(() => {
   vi.clearAllMocks();
   state.blocked = [];
   state.contacts = [];
+  state.hidden = new Set();
   state.snapshot = null;
 });
 
@@ -237,7 +244,6 @@ it("shows the copy a message holds and offers to write to an author who is no co
   );
   expect(byTestId(container, "listing-author")?.textContent).toContain("Carol");
   expect(byTestId(container, "listing-reply")).toBeNull();
-  expect(byTestId(container, "listing-hide")).toBeNull();
   await act(async () => byTestId(container, "listing-contact-author")?.click());
   expect(attachListingToChat).toHaveBeenCalledExactlyOnceWith(
     `unknown:${PEER}`,
@@ -257,6 +263,19 @@ it("offers no way to write to an author the user blocked", async () => {
   expect(byTestId(container, "listing-author")?.textContent).not.toContain(
     "Carol",
   );
+  await unmount();
+});
+
+it.each([
+  ["listing", { author: PEER, listingId: "eggs" }],
+  ["passed-on listing", { author: STRANGER, listingId: "bike" }],
+])("finds no live %s of a blocked contact", async (_, route) => {
+  state.contacts = [{ id: contactId, name: "Alice", npub: encodeNpub(PEER) }];
+  state.blocked = [PEER];
+  const { container, unmount } = await renderIntoDocument(
+    <ListingDetailPage {...route} messageId={null} />,
+  );
+  expect(container.textContent).toContain("listingNotFound");
   await unmount();
 });
 
@@ -286,39 +305,28 @@ it("replies with the very copy the message holds", async () => {
   await unmount();
 });
 
-it("hides a contact's listing on the contact", async () => {
+it("hides a contact's listing", async () => {
   state.contacts = [{ id: contactId, name: "Alice", npub: encodeNpub(PEER) }];
   const { container, unmount } = await renderIntoDocument(
     <ListingDetailPage author={PEER} listingId="eggs" messageId={null} />,
   );
   expect(byTestId(container, "listing-show")).toBeNull();
   await act(async () => byTestId(container, "listing-hide")?.click());
-  expect(setListingHidden).toHaveBeenCalledExactlyOnceWith(
-    contactId,
-    "eggs",
-    true,
-  );
+  expect(setListingHidden).toHaveBeenCalledExactlyOnceWith(PEER, "eggs", true);
   await unmount();
 });
 
-it("shows a listing the contact row marks hidden again", async () => {
-  state.contacts = [
-    {
-      id: contactId,
-      name: "Alice",
-      npub: encodeNpub(PEER),
-      hiddenListingIdsJson: '["eggs"]',
-    },
-  ];
+it("shows a hidden listing from someone who is no contact again", async () => {
+  state.contacts = [{ id: contactId, name: "Alice", npub: encodeNpub(PEER) }];
+  state.hidden = new Set([hiddenListingKey(STRANGER, "bike")]);
   const { container, unmount } = await renderIntoDocument(
-    <ListingDetailPage author={PEER} listingId="eggs" messageId={null} />,
+    <ListingDetailPage author={STRANGER} listingId="bike" messageId={null} />,
   );
   expect(byTestId(container, "listing-hide")).toBeNull();
-  expect(byTestId(container, "listing-reply")).not.toBeNull();
   await act(async () => byTestId(container, "listing-show")?.click());
   expect(setListingHidden).toHaveBeenCalledExactlyOnceWith(
-    contactId,
-    "eggs",
+    STRANGER,
+    "bike",
     false,
   );
   await unmount();

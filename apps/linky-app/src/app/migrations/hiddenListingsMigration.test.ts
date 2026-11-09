@@ -1,12 +1,10 @@
 import { encodeNpub, Pubkey } from "@linky-fit/linkstr";
 import {
   createId,
-  makeContactsRepository,
+  NonEmptyString,
   NonEmptyString1000,
 } from "@linky-fit/linksync";
-import { Effect } from "effect";
 import { expect, it } from "vitest";
-import { makeTestLinkyStore } from "../../testUtils/linkyStore";
 import { hiddenListingsToMove } from "./hiddenListingsMigration";
 
 const ALICE = Pubkey.make(
@@ -16,17 +14,10 @@ const STRANGER = Pubkey.make(
   "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
 );
 
-it("moves each hidden listing onto its author's contact and drops strangers' and malformed keys", async () => {
-  const { store } = makeTestLinkyStore();
-  const contacts = makeContactsRepository(store);
+it("moves this device's hides, strangers' included, and the hides on contact rows", () => {
   const alice = createId<"Contact">();
-  await Effect.runPromise(
-    contacts.insert({
-      id: alice,
-      npub: NonEmptyString1000.orThrow(encodeNpub(ALICE)),
-    }),
-  );
-  const rows = await Effect.runPromise(contacts.all);
+  const bob = createId<"Contact">();
+  const plain = createId<"Contact">();
 
   expect(
     hiddenListingsToMove(
@@ -37,10 +28,28 @@ it("moves each hidden listing onto its author's contact and drops strangers' and
         "eggs",
         `${ALICE}:`,
       ],
-      rows,
+      [
+        {
+          id: alice,
+          npub: NonEmptyString1000.orThrow(encodeNpub(ALICE)),
+          hiddenListingIdsJson: NonEmptyString.orThrow('["bike"]'),
+        },
+        // A row without a readable npub keeps no hide but is still cleared.
+        {
+          id: bob,
+          npub: null,
+          hiddenListingIdsJson: NonEmptyString.orThrow('["lamp"]'),
+        },
+        { id: plain, npub: null, hiddenListingIdsJson: null },
+      ],
     ),
-  ).toEqual([
-    { contactId: alice, listingId: "eggs" },
-    { contactId: alice, listingId: "a:b" },
-  ]);
+  ).toEqual({
+    moves: [
+      { author: ALICE, listingId: "eggs" },
+      { author: ALICE, listingId: "a:b" },
+      { author: STRANGER, listingId: "milk" },
+      { author: ALICE, listingId: "bike" },
+    ],
+    contactsToClear: [alice, bob],
+  });
 });

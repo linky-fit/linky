@@ -15,14 +15,14 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 ### en-US
 
 - In Goods & services, a listing can be free (price 0) or leave the price to be agreed (no price).
-- Listings you hide in Goods & services stay hidden on all your devices.
-- In Goods & services, choose who sees each listing: your contacts, your network (their contacts too) or one contact group. A listing from someone you don't know shows the contacts it came through, and you can write to its author without adding them. Settings can stop passing your contacts' listings on.
+- Hidden listings stay hidden on all your devices, strangers' too; blocked people's listings no longer show.
+- In Goods & services, choose who sees each listing: contacts, your network (their contacts too) or one group. A listing from someone you don't know shows the contacts it came through, and you can write to its author without adding them. Settings can stop passing contacts' listings on.
 
 ### cs-CZ
 
 - Ve zboží a službách může být nabídka zdarma (cena 0) nebo s cenou dohodou (bez ceny).
-- Inzeráty skryté ve zboží a službách zůstanou skryté na všech vašich zařízeních.
-- Ve zboží a službách vyberete, kdo nabídku uvidí: kontakty, síť (i kontakty vašich kontaktů) nebo jedna skupina. U nabídky od neznámého člověka uvidíte kontakty, přes které přišla, a inzerentovi napíšete, i když ho nepřidáte do kontaktů. V nastavení lze vypnout předávání nabídek kontaktů dál.
+- Skryté nabídky zůstanou skryté na všech zařízeních, i od neznámých; nabídky blokovaných se nezobrazují.
+- Ve zboží a službách vyberete, kdo nabídku uvidí: kontakty, síť (i kontakty kontaktů) nebo jedna skupina. U nabídky od neznámého uvidíte kontakty, přes které přišla, a inzerentovi napíšete i bez přidání do kontaktů. V nastavení lze vypnout předávání nabídek kontaktů dál.
 
 ## [26.11.2] - 2026-11-07
 

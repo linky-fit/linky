@@ -30,6 +30,7 @@ import {
 } from "./lib/listingAudience";
 import { usePassOnListings } from "./hooks/usePassOnListings";
 import { blockListAtom } from "./state/contacts/blockList";
+import { useHiddenListingKeys } from "./hooks/useHiddenListings";
 import {
   loadPeerListings,
   peerListingsAtom,
@@ -126,6 +127,7 @@ const useListingsPublisher = (
   const { cashIntent } = useCashIntent();
   const peerDocuments = useAtomValue(peerListingsAtom);
   const { passOnListings } = usePassOnListings();
+  const hidden = useHiddenListingKeys();
   const draft = React.useMemo(
     () =>
       buildListingsDraft({
@@ -134,8 +136,9 @@ const useListingsPublisher = (
         recipients,
         peerDocuments,
         passOn: passOnListings,
+        hidden,
       }),
-    [cashIntent, passOnListings, peerDocuments, recipients, records],
+    [cashIntent, hidden, passOnListings, peerDocuments, recipients, records],
   );
   usePublishWhenChanged({
     kv: useAtomValue(platformAtom).kv,

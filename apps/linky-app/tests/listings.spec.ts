@@ -330,6 +330,20 @@ test("a network listing reaches a contact's contact, listed through the contact 
       ).toHaveCount(1, { timeout: 60_000 });
     });
 
+    await test.step("C hides the listing of A, who is no contact, and shows it again", async () => {
+      await c.page.goto("/#collaboration/listings");
+      await c.page.getByTestId("peer-listing").click();
+      await c.page.getByTestId("listing-hide").click();
+      await c.page.goto("/#collaboration/listings");
+      await expect(c.page.getByTestId("peer-listing")).toHaveCount(0);
+      await c.page.getByTestId("hidden-listings").click();
+      await c.page.getByTestId("peer-listing").click();
+      await c.page.getByTestId("listing-show").click();
+      await c.page.goto("/#collaboration/listings");
+      await expect(c.page.getByTestId("hidden-listings")).toHaveCount(0);
+      await expect(c.page.getByTestId("peer-listing")).toHaveCount(1);
+    });
+
     await test.step("A narrows it to the contacts and C stops seeing it", async () => {
       await a.page.goto("/#collaboration/listings");
       await a.page.getByTestId("own-listing").click();

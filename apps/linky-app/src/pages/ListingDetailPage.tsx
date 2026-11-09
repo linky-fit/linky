@@ -4,10 +4,10 @@ import {
   type Listing,
   type Pubkey,
 } from "@linky-fit/linkstr";
-import { useAtomSuspense, useAtomValue } from "@linky-fit/linkstr-react";
+import { useAtomValue } from "@linky-fit/linkstr-react";
 import {
   ContactId,
-  hiddenListingIdsOf,
+  hiddenListingKey,
   type MessageId,
 } from "@linky-fit/linksync";
 import {
@@ -30,13 +30,16 @@ import {
 import { buildUnknownContactId } from "../app/hooks/messages/contactIdentity";
 import { useEffectiveProfile } from "../app/hooks/profile/useEffectiveProfile";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
+import {
+  useHiddenListingKeys,
+  useSetListingHidden,
+} from "../app/hooks/useHiddenListings";
 import { useListingRecords } from "../app/hooks/useLinksync";
 import {
   useAttachListingToChat,
   useSharedListingOfMessage,
 } from "../app/hooks/useSharedListing";
 import { formatListingPrice, listingOfRecord } from "../app/lib/listings";
-import { contactsCommandsAtom } from "../app/state/contacts/commands";
 import {
   listingAudienceLabel,
   listingAudienceOfRecord,
@@ -180,10 +183,10 @@ export function ListingDetailPage({
   const blocked = useAtomValue(blockListAtom).includes(author);
   const unknownChatId = blocked ? null : buildUnknownContactId(author);
   const attachListingToChat = useAttachListingToChat();
-  const { setListingHidden } = useAtomSuspense(contactsCommandsAtom).value;
-  const hidden = contact
-    ? hiddenListingIdsOf(contact).includes(listingId)
-    : false;
+  const setListingHidden = useSetListingHidden();
+  const hidden = useHiddenListingKeys().has(
+    hiddenListingKey(author, listingId),
+  );
   const stranger = useStrangerProfile(
     authorNpub,
     !isOwn && contactId === null && !blocked,
@@ -292,19 +295,14 @@ export function ListingDetailPage({
                 {t("listingContactAuthor")}
               </Button>
             ) : null}
-            {/* Hides live on the author's contact row, so only a contact's listings can be hidden. */}
-            {contactId ? (
-              <Button
-                variant="ghost"
-                icon={hidden ? "Eye" : "EyeOff"}
-                onPress={() =>
-                  void setListingHidden(contactId, listingId, !hidden)
-                }
-                testID={hidden ? "listing-show" : "listing-hide"}
-              >
-                {t(hidden ? "listingShow" : "listingHide")}
-              </Button>
-            ) : null}
+            <Button
+              variant="ghost"
+              icon={hidden ? "Eye" : "EyeOff"}
+              onPress={() => void setListingHidden(author, listingId, !hidden)}
+              testID={hidden ? "listing-show" : "listing-hide"}
+            >
+              {t(hidden ? "listingShow" : "listingHide")}
+            </Button>
             {askVia ? (
               <Stack gap="$xs" paddingTop="$sm" testID="listing-via-contacts">
                 <Text variant="caption" color="$colorMuted">

@@ -2,6 +2,7 @@ import {
   linkyScopes,
   makeContactsRepository,
   makeConversationsRepository,
+  makeHiddenListingsRepository,
   makeIdentityRepository,
   makeInboxCursorsRepository,
   makeKeryxSubscriptionsRepository,
@@ -88,6 +89,9 @@ export const recurringPaymentsRepositoryAtom = repositoryAtom(
   makeRecurringPaymentsRepository,
 );
 export const listingsRepositoryAtom = repositoryAtom(makeListingsRepository);
+export const hiddenListingsRepositoryAtom = repositoryAtom(
+  makeHiddenListingsRepository,
+);
 export const settingsRepositoryAtom = repositoryAtom(makeSettingsRepository);
 export const transactionsRepositoryAtom = repositoryAtom(
   makeTransactionsRepository,

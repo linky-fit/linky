@@ -1,5 +1,5 @@
 import { parsePubkey, SharedListing, type Listing } from "@linky-fit/linkstr";
-import { hiddenListingIdsOf } from "@linky-fit/linksync";
+import { hiddenListingKey } from "@linky-fit/linksync";
 import type { Pubkey } from "@linky-fit/linkstr";
 import { useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
@@ -17,6 +17,7 @@ import {
   useNpubMessageContactInfo,
 } from "./contacts/useDisplayContacts";
 import { useDisplayAmounts, useTranslation } from "./shell";
+import { useHiddenListingKeys } from "./useHiddenListings";
 import { useListingRecords } from "./useLinksync";
 
 /** A saved contact who shares with this identity, with what they share. */
@@ -48,12 +49,14 @@ export interface PeerListing {
 
 /**
  * The contacts whose listings document reached this identity, in name
- * order. A document only decodes for contacts who saved the user back, so
- * these are the mutual contacts who share anything.
+ * order, leaving out the blocked ones. A document only decodes for contacts
+ * who saved the user back, so these are the mutual contacts who share
+ * anything.
  */
 export const useSharingContacts = (): ReadonlyArray<SharingContact> => {
   const contacts = useContacts();
   const peers = useAtomValue(peerListingsAtom);
+  const blockList = useAtomValue(blockListAtom);
   const contactInfo = useNpubMessageContactInfo();
   const { lang } = useTranslation();
   return React.useMemo(() => {
@@ -67,7 +70,7 @@ export const useSharingContacts = (): ReadonlyArray<SharingContact> => {
         if (isDeletedContact(contact)) return [];
         const npub = normalizeNpubIdentifier(contact.npub ?? "");
         const pubkey = npub ? parsePubkey(npub) : null;
-        if (!npub || !pubkey) return [];
+        if (!npub || !pubkey || blockList.includes(pubkey)) return [];
         const peer = peers[pubkey];
         const info = peer ? contactInfo(npub) : null;
         if (!peer || !info) return [];
@@ -83,7 +86,7 @@ export const useSharingContacts = (): ReadonlyArray<SharingContact> => {
         ];
       })
       .sort((left, right) => collator.compare(left.name, right.name));
-  }, [contactInfo, contacts, lang, peers]);
+  }, [blockList, contactInfo, contacts, lang, peers]);
 };
 
 /** Every listing others share with the user: the contacts' own, then those passed on through them from the contacts' contacts. */
@@ -138,18 +141,17 @@ export const usePeerListings = (): {
   hidden: ReadonlyArray<PeerListing>;
 } => {
   const entries = useAllPeerListings();
+  const hiddenKeys = useHiddenListingKeys();
   return React.useMemo(() => {
-    // Hides live on the author's contact row, so only a contact's listings can be hidden.
-    const isHidden = ({ seller, listing }: PeerListing) =>
-      seller !== null &&
-      hiddenListingIdsOf(seller.contact).includes(listing.id);
+    const isHidden = ({ author, listing }: PeerListing) =>
+      hiddenKeys.has(hiddenListingKey(author, listing.id));
     const shown = entries.filter((entry) => !isHidden(entry));
     return {
       offered: shown.filter(({ listing }) => listing.side === "offer"),
       wanted: shown.filter(({ listing }) => listing.side === "want"),
       hidden: entries.filter(isHidden),
     };
-  }, [entries]);
+  }, [entries, hiddenKeys]);
 };
 
 /** Contacts by cash intent. */
@@ -173,6 +175,7 @@ export const useMentionListings = (): ReadonlyArray<MessageMentionListing> => {
   const records = useListingRecords();
   const sharing = useSharingContacts();
   const peers = useAtomValue(peerListingsAtom);
+  const hiddenKeys = useHiddenListingKeys();
   return React.useMemo(() => {
     const dated: Array<MessageMentionListing & { readonly at: number }> = [];
     if (ownPubkey) {
@@ -188,10 +191,10 @@ export const useMentionListings = (): ReadonlyArray<MessageMentionListing> => {
     }
     for (const contact of sharing) {
       const at = peers[contact.pubkey]?.updatedAt ?? 0;
-      const hidden = hiddenListingIdsOf(contact.contact);
       // A document lists oldest first, and the sort below keeps equal times in order.
       for (const listing of [...contact.listings].reverse()) {
-        if (hidden.includes(listing.id)) continue;
+        if (hiddenKeys.has(hiddenListingKey(contact.pubkey, listing.id)))
+          continue;
         dated.push({
           at,
           authorName: contact.name,
@@ -202,7 +205,7 @@ export const useMentionListings = (): ReadonlyArray<MessageMentionListing> => {
     return dated
       .sort((left, right) => right.at - left.at)
       .map(({ authorName, shared }) => ({ authorName, shared }));
-  }, [ownPubkey, peers, records, sharing]);
+  }, [hiddenKeys, ownPubkey, peers, records, sharing]);
 };
 
 /** `90 Kč · per 10 pieces`, priced in the viewer's display unit. */

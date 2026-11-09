@@ -342,6 +342,10 @@ _Avoid_: visibility, privacy, reach (except as that wire field)
 A contact's network listing that the user's listings document carries on to the user's own contacts, with its author's public key; it is never passed on further. The user passes on what they did not hide, unless they turned passing on off in Settings, which also keeps their contacts from learning who else they have as a contact. A reader who does not have its author as a contact sees, in the list, only the contacts it came through; its detail shows the author too, whom the reader can write to as an unknown sender without adding them.
 _Avoid_: relayed listing (relay is a Nostr server), forwarded listing, shared listing (that is the chat copy)
 
+**Hidden listing**:
+Someone else's listing the user hid from Goods & services, whether or not its author is a contact; the hide syncs to all the user's devices, and a hidden listing is never passed on. A blocked contact's listings, and what they pass on, are not shown at all.
+_Avoid_: muted listing, blocked listing (blocking is for people)
+
 **Listings document**:
 The one addressable Nostr event (kind 34133) in which a user shares their cash intent, listings and passed-on listings; its content is readable only by the contacts the user chose, each through their own key slot, and a group's listings only by its members. A contact's document reaching the user proves the contact saved them.
 _Avoid_: listings event, catalog, shop
