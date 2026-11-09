@@ -301,12 +301,32 @@ test("a network listing reaches a contact's contact, listed through the contact 
 
       await peer.click();
       await expect(c.page.getByTestId("listing-author")).toBeVisible();
-      await expect(c.page.getByTestId("listing-add-author")).toBeVisible();
       await c.page.getByTestId("listing-ask-via").click();
-      await c.page.waitForURL(/#chat\/[^/]+$/);
+      await c.page.waitForURL(/#chat\/(?!unknown)[^/]+$/);
       await expect(c.page.getByTestId("chat-compose")).toContainText(
         "Old bike",
       );
+    });
+
+    await test.step("C writes to A directly and stays an unknown sender to A", async () => {
+      await c.page.goto("/#collaboration/listings");
+      await c.page.getByTestId("peer-listing").click();
+      await c.page.getByTestId("listing-contact-author").click();
+      await expect(c.page).toHaveURL(/#chat\/unknown(:|%3A)[0-9a-f]+$/);
+      await expect(c.page.getByTestId("chat-compose")).toContainText(
+        "Old bike",
+      );
+      await c.page.locator("[data-guide='chat-send']").click();
+      await expect(
+        c.page.getByTestId("chat-bubble").filter({ hasText: "Old bike" }),
+      ).toBeVisible();
+
+      await a.page.goto("/#contacts");
+      await expect(
+        a.page.locator(
+          "[data-guide='contact-card'][data-guide-contact-id^='unknown:']",
+        ),
+      ).toHaveCount(1, { timeout: 60_000 });
     });
 
     await test.step("A narrows it to the contacts and C stops seeing it", async () => {

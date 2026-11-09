@@ -27,7 +27,7 @@ import {
   useContacts,
   useNpubMessageContactInfo,
 } from "../app/hooks/contacts/useDisplayContacts";
-import { useSaveNpubContact } from "../app/hooks/contacts/useSaveNpubContact";
+import { buildUnknownContactId } from "../app/hooks/messages/contactIdentity";
 import { useEffectiveProfile } from "../app/hooks/profile/useEffectiveProfile";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import { useListingRecords } from "../app/hooks/useLinksync";
@@ -175,7 +175,8 @@ export function ListingDetailPage({
   const contact = contactsByNpub.get(authorNpub) ?? null;
   const contactId = asContactId(contact?.id);
   const authorInfo = useNpubMessageContactInfo()(authorNpub);
-  const saveNpubContact = useSaveNpubContact();
+  // Writing to an author who is not a contact keeps them an unknown sender until the user adds them.
+  const unknownChatId = buildUnknownContactId(author);
   const attachListingToChat = useAttachListingToChat();
   const { setListingHidden } = useAtomSuspense(contactsCommandsAtom).value;
   const hidden = contact
@@ -269,8 +270,38 @@ export function ListingDetailPage({
           ) : null
         ) : (
           <>
+            {contactId ? (
+              <Button
+                icon="Reply"
+                onPress={() => attachListingToChat(contactId, shared)}
+                testID="listing-reply"
+              >
+                {t("listingReply")}
+              </Button>
+            ) : unknownChatId ? (
+              <Button
+                icon="MessageCircle"
+                onPress={() => attachListingToChat(unknownChatId, shared)}
+                testID="listing-contact-author"
+              >
+                {t("listingContactAuthor")}
+              </Button>
+            ) : null}
+            {/* Hides live on the author's contact row, so only a contact's listings can be hidden. */}
+            {contactId ? (
+              <Button
+                variant="ghost"
+                icon={hidden ? "Eye" : "EyeOff"}
+                onPress={() =>
+                  void setListingHidden(contactId, listingId, !hidden)
+                }
+                testID={hidden ? "listing-show" : "listing-hide"}
+              >
+                {t(hidden ? "listingShow" : "listingHide")}
+              </Button>
+            ) : null}
             {askVia ? (
-              <Stack gap="$xs" testID="listing-via-contacts">
+              <Stack gap="$xs" paddingTop="$sm" testID="listing-via-contacts">
                 <Text variant="caption" color="$colorMuted">
                   {t("listingViaLead")}
                 </Text>
@@ -299,36 +330,6 @@ export function ListingDetailPage({
                   ) : null;
                 })}
               </Stack>
-            ) : null}
-            {contactId ? (
-              <Button
-                icon="Reply"
-                onPress={() => attachListingToChat(contactId, shared)}
-                testID="listing-reply"
-              >
-                {t("listingReply")}
-              </Button>
-            ) : (
-              <Button
-                icon="UserPlus"
-                onPress={() => saveNpubContact(authorNpub)}
-                testID="listing-add-author"
-              >
-                {t("addContact")}
-              </Button>
-            )}
-            {/* Hides live on the author's contact row, so only a contact's listings can be hidden. */}
-            {contactId ? (
-              <Button
-                variant="ghost"
-                icon={hidden ? "Eye" : "EyeOff"}
-                onPress={() =>
-                  void setListingHidden(contactId, listingId, !hidden)
-                }
-                testID={hidden ? "listing-show" : "listing-hide"}
-              >
-                {t(hidden ? "listingShow" : "listingHide")}
-              </Button>
             ) : null}
           </>
         )}

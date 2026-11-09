@@ -1,3 +1,4 @@
+import { encodeNpub } from "@linky-fit/linkstr";
 import { useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
 import {
@@ -11,15 +12,25 @@ import { formatShortNpub } from "../../../utils/formatting";
 import { isDeletedContact } from "../../../utils/contactName";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import { unknownNamesAtom } from "../../state/contacts/chatContacts";
-import { unknownSendersAtom } from "../../state/contacts/displayContacts";
+import {
+  unknownSendersAtom,
+  type UnknownSender,
+} from "../../state/contacts/displayContacts";
+import { blockListAtom } from "../../state/contacts/blockList";
 import { profileCacheAtom } from "../../state/contacts/profiles";
 import { contactsAtom } from "../../state/contacts/readModel";
-import { currentNpubAtom } from "../../state/session/session";
+import {
+  currentNpubAtom,
+  currentPubkeyAtom,
+} from "../../state/session/session";
 import type {
   ContactRowLike,
   ProxyPaymentPayerContact,
 } from "../../types/appTypes";
-import { normalizePubkeyHex } from "../messages/contactIdentity";
+import {
+  normalizePubkeyHex,
+  readUnknownContactIdPubkey,
+} from "../messages/contactIdentity";
 import { useTranslation } from "../shell";
 
 export type DisplayContact = ContactRowLike & {
@@ -87,11 +98,10 @@ export const useDisplayContacts = () => {
   const unknownSenders = useAtomValue(unknownSendersAtom);
   const { t } = useTranslation();
 
-  const unknownContacts = React.useMemo(() => {
-    const prefix = t("unknownContactNamePrefix");
-    return unknownSenders.map((sender): DisplayContact & { id: string } => ({
+  const unknownContactOf = React.useCallback(
+    (sender: UnknownSender): DisplayContact & { id: string } => ({
       id: sender.id,
-      name: `${prefix} ${
+      name: `${t("unknownContactNamePrefix")} ${
         (sender.profileName ?? "").trim() ||
         (sender.npub ? formatShortNpub(sender.npub) : t("unknownContactTitle"))
       }`.trim(),
@@ -100,8 +110,13 @@ export const useDisplayContacts = () => {
       groupName: null,
       isUnknownContact: true,
       unknownPubkeyHex: sender.unknownPubkeyHex,
-    }));
-  }, [t, unknownSenders]);
+    }),
+    [t],
+  );
+  const unknownContacts = React.useMemo(
+    () => unknownSenders.map(unknownContactOf),
+    [unknownContactOf, unknownSenders],
+  );
 
   const displayContacts = React.useMemo<DisplayContact[]>(
     () => [...contacts, ...unknownContacts],
@@ -118,20 +133,42 @@ export const useDisplayContacts = () => {
     return byId;
   }, [displayContacts]);
 
-  return { displayContactById, displayContacts, unknownContacts };
+  return {
+    displayContactById,
+    displayContacts,
+    unknownContactOf,
+    unknownContacts,
+  };
 };
 
 /** The peer of the conversation the route shows, saved or not. */
 export const useChatContact = (route: Route): ChatSelectedContact | null => {
-  const { displayContactById } = useDisplayContacts();
+  const { displayContactById, unknownContactOf } = useDisplayContacts();
   const selectedContact = useRouteContact(route);
+  const unknownNames = useAtomValue(unknownNamesAtom);
+  const blockList = useAtomValue(blockListAtom);
+  const ownPubkey = useAtomValue(currentPubkeyAtom);
   return React.useMemo(() => {
     if (route.kind !== "chat" && route.kind !== "bankPaymentOffer") return null;
 
     const chatId = (route.kind === "chat" ? route.id : route.chatId).trim();
     if (!chatId) return null;
 
-    const source = displayContactById.get(chatId) ?? null;
+    // A chat the user opens with someone who is not a contact has no messages yet.
+    const newUnknown = (): DisplayContact | null => {
+      const pubkey = readUnknownContactIdPubkey(chatId);
+      if (!pubkey || pubkey === ownPubkey || blockList.includes(pubkey)) {
+        return null;
+      }
+      const npub = encodeNpub(pubkey);
+      return unknownContactOf({
+        id: chatId,
+        npub,
+        unknownPubkeyHex: pubkey,
+        profileName: unknownNames[npub] ?? null,
+      });
+    };
+    const source = displayContactById.get(chatId) ?? newUnknown();
     if (!source) return null;
 
     const normalizedId = (source.id ?? "").trim();
@@ -166,7 +203,15 @@ export const useChatContact = (route: Route): ChatSelectedContact | null => {
           }
         : {}),
     };
-  }, [displayContactById, route, selectedContact]);
+  }, [
+    blockList,
+    displayContactById,
+    ownPubkey,
+    route,
+    selectedContact,
+    unknownContactOf,
+    unknownNames,
+  ]);
 };
 
 /** The name and picture a message shows for an npub it mentions. */
