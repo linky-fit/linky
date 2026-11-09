@@ -339,7 +339,7 @@ Who sees one of the user's listings: the **contacts** (the default), the **netwo
 _Avoid_: visibility, privacy, reach
 
 **Passed-on listing**:
-A contact's network listing that the user's listings document carries on to the user's own contacts, with its author; it is never passed on further. A reader who does not have its author as a contact sees neither the author's name nor photo, only the contacts it came through.
+A contact's network listing that the user's listings document carries on to the user's own contacts, with its author's public key; it is never passed on further. The user passes on what they did not hide, unless they turned passing on off in Settings, which also keeps their contacts from learning who else they have as a contact. A reader who does not have its author as a contact sees, in the list, only the contacts it came through; its detail shows the author too.
 _Avoid_: relayed listing (relay is a Nostr server), forwarded listing, shared listing (that is the chat copy)
 
 **Listings document**:

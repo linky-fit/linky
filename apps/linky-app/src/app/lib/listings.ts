@@ -2,8 +2,10 @@ import {
   LISTING_SAT_CURRENCY,
   Listing,
   listingPriceKind,
+  ListingsDocument,
   ListingsDraft,
   PrivateImage,
+  SharedListing,
   type CashIntent,
   type ListingSide,
   type RelayUrl,
@@ -66,6 +68,11 @@ export interface ListingsPublication {
   readonly refreshPeriod: number;
 }
 
+const bySharedKey = (left: SharedListing, right: SharedListing): number =>
+  `${left.author}:${left.listing.id}`.localeCompare(
+    `${right.author}:${right.listing.id}`,
+  );
+
 /** What a publish depends on, as text: equal text means the relays already hold it. */
 export const listingsPublishFingerprint = ({
   draft,
@@ -77,6 +84,13 @@ export const listingsPublishFingerprint = ({
       new ListingsDraft({
         ...draft,
         recipients: [...draft.recipients].sort(),
+        // Their order follows when the contacts last published, which alone is no reason to publish again.
+        document: new ListingsDocument({
+          ...draft.document,
+          ...(draft.document.passedOn
+            ? { passedOn: [...draft.document.passedOn].sort(bySharedKey) }
+            : {}),
+        }),
       }),
     ),
     relays: [...relays].sort(),

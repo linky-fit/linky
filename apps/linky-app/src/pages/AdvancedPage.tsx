@@ -41,6 +41,7 @@ import {
   useRelayHealth,
 } from "../app/hooks/useRelayHealth";
 import { useExperimentalFeatures } from "../app/hooks/useExperimentalFeatures";
+import { usePassOnListings } from "../app/hooks/usePassOnListings";
 import { usePushNotificationsSetting } from "../app/hooks/usePushNotificationsSetting";
 import { useColorModePreference } from "../hooks/useColorMode";
 import { navigateTo, useRouting } from "../hooks/useRouting";
@@ -72,6 +73,7 @@ export function AdvancedPage(): React.ReactElement {
   const receiveMethod = useAtomValue(receiveMethodAtom);
   const relayUrls = useAtomValue(nostrRelayUrlsAtom);
   const { allowTestMints, setAllowTestMints } = useAllowTestMints();
+  const { passOnListings, setPassOnListings } = usePassOnListings();
   const { experimentalFeatures, setExperimentalFeatures } =
     useExperimentalFeatures();
   const relayHealth = useRelayHealth();
@@ -216,6 +218,15 @@ export function AdvancedPage(): React.ReactElement {
           t("sendReadReceipts"),
           sendReadReceiptsEnabled,
           toggleSendReadReceipts,
+        )}
+        {toggleRow(
+          "Share2",
+          t("passOnListings"),
+          passOnListings,
+          (checked) =>
+            void setPassOnListings(checked).then((outcome) => {
+              if (!outcome.ok) pushToast(outcome.error);
+            }),
         )}
         {linkRow(
           "Ban",

@@ -257,7 +257,7 @@ test("a listing and the cash intent reach a contact who saved the author back", 
   }
 });
 
-test("a network listing reaches a contact's contact through them, without its author", async ({
+test("a network listing reaches a contact's contact, listed through the contact it came by", async ({
   browser,
 }) => {
   const a = await bootAccount(browser, "A");
@@ -291,7 +291,7 @@ test("a network listing reaches a contact's contact through them, without its au
       await expect(peer.getByTestId("listing-placeholder")).toBeVisible();
     });
 
-    await test.step("C sees it through B and asks B about it", async () => {
+    await test.step("C sees it through B, sees A on its detail and asks B about it", async () => {
       await c.page.goto("/#collaboration/listings");
       const peer = c.page.getByTestId("peer-listing");
       await expect(peer).toHaveCount(1, { timeout: 60_000 });
@@ -300,7 +300,8 @@ test("a network listing reaches a contact's contact through them, without its au
       await expect(peer.getByTestId("listing-seller")).toHaveCount(0);
 
       await peer.click();
-      await expect(c.page.getByTestId("listing-author")).toHaveCount(0);
+      await expect(c.page.getByTestId("listing-author")).toBeVisible();
+      await expect(c.page.getByTestId("listing-add-author")).toBeVisible();
       await c.page.getByTestId("listing-ask-via").click();
       await c.page.waitForURL(/#chat\/[^/]+$/);
       await expect(c.page.getByTestId("chat-compose")).toContainText(

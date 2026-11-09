@@ -1001,6 +1001,7 @@ export const en = {
   decimalInput: "Decimal places",
   showProfileQrOnTilt: "Tilt to show profile",
   sendReadReceipts: "Send read receipts",
+  passOnListings: "Pass contacts' listings on",
   decimalPoint: ".",
 
   cashuBalance: "Available balance",

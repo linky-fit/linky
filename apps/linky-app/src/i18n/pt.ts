@@ -1018,6 +1018,7 @@ export const pt = {
   decimalInput: "Casas decimais",
   showProfileQrOnTilt: "Inclinar para mostrar o perfil",
   sendReadReceipts: "Enviar confirmações de leitura",
+  passOnListings: "Repassar anúncios dos contatos",
   decimalPoint: ",",
 
   cashuBalance: "Saldo disponível",
