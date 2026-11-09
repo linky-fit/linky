@@ -45,7 +45,13 @@ vi.mock("@linky-fit/linkstr-react", async (importOriginal) => {
     ...(await importOriginal<typeof import("@linky-fit/linkstr-react")>()),
     useAtomValue: (atom: unknown) =>
       atom === contactGroupsAtom
-        ? { groupNames: ["Sousedé", "Rodina"] }
+        ? {
+            groupNames: ["Sousedé", "Rodina"],
+            groupCounts: new Map([
+              ["Sousedé", 3],
+              ["Rodina", 2],
+            ]),
+          }
         : ["btc", "czk"],
   };
 });
@@ -178,7 +184,7 @@ describe("ListingFormPage", () => {
     await act(async () => {
       audience("listingAudienceGroup").click();
     });
-    expect(container.textContent).toContain("Sousedé");
+    expect(container.textContent).toContain("Sousedé (3)");
     await act(async () => {
       button(container, "listing-save").click();
     });
@@ -289,7 +295,20 @@ describe("ListingFormPage", () => {
     });
     expect(update).toHaveBeenCalledWith(
       id,
-      expect.objectContaining({ description: null, audience: null }),
+      expect.objectContaining({ description: null }),
     );
+  });
+
+  it("saves an edit's stored audience back unchanged until the user picks another", async () => {
+    const id = createIdFromString<"Listing">("eggs");
+    records.push({
+      ...storedEggs(id),
+      audience: NonEmptyString1000.orThrow('{"kind":"everyone"}'),
+    });
+    const { container } = await renderIntoDocument(<ListingFormPage id={id} />);
+    await act(async () => {
+      button(container, "listing-save").click();
+    });
+    expect(update.mock.calls[0]?.[1]).not.toHaveProperty("audience");
   });
 });

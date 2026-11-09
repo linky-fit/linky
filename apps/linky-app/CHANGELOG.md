@@ -15,12 +15,12 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 ### en-US
 
 - In Goods & services, a listing can be free (price 0) or leave the price to be agreed (no price).
-- In Goods & services, choose who sees each listing: your contacts, your network (their contacts too) or one contact group. The seller's photo and name sit under the title, and a listing from someone you don't know shows the contacts it came through instead.
+- In Goods & services, choose who sees each listing: your contacts, your network (their contacts too) or one contact group. The list shows the seller's photo, or the contacts a listing from someone you don't know came through; a listing without a photo gets a placeholder. Settings can stop passing your contacts' listings on.
 
 ### cs-CZ
 
 - Ve zboží a službách může být nabídka zdarma (cena 0) nebo s cenou dohodou (bez ceny).
-- Ve zboží a službách vyberete, kdo nabídku uvidí: kontakty, síť (i kontakty vašich kontaktů) nebo jedna skupina. Fotka a jméno inzerenta jsou pod názvem a u nabídky od neznámého člověka uvidíte kontakty, přes které k vám přišla.
+- Ve zboží a službách vyberete, kdo nabídku uvidí: kontakty, síť (i kontakty vašich kontaktů) nebo jedna skupina. Seznam ukazuje fotku inzerenta, u nabídky od neznámého člověka kontakty, přes které přišla; nabídka bez fotky má zástupný obrázek. V nastavení lze vypnout předávání nabídek kontaktů dál.
 
 ## [26.11.2] - 2026-11-07
 

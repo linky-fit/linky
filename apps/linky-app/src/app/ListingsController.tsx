@@ -1,5 +1,4 @@
 import {
-  parsePubkey,
   type ListingsUpdated,
   type Pubkey,
   type RelayUrl,
@@ -17,8 +16,6 @@ import {
 import React from "react";
 import { reportAppLog } from "../devtools/inspector/appLog";
 import { getUnknownErrorMessage } from "../utils/unknown";
-import { isDeletedContact } from "../utils/contactName";
-import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 import { useCashIntent } from "./hooks/useCashIntent";
 import { usePublishWhenChanged } from "./hooks/usePublishWhenChanged";
 import {
@@ -26,11 +23,13 @@ import {
   useContactRows,
   useListingRecords,
 } from "./hooks/useLinksync";
-import { getContactGroups } from "../utils/contactGroups";
+import { useHiddenListingKeys } from "./lib/hiddenListings";
 import {
   buildListingsDraft,
+  listingsRecipients,
   type ListingsRecipient,
 } from "./lib/listingAudience";
+import { usePassOnListings } from "./hooks/usePassOnListings";
 import { blockListAtom } from "./state/contacts/blockList";
 import {
   loadPeerListings,
@@ -43,29 +42,15 @@ import { currentPubkeyAtom } from "./state/session/session";
 const PUBLISHED_STORAGE_PREFIX = "linky.listings.published.v1.";
 const noRelays: ReadonlyArray<RelayUrl> = [];
 
-/** The contacts who get a key slot: saved, not blocked, with a pubkey; with their groups, which decide the group listings they read. */
 const useRecipients = (
   ownPubkey: Pubkey | null,
 ): ReadonlyArray<ListingsRecipient> => {
   const rows = useContactRows();
   const blockList = useAtomValue(blockListAtom);
-  return React.useMemo(() => {
-    const hidden = new Set<string>(blockList);
-    if (ownPubkey) hidden.add(ownPubkey);
-    const recipients = new Map<Pubkey, Set<string>>();
-    for (const row of rows) {
-      if (isDeletedContact(row)) continue;
-      const npub = normalizeNpubIdentifier(row.npub ?? "");
-      const pubkey = npub ? parsePubkey(npub) : null;
-      if (!pubkey || hidden.has(pubkey)) continue;
-      const groups = recipients.get(pubkey) ?? new Set<string>();
-      for (const group of getContactGroups(row)) groups.add(group);
-      recipients.set(pubkey, groups);
-    }
-    return [...recipients.entries()]
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([pubkey, groups]) => ({ pubkey, groups: [...groups].sort() }));
-  }, [blockList, ownPubkey, rows]);
+  return React.useMemo(
+    () => listingsRecipients(rows, blockList, ownPubkey),
+    [blockList, ownPubkey, rows],
+  );
 };
 
 /** Follows the recipients' listings events and keeps the per-identity cache. */
@@ -88,7 +73,8 @@ const useListingsWatch = (
     const onEvent = (fact: ListingsUpdated) => {
       setPeerListings((current) => {
         const known = current[fact.pubkey];
-        if (known && known.updatedAt >= fact.updatedAt) return current;
+        // An equal time is taken too: a cache an older release wrote may hold less of the same event.
+        if (known && known.updatedAt > fact.updatedAt) return current;
         const next = {
           ...current,
           [fact.pubkey]: {
@@ -140,6 +126,8 @@ const useListingsPublisher = (
   const records = useListingRecords();
   const { cashIntent } = useCashIntent();
   const peerDocuments = useAtomValue(peerListingsAtom);
+  const { passOnListings } = usePassOnListings();
+  const hidden = useHiddenListingKeys();
   const draft = React.useMemo(
     () =>
       buildListingsDraft({
@@ -147,8 +135,10 @@ const useListingsPublisher = (
         cash: cashIntent,
         recipients,
         peerDocuments,
+        passOn: passOnListings,
+        hidden,
       }),
-    [cashIntent, peerDocuments, recipients, records],
+    [cashIntent, hidden, passOnListings, peerDocuments, recipients, records],
   );
   usePublishWhenChanged({
     kv: useAtomValue(platformAtom).kv,

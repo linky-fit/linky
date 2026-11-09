@@ -79,17 +79,19 @@ vi.mock("@linky-fit/linkstr-react", () => ({
   useAtomValue: (atom: unknown) =>
     atom === currentPubkeyAtom
       ? ME
-      : atom === peerListingsAtom
-        ? {
-            [PEER]: {
-              document: {
-                listings: [peerListing],
-                passedOn: [{ author: STRANGER, listing: bike }],
+      : atom === contactGroupsAtom
+        ? { groupCounts: new Map(), groupNames: [], ungroupedCount: 0 }
+        : atom === peerListingsAtom
+          ? {
+              [PEER]: {
+                document: {
+                  listings: [peerListing],
+                  passedOn: [{ author: STRANGER, listing: bike }],
+                },
+                updatedAt: 1,
               },
-              updatedAt: 1,
-            },
-          }
-        : null,
+            }
+          : null,
 }));
 vi.mock("../app/state/session/session", () => ({
   currentPubkeyAtom: { id: "currentPubkey" },
@@ -97,8 +99,16 @@ vi.mock("../app/state/session/session", () => ({
 vi.mock("../app/state/contacts/listings", () => ({
   peerListingsAtom: { id: "peerListings" },
 }));
+vi.mock("../app/state/contacts/readModel", () => ({
+  contactGroupsAtom: { id: "contactGroups" },
+}));
+vi.mock("../app/hooks/profile/useStrangerProfile", () => ({
+  useStrangerProfile: (_npub: string, enabled: boolean) =>
+    enabled ? { name: "Carol Seller", pictureUrl: null } : null,
+}));
 import { currentPubkeyAtom } from "../app/state/session/session";
 import { peerListingsAtom } from "../app/state/contacts/listings";
+import { contactGroupsAtom } from "../app/state/contacts/readModel";
 
 vi.mock("../app/hooks/shell", async () =>
   (await import("../testUtils/shellHooks")).shellHooksMock(),
@@ -178,14 +188,15 @@ it("replies to a contact's listing in their chat", async () => {
   await unmount();
 });
 
-it("keeps the author of a listing from the network anonymous and asks the contact it came through", async () => {
+it("shows who offers a listing from the network and asks the contact it came through", async () => {
   state.contacts = [{ id: contactId, name: "Alice", npub: encodeNpub(PEER) }];
   const { container, unmount } = await renderIntoDocument(
     <ListingDetailPage author={STRANGER} listingId="bike" messageId={null} />,
   );
   expect(container.textContent).toContain("Old bike");
-  expect(byTestId(container, "listing-author")).toBeNull();
-  expect(byTestId(container, "listing-add-author")).toBeNull();
+  expect(byTestId(container, "listing-author")?.textContent).toContain("Carol");
+  await act(async () => byTestId(container, "listing-add-author")?.click());
+  expect(saveNpubContact).toHaveBeenCalledExactlyOnceWith(encodeNpub(STRANGER));
   expect(byTestId(container, "listing-via-contacts")?.textContent).toContain(
     "Alice",
   );
@@ -211,9 +222,7 @@ it("shows the copy a message holds and offers to save an author who is no contac
   expect(byTestId(container, "listing-description")?.textContent).toBe(
     "Free range.\nPick up in Brno.",
   );
-  expect(byTestId(container, "listing-author")?.textContent).toContain(
-    "npub1short",
-  );
+  expect(byTestId(container, "listing-author")?.textContent).toContain("Carol");
   expect(byTestId(container, "listing-reply")).toBeNull();
   await act(async () => byTestId(container, "listing-add-author")?.click());
   expect(saveNpubContact).toHaveBeenCalledExactlyOnceWith(encodeNpub(PEER));

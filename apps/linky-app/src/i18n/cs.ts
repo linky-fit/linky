@@ -1009,6 +1009,7 @@ export const cs = {
   decimalInput: "Desetinná místa",
   showProfileQrOnTilt: "Naklopením zobrazit profil",
   sendReadReceipts: "Odesílat potvrzení o přečtení",
+  passOnListings: "Předávat nabídky kontaktů dál",
   decimalPoint: ",",
 
   cashuBalance: "Dostupný zůstatek",

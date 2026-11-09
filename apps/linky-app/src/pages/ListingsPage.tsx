@@ -21,6 +21,7 @@ import {
   listingAudienceLabel,
   listingAudienceOfRecord,
 } from "../app/lib/listingAudience";
+import { contactGroupsAtom } from "../app/state/contacts/readModel";
 import { currentPubkeyAtom } from "../app/state/session/session";
 import type { DisplayAmountOptions } from "../utils/displayAmounts";
 import {
@@ -214,6 +215,7 @@ export function ListingsPage(): React.ReactElement {
   );
 
   const ownPubkey = useAtomValue(currentPubkeyAtom);
+  const { groupCounts } = useAtomValue(contactGroupsAtom);
   const addButton = (
     <FloatingActionButton
       icon="Plus"
@@ -272,7 +274,7 @@ export function ListingsPage(): React.ReactElement {
                   />
                 }
                 title={listing.title}
-                description={`${t(listing.side === "offer" ? "listingSideOffer" : "listingSideWant")} · ${listingAudienceLabel(audience, t)}`}
+                description={`${t(listing.side === "offer" ? "listingSideOffer" : "listingSideWant")} · ${listingAudienceLabel(audience, t, groupCounts)}`}
                 trailing={
                   <Price>{formatListingPrice(listing, display, t)}</Price>
                 }

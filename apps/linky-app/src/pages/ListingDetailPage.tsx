@@ -45,6 +45,8 @@ import {
   useAllPeerListings,
   type PeerListing,
 } from "../app/hooks/useCollaboration";
+import { useStrangerProfile } from "../app/hooks/profile/useStrangerProfile";
+import { contactGroupsAtom } from "../app/state/contacts/readModel";
 import { currentPubkeyAtom } from "../app/state/session/session";
 import { ListingImage } from "../components/ListingImage";
 import { navigateTo } from "../hooks/useRouting";
@@ -175,6 +177,8 @@ export function ListingDetailPage({
   const saveNpubContact = useSaveNpubContact();
   const attachListingToChat = useAttachListingToChat();
   const hidden = useIsListingHidden(author, listingId);
+  const stranger = useStrangerProfile(authorNpub, !isOwn && contactId === null);
+  const { groupCounts } = useAtomValue(contactGroupsAtom);
 
   if (!shared) {
     return <EmptyState icon="Package" title={t("listingNotFound")} />;
@@ -183,12 +187,12 @@ export function ListingDetailPage({
   const { listing } = shared;
   const authorName = isOwn
     ? (ownProfile.effectiveProfileName ?? "")
-    : (authorInfo?.displayName ?? "");
+    : (stranger?.name ?? authorInfo?.displayName ?? "");
   const authorPicture = isOwn
     ? ownProfile.effectiveProfilePicture
-    : authorInfo?.pictureUrl;
-  // Someone the user does not know stays anonymous; the contacts it came through stand in for them.
-  const anonymous = !isOwn && contactId === null && via.length > 0;
+    : (stranger?.pictureUrl ?? authorInfo?.pictureUrl);
+  // The list shows only the contacts a stranger's listing came through; here the author shows too, and the user may ask those contacts.
+  const askVia = !isOwn && contactId === null && via.length > 0;
 
   return (
     <Stack gap="$lg">
@@ -207,18 +211,16 @@ export function ListingDetailPage({
           <Text variant="heading" role="heading" flex={1}>
             {listing.title}
           </Text>
-          {anonymous ? null : (
-            <ListingAuthor
-              name={authorName}
-              pictureUrl={authorPicture}
-              label={isOwn ? t("nearbyYou") : firstName(authorName)}
-              onPress={
-                contactId && !isOwn
-                  ? () => navigateTo({ route: "contact", id: contactId })
-                  : undefined
-              }
-            />
-          )}
+          <ListingAuthor
+            name={authorName}
+            pictureUrl={authorPicture}
+            label={isOwn ? t("nearbyYou") : firstName(authorName)}
+            onPress={
+              contactId && !isOwn
+                ? () => navigateTo({ route: "contact", id: contactId })
+                : undefined
+            }
+          />
         </Row>
         <Row gap="$sm" alignItems="baseline" flexWrap="wrap">
           <Text variant="title" bold testID="listing-price">
@@ -234,7 +236,7 @@ export function ListingDetailPage({
           <Row gap="$xs" alignItems="center" testID="listing-audience">
             <Icon name="Eye" size="sm" color="$colorMuted" />
             <Text variant="caption" color="$colorMuted">
-              {listingAudienceLabel(liveEntry.audience, t)}
+              {listingAudienceLabel(liveEntry.audience, t, groupCounts)}
             </Text>
           </Row>
         ) : null}
@@ -263,7 +265,7 @@ export function ListingDetailPage({
           ) : null
         ) : (
           <>
-            {anonymous ? (
+            {askVia ? (
               <Stack gap="$xs" testID="listing-via-contacts">
                 <Text variant="caption" color="$colorMuted">
                   {t("listingViaLead")}
@@ -293,7 +295,8 @@ export function ListingDetailPage({
                   ) : null;
                 })}
               </Stack>
-            ) : contactId ? (
+            ) : null}
+            {contactId ? (
               <Button
                 icon="Reply"
                 onPress={() => attachListingToChat(contactId, shared)}
