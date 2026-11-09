@@ -47,6 +47,7 @@ import {
   type PeerListing,
 } from "../app/hooks/useCollaboration";
 import { useStrangerProfile } from "../app/hooks/profile/useStrangerProfile";
+import { blockListAtom } from "../app/state/contacts/blockList";
 import { contactGroupsAtom } from "../app/state/contacts/readModel";
 import { currentPubkeyAtom } from "../app/state/session/session";
 import { ListingImage } from "../components/ListingImage";
@@ -176,13 +177,17 @@ export function ListingDetailPage({
   const contactId = asContactId(contact?.id);
   const authorInfo = useNpubMessageContactInfo()(authorNpub);
   // Writing to an author who is not a contact keeps them an unknown sender until the user adds them.
-  const unknownChatId = buildUnknownContactId(author);
+  const blocked = useAtomValue(blockListAtom).includes(author);
+  const unknownChatId = blocked ? null : buildUnknownContactId(author);
   const attachListingToChat = useAttachListingToChat();
   const { setListingHidden } = useAtomSuspense(contactsCommandsAtom).value;
   const hidden = contact
     ? hiddenListingIdsOf(contact).includes(listingId)
     : false;
-  const stranger = useStrangerProfile(authorNpub, !isOwn && contactId === null);
+  const stranger = useStrangerProfile(
+    authorNpub,
+    !isOwn && contactId === null && !blocked,
+  );
   const { groupCounts } = useAtomValue(contactGroupsAtom);
 
   if (!shared) {
