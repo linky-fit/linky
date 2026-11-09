@@ -1019,6 +1019,7 @@ export const de = {
   decimalInput: "Dezimalstellen",
   showProfileQrOnTilt: "Profil durch Kippen anzeigen",
   sendReadReceipts: "Lesebestätigungen senden",
+  passOnListings: "Angebote von Kontakten weitergeben",
   decimalPoint: ",",
 
   cashuBalance: "Verfügbares Guthaben",

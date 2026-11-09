@@ -48,6 +48,7 @@ import {
   uploadPrivateImage,
 } from "../app/lib/privateImageMessage";
 import {
+  contactGroupLabel,
   LISTING_AUDIENCE_KINDS,
   listingAudienceColumn,
   listingAudienceOfRecord,
@@ -110,10 +111,12 @@ export function ListingFormPage({
     [allowedDisplayCurrencies],
   );
   const [side, setSide] = React.useState<ListingSide>("offer");
-  const { groupNames } = useAtomValue(contactGroupsAtom);
+  const { groupNames, groupCounts } = useAtomValue(contactGroupsAtom);
   const [audienceKind, setAudienceKind] =
     React.useState<AudienceKind>("contacts");
   const [group, setGroup] = React.useState<string | null>(null);
+  // An edit saves the stored audience back unchanged, even one this release cannot read, until the user picks another.
+  const [audienceChanged, setAudienceChanged] = React.useState(false);
   // An edited listing keeps its group even when no contact is in it any more.
   const groupChoices =
     group !== null && !groupNames.includes(group)
@@ -274,7 +277,7 @@ export function ListingFormPage({
             ...columns,
             description: descriptionValue,
             priceByAgreement: priceByAgreementValue,
-            audience: audienceValue,
+            ...(audienceChanged ? { audience: audienceValue } : {}),
           })
         : repository.insert({
             id: createId<"Listing">(),
@@ -411,14 +414,23 @@ export function ListingFormPage({
             value,
             label: t(AUDIENCE_KEYS[value].label),
           }))}
-          onValueChange={setAudienceKind}
+          onValueChange={(next) => {
+            setAudienceKind(next);
+            setAudienceChanged(true);
+          }}
         />
         {audienceKind === "group" && chosenGroup !== null ? (
           <SelectField
             label={t("listingAudienceGroupPick")}
             value={chosenGroup}
-            options={groupChoices.map((name) => ({ value: name, label: name }))}
-            onValueChange={setGroup}
+            options={groupChoices.map((name) => ({
+              value: name,
+              label: contactGroupLabel(name, groupCounts),
+            }))}
+            onValueChange={(next) => {
+              setGroup(next);
+              setAudienceChanged(true);
+            }}
           />
         ) : null}
         <Text
