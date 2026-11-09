@@ -365,6 +365,7 @@ describe("network listings", () => {
     recipientSeeds: ReadonlyArray<string>,
     groups: number,
     passedOnCount: number,
+    shortTitles = 0,
   ) => {
     const secretOf = (seed: string) =>
       NostrSecretKey.make(sha256(new TextEncoder().encode(seed)));
@@ -389,7 +390,13 @@ describe("network listings", () => {
       { length: groups },
       (_, index) =>
         new ListingsAudience({
-          listings: [new Listing({ ...eggs, id: `group-${index}` })],
+          listings: [
+            new Listing({
+              ...eggs,
+              id: `group-${index}`,
+              ...(index < shortTitles ? { title: "x" } : {}),
+            }),
+          ],
           recipients: recipients.slice(0, 1),
         }),
     );
@@ -441,6 +448,21 @@ describe("network listings", () => {
       );
     }
     expect(passedOn.length).toBeGreaterThan(0);
+  }, 15_000);
+
+  it("counts the event's own tags when it reserves room for the split", () => {
+    // Shorter parts leave the lighter split a tight fit, which only holds when both sides count the same bytes.
+    const { events } = publishToGroups(
+      Array.from({ length: 120 }, (_, index) => `g80-run3-r-${index}`),
+      80,
+      40,
+      39,
+    );
+    for (const event of events) {
+      expect(JSON.stringify(event).length).toBeLessThanOrEqual(
+        LISTINGS_MAX_EVENT_BYTES,
+      );
+    }
   }, 15_000);
 
   it("drops an unknown reach and a malformed passed-on list, keeping the rest", () => {
