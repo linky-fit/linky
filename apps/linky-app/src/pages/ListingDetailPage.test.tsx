@@ -63,7 +63,12 @@ const ownRecord: ListingRecord = {
 };
 
 const state = vi.hoisted(
-  (): { contacts: ContactRowLike[]; snapshot: SharedListing | null } => ({
+  (): {
+    blocked: string[];
+    contacts: ContactRowLike[];
+    snapshot: SharedListing | null;
+  } => ({
+    blocked: [],
     contacts: [],
     snapshot: null,
   }),
@@ -93,7 +98,12 @@ vi.mock("@linky-fit/linkstr-react", () => ({
                 updatedAt: 1,
               },
             }
-          : null,
+          : atom === blockListAtom
+            ? state.blocked
+            : null,
+}));
+vi.mock("../app/state/contacts/blockList", () => ({
+  blockListAtom: { id: "blockList" },
 }));
 vi.mock("../app/state/session/session", () => ({
   currentPubkeyAtom: { id: "currentPubkey" },
@@ -108,6 +118,7 @@ vi.mock("../app/hooks/profile/useStrangerProfile", () => ({
   useStrangerProfile: (_npub: string, enabled: boolean) =>
     enabled ? { name: "Carol Seller", pictureUrl: null } : null,
 }));
+import { blockListAtom } from "../app/state/contacts/blockList";
 import { currentPubkeyAtom } from "../app/state/session/session";
 import { peerListingsAtom } from "../app/state/contacts/listings";
 import { contactGroupsAtom } from "../app/state/contacts/readModel";
@@ -141,6 +152,7 @@ vi.mock("../hooks/useRouting", () => ({ navigateTo }));
 
 afterEach(() => {
   vi.clearAllMocks();
+  state.blocked = [];
   state.contacts = [];
   state.snapshot = null;
 });
@@ -230,6 +242,20 @@ it("shows the copy a message holds and offers to write to an author who is no co
   expect(attachListingToChat).toHaveBeenCalledExactlyOnceWith(
     `unknown:${PEER}`,
     state.snapshot,
+  );
+  await unmount();
+});
+
+it("offers no way to write to an author the user blocked", async () => {
+  state.blocked = [PEER];
+  state.snapshot = new SharedListing({ author: PEER, listing: peerListing });
+  const { container, unmount } = await renderIntoDocument(
+    <ListingDetailPage author={PEER} listingId="eggs" messageId={messageId} />,
+  );
+  expect(container.textContent).toContain("Garden eggs");
+  expect(byTestId(container, "listing-contact-author")).toBeNull();
+  expect(byTestId(container, "listing-author")?.textContent).not.toContain(
+    "Carol",
   );
   await unmount();
 });
