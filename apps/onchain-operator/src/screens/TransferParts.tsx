@@ -8,16 +8,15 @@ import {
   Text,
 } from "@linky-fit/ui";
 import type { Tone } from "@linky-fit/ui";
-import type { OperatorTransferStatus } from "@linky-fit/onchain-transfer";
 import { copy } from "../copy/en";
 import { transferTerms, type OperatorTransfer } from "../domain/transfer";
 import { formatDateTime, formatSats } from "../format";
-import { statusKey, transferTitle } from "./labels";
+import { statusKey, transferTitle, type StatusKey } from "./labels";
 import { navigateTo } from "../platform/hashRoute";
 import { transferRoute } from "../routing";
 import { usePeerProfile } from "../services/react";
 
-const statusTones: Record<OperatorTransferStatus | "requested", Tone> = {
+const statusTones: Record<StatusKey, Tone> = {
   requested: "warning",
   accepted: "info",
   fundsSeen: "info",
@@ -26,6 +25,8 @@ const statusTones: Record<OperatorTransferStatus | "requested", Tone> = {
   denied: "neutral",
   cancelled: "neutral",
   refunded: "neutral",
+  closedCompleted: "accent",
+  closedCancelled: "neutral",
 };
 
 export function StatusPill({
@@ -34,7 +35,14 @@ export function StatusPill({
   readonly transfer: OperatorTransfer;
 }) {
   const key = statusKey(transfer);
-  return <Pill size="sm" label={copy.status[key]} tone={statusTones[key]} />;
+  return (
+    <Row gap="$xs">
+      {transfer.isTest ? (
+        <Pill size="sm" label={copy.testPill} tone="neutral" />
+      ) : null}
+      <Pill size="sm" label={copy.status[key]} tone={statusTones[key]} />
+    </Row>
+  );
 }
 
 /** One transfer in a list; opens its detail. */

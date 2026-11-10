@@ -213,6 +213,8 @@ const transferOf = (
   ecashSendId: null,
   update: null,
   userCancelledAtSec: null,
+  closedByHand: null,
+  isTest: false,
   ...overrides,
 });
 
@@ -325,6 +327,18 @@ describe("firstUnusedAddressIndex", () => {
 });
 
 describe("nextUpdate", () => {
+  it("sends no update for a transfer the operator closed by hand", () => {
+    expect(
+      nextUpdate(
+        transferOf({
+          update: updateOf({ status: "accepted" }),
+          closedByHand: "completed",
+        }),
+        "fundsSeen",
+      ),
+    ).toBeNull();
+  });
+
   it("numbers the first update 1 and locks the requested fee", () => {
     expect(
       nextUpdate(transferOf(), "accepted", { depositAddress: payoutAddress }),

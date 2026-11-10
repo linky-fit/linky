@@ -2,7 +2,6 @@ import type { OnchainTransferId } from "@linky-fit/domain";
 import { decodePaymentRequest, type OperationId } from "@linky-fit/linkshu";
 import type { Pubkey } from "@linky-fit/linkstr";
 import {
-  isTerminalStatus,
   serviceFee,
   amountWithServiceFee,
   type OperatorTransferStatus,
@@ -10,6 +9,10 @@ import {
   type OnchainTransferRefund,
   type OnchainTransferUpdate,
 } from "@linky-fit/onchain-transfer";
+
+/** The outcome the operator closed a transfer with by hand, after settling it outside the protocol. */
+export const closedByHandOutcomes = ["completed", "cancelled"] as const;
+export type ClosedByHand = (typeof closedByHandOutcomes)[number];
 
 /** One on-chain transfer as the on-chain operator holds it. */
 export interface OperatorTransfer {
@@ -38,6 +41,10 @@ export interface OperatorTransfer {
   readonly update: OnchainTransferUpdate | null;
   /** When the user asked to cancel; a transfer whose funds moved stays open. */
   readonly userCancelledAtSec: number | null;
+  /** Set when the operator closed the transfer by hand; it then gets no more updates and the user is not told. */
+  readonly closedByHand: ClosedByHand | null;
+  /** A test transfer, hidden in the console and left out of the stats. */
+  readonly isTest: boolean;
 }
 
 /** `null` while the transfer waits for the operator to accept or deny it. */
@@ -45,10 +52,32 @@ export const transferStatus = (
   transfer: OperatorTransfer,
 ): OperatorTransferStatus | null => transfer.update?.status ?? null;
 
-export const isOpen = (transfer: OperatorTransfer): boolean => {
+export type TransferOutcome =
+  | "completed"
+  | "open"
+  | "refunded"
+  | "cancelled"
+  | "denied";
+
+/** How the transfer ended, the outcome it was closed with by hand first; `open` while it runs. */
+export const transferOutcome = (
+  transfer: OperatorTransfer,
+): TransferOutcome => {
+  if (transfer.closedByHand !== null) return transfer.closedByHand;
   const status = transferStatus(transfer);
-  return status === null || !isTerminalStatus(status);
+  switch (status) {
+    case "completed":
+    case "refunded":
+    case "cancelled":
+    case "denied":
+      return status;
+    default:
+      return "open";
+  }
 };
+
+export const isOpen = (transfer: OperatorTransfer): boolean =>
+  transferOutcome(transfer) === "open";
 
 /** The terms of a transfer: what the user gets, the fee and what they send. */
 export interface TransferTerms {
@@ -86,17 +115,20 @@ export const isAnyAmountReceive = (transfer: OperatorTransfer): boolean =>
   transfer.userPaymentRequest !== null &&
   decodePaymentRequest(transfer.userPaymentRequest)?.amount === null;
 
-/** Open transfers first, the oldest on top since it waits longest; then the rest, newest first. */
+/** Open transfers first, the oldest on top since it waits longest; then the rest, newest first; test transfers apart, newest first. */
 export const sortTransfers = (
   transfers: readonly OperatorTransfer[],
 ): {
   readonly open: readonly OperatorTransfer[];
   readonly closed: readonly OperatorTransfer[];
-} => ({
-  open: transfers
-    .filter(isOpen)
-    .sort((a, b) => a.createdAtSec - b.createdAtSec),
-  closed: transfers
-    .filter((transfer) => !isOpen(transfer))
-    .sort((a, b) => b.createdAtSec - a.createdAtSec),
-});
+  readonly tests: readonly OperatorTransfer[];
+} => {
+  const real = transfers.filter((transfer) => !transfer.isTest);
+  const newestFirst = (a: OperatorTransfer, b: OperatorTransfer) =>
+    b.createdAtSec - a.createdAtSec;
+  return {
+    open: real.filter(isOpen).sort((a, b) => a.createdAtSec - b.createdAtSec),
+    closed: real.filter((transfer) => !isOpen(transfer)).sort(newestFirst),
+    tests: transfers.filter((transfer) => transfer.isTest).sort(newestFirst),
+  };
+};

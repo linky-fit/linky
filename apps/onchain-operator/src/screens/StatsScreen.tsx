@@ -24,9 +24,8 @@ import {
   type FlowTotals,
   type MonthAnalytics,
   type Period,
-  type TransferOutcome,
 } from "../domain/analytics";
-import type { OperatorTransfer } from "../domain/transfer";
+import type { OperatorTransfer, TransferOutcome } from "../domain/transfer";
 import { formatMonth, formatNumber, formatSats } from "../format";
 import { useTransfers } from "../services/react";
 import { nowSeconds } from "../utils/time";

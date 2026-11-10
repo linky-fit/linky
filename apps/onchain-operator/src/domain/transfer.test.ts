@@ -44,6 +44,8 @@ const transferOf = (
           sendAmount: 101_000,
         },
   userCancelledAtSec: null,
+  closedByHand: null,
+  isTest: false,
 });
 
 describe("sortTransfers", () => {
@@ -58,6 +60,18 @@ describe("sortTransfers", () => {
     const { open, closed } = sortTransfers(transfers);
     expect(open.map((transfer) => transfer.createdAtSec)).toEqual([2, 4, 5]);
     expect(closed.map((transfer) => transfer.createdAtSec)).toEqual([3, 1]);
+  });
+
+  it("lists a transfer closed by hand as closed and test transfers apart, newest first", () => {
+    const { open, closed, tests } = sortTransfers([
+      { ...transferOf(1, "accepted"), closedByHand: "cancelled" },
+      { ...transferOf(2, null), isTest: true },
+      { ...transferOf(3, "completed"), isTest: true },
+      transferOf(4, "accepted"),
+    ]);
+    expect(open.map((transfer) => transfer.createdAtSec)).toEqual([4]);
+    expect(closed.map((transfer) => transfer.createdAtSec)).toEqual([1]);
+    expect(tests.map((transfer) => transfer.createdAtSec)).toEqual([3, 2]);
   });
 });
 

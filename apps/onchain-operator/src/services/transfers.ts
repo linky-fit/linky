@@ -55,6 +55,7 @@ import {
   isAnyAmountReceive,
   transferStatus,
   transferTerms,
+  type ClosedByHand,
   type OperatorTransfer,
 } from "../domain/transfer";
 import {
@@ -62,7 +63,9 @@ import {
   markUserCancelled,
   readTransfer,
   readTransfers,
+  saveClosedByHand,
   saveEcashSend,
+  saveIsTest,
   saveUpdate,
 } from "../storage/transfers";
 import { logTransferMessage } from "../storage/transferLog";
@@ -96,10 +99,11 @@ export type TransferActionFailure =
 type ActionResult = Promise<TransferActionFailure | null>;
 
 /**
- * Sats of transfer-mint ecash that named an on-chain send before the operator
- * had accepted it (Linky pays right after requesting, so the Cashu may even
- * beat the request). Kept on the device that received it until the send is
- * accepted and the funds reported.
+ * Sats of transfer-mint ecash naming an on-chain send whose funds are not
+ * reported yet: it came before the operator had accepted the send (Linky pays
+ * right after requesting, so the Cashu may even beat the request), or short of
+ * the amount plus the fee. Kept on the device that received it until it covers
+ * that and the send is accepted.
  */
 export interface EarlyEcashStore {
   readonly get: (id: OnchainTransferId) => number | null;
@@ -165,8 +169,20 @@ export interface Transfers {
   readonly takeBackEcash: (id: OnchainTransferId) => ActionResult;
   /** Reports what arrived at every watched deposit address. */
   readonly checkDeposits: () => Promise<void>;
-  /** Sats that arrived for the send on this device before it was accepted, short of what it needs; `null` when none wait. */
+  /** Sats that arrived for the send on this device without reporting its funds; `null` when none wait. */
   readonly earlyEcash: (id: OnchainTransferId) => number | null;
+  /**
+   * Closes the transfer by hand with `outcome` after the operator settled it
+   * outside the protocol, or reopens it with `null`. Only the console's
+   * bookkeeping changes: the user is not told, and a closed transfer gets no
+   * more updates.
+   */
+  readonly closeByHand: (
+    id: OnchainTransferId,
+    outcome: ClosedByHand | null,
+  ) => ActionResult;
+  /** Marks the transfer a test transfer, hidden and left out of the stats, or a real one again. */
+  readonly markTest: (id: OnchainTransferId, isTest: boolean) => ActionResult;
 }
 
 const UPDATE_REF = "transfer-update:";
@@ -270,7 +286,7 @@ export const createTransfers = ({
     changes: UpdateChanges = {},
   ): ActionResult => serially(() => moveNow(id, status, changes));
 
-  /** Reports the ecash that arrived for the send before it was accepted, once it covers the amount plus the fee. */
+  /** Reports the ecash kept for the send once the send is accepted and the ecash covers the amount plus the fee. */
   const settleEarlyEcash = async (id: OnchainTransferId) => {
     const sats = earlyEcash.get(id);
     const transfer = await load(id);
@@ -395,7 +411,11 @@ export const createTransfers = ({
     if (transfer.userCancelledAtSec === null) {
       await run(markUserCancelled(transfers, transfer.id, sentAtSec));
       // Once funds moved the two settle it in the chat.
-      if (fundsMoved && !isTerminalStatus(status))
+      if (
+        fundsMoved &&
+        !isTerminalStatus(status) &&
+        transfer.closedByHand === null
+      )
         void alertWatchers({ _tag: "cancelledAfterFunds", transfer });
     }
     const update =
@@ -462,22 +482,11 @@ export const createTransfers = ({
     await serially(async () => {
       const transfer = await load(requestId);
       if (transfer !== null && transfer.direction !== "send") return;
+      const status = transfer === null ? null : transferStatus(transfer);
       // Linky pays right after requesting, so the Cashu may beat the request or the accept.
-      if (transfer === null || transferStatus(transfer) === null) {
-        earlyEcash.set(requestId, (earlyEcash.get(requestId) ?? 0) + sats);
-        return;
-      }
-      if (
-        transferStatus(transfer) !== "accepted" ||
-        sats < transferTerms(transfer).sendAmount
-      )
-        return;
-      const update = nextUpdate(transfer, "fundsReceived", {
-        receivedAmount: sats,
-      });
-      if (update === null) return;
-      await publish(transfer, update);
-      void alertWatchers({ _tag: "payoutDue", transfer });
+      if (status !== null && status !== "accepted") return;
+      earlyEcash.set(requestId, (earlyEcash.get(requestId) ?? 0) + sats);
+      await settleEarlyEcash(requestId);
     });
   });
 
@@ -595,6 +604,7 @@ export const createTransfers = ({
       const status = transferStatus(transfer);
       return transfer.direction === "receive" &&
         transfer.depositAddress !== null &&
+        transfer.closedByHand === null &&
         !shared.has(transfer.depositAddress) &&
         (status === "accepted" || status === "fundsSeen")
         ? [{ transfer, address: transfer.depositAddress }]
@@ -678,7 +688,11 @@ export const createTransfers = ({
   ): Promise<TransferActionFailure | OperatorTransfer> => {
     const transfer = await load(id);
     if (transfer === null) return { reason: "unknownTransfer" };
-    if (transfer.direction !== direction || transferStatus(transfer) !== status)
+    if (
+      transfer.direction !== direction ||
+      transferStatus(transfer) !== status ||
+      transfer.closedByHand !== null
+    )
       return { reason: "notAllowed" };
     return transfer.ecashSendId === null ? transfer : { reason: "inFlight" };
   };
@@ -801,5 +815,20 @@ export const createTransfers = ({
       return checking;
     },
     earlyEcash: (id) => earlyEcash.get(id),
+    closeByHand: (id, outcome) =>
+      serially(async () => {
+        const transfer = await load(id);
+        if (transfer === null) return { reason: "unknownTransfer" };
+        // The Cashu on its way still moves the transfer on once it lands.
+        if (transfer.ecashSendId !== null) return { reason: "inFlight" };
+        await run(saveClosedByHand(transfers, id, outcome));
+        return null;
+      }),
+    markTest: (id, isTest) =>
+      serially(async () => {
+        if ((await load(id)) === null) return { reason: "unknownTransfer" };
+        await run(saveIsTest(transfers, id, isTest));
+        return null;
+      }),
   };
 };

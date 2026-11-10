@@ -201,14 +201,18 @@ export type UpdateChanges = Partial<
 /**
  * The next update of the transfer: its whole state with one revision more, the
  * fee locked by the first update. `null` when the status may not follow the
- * current one.
+ * current one, or the operator closed the transfer by hand.
  */
 export const nextUpdate = (
   transfer: OperatorTransfer,
   status: OperatorTransferStatus,
   changes: UpdateChanges = {},
 ): OnchainTransferUpdate | null => {
-  if (!canOperatorMove(transferStatus(transfer), status)) return null;
+  if (
+    transfer.closedByHand !== null ||
+    !canOperatorMove(transferStatus(transfer), status)
+  )
+    return null;
   return {
     // A reason explains one move; the next update does not repeat it.
     ...(transfer.update === null

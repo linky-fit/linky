@@ -29,6 +29,8 @@ const transferAt = (createdAtSec: number): OperatorTransfer => ({
   ecashSendId: null,
   update: null,
   userCancelledAtSec: null,
+  closedByHand: null,
+  isTest: false,
 });
 
 const messageAt = (createdAtSec: number): ChatMessage => ({

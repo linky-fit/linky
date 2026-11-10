@@ -27,6 +27,8 @@ const transfer: OperatorTransfer = {
   ecashSendId: null,
   update: null,
   userCancelledAtSec: null,
+  closedByHand: null,
+  isTest: false,
 };
 
 describe("parseWatchers", () => {

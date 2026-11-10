@@ -21,11 +21,16 @@ import {
   type OnchainTransferUpdate,
 } from "@linky-fit/onchain-transfer";
 import { Effect, Option, Schema } from "effect";
-import type { OperatorTransfer } from "../domain/transfer";
+import {
+  closedByHandOutcomes,
+  type ClosedByHand,
+  type OperatorTransfer,
+} from "../domain/transfer";
 
 const OPERATOR = "operator";
 const isPubkey = Schema.is(Pubkey);
 const isDirection = Schema.is(OnchainTransferDirection);
+const isClosedByHand = Schema.is(Schema.Literals(closedByHandOutcomes));
 
 const refundOf = (row: OnchainTransferRecord): OnchainTransferRefund | null =>
   row.refundAddress !== null
@@ -59,6 +64,10 @@ export const toOperatorTransfer = (
         ),
         update: decodeTransferUpdateColumn(row.updateJson),
         userCancelledAtSec: row.cancelledAtSec,
+        closedByHand: isClosedByHand(row.closedByHand)
+          ? row.closedByHand
+          : null,
+        isTest: row.isTest === sqliteTrue,
       }
     : null;
 
@@ -162,3 +171,21 @@ export const saveEcashSend = (
     ecashSendId:
       operationId === null ? null : NonEmptyString100.orThrow(operationId),
   });
+
+/** Records the outcome the operator closed the transfer with by hand; `null` reopens it. */
+export const saveClosedByHand = (
+  transfers: OnchainTransfersRepository,
+  id: OnchainTransferId,
+  outcome: ClosedByHand | null,
+): Effect.Effect<void, ShardDbError | RowNotFound> =>
+  transfers.update(id, {
+    closedByHand: outcome === null ? null : NonEmptyString100.orThrow(outcome),
+  });
+
+/** Marks the transfer a test transfer, or a real one again. */
+export const saveIsTest = (
+  transfers: OnchainTransfersRepository,
+  id: OnchainTransferId,
+  isTest: boolean,
+): Effect.Effect<void, ShardDbError | RowNotFound> =>
+  transfers.update(id, { isTest: isTest ? sqliteTrue : null });

@@ -1,9 +1,8 @@
 import { MAX_WATCHERS } from "../domain/watchers";
-import type {
-  OperatorTransferStatus,
-  OnchainTransferDirection,
-} from "@linky-fit/onchain-transfer";
-import type { Period, TransferOutcome } from "../domain/analytics";
+import type { OnchainTransferDirection } from "@linky-fit/onchain-transfer";
+import type { Period } from "../domain/analytics";
+import type { TransferOutcome } from "../domain/transfer";
+import type { StatusKey } from "../screens/labels";
 import type { TransferActionFailure } from "../services/transfers";
 import type { SendError } from "@linky-fit/linkshu";
 import type { LightningFailure } from "../services/lightningPayments";
@@ -46,10 +45,16 @@ export const copy = {
     completed: "Completed",
     cancelled: "Cancelled",
     refunded: "Refunded",
-  } satisfies Record<OperatorTransferStatus | "requested", string>,
+    closedCompleted: "Completed by hand",
+    closedCancelled: "Cancelled by hand",
+  } satisfies Record<StatusKey, string>,
+  testPill: "Test",
   transfers: {
     open: "Open",
     history: "History",
+    tests: "Test transfers",
+    showTests: (count: number) => `Show test transfers (${count})`,
+    hideTests: "Hide test transfers",
     emptyTitle: "No transfers yet",
     emptyDescription:
       "Requests from Linky users appear here once the on-chain config is published.",
@@ -127,6 +132,18 @@ export const copy = {
     copy: "Copy",
     copied: "Copied",
     viewInExplorer: "View in the explorer",
+    bookkeeping: "Bookkeeping",
+    bookkeepingHint:
+      "For a transfer you settled in the chat or by other means, or one that will never finish. Only this console changes: the user is not told, so tell them in the chat.",
+    closeCompleted: "Mark completed",
+    closeCancelled: "Mark cancelled",
+    closedByHand: (outcome: "completed" | "cancelled") =>
+      `You marked this transfer ${outcome} by hand. It gets no more updates and Linky keeps showing what it was last told.`,
+    reopen: "Reopen",
+    markTest: "Mark as test",
+    unmarkTest: "Not a test",
+    isTest:
+      "A test transfer: hidden under Transfers and left out of the stats.",
   },
   stats: {
     period: "Period",
@@ -162,7 +179,7 @@ export const copy = {
     month: "Month",
     monthFee: (fees: string) => `${fees} fees`,
     footnote:
-      "Only completed transfers count toward the amounts and fees. Transfers count in the period and month they were requested in, since completion time is not stored. Miner fees you paid for payouts and refunds are not tracked or subtracted.",
+      "Only completed transfers count toward the amounts and fees, those you marked completed by hand included; test transfers do not count at all. Transfers count in the period and month they were requested in, since completion time is not stored. Miner fees you paid for payouts and refunds are not tracked or subtracted.",
   },
   failure: (failure: TransferActionFailure): string => {
     switch (failure.reason) {

@@ -28,8 +28,10 @@ import {
 } from "../domain/rules";
 import {
   isAnyAmountReceive,
+  transferOutcome,
   transferStatus,
   transferTerms,
+  type ClosedByHand,
   type OperatorTransfer,
 } from "../domain/transfer";
 import { encodeNpub } from "@linky-fit/linkstr";
@@ -243,11 +245,89 @@ function TransferDetail({
         sharedAddress={sharedAddress}
         concern={transferConcern(transfer, { ...config, profile })}
       />
-      <Steps transfer={transfer} action={action} />
+      {transfer.closedByHand === null ? (
+        <Steps transfer={transfer} action={action} />
+      ) : null}
       {action.error === null ? null : (
         <Notice tone="danger" icon="CircleAlert" title={action.error} />
       )}
+      <Bookkeeping transfer={transfer} action={action} />
     </Stack>
+  );
+}
+
+/** Closing the transfer by hand and marking it a test, which only the console sees. */
+function Bookkeeping({
+  transfer,
+  action,
+}: {
+  readonly transfer: OperatorTransfer;
+  readonly action: Action;
+}) {
+  const { transfers } = useAppServices();
+  const outcome = transferOutcome(transfer);
+  const closeButton = (closed: ClosedByHand, icon: "Check" | "Ban") =>
+    outcome === closed ? null : (
+      <Button
+        size="sm"
+        variant="secondary"
+        icon={icon}
+        loading={action.busy === `close-${closed}`}
+        onPress={() =>
+          void action.run(`close-${closed}`, () =>
+            transfers.closeByHand(transfer.id, closed),
+          )
+        }
+      >
+        {closed === "completed"
+          ? copy.transfer.closeCompleted
+          : copy.transfer.closeCancelled}
+      </Button>
+    );
+  return (
+    <Card gap="$md" testID="transfer-bookkeeping">
+      <Text variant="title">{copy.transfer.bookkeeping}</Text>
+      {transfer.closedByHand === null ? (
+        <Text color="$colorMuted">{copy.transfer.bookkeepingHint}</Text>
+      ) : (
+        <Notice
+          tone="info"
+          icon="Info"
+          title={copy.transfer.closedByHand(transfer.closedByHand)}
+          action={{
+            label: copy.transfer.reopen,
+            onPress: () =>
+              void action.run("reopen", () =>
+                transfers.closeByHand(transfer.id, null),
+              ),
+          }}
+        />
+      )}
+      {transfer.isTest ? (
+        <Text color="$colorMuted">{copy.transfer.isTest}</Text>
+      ) : null}
+      <Row gap="$sm" flexWrap="wrap">
+        {transfer.closedByHand === null ? (
+          <>
+            {closeButton("completed", "Check")}
+            {closeButton("cancelled", "Ban")}
+          </>
+        ) : null}
+        <Button
+          size="sm"
+          variant="secondary"
+          icon={transfer.isTest ? "EyeOff" : "FlaskConical"}
+          loading={action.busy === "markTest"}
+          onPress={() =>
+            void action.run("markTest", () =>
+              transfers.markTest(transfer.id, !transfer.isTest),
+            )
+          }
+        >
+          {transfer.isTest ? copy.transfer.unmarkTest : copy.transfer.markTest}
+        </Button>
+      </Row>
+    </Card>
   );
 }
 
