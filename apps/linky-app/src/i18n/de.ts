@@ -697,6 +697,7 @@ export const de = {
   contactsOnboardingTaskLinkyName: "Linky-Namen registrieren",
   contactsOnboardingTaskGroups: "Gruppe erstellen",
   contactsOnboardingTaskProxyPayment: "Proxy-Zahlungen einrichten",
+  contactsOnboardingTaskListings: "Angebot oder Gesuch hinzufügen",
   contactsOnboardingTaskBeacon: "Beacon einschalten",
   contactsOnboardingTaskSupport: "Linky regelmäßig unterstützen",
   guideSupportStep2Title: "Linky unterstützen",
@@ -733,6 +734,19 @@ export const de = {
   guideProxyPaymentStep4Title: "Bitcoin verdienen",
   guideProxyPaymentStep4Body:
     "Schalte die Währungen ein, in denen du zahlen kannst. Kontakte schicken dir dann ihre Bankzahlungen, und du verdienst Bitcoin, indem du sie bezahlst.",
+  guideListingsStep1Title: "Zusammenarbeit",
+  guideListingsStep1Body: "Öffne Zusammenarbeit in der unteren Leiste.",
+  guideListingsStep2Title: "Waren und Dienste",
+  guideListingsStep2Body: "Öffne Waren und Dienste.",
+  guideListingsStep3Title: "Angebot hinzufügen",
+  guideListingsStep3Body:
+    "Tippe auf +, um hinzuzufügen, was du anbietest oder suchst.",
+  guideListingsStep4Title: "Biete an oder Suche",
+  guideListingsStep4Body:
+    "Wähle Biete an oder Suche. Fülle dann Bezeichnung, Preis und Einheit aus; ohne Preis ist er Verhandlungssache, null heißt kostenlos.",
+  guideListingsStep5Title: "Wer es sieht",
+  guideListingsStep5Body:
+    "Wähle, wer es sieht: deine Kontakte, dein Netzwerk mit deren Kontakten oder eine Gruppe. Nur Kontakte, die dich ebenfalls gespeichert haben, sehen es. Tippe dann auf Hinzufügen.",
   guideBeaconStep1Title: "Zusammenarbeit",
   guideBeaconStep1Body: "Öffne Zusammenarbeit in der unteren Leiste.",
   guideBeaconStep2Title: "Bargeld",

@@ -688,6 +688,7 @@ export const cs = {
   contactsOnboardingTaskLinkyName: "Zaregistrovat Linky jméno",
   contactsOnboardingTaskGroups: "Vytvořit skupinu",
   contactsOnboardingTaskProxyPayment: "Nastavit proxy platby",
+  contactsOnboardingTaskListings: "Přidat nabídku nebo poptávku",
   contactsOnboardingTaskBeacon: "Zapnout maják",
   contactsOnboardingTaskSupport: "Pravidelně podpořit Linky",
   guideSupportStep2Title: "Podpořit Linky",
@@ -722,6 +723,18 @@ export const cs = {
   guideProxyPaymentStep4Title: "Vydělat bitcoin",
   guideProxyPaymentStep4Body:
     "Zapněte měny, ve kterých umíte platit. Kontakty vám pak posílají své bankovní platby a vy za jejich zaplacení získáte bitcoin.",
+  guideListingsStep1Title: "Spolupráce",
+  guideListingsStep1Body: "Otevřete Spolupráci v dolní liště.",
+  guideListingsStep2Title: "Zboží a služby",
+  guideListingsStep2Body: "Otevřete Zboží a služby.",
+  guideListingsStep3Title: "Přidat nabídku",
+  guideListingsStep3Body: "Klepněte na + a přidejte, co nabízíte nebo hledáte.",
+  guideListingsStep4Title: "Nabízím, nebo hledám",
+  guideListingsStep4Body:
+    "Zvolte Nabízím, nebo Hledám. Pak vyplňte název, cenu a jednotku; bez ceny je dohodou, nula znamená zdarma.",
+  guideListingsStep5Title: "Kdo ji uvidí",
+  guideListingsStep5Body:
+    "Zvolte, kdo nabídku uvidí: vaše kontakty, síť i s jejich kontakty, nebo jedna skupina. Vidí ji jen kontakty, které si uložily i vás. Nakonec klepněte na Přidat.",
   guideBeaconStep1Title: "Spolupráce",
   guideBeaconStep1Body: "Otevřete Spolupráci v dolní liště.",
   guideBeaconStep2Title: "Hotovost",

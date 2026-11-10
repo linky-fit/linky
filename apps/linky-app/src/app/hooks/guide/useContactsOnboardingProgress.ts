@@ -6,6 +6,7 @@ import {
   contactsOnboardingHasSupportedAtom,
   hasContactGroupsAtom,
   hasLinkyNameAtom,
+  hasListingsAtom,
   hasProxyPaymentSetupAtom,
 } from "../../state/contacts/onboarding";
 import {
@@ -49,6 +50,8 @@ export interface ContactsOnboardingExtras {
   hasContactGroups: boolean;
   /** The user owns a name@linky.fit lightning address. */
   hasLinkyName: boolean;
+  /** The user has a listing of their own. */
+  hasListings: boolean;
   hasProxyPaymentSetup: boolean;
   /** The user supported Linky from this device, once or regularly. */
   hasSupportedLinky: boolean;
@@ -68,6 +71,7 @@ export const useContactsOnboardingExtras = (): ContactsOnboardingExtras => {
   const beaconSupported = useBeaconSupport();
   const hasContactGroups = useAtomValue(hasContactGroupsAtom);
   const hasLinkyName = useAtomValue(hasLinkyNameAtom);
+  const hasListings = useAtomValue(hasListingsAtom);
   const hasProxyPaymentSetup = useAtomValue(hasProxyPaymentSetupAtom);
   const hasSupportedLinky = useAtomValue(contactsOnboardingHasSupportedAtom);
   return React.useMemo(
@@ -76,6 +80,7 @@ export const useContactsOnboardingExtras = (): ContactsOnboardingExtras => {
       beaconSupported,
       hasContactGroups,
       hasLinkyName,
+      hasListings,
       hasProxyPaymentSetup,
       hasSupportedLinky,
     }),
@@ -84,6 +89,7 @@ export const useContactsOnboardingExtras = (): ContactsOnboardingExtras => {
       beaconSupported,
       hasContactGroups,
       hasLinkyName,
+      hasListings,
       hasProxyPaymentSetup,
       hasSupportedLinky,
     ],
@@ -100,6 +106,7 @@ export const contactsOnboardingTasksOf = ({
   contactsOnboardingHasSentMessage,
   hasContactGroups,
   hasLinkyName,
+  hasListings,
   hasProxyPaymentSetup,
   hasSupportedLinky,
   t,
@@ -144,6 +151,11 @@ export const contactsOnboardingTasksOf = ({
       key: "proxy_payment",
       label: t("contactsOnboardingTaskProxyPayment"),
       done: hasProxyPaymentSetup,
+    },
+    {
+      key: "listings",
+      label: t("contactsOnboardingTaskListings"),
+      done: hasListings,
     },
     ...(beaconSupported
       ? [
@@ -194,6 +206,7 @@ export const useContactsOnboardingProgress = ({
     beaconSupported,
     hasContactGroups,
     hasLinkyName,
+    hasListings,
     hasProxyPaymentSetup,
     hasSupportedLinky,
   } = useContactsOnboardingExtras();
@@ -210,6 +223,7 @@ export const useContactsOnboardingProgress = ({
         contactsOnboardingHasSentMessage,
         hasContactGroups,
         hasLinkyName,
+        hasListings,
         hasProxyPaymentSetup,
         hasSupportedLinky,
         t,
@@ -224,6 +238,7 @@ export const useContactsOnboardingProgress = ({
       contactsOnboardingHasSentMessage,
       hasContactGroups,
       hasLinkyName,
+      hasListings,
       hasProxyPaymentSetup,
       hasSupportedLinky,
       t,

@@ -221,6 +221,7 @@ export function ListingsPage(): React.ReactElement {
       icon="Plus"
       label={t("listingAddNew")}
       onPress={() => navigateTo({ route: "listingNew" })}
+      guide="listing-add"
       pinned
     />
   );

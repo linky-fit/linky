@@ -337,15 +337,17 @@ export function ListingFormPage({
 
   return (
     <Stack gap="$lg">
-      <SegmentedControl
-        accessibilityLabel={t("listingSide")}
-        value={side}
-        options={LISTING_SIDES.map((value) => ({
-          value,
-          label: t(SIDE_KEYS[value]),
-        }))}
-        onValueChange={setSide}
-      />
+      <Stack data-guide="listing-side">
+        <SegmentedControl
+          accessibilityLabel={t("listingSide")}
+          value={side}
+          options={LISTING_SIDES.map((value) => ({
+            value,
+            label: t(SIDE_KEYS[value]),
+          }))}
+          onValueChange={setSide}
+        />
+      </Stack>
       <TextField
         label={t("listingTitle")}
         placeholder={t("listingTitlePlaceholder")}
@@ -405,7 +407,7 @@ export function ListingFormPage({
           />
         </Stack>
       </Row>
-      <Stack gap="$sm">
+      <Stack gap="$sm" data-guide="listing-audience">
         <Text variant="label">{t("listingAudience")}</Text>
         <SegmentedControl
           accessibilityLabel={t("listingAudience")}
