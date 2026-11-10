@@ -82,6 +82,10 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "The user replied to or shared a listing, or picked one from the composer's @ suggestions: it is attached to the composer of the chat in the contact link, replacing any other. The pubkey link is the listing's author.",
   "listings.sharedSent":
     "A message carrying a shared listing was enqueued. Message, rumor and contact links tie it to the send; the pubkey link is the listing's author. The payload says whether it had a note or a photo, never the photo's url or key.",
+  "listings.hidden":
+    "The user hid someone's listing, a contact's or a stranger's: a `hiddenListing` row now keeps it out of Goods & services on every device, and it is never passed on. The payload has the author pubkey and listing id.",
+  "listings.shown":
+    "The user showed a hidden listing again: its `hiddenListing` row was removed on every device. The payload has the author pubkey and listing id.",
   "contacts.npubSaved":
     "A Nostr contact was saved after the duplicate check. The contact link identifies the new row; the insert itself runs in the background.",
   "contacts.sharedProfileOpened":
@@ -130,6 +134,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "After hydration, the unknown-sender messages this device kept in its localStorage overlay were imported into the unknown senders scope and the overlay was cleared. Messages another device already stored and messages of blocked senders are skipped; the payload counts both sides. Message and pubkey links identify the rows.",
   ArchiveCopiedToContact:
     "After hydration, conversation archives this device sees were copied onto their contacts, where the archive state now lives. It also fires for archives an older app version wrote on the conversation; an archive is copied only onto a contact without one, and an unarchive clears both, so it is never undone. Contact and conversation links identify the rows.",
+  HiddenListingsMovedToTable:
+    "After hydration, the listings hidden in this device's localStorage or on contact rows (`hiddenListingIdsJson`, nightly builds) moved into the `hiddenListing` table, the stored keys were dropped and the contact column cleared. A listing another device already showed again stays shown. The payload lists the author pubkeys and listing ids; contact links identify the cleared rows.",
   "evolu.legacySpentProofSyncFailed":
     "A terminal proof state could not be mirrored to legacy storage. An older device may show stale funds until its mint check corrects them; the next proof change retries.",
   "cashu.sendForgetFailed":

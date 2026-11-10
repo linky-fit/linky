@@ -27,6 +27,7 @@ it("moves this device's hides, strangers' included, and the hides on contact row
         `${STRANGER}:milk`,
         "eggs",
         `${ALICE}:`,
+        `${ALICE}:${"x".repeat(1001)}`,
       ],
       [
         {
@@ -34,7 +35,7 @@ it("moves this device's hides, strangers' included, and the hides on contact row
           npub: NonEmptyString1000.orThrow(encodeNpub(ALICE)),
           hiddenListingIdsJson: NonEmptyString.orThrow('["bike"]'),
         },
-        // A row without a readable npub keeps no hide but is still cleared.
+        // A row whose npub has not synced yet keeps its hides for later.
         {
           id: bob,
           npub: null,
@@ -50,6 +51,6 @@ it("moves this device's hides, strangers' included, and the hides on contact row
       { author: STRANGER, listingId: "milk" },
       { author: ALICE, listingId: "bike" },
     ],
-    contactsToClear: [alice, bob],
+    contactsToClear: [alice],
   });
 });

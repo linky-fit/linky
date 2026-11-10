@@ -7,7 +7,11 @@
 // dropped and the contact column cleared.
 
 import { parsePubkey, type Pubkey } from "@linky-fit/linkstr";
-import type { ContactId, ContactRow } from "@linky-fit/linksync";
+import {
+  NonEmptyString1000,
+  type ContactId,
+  type ContactRow,
+} from "@linky-fit/linksync";
 import { Option, Schema } from "effect";
 import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
 import {
@@ -51,7 +55,8 @@ export const hiddenListingsToMove = (
 ): HiddenListingsMigration => {
   const moves: Array<HiddenListingMove> = [];
   const add = (author: Pubkey | null, listingId: string) => {
-    if (author !== null && listingId !== "") moves.push({ author, listingId });
+    if (author !== null && NonEmptyString1000.is(listingId))
+      moves.push({ author, listingId });
   };
   for (const key of keys) {
     const separator = key.indexOf(":");
@@ -60,10 +65,11 @@ export const hiddenListingsToMove = (
   }
   const contactsToClear: Array<ContactId> = [];
   for (const contact of contacts) {
-    if (contact.hiddenListingIdsJson === null) continue;
-    contactsToClear.push(contact.id);
     const npub = normalizeNpubIdentifier(contact.npub ?? "");
     const author = npub ? parsePubkey(npub) : null;
+    // A row whose npub has not synced yet keeps its hides until it has.
+    if (contact.hiddenListingIdsJson === null || author === null) continue;
+    contactsToClear.push(contact.id);
     const ids = Option.getOrElse(
       decodeContactColumn(contact.hiddenListingIdsJson),
       () => [],

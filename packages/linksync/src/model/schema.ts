@@ -111,6 +111,7 @@ export const LinkySchema = {
     archivedAtSec: nullOr(PositiveInt),
     // Written only by nightly builds before `hiddenListing`: JSON array of the
     // contact's listing ids the user hid, read once to move them there.
+    // Removal gate in app/migrations/AGENTS.md.
     hiddenListingIdsJson: nullOr(NonEmptyString),
   },
   /**
