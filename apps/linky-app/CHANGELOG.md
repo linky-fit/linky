@@ -14,15 +14,17 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ### en-US
 
-- In Goods & services, a listing can be free (price 0) or leave the price to be agreed (no price).
+- In Goods & services, a listing can be free or have its price agreed.
 - Hidden listings stay hidden on all your devices, strangers' too; blocked people's listings no longer show.
-- In Goods & services, choose who sees each listing: contacts, your network (their contacts too) or one group. A listing from someone you don't know shows the contacts it came through, and you can write to its author without adding them. Settings can stop passing contacts' listings on.
+- In Goods & services, choose who sees each listing: contacts, your network (their contacts too) or one group. A stranger's listing shows the contacts it came through, and you can write to its author without adding them. Settings can stop passing listings on.
+- On-chain sends and receives have separate fees.
 
 ### cs-CZ
 
-- Ve zboží a službách může být nabídka zdarma (cena 0) nebo s cenou dohodou (bez ceny).
+- Ve zboží a službách může být nabídka zdarma nebo s cenou dohodou.
 - Skryté nabídky zůstanou skryté na všech zařízeních, i od neznámých; nabídky blokovaných se nezobrazují.
-- Ve zboží a službách vyberete, kdo nabídku uvidí: kontakty, síť (i kontakty kontaktů) nebo jedna skupina. U nabídky od neznámého uvidíte kontakty, přes které přišla, a inzerentovi napíšete i bez přidání do kontaktů. V nastavení lze vypnout předávání nabídek kontaktů dál.
+- Ve zboží a službách vyberete, kdo nabídku uvidí: kontakty, síť (i kontakty kontaktů) nebo skupina. U cizí nabídky uvidíte kontakty, přes které přišla, a autorovi napíšete i bez přidání. V nastavení lze vypnout předávání nabídek dál.
+- Odeslání na on-chain a příjem z něj mají vlastní poplatky.
 
 ## [26.11.2] - 2026-11-07
 

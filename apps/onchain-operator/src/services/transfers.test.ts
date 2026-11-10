@@ -61,7 +61,8 @@ const payoutAddress = "bcrt1q6rz28mcfaxtmd6v789l9rrlrusdprr9pz3cppk";
 const profile: OperatorProfile = {
   name: "On-chain operator",
   xpub: tpub,
-  feeBasisPoints: 100,
+  sendFeeBasisPoints: 100,
+  receiveFeeBasisPoints: 100,
   paused: false,
   description: "",
   amounts: [100_000, 250_000],

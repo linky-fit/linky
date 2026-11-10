@@ -180,13 +180,28 @@ function ProfileEditor({
         }
       />
       <TextField
-        label={copy.settings.feePercent}
-        value={form.feePercent}
+        label={copy.settings.sendFeePercent}
+        value={form.sendFeePercent}
         inputMode="decimal"
         trailing={copy.settings.feeUnit}
-        onChangeText={(feePercent) => edit({ feePercent })}
+        onChangeText={(sendFeePercent) => edit({ sendFeePercent })}
         error={
-          errors.feePercent === undefined ? undefined : copy.settings.feeInvalid
+          errors.sendFeePercent === undefined
+            ? undefined
+            : copy.settings.feeInvalid
+        }
+      />
+      <TextField
+        label={copy.settings.receiveFeePercent}
+        hint={copy.settings.feeHint}
+        value={form.receiveFeePercent}
+        inputMode="decimal"
+        trailing={copy.settings.feeUnit}
+        onChangeText={(receiveFeePercent) => edit({ receiveFeePercent })}
+        error={
+          errors.receiveFeePercent === undefined
+            ? undefined
+            : copy.settings.feeInvalid
         }
       />
       <TextField

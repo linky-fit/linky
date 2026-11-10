@@ -352,6 +352,27 @@ describe("planOnchainTransfer", () => {
     ).toMatchObject({ payoutAddress: REGTEST_ADDRESS });
   });
 
+  it("requests each direction at its own fee, the shared one where the config names none", () => {
+    const twoFees = {
+      ...config,
+      feeBasisPoints: 200,
+      sendFeeBasisPoints: 200,
+      receiveFeeBasisPoints: 50,
+    };
+    const plan = (draft: NewOnchainTransferDraft) =>
+      planOnchainTransfer({
+        draft,
+        config: twoFees,
+        id,
+        nowSec: NOW,
+        operator,
+        userPaymentRequest: draft.direction === "receive" ? "creqA" : null,
+      });
+    expect(plan(send)?.request.feeBasisPoints).toBe(200);
+    expect(plan(receive)?.request.feeBasisPoints).toBe(50);
+    expect(plan(receive)?.row.feeBasisPoints).toBe(50);
+  });
+
   it("requests an on-chain send with the payout address at the config's fee", () => {
     const planned = planOnchainTransfer({
       draft: { ...send, payoutAddress: ` ${REGTEST_ADDRESS} ` },

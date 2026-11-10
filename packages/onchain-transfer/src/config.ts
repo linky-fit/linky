@@ -15,7 +15,15 @@ export const ClientVersion = Schema.String.check(
 /** The on-chain operator's public terms, published as a NIP-78 event. */
 export const OnchainConfig = Schema.Struct({
   v: Schema.Literal(1),
+  /**
+   * The service fee of both directions to a Linky that reads no fee of its
+   * own direction; an operator charging two fees publishes the higher here.
+   */
   feeBasisPoints: BasisPoints,
+  /** The service fee of an on-chain send; `feeBasisPoints` without it. */
+  sendFeeBasisPoints: Schema.optionalKey(BasisPoints),
+  /** The service fee of an on-chain receive; `feeBasisPoints` without it. */
+  receiveFeeBasisPoints: Schema.optionalKey(BasisPoints),
   /** No new transfers are accepted while paused. */
   paused: Schema.Boolean,
   description: Schema.String.check(Schema.isMaxLength(1000)),
@@ -63,6 +71,33 @@ export const isOfferedAmount = (
     amount <= terms.maxReceiveAmount
   );
 };
+
+type FeeTerms = Pick<
+  OnchainConfig,
+  "feeBasisPoints" | "sendFeeBasisPoints" | "receiveFeeBasisPoints"
+>;
+
+/** The service fee a transfer in `direction` is requested at. */
+export const serviceFeeBasisPoints = (
+  terms: FeeTerms,
+  direction: OnchainTransferDirection,
+): number =>
+  (direction === "send"
+    ? terms.sendFeeBasisPoints
+    : terms.receiveFeeBasisPoints) ?? terms.feeBasisPoints;
+
+/**
+ * Whether the operator takes a request in `direction` made at `feeBasisPoints`:
+ * the direction's fee, or `feeBasisPoints` of the config, which a Linky reading
+ * no fee per direction requests at.
+ */
+export const isCurrentServiceFee = (
+  terms: FeeTerms,
+  direction: OnchainTransferDirection,
+  feeBasisPoints: number,
+): boolean =>
+  feeBasisPoints === serviceFeeBasisPoints(terms, direction) ||
+  feeBasisPoints === terms.feeBasisPoints;
 
 /** The app data draft the operator publishes its config with. */
 export const onchainConfigDraft = (config: OnchainConfig): AppDataDraft =>

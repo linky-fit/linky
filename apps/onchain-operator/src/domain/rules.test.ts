@@ -41,7 +41,8 @@ const transferId = createId<"OnchainTransfer">();
 const profile: OperatorProfile = {
   name: "On-chain operator",
   xpub: "tpub",
-  feeBasisPoints: 100,
+  sendFeeBasisPoints: 100,
+  receiveFeeBasisPoints: 100,
   paused: false,
   description: "",
   amounts: [100_000, 250_000],
@@ -117,8 +118,21 @@ describe("requestDenyReason", () => {
     expect(denyReason({ ...send, amount: 123_456 })).toMatch(
       /not one of the offered amounts/u,
     );
-    expect(denyReason(send, { feeBasisPoints: 150 })).toMatch(
+    expect(denyReason(send, { sendFeeBasisPoints: 150 })).toMatch(
       /fee is now 1.5 %/u,
+    );
+  });
+
+  it("takes each direction at its own fee, and at the higher one a Linky without fees per direction requests at", () => {
+    const fees = { sendFeeBasisPoints: 200, receiveFeeBasisPoints: 50 };
+    expect(denyReason({ ...send, feeBasisPoints: 200 }, fees)).toBeNull();
+    expect(denyReason({ ...receive, feeBasisPoints: 50 }, fees)).toBeNull();
+    expect(denyReason({ ...receive, feeBasisPoints: 200 }, fees)).toBeNull();
+    expect(denyReason({ ...receive, feeBasisPoints: 100 }, fees)).toMatch(
+      /fee is now 0.5 %/u,
+    );
+    expect(denyReason({ ...send, feeBasisPoints: 50 }, fees)).toMatch(
+      /fee is now 2 %/u,
     );
   });
 

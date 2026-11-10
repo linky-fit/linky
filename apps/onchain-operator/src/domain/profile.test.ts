@@ -73,7 +73,8 @@ describe("parseProfileForm", () => {
       Result.succeed({
         name: "Linky support",
         xpub: tpub,
-        feeBasisPoints: 100,
+        sendFeeBasisPoints: 100,
+        receiveFeeBasisPoints: 100,
         paused: false,
         description: "Hi",
         amounts: [100_000, 250_000, 500_000, 1_000_000],
@@ -108,7 +109,8 @@ describe("parseProfileForm", () => {
         {
           name: " ",
           xpub: tpub,
-          feePercent: "x",
+          sendFeePercent: "x",
+          receiveFeePercent: "101",
           paused: true,
           description: "a".repeat(1001),
           amounts: "",
@@ -123,7 +125,8 @@ describe("parseProfileForm", () => {
       Result.fail({
         name: "invalid",
         xpub: "invalid",
-        feePercent: "invalid",
+        sendFeePercent: "invalid",
+        receiveFeePercent: "invalid",
         description: "invalid",
         amounts: "invalid",
         maxReceiveAmount: "invalid",
@@ -154,9 +157,25 @@ describe("parseProfileForm", () => {
         appConfig,
       ).minClientVersion,
     ).toBe("26.10.7");
+    expect(
+      onchainConfigOf(
+        {
+          ...parsed.success,
+          sendFeeBasisPoints: 150,
+          receiveFeeBasisPoints: 50,
+        },
+        appConfig,
+      ),
+    ).toMatchObject({
+      feeBasisPoints: 150,
+      sendFeeBasisPoints: 150,
+      receiveFeeBasisPoints: 50,
+    });
     expect(onchainConfigOf(parsed.success, appConfig)).toEqual({
       v: 1,
       feeBasisPoints: 100,
+      sendFeeBasisPoints: 100,
+      receiveFeeBasisPoints: 100,
       paused: false,
       description: "Hi",
       amounts: [100_000, 250_000, 500_000, 1_000_000],
