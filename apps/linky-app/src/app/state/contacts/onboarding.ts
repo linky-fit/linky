@@ -8,8 +8,10 @@ import { parseProfileGeneralStatus } from "../../../nostrStatus";
 import { bankPaymentOfferMessagesAtom } from "../messages/bankOffers";
 import { messagesByContactAtom } from "../messages/readModel";
 import { kvSeededAtom } from "../platform";
+import { liveAtom } from "../session/live";
+import { listingsRepositoryAtom } from "../session/store";
 import { myProfileAtom, ownedLightningAddressesAtom } from "./profiles";
-import { contactGroupsAtom } from "./readModel";
+import { contactGroupsAtom, liveRowsAtom } from "./readModel";
 
 const onboardingFlagAtom = (key: string) =>
   kvSeededAtom(
@@ -58,4 +60,13 @@ export const contactsOnboardingHasSentMessageAtom = Atom.readable((get) =>
   get(messagesByContactAtom).recentMessages.some(
     (message) => message.direction === "out",
   ),
+);
+
+const listingRowsAtom = liveRowsAtom(
+  liveAtom(listingsRepositoryAtom, (listings) => listings),
+);
+
+/** The user has a listing of their own, a step of the contacts onboarding. */
+export const hasListingsAtom = Atom.readable(
+  (get) => get(listingRowsAtom).length > 0,
 );

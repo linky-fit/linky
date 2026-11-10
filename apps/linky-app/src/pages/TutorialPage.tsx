@@ -20,6 +20,7 @@ const TASK_ICONS: Record<ContactsGuideKey, IconName> = {
   beacon: "Radio",
   groups: "Users",
   linky_name: "Zap",
+  listings: "Package",
   message: "MessageCircleMore",
   pay: "HandCoins",
   proxy_payment: "Landmark",

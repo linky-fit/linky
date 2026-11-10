@@ -709,6 +709,18 @@ export const en = {
   guideProxyPaymentStep4Title: "Earn bitcoin",
   guideProxyPaymentStep4Body:
     "Turn on the currencies you can pay in. Contacts then send you their bank payments, and you earn bitcoin by paying them.",
+  guideListingsStep1Title: "Collaboration",
+  guideListingsStep1Body: "Open Collaboration from the bottom bar.",
+  guideListingsStep2Title: "Goods and services",
+  guideListingsStep2Body: "Open Goods and services.",
+  guideListingsStep3Title: "Add a listing",
+  guideListingsStep3Body: "Tap + to add what you offer or look for.",
+  guideListingsStep4Title: "Offering or looking for",
+  guideListingsStep4Body:
+    "Choose Offering or Looking for. Then fill in the title, price and unit; no price leaves it to agreement, zero makes it free.",
+  guideListingsStep5Title: "Who sees it",
+  guideListingsStep5Body:
+    "Choose who sees it: your contacts, your network with their contacts, or one group. Only contacts who also saved you see it. Then tap Add.",
   guideBeaconStep1Title: "Collaboration",
   guideBeaconStep1Body: "Open Collaboration from the bottom bar.",
   guideBeaconStep2Title: "Cash",
@@ -727,6 +739,7 @@ export const en = {
   contactsOnboardingTaskLinkyName: "Register a Linky name",
   contactsOnboardingTaskGroups: "Create a group",
   contactsOnboardingTaskProxyPayment: "Set up proxy payments",
+  contactsOnboardingTaskListings: "Add a listing",
   contactsOnboardingTaskBeacon: "Turn on the beacon",
   contactsOnboardingTaskSupport: "Support Linky regularly",
   addContact: "Add contact",

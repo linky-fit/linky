@@ -348,6 +348,27 @@ describe("useContactsGuide proxy_payment and beacon tasks", () => {
   });
 });
 
+describe("useContactsGuide listings task", () => {
+  it("follows the user from Collaboration to the new listing form", () => {
+    const { cleanup, getApi, render } = setup();
+
+    render({ kind: "contacts" });
+    act(() => {
+      getApi().startContactsGuide("listings");
+    });
+    render({ kind: "collaboration" });
+    expect(getApi().contactsGuideActiveStep?.step?.id).toBe("listings_2");
+
+    render({ kind: "listings" });
+    expect(getApi().contactsGuideActiveStep?.step?.id).toBe("listings_3");
+
+    render({ kind: "listingNew" });
+    expect(getApi().contactsGuideActiveStep?.step?.id).toBe("listings_4");
+
+    cleanup();
+  });
+});
+
 describe("useContactsGuide backup_keys task", () => {
   it("advances to the master keys step when the user opens settings", () => {
     const { cleanup, getApi, render } = setup();

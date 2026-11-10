@@ -136,6 +136,7 @@ describe("useContactsOnboardingProgress", () => {
       "linky_name",
       "groups",
       "proxy_payment",
+      "listings",
       "support",
     ]);
 

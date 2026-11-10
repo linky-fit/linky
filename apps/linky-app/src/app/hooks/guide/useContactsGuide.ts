@@ -9,7 +9,10 @@ import { ContactId } from "../../../evoluIds";
 import { navigateTo } from "../../../hooks/useRouting";
 import type { Route } from "../../../types/route";
 import { CONTACTS_GUIDE_STEPS } from "../../lib/contactsGuideSteps";
-import { hasLinkyNameAtom } from "../../state/contacts/onboarding";
+import {
+  hasLinkyNameAtom,
+  hasListingsAtom,
+} from "../../state/contacts/onboarding";
 import {
   contactsGuideAtom,
   contactsGuideHighlightRectAtom,
@@ -72,6 +75,7 @@ export const useContactsGuide = ({
   const registry = React.useContext(RegistryContext);
   const beaconEnabled = useBeacon().enabled;
   const hasLinkyName = useAtomValue(hasLinkyNameAtom);
+  const hasListings = useAtomValue(hasListingsAtom);
   const [contactsGuide, setContactsGuide] = useAtom(contactsGuideAtom);
   const [contactsGuideTargetContactId, setContactsGuideTargetContactId] =
     useAtom(contactsGuideTargetContactIdAtom);
@@ -85,6 +89,7 @@ export const useContactsGuide = ({
     () => ({
       backup_keys: contactsOnboardingHasBackedUpKeys,
       linky_name: hasLinkyName,
+      listings: hasListings,
       message: contactsOnboardingHasSentMessage,
       pay: contactsOnboardingHasPaid,
       support: contactsOnboardingHasSupported,
@@ -97,6 +102,7 @@ export const useContactsGuide = ({
       contactsOnboardingHasSentMessage,
       contactsOnboardingHasSupported,
       hasLinkyName,
+      hasListings,
     ],
   );
 
@@ -141,6 +147,8 @@ export const useContactsGuide = ({
       if (kind === "proxyPayments") navigateTo({ route: "proxyPayments" });
       if (kind === "collaboration") navigateTo({ route: "collaboration" });
       if (kind === "cash") navigateTo({ route: "cash" });
+      if (kind === "listings") navigateTo({ route: "listings" });
+      if (kind === "listingNew") navigateTo({ route: "listingNew" });
       if (kind === "profile") navigateTo({ route: "profile" });
       if (kind === "profileEdit") navigateTo({ route: "profileEdit" });
       if (kind === "settings") navigateTo({ route: "settings" });
@@ -320,7 +328,7 @@ export const useContactsGuide = ({
     }
 
     if (
-      (id === "proxy_payment_1" || id === "beacon_1") &&
+      (id === "proxy_payment_1" || id === "beacon_1" || id === "listings_1") &&
       transition("contacts", "collaboration")
     ) {
       goToStep(1);
@@ -330,6 +338,12 @@ export const useContactsGuide = ({
       transition("collaboration", "proxyPayments")
     ) {
       goToStep(2);
+    }
+    if (id === "listings_2" && transition("collaboration", "listings")) {
+      goToStep(2);
+    }
+    if (id === "listings_3" && transition("listings", "listingNew")) {
+      goToStep(3);
     }
     if (id === "beacon_2" && transition("collaboration", "cash")) {
       goToStep(2);

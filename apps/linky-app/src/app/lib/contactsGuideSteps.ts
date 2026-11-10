@@ -260,6 +260,43 @@ export const CONTACTS_GUIDE_STEPS: Record<
       "proxyPayments",
     ),
   ],
+  listings: [
+    step(
+      "listings_1",
+      '[data-testid="open-collaboration"]',
+      "guideListingsStep1Title",
+      "guideListingsStep1Body",
+      "contacts",
+    ),
+    step(
+      "listings_2",
+      '[data-guide="collaboration-listings"]',
+      "guideListingsStep2Title",
+      "guideListingsStep2Body",
+      "collaboration",
+    ),
+    step(
+      "listings_3",
+      '[data-guide="listing-add"]',
+      "guideListingsStep3Title",
+      "guideListingsStep3Body",
+      "listings",
+    ),
+    step(
+      "listings_4",
+      '[data-guide="listing-side"]',
+      "guideListingsStep4Title",
+      "guideListingsStep4Body",
+      "listingNew",
+    ),
+    step(
+      "listings_5",
+      '[data-guide="listing-audience"]',
+      "guideListingsStep5Title",
+      "guideListingsStep5Body",
+      "listingNew",
+    ),
+  ],
   beacon: [
     step(
       "beacon_1",

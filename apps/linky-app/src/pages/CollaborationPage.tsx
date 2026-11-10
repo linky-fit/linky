@@ -80,7 +80,7 @@ export function CollaborationPage(): React.ReactElement {
         route.kind === "listingNew" ||
         route.kind === "listingEdit" ||
         route.kind === "listing",
-      guide: undefined,
+      guide: "collaboration-listings",
       testID: "open-listings",
     },
   ] as const;

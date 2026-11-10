@@ -205,6 +205,7 @@ export type ContactsGuideKey =
   | "linky_name"
   | "groups"
   | "proxy_payment"
+  | "listings"
   | "beacon"
   | "support";
 
