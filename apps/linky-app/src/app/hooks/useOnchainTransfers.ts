@@ -282,7 +282,7 @@ export const useOnchainTransferCommands = () => {
         payload: {
           direction: draft.direction,
           amount: draft.amount,
-          feeBasisPoints: config.feeBasisPoints,
+          feeBasisPoints: planned.request.feeBasisPoints,
           network: config.network,
         },
       });
@@ -293,7 +293,7 @@ export const useOnchainTransferCommands = () => {
             amount: draft.amount,
             sendAmount: amountWithServiceFee(
               draft.amount,
-              config.feeBasisPoints,
+              planned.request.feeBasisPoints,
             ),
             payoutAddress: planned.request.payoutAddress ?? null,
           },

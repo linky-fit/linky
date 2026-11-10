@@ -10,8 +10,10 @@ import { Option } from "effect";
 import {
   decodeOnchainConfig,
   isClientVersionSupported,
+  isCurrentServiceFee,
   isOfferedAmount,
   onchainConfigDraft,
+  serviceFeeBasisPoints,
   type OnchainConfig,
 } from "./config";
 import {
@@ -99,6 +101,34 @@ describe("on-chain config", () => {
     ["a missing mint", JSON.stringify({ ...config, mintUrl: undefined })],
   ])("rejects %s", (_, content) => {
     expect(decodeOnchainConfig(eventWith(content))).toEqual(Option.none());
+  });
+});
+
+describe("service fee per direction", () => {
+  it("charges each direction its own fee and falls back to the shared one", () => {
+    const twoFees = {
+      ...config,
+      feeBasisPoints: 150,
+      sendFeeBasisPoints: 150,
+      receiveFeeBasisPoints: 50,
+    };
+    expect(serviceFeeBasisPoints(twoFees, "send")).toBe(150);
+    expect(serviceFeeBasisPoints(twoFees, "receive")).toBe(50);
+    expect(serviceFeeBasisPoints(config, "receive")).toBe(100);
+    const event = eventWith(onchainConfigDraft(twoFees).content);
+    expect(Option.getOrNull(decodeOnchainConfig(event))).toEqual(twoFees);
+  });
+
+  it("takes the direction's fee and the shared one an older Linky requests at", () => {
+    const twoFees = {
+      ...config,
+      feeBasisPoints: 150,
+      receiveFeeBasisPoints: 50,
+    };
+    expect(isCurrentServiceFee(twoFees, "receive", 50)).toBe(true);
+    expect(isCurrentServiceFee(twoFees, "receive", 150)).toBe(true);
+    expect(isCurrentServiceFee(twoFees, "receive", 100)).toBe(false);
+    expect(isCurrentServiceFee(twoFees, "send", 50)).toBe(false);
   });
 });
 

@@ -8,7 +8,8 @@ import { createWatcherAlerts } from "./watchers";
 const profileWith = (watchers: readonly Pubkey[]): OperatorProfile => ({
   name: "On-chain operator",
   xpub: "tpub",
-  feeBasisPoints: 100,
+  sendFeeBasisPoints: 100,
+  receiveFeeBasisPoints: 100,
   paused: false,
   description: "",
   amounts: [100_000],

@@ -347,7 +347,10 @@ export const copy = {
       `The ${prefix} or descriptor of a Taproot (BIP86) account, e.g. from Trezor Suite or Sparrow. Each on-chain receive gets a fresh deposit address from it; it cannot spend.`,
     xpubInvalid: (prefix: string) =>
       `Paste the ${prefix} or tr(…) descriptor of a Taproot account.`,
-    feePercent: "Service fee",
+    sendFeePercent: "Service fee of an on-chain send",
+    receiveFeePercent: "Service fee of an on-chain receive",
+    feeHint:
+      "Linky versions from before separate fees charge the higher fee in both directions.",
     feeInvalid: "A percentage from 0 to 100 with up to two decimals.",
     feeUnit: "%",
     paused: "Paused",

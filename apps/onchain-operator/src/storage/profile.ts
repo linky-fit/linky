@@ -10,7 +10,7 @@ import {
   DEFAULT_MAX_RECEIVE_AMOUNT,
   DEFAULT_MIN_RECEIVE_AMOUNT,
 } from "@linky-fit/onchain-transfer";
-import { Effect, Option, Schema } from "effect";
+import { Effect, Option, Schema, Struct } from "effect";
 import { DEFAULT_OPERATOR_NAME, type OperatorProfile } from "../domain/profile";
 import type { SettingsRepository } from "./repositories";
 
@@ -39,8 +39,12 @@ const ProfileJson = Schema.fromJsonString(
     // Absent in profiles saved before the operator had a name.
     name: Schema.optionalKey(Schema.String),
     xpub: Schema.String,
+    // The on-chain send's fee, the only fee before receives had their own.
     feeBasisPoints: Schema.Int.check(
       Schema.isBetween({ minimum: 0, maximum: 10_000 }),
+    ),
+    receiveFeeBasisPoints: Schema.optionalKey(
+      Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 10_000 })),
     ),
     paused: Schema.Boolean,
     amounts: Schema.NonEmptyArray(Schema.Int.check(Schema.isGreaterThan(0))),
@@ -73,7 +77,10 @@ export const readProfile = (
         Option.map(
           Schema.decodeUnknownOption(ProfileJson)(profile?.value),
           (stored) => ({
-            ...stored,
+            ...Struct.omit(stored, ["feeBasisPoints"]),
+            sendFeeBasisPoints: stored.feeBasisPoints,
+            receiveFeeBasisPoints:
+              stored.receiveFeeBasisPoints ?? stored.feeBasisPoints,
             name: stored.name ?? DEFAULT_OPERATOR_NAME,
             maxReceiveAmount:
               stored.maxReceiveAmount ?? DEFAULT_MAX_RECEIVE_AMOUNT,
@@ -123,7 +130,8 @@ export const saveProfile = (
           Schema.encodeSync(ProfileJson)({
             name: profile.name,
             xpub: profile.xpub,
-            feeBasisPoints: profile.feeBasisPoints,
+            feeBasisPoints: profile.sendFeeBasisPoints,
+            receiveFeeBasisPoints: profile.receiveFeeBasisPoints,
             paused: profile.paused,
             amounts: profile.amounts,
             maxReceiveAmount: profile.maxReceiveAmount,

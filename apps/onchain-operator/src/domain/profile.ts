@@ -17,7 +17,10 @@ export interface OperatorProfile {
   readonly name: string;
   /** BIP86 account-level xpub (tpub on test networks) deposit addresses derive from. */
   readonly xpub: string;
-  readonly feeBasisPoints: number;
+  /** The service fee of an on-chain send. */
+  readonly sendFeeBasisPoints: number;
+  /** The service fee of an on-chain receive. */
+  readonly receiveFeeBasisPoints: number;
   readonly paused: boolean;
   readonly description: string;
   /** What an on-chain send can be made for. */
@@ -37,11 +40,12 @@ export interface OperatorProfile {
 /** What the settings form edits; the picture is saved on its own. */
 export type EditedProfile = Omit<OperatorProfile, "picture">;
 
-/** The settings form as typed; the fee is in percent. */
+/** The settings form as typed; the fees are in percent. */
 export interface ProfileForm {
   readonly name: string;
   readonly xpub: string;
-  readonly feePercent: string;
+  readonly sendFeePercent: string;
+  readonly receiveFeePercent: string;
   readonly paused: boolean;
   readonly description: string;
   readonly amounts: string;
@@ -55,7 +59,8 @@ export type ProfileFormErrors = Partial<
   Record<
     | "name"
     | "xpub"
-    | "feePercent"
+    | "sendFeePercent"
+    | "receiveFeePercent"
     | "description"
     | "amounts"
     | "maxReceiveAmount"
@@ -122,7 +127,8 @@ export const parseMinClientVersion = (
 export const profileForm = (profile: EditedProfile | null): ProfileForm => ({
   name: profile?.name ?? DEFAULT_OPERATOR_NAME,
   xpub: profile?.xpub ?? "",
-  feePercent: feePercentText(profile?.feeBasisPoints ?? 100),
+  sendFeePercent: feePercentText(profile?.sendFeeBasisPoints ?? 100),
+  receiveFeePercent: feePercentText(profile?.receiveFeeBasisPoints ?? 100),
   paused: profile?.paused ?? false,
   description: profile?.description ?? "",
   amounts: (profile?.amounts ?? DEFAULT_TRANSFER_AMOUNTS).join(", "),
@@ -141,7 +147,8 @@ export const parseProfileForm = (
   network: BitcoinNetwork,
 ): Result.Result<EditedProfile, ProfileFormErrors> => {
   const xpub = parseDepositXpub(form.xpub, network);
-  const feeBasisPoints = parseFeePercent(form.feePercent);
+  const sendFeeBasisPoints = parseFeePercent(form.sendFeePercent);
+  const receiveFeeBasisPoints = parseFeePercent(form.receiveFeePercent);
   const amounts = parseAmounts(form.amounts);
   const maxReceiveAmount = parseSats(form.maxReceiveAmount);
   const minReceiveAmount = parseSats(form.minReceiveAmount);
@@ -157,7 +164,8 @@ export const parseProfileForm = (
   if (
     !nameFits ||
     xpub === null ||
-    feeBasisPoints === null ||
+    sendFeeBasisPoints === null ||
+    receiveFeeBasisPoints === null ||
     amounts === null ||
     maxReceiveAmount === null ||
     !minReceiveFits ||
@@ -168,7 +176,10 @@ export const parseProfileForm = (
     return Result.fail({
       ...(nameFits ? {} : { name: "invalid" }),
       ...(xpub === null ? { xpub: "invalid" } : {}),
-      ...(feeBasisPoints === null ? { feePercent: "invalid" } : {}),
+      ...(sendFeeBasisPoints === null ? { sendFeePercent: "invalid" } : {}),
+      ...(receiveFeeBasisPoints === null
+        ? { receiveFeePercent: "invalid" }
+        : {}),
       ...(amounts === null ? { amounts: "invalid" } : {}),
       ...(maxReceiveAmount === null ? { maxReceiveAmount: "invalid" } : {}),
       ...(minReceiveFits ? {} : { minReceiveAmount: "invalid" }),
@@ -182,7 +193,8 @@ export const parseProfileForm = (
   return Result.succeed({
     name,
     xpub,
-    feeBasisPoints,
+    sendFeeBasisPoints,
+    receiveFeeBasisPoints,
     paused: form.paused,
     description,
     amounts,
@@ -192,6 +204,24 @@ export const parseProfileForm = (
     watchers,
   });
 };
+
+/** The config's service fees: one per direction, and the higher one for a Linky that reads no fee per direction. */
+export const profileFeeTerms = (
+  profile: Pick<
+    OperatorProfile,
+    "sendFeeBasisPoints" | "receiveFeeBasisPoints"
+  >,
+): Pick<
+  OnchainConfig,
+  "feeBasisPoints" | "sendFeeBasisPoints" | "receiveFeeBasisPoints"
+> => ({
+  feeBasisPoints: Math.max(
+    profile.sendFeeBasisPoints,
+    profile.receiveFeeBasisPoints,
+  ),
+  sendFeeBasisPoints: profile.sendFeeBasisPoints,
+  receiveFeeBasisPoints: profile.receiveFeeBasisPoints,
+});
 
 /** The public on-chain config the profile publishes; the mint, network and explorer come from the app config. */
 export const onchainConfigOf = (
@@ -203,7 +233,7 @@ export const onchainConfigOf = (
   },
 ): OnchainConfig => ({
   v: 1,
-  feeBasisPoints: profile.feeBasisPoints,
+  ...profileFeeTerms(profile),
   paused: profile.paused,
   description: profile.description,
   amounts: profile.amounts,

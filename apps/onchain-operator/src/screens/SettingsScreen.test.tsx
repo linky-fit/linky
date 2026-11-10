@@ -41,7 +41,8 @@ it.each([
     state.profile = {
       name: "Transfer desk",
       xpub: "tpubDDfvzhdVV4unsoKt5aE6dcsNsfeWbTgmLZPi8LQDYU2xixrYemMfWJ3BaVneH3u7DBQePdTwhpybaKRU95pi6PMUtLPBJLVQRpzEnjfjZzX",
-      feeBasisPoints: 100,
+      sendFeeBasisPoints: 100,
+      receiveFeeBasisPoints: 100,
       paused: false,
       description: "",
       amounts: [100000],
@@ -93,7 +94,8 @@ it("removes the picture without dropping unsaved form edits", async () => {
   state.profile = {
     name: "Transfer desk",
     xpub: "tpubDDfvzhdVV4unsoKt5aE6dcsNsfeWbTgmLZPi8LQDYU2xixrYemMfWJ3BaVneH3u7DBQePdTwhpybaKRU95pi6PMUtLPBJLVQRpzEnjfjZzX",
-    feeBasisPoints: 100,
+    sendFeeBasisPoints: 100,
+    receiveFeeBasisPoints: 100,
     paused: false,
     description: "",
     amounts: [100000],

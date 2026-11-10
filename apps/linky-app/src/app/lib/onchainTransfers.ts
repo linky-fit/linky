@@ -26,6 +26,7 @@ import {
   isValidBitcoinAddress,
   newerTransferUpdate,
   serviceFee,
+  serviceFeeBasisPoints,
   OnchainTransferDirection,
   amountWithServiceFee,
   OnchainTransferRequest,
@@ -267,6 +268,7 @@ export const planOnchainTransfer = ({
   readonly userPaymentRequest: string | null;
 }): PlannedOnchainTransfer | null => {
   const send = draft.direction === "send";
+  const feeBasisPoints = serviceFeeBasisPoints(config, draft.direction);
   const rowAmount = send ? draft.amount : (config.minReceiveAmount ?? null);
   if (rowAmount === null) return null;
   // The operator's chain watcher matches addresses as Esplora reports them; "" fails the request schema.
@@ -278,7 +280,7 @@ export const planOnchainTransfer = ({
     transferId: id,
     direction: draft.direction,
     ...(draft.amount === null ? {} : { amount: draft.amount }),
-    feeBasisPoints: config.feeBasisPoints,
+    feeBasisPoints,
     ...(send
       ? { payoutAddress }
       : {
@@ -291,8 +293,8 @@ export const planOnchainTransfer = ({
   if (!isOnchainTransferRequest(request)) return null;
   const createdAtSec = PositiveInt.from(nowSec);
   const amount = PositiveInt.from(rowAmount);
-  const feeBasisPoints = NonNegativeInt.from(config.feeBasisPoints);
-  if (!createdAtSec.ok || !amount.ok || !feeBasisPoints.ok) return null;
+  const feeColumn = NonNegativeInt.from(feeBasisPoints);
+  if (!createdAtSec.ok || !amount.ok || !feeColumn.ok) return null;
   const payout = send ? textColumn(payoutAddress) : null;
   const userRequest = send ? null : textColumn(userPaymentRequest);
   return {
@@ -304,7 +306,7 @@ export const planOnchainTransfer = ({
       peerPubkey: NonEmptyString100.orThrow(operator),
       direction: NonEmptyString100.orThrow(draft.direction),
       amount: amount.value,
-      feeBasisPoints: feeBasisPoints.value,
+      feeBasisPoints: feeColumn.value,
       ...(payout === null ? {} : { payoutAddress: payout }),
       ...(send ? {} : { refundToSender: sqliteTrue }),
       ...(userRequest === null ? {} : { userPaymentRequest: userRequest }),

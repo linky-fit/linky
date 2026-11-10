@@ -3,7 +3,9 @@ import {
   amountWithServiceFee,
   canOperatorMove,
   depositTerms,
+  isCurrentServiceFee,
   isOfferedAmount,
+  serviceFeeBasisPoints,
   paysAddress,
   REQUIRED_CONFIRMATIONS,
   isValidBitcoinAddress,
@@ -17,7 +19,7 @@ import {
   type OnchainTransferUpdate,
 } from "@linky-fit/onchain-transfer";
 import { Effect, Struct } from "effect";
-import type { OperatorProfile } from "./profile";
+import { profileFeeTerms, type OperatorProfile } from "./profile";
 import {
   isAnyAmountReceive,
   isOpen,
@@ -103,8 +105,9 @@ export const requestDenyReason = (args: {
       : request.direction === "send"
         ? `${sats(amount)} is not one of the offered amounts.`
         : `The most you can receive is ${sats(profile.maxReceiveAmount)}.`;
-  if (request.feeBasisPoints !== profile.feeBasisPoints)
-    return `The fee is now ${profile.feeBasisPoints / 100} %; request the transfer again.`;
+  const fees = profileFeeTerms(profile);
+  if (!isCurrentServiceFee(fees, request.direction, request.feeBasisPoints))
+    return `The fee is now ${serviceFeeBasisPoints(fees, request.direction) / 100} %; request the transfer again.`;
   if (
     request.payoutAddress !== undefined &&
     !isValidBitcoinAddress(request.payoutAddress, network)

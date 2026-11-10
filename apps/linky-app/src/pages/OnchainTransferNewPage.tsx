@@ -18,6 +18,7 @@ import {
 import {
   amountWithServiceFee,
   isClientVersionSupported,
+  serviceFeeBasisPoints,
   type OnchainConfig,
   type OnchainTransferDirection,
 } from "@linky-fit/onchain-transfer";
@@ -64,7 +65,7 @@ export function OnchainSendForm({
 }: OnchainSendFormProps): React.ReactElement {
   const { t } = useTranslation();
   const { formatDisplayedAmountText: amountText } = useDisplayAmounts();
-  const { feeBasisPoints } = config;
+  const feeBasisPoints = serviceFeeBasisPoints(config, "send");
   const total = (amount: number) =>
     amountWithServiceFee(amount, feeBasisPoints);
   const amounts = [...config.amounts].sort((a, b) => a - b);
@@ -245,7 +246,7 @@ export function OnchainReceiveIntro({
       "Coins",
       t("onchainReceiveIntroFee").replace(
         "{fee}",
-        formatServiceFeePercent(config.feeBasisPoints, lang),
+        formatServiceFeePercent(serviceFeeBasisPoints(config, "receive"), lang),
       ),
     ],
     ["ArrowDownToLine", t("onchainReceiveIntroRefund")],

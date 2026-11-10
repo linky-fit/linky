@@ -14,7 +14,8 @@ import { readProfile, saveProfile } from "./profile";
 const profile: OperatorProfile = {
   name: "Dave's transfers",
   xpub: "tpub-key",
-  feeBasisPoints: 150,
+  sendFeeBasisPoints: 150,
+  receiveFeeBasisPoints: 50,
   paused: true,
   description: "x".repeat(1000),
   amounts: [100_000],
@@ -42,7 +43,7 @@ describe("profile setting", () => {
     expect(await Effect.runPromise(readProfile(settings))).toEqual(emptied);
   });
 
-  it("names a profile saved before the operator had a name, a picture, receive limits or a minimum Linky version", async () => {
+  it("names a profile saved before the operator had a name, a picture, receive limits, a receive fee or a minimum Linky version", async () => {
     const settings = tableRepository(testStore(), "meta", "setting");
     await Effect.runPromise(
       settings.insert({
@@ -61,6 +62,8 @@ describe("profile setting", () => {
     expect(await Effect.runPromise(readProfile(settings))).toMatchObject({
       name: "Linky support",
       xpub: "tpub-key",
+      sendFeeBasisPoints: 100,
+      receiveFeeBasisPoints: 100,
       maxReceiveAmount: 2_000_000,
       minReceiveAmount: 100_000,
       minClientVersion: null,
