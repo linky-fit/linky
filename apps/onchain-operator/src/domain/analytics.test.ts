@@ -11,6 +11,36 @@ const all = () => true;
 const sec = (iso: string) => Date.parse(iso) / 1000;
 
 describe("transferAnalytics", () => {
+  it("counts a transfer closed by hand as its outcome and leaves test transfers out", () => {
+    const stats = transferAnalytics(
+      [
+        {
+          ...transferOf({ status: "fundsReceived", amount: 100_000 }),
+          closedByHand: "completed",
+        },
+        { ...transferOf({ status: "accepted" }), closedByHand: "cancelled" },
+        { ...transferOf({ status: "completed" }), isTest: true },
+        { ...transferOf({ status: null }), isTest: true },
+      ],
+      all,
+    );
+    expect(stats.completed.count).toBe(1);
+    expect(stats.completed.amount).toBe(100_000);
+    expect(stats.outcomes).toEqual({
+      completed: 1,
+      open: 0,
+      refunded: 0,
+      cancelled: 1,
+      denied: 0,
+    });
+    expect(
+      monthlyAnalytics(
+        [{ ...transferOf({ status: "completed" }), isTest: true }],
+        "UTC",
+      ),
+    ).toEqual([]);
+  });
+
   it("counts only completed transfers toward the amount, what users sent and the fees", () => {
     const stats = transferAnalytics(
       [

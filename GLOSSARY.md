@@ -432,6 +432,14 @@ _Avoid_: receive (that is a token), topup, deposit
 The one person who completes on-chain transfers from the operator console; Linky knows them by a fixed npub. The UI never names them: their chat is the user's support chat and carries no transfer state.
 _Avoid_: swap operator, exchanger, admin, LSP
 
+**Closed by hand**:
+An on-chain transfer the on-chain operator marked completed or cancelled in the console after settling it outside the protocol; it gets no more updates and the user is not told, so Linky keeps showing its last phase.
+_Avoid_: resolved, force-closed, archived
+
+**Test transfer**:
+An on-chain transfer the on-chain operator marked as a test; the console hides it and leaves it out of the stats.
+_Avoid_: dummy transfer, fake transfer
+
 **Waiting for details**:
 An on-chain transfer the on-chain operator has not accepted yet, so it has no payment request or deposit address; Linky notifies the user once it has.
 _Avoid_: waiting for the operator, pending approval

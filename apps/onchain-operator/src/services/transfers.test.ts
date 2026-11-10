@@ -499,12 +499,26 @@ describe("ecash in", () => {
     });
   });
 
-  it("receives the amount without the fee without moving the transfer on", async () => {
-    const { pay, updates } = await acceptedSend(
-      fakeWallet(() => Result.succeed(receiveReceipt(100_000))),
+  it("keeps ecash short of the amount plus the fee for the operator to settle, and counts what follows", async () => {
+    let amount = 100_000;
+    let operation = 0;
+    const { pay, updates, transfers, request, alerts } = await acceptedSend(
+      fakeWallet(() =>
+        Result.succeed(receiveReceipt(amount, `receive-${(operation += 1)}`)),
+      ),
     );
     await pay(100_000);
     expect(updates().map((update) => update.status)).toEqual(["accepted"]);
+    expect(transfers.earlyEcash(request.transferId)).toBe(100_000);
+
+    amount = 1_000;
+    await pay(1_000);
+    expect(updates().at(-1)).toMatchObject({
+      status: "fundsReceived",
+      receivedAmount: 101_000,
+    });
+    expect(alerts).toEqual(["payoutDue"]);
+    expect(transfers.earlyEcash(request.transferId)).toBeNull();
   });
 
   it("pays one transfer with ecash, never again and never another one, and leaves a deferred one for the next session", async () => {
@@ -607,6 +621,48 @@ describe("ecash in", () => {
     await send(request);
     expect(updates().map((update) => update.status)).toEqual(["accepted"]);
     expect(transfers.earlyEcash(request.transferId)).toBe(50_000);
+  });
+});
+
+describe("closing by hand", () => {
+  it("records the outcome without telling the user and stops watching the deposit until reopened", async () => {
+    const { transfers, send, stored, updates, esplora, user } = setup();
+    const request = receiveRequest(user);
+    await send(request);
+    const address = (await stored(request.transferId)).depositAddress ?? "";
+
+    expect(
+      await transfers.closeByHand(request.transferId, "cancelled"),
+    ).toBeNull();
+    expect((await stored(request.transferId)).closedByHand).toBe("cancelled");
+    esplora.state.byAddress.set(address, [
+      txPaying("bb".repeat(32), address, 101_000),
+    ]);
+    await transfers.checkDeposits();
+    expect(updates().map((update) => update.status)).toEqual(["accepted"]);
+    expect(await transfers.cancel(request.transferId, "")).toEqual({
+      reason: "notAllowed",
+    });
+
+    expect(await transfers.closeByHand(request.transferId, null)).toBeNull();
+    await transfers.checkDeposits();
+    expect(updates().map((update) => update.status)).toEqual([
+      "accepted",
+      "fundsSeen",
+    ]);
+  });
+
+  it("marks a transfer a test and a real one again", async () => {
+    const { transfers, send, stored } = setup();
+    const request = sendRequest();
+    await send(request);
+    expect(await transfers.markTest(request.transferId, true)).toBeNull();
+    expect((await stored(request.transferId)).isTest).toBe(true);
+    expect(await transfers.markTest(request.transferId, false)).toBeNull();
+    expect((await stored(request.transferId)).isTest).toBe(false);
+    expect(
+      await transfers.markTest(createId<"OnchainTransfer">(), true),
+    ).toEqual({ reason: "unknownTransfer" });
   });
 });
 
@@ -910,7 +966,7 @@ describe("payouts", () => {
     expect(updates().at(-1)?.status).toBe("fundsReceived");
   });
 
-  it("keeps another device from paying while the Cashu is on its way", async () => {
+  it("keeps another device from paying or closing the transfer while the Cashu is on its way", async () => {
     const first = await receivedDeposit();
     const second = setup({ store: first.store });
     expect(
@@ -926,6 +982,9 @@ describe("payouts", () => {
     );
     expect(
       await second.transfers.confirmRefund(first.request.transferId, refund),
+    ).toEqual({ reason: "inFlight" });
+    expect(
+      await second.transfers.closeByHand(first.request.transferId, "completed"),
     ).toEqual({ reason: "inFlight" });
     expect(second.wallet.sent).toEqual([]);
   });

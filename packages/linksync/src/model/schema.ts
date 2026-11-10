@@ -339,6 +339,10 @@ export const LinkySchema = {
     // User only.
     sentAtSec: nullOr(PositiveInt),
     cancelledAtSec: nullOr(PositiveInt),
+    // Operator only: "completed" | "cancelled", the outcome the operator closed the transfer with by hand; the user is not told.
+    closedByHand: nullOr(NonEmptyString100),
+    // Operator only: "1" when the operator marked it a test transfer, which the console hides and leaves out of the stats.
+    isTest: nullOr(SqliteBoolean),
   },
   /** Onchain scope, operator only: an on-chain transfer message a user sent, exactly as it arrived, the record to settle a dispute by. */
   onchainTransferMessage: {

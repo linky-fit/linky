@@ -9,11 +9,19 @@ import {
 } from "../domain/transfer";
 import { formatSats } from "../format";
 
-/** The status as the operator reads it; a request nobody answered yet waits for them. */
-export const statusKey = (
-  transfer: OperatorTransfer,
-): OperatorTransferStatus | "requested" =>
-  transferStatus(transfer) ?? "requested";
+export type StatusKey =
+  | OperatorTransferStatus
+  | "requested"
+  | "closedCompleted"
+  | "closedCancelled";
+
+/** The status as the operator reads it: how they closed it by hand, or the protocol's; a request nobody answered yet waits for them. */
+export const statusKey = (transfer: OperatorTransfer): StatusKey =>
+  transfer.closedByHand === "completed"
+    ? "closedCompleted"
+    : transfer.closedByHand === "cancelled"
+      ? "closedCancelled"
+      : (transferStatus(transfer) ?? "requested");
 
 export const transferTitle = (transfer: OperatorTransfer): string =>
   copy.transfers.summary(

@@ -60,7 +60,9 @@ function ChatRow({
   const { config } = useAppServices();
   const { name } = usePeerProfile(chat.peer);
   const last = chat.messages.at(-1);
-  const open = transfers.filter(isOpen).length;
+  const open = transfers.filter(
+    (transfer) => !transfer.isTest && isOpen(transfer),
+  ).length;
   const lastSec = lastActivitySec(chat, transfers);
   return (
     <ListRow

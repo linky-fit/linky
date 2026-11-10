@@ -50,5 +50,7 @@ export const operatorTransferOf = ({
             sendAmount: amount + fee,
           },
     userCancelledAtSec: null,
+    closedByHand: null,
+    isTest: false,
   };
 };

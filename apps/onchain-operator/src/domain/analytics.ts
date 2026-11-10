@@ -1,8 +1,9 @@
 import type { OnchainTransferDirection } from "@linky-fit/onchain-transfer";
 import {
-  transferStatus,
+  transferOutcome,
   transferTerms,
   type OperatorTransfer,
+  type TransferOutcome,
 } from "./transfer";
 
 /** Sums over completed transfers: `amount` is what users got, `sent` what they sent, the amount plus `fees`. */
@@ -12,13 +13,6 @@ export interface FlowTotals {
   readonly sent: number;
   readonly fees: number;
 }
-
-export type TransferOutcome =
-  | "completed"
-  | "open"
-  | "refunded"
-  | "cancelled"
-  | "denied";
 
 export interface TransferAnalytics {
   readonly completed: FlowTotals;
@@ -39,21 +33,8 @@ export type Period = (typeof periods)[number];
 const DAY_SEC = 86_400;
 const noFlow: FlowTotals = { count: 0, amount: 0, sent: 0, fees: 0 };
 
-const outcomeOf = (transfer: OperatorTransfer): TransferOutcome => {
-  const status = transferStatus(transfer);
-  switch (status) {
-    case "completed":
-    case "refunded":
-    case "cancelled":
-    case "denied":
-      return status;
-    default:
-      return "open";
-  }
-};
-
 const isCompleted = (transfer: OperatorTransfer): boolean =>
-  outcomeOf(transfer) === "completed";
+  transferOutcome(transfer) === "completed";
 
 const addTransfer = (
   totals: FlowTotals,
@@ -117,13 +98,13 @@ export const inPeriod = (
   }
 };
 
-/** What flowed through the transfers whose request time `includes` accepts; only completed transfers count toward the totals. */
+/** What flowed through the transfers whose request time `includes` accepts; only completed transfers count toward the totals, test transfers not at all. */
 export const transferAnalytics = (
   transfers: readonly OperatorTransfer[],
   includes: (sec: number) => boolean,
 ): TransferAnalytics => {
-  const inRange = transfers.filter((transfer) =>
-    includes(transfer.createdAtSec),
+  const inRange = transfers.filter(
+    (transfer) => !transfer.isTest && includes(transfer.createdAtSec),
   );
   const completed = inRange.filter(isCompleted);
   const outcomes: Record<TransferOutcome, number> = {
@@ -133,7 +114,7 @@ export const transferAnalytics = (
     cancelled: 0,
     denied: 0,
   };
-  for (const transfer of inRange) outcomes[outcomeOf(transfer)] += 1;
+  for (const transfer of inRange) outcomes[transferOutcome(transfer)] += 1;
   return {
     completed: flowOf(completed),
     byDirection: flowByDirection(completed),
@@ -153,14 +134,14 @@ export const completionRate = (
   return finished === 0 ? null : outcomes.completed / finished;
 };
 
-/** Completed transfers per calendar month of their request time in `timeZone`, newest month first. */
+/** Completed transfers but test ones per calendar month of their request time in `timeZone`, newest month first. */
 export const monthlyAnalytics = (
   transfers: readonly OperatorTransfer[],
   timeZone: string,
 ): readonly MonthAnalytics[] => {
   const monthOf = monthKeyIn(timeZone);
   const completed = transfers
-    .filter(isCompleted)
+    .filter((transfer) => !transfer.isTest && isCompleted(transfer))
     .map((transfer) => ({ transfer, month: monthOf(transfer.createdAtSec) }));
   const months = [...new Set(completed.map(({ month }) => month))].sort(
     (a, b) => b.localeCompare(a),
