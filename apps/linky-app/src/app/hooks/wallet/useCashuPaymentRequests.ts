@@ -158,8 +158,12 @@ export const useCashuPaymentRequests = ({
     [contactsRef],
   );
 
+  /** The request's recipient as a contact, saved if new; a new one opens unless `openIfNew` is false. */
   const ensureContactFor = React.useCallback(
-    (request: CashuPaymentRequestMessageInfo): ContactRowLike | null => {
+    (
+      request: CashuPaymentRequestMessageInfo,
+      openIfNew: boolean,
+    ): ContactRowLike | null => {
       const requestPubkeyHex = normalizePubkeyHex(request.transportPubkeyHex);
       if (!requestPubkeyHex) return null;
       const existing = findContactFor(request);
@@ -169,7 +173,7 @@ export const useCashuPaymentRequests = ({
       if (!pubkey) return null;
       const saved = saveNpubContact(encodeNpub(pubkey));
       if (!saved) return null;
-      if (saved.created) openSavedContact(saved.npub);
+      if (saved.created && openIfNew) openSavedContact(saved.npub);
       return saved.contact;
     },
     [findContactFor, openSavedContact, saveNpubContact],
@@ -280,7 +284,8 @@ export const useCashuPaymentRequests = ({
           ? null
           : chat !== null && !recipientDiffers
             ? chat.contact
-            : ensureContactFor(request);
+            : // A caller with `onPaid` keeps the user where they are, e.g. on an on-chain transfer.
+              ensureContactFor(request, onPaid === undefined);
       if (recipient === null && request.transportPostUrl === null) {
         setStatus(t("paymentRequestUnknownContact"));
         return;
