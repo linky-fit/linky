@@ -252,19 +252,34 @@ it("shows the copy a message holds and offers to write to an author who is no co
   await unmount();
 });
 
-it("offers no way to write to an author the user blocked", async () => {
-  state.blocked = [PEER];
-  state.snapshot = new SharedListing({ author: PEER, listing: peerListing });
-  const { container, unmount } = await renderIntoDocument(
-    <ListingDetailPage author={PEER} listingId="eggs" messageId={messageId} />,
-  );
-  expect(container.textContent).toContain("Garden eggs");
-  expect(byTestId(container, "listing-contact-author")).toBeNull();
-  expect(byTestId(container, "listing-author")?.textContent).not.toContain(
-    "Carol",
-  );
-  await unmount();
-});
+it.each([
+  ["no contact", []],
+  [
+    "a saved contact",
+    [{ id: contactId, name: "Alice", npub: encodeNpub(PEER) }],
+  ],
+])(
+  "offers no way to write to a blocked author who is %s",
+  async (_, contacts) => {
+    state.contacts = contacts;
+    state.blocked = [PEER];
+    state.snapshot = new SharedListing({ author: PEER, listing: peerListing });
+    const { container, unmount } = await renderIntoDocument(
+      <ListingDetailPage
+        author={PEER}
+        listingId="eggs"
+        messageId={messageId}
+      />,
+    );
+    expect(container.textContent).toContain("Garden eggs");
+    expect(byTestId(container, "listing-contact-author")).toBeNull();
+    expect(byTestId(container, "listing-reply")).toBeNull();
+    expect(byTestId(container, "listing-author")?.textContent).not.toContain(
+      "Carol",
+    );
+    await unmount();
+  },
+);
 
 it.each([
   ["listing", { author: PEER, listingId: "eggs" }],
