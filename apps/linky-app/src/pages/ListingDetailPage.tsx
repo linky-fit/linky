@@ -278,7 +278,7 @@ export function ListingDetailPage({
           ) : null
         ) : (
           <>
-            {contactId ? (
+            {contactId && !blocked ? (
               <Button
                 icon="Reply"
                 onPress={() => attachListingToChat(contactId, shared)}
