@@ -12,6 +12,8 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ## [Unreleased]
 
+## [26.11.3] - 2026-11-10
+
 ### en-US
 
 - In Goods & services, a listing can be free or have its price agreed.
