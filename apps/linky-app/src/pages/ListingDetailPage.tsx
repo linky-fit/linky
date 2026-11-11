@@ -39,7 +39,11 @@ import {
   useAttachListingToChat,
   useSharedListingOfMessage,
 } from "../app/hooks/useSharedListing";
-import { formatListingPrice, listingOfRecord } from "../app/lib/listings";
+import {
+  formatListingPrice,
+  listingOfRecord,
+  listingPriceFollowsDisplayUnit,
+} from "../app/lib/listings";
 import {
   listingAudienceLabel,
   listingAudienceOfRecord,
@@ -54,6 +58,7 @@ import { blockListAtom } from "../app/state/contacts/blockList";
 import { contactGroupsAtom } from "../app/state/contacts/readModel";
 import { currentPubkeyAtom } from "../app/state/session/session";
 import { ListingImage } from "../components/ListingImage";
+import { UnitCyclePressable } from "../components/UnitCyclePressable";
 import { navigateTo } from "../hooks/useRouting";
 import { isDeletedContact } from "../utils/contactName";
 import { firstName } from "../utils/formatting";
@@ -235,16 +240,21 @@ export function ListingDetailPage({
             }
           />
         </Row>
-        <Row gap="$sm" alignItems="baseline" flexWrap="wrap">
-          <Text variant="title" bold testID="listing-price">
-            {formatListingPrice(
-              listing,
-              { displayCurrency, fiatRates, lang },
-              t,
-            )}
-          </Text>
-          <Text color="$colorMuted">{listing.unit}</Text>
-        </Row>
+        <UnitCyclePressable
+          alignSelf="flex-start"
+          cycles={listingPriceFollowsDisplayUnit(listing)}
+        >
+          <Row gap="$sm" alignItems="baseline" flexWrap="wrap">
+            <Text variant="title" bold testID="listing-price">
+              {formatListingPrice(
+                listing,
+                { displayCurrency, fiatRates, lang },
+                t,
+              )}
+            </Text>
+            <Text color="$colorMuted">{listing.unit}</Text>
+          </Row>
+        </UnitCyclePressable>
         {isOwn && liveEntry ? (
           <Row gap="$xs" alignItems="center" testID="listing-audience">
             <Icon name="Eye" size="sm" color="$colorMuted" />

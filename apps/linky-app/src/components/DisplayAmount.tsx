@@ -1,12 +1,9 @@
-import { Amount, Pressable, Stack } from "@linky-fit/ui";
+import { Amount } from "@linky-fit/ui";
 import type { AmountProps } from "@linky-fit/ui";
-import {
-  useDisplayAmounts,
-  useDisplayCurrencyCycle,
-  useTranslation,
-} from "../app/hooks/shell";
+import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import type { Lang } from "../i18n";
 import type { DisplayAmountParts } from "../utils/displayAmounts";
+import { UnitCyclePressable } from "./UnitCyclePressable";
 
 interface DisplayAmountProps {
   /** Sat, shown in the display unit; text is an amount without a sat value and shows as is. */
@@ -49,40 +46,25 @@ export function DisplayAmount({
   accessibilityLabel,
   testID,
 }: DisplayAmountProps) {
-  const { lang, t } = useTranslation();
+  const { lang } = useTranslation();
   const { formatDisplayedAmountParts } = useDisplayAmounts();
-  const { allowedDisplayCurrencies, cycleDisplayCurrency } =
-    useDisplayCurrencyCycle();
-  const content = (
-    <Amount
-      {...(typeof amount === "string"
-        ? { value: amount }
-        : satAmount(
-            parts ?? formatDisplayedAmountParts(amount),
-            typedValue,
-            lang,
-          ))}
-      caption={caption}
-      size={size}
-    />
-  );
-  const frame = {
-    testID,
-    "aria-label": accessibilityLabel,
-    alignSelf: "center",
-    maxWidth: "100%",
-  } as const;
-
-  if (!cycles || allowedDisplayCurrencies.length <= 1) {
-    return <Stack {...frame}>{content}</Stack>;
-  }
   return (
-    <Pressable
-      {...frame}
-      tooltip={t("unitCycleAction")}
-      onPress={cycleDisplayCurrency}
+    <UnitCyclePressable
+      cycles={cycles}
+      testID={testID}
+      aria-label={accessibilityLabel}
     >
-      {content}
-    </Pressable>
+      <Amount
+        {...(typeof amount === "string"
+          ? { value: amount }
+          : satAmount(
+              parts ?? formatDisplayedAmountParts(amount),
+              typedValue,
+              lang,
+            ))}
+        caption={caption}
+        size={size}
+      />
+    </UnitCyclePressable>
   );
 }

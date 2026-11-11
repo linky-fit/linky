@@ -16,6 +16,7 @@ import {
 import { useCopyText, useTranslation } from "../app/hooks/shell";
 import { readRepeatablePayment } from "../app/lib/transactionHistory";
 import { TransactionAvatar } from "../components/TransactionRow";
+import { UnitCyclePressable } from "../components/UnitCyclePressable";
 import { formatDateTime } from "../utils/formatting";
 
 const withoutScheme = (value: string) => value.replace(/^https?:\/\//u, "");
@@ -51,14 +52,16 @@ export function TransactionPage({ id }: { id: string }): React.ReactElement {
         <Text variant="title" textAlign="center">
           {history.buildTitle(item)}
         </Text>
-        <Text
-          variant="amount"
-          color={item.direction === "in" ? "$accentText" : "$colorStrong"}
-          textAlign="center"
-          fontVariant={["tabular-nums"]}
-        >
-          {signedAmountText(history, item)}
-        </Text>
+        <UnitCyclePressable cycles={!item.unit || item.unit === "sat"}>
+          <Text
+            variant="amount"
+            color={item.direction === "in" ? "$accentText" : "$colorStrong"}
+            textAlign="center"
+            fontVariant={["tabular-nums"]}
+          >
+            {signedAmountText(history, item)}
+          </Text>
+        </UnitCyclePressable>
         {problemStatusPill ? (
           <Pill label={problemStatusPill.label} tone={problemStatusPill.tone} />
         ) : null}

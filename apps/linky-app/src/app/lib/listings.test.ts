@@ -22,6 +22,7 @@ import {
   beaconTradeOfCashIntent,
   encodeListingImage,
   formatListingPrice,
+  listingPriceFollowsDisplayUnit,
   defaultListingUnit,
   filterListingAmountInput,
   listingCurrencyLabel,
@@ -290,5 +291,17 @@ describe("listing amounts", () => {
     expect(
       formatListingPrice({ ...listing, priceByAgreement: true }, czk, t),
     ).toBe("listingPriceByAgreement");
+  });
+
+  it("lets only a sat or fiat price follow the display unit", () => {
+    const follows = (amount: string, currency: string) =>
+      listingPriceFollowsDisplayUnit({
+        amount: ListingAmount.make(amount),
+        currency: ListingCurrency.make(currency),
+      });
+    expect(follows("21000", "SAT")).toBe(true);
+    expect(follows("90", "CZK")).toBe(true);
+    expect(follows("5", "XXX")).toBe(false);
+    expect(follows("0", "CZK")).toBe(false);
   });
 });
