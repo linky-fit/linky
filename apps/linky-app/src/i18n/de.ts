@@ -213,10 +213,13 @@ export const de = {
     "Hier erscheinen Zahlungen, die du sendest und empfängst.",
   paymentsHistoryFee: "Gebühr",
   logout: "Abmelden",
-  logoutArmedHint:
-    "Klicke noch einmal, um dich abzumelden und Linkys Daten von diesem Gerät zu löschen.",
-  logoutUnsyncedArmedHint:
-    "Dieses Gerät ist nicht synchronisiert. Beim Abmelden werden Änderungen und Guthaben gelöscht, die keinen Server erreicht haben. Klicke noch einmal, um dich trotzdem abzumelden.",
+  logoutConfirmTitle: "Abmelden?",
+  logoutConfirmBody:
+    "Beim Abmelden werden Linkys Daten von diesem Gerät gelöscht. Anmelden kannst du dich danach nur mit deinen gesicherten Schlüsseln; ohne sie gehen Kontakte, Nachrichten und Guthaben verloren. Hast du deine Schlüssel gesichert?",
+  logoutConfirmUnsyncedBody:
+    "Dieses Gerät ist nicht synchronisiert. Beim Abmelden werden Änderungen und Guthaben gelöscht, die keinen Server erreicht haben. Anmelden kannst du dich danach nur mit deinen gesicherten Schlüsseln. Hast du deine Schlüssel gesichert?",
+  logoutConfirmBackedUp: "Ich habe ein Backup, abmelden",
+  logoutConfirmBackUpFirst: "Zuerst Schlüssel sichern",
 
   nostrIdentity: "Nostr-Identität",
   masterKeys: "Hauptschlüssel",
@@ -904,6 +907,12 @@ export const de = {
   bankPaymentOfferStatusSettled: "Erledigt",
   bankPaymentOfferAccept: "Annehmen",
   bankPaymentOfferCancel: "Angebot abbrechen",
+  bankPaymentOfferCancelConfirmTitle: "Proxy-Zahlung abbrechen?",
+  bankPaymentOfferCancelConfirmBody:
+    "Deine Kontakte können das Angebot nicht mehr annehmen. Wer es schon angenommen hat, erfährt, dass er die Banküberweisung nicht senden soll.",
+  bankPaymentOfferNotPaidConfirmTitle: "Zahlung nicht angekommen?",
+  bankPaymentOfferNotPaidConfirmBody:
+    "Der Zahler erfährt, dass die Banküberweisung nicht angekommen ist, und du schickst ihm keine Sats. Fahre nur fort, wenn du die Zahlung wirklich nicht auf deinem Konto siehst.",
   bankPaymentOfferDetails: "Zahlungsdetails",
   bankPaymentOfferQr: "QR-Code der Banküberweisung",
   bankPaymentOfferMarkPaid: "Ich habe bezahlt",

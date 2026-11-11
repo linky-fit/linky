@@ -1,6 +1,7 @@
 import {
   Avatar,
   Button,
+  Dialog,
   EmptyState,
   FileAttachment,
   ImageAttachment,
@@ -372,6 +373,10 @@ export function OwnerOfferView({
   responseStatus,
   cancelOffer,
 }: OwnerOfferViewProps) {
+  const [confirmingCancel, setConfirmingCancel] = React.useState(false);
+  const cancelLabel = t(
+    canSettle ? "bankPaymentOfferNotPaid" : "bankPaymentOfferCancel",
+  );
   const recipient = (contact: ContactRowLike | null | undefined) => {
     const npub = normalizeNpubIdentifier(contact?.npub ?? "");
     return {
@@ -440,11 +445,44 @@ export function OwnerOfferView({
           variant="secondary"
           icon="X"
           disabled={responseStatus !== null}
-          onPress={() => void cancelOffer()}
+          onPress={() => setConfirmingCancel(true)}
         >
-          {t(canSettle ? "bankPaymentOfferNotPaid" : "bankPaymentOfferCancel")}
+          {cancelLabel}
         </Button>
       ) : null}
+      <Dialog
+        open={confirmingCancel}
+        onOpenChange={setConfirmingCancel}
+        title={t(
+          canSettle
+            ? "bankPaymentOfferNotPaidConfirmTitle"
+            : "bankPaymentOfferCancelConfirmTitle",
+        )}
+        description={t(
+          canSettle
+            ? "bankPaymentOfferNotPaidConfirmBody"
+            : "bankPaymentOfferCancelConfirmBody",
+        )}
+        actions={
+          <>
+            <Button
+              variant="danger"
+              onPress={() => {
+                setConfirmingCancel(false);
+                void cancelOffer();
+              }}
+            >
+              {cancelLabel}
+            </Button>
+            <Button
+              variant="secondary"
+              onPress={() => setConfirmingCancel(false)}
+            >
+              {t("back")}
+            </Button>
+          </>
+        }
+      />
     </BankPaymentScreen>
   );
 }

@@ -207,10 +207,13 @@ export const en = {
   paymentsHistoryFee: "Fee",
 
   logout: "Log out",
-  logoutArmedHint:
-    "Click once more to log out and delete Linky's data from this device.",
-  logoutUnsyncedArmedHint:
-    "This device isn't synced. Logging out deletes changes and funds that haven't reached a server. Click once more to log out anyway.",
+  logoutConfirmTitle: "Log out?",
+  logoutConfirmBody:
+    "Logging out deletes Linky's data from this device. You can only log back in with your backed-up keys; without them, your contacts, messages and funds are lost. Do you have your keys saved?",
+  logoutConfirmUnsyncedBody:
+    "This device isn't synced. Logging out deletes changes and funds that haven't reached a server. You can only log back in with your backed-up keys. Do you have your keys saved?",
+  logoutConfirmBackedUp: "I have a backup, log out",
+  logoutConfirmBackUpFirst: "Back up keys first",
 
   nostrIdentity: "Nostr identity",
   masterKeys: "Master keys",
@@ -891,6 +894,12 @@ export const en = {
   bankPaymentOfferStatusSettled: "Done",
   bankPaymentOfferAccept: "Accept",
   bankPaymentOfferCancel: "Cancel offer",
+  bankPaymentOfferCancelConfirmTitle: "Cancel the proxy payment?",
+  bankPaymentOfferCancelConfirmBody:
+    "Your contacts can no longer accept the offer. Anyone who already accepted it is told not to send the bank payment.",
+  bankPaymentOfferNotPaidConfirmTitle: "Payment didn't arrive?",
+  bankPaymentOfferNotPaidConfirmBody:
+    "The payer is told the bank payment didn't arrive, and you don't send them the sats. Only continue if you really don't see the payment in your account.",
   bankPaymentOfferDetails: "Payment details",
   bankPaymentOfferQr: "Bank payment QR code",
   bankPaymentOfferMarkPaid: "I paid",

@@ -72,7 +72,6 @@ import {
   attachedNsecAtom,
   defaultNpubAtom,
   defaultNsecAtom,
-  logoutArmedAtom,
   nostrIdentitySourceAtom,
   pendingIdentitySwitchAtom,
   seedMnemonicAtom,
@@ -174,7 +173,6 @@ interface UseProfileAuthDomainResult {
   createNewAccount: () => Promise<void>;
   currentNpub: string | null;
   isSeedLogin: boolean;
-  logoutArmed: boolean;
   onboardingIsBusy: boolean;
   onboardingPhotoInputRef: React.RefObject<FilePickerHandle | null>;
   onboardingStep: OnboardingStep;
@@ -221,7 +219,6 @@ export const useProfileAuthDomain = ({
   const [activeNostrIdentitySource, setActiveNostrIdentitySource] = useAtom(
     nostrIdentitySourceAtom,
   );
-  const [logoutArmed, setLogoutArmed] = useAtom(logoutArmedAtom);
   const [pendingIdentitySwitch, setPendingIdentitySwitch] = useAtom(
     pendingIdentitySwitchAtom,
   );
@@ -1240,16 +1237,7 @@ export const useProfileAuthDomain = ({
 
   const requestLogout = React.useCallback(
     ({ evoluConnected }: { evoluConnected: boolean }) => {
-      if (!logoutArmed) {
-        setLogoutArmed(true);
-        pushToast(
-          t(evoluConnected ? "logoutArmedHint" : "logoutUnsyncedArmedHint"),
-        );
-        return;
-      }
-
       void (async () => {
-        setLogoutArmed(false);
         reportAppLog({
           tag: "auth.loggedOut",
           summary:
@@ -1263,20 +1251,8 @@ export const useProfileAuthDomain = ({
         globalThis.location.reload();
       })();
     },
-    [logoutArmed, pushToast, t, setLogoutArmed],
+    [],
   );
-
-  React.useEffect(() => {
-    if (!logoutArmed) return;
-
-    const timeoutId = window.setTimeout(() => {
-      setLogoutArmed(false);
-    }, 5000);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [logoutArmed, setLogoutArmed]);
 
   return {
     answerPendingIdentitySwitch,
@@ -1288,7 +1264,6 @@ export const useProfileAuthDomain = ({
     currentNpub,
     derivedIdentityNpub: defaultNpub,
     isSeedLogin,
-    logoutArmed,
     nostrIdentitySource: activeNostrIdentitySource,
     onboardingIsBusy,
     onboardingPhotoInputRef,

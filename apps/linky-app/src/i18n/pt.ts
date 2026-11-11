@@ -213,10 +213,13 @@ export const pt = {
   paymentsHistoryFee: "Taxa",
 
   logout: "Sair",
-  logoutArmedHint:
-    "Toque mais uma vez para sair e apagar os dados do Linky deste aparelho.",
-  logoutUnsyncedArmedHint:
-    "Este aparelho não está sincronizado. Sair apaga alterações e fundos que ainda não chegaram a um servidor. Toque mais uma vez para sair mesmo assim.",
+  logoutConfirmTitle: "Sair?",
+  logoutConfirmBody:
+    "Sair apaga os dados do Linky deste aparelho. Você só consegue entrar de novo com suas chaves salvas; sem elas, seus contatos, mensagens e fundos são perdidos. Você salvou suas chaves?",
+  logoutConfirmUnsyncedBody:
+    "Este aparelho não está sincronizado. Sair apaga alterações e fundos que ainda não chegaram a um servidor. Você só consegue entrar de novo com suas chaves salvas. Você salvou suas chaves?",
+  logoutConfirmBackedUp: "Tenho um backup, sair",
+  logoutConfirmBackUpFirst: "Salvar as chaves primeiro",
 
   nostrIdentity: "Identidade Nostr",
   masterKeys: "Chaves mestras",
@@ -908,6 +911,12 @@ export const pt = {
   bankPaymentOfferStatusSettled: "Concluído",
   bankPaymentOfferAccept: "Aceitar",
   bankPaymentOfferCancel: "Cancelar oferta",
+  bankPaymentOfferCancelConfirmTitle: "Cancelar o pagamento proxy?",
+  bankPaymentOfferCancelConfirmBody:
+    "Seus contatos não poderão mais aceitar a oferta. Quem já aceitou é avisado para não enviar o pagamento bancário.",
+  bankPaymentOfferNotPaidConfirmTitle: "O pagamento não chegou?",
+  bankPaymentOfferNotPaidConfirmBody:
+    "O pagador é avisado de que o pagamento bancário não chegou, e você não envia os sats. Só continue se realmente não vê o pagamento na sua conta.",
   bankPaymentOfferDetails: "Dados do pagamento",
   bankPaymentOfferQr: "QR code do pagamento bancário",
   bankPaymentOfferMarkPaid: "Eu paguei",
