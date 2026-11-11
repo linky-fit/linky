@@ -15,10 +15,12 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 ### en-US
 
 - The cashu.21m.lol mint is no longer offered; it stays listed for those who picked it as default or hold sats there.
+- Tapping the amount in a transaction, a recurring payment or a listing switches the display unit, like the wallet balance.
 
 ### cs-CZ
 
 - Mint cashu.21m.lol už není v nabídce; zůstane jen tomu, kdo ho má jako výchozí nebo u něj drží saty.
+- Klepnutí na částku v detailu transakce, pravidelné platby nebo nabídky přepne jednotku, stejně jako u zůstatku peněženky.
 
 ## [26.11.3] - 2026-11-10
 

@@ -261,6 +261,16 @@ const formatInListingCurrency = (
  * for the listing's currency it stays as the author priced it. A listing
  * without a price reads as free or by agreement.
  */
+/** Whether the price follows the display unit, so switching the unit changes how it shows. */
+export const listingPriceFollowsDisplayUnit = (
+  listing: Pick<Listing, "amount" | "currency" | "priceByAgreement">,
+): boolean => {
+  if (listingPriceKind(listing) !== "amount") return false;
+  if (listing.currency === LISTING_SAT_CURRENCY) return true;
+  const currency = parseDisplayCurrency(listing.currency);
+  return currency !== null && isFiatDisplayCurrency(currency);
+};
+
 export const formatListingPrice = (
   listing: Pick<Listing, "amount" | "currency" | "priceByAgreement">,
   options: DisplayAmountOptions,

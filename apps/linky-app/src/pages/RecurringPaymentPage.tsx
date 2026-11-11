@@ -23,6 +23,7 @@ import {
   recurringLastRunLabel,
 } from "../app/lib/recurringPaymentDisplay";
 import { ContactSummaryAvatar } from "../components/ContactSummaryAvatar";
+import { UnitCyclePressable } from "../components/UnitCyclePressable";
 import { navigateTo } from "../hooks/useRouting";
 import { formatTimeAgo, normalizeLocale } from "../utils/formatting";
 import { formatMintHost } from "../utils/mint";
@@ -102,9 +103,9 @@ export function RecurringPaymentPage({
         </Row>
       </Stack>
 
-      <Stack alignItems="center" testID="recurring-detail-amount">
+      <UnitCyclePressable testID="recurring-detail-amount">
         <Amount value={amountText} size="md" />
-      </Stack>
+      </UnitCyclePressable>
 
       <Stack gap="$none">
         {order.note ? (
