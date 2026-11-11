@@ -12,6 +12,14 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ## [Unreleased]
 
+### en-US
+
+- The cashu.21m.lol mint is no longer offered; it stays listed for those who picked it as default or hold sats there.
+
+### cs-CZ
+
+- Mint cashu.21m.lol už není v nabídce; zůstane jen tomu, kdo ho má jako výchozí nebo u něj drží saty.
+
 ## [26.11.3] - 2026-11-10
 
 ### en-US
