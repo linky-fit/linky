@@ -16,11 +16,13 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 - The cashu.21m.lol mint is no longer offered; it stays listed for those who picked it as default or hold sats there.
 - Tapping the amount in a transaction, a recurring payment or a listing switches the display unit, like the wallet balance.
+- Logging out and canceling a proxy payment now ask for confirmation; logging out first asks whether your keys are backed up.
 
 ### cs-CZ
 
 - Mint cashu.21m.lol už není v nabídce; zůstane jen tomu, kdo ho má jako výchozí nebo u něj drží saty.
 - Klepnutí na částku v detailu transakce, pravidelné platby nebo nabídky přepne jednotku, stejně jako u zůstatku peněženky.
+- Odhlášení a zrušení proxy platby si teď vyžádají potvrzení; před odhlášením se Linky zeptá, jestli máš zálohované klíče.
 
 ## [26.11.3] - 2026-11-10
 

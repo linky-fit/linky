@@ -140,12 +140,10 @@ describe("logging out", () => {
     mocks.calls.length = 0;
     vi.stubGlobal("location", { reload: () => mocks.calls.push("reload") });
     const domain = await setup();
-    const confirm = () =>
-      act(async () => domain.current?.requestLogout({ evoluConnected: true }));
+    await act(async () =>
+      domain.current?.requestLogout({ evoluConnected: true }),
+    );
 
-    await confirm();
-    expect(mocks.calls).toEqual([]);
-    await confirm();
     expect(mocks.calls).toEqual([
       "stopBeacon",
       "clearIdentitySecrets",

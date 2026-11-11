@@ -207,10 +207,13 @@ export const cs = {
   paymentsHistoryFee: "Poplatek",
 
   logout: "Odhlásit se",
-  logoutArmedHint:
-    "Pro odhlášení a smazání dat Linky z tohoto zařízení klikněte ještě jednou.",
-  logoutUnsyncedArmedHint:
-    "Toto zařízení není synchronizované. Odhlášení smaže změny a peníze, které se nedostaly na server. Pro odhlášení přesto klikněte ještě jednou.",
+  logoutConfirmTitle: "Opravdu se odhlásit?",
+  logoutConfirmBody:
+    "Odhlášení smaže data Linky z tohoto zařízení. Zpátky se přihlásíte jen se zálohovanými klíči, bez nich přijdete o kontakty, zprávy i peníze. Máte klíče uložené?",
+  logoutConfirmUnsyncedBody:
+    "Toto zařízení není synchronizované. Odhlášení smaže změny a peníze, které se nedostaly na server. Zpátky se přihlásíte jen se zálohovanými klíči. Máte klíče uložené?",
+  logoutConfirmBackedUp: "Mám zálohu, odhlásit",
+  logoutConfirmBackUpFirst: "Nejdřív zálohovat klíče",
 
   nostrIdentity: "Nostr identita",
   masterKeys: "Hlavní klíče",
@@ -899,6 +902,12 @@ export const cs = {
   bankPaymentOfferStatusSettled: "Dokončeno",
   bankPaymentOfferAccept: "Přijmout",
   bankPaymentOfferCancel: "Zrušit nabídku",
+  bankPaymentOfferCancelConfirmTitle: "Zrušit proxy platbu?",
+  bankPaymentOfferCancelConfirmBody:
+    "Kontakty už nabídku nebudou moct přijmout. Kdo ji už přijal, dostane zprávu, ať bankovní platbu neposílá.",
+  bankPaymentOfferNotPaidConfirmTitle: "Platba nedorazila?",
+  bankPaymentOfferNotPaidConfirmBody:
+    "Plátce dostane zprávu, že bankovní platba nedorazila, a satoshi mu nepošlete. Pokračujte jen tehdy, když na účtu platbu opravdu nevidíte.",
   bankPaymentOfferDetails: "Platební údaje",
   bankPaymentOfferQr: "QR kód bankovní platby",
   bankPaymentOfferMarkPaid: "Zaplaceno",
