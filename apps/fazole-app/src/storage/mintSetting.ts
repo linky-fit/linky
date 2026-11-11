@@ -19,7 +19,6 @@ export const PRODUCTION_MINTS: readonly string[] = [
   "https://cashu.cz",
   "https://mint.minibits.cash/Bitcoin",
   "https://kashu.me",
-  "https://cashu.21m.lol",
 ];
 
 /** The mint new payments are minted at; the config's until the merchant picks another. */

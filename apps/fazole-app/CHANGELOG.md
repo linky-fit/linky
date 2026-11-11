@@ -13,10 +13,12 @@ Každá vydaná verze musí obsahovat nejprve `en-US` a potom `cs-CZ`.
 ### en-US
 
 - The tab bar on a phone shows only icons, like the side bar on a computer.
+- The cashu.21m.lol mint is no longer offered; it stays listed for shops that picked it or hold sats there.
 
 ### cs-CZ
 
 - Spodní lišta na telefonu ukazuje jen ikony, stejně jako boční lišta na počítači.
+- Mint cashu.21m.lol už není v nabídce; zůstane jen obchodům, které ho zvolily nebo u něj drží saty.
 
 ## [26.10.4] - 2026-10-30
 

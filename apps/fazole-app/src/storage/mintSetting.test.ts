@@ -65,7 +65,6 @@ describe("offeredMints", () => {
       "https://cashu.cz",
       "https://mint.minibits.cash/Bitcoin",
       "https://kashu.me",
-      "https://cashu.21m.lol",
       "https://mint.example",
     ]);
   });

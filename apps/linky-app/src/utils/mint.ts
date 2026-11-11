@@ -29,7 +29,6 @@ export const PRODUCTION_MINTS = [
   FALLBACK_PRODUCTION_MINT_URL,
   "https://mint.minibits.cash/Bitcoin",
   "https://kashu.me",
-  "https://cashu.21m.lol",
 ];
 
 export const PRESET_MINTS = configuredMainMintUrl
