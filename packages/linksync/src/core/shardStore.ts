@@ -233,6 +233,8 @@ export interface ShardStore<
    * present with the same or a newer `updatedAt` is skipped, and a row the
    * shards have tombstoned is not resurrected. Rows wait for hydration,
    * so they are compared with the account's copies, not a partial sync.
+   * Each shard fills only up to the scope's rule, then rotates regardless
+   * of the cooldown.
    */
   readonly ingest: <
     Scope extends keyof R & string,
@@ -349,6 +351,16 @@ const columnsOf = (row: Row<Columns>): Columns => ({
   ),
   id: row.id,
 });
+
+/** The column-value bytes a copy adds to a shard's history, as `ownerUsage` counts them. */
+const rowBytes = (row: Row<Columns>): number =>
+  Object.entries(columnsOf(row)).reduce(
+    (total, [column, value]) =>
+      column === "id" || value === null || value === undefined
+        ? total
+        : total + String(value).length,
+    0,
+  );
 
 const isLive = (row: Pick<SystemColumns, "isDeleted">): boolean =>
   row.isDeleted !== 1;
@@ -563,6 +575,22 @@ export const createShardStore = <
   ): Effect.Effect<void, ShardDbError> =>
     db.mutate([{ kind: "upsert", table, ownerId, row }]);
 
+  const upsertRows = (
+    table: string,
+    ownerId: OwnerId,
+    rows: ReadonlyArray<Row<Columns>>,
+  ): Effect.Effect<void, ShardDbError> =>
+    rows.length === 0
+      ? Effect.void
+      : db.mutate(
+          rows.map((row) => ({
+            kind: "upsert",
+            table,
+            ownerId,
+            row: columnsOf(row),
+          })),
+        );
+
   const locateLive = <T extends keyof S & string>(
     scope: string,
     table: T,
@@ -701,15 +729,41 @@ export const createShardStore = <
         const existing = known.get(row.id);
         return existing === undefined || existing.updatedAt < row.updatedAt;
       });
-      if (fresh.length > 0) yield* retainBeforeWrite(scope);
-      yield* db.mutate(
-        fresh.map((row) => ({
-          kind: "upsert",
-          table,
-          ownerId: active.id,
-          row: columnsOf(row),
-        })),
-      );
+      if (fresh.length === 0) return { ingested: 0 };
+      yield* retainBeforeWrite(scope);
+      const scopeDefinition = definition(scope);
+      const rule =
+        scopeDefinition.owner === "shard" ? scopeDefinition.rotation : null;
+      if (rule === null) {
+        yield* upsertRows(table, active.id, fresh);
+        return { ingested: fresh.length };
+      }
+      // A legacy history can hold many shards' worth of rows, so it fills each
+      // shard up to the rule and rotates past the cooldown, a bulk copy being
+      // no concurrent rotation.
+      let owner = active;
+      let { mutations, bytes } = yield* db.ownerUsage(owner.id);
+      let chunk: Array<Row<S[T]>> = [];
+      for (const row of fresh) {
+        const size = rowBytes(row);
+        while (
+          mutations > 0 &&
+          (mutations + 1 > rule.maxMutations || bytes + size > rule.maxBytes)
+        ) {
+          yield* upsertRows(table, owner.id, chunk);
+          chunk = [];
+          const next = yield* rotate(scope).pipe(
+            // `definition` above already resolved the scope.
+            Effect.catchTag("UnknownScope", (error) => Effect.die(error)),
+          );
+          owner = shardOwner(scope, next);
+          ({ mutations, bytes } = yield* db.ownerUsage(owner.id));
+        }
+        chunk.push(row);
+        mutations += 1;
+        bytes += size;
+      }
+      yield* upsertRows(table, owner.id, chunk);
       return { ingested: fresh.length };
     });
 
