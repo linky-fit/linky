@@ -78,3 +78,5 @@ All selectors take `state.offers` and are pure; the consumer's effects run on th
 ## Advertised currencies
 
 A user advertises the currencies they pay in for friends in their general status (kind 30315, `d=general`). `buildProfileGeneralStatus({ text, currencies })` writes the free text and, on the last line, the selected `PROFILE_STATUS_CURRENCIES` in their canonical order. `parseProfileGeneralStatus(status)` returns `{ text, currencies }`; a last line that is not a currency list stays part of the text. Legacy `BTC` and `USD` entries parse and are dropped.
+
+A user's listings document (linkstr, kind 34133) carries the same currencies as `proxyPaymentCurrencies`, readable only by their contacts. `advertisedProxyPaymentCurrencies(document, status)` is what a contact offers: the document's list when it has one, an empty list included, else the status's currencies, as an author whose client does not set the list advertises them only there. Both drop codes outside `PROFILE_STATUS_CURRENCIES`.

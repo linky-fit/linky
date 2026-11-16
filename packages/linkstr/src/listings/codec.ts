@@ -1,6 +1,6 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes, randomBytes } from "@noble/hashes/utils.js";
-import { Option, Result, Schema } from "effect";
+import { Option, Result, Schema, Struct } from "effect";
 import type { Filter } from "nostr-tools";
 import { decrypt, encrypt, getConversationKey } from "nostr-tools/nip44";
 import type { NostrSecretKey, Pubkey } from "../domain/primitives";
@@ -159,10 +159,11 @@ const withinBudget = (
     if (fits(middle)) low = middle;
     else high = middle - 1;
   }
-  return low === 0
-    ? new ListingsDocument({ cash: document.cash, listings: document.listings })
-    : keeping(low);
+  return low === 0 ? withoutPassedOn(document) : keeping(low);
 };
+
+const withoutPassedOn = (document: ListingsDocument): ListingsDocument =>
+  new ListingsDocument(Struct.omit(document, ["passedOn"]));
 
 const fitsRelays = (template: PlainEventTemplate): boolean =>
   JSON.stringify(template).length + SIGNED_EVENT_OVERHEAD_BYTES <=

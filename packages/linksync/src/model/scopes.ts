@@ -39,6 +39,11 @@ export const linkyScopes = {
     rotation: rotation(220),
     forget: "never",
   }),
+  peerListings: shardScope({
+    tables: ["peerListings"],
+    rotation: rotation(160),
+    forget: { keepNewest: 2 },
+  }),
   messages: shardScope({
     tables: ["conversation", "message", "reaction"],
     rotation: rotation(160),

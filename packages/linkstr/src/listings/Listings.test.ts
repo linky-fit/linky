@@ -34,6 +34,7 @@ import {
 } from "./codec";
 import {
   emptyListingsDocument,
+  isEmptyListingsDocument,
   LISTING_DESCRIPTION_MAX_LENGTH,
   Listing,
   ListingAmount,
@@ -473,6 +474,44 @@ describe("network listings", () => {
     expect(decoded.listings[0]?.title).toBe(eggs.title);
     expect(decoded.listings[0] && "reach" in decoded.listings[0]).toBe(false);
     expect("passedOn" in decoded).toBe(false);
+  });
+});
+
+describe("proxy payment currencies", () => {
+  const decodeDocument = Schema.decodeUnknownSync(ListingsDocument);
+
+  it("carries the currencies to the reader, an empty list included", () => {
+    for (const proxyPaymentCurrencies of [["CZK", "EUR"], []]) {
+      const event = listingsEvent(
+        alice,
+        [bob.pubkey],
+        base,
+        new ListingsDocument({ proxyPaymentCurrencies }),
+      );
+      const read = documentOf(decodeListingsEvent(event, bob.secretKey));
+      expect(read?.proxyPaymentCurrencies).toEqual(proxyPaymentCurrencies);
+    }
+  });
+
+  it("decodes a missing or malformed list as absent", () => {
+    expect("proxyPaymentCurrencies" in decodeDocument({})).toBe(false);
+    expect(
+      "proxyPaymentCurrencies" in
+        decodeDocument({ proxyPaymentCurrencies: ["czk"] }),
+    ).toBe(false);
+  });
+
+  it("counts a document with currencies alone as not empty", () => {
+    expect(
+      isEmptyListingsDocument(
+        new ListingsDocument({ proxyPaymentCurrencies: ["CZK"] }),
+      ),
+    ).toBe(false);
+    expect(
+      isEmptyListingsDocument(
+        new ListingsDocument({ proxyPaymentCurrencies: [] }),
+      ),
+    ).toBe(true);
   });
 });
 

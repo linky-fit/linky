@@ -14,13 +14,16 @@ import {
 } from "../../../nostrStatus";
 import { saveCachedStatus } from "../../../profileCache";
 import { nowSeconds } from "../../../utils/time";
+import { runWrite } from "../../lib/storeWrite";
 import {
   myProfileAtom,
   profileStatusSavingAtom,
 } from "../../state/contacts/profiles";
 import { currentNpubAtom, currentNsecAtom } from "../../state/session/session";
+import { useSetting, useSettingsRepository } from "../useLinksync";
 import { useSetStatus, useTranslation } from "../shell";
 import { useUpdateMyProfile } from "./useProfileEditor";
+import { useOwnProxyPaymentCurrencies } from "./useProxyPaymentCurrencies";
 
 interface UseProfileStatusEditorResult {
   profileStatusCurrencies: readonly ProfileStatusCurrency[];
@@ -31,7 +34,11 @@ interface UseProfileStatusEditorResult {
   ) => Promise<void>;
 }
 
-/** The currencies the own status offers, and toggling one, which publishes the status. */
+/**
+ * The currencies the user pays bank transfers in for their contacts, and
+ * toggling one: the synced setting the listings document names them from,
+ * and the profile status contacts on older releases still read them in.
+ */
 export const useProfileStatusEditor = (): UseProfileStatusEditorResult => {
   const { t } = useTranslation();
   const setStatus = useSetStatus();
@@ -48,11 +55,9 @@ export const useProfileStatusEditor = (): UseProfileStatusEditorResult => {
   );
 
   const { publishStatus } = useLinkstrCommands();
-
-  const selectedProfileStatusCurrencies = React.useMemo(
-    () => parseProfileGeneralStatus(myProfileStatus).currencies,
-    [myProfileStatus],
-  );
+  const settingsRepository = useSettingsRepository();
+  const currenciesSetting = useSetting("proxyPaymentCurrencies");
+  const selectedProfileStatusCurrencies = useOwnProxyPaymentCurrencies();
 
   const toggleProfileStatusCurrency = React.useCallback(
     async (currency: ProfileStatusCurrency) => {
@@ -62,11 +67,19 @@ export const useProfileStatusEditor = (): UseProfileStatusEditorResult => {
         return;
       }
 
-      const currentSelection =
-        parseProfileGeneralStatus(myProfileStatus).currencies;
+      const currentSelection = selectedProfileStatusCurrencies;
       const nextSelection = currentSelection.includes(currency)
         ? currentSelection.filter((value) => value !== currency)
         : [...currentSelection, currency];
+      const restoreSetting = () =>
+        runWrite(
+          currenciesSetting === null
+            ? settingsRepository.remove("proxyPaymentCurrencies")
+            : settingsRepository.set(
+                "proxyPaymentCurrencies",
+                currenciesSetting,
+              ),
+        );
       const nextStatus = buildProfileGeneralStatus({
         currencies: nextSelection,
         text: parseProfileGeneralStatus(myProfileStatus).text,
@@ -77,10 +90,17 @@ export const useProfileStatusEditor = (): UseProfileStatusEditorResult => {
       setProfileStatusIsSaving(true);
 
       try {
+        const written = await runWrite(
+          settingsRepository.set("proxyPaymentCurrencies", nextSelection),
+        );
+        if (!written.ok) throw new Error(written.error);
         const exit = await publishStatus(
           new StatusDraft({ content: nextStatus ?? "" }),
         );
-        if (Exit.isFailure(exit)) throw new Error("publish failed");
+        if (Exit.isFailure(exit)) {
+          await restoreSetting();
+          throw new Error("publish failed");
+        }
         saveCachedStatus(currentNpub, nextStatus ?? "", nowSeconds());
       } catch (error) {
         setMyProfileStatus(previousStatus);
@@ -90,11 +110,14 @@ export const useProfileStatusEditor = (): UseProfileStatusEditorResult => {
       }
     },
     [
+      currenciesSetting,
       currentNpub,
       currentNsec,
       myProfileStatus,
       profileStatusIsSaving,
       publishStatus,
+      selectedProfileStatusCurrencies,
+      settingsRepository,
       setMyProfileStatus,
       setProfileStatusIsSaving,
       setStatus,

@@ -23,6 +23,12 @@ export type ListingUnit = typeof ListingUnit.Type;
 export const CashIntent = Schema.Literals(["offer", "want"]);
 export type CashIntent = typeof CashIntent.Type;
 
+/** An ISO 4217 code of a currency the author pays bank transfers in for their contacts, as proxy payments. */
+export const ProxyPaymentCurrency = Schema.String.check(
+  Schema.isPattern(/^[A-Z]{3}$/),
+);
+export type ProxyPaymentCurrency = typeof ProxyPaymentCurrency.Type;
+
 /** A decimal amount as the author typed it, so no client re-rounds it. */
 export const ListingAmount = Schema.String.check(
   Schema.isPattern(/^\d{1,12}(\.\d{1,2})?$/),
@@ -116,6 +122,16 @@ export class ListingsDocument extends Schema.Class<ListingsDocument>(
       Schema.catchDecoding(() => Effect.succeedNone),
     ),
   ),
+  /**
+   * The currencies the author pays bank transfers in for their contacts;
+   * absent when the author's client does not say, which is not the same as
+   * an empty list. A malformed list decodes as absent.
+   */
+  proxyPaymentCurrencies: Schema.optionalKey(
+    Schema.Array(ProxyPaymentCurrency).pipe(
+      Schema.catchDecoding(() => Effect.succeedNone),
+    ),
+  ),
 }) {}
 
 /** A document with no cash intent and no listings, which is what an author publishes to withdraw everything. */
@@ -124,7 +140,8 @@ export const emptyListingsDocument = new ListingsDocument({});
 export const isEmptyListingsDocument = (document: ListingsDocument): boolean =>
   document.cash === null &&
   document.listings.length === 0 &&
-  (document.passedOn ?? []).length === 0;
+  (document.passedOn ?? []).length === 0 &&
+  (document.proxyPaymentCurrencies ?? []).length === 0;
 
 /** Listings only some of the recipients may read, on top of the document. */
 export class ListingsAudience extends Schema.Class<ListingsAudience>(

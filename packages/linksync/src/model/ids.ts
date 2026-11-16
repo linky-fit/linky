@@ -3,6 +3,7 @@ import {
   type HiddenListingId,
   type KeryxSubscriptionId,
   type MessageId,
+  type PeerListingsId,
   type PinnedListingId,
   type ReactionId,
   type SettingId,
@@ -51,3 +52,10 @@ export const pinnedListingIdFor = (
   listingId: string,
 ): PinnedListingId =>
   createIdFromString<"PinnedListing">(`pinnedListing/${author}/${listingId}`);
+
+/** One author's listings document as one identity reads it, on any device, is one row. */
+export const peerListingsIdFor = (
+  reader: Pubkey,
+  author: Pubkey,
+): PeerListingsId =>
+  createIdFromString<"PeerListings">(`peerListings/${reader}/${author}`);

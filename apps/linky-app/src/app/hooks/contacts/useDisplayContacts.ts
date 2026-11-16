@@ -1,4 +1,5 @@
-import { encodeNpub } from "@linky-fit/linkstr";
+import { decodeNpub, encodeNpub } from "@linky-fit/linkstr";
+import { advertisedProxyPaymentCurrencies } from "@linky-fit/proxy-payment";
 import { useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
 import {
@@ -6,7 +7,7 @@ import {
   deriveDefaultProfile,
 } from "../../../derivedProfile";
 import type { Route } from "../../../types/route";
-import { parseProfileGeneralStatus } from "../../../nostrStatus";
+import type { ProfileStatusCurrency } from "../../../nostrStatus";
 import { getContactGroups } from "../../../utils/contactGroups";
 import { formatShortNpub } from "../../../utils/formatting";
 import { isDeletedContact } from "../../../utils/contactName";
@@ -17,6 +18,7 @@ import {
   type UnknownSender,
 } from "../../state/contacts/displayContacts";
 import { blockListAtom } from "../../state/contacts/blockList";
+import { peerListingsAtom } from "../../state/contacts/listings";
 import { profileCacheAtom } from "../../state/contacts/profiles";
 import { contactsAtom } from "../../state/contacts/readModel";
 import {
@@ -56,6 +58,27 @@ export const useContacts = () => useAtomValue(contactsAtom);
 /** Profile statuses by npub, as the profile watch last saw them. */
 export const useNostrStatusByNpub = () =>
   useAtomValue(profileCacheAtom, (cache) => cache.statusByNpub);
+
+/** The currencies a contact, by npub, pays bank transfers in for their contacts. */
+export type ProxyPaymentCurrenciesOf = (
+  npub: string,
+) => ProfileStatusCurrency[];
+
+/** What each contact offers as proxy payments: their listings document's currencies, else their status's. */
+export const useProxyPaymentCurrenciesOf = (): ProxyPaymentCurrenciesOf => {
+  const statusByNpub = useNostrStatusByNpub();
+  const peers = useAtomValue(peerListingsAtom);
+  return React.useCallback(
+    (npub) => {
+      const pubkey = decodeNpub(npub);
+      return advertisedProxyPaymentCurrencies(
+        pubkey === null ? null : (peers[pubkey]?.document ?? null),
+        statusByNpub[npub],
+      );
+    },
+    [peers, statusByNpub],
+  );
+};
 
 const routeContactId = (route: Route): string | null =>
   route.kind === "contact" ||
@@ -258,7 +281,7 @@ export const useNpubMessageContactInfo = () => {
 /** The contacts a message can mention, with their groups and offered currencies. */
 export const useMentionContacts = () => {
   const contacts = useContacts();
-  const statusByNpub = useNostrStatusByNpub();
+  const currenciesOf = useProxyPaymentCurrenciesOf();
   return React.useMemo(
     () =>
       contacts.flatMap((contact) => {
@@ -273,12 +296,11 @@ export const useMentionContacts = () => {
             npub,
             groupName: groupName || null,
             groupNames,
-            statusNames: parseProfileGeneralStatus(statusByNpub[npub])
-              .currencies,
+            statusNames: currenciesOf(npub),
           },
         ];
       }),
-    [contacts, statusByNpub],
+    [contacts, currenciesOf],
   );
 };
 
@@ -324,7 +346,7 @@ export const useRoutePeopleContact = (route: Route) => {
 /** Contacts who offer proxy payments, with the currencies they offer, by name. */
 export const useProxyPaymentPayerContacts = () => {
   const contacts = useContacts();
-  const statusByNpub = useNostrStatusByNpub();
+  const currenciesOf = useProxyPaymentCurrenciesOf();
   const pictures = useAtomValue(
     profileCacheAtom,
     (cache) => cache.pictureByNpub,
@@ -340,9 +362,7 @@ export const useProxyPaymentPayerContacts = () => {
       .flatMap((contact) => {
         if (isDeletedContact(contact)) return [];
         const npub = normalizeNpubIdentifier(contact.npub ?? "");
-        const currencies = npub
-          ? parseProfileGeneralStatus(statusByNpub[npub]).currencies
-          : [];
+        const currencies = npub ? currenciesOf(npub) : [];
         if (currencies.length === 0) return [];
         return [
           {
@@ -355,5 +375,5 @@ export const useProxyPaymentPayerContacts = () => {
       .sort((left, right) =>
         collator.compare(left.contact.name ?? "", right.contact.name ?? ""),
       );
-  }, [contacts, lang, pictures, statusByNpub]);
+  }, [contacts, currenciesOf, lang, pictures]);
 };

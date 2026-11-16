@@ -6,6 +6,7 @@ import {
   ListingsDraft,
   SharedListing,
   type CashIntent,
+  type ProxyPaymentCurrency,
   type Pubkey,
 } from "@linky-fit/linkstr";
 import {
@@ -120,6 +121,8 @@ export const listingsRecipients = (
 interface ListingsDraftInput {
   readonly records: ReadonlyArray<ListingRecord>;
   readonly cash: CashIntent | null;
+  /** The currencies the user pays bank transfers in for their contacts; null leaves the document silent about them. */
+  readonly proxyPaymentCurrencies: ReadonlyArray<ProxyPaymentCurrency> | null;
   readonly recipients: ReadonlyArray<ListingsRecipient>;
   /** The documents the recipients share with the user, whose `network` listings the user passes on. */
   readonly peerDocuments: Readonly<
@@ -182,6 +185,7 @@ const passedOnListings = (
 export const buildListingsDraft = ({
   records,
   cash,
+  proxyPaymentCurrencies,
   recipients,
   peerDocuments,
   passOn,
@@ -215,6 +219,7 @@ export const buildListingsDraft = ({
       cash,
       listings: everyone,
       ...(passedOn.length > 0 ? { passedOn } : {}),
+      ...(proxyPaymentCurrencies === null ? {} : { proxyPaymentCurrencies }),
     }),
     recipients: recipients.map(({ pubkey }) => pubkey),
     audiences: [...byGroup.entries()]

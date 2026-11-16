@@ -90,6 +90,7 @@ describe("listing audience column", () => {
     const draft = buildListingsDraft({
       records: [record({ audience: unknown })],
       cash: null,
+      proxyPaymentCurrencies: null,
       recipients: [{ pubkey: bob, groups: [] }],
       peerDocuments: {},
       passOn: true,
@@ -113,6 +114,7 @@ describe("buildListingsDraft", () => {
         record({ amount: "1.234" }),
       ],
       cash: "want",
+      proxyPaymentCurrencies: null,
       recipients: [{ pubkey: bob, groups: [] }],
       peerDocuments: {},
       passOn: true,
@@ -126,6 +128,24 @@ describe("buildListingsDraft", () => {
       ["Med", "network"],
     ]);
     expect(draft.recipients).toEqual([bob]);
+    expect("proxyPaymentCurrencies" in draft.document).toBe(false);
+  });
+
+  it("names the proxy payment currencies once the user set them, an empty list included", () => {
+    for (const proxyPaymentCurrencies of [["CZK"], []]) {
+      const draft = buildListingsDraft({
+        records: [],
+        cash: null,
+        proxyPaymentCurrencies,
+        recipients: [{ pubkey: bob, groups: [] }],
+        peerDocuments: {},
+        passOn: true,
+        hidden: new Set(),
+      });
+      expect(draft.document.proxyPaymentCurrencies).toEqual(
+        proxyPaymentCurrencies,
+      );
+    }
   });
 
   it("leaves a paused listing out, for the contacts and a group alike", () => {
@@ -137,6 +157,7 @@ describe("buildListingsDraft", () => {
         record(),
       ],
       cash: null,
+      proxyPaymentCurrencies: null,
       recipients: [{ pubkey: bob, groups: ["Rodina"] }],
       peerDocuments: {},
       passOn: true,
@@ -161,6 +182,7 @@ describe("buildListingsDraft", () => {
         }),
       ],
       cash: null,
+      proxyPaymentCurrencies: null,
       recipients: [
         { pubkey: bob, groups: ["Rodina"] },
         { pubkey: carol, groups: ["Práce"] },
@@ -181,6 +203,7 @@ describe("buildListingsDraft", () => {
     const draft = buildListingsDraft({
       records: [],
       cash: null,
+      proxyPaymentCurrencies: null,
       recipients: [{ pubkey: bob, groups: [] }],
       peerDocuments: {
         [bob]: peer(
@@ -210,6 +233,7 @@ describe("buildListingsDraft", () => {
     const draft = buildListingsDraft({
       records: [],
       cash: null,
+      proxyPaymentCurrencies: null,
       recipients: [
         { pubkey: bob, groups: [] },
         { pubkey: carol, groups: [] },
@@ -243,6 +267,7 @@ describe("buildListingsDraft", () => {
     const draft = buildListingsDraft({
       records: [],
       cash: null,
+      proxyPaymentCurrencies: null,
       recipients: [{ pubkey: bob, groups: [] }],
       peerDocuments: {
         [bob]: peer(
@@ -292,6 +317,7 @@ describe("group listings from the contact rows", () => {
         }),
       ],
       cash: null,
+      proxyPaymentCurrencies: null,
       recipients,
       peerDocuments: {},
       passOn: true,

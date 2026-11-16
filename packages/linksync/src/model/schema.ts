@@ -26,6 +26,7 @@ import {
   ShardPointerId,
   OnchainTransferId,
   OnchainTransferMessageId,
+  PeerListingsId,
   TransactionId,
 } from "@linky-fit/domain";
 
@@ -159,6 +160,22 @@ export const LinkySchema = {
     // Hex pubkey (64 chars) of the listing's author, a contact or not.
     authorPubkey: NonEmptyString100,
     listingId: NonEmptyString1000,
+  },
+  /**
+   * Peer listings scope: the newest listings document of someone who shares
+   * one with the user, kept so every device shows it while relays do not.
+   */
+  peerListings: {
+    // `peerListingsIdFor(readerPubkey, authorPubkey)`, so every device lands on one row.
+    id: PeerListingsId,
+    // Hex pubkey (64 chars) of the user's identity that read the document; another identity reads another one.
+    readerPubkey: NonEmptyString100,
+    // Hex pubkey (64 chars) of the document's author.
+    authorPubkey: NonEmptyString100,
+    // JSON of linkstr's `ListingsDocument` as the reader decoded it; validated by the consumer.
+    document: NonEmptyString,
+    // The `created_at` of the event that carried the document.
+    publishedAtSec: PositiveInt,
   },
   /**
    * Contacts scope: the user's instruction to pay a contact on a schedule.
@@ -398,6 +415,7 @@ export type RecurringPaymentRow = Row<LinkyDbSchema["recurringPayment"]>;
 export type ListingRow = Row<LinkyDbSchema["listing"]>;
 export type HiddenListingRow = Row<LinkyDbSchema["hiddenListing"]>;
 export type PinnedListingRow = Row<LinkyDbSchema["pinnedListing"]>;
+export type PeerListingsRow = Row<LinkyDbSchema["peerListings"]>;
 export type KeryxSubscriptionRow = Row<LinkyDbSchema["keryxSubscription"]>;
 export type OnchainTransferRow = Row<LinkyDbSchema["onchainTransfer"]>;
 export type OnchainTransferMessageRow = Row<
@@ -426,6 +444,7 @@ export const linkyTableColumns: TableColumns<LinkyDbSchema> = {
   listing: columnNames(LinkySchema.listing),
   hiddenListing: columnNames(LinkySchema.hiddenListing),
   pinnedListing: columnNames(LinkySchema.pinnedListing),
+  peerListings: columnNames(LinkySchema.peerListings),
   keryxSubscription: columnNames(LinkySchema.keryxSubscription),
   onchainTransfer: columnNames(LinkySchema.onchainTransfer),
   onchainTransferMessage: columnNames(LinkySchema.onchainTransferMessage),

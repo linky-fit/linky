@@ -31,6 +31,14 @@ export type {
   OnchainTransfersRepository,
 } from "./onchainTransfers";
 export { makeListingsRepository, normalizeListing } from "./listings";
+export {
+  makePeerListingsRepository,
+  normalizePeerListings,
+} from "./peerListings";
+export type {
+  PeerListingsRecord,
+  PeerListingsRepository,
+} from "./peerListings";
 export type { ListingRecord, ListingsRepository } from "./listings";
 export { makeSettingsRepository } from "./settings";
 export type { SettingsRepository } from "./settings";

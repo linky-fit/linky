@@ -13,6 +13,7 @@ export type {
   NostrIdentityRow,
   OnchainTransferMessageRow,
   OnchainTransferRow,
+  PeerListingsRow,
   ReactionRow,
   RecurringPaymentRow,
   SettingRow,

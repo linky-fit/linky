@@ -11,6 +11,7 @@ A scope is one kind of data with one storage policy. `meta` lives in the Evolu `
 | `meta`           | `AppOwner`                           | `shardPointer`, `setting`                                                  | no                       | never         |
 | `identity`       | `ShardOwner` `["identity", 0]`       | `nostrIdentity`                                                            | no                       | never         |
 | `contacts`       | `ShardOwner` `["contacts", n]`       | `contact`, `recurringPayment`, `listing`, `hiddenListing`, `pinnedListing` | 256 KiB or 220 mutations | never         |
+| `peerListings`   | `ShardOwner` `["peerListings", n]`   | `peerListings`                                                             | 256 KiB or 160 mutations | keep newest 2 |
 | `messages`       | `ShardOwner` `["messages", n]`       | `conversation`, `message`, `reaction`                                      | 256 KiB or 160 mutations | keep newest 4 |
 | `unknownSenders` | `ShardOwner` `["unknownSenders", n]` | `unknownSenderMessage`                                                     | 256 KiB or 160 mutations | keep newest 2 |
 | `cashu`          | `ShardOwner` `["cashu", n]`          | `cashuProof`, `cashuOperation`                                             | 256 KiB or 170 mutations | never         |
@@ -21,6 +22,8 @@ A scope is one kind of data with one storage policy. `meta` lives in the Evolu `
 A shard rotates once its Evolu history holds `SHARD_MAX_BYTES` (256 KiB) of column values or the scope's mutation count, whichever comes first, with `SHARD_ROTATION_COOLDOWN_MS` (60 s) between rotations of one scope. The byte threshold is a quarter of the official Evolu relay's 1 MB per-owner quota, leaving room for encryption and per-row overhead. Rotation moves a pointer; nothing is copied.
 
 Money truth is the proofs and operations, never forgotten; the transaction history is a view of it and forgettable.
+
+Peer listings are a copy of what relays serve, kept so every device shows a contact's last document while relays do not; a document unchanged long enough to sit only in an older shard stays on the devices that hold that shard, and a fresh device reads it from the relays.
 
 ## Tables
 
@@ -60,6 +63,7 @@ Copy-on-write identity is the row `id`. These ids are deterministic, so every de
 | `nostrReactionIdFor`      | the reaction's rumor id and reactor | a reaction fetched again stays one row; a removal stored first applies only to its author's reaction |
 | `keryxSubscriptionIdFor`  | the company's join origin           | pairing a company on two devices lands on one row                                                    |
 | `settingIdFor`            | the key                             | one row per key                                                                                      |
+| `peerListingsIdFor`       | the reader and the author pubkeys   | one author's document as one identity reads it is one row on every device                            |
 | `activeNostrIdentityId`   | constant                            | one mirrored identity row                                                                            |
 | `shardPointerId`          | the scope name                      | one pointer row per scope, upserted by every device                                                  |
 | `createId`                | random                              | everything else                                                                                      |
