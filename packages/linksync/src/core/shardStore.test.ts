@@ -810,6 +810,40 @@ describe("shard store", () => {
       );
     });
 
+    it("spreads a history larger than a shard over rotated shards", () => {
+      const { db, store } = toyStore();
+      run(store.insert("notes", "note", note("present")));
+      const rows = ["a", "b", "c", "d", "e"].map((id) => note(id));
+      const big = note("big", "x".repeat(900));
+      run(
+        db.mutate(
+          [...rows, big].map((row) => ({
+            kind: "upsert" as const,
+            table: "note",
+            ownerId: legacy.id,
+            row,
+          })),
+        ),
+      );
+      expect(
+        run(
+          store.ingest(
+            "notes",
+            "note",
+            run(store.foreignRows("note", legacy.id)),
+          ),
+        ),
+      ).toEqual({ ingested: 6 });
+
+      const shardUsage = [0, 1, 2, 3].map((index) =>
+        run(db.ownerUsage(store.shardOwner("notes", index).id)),
+      );
+      expect(shardUsage.map((usage) => usage.mutations)).toEqual([3, 3, 1, 0]);
+      for (const usage of shardUsage) expect(usage.bytes).toBeLessThan(1_000);
+      expect(run(store.activeIndex("notes"))).toBe(2);
+      expect(run(store.rows("notes", "note"))).toHaveLength(7);
+    });
+
     it("does not wait when there is nothing to ingest", () => {
       const { store } = toyStore(testAppOwner(), { holdSync: true });
       expect(run(store.ingest("notes", "note", []))).toEqual({ ingested: 0 });

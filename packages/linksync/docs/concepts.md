@@ -35,6 +35,7 @@ Peer listings are a copy of what relays serve, kept so every device shows a cont
 - `update` of a row in the active shard patches it in place. Update of a row in an older shard copies the whole row, patch applied, into the active shard and tombstones the copy where it was. Retired shards therefore receive at most tombstones.
 - `write(scope, table, writes)` does what `insert` and `update` would for each row of a batch, in order, and issues it all as one `mutate`, so the batch lands whole or not at all. An update of an id with no live copy is skipped instead of failing, and an update may follow the insert of its row in the same batch.
 - `remove` tombstones the row where it lives; nothing is copied.
+- `ingest` copies rows from outside the shards, such as legacy owners, into the active shard. It fills each shard only up to the scope's rule and rotates past the cooldown, so a history of any size spreads over as many shards as it needs.
 - `insertRemoved` writes a tombstone into the active shard for a row that has not arrived yet, so a later insert of that id can be refused. It carries only the columns given.
 - A read takes every row of the visible shards, keeps one copy per id from the highest shard index, and drops tombstones.
 - `rotate` upserts the scope's pointer to `index + 1`. The device that rotated keeps using the new index until its read model shows it, so a lagging query cannot send writes back to the old shard.
