@@ -3,6 +3,7 @@ import { asNonEmptyString } from "./validation";
 import { encodeNpub, parsePubkey, RelayUrl } from "@linky-fit/linkstr";
 import { Schema } from "effect";
 import { stripNostrUriPrefix } from "./nostrNpub";
+import { isNativePlatform } from "../platform/runtime";
 
 export const DEFAULT_NIP05_DOMAIN = "linky.fit";
 
@@ -145,6 +146,29 @@ const readRelays = (value: unknown, pubkeyHex: string): string[] => {
   return out;
 };
 
+const fetchNostrJson = async (
+  url: URL,
+  signal: AbortSignal | undefined,
+): Promise<Response> => {
+  const init: RequestInit = {
+    headers: { Accept: "application/json" },
+    redirect: "manual",
+  };
+  if (signal) init.signal = signal;
+  try {
+    return await fetch(url, init);
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    // Some NIP-05 hosts send CORS headers browsers reject (e.g. primal.net's
+    // duplicated `*`), so retry through Linky's same-origin JSON proxy.
+    const origin = isNativePlatform() ? "https://app.linky.fit" : "";
+    return fetch(
+      `${origin}/api/lnurlp?url=${encodeURIComponent(url.toString())}`,
+      init,
+    );
+  }
+};
+
 const resolveNip05Identifier = async (
   identifier: Nip05Identifier,
   options?: { signal?: AbortSignal },
@@ -155,13 +179,7 @@ const resolveNip05Identifier = async (
   url.searchParams.set("name", identifier.localPart);
 
   try {
-    const init: RequestInit = {
-      headers: { Accept: "application/json" },
-      redirect: "manual",
-    };
-    if (options?.signal) init.signal = options.signal;
-
-    const response = await fetch(url, init);
+    const response = await fetchNostrJson(url, options?.signal);
     if (!response.ok || response.type === "opaqueredirect") {
       return { identifier, kind: "not_found" };
     }
