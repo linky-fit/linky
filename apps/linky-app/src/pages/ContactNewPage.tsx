@@ -1,10 +1,8 @@
 import { encodeNpub, type Pubkey } from "@linky-fit/linkstr";
 import {
-  Avatar,
   Button,
   Chip,
   IconButton,
-  ListRow,
   LoadingState,
   NearbyAvatar,
   type NearbyBadge,
@@ -21,7 +19,10 @@ import {
 import { useAtomValue } from "@linky-fit/linkstr-react";
 import type { FC } from "react";
 import React from "react";
+import { useOpenContactCandidate } from "../app/hooks/contacts/useContactActions";
+import type { ContactSearchCandidate } from "../app/hooks/contacts/useContactCandidates";
 import {
+  type ContactSearchResult,
   useContactEditor,
   useContactEditorParams,
 } from "../app/hooks/contacts/useContactEditor";
@@ -40,13 +41,10 @@ import { isLightningAddress } from "../lnurlPay";
 
 import type { Translate } from "../i18n";
 import { BeaconOffer } from "../components/NearbyBeaconSection";
+import { ContactSearchCandidateRow } from "../components/ContactSearchCandidateRow";
 import { readClipboardText } from "../platform/clipboard";
 import { normalizeContactGroups } from "../utils/contactGroups";
-import {
-  firstName,
-  formatShortLightningAddress,
-  formatShortNpub,
-} from "../utils/formatting";
+import { firstName, formatShortNpub } from "../utils/formatting";
 
 export interface ContactFormData {
   name: string;
@@ -189,29 +187,12 @@ export function ContactFields({
   );
 }
 
-interface ContactSearchCandidate {
-  existingContactId?: string;
-  isSelf?: boolean;
-  isExactMatch: boolean;
-  lnAddress: string;
-  name: string;
-  npub: string;
-  pictureUrl: string | null;
-  query: string;
-}
-
 interface ContactSuggestionCandidate extends Omit<
   ContactSearchCandidate,
-  "isExactMatch"
+  "isExactMatch" | "nip05" | "nip05Verified" | "usesLinky"
 > {
   displayLnAddress: string;
 }
-
-type ContactSearchResult =
-  | { kind: "empty" }
-  | { kind: "error"; identifier: string }
-  | { kind: "found"; contacts: ContactSearchCandidate[] }
-  | { kind: "not_found"; query: string };
 
 interface ContactSearchResults {
   contacts: ContactSearchCandidate[];
@@ -220,61 +201,6 @@ interface ContactSearchResults {
 
 /** Suggested people shown until the row is measured. */
 const DEFAULT_SUGGESTED_PEOPLE = 3;
-
-interface SearchCandidateRowProps {
-  candidate: ContactSearchCandidate;
-  isSavingContact: boolean;
-  onAdd: (candidate: ContactSearchCandidate) => Promise<void>;
-  t: Translate;
-  testID?: string;
-}
-
-function SearchCandidateRow({
-  candidate,
-  isSavingContact,
-  onAdd,
-  t,
-  testID,
-}: SearchCandidateRowProps) {
-  const displayName =
-    (candidate.name || candidate.query || "").trim() || t("contact");
-  const opens = Boolean(candidate.existingContactId || candidate.isSelf);
-  return (
-    <ListRow
-      testID={testID}
-      selected={candidate.isExactMatch}
-      leading={
-        <Avatar name={displayName} uri={candidate.pictureUrl ?? undefined} />
-      }
-      title={
-        <Text fontWeight="$semibold" numberOfLines={1}>
-          {displayName}
-        </Text>
-      }
-      description={
-        <Stack gap="$xxs">
-          {candidate.lnAddress ? (
-            <Text variant="caption" color="$colorMuted" numberOfLines={1}>
-              {formatShortLightningAddress(candidate.lnAddress)}
-            </Text>
-          ) : null}
-          <Text variant="caption" color="$colorMuted" numberOfLines={1}>
-            {formatShortNpub(candidate.npub)}
-          </Text>
-        </Stack>
-      }
-      trailing={
-        <Button
-          icon={opens ? "User" : "UserPlus"}
-          onPress={() => void onAdd(candidate)}
-          loading={isSavingContact}
-        >
-          {opens ? t("openContact") : t("saveContact")}
-        </Button>
-      }
-    />
-  );
-}
 
 /**
  * Nearby npubs as search candidates; each is looked up once, and shows as its short npub until its profile arrives.
@@ -320,8 +246,11 @@ const useNearbyCandidates = (
         lnAddress: "",
         name: "",
         npub,
+        nip05: "",
+        nip05Verified: false,
         pictureUrl: null,
         query: formatShortNpub(npub),
+        usesLinky: false,
       }
     );
   });
@@ -336,6 +265,7 @@ interface ContactNewPageProps {
   groupNames: string[];
   handleSaveContact: () => void;
   isSavingContact: boolean;
+  openContactCandidate: (candidate: ContactSearchCandidate) => void;
   openScan: () => void;
   setStep: (step: ContactNewStep) => void;
   step: ContactNewStep;
@@ -354,6 +284,7 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
   groupNames,
   handleSaveContact,
   isSavingContact,
+  openContactCandidate,
   openScan,
   searchNewContact,
   setForm,
@@ -396,7 +327,14 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
       add(candidate, { label: t("nearby"), tone: "accent" });
     for (const suggestion of contactSuggestions)
       add(
-        { ...suggestion, isExactMatch: false },
+        // Suggestions are people who just used Linky.
+        {
+          ...suggestion,
+          isExactMatch: false,
+          nip05: "",
+          nip05Verified: false,
+          usesLinky: true,
+        },
         { label: t("contactSuggestionNew"), tone: "neutral" },
       );
     return people.slice(
@@ -590,12 +528,13 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
       {searchResults ? (
         <Stack gap="$xs">
           {searchResults.contacts.map((candidate) => (
-            <SearchCandidateRow
+            <ContactSearchCandidateRow
               key={candidate.npub}
               testID="contact-new-search-result"
               candidate={candidate}
               isSavingContact={isSavingContact}
-              onAdd={addNewContactFromSearchResult}
+              onAdd={(found) => void addNewContactFromSearchResult(found)}
+              onOpen={openContactCandidate}
               t={t}
             />
           ))}
@@ -675,6 +614,7 @@ export const ContactNewRoute: FC<{ route: Route }> = ({ route }) => {
   const { groupNames } = useAtomValue(contactGroupsAtom);
   const { openScan } = useScanCommands();
   const editor = useContactEditor(useContactEditorParams(route));
+  const openContactCandidate = useOpenContactCandidate();
   return (
     <ContactNewPage
       addNewContactFromSearchResult={editor.addNewContactFromSearchResult}
@@ -683,6 +623,7 @@ export const ContactNewRoute: FC<{ route: Route }> = ({ route }) => {
       groupNames={groupNames}
       handleSaveContact={editor.handleSaveContact}
       isSavingContact={editor.isSavingContact}
+      openContactCandidate={openContactCandidate}
       openScan={openScan}
       searchNewContact={editor.searchNewContact}
       setForm={editor.setForm}

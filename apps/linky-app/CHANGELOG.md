@@ -19,6 +19,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - Logging out and canceling a proxy payment now ask for confirmation; logging out first asks whether your keys are backed up.
 - Swipe listings to hide or pin, your own to pause.
 - All your devices show which contacts offer proxy payments, even when relays fail.
+- Contact search finds people you haven't added by npub or Linky name, to write to them first; results show who uses Linky.
 
 ### cs-CZ
 
@@ -27,6 +28,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - Odhlášení a zrušení proxy platby si teď vyžádají potvrzení; před odhlášením se Linky zeptá, jestli máš zálohované klíče.
 - Nabídku swipem skryješ nebo připneš, svoji pozastavíš.
 - Všechna tvoje zařízení ukazují, kdo z kontaktů nabízí proxy platby, i když relaye neodpovídají.
+- Hledání kontaktů najde podle npubu nebo Linky jména i lidi, které nemáš přidané, a můžeš jim rovnou napsat; výsledky ukazují, kdo používá Linky.
 
 ## [26.11.3] - 2026-11-10
 

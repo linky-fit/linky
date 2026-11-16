@@ -23,6 +23,7 @@ import { runWrite } from "../../lib/storeWrite";
 import {
   pendingContactsGroupAssignmentAtom,
   pendingUnknownContactAddAtom,
+  unknownNamesAtom,
   type PendingContactsGroupAssignment,
 } from "../../state/contacts/chatContacts";
 import { contactsCommandsAtom } from "../../state/contacts/commands";
@@ -33,6 +34,7 @@ import {
   makeEmptyContactForm,
 } from "../../state/contacts/contactForm";
 import { syncMuteListAtom } from "../../state/contacts/muteList";
+import { profileCacheAtom } from "../../state/contacts/profiles";
 import {
   contactGroupsAtom,
   contactsAtom,
@@ -42,7 +44,10 @@ import {
   contactPaymentIntentAtom,
   payAmountAtom,
 } from "../../state/wallet/contactPay";
-import { normalizePubkeyHex } from "../messages/contactIdentity";
+import {
+  buildUnknownContactId,
+  normalizePubkeyHex,
+} from "../messages/contactIdentity";
 import { useMessageWrites } from "../messages/useMessageWrites";
 import { useMessagesCommands } from "../messages/useMessagesCommands";
 import { useSetNavIntent } from "../shell/navIntents";
@@ -52,6 +57,7 @@ import {
   useConversationsRepository,
   useUnknownSendersRepository,
 } from "../useLinksync";
+import type { ContactSearchCandidate } from "./useContactCandidates";
 import type { ChatSelectedContact } from "./useDisplayContacts";
 import { useContacts } from "./useDisplayContacts";
 import { useSaveNpubContact } from "./useSaveNpubContact";
@@ -571,6 +577,40 @@ export const useOpenNewContactPage = () => {
     }));
     navigateTo({ route: "contactNew" });
   }, [registry]);
+};
+
+/**
+ * Opens a found profile without saving it: the user's own profile, a saved
+ * contact's conversation, or else a conversation with them as an unknown sender.
+ */
+export const useOpenContactCandidate = () => {
+  const openContactDetail = useOpenContactDetail();
+  const setUnknownNames = useAtomSet(unknownNamesAtom);
+  const setProfileCache = useAtomSet(profileCacheAtom);
+  return React.useCallback(
+    (candidate: ContactSearchCandidate) => {
+      if (candidate.isSelf) {
+        navigateTo({ route: "profile" });
+        return;
+      }
+      if (candidate.existingContactId) {
+        openContactDetail({ id: candidate.existingContactId });
+        return;
+      }
+      const chatId = buildUnknownContactId(decodeNpub(candidate.npub));
+      if (!chatId) return;
+      // A conversation with no messages yet has no other source for the peer's name and picture.
+      const { name, npub, pictureUrl } = candidate;
+      if (name) setUnknownNames((names) => ({ ...names, [npub]: name }));
+      if (pictureUrl)
+        setProfileCache((cache) => ({
+          ...cache,
+          pictureByNpub: { ...cache.pictureByNpub, [npub]: pictureUrl },
+        }));
+      navigateTo({ route: "chat", id: chatId });
+    },
+    [openContactDetail, setProfileCache, setUnknownNames],
+  );
 };
 
 /** Opens a contact from the list: its conversation, or its page or pay screen without an npub. */

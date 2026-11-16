@@ -1,8 +1,9 @@
 import { useAtom, useAtomValue } from "@linky-fit/linkstr-react";
-import { Stack } from "@linky-fit/ui";
+import { EmptyState, LoadingState, Section, Stack } from "@linky-fit/ui";
 import React from "react";
 import { ContactCard } from "../../components/ContactCard";
 import { ContactsChecklist } from "../../components/ContactsChecklist";
+import { ContactSearchCandidateRow } from "../../components/ContactSearchCandidateRow";
 import {
   FloatingActionButton,
   floatingActionButtonClearance,
@@ -17,7 +18,16 @@ import { nowSeconds } from "../../utils/time";
 import {
   useOpenContactDetail,
   useOpenNewContactPage,
+  useOpenContactCandidate,
 } from "../hooks/contacts/useContactActions";
+import {
+  useContactEditor,
+  useContactEditorParams,
+} from "../hooks/contacts/useContactEditor";
+import {
+  isContactsSearchExact,
+  useContactsSearchPeer,
+} from "../hooks/contacts/useContactsSearchPeer";
 import { useContactsListView } from "../hooks/contacts/useContactsList";
 import {
   useDisplayContacts,
@@ -238,6 +248,39 @@ export const ContactsOnboardingCard = (): React.ReactElement | null => {
   );
 };
 
+const CONTACTS_ROUTE = { kind: "contacts" } as const;
+
+/** The profile a search names exactly when no contact matches it, to open or save. */
+const ContactsSearchPeer = ({
+  search,
+}: {
+  search: string;
+}): React.ReactElement | null => {
+  const { t } = useTranslation();
+  const { candidate, searching } = useContactsSearchPeer(search);
+  const editor = useContactEditor(useContactEditorParams(CONTACTS_ROUTE));
+  const openContactCandidate = useOpenContactCandidate();
+  if (candidate) {
+    return (
+      <Section title={t("contactsSearchNotSaved")}>
+        <ContactSearchCandidateRow
+          testID="contacts-search-peer"
+          candidate={candidate}
+          isSavingContact={editor.isSavingContact}
+          onAdd={(found) => void editor.addNewContactFromSearchResult(found)}
+          onOpen={openContactCandidate}
+          t={t}
+        />
+      </Section>
+    );
+  }
+  return searching ? (
+    <LoadingState label={t("contactSearching")} />
+  ) : (
+    <EmptyState title={t("contactSearchNoResult")} />
+  );
+};
+
 const ContactsContent = ({
   filterAlwaysOpen,
   onboardingInList,
@@ -256,6 +299,9 @@ const ContactsContent = ({
   const visibleContactSections = useVisibleContactSections(
     useActiveBankPaymentOfferContacts(),
     visibleContacts,
+  );
+  const noContactMatches = Object.values(visibleContactSections).every(
+    (section) => section.length === 0,
   );
 
   return (
@@ -276,6 +322,11 @@ const ContactsContent = ({
       conversationsLabel={t("conversations")}
       otherContactsLabel={t("otherContacts")}
       renderContactCard={renderContactCard}
+      searchPeer={
+        noContactMatches && isContactsSearchExact(contactsSearch) ? (
+          <ContactsSearchPeer search={contactsSearch} />
+        ) : null
+      }
       t={t}
     />
   );

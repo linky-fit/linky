@@ -15,11 +15,11 @@ import React from "react";
 import { omitSyntheticContactLightningAddress } from "../../../derivedProfile";
 import { getProfilePictureUrl } from "../../../profileCache";
 import { formatShortNpub, getBestNostrName } from "../../../utils/formatting";
+import { isLinkyProfile } from "../../lib/linkyProfile";
 import { contactSuggestionsAtom } from "../../state/contacts/contactForm";
 
 const CONTACT_SUGGESTION_LIMIT = 3;
 const CONTACT_SUGGESTION_WINDOW_SECONDS = 60 * 60;
-const LINKY_LIGHTNING_ADDRESS_SUFFIX = "@linky.fit";
 const STATUS_EVENT_KIND = 30315;
 
 // Public relays' kind-1 firehose saturates the default activity scan within
@@ -44,11 +44,6 @@ export interface ContactSuggestionCandidate {
 const getProfileLightningAddress = (metadata: ProfileMetadata): string =>
   (metadata.lud16 ?? "").trim() || (metadata.lud06 ?? "").trim();
 
-const isLinkyUser = (metadata: ProfileMetadata): boolean =>
-  getProfileLightningAddress(metadata)
-    .toLowerCase()
-    .endsWith(LINKY_LIGHTNING_ADDRESS_SUFFIX);
-
 export const selectContactSuggestions = (
   profiles: ReadonlyArray<DiscoveredProfile>,
   knownNpubs: ReadonlySet<string>,
@@ -60,7 +55,7 @@ export const selectContactSuggestions = (
 
     const npub = encodeNpub(profile.pubkey);
     if (knownNpubs.has(npub)) continue;
-    if (!isLinkyUser(profile.metadata)) continue;
+    if (!isLinkyProfile(profile.metadata)) continue;
 
     // A fresh account only has the synthetic npub@linky.fit address, which
     // is hidden in the UI; the profile still counts as a Linky user.

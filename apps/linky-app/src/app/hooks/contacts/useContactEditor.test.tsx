@@ -152,9 +152,12 @@ it("restores a deleted contact instead of adding it again", async () => {
       isExactMatch: true,
       lnAddress: "",
       name: "Alice",
+      nip05: "",
+      nip05Verified: false,
       npub,
       pictureUrl: null,
       query: npub,
+      usesLinky: false,
     });
   });
 

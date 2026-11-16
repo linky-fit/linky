@@ -44,6 +44,43 @@ export const lists: Section = {
             onPress={() => {}}
           />
           <UI.ListRow title="Remove example" destructive onPress={() => {}} />
+          <UI.ListRow
+            leading={<UI.Avatar name="Alice" />}
+            title="Alice"
+            description={
+              <UI.Row gap="$xs" alignItems="center">
+                <UI.Text variant="caption" color="$colorMuted">
+                  alice@linky.fit
+                </UI.Text>
+                <UI.Icon name="Check" size="sm" color="$accent" />
+              </UI.Row>
+            }
+            chevron={false}
+            onPress={() => {}}
+            action={
+              <UI.Row gap="$sm" alignItems="center">
+                <UI.BrandMark size="icon" />
+                <UI.Button icon="UserPlus" onPress={() => {}}>
+                  Add
+                </UI.Button>
+              </UI.Row>
+            }
+          />
+          <UI.ListRow
+            leading={<UI.Avatar name="Bob" />}
+            title="Bob"
+            description="npub1bob…"
+            chevron={false}
+            onPress={() => {}}
+            action={
+              <UI.Row gap="$sm" alignItems="center">
+                <UI.Icon name="Nostr" color="$colorMuted" />
+                <UI.Button icon="UserPlus" onPress={() => {}}>
+                  Add
+                </UI.Button>
+              </UI.Row>
+            }
+          />
         </UI.Stack>
       );
     },

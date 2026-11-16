@@ -41,6 +41,7 @@ const renderPage = (overrides: Partial<PageProps> = {}) =>
       groupNames={[]}
       handleSaveContact={() => {}}
       isSavingContact={false}
+      openContactCandidate={() => {}}
       openScan={() => {}}
       searchNewContact={async () => ({ kind: "empty" })}
       setForm={() => {}}
@@ -78,17 +79,23 @@ describe("ContactNewPage", () => {
                 isExactMatch: false,
                 lnAddress: "",
                 name: "Someone Else",
+                nip05: "",
+                nip05Verified: false,
                 npub: encodeNpub(unknown),
                 pictureUrl: null,
                 query: encodeNpub(known),
+                usesLinky: false,
               },
               {
                 isExactMatch: true,
                 lnAddress: "dana@linky.fit",
                 name: "Dana Kral",
+                nip05: "",
+                nip05Verified: false,
                 npub: encodeNpub(known),
                 pictureUrl: null,
                 query: encodeNpub(known),
+                usesLinky: false,
               },
             ],
           }
@@ -125,6 +132,8 @@ describe("ContactNewPage", () => {
       expect.objectContaining({
         isExactMatch: false,
         name: "Dana Kral",
+        nip05: "",
+        nip05Verified: false,
         npub: encodeNpub(known),
       }),
     );
@@ -133,6 +142,8 @@ describe("ContactNewPage", () => {
       expect.objectContaining({
         isExactMatch: false,
         name: "Eva",
+        nip05: "",
+        nip05Verified: false,
         npub: "npub1eva",
       }),
     );
@@ -201,23 +212,29 @@ describe("ContactNewPage", () => {
     await unmount();
   });
 
-  it("lists search candidates and highlights the verified exact match", async () => {
+  it("lists search candidates, checking the verified address and marking whether each uses Linky", async () => {
     vi.useFakeTimers();
     const exact = {
       isExactMatch: true,
       lnAddress: "alice@linky.fit",
       name: "Alice",
+      nip05: "alice@linky.fit",
+      nip05Verified: true,
       npub: "npub1alice",
       pictureUrl: null,
       query: "alice",
+      usesLinky: true,
     };
     const similar = {
       isExactMatch: false,
       lnAddress: "",
       name: "Alice Cooper",
+      nip05: "",
+      nip05Verified: false,
       npub: "npub1cooper",
       pictureUrl: null,
       query: "alice",
+      usesLinky: false,
     };
 
     const { container, unmount } = await renderPage({
@@ -234,11 +251,55 @@ describe("ContactNewPage", () => {
     const rows = container.querySelectorAll(
       '[data-testid="contact-new-search-result"]',
     );
+    const marks = (row: Element | undefined) =>
+      [...(row?.querySelectorAll('[role="img"][aria-label]') ?? [])]
+        .map((mark) => mark.getAttribute("aria-label"))
+        .filter((label) => label !== null && /^[a-z]/.test(label));
     expect(rows).toHaveLength(2);
-    expect(rows[0]?.getAttribute("aria-selected")).toBe("true");
     expect(rows[0]?.textContent).toContain("Alice");
-    expect(rows[1]?.getAttribute("aria-selected")).toBe("false");
+    expect(marks(rows[0])).toEqual(["verifiedNip05", "contactUsesLinky"]);
+    expect(rows[0]?.textContent?.match(/alice@linky\.fit/g)).toHaveLength(1);
     expect(rows[1]?.textContent).toContain("Alice Cooper");
+    expect(marks(rows[1])).toEqual(["contactUsesNostr"]);
+    await unmount();
+  });
+
+  it("opens a candidate from its row and saves it only from its button", async () => {
+    vi.useFakeTimers();
+    const candidate = {
+      isExactMatch: true,
+      lnAddress: "",
+      name: "Bob",
+      nip05: "",
+      nip05Verified: false,
+      npub: "npub1bob",
+      pictureUrl: null,
+      query: "npub1bob",
+      usesLinky: false,
+    };
+    const openContactCandidate = vi.fn();
+    const addNewContactFromSearchResult = vi.fn(async () => {});
+    const { container, unmount } = await renderPage({
+      addNewContactFromSearchResult,
+      form: { groups: [], lnAddress: "", name: "", npub: "npub1bob" },
+      openContactCandidate,
+      searchNewContact: async () => ({ contacts: [candidate], kind: "found" }),
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(900);
+    });
+
+    const [open, add] = buttonsOf(
+      container.querySelector('[data-testid="contact-new-search-result"]'),
+    );
+    await act(async () => open?.click());
+    expect(openContactCandidate).toHaveBeenCalledWith(candidate);
+    expect(addNewContactFromSearchResult).not.toHaveBeenCalled();
+
+    expect(add?.textContent).toBe("saveContact");
+    await act(async () => add?.click());
+    expect(addNewContactFromSearchResult).toHaveBeenCalledWith(candidate);
+    expect(openContactCandidate).toHaveBeenCalledOnce();
     await unmount();
   });
 
@@ -253,9 +314,12 @@ describe("ContactNewPage", () => {
             isSelf: true,
             lnAddress: "",
             name: "Me",
+            nip05: "",
+            nip05Verified: false,
             npub: "npub1me",
             pictureUrl: null,
             query: "npub1me",
+            usesLinky: true,
           },
         ],
         kind: "found",
@@ -268,7 +332,7 @@ describe("ContactNewPage", () => {
     const row = container.querySelector(
       '[data-testid="contact-new-search-result"]',
     );
-    expect(row?.querySelector("button")?.textContent).toBe("openContact");
+    expect(buttonsOf(row).at(-1)?.textContent).toBe("openContact");
     await unmount();
   });
 });

@@ -809,6 +809,9 @@ export const en = {
   saveChanges: "Save changes",
   saveContact: "Add",
   openContact: "Open",
+  contactUsesLinky: "Uses Linky",
+  contactUsesNostr: "Nostr profile",
+  contactsSearchNotSaved: "Not in your contacts",
   saving: "Saving...",
   clearForm: "Clear form",
 

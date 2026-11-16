@@ -67,7 +67,14 @@ vi.mock("../../state/session/session", async (importOriginal) => ({
   currentNsecAtom: Atom.make("nsec1test"),
 }));
 
-import { useBlockEditedContact, useDeleteContact } from "./useContactActions";
+import { useAtomValue } from "@linky-fit/linkstr-react";
+import { navigateTo } from "../../../hooks/useRouting";
+import { unknownNamesAtom } from "../../state/contacts/chatContacts";
+import {
+  useBlockEditedContact,
+  useDeleteContact,
+  useOpenContactCandidate,
+} from "./useContactActions";
 
 const peer = makeIdentity();
 const withNpub = { id: createId<"Contact">(), npub: encodeNpub(peer.pubkey) };
@@ -169,6 +176,74 @@ describe("contact block actions", () => {
   it("has nothing to block on a contact without an npub", async () => {
     const { hooks, unmount } = await renderHooks(lightningOnly.id);
     expect(hooks.blockEdited).toBeNull();
+    await unmount();
+  });
+});
+
+describe("useOpenContactCandidate", () => {
+  const stranger = makeIdentity();
+  const candidate = (npub: string) => ({
+    isExactMatch: true,
+    lnAddress: "",
+    name: "Stranger",
+    nip05: "",
+    nip05Verified: false,
+    npub,
+    pictureUrl: null,
+    query: npub,
+    usesLinky: false,
+  });
+
+  beforeEach(() => {
+    mocks.contacts.splice(0, mocks.contacts.length, withNpub);
+    vi.clearAllMocks();
+  });
+
+  const renderOpen = async () => {
+    const seen: {
+      open?: ReturnType<typeof useOpenContactCandidate>;
+      names?: Readonly<Record<string, string | null>>;
+    } = {};
+    const Probe = () => {
+      const open = useOpenContactCandidate();
+      const names = useAtomValue(unknownNamesAtom);
+      React.useEffect(() => {
+        seen.open = open;
+        seen.names = names;
+      });
+      return null;
+    };
+    const view = await renderIntoDocument(<Probe />);
+    return { seen, unmount: view.unmount };
+  };
+
+  it("opens someone who is not a contact as an unknown sender, under their profile name, without saving them", async () => {
+    const { seen, unmount } = await renderOpen();
+    const npub = encodeNpub(stranger.pubkey);
+    await act(async () => seen.open!(candidate(npub)));
+
+    expect(navigateTo).toHaveBeenCalledWith({
+      route: "chat",
+      id: `unknown:${stranger.pubkey}`,
+    });
+    expect(seen.names?.[npub]).toBe("Stranger");
+    expect(mocks.contacts).toEqual([withNpub]);
+    await unmount();
+  });
+
+  it("opens a saved contact's own conversation", async () => {
+    const { seen, unmount } = await renderOpen();
+    await act(async () =>
+      seen.open!({
+        ...candidate(withNpub.npub),
+        existingContactId: withNpub.id,
+      }),
+    );
+
+    expect(navigateTo).toHaveBeenLastCalledWith({
+      route: "chat",
+      id: withNpub.id,
+    });
     await unmount();
   });
 });

@@ -53,7 +53,7 @@ The other party of a conversation or offer, whether or not they are a contact.
 _Avoid_: counterparty, remote user, other side
 
 **Unknown sender**:
-A peer who wrote to the user but is not a contact; they stay outside contacts until the user adds them, and their messages move into the conversation once the sender becomes a contact.
+A peer with a conversation who is not a contact, because they wrote to the user or the user opened them from a search or a listing; they stay outside contacts until the user adds them, and their messages move into the conversation once the sender becomes a contact.
 _Avoid_: stranger, anonymous contact
 
 ## Messaging

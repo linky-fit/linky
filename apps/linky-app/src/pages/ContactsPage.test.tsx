@@ -50,7 +50,9 @@ const bea = {
   pubkey: derivePubkey(NostrSecretKey.make(new Uint8Array(32).fill(2))),
 };
 
-const renderContacts = () =>
+const renderContacts = (
+  overrides: Partial<React.ComponentProps<typeof ContactsPage>> = {},
+) =>
   renderIntoDocument(
     <ContactsPage
       activeGroup={null}
@@ -73,6 +75,7 @@ const renderContacts = () =>
         pinned: [],
         proxyPayments: [],
       }}
+      {...overrides}
     />,
   );
 
@@ -84,6 +87,23 @@ describe("ContactsPage", () => {
     beacon.nearby = [];
     beacon.rows = [];
     document.body.innerHTML = "";
+  });
+
+  it("shows the profile a search found in place of the empty list", async () => {
+    const empty = {
+      conversations: [],
+      others: [],
+      pinned: [],
+      proxyPayments: [],
+    };
+    const { container, unmount } = await renderContacts({
+      contactsSearch: "alice",
+      searchPeer: <div>Alice’s profile</div>,
+      visibleContacts: empty,
+    });
+    expect(container.textContent).toContain("Alice’s profile");
+    expect(container.textContent).not.toContain("noContactsYet");
+    await unmount();
   });
 
   it("puts the user with their trade and nearby contacts above the sections", async () => {
