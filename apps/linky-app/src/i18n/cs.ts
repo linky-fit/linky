@@ -813,6 +813,9 @@ export const cs = {
   saveChanges: "Uložit změny",
   saveContact: "Přidat",
   openContact: "Otevřít",
+  contactUsesLinky: "Používá Linky",
+  contactUsesNostr: "Profil na Nostru",
+  contactsSearchNotSaved: "Mimo vaše kontakty",
   saving: "Ukládání...",
   clearForm: "Vyčistit formulář",
 

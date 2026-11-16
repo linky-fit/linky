@@ -39,6 +39,8 @@ interface ContactsPageProps {
   onboardingContent?: React.ReactNode;
   otherContactsLabel: string;
   renderContactCard: (contact: ContactRowLike) => React.ReactNode;
+  /** Shown instead of the empty list: the profile a search names that no contact matches. */
+  searchPeer?: React.ReactNode;
   setActiveGroup: (value: string | null) => void;
   setContactsSearch: (value: string) => void;
   showGroupFilter: boolean;
@@ -166,6 +168,7 @@ export const ContactsPage: FC<ContactsPageProps> = React.memo(
     onboardingContent,
     otherContactsLabel,
     renderContactCard,
+    searchPeer,
     setActiveGroup,
     setContactsSearch,
     showGroupFilter,
@@ -271,7 +274,7 @@ export const ContactsPage: FC<ContactsPageProps> = React.memo(
           <Stack gap="$xs">
             {beaconSupported ? <NearbyContactsSection t={t} /> : null}
             {!hasAnyContacts ? (
-              <EmptyState title={t("noContactsYet")} />
+              (searchPeer ?? <EmptyState title={t("noContactsYet")} />)
             ) : (
               <>
                 {visibleContacts.pinned.length > 0 && (

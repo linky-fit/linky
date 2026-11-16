@@ -126,6 +126,7 @@ import {
   X,
   Zap,
 } from "lucide-react-native";
+import { Nostr } from "./nostr-icon";
 
 const Request = createLucideIcon("Request", [
   [
@@ -235,6 +236,7 @@ export const icons = {
   MessageCircle,
   MessageCircleMore,
   Newspaper,
+  Nostr,
   Minimize,
   Minus,
   Monitor,

@@ -5,7 +5,6 @@ import {
 } from "@linky-fit/linksync";
 import { toContactTextFields } from "../../lib/contactFields";
 import {
-  decodeNpub,
   encodeNpub,
   type ProfileMetadata,
   type ProfileSearchHit,
@@ -22,11 +21,7 @@ import { Exit } from "effect";
 import React from "react";
 import { ContactId } from "../../../evoluIds";
 import { navigateTo } from "../../../hooks/useRouting";
-import {
-  getProfilePictureUrl,
-  loadCachedProfile,
-  saveCachedProfile,
-} from "../../../profileCache";
+import { loadCachedProfile, saveCachedProfile } from "../../../profileCache";
 import type { Route } from "../../../types/route";
 import {
   getContactGroups,
@@ -36,7 +31,6 @@ import { isDeletedContact } from "../../../utils/contactName";
 import { getBestNostrName } from "../../../utils/formatting";
 import {
   DEFAULT_NIP05_DOMAIN,
-  parseNip05IdentifierInput,
   resolveNip05Input,
 } from "../../../utils/nostrNip05";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
@@ -46,7 +40,6 @@ import {
   getContactPublicProfile,
   resolveContactProfile,
 } from "../../lib/contactProfile";
-import { getContactQueryPrefill } from "../../lib/contactQueryPrefill";
 import { runWrite, type WriteOutcome } from "../../lib/storeWrite";
 import { contactsCommandsAtom } from "../../state/contacts/commands";
 import {
@@ -63,46 +56,22 @@ import { currentNpubAtom } from "../../state/session/session";
 import type { ContactFormState, ContactRowLike } from "../../types/appTypes";
 import { useSetStatus, useTranslation } from "../shell";
 import { useReadNavIntent, useSetNavIntent } from "../shell/navIntents";
-import { fetchAndCacheProfile } from "../useLinkstrProfileSync";
 import { useContactsRepository } from "../useLinksync";
 import { useContacts, useRouteContact } from "./useDisplayContacts";
 import { useContactSuggestions } from "./useContactSuggestions";
+import {
+  useContactCandidates,
+  type ContactSearchCandidate,
+} from "./useContactCandidates";
 import type { Translate } from "../../../i18n";
 
-export interface ContactSearchCandidate {
-  existingContactId?: string;
-  /** The user's own identity, which opens the profile instead of saving. */
-  isSelf?: boolean;
-  /** The query resolved to exactly this profile (npub or verified NIP-05). */
-  isExactMatch: boolean;
-  lnAddress: string;
-  name: string;
-  npub: string;
-  pictureUrl: string | null;
-  query: string;
-}
-
 const CONTACT_SEARCH_RESULT_LIMIT = 6;
-const NIP05_RESOLVE_TIMEOUT_MS = 3000;
-/** The exact candidate is shown before its profile arrives; wait at most this. */
-const EXACT_PROFILE_WAIT_MS = 3000;
-
-const settleWithin = <T>(promise: Promise<T>, ms: number): Promise<T | null> =>
-  Promise.race([
-    promise,
-    new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
-  ]);
 
 export type ContactSearchResult =
   | { kind: "empty" }
   | { kind: "error"; identifier: string }
   | { kind: "found"; contacts: ContactSearchCandidate[] }
   | { kind: "not_found"; query: string };
-
-const getMetadataLightningAddress = (
-  metadata: ProfileMetadata | null,
-  npub: string,
-): string => getContactPublicProfile(npub, metadata).lnAddress;
 
 type ContactRow = ContactRowLike;
 type SelectedContactRow = ContactRowLike & { id: ContactId };
@@ -130,15 +99,6 @@ interface UseContactEditorParams {
   setStatus: (status: string) => void;
   t: Translate;
 }
-
-const decodeDirectNpubIdentifier = async (
-  value: string,
-): Promise<string | null> => {
-  const normalized = normalizeNpubIdentifier(value);
-  if (!normalized || !/^npub1/i.test(normalized)) return null;
-
-  return decodeNpub(normalized) ? normalized : null;
-};
 
 /** The contact form's fields in `contactFormAtom`, with a setter per field. */
 const useContactFormState = () => {
@@ -368,10 +328,7 @@ export const useContactEditor = ({
   const contactSuggestions = useAtomValue(contactSuggestionsAtom);
   const [contactNewStep, setContactNewStep] = useAtom(contactNewStepAtom);
 
-  const {
-    fetchProfile: fetchProfileOneShot,
-    searchProfiles: searchProfilesOneShot,
-  } = useLinkstrCommands();
+  const { searchProfiles: searchProfilesOneShot } = useLinkstrCommands();
 
   const clearContactForm = React.useCallback(() => {
     setForm(makeEmptyContactForm());
@@ -694,105 +651,9 @@ export const useContactEditor = ({
     updateContactFields,
   ]);
 
-  const findExistingContactId = React.useCallback(
-    (npub: string): string | undefined => {
-      const existingContact = contacts.find(
-        (contact) => normalizeNpubIdentifier(contact.npub ?? "") === npub,
-      );
-      return existingContact?.id ? existingContact.id : undefined;
-    },
-    [contacts],
-  );
-
-  const toSearchCandidate = React.useCallback(
-    (
-      npub: string,
-      metadata: ProfileMetadata | null,
-      query: string,
-      fallback: { name: string; lnAddress: string; isExactMatch: boolean },
-    ): ContactSearchCandidate => {
-      const existingContactId = findExistingContactId(npub);
-      const isSelf = npub === normalizeNpubIdentifier(currentNpub ?? "");
-      return {
-        ...(existingContactId ? { existingContactId } : {}),
-        ...(isSelf ? { isSelf } : {}),
-        isExactMatch: fallback.isExactMatch,
-        lnAddress:
-          getMetadataLightningAddress(metadata, npub) || fallback.lnAddress,
-        name: (metadata ? getBestNostrName(metadata) : null) ?? fallback.name,
-        npub,
-        pictureUrl: getProfilePictureUrl(metadata),
-        query,
-      };
-    },
-    [currentNpub, findExistingContactId],
-  );
-
-  const resolveExactContact = React.useCallback(
-    async (
-      rawQuery: string,
-      onCandidate: (candidate: ContactSearchCandidate) => void,
-    ): Promise<
-      | { kind: "resolved"; contact: ContactSearchCandidate }
-      | { kind: "error"; identifier: string }
-      | { kind: "none" }
-    > => {
-      const resolveExact = async (
-        npub: string,
-        fallback: { name: string; lnAddress: string },
-      ) => {
-        const candidateWith = (metadata: ProfileMetadata | null) =>
-          toSearchCandidate(npub, metadata, rawQuery, {
-            ...fallback,
-            isExactMatch: true,
-          });
-        const cachedMetadata = loadCachedProfile(npub)?.metadata ?? null;
-        onCandidate(candidateWith(cachedMetadata));
-        const fetched = fetchAndCacheProfile(fetchProfileOneShot, npub).then(
-          (metadata) => {
-            const contact = candidateWith(metadata ?? cachedMetadata);
-            onCandidate(contact);
-            return contact;
-          },
-        );
-        // The identity is settled; a slow profile fetch keeps filling the
-        // candidate in through onCandidate instead of holding the result.
-        const contact = await settleWithin(fetched, EXACT_PROFILE_WAIT_MS);
-        return {
-          contact: contact ?? candidateWith(cachedMetadata),
-          kind: "resolved" as const,
-        };
-      };
-
-      const directNpub = await decodeDirectNpubIdentifier(rawQuery);
-      if (directNpub)
-        return resolveExact(directNpub, { lnAddress: "", name: "" });
-      if (!parseNip05IdentifierInput(rawQuery)) return { kind: "none" };
-
-      const queryPrefill = getContactQueryPrefill(rawQuery);
-      const nip05Result = await resolveNip05Input(rawQuery, {
-        signal: AbortSignal.timeout(NIP05_RESOLVE_TIMEOUT_MS),
-      });
-      if (nip05Result.kind === "none" || nip05Result.kind === "not_found") {
-        return { kind: "none" };
-      }
-      if (nip05Result.kind === "error") {
-        return queryPrefill.lnAddress
-          ? { kind: "none" }
-          : { identifier: nip05Result.identifier.identifier, kind: "error" };
-      }
-
-      const { identifier } = nip05Result;
-      return resolveExact(nip05Result.npub, {
-        lnAddress:
-          queryPrefill.lnAddress ||
-          (identifier.domain === DEFAULT_NIP05_DOMAIN
-            ? identifier.identifier
-            : ""),
-        name: queryPrefill.name ? identifier.localPart : "",
-      });
-    },
-    [fetchProfileOneShot, toSearchCandidate],
+  const { resolveExactContact, toSearchCandidate } = useContactCandidates(
+    contacts,
+    currentNpub,
   );
 
   const searchProfileCandidates = React.useCallback(

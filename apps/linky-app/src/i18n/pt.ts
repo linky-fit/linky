@@ -824,6 +824,9 @@ export const pt = {
   saveChanges: "Salvar alterações",
   saveContact: "Adicionar",
   openContact: "Abrir",
+  contactUsesLinky: "Usa o Linky",
+  contactUsesNostr: "Perfil Nostr",
+  contactsSearchNotSaved: "Fora dos seus contatos",
   saving: "Salvando...",
   clearForm: "Limpar formulário",
 

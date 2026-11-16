@@ -24,6 +24,8 @@ export interface ListRowProps {
   /** Muted text at the end of the row, e.g. a setting's current value; a string title also labels it. */
   value?: string | number | undefined;
   trailing?: ReactNode;
+  /** A control beside the row, outside its press target, e.g. a button next to a row that opens something else. */
+  action?: ReactNode;
   onPress?: (() => void) | undefined;
   /** Defaults to true for pressable rows. */
   chevron?: boolean | undefined;
@@ -43,7 +45,29 @@ export interface ListRowProps {
  * The single row primitive: settings links, options, transactions, mints and relays.
  * Its content lines up with the surrounding content; the press and selection highlight extends `$md` past it on both sides.
  */
-export function ListRow({
+export function ListRow({ action, testID, ...props }: ListRowProps) {
+  const grouped = useContext(GroupedSectionContext);
+  if (action === undefined) return <ListRowFrame testID={testID} {...props} />;
+  // A button can't hold the action's button, so the row around both carries the highlight.
+  return (
+    <Row
+      testID={testID}
+      alignItems="center"
+      gap="$md"
+      marginHorizontal={-space.md}
+      paddingRight="$md"
+      borderRadius={grouped ? "$none" : "$control"}
+      hoverStyle={props.onPress ? { backgroundColor: "$neutralSoft" } : null}
+    >
+      <Stack flex={1} minWidth={0}>
+        <ListRowFrame {...props} embedded />
+      </Stack>
+      {action}
+    </Row>
+  );
+}
+
+function ListRowFrame({
   title,
   description,
   meta,
@@ -61,7 +85,11 @@ export function ListRow({
   disabled = false,
   accessibilityLabel,
   testID,
-}: ListRowProps) {
+  embedded = false,
+}: Omit<ListRowProps, "action"> & {
+  /** Inside a row with an action, which owns the margin and the highlight. */
+  embedded?: boolean;
+}) {
   const titleColor = destructive
     ? "$dangerText"
     : active
@@ -69,7 +97,8 @@ export function ListRow({
       : "$color";
   const Frame = onPress ? Pressable : Row;
   const background = active ? "$accentSoft" : "$transparent";
-  const highlight = onPress && !active ? "$neutralSoft" : background;
+  const highlight =
+    onPress && !active && !embedded ? "$neutralSoft" : background;
   const grouped = useContext(GroupedSectionContext);
   return (
     <Frame
@@ -81,8 +110,9 @@ export function ListRow({
       aria-expanded={expanded}
       gap="$md"
       minHeight="$controlLg"
-      marginHorizontal={-space.md}
-      paddingHorizontal="$md"
+      marginHorizontal={embedded ? "$none" : -space.md}
+      paddingLeft="$md"
+      paddingRight={embedded ? "$none" : "$md"}
       paddingVertical="$sm"
       borderRadius={grouped ? "$none" : "$control"}
       backgroundColor={background}
