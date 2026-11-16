@@ -2,10 +2,7 @@ import { useAtom, useAtomValue } from "@linky-fit/linkstr-react";
 import { getBankPaymentOfferCurrency } from "@linky-fit/proxy-payment";
 import React from "react";
 import { useRouting } from "../../../hooks/useRouting";
-import {
-  buildStatusFilterValue,
-  parseProfileGeneralStatus,
-} from "../../../nostrStatus";
+import { buildStatusFilterValue } from "../../../nostrStatus";
 import { NO_GROUP_FILTER } from "../../../utils/constants";
 import { getContactGroups } from "../../../utils/contactGroups";
 import { isDeletedContact } from "../../../utils/contactName";
@@ -24,8 +21,9 @@ import { useRecentBankPaymentOfferOutcomes } from "../useBankPaymentOffers";
 import { useTranslation } from "../shell";
 import {
   useDisplayContacts,
-  useNostrStatusByNpub,
+  useProxyPaymentCurrenciesOf,
   type DisplayContact,
+  type ProxyPaymentCurrenciesOf,
 } from "./useDisplayContacts";
 import { useNostrPictureByNpub } from "./useProfileCache";
 import { useVisibleContacts } from "./useVisibleContacts";
@@ -34,7 +32,7 @@ import { contactPictureUrl } from "../../../derivedProfile";
 /** How many unarchived contacts offer each currency in their profile status, most offered first. */
 export const statusFilterSummary = (
   displayContacts: readonly DisplayContact[],
-  nostrStatusByNpub: Readonly<Record<string, string | null>>,
+  currenciesOf: ProxyPaymentCurrenciesOf,
 ) => {
   const currencyCounts = new Map<string, number>();
 
@@ -43,9 +41,7 @@ export const statusFilterSummary = (
     const normalizedNpub = normalizeNpubIdentifier(contact.npub ?? "");
     if (!normalizedNpub) continue;
 
-    for (const currency of parseProfileGeneralStatus(
-      nostrStatusByNpub[normalizedNpub],
-    ).currencies) {
+    for (const currency of currenciesOf(normalizedNpub)) {
       currencyCounts.set(currency, (currencyCounts.get(currency) ?? 0) + 1);
     }
   }
@@ -83,7 +79,7 @@ export const useContactsListView = () => {
   const activeGroup = useAtomValue(activeContactGroupAtom);
   const contactsSearch = useAtomValue(contactsSearchAtom);
   const { displayContacts } = useDisplayContacts();
-  const nostrStatusByNpub = useNostrStatusByNpub();
+  const currenciesOf = useProxyPaymentCurrenciesOf();
   const { groupCounts, groupNames, ungroupedCount } =
     useAtomValue(contactGroupsAtom);
   const lastVisibleMessageByContactId = useAtomValue(
@@ -114,8 +110,7 @@ export const useContactsListView = () => {
       const groupNames = getContactGroups(contact);
       const normalizedNpub = normalizeNpubIdentifier(contact.npub ?? "");
       const statusFilterValues = normalizedNpub
-        ? parseProfileGeneralStatus(nostrStatusByNpub[normalizedNpub])
-            .currencies
+        ? currenciesOf(normalizedNpub)
         : [];
       const haystack = [
         contact.name,
@@ -137,11 +132,11 @@ export const useContactsListView = () => {
         statusFilterValues,
       };
     });
-  }, [displayContacts, nostrStatusByNpub]);
+  }, [currenciesOf, displayContacts]);
 
   const { statusFilterCounts, statusFilterCurrencies } = React.useMemo(
-    () => statusFilterSummary(displayContacts, nostrStatusByNpub),
-    [displayContacts, nostrStatusByNpub],
+    () => statusFilterSummary(displayContacts, currenciesOf),
+    [currenciesOf, displayContacts],
   );
   const contactFilterOptions = React.useMemo(() => {
     const options: Array<{ count: number; label: string; value: string }> = [];
@@ -209,7 +204,7 @@ export const useContactsListView = () => {
  */
 export const useBankPaymentOfferContacts = (spdPayload: string) => {
   const { visibleContacts } = useContactsListView();
-  const nostrStatusByNpub = useNostrStatusByNpub();
+  const currenciesOf = useProxyPaymentCurrenciesOf();
   const nostrPictureByNpub = useNostrPictureByNpub();
   const recentBankPaymentOfferOutcomesByContactId =
     useRecentBankPaymentOfferOutcomes();
@@ -226,11 +221,7 @@ export const useBankPaymentOfferContacts = (spdPayload: string) => {
     return sortedContacts.flatMap((contact) => {
       const normalizedNpub = normalizeNpubIdentifier(contact.npub ?? "");
       if (!normalizedNpub) return [];
-      if (
-        !parseProfileGeneralStatus(
-          nostrStatusByNpub[normalizedNpub],
-        ).currencies.includes(bankPaymentOfferCurrency)
-      ) {
+      if (!currenciesOf(normalizedNpub).includes(bankPaymentOfferCurrency)) {
         return [];
       }
 
@@ -247,9 +238,9 @@ export const useBankPaymentOfferContacts = (spdPayload: string) => {
     });
   }, [
     bankPaymentOfferCurrency,
+    currenciesOf,
     recentBankPaymentOfferOutcomesByContactId,
     nostrPictureByNpub,
-    nostrStatusByNpub,
     visibleContacts.pinned,
     visibleContacts.conversations,
     visibleContacts.others,

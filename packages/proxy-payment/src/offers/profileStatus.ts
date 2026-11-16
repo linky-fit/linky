@@ -1,3 +1,4 @@
+import type { ListingsDocument } from "@linky-fit/linkstr";
 import { BANK_PAYMENT_OFFER_CURRENCIES } from "../bankQr/bankPayment";
 
 /**
@@ -107,4 +108,21 @@ export const buildProfileGeneralStatus = (params: {
   if (text) return text;
 
   return selected.length > 0 ? selected.join(", ") : null;
+};
+
+/**
+ * The currencies someone pays bank transfers in for their contacts: those
+ * their listings document names when it names any list, an empty one
+ * included, else those of their general status, which authors on older
+ * releases still advertise them in. Unsupported codes are dropped.
+ */
+export const advertisedProxyPaymentCurrencies = (
+  document: Pick<ListingsDocument, "proxyPaymentCurrencies"> | null,
+  status: string | null | undefined,
+): ProfileStatusCurrency[] => {
+  const listed = document?.proxyPaymentCurrencies;
+  if (listed === undefined) return parseProfileGeneralStatus(status).currencies;
+  return PROFILE_STATUS_CURRENCIES.filter((currency) =>
+    listed.includes(currency),
+  );
 };

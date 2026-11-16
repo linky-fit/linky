@@ -9,20 +9,21 @@ export {
 
 const STATUS_FILTER_PREFIX = "status:";
 
+/** The status's free text with the proxy payment currencies, which come from wherever the contact offers them. */
 export const formatDisplayGeneralStatus = (params: {
   status: string | null | undefined;
+  currencies: ReadonlyArray<string>;
   providesLabel: string;
 }): string | null => {
-  const parsed = parseProfileGeneralStatus(params.status);
-  if (parsed.text && parsed.currencies.length > 0) {
-    return `${parsed.text} - ${params.providesLabel} ${parsed.currencies.join(
-      ", ",
-    )}`;
+  const { text } = parseProfileGeneralStatus(params.status);
+  const { currencies } = params;
+  if (text && currencies.length > 0) {
+    return `${text} - ${params.providesLabel} ${currencies.join(", ")}`;
   }
 
-  if (parsed.text) return parsed.text;
-  if (parsed.currencies.length === 0) return null;
-  return `${params.providesLabel} ${parsed.currencies.join(", ")}`;
+  if (text) return text;
+  if (currencies.length === 0) return null;
+  return `${params.providesLabel} ${currencies.join(", ")}`;
 };
 
 export const buildStatusFilterValue = (currency: string): string => {

@@ -25,6 +25,8 @@ const settingSchemas = {
   passOnListings: Flag,
   /** Whether the user offers cash for bitcoin or wants cash for it; absent means neither. */
   cashIntent: Schema.Literals(["offer", "want"]),
+  /** The currency codes the user pays bank transfers in for their contacts; absent until set or carried over from the profile status. */
+  proxyPaymentCurrencies: Schema.fromJsonString(Schema.Array(Schema.String)),
 };
 
 export type SettingKey = keyof typeof settingSchemas;

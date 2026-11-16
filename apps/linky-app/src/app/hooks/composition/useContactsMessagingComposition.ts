@@ -70,6 +70,7 @@ import { useOpenNewContactPage } from "../contacts/useContactActions";
 import {
   useChatContact,
   useDisplayContacts,
+  useProxyPaymentCurrenciesOf,
   type DisplayContact,
 } from "../contacts/useDisplayContacts";
 import { useProfileCache } from "../contacts/useProfileCache";
@@ -389,6 +390,7 @@ export const useContactsMessagingComposition = ({
   });
 
   const { displayContacts, unknownContacts } = useDisplayContacts();
+  const proxyPaymentCurrenciesOf = useProxyPaymentCurrenciesOf();
 
   useUnknownSenderReassignment({
     contacts,
@@ -513,8 +515,8 @@ export const useContactsMessagingComposition = ({
   const selectedChatContact = useChatContact(route);
 
   const { statusFilterCurrencies } = React.useMemo(
-    () => statusFilterSummary(displayContacts, nostrStatusByNpub),
-    [displayContacts, nostrStatusByNpub],
+    () => statusFilterSummary(displayContacts, proxyPaymentCurrenciesOf),
+    [displayContacts, proxyPaymentCurrenciesOf],
   );
 
   React.useEffect(() => {

@@ -1,6 +1,6 @@
 # Listings
 
-`Listings` shares what a user offers to, or wants from, the people who saved them: a cash intent (has cash and wants bitcoin for it, or the other way round) and listings of goods and services with a price. It is one plain, addressable kind 34133 event per author (a few, for an author with hundreds of contacts), so relays keep only the newest and a new reader gets the current state at once, but its content is readable only by the contacts the author chose. It is not public like NIP-99 classified listings (kind 30402) and not a message like a gift wrap: the event is replaced, never backfilled.
+`Listings` shares what a user offers to, or wants from, the people who saved them: a cash intent (has cash and wants bitcoin for it, or the other way round), the currencies they pay bank transfers in for their contacts, and listings of goods and services with a price. It is one plain, addressable kind 34133 event per author (a few, for an author with hundreds of contacts), so relays keep only the newest and a new reader gets the current state at once, but its content is readable only by the contacts the author chose. It is not public like NIP-99 classified listings (kind 30402) and not a message like a gift wrap: the event is replaced, never backfilled.
 
 ## Publishing
 
@@ -41,11 +41,11 @@ const share = (contacts: ReadonlyArray<Pubkey>) =>
   );
 ```
 
-A `Listing` has the author's own stable `id` (so a reader can tell an edit from a new entry), a `side` (`offer` or `want`), a trimmed `title` of at most `LISTING_TITLE_MAX_LENGTH` characters, a decimal `amount` with up to two fraction digits as the author typed it, a `currency` (an ISO 4217 code, or `LISTING_SAT_CURRENCY` for whole satoshis) and a `unit` of at most `LISTING_UNIT_MAX_LENGTH` characters saying what the amount buys, in the author's words ("per hour", "per kg"), shown as written. A zero `amount` means the listing is free, unless the listing carries `priceByAgreement: true`: then the price is left to the two parties to agree on. `listingPriceKind(listing)` tells the three apart (`amount`, `free`, `by-agreement`); the flag counts only with a zero amount, so a price typed later wins over it. A reader whose release does not know `priceByAgreement` shows a listing priced by agreement as costing zero. A listing may carry a `description`: trimmed text of at most `LISTING_DESCRIPTION_MAX_LENGTH` characters in the author's words, line breaks kept; an empty, too long or malformed one decodes as none. It may also carry one `image`: a `PrivateImage`, the same encrypted Blossom reference an image message carries ([chat.md](./chat.md#images-and-files)), uploaded by the author before publishing. A malformed `image` decodes as none, so the listing and the document still arrive. `cash` is `null` when the author has no cash intent.
+A `Listing` has the author's own stable `id` (so a reader can tell an edit from a new entry), a `side` (`offer` or `want`), a trimmed `title` of at most `LISTING_TITLE_MAX_LENGTH` characters, a decimal `amount` with up to two fraction digits as the author typed it, a `currency` (an ISO 4217 code, or `LISTING_SAT_CURRENCY` for whole satoshis) and a `unit` of at most `LISTING_UNIT_MAX_LENGTH` characters saying what the amount buys, in the author's words ("per hour", "per kg"), shown as written. A zero `amount` means the listing is free, unless the listing carries `priceByAgreement: true`: then the price is left to the two parties to agree on. `listingPriceKind(listing)` tells the three apart (`amount`, `free`, `by-agreement`); the flag counts only with a zero amount, so a price typed later wins over it. A reader whose release does not know `priceByAgreement` shows a listing priced by agreement as costing zero. A listing may carry a `description`: trimmed text of at most `LISTING_DESCRIPTION_MAX_LENGTH` characters in the author's words, line breaks kept; an empty, too long or malformed one decodes as none. It may also carry one `image`: a `PrivateImage`, the same encrypted Blossom reference an image message carries ([chat.md](./chat.md#images-and-files)), uploaded by the author before publishing. A malformed `image` decodes as none, so the listing and the document still arrive. `cash` is `null` when the author has no cash intent. `proxyPaymentCurrencies` lists the ISO 4217 codes of the currencies the author pays bank transfers in for their contacts. It is optional and absent is not empty: `[]` says the author pays in none, while an absent list (from an author whose client does not set it, or a malformed one) says nothing, so a reader may fall back on another source. A document whose only content is an empty list counts as empty (`isEmptyListingsDocument`).
 
 A listing may carry `reach: "network"`, which lets its readers pass it on to their own contacts; any other value decodes as none, and without it the listing is for the readers alone. A document may carry `passedOn`: the network listings of the author's contacts that the author passes on, each a `SharedListing` with its original author ([Passing listings on](#passing-listings-on)). A malformed `passedOn` decodes as none.
 
-The image key goes to every reader of the document and into every copy of the listing they keep or pass on, and it cannot be revoked: removing the image or the reader stops new copies, not the ones already read. A reader whose release does not know `description` or `image` drops the field; an author device on such a release republishes the document without the descriptions and images it does not know about, until a newer device publishes again.
+The image key goes to every reader of the document and into every copy of the listing they keep or pass on, and it cannot be revoked: removing the image or the reader stops new copies, not the ones already read. A reader whose release does not know `description`, `image` or `proxyPaymentCurrencies` drops the field; an author device on such a release republishes the document without the descriptions and images it does not know about, until a newer device publishes again.
 
 ### Audiences
 
@@ -128,7 +128,7 @@ Every recipient gets one `slot` tag. Its `<id>` is the first 32 hex characters o
 
 Each audience gets a `part` tag, in audience order: the JSON array of its listings, NIP-44 v2 encrypted under a random 32-byte key of its own. When the event has parts, every slot has a fourth element: the JSON `[[<part index>, "<part key as 64 hex>"], …]` of the parts that recipient may open, `[]` for none, padded with trailing spaces to one length across the publish and NIP-44 v2 encrypted under the same `conversationKey`, so the slots do not tell an audience's members from the others. A reader opens the parts their slot names and appends their listings; a part that does not open or decode is left out. Readers that know no parts ignore both.
 
-The content key and the part keys are drawn fresh for every publish, so a recipient who is no longer listed, or no longer in an audience, cannot read any later version of it, and the content is one NIP-44 v2 payload of the JSON document, `priceByAgreement`, `description`, `image`, `reach` and `passedOn` left out when there are none:
+The content key and the part keys are drawn fresh for every publish, so a recipient who is no longer listed, or no longer in an audience, cannot read any later version of it, and the content is one NIP-44 v2 payload of the JSON document, `priceByAgreement`, `description`, `image`, `reach` and `passedOn` left out when there are none, and `proxyPaymentCurrencies` when the author does not set it:
 
 ```json
 {
@@ -147,7 +147,8 @@ The content key and the part keys are drawn fresh for every publish, so a recipi
       "reach": "network"
     }
   ],
-  "passedOn": [{ "author": "<hex pubkey>", "listing": { … } }]
+  "passedOn": [{ "author": "<hex pubkey>", "listing": { … } }],
+  "proxyPaymentCurrencies": ["CZK", "EUR"]
 }
 ```
 

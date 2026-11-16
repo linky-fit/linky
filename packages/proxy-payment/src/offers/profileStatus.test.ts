@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  advertisedProxyPaymentCurrencies,
   buildProfileGeneralStatus,
   parseProfileGeneralStatus,
 } from "./profileStatus";
@@ -44,5 +45,36 @@ describe("profile general status", () => {
       "CZK",
       "EUR",
     ]);
+  });
+});
+
+describe("advertised proxy payment currencies", () => {
+  it("takes the listings document's list over the status, an empty one included", () => {
+    expect(
+      advertisedProxyPaymentCurrencies(
+        { proxyPaymentCurrencies: ["EUR", "CZK"] },
+        "CZK",
+      ),
+    ).toEqual(["CZK", "EUR"]);
+    expect(
+      advertisedProxyPaymentCurrencies({ proxyPaymentCurrencies: [] }, "CZK"),
+    ).toEqual([]);
+  });
+
+  it("falls back on the status when the document names no list", () => {
+    expect(advertisedProxyPaymentCurrencies({}, "Hi\nCZK")).toEqual(["CZK"]);
+    expect(advertisedProxyPaymentCurrencies(null, "CZK, EUR")).toEqual([
+      "CZK",
+      "EUR",
+    ]);
+  });
+
+  it("drops codes Linky does not offer", () => {
+    expect(
+      advertisedProxyPaymentCurrencies(
+        { proxyPaymentCurrencies: ["USD", "CZK"] },
+        null,
+      ),
+    ).toEqual(["CZK"]);
   });
 });

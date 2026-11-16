@@ -1,6 +1,7 @@
 import { Atom } from "effect/reactivity";
 import { ListingsDocument, Pubkey } from "@linky-fit/linkstr";
-import { Schema } from "effect";
+import type { PeerListingsRecord } from "@linky-fit/linksync";
+import { Option, Schema } from "effect";
 import type { KeyValuePort } from "../../../platform/ports";
 
 /** An author's newest listings document and when they published it; a plain shape, so the watch handler's objects store as they are. */
@@ -12,34 +13,108 @@ export type PeerListings = typeof PeerListings.Type;
 
 export type PeerListingsByPubkey = Readonly<Record<Pubkey, PeerListings>>;
 
-/** The documents of the contacts who share with this identity, as last watched; the listings controller keeps it current. */
+/** The documents of the contacts who share with this identity, as last watched or stored; the listings controller keeps it current. */
 export const peerListingsAtom = Atom.keepAlive(
   Atom.make<PeerListingsByPubkey>({}),
 );
 
-const STORAGE_PREFIX = "linky.listings.peers.v1.";
+const isPubkey = Schema.is(Pubkey);
 
-const StoredPeerListings = Schema.fromJsonString(
-  Schema.Record(Pubkey, PeerListings),
-);
-const decodeStored = Schema.decodeUnknownOption(StoredPeerListings);
-const encodeStored = Schema.encodeSync(StoredPeerListings);
-
-/** The cache is per identity: another identity on the device has other slots. */
-export const loadPeerListings = (
-  kv: KeyValuePort,
-  ownPubkey: Pubkey,
+/**
+ * `current` with each of `incoming` that is newer than what it holds; with
+ * `takeEqual` an equally old one replaces it too, as a document just read
+ * from a relay may hold more than a stored copy of the same event.
+ */
+export const withNewerPeerListings = (
+  current: PeerListingsByPubkey,
+  incoming: PeerListingsByPubkey,
+  { takeEqual }: { readonly takeEqual: boolean },
 ): PeerListingsByPubkey => {
-  const stored = kv.getItem(STORAGE_PREFIX + ownPubkey);
-  if (stored === null) return {};
-  const decoded = decodeStored(stored);
-  return decoded._tag === "Some" ? decoded.value : {};
+  let next: Record<Pubkey, PeerListings> | null = null;
+  for (const [pubkey, entry] of Object.entries(incoming)) {
+    if (!isPubkey(pubkey)) continue;
+    const known = current[pubkey];
+    if (
+      known &&
+      (known.updatedAt > entry.updatedAt ||
+        (!takeEqual && known.updatedAt === entry.updatedAt))
+    ) {
+      continue;
+    }
+    next ??= { ...current };
+    next[pubkey] = entry;
+  }
+  return next ?? current;
 };
 
-export const savePeerListings = (
+const DocumentJson = Schema.fromJsonString(ListingsDocument);
+const decodeDocumentJson = Schema.decodeUnknownOption(DocumentJson);
+const encodeDocumentJson = Schema.encodeSync(DocumentJson);
+
+/** The stored documents `reader` read, by author; a document this release cannot decode is left out. */
+export const peerListingsOfRecords = (
+  records: ReadonlyArray<PeerListingsRecord>,
+  reader: Pubkey,
+): PeerListingsByPubkey => {
+  const byAuthor: Record<Pubkey, PeerListings> = {};
+  for (const record of records) {
+    if (record.reader !== reader) continue;
+    const document = decodeDocumentJson(record.document);
+    if (Option.isNone(document)) continue;
+    byAuthor[record.author] = {
+      document: document.value,
+      updatedAt: record.publishedAtSec,
+    };
+  }
+  return byAuthor;
+};
+
+/** The documents newer than their stored copy, as records to store for `reader`. */
+export const peerListingsToStore = (
+  peers: PeerListingsByPubkey,
+  records: ReadonlyArray<PeerListingsRecord>,
+  reader: Pubkey,
+): ReadonlyArray<PeerListingsRecord> => {
+  const storedAt = new Map(
+    records
+      .filter((record) => record.reader === reader)
+      .map((record) => [record.author, record.publishedAtSec]),
+  );
+  return Object.entries(peers).flatMap(([author, { document, updatedAt }]) =>
+    isPubkey(author) && updatedAt > 0 && updatedAt > (storedAt.get(author) ?? 0)
+      ? [
+          {
+            reader,
+            author,
+            document: encodeDocumentJson(document),
+            publishedAtSec: updatedAt,
+          },
+        ]
+      : [],
+  );
+};
+
+// Migration bridge; removal gate in app/migrations/AGENTS.md
+const LEGACY_STORAGE_PREFIX = "linky.listings.peers.v1.";
+
+const LegacyPeerListings = Schema.fromJsonString(
+  Schema.Record(Pubkey, PeerListings),
+);
+const decodeLegacy = Schema.decodeUnknownOption(LegacyPeerListings);
+
+/** What releases before the `peerListings` table cached on this device for one identity. */
+export const loadLegacyPeerListings = (
   kv: KeyValuePort,
   ownPubkey: Pubkey,
-  peers: PeerListingsByPubkey,
+): PeerListingsByPubkey | null => {
+  const stored = kv.getItem(LEGACY_STORAGE_PREFIX + ownPubkey);
+  if (stored === null) return null;
+  return Option.getOrElse(decodeLegacy(stored), () => ({}));
+};
+
+export const forgetLegacyPeerListings = (
+  kv: KeyValuePort,
+  ownPubkey: Pubkey,
 ): void => {
-  kv.setItem(STORAGE_PREFIX + ownPubkey, encodeStored(peers));
+  kv.removeItem(LEGACY_STORAGE_PREFIX + ownPubkey);
 };

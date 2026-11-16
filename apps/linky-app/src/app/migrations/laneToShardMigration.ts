@@ -216,6 +216,7 @@ const REQUIRED_COLUMNS: {
   contact: [],
   hiddenListing: ["authorPubkey", "listingId"],
   pinnedListing: ["authorPubkey", "listingId"],
+  peerListings: ["readerPubkey", "authorPubkey", "document", "publishedAtSec"],
   conversation: ["kind"],
   message: ["conversationId", "direction", "content", "wrapId", "createdAtSec"],
   reaction: [

@@ -38,6 +38,10 @@ vi.mock("../shell", async () =>
   }),
 );
 
+vi.mock("./useProxyPaymentCurrencies", () => ({
+  useOwnProxyPaymentCurrencies: () => [],
+}));
+
 const nsec = nip19.nsecEncode(createSecretKey(3));
 
 vi.mock("../../lib/profilePicture", () => ({

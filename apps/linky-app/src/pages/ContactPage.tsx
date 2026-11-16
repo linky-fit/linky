@@ -13,6 +13,7 @@ import { useAtomValue } from "@linky-fit/linkstr-react";
 import { useOpenContactPay } from "../app/hooks/contacts/useContactActions";
 import {
   useNostrStatusByNpub,
+  useProxyPaymentCurrenciesOf,
   useRoutePeopleContact,
 } from "../app/hooks/contacts/useDisplayContacts";
 import { useNostrPictureByNpub } from "../app/hooks/contacts/useProfileCache";
@@ -55,6 +56,8 @@ interface ContactPageProps {
   payWithCashuEnabled: boolean;
   selectedContact: Contact | null;
   statusText: string | null;
+  /** What the contact offers as proxy payments. */
+  proxyPaymentCurrencies: ReadonlyArray<string>;
   t: Translate;
 }
 
@@ -106,6 +109,7 @@ export const ContactPage: FC<ContactPageProps> = ({
   payWithCashuEnabled,
   selectedContact,
   statusText,
+  proxyPaymentCurrencies,
   t,
 }) => {
   const selectedNpub = normalizeNpubIdentifier(selectedContact?.npub ?? "");
@@ -136,6 +140,7 @@ export const ContactPage: FC<ContactPageProps> = ({
   const messageLabel = isFeedbackContact ? t("feedback") : t("sendMessage");
   const contactStatus = formatDisplayGeneralStatus({
     status: statusText,
+    currencies: proxyPaymentCurrencies,
     providesLabel: t("contactStatusProvides"),
   });
   return (
@@ -220,6 +225,7 @@ export const ContactRoute: FC<{ route: Route }> = ({ route }) => {
   const selectedContact = useRoutePeopleContact(route);
   const nostrPictureByNpub = useNostrPictureByNpub();
   const statusByNpub = useNostrStatusByNpub();
+  const proxyPaymentCurrenciesOf = useProxyPaymentCurrenciesOf();
   const { cashuBalance, cashuIsBusy } = useWalletBalance();
   const payWithCashuEnabled = useAtomValue(payWithCashuEnabledAtom);
   const openContactPay = useOpenContactPay();
@@ -235,6 +241,7 @@ export const ContactRoute: FC<{ route: Route }> = ({ route }) => {
       payWithCashuEnabled={payWithCashuEnabled}
       selectedContact={selectedContact}
       statusText={npub ? (statusByNpub[npub] ?? null) : null}
+      proxyPaymentCurrencies={npub ? proxyPaymentCurrenciesOf(npub) : []}
       t={t}
     />
   );

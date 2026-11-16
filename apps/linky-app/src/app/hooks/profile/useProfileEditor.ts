@@ -40,6 +40,7 @@ import {
 import { currentNpubAtom, currentNsecAtom } from "../../state/session/session";
 import type { FilePickerHandle } from "../../../utils/pickFile";
 import { nowSeconds } from "../../../utils/time";
+import { useOwnProxyPaymentCurrencies } from "./useProxyPaymentCurrencies";
 import { useSetStatus, useTranslation } from "../shell";
 
 interface PersistProfileValuesArgs {
@@ -153,7 +154,7 @@ export const useProfileEditor = () => {
   const currentNpub = useAtomValue(currentNpubAtom);
   const currentNsec = useAtomValue(currentNsecAtom);
   const myProfileMetadata = useAtomValue(myProfileMetadataAtom);
-  const myProfileStatus = useAtomValue(myProfileAtom, (my) => my.status);
+  const ownProxyPaymentCurrencies = useOwnProxyPaymentCurrencies();
   const { defaultLightningAddress, effectiveMyLightningAddress } =
     useAtomValue(effectiveProfileAtom);
   const owned = useAtomValue(ownedLightningAddressesAtom);
@@ -273,7 +274,7 @@ export const useProfileEditor = () => {
         );
         const trimmedStatus = status.trim();
         const nextStatus = buildProfileGeneralStatus({
-          currencies: parseProfileGeneralStatus(myProfileStatus).currencies,
+          currencies: ownProxyPaymentCurrencies,
           text: status,
         });
 
@@ -357,7 +358,7 @@ export const useProfileEditor = () => {
       currentNpub,
       currentNsec,
       myProfileMetadata,
-      myProfileStatus,
+      ownProxyPaymentCurrencies,
       publishProfile,
       publishStatus,
       registry,
