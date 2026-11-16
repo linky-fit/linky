@@ -1,8 +1,8 @@
 import { encodeNpub, Pubkey } from "@linky-fit/linkstr";
 import {
   createId,
-  hiddenListingKey,
-  hiddenListingKeysOf,
+  listingKey,
+  listingKeysOf,
   makeContactsRepository,
   makeHiddenListingsRepository,
   NonEmptyString,
@@ -57,11 +57,8 @@ it("moves the hides into the table without hiding again what another device show
   const view = await renderIntoDocument(<Probe />);
   await act(async () => {});
 
-  expect(hiddenListingKeysOf(await Effect.runPromise(hidden.all))).toEqual(
-    new Set([
-      hiddenListingKey(ALICE, "bike"),
-      hiddenListingKey(STRANGER, "milk"),
-    ]),
+  expect(listingKeysOf(await Effect.runPromise(hidden.all))).toEqual(
+    new Set([listingKey(ALICE, "bike"), listingKey(STRANGER, "milk")]),
   );
   expect(
     (await Effect.runPromise(contacts.byId(alice)))?.hiddenListingIdsJson,

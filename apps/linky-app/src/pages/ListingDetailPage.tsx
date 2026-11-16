@@ -7,7 +7,8 @@ import {
 import { useAtomValue } from "@linky-fit/linkstr-react";
 import {
   ContactId,
-  hiddenListingKey,
+  listingKey,
+  type ListingId,
   type MessageId,
 } from "@linky-fit/linksync";
 import {
@@ -32,8 +33,11 @@ import { useEffectiveProfile } from "../app/hooks/profile/useEffectiveProfile";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import {
   useHiddenListingKeys,
+  usePinnedListingKeys,
   useSetListingHidden,
-} from "../app/hooks/useHiddenListings";
+  useSetListingPaused,
+  useSetListingPinned,
+} from "../app/hooks/useListingMarks";
 import { useListingRecords } from "../app/hooks/useLinksync";
 import {
   useAttachListingToChat,
@@ -84,6 +88,8 @@ const useLiveListing = (
 ): {
   listing: Listing;
   audience: ListingAudience | null;
+  /** The own row, which the user can pause or resume; null for someone else's listing. */
+  own: { id: ListingId; paused: boolean } | null;
   via: PeerListing["via"];
 } | null => {
   const records = useListingRecords();
@@ -93,7 +99,12 @@ const useLiveListing = (
       const record = records.find((candidate) => candidate.id === listingId);
       const listing = record ? listingOfRecord(record) : null;
       return record && listing
-        ? { listing, audience: listingAudienceOfRecord(record), via: [] }
+        ? {
+            listing,
+            audience: listingAudienceOfRecord(record),
+            own: { id: record.id, paused: record.pausedAtSec !== null },
+            via: [],
+          }
         : null;
     }
     const entry = entries.find(
@@ -101,7 +112,7 @@ const useLiveListing = (
         candidate.author === author && candidate.listing.id === listingId,
     );
     return entry
-      ? { listing: entry.listing, audience: null, via: entry.via }
+      ? { listing: entry.listing, audience: null, own: null, via: entry.via }
       : null;
   }, [author, entries, isOwn, listingId, records]);
 };
@@ -162,6 +173,7 @@ export function ListingDetailPage({
   const isOwn = author === ownPubkey;
   const liveEntry = useLiveListing(author, listingId, isOwn);
   const live = liveEntry?.listing ?? null;
+  const own = liveEntry?.own ?? null;
   const via = messageId ? [] : (liveEntry?.via ?? []);
   const snapshot = useSharedListingOfMessage(messageId);
   const snapshotMatchesRoute =
@@ -188,10 +200,11 @@ export function ListingDetailPage({
   const blocked = useAtomValue(blockListAtom).includes(author);
   const unknownChatId = blocked ? null : buildUnknownContactId(author);
   const attachListingToChat = useAttachListingToChat();
+  const setListingPinned = useSetListingPinned();
+  const setListingPaused = useSetListingPaused();
+  const pinned = usePinnedListingKeys().has(listingKey(author, listingId));
   const setListingHidden = useSetListingHidden();
-  const hidden = useHiddenListingKeys().has(
-    hiddenListingKey(author, listingId),
-  );
+  const hidden = useHiddenListingKeys().has(listingKey(author, listingId));
   const stranger = useStrangerProfile(
     authorNpub,
     !isOwn && contactId === null && !blocked,
@@ -263,6 +276,14 @@ export function ListingDetailPage({
             </Text>
           </Row>
         ) : null}
+        {own?.paused ? (
+          <Row gap="$xs" alignItems="center" testID="listing-paused">
+            <Icon name="Pause" size="sm" color="$colorMuted" />
+            <Text variant="caption" color="$colorMuted">
+              {t("listingPausedHint")}
+            </Text>
+          </Row>
+        ) : null}
       </Stack>
       {listing.description ? (
         <Text
@@ -275,16 +296,26 @@ export function ListingDetailPage({
       ) : null}
       <Stack gap="$sm">
         {isOwn ? (
-          live ? (
-            <Button
-              icon="Pencil"
-              onPress={() =>
-                navigateTo({ route: "listingEdit", id: listingId })
-              }
-              testID="listing-edit"
-            >
-              {t("edit")}
-            </Button>
+          live && own ? (
+            <>
+              <Button
+                icon="Pencil"
+                onPress={() =>
+                  navigateTo({ route: "listingEdit", id: listingId })
+                }
+                testID="listing-edit"
+              >
+                {t("edit")}
+              </Button>
+              <Button
+                variant="ghost"
+                icon={own.paused ? "Play" : "Pause"}
+                onPress={() => void setListingPaused(own.id, !own.paused)}
+                testID={own.paused ? "listing-resume" : "listing-pause"}
+              >
+                {t(own.paused ? "listingResume" : "listingPause")}
+              </Button>
+            </>
           ) : null
         ) : (
           <>
@@ -305,6 +336,18 @@ export function ListingDetailPage({
                 {t("listingContactAuthor")}
               </Button>
             ) : null}
+            {hidden ? null : (
+              <Button
+                variant="ghost"
+                icon={pinned ? "PinOff" : "Pin"}
+                onPress={() =>
+                  void setListingPinned(author, listingId, !pinned)
+                }
+                testID={pinned ? "listing-unpin" : "listing-pin"}
+              >
+                {t(pinned ? "listingUnpin" : "listingPin")}
+              </Button>
+            )}
             <Button
               variant="ghost"
               icon={hidden ? "Eye" : "EyeOff"}

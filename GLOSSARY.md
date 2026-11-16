@@ -346,6 +346,14 @@ _Avoid_: relayed listing (relay is a Nostr server), forwarded listing, shared li
 Someone else's listing the user hid from Goods & services, whether or not its author is a contact; the hide syncs to all the user's devices, and a hidden listing is never passed on. A blocked contact's listings, and what they pass on, are not shown at all.
 _Avoid_: muted listing, blocked listing (blocking is for people)
 
+**Pinned listing**:
+Someone else's listing the user pinned above the other sections of Goods & services; the pin syncs to all the user's devices. Pinning a hidden listing shows it again, and hiding a pinned one unpins it.
+_Avoid_: favorite listing, starred listing, bookmarked listing
+
+**Paused listing**:
+One of the user's own listings they paused: it stays on their devices but leaves the listings document until they resume it. The pause syncs to all the user's devices; a release older than the pause keeps publishing it.
+_Avoid_: inactive listing, draft, archived listing
+
 **Listings document**:
 The one addressable Nostr event (kind 34133) in which a user shares their cash intent, listings and passed-on listings; its content is readable only by the contacts the user chose, each through their own key slot, and a group's listings only by its members. A contact's document reaching the user proves the contact saved them.
 _Avoid_: listings event, catalog, shop

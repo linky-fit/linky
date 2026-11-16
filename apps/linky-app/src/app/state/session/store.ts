@@ -8,6 +8,7 @@ import {
   makeKeryxSubscriptionsRepository,
   makeOnchainTransfersRepository,
   makeListingsRepository,
+  makePinnedListingsRepository,
   makeRecurringPaymentsRepository,
   makeSettingsRepository,
   makeTransactionsRepository,
@@ -91,6 +92,9 @@ export const recurringPaymentsRepositoryAtom = repositoryAtom(
 export const listingsRepositoryAtom = repositoryAtom(makeListingsRepository);
 export const hiddenListingsRepositoryAtom = repositoryAtom(
   makeHiddenListingsRepository,
+);
+export const pinnedListingsRepositoryAtom = repositoryAtom(
+  makePinnedListingsRepository,
 );
 export const settingsRepositoryAtom = repositoryAtom(makeSettingsRepository);
 export const transactionsRepositoryAtom = repositoryAtom(

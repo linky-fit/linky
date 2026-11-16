@@ -35,6 +35,9 @@ export type ListingId = typeof ListingId.Type;
 export const HiddenListingId = id("HiddenListing");
 export type HiddenListingId = typeof HiddenListingId.Type;
 
+export const PinnedListingId = id("PinnedListing");
+export type PinnedListingId = typeof PinnedListingId.Type;
+
 export const KeryxSubscriptionId = id("KeryxSubscription");
 export type KeryxSubscriptionId = typeof KeryxSubscriptionId.Type;
 
