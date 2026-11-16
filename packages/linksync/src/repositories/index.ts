@@ -3,11 +3,15 @@ export type { ContactsRepository } from "./contacts";
 export { makeConversationsRepository } from "./conversations";
 export type { ConversationsRepository, PeerSeenWindow } from "./conversations";
 export {
-  hiddenListingKey,
-  hiddenListingKeysOf,
+  listingKey,
+  listingKeysOf,
   makeHiddenListingsRepository,
-} from "./hiddenListings";
-export type { HiddenListingsRepository } from "./hiddenListings";
+  makePinnedListingsRepository,
+} from "./listingMarks";
+export type {
+  HiddenListingsRepository,
+  PinnedListingsRepository,
+} from "./listingMarks";
 export { makeIdentityRepository } from "./identity";
 export type { IdentityRepository } from "./identity";
 export { makeInboxCursorsRepository } from "./inboxCursors";

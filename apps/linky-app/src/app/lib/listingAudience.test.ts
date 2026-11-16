@@ -10,7 +10,7 @@ import {
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import type { ListingRecord } from "@linky-fit/linksync";
 import {
-  hiddenListingKey,
+  listingKey,
   createId,
   NonEmptyString1000,
   OwnerId,
@@ -22,6 +22,7 @@ import {
   listingAudienceColumn,
   listingAudienceOfRecord,
   listingsRecipients,
+  partitionPeerListings,
   peerListingEntries,
   type ListingSource,
 } from "./listingAudience";
@@ -38,6 +39,7 @@ const record = (overrides: Partial<ListingRecord> = {}): ListingRecord => ({
   image: null,
   priceByAgreement: null,
   audience: null,
+  pausedAtSec: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
   isDeleted: 0,
@@ -126,6 +128,26 @@ describe("buildListingsDraft", () => {
     expect(draft.recipients).toEqual([bob]);
   });
 
+  it("leaves a paused listing out, for the contacts and a group alike", () => {
+    const paused = { pausedAtSec: PositiveInt.orThrow(150) };
+    const draft = buildListingsDraft({
+      records: [
+        record({ title: "Med", ...paused }),
+        record({ ...audience({ kind: "group", group: "Rodina" }), ...paused }),
+        record(),
+      ],
+      cash: null,
+      recipients: [{ pubkey: bob, groups: ["Rodina"] }],
+      peerDocuments: {},
+      passOn: true,
+      hidden: new Set(),
+    });
+    expect(draft.document.listings.map(({ title }) => title)).toEqual([
+      "Domácí vajíčka",
+    ]);
+    expect(draft.audiences).toEqual([]);
+  });
+
   it("gives a group's listings to its members only and drops a group nobody is in", () => {
     const draft = buildListingsDraft({
       records: [
@@ -207,7 +229,7 @@ describe("buildListingsDraft", () => {
         ),
       },
       passOn: true,
-      hidden: new Set([hiddenListingKey(bob, "b2")]),
+      hidden: new Set([listingKey(bob, "b2")]),
     });
     expect(draft.document.passedOn?.map(({ listing: { id } }) => id)).toEqual([
       "c2",
@@ -358,5 +380,38 @@ describe("peerListingEntries", () => {
     expect(entries.map(({ author, via }) => [author, via.length])).toEqual([
       [carol, 0],
     ]);
+  });
+});
+
+describe("partitionPeerListings", () => {
+  const entry = (author: Pubkey, id: string, side: "offer" | "want") => ({
+    author,
+    listing: new Listing({ ...listing(id), side }),
+    via: [],
+  });
+
+  it("lists pinned listings apart from their side, and keeps one hidden on another device hidden", () => {
+    const entries = [
+      entry(bob, "med", "offer"),
+      entry(bob, "kolo", "offer"),
+      entry(carol, "hlídání", "want"),
+      entry(carol, "byt", "want"),
+      entry(dave, "vejce", "offer"),
+    ];
+    const ids = (list: ReadonlyArray<(typeof entries)[number]>) =>
+      list.map(({ listing: { id } }) => id);
+    const parts = partitionPeerListings(
+      entries,
+      new Set([listingKey(dave, "vejce")]),
+      new Set([
+        listingKey(bob, "kolo"),
+        listingKey(carol, "byt"),
+        listingKey(dave, "vejce"),
+      ]),
+    );
+    expect(ids(parts.pinned)).toEqual(["kolo", "byt"]);
+    expect(ids(parts.offered)).toEqual(["med"]);
+    expect(ids(parts.wanted)).toEqual(["hlídání"]);
+    expect(ids(parts.hidden)).toEqual(["vejce"]);
   });
 });

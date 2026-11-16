@@ -83,9 +83,17 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "listings.sharedSent":
     "A message carrying a shared listing was enqueued. Message, rumor and contact links tie it to the send; the pubkey link is the listing's author. The payload says whether it had a note or a photo, never the photo's url or key.",
   "listings.hidden":
-    "The user hid someone's listing, a contact's or a stranger's: a `hiddenListing` row now keeps it out of Goods & services on every device, and it is never passed on. The payload has the author pubkey and listing id.",
+    "The user hid someone's listing, a contact's or a stranger's: a `hiddenListing` row now keeps it out of Goods & services on every device, any `pinnedListing` row for it was removed, and it is never passed on. The payload has the author pubkey and listing id.",
   "listings.shown":
     "The user showed a hidden listing again: its `hiddenListing` row was removed on every device. The payload has the author pubkey and listing id.",
+  "listings.pinned":
+    "The user pinned someone's listing to the top of Goods & services: a `pinnedListing` row now keeps it there on every device, and a `hiddenListing` row for it was removed. The payload has the author pubkey and listing id.",
+  "listings.unpinned":
+    "The user unpinned someone's listing: its `pinnedListing` row was removed on every device and it went back to its section. The payload has the author pubkey and listing id.",
+  "listings.paused":
+    "The user paused one of their own listings: its `listing` row got `pausedAtSec`, so the next listings document leaves it out. The payload has the listing id.",
+  "listings.resumed":
+    "The user resumed a paused listing of their own: its `pausedAtSec` was cleared, so the next listings document carries it again. The payload has the listing id.",
   "contacts.npubSaved":
     "A Nostr contact was saved after the duplicate check. The contact link identifies the new row; the insert itself runs in the background.",
   "contacts.sharedProfileOpened":

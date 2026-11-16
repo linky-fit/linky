@@ -3,6 +3,7 @@ import {
   type HiddenListingId,
   type KeryxSubscriptionId,
   type MessageId,
+  type PinnedListingId,
   type ReactionId,
   type SettingId,
 } from "@linky-fit/domain";
@@ -43,3 +44,10 @@ export const hiddenListingIdFor = (
   listingId: string,
 ): HiddenListingId =>
   createIdFromString<"HiddenListing">(`hiddenListing/${author}/${listingId}`);
+
+/** Pinning one author's listing on any device lands on one row. */
+export const pinnedListingIdFor = (
+  author: Pubkey,
+  listingId: string,
+): PinnedListingId =>
+  createIdFromString<"PinnedListing">(`pinnedListing/${author}/${listingId}`);

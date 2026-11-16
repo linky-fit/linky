@@ -30,7 +30,7 @@ import {
 } from "./lib/listingAudience";
 import { usePassOnListings } from "./hooks/usePassOnListings";
 import { blockListAtom } from "./state/contacts/blockList";
-import { useHiddenListingKeys } from "./hooks/useHiddenListings";
+import { useHiddenListingKeys } from "./hooks/useListingMarks";
 import {
   loadPeerListings,
   peerListingsAtom,

@@ -9,7 +9,7 @@ import {
 import {
   createId,
   createIdFromString,
-  hiddenListingKey,
+  listingKey,
   NonEmptyString100,
   NonEmptyString1000,
   OwnerId,
@@ -57,6 +57,7 @@ const ownRecord: ListingRecord = {
   description: null,
   image: null,
   audience: null,
+  pausedAtSec: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
   isDeleted: 0,
@@ -68,21 +69,31 @@ const state = vi.hoisted(
     blocked: string[];
     contacts: ContactRowLike[];
     hidden: Set<string>;
+    pinned: Set<string>;
+    ownPaused: boolean;
     snapshot: SharedListing | null;
   } => ({
     blocked: [],
     contacts: [],
     hidden: new Set(),
+    pinned: new Set(),
+    ownPaused: false,
     snapshot: null,
   }),
 );
-const { attachListingToChat, navigateTo, setListingHidden } = vi.hoisted(
-  () => ({
-    attachListingToChat: vi.fn(),
-    navigateTo: vi.fn(),
-    setListingHidden: vi.fn(),
-  }),
-);
+const {
+  attachListingToChat,
+  navigateTo,
+  setListingHidden,
+  setListingPaused,
+  setListingPinned,
+} = vi.hoisted(() => ({
+  attachListingToChat: vi.fn(),
+  navigateTo: vi.fn(),
+  setListingHidden: vi.fn(),
+  setListingPaused: vi.fn(),
+  setListingPinned: vi.fn(),
+}));
 
 vi.mock("@linky-fit/linkstr-react", () => ({
   useAtomValue: (atom: unknown) =>
@@ -128,12 +139,20 @@ import { contactGroupsAtom } from "../app/state/contacts/readModel";
 vi.mock("../app/hooks/shell", async () =>
   (await import("../testUtils/shellHooks")).shellHooksMock(),
 );
-vi.mock("../app/hooks/useHiddenListings", () => ({
+vi.mock("../app/hooks/useListingMarks", () => ({
   useHiddenListingKeys: () => state.hidden,
+  usePinnedListingKeys: () => state.pinned,
   useSetListingHidden: () => setListingHidden,
+  useSetListingPaused: () => setListingPaused,
+  useSetListingPinned: () => setListingPinned,
 }));
 vi.mock("../app/hooks/useLinksync", () => ({
-  useListingRecords: () => [ownRecord],
+  useListingRecords: () => [
+    {
+      ...ownRecord,
+      pausedAtSec: state.ownPaused ? PositiveInt.orThrow(150) : null,
+    },
+  ],
 }));
 vi.mock("../app/hooks/contacts/useDisplayContacts", () => ({
   useContacts: () => state.contacts,
@@ -161,6 +180,8 @@ afterEach(() => {
   state.blocked = [];
   state.contacts = [];
   state.hidden = new Set();
+  state.pinned = new Set();
+  state.ownPaused = false;
   state.snapshot = null;
 });
 
@@ -331,13 +352,53 @@ it("hides a contact's listing", async () => {
   await unmount();
 });
 
+it("pauses the user's own listing and resumes it", async () => {
+  const { container, unmount } = await renderIntoDocument(
+    <ListingDetailPage author={ME} listingId={ownId} messageId={null} />,
+  );
+  expect(byTestId(container, "listing-paused")).toBeNull();
+  await act(async () => byTestId(container, "listing-pause")?.click());
+  expect(setListingPaused).toHaveBeenCalledExactlyOnceWith(ownId, true);
+  await unmount();
+
+  state.ownPaused = true;
+  const paused = await renderIntoDocument(
+    <ListingDetailPage author={ME} listingId={ownId} messageId={null} />,
+  );
+  expect(byTestId(paused.container, "listing-paused")?.textContent).toBe(
+    "listingPausedHint",
+  );
+  await act(async () => byTestId(paused.container, "listing-resume")?.click());
+  expect(setListingPaused).toHaveBeenLastCalledWith(ownId, false);
+  await paused.unmount();
+});
+
+it("pins a contact's listing to the top and unpins it", async () => {
+  state.contacts = [{ id: contactId, name: "Alice", npub: encodeNpub(PEER) }];
+  const { container, unmount } = await renderIntoDocument(
+    <ListingDetailPage author={PEER} listingId="eggs" messageId={null} />,
+  );
+  await act(async () => byTestId(container, "listing-pin")?.click());
+  expect(setListingPinned).toHaveBeenCalledExactlyOnceWith(PEER, "eggs", true);
+  await unmount();
+
+  state.pinned = new Set([listingKey(PEER, "eggs")]);
+  const pinned = await renderIntoDocument(
+    <ListingDetailPage author={PEER} listingId="eggs" messageId={null} />,
+  );
+  await act(async () => byTestId(pinned.container, "listing-unpin")?.click());
+  expect(setListingPinned).toHaveBeenLastCalledWith(PEER, "eggs", false);
+  await pinned.unmount();
+});
+
 it("shows a hidden listing from someone who is no contact again", async () => {
   state.contacts = [{ id: contactId, name: "Alice", npub: encodeNpub(PEER) }];
-  state.hidden = new Set([hiddenListingKey(STRANGER, "bike")]);
+  state.hidden = new Set([listingKey(STRANGER, "bike")]);
   const { container, unmount } = await renderIntoDocument(
     <ListingDetailPage author={STRANGER} listingId="bike" messageId={null} />,
   );
   expect(byTestId(container, "listing-hide")).toBeNull();
+  expect(byTestId(container, "listing-pin")).toBeNull();
   await act(async () => byTestId(container, "listing-show")?.click());
   expect(setListingHidden).toHaveBeenCalledExactlyOnceWith(
     STRANGER,

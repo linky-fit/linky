@@ -19,6 +19,7 @@ import {
   ListingId,
   MessageId,
   NostrIdentityId,
+  PinnedListingId,
   ReactionId,
   RecurringPaymentId,
   SettingId,
@@ -139,11 +140,22 @@ export const LinkySchema = {
     // Who sees the listing, JSON validated by the consumer: null for the
     // contacts, {"kind":"network"} or {"kind":"group","group":"<groupName>"}.
     audience: nullOr(NonEmptyString1000),
+    // When the user paused the listing, which keeps it unpublished until they
+    // resume it; null while it is active. Older releases ignore the column.
+    pausedAtSec: nullOr(PositiveInt),
   },
   /** Contacts scope: someone else's listing the user hid; a removed row shows it again. */
   hiddenListing: {
     // `hiddenListingIdFor(authorPubkey, listingId)`, so hiding on two devices lands on one row.
     id: HiddenListingId,
+    // Hex pubkey (64 chars) of the listing's author, a contact or not.
+    authorPubkey: NonEmptyString100,
+    listingId: NonEmptyString1000,
+  },
+  /** Contacts scope: someone else's listing the user pinned to the top; a removed row unpins it. */
+  pinnedListing: {
+    // `pinnedListingIdFor(authorPubkey, listingId)`, so pinning on two devices lands on one row.
+    id: PinnedListingId,
     // Hex pubkey (64 chars) of the listing's author, a contact or not.
     authorPubkey: NonEmptyString100,
     listingId: NonEmptyString1000,
@@ -385,6 +397,7 @@ export type TransactionRow = Row<LinkyDbSchema["transaction"]>;
 export type RecurringPaymentRow = Row<LinkyDbSchema["recurringPayment"]>;
 export type ListingRow = Row<LinkyDbSchema["listing"]>;
 export type HiddenListingRow = Row<LinkyDbSchema["hiddenListing"]>;
+export type PinnedListingRow = Row<LinkyDbSchema["pinnedListing"]>;
 export type KeryxSubscriptionRow = Row<LinkyDbSchema["keryxSubscription"]>;
 export type OnchainTransferRow = Row<LinkyDbSchema["onchainTransfer"]>;
 export type OnchainTransferMessageRow = Row<
@@ -412,6 +425,7 @@ export const linkyTableColumns: TableColumns<LinkyDbSchema> = {
   recurringPayment: columnNames(LinkySchema.recurringPayment),
   listing: columnNames(LinkySchema.listing),
   hiddenListing: columnNames(LinkySchema.hiddenListing),
+  pinnedListing: columnNames(LinkySchema.pinnedListing),
   keryxSubscription: columnNames(LinkySchema.keryxSubscription),
   onchainTransfer: columnNames(LinkySchema.onchainTransfer),
   onchainTransferMessage: columnNames(LinkySchema.onchainTransferMessage),

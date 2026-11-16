@@ -47,6 +47,52 @@ export const lists: Section = {
         </UI.Stack>
       );
     },
+    SwipeRow: () => {
+      const [last, setLast] = useState("Swipe the row either way");
+      return (
+        <UI.Stack gap="$sm">
+          <UI.SwipeRow
+            swipeLeft={{
+              icon: "EyeOff",
+              label: "Hide",
+              tone: "neutral",
+              onTrigger: () => setLast("Hidden"),
+            }}
+            swipeRight={{
+              icon: "Pin",
+              label: "Pin",
+              tone: "accent",
+              onTrigger: () => setLast("Pinned"),
+            }}
+          >
+            <UI.ListRow
+              title="Homemade bread"
+              description="per loaf"
+              trailing={<UI.Text variant="label">120 Kč</UI.Text>}
+              onPress={() => setLast("Opened")}
+            />
+          </UI.SwipeRow>
+          <UI.SwipeRow
+            swipeLeft={{
+              icon: "Pause",
+              label: "Pause",
+              tone: "neutral",
+              onTrigger: () => setLast("Paused"),
+            }}
+          >
+            <UI.ListRow
+              title="Bike repair"
+              description="per hour"
+              trailing={<UI.Text variant="label">300 Kč</UI.Text>}
+              onPress={() => setLast("Opened")}
+            />
+          </UI.SwipeRow>
+          <UI.Text variant="caption" color="$colorMuted">
+            {last}
+          </UI.Text>
+        </UI.Stack>
+      );
+    },
     ContactRow: () => {
       const [selected, setSelected] = useState(false);
       return (
