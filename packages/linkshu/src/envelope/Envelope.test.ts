@@ -187,6 +187,7 @@ const deviceWallet = (fakeMint: FakeMint, args: DeviceArgs) => {
         return response;
       }),
     mint: {
+      ...fakeWallet().mint,
       webSocketConnection: undefined,
       disconnectWebSocket: () => undefined,
       restore: ({ outputs }) => {

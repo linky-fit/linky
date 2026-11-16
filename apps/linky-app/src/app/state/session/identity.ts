@@ -58,9 +58,6 @@ export const canSwitchToDefaultIdentityAtom = Atom.readable((get) => {
   );
 });
 
-/** Logout was tapped once; a second tap within 5 s logs out. */
-export const logoutArmedAtom = Atom.keepAlive(Atom.make(false));
-
 export const pendingIdentitySwitchAtom = Atom.keepAlive(
   Atom.make<PendingIdentitySwitch | null>(null),
 );

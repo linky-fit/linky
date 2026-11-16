@@ -83,9 +83,17 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "listings.sharedSent":
     "A message carrying a shared listing was enqueued. Message, rumor and contact links tie it to the send; the pubkey link is the listing's author. The payload says whether it had a note or a photo, never the photo's url or key.",
   "listings.hidden":
-    "The user hid someone's listing, a contact's or a stranger's: a `hiddenListing` row now keeps it out of Goods & services on every device, and it is never passed on. The payload has the author pubkey and listing id.",
+    "The user hid someone's listing, a contact's or a stranger's: a `hiddenListing` row now keeps it out of Goods & services on every device, any `pinnedListing` row for it was removed, and it is never passed on. The payload has the author pubkey and listing id.",
   "listings.shown":
     "The user showed a hidden listing again: its `hiddenListing` row was removed on every device. The payload has the author pubkey and listing id.",
+  "listings.pinned":
+    "The user pinned someone's listing to the top of Goods & services: a `pinnedListing` row now keeps it there on every device, and a `hiddenListing` row for it was removed. The payload has the author pubkey and listing id.",
+  "listings.unpinned":
+    "The user unpinned someone's listing: its `pinnedListing` row was removed on every device and it went back to its section. The payload has the author pubkey and listing id.",
+  "listings.paused":
+    "The user paused one of their own listings: its `listing` row got `pausedAtSec`, so the next listings document leaves it out. The payload has the listing id.",
+  "listings.resumed":
+    "The user resumed a paused listing of their own: its `pausedAtSec` was cleared, so the next listings document carries it again. The payload has the listing id.",
   "contacts.npubSaved":
     "A Nostr contact was saved after the duplicate check. The contact link identifies the new row; the insert itself runs in the background.",
   "contacts.sharedProfileOpened":
@@ -192,6 +200,10 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "The wallet chose how to pay a NUT-18 payment request of this amount, before anything moved: Direct from a mint the request accepts (other mints before the default one), NeedsMintMove into the default mint, Lightning from another mint into one the request accepts, or why it cannot pay. The fee is what leaves the wallet on top of the amount.",
   "paymentRequest.lightningMove":
     "To pay a request at a mint the wallet held too little at, the amount plus the send's fee allowance was moved over Lightning (melt at the source, mint at the target). Once moved, the sats stay at the target even if the payment then fails.",
+  "lightningInvoice.amountlessRouted":
+    "The wallet chose where to pay a Lightning invoice without an amount at the amount the user entered, before anything moved: Direct from a funded mint that advertises NUT-23 amountless melts, Lightning from another mint into such a mint in the user's list, Unsupported when no listed mint pays such invoices, or why it cannot pay.",
+  "lightningInvoice.amountlessMove":
+    "To pay an invoice without an amount, its cost was moved over Lightning into a mint that pays such invoices (melt at the source, mint at the target). Once moved, the sats stay at the target even if the payment then fails.",
   "paymentRequest.delivery":
     "The NUT-18 payment payload left over the request's transport: a NIP-17 message to the request's nprofile and its relays, or a POST to its URL. queued means the message is stored but no relay took it yet; failed POSTs are taken back into the wallet.",
   "messages.deleted":

@@ -165,10 +165,22 @@ const mintInfo = (overrides: Partial<MintInfo> = {}) =>
     inputFeePpk: 100,
     supportsMpp: false,
     supportsP2pk: true,
+    supportsAmountlessMelt: false,
     isFakeLightning: false,
     iconUrl: null,
     ...overrides,
   });
+
+/** Mint info where only `capable` mints pay invoices without an amount. */
+const amountlessAt =
+  (...capable: string[]): PaymentsDeps["linkshu"]["fetchMintInfo"] =>
+  async (mint) =>
+    Result.succeed(
+      mintInfo({
+        url: MintUrl.make(mint),
+        supportsAmountlessMelt: capable.includes(mint),
+      }),
+    );
 
 const autoswapEstimate = (
   move: { sourceMint: string; targetMint: string; amountSat?: number },
@@ -399,7 +411,9 @@ describe("quoteLightningInvoice", () => {
   });
 
   it("prices an amountless invoice at the entered amount, and an invoice's own amount over it", async () => {
-    const { commands, linkshu } = setup();
+    const { commands, linkshu } = setup({
+      fetchMintInfo: amountlessAt(MINT_URL),
+    });
     const amountless = makeLightningInvoice("");
 
     expect(await commands.quoteLightningInvoice(amountless, 40)).toEqual({
@@ -487,7 +501,9 @@ describe("payLightningInvoice", () => {
   });
 
   it("pays an amountless invoice with the entered amount", async () => {
-    const { commands, linkshu } = setup();
+    const { commands, linkshu } = setup({
+      fetchMintInfo: amountlessAt(MINT_URL),
+    });
     const amountless = makeLightningInvoice("");
 
     const outcome = await commands.payLightningInvoice(amountless, {
@@ -500,6 +516,54 @@ describe("payLightningInvoice", () => {
       mint: MINT_URL,
       amountSat: 40,
     });
+  });
+
+  it("moves an amountless invoice's cost over Lightning to a listed mint able to pay it", async () => {
+    const { commands, linkshu } = setup({
+      fetchMintInfo: amountlessAt(FOREIGN),
+      quoteCashuMelt: async () => Result.succeed(meltCost(40, 2, 1)),
+    });
+    const amountless = makeLightningInvoice("");
+
+    expect(await commands.quoteLightningInvoice(amountless, 40)).toEqual({
+      _tag: "Quoted",
+      amount: 40,
+      // 43 lands at the target for the melt, 10 more leaves for the move.
+      fee: 13,
+      mint: MINT_URL,
+    });
+    const outcome = await commands.payLightningInvoice(amountless, {
+      amountSat: 40,
+    });
+
+    expect(outcome).toMatchObject({ _tag: "Paid" });
+    expect(linkshu.quoteCashuMelt).toHaveBeenCalledWith({
+      invoice: amountless,
+      mint: FOREIGN,
+      amountSat: 40,
+    });
+    expect(linkshu.autoswapCashu).toHaveBeenCalledWith({
+      sourceMint: MINT_URL,
+      targetMint: FOREIGN,
+      amountSat: 43,
+    });
+    expect(linkshu.meltCashuInvoice).toHaveBeenCalledWith({
+      invoice: amountless,
+      mint: FOREIGN,
+      amountSat: 40,
+    });
+  });
+
+  it("refuses an amountless invoice when no listed mint pays one, moving nothing", async () => {
+    const { commands, linkshu } = setup();
+    const amountless = makeLightningInvoice("");
+
+    expect(
+      await commands.payLightningInvoice(amountless, { amountSat: 40 }),
+    ).toMatchObject({ _tag: "Failed" });
+    expect(linkshu.quoteCashuMelt).not.toHaveBeenCalled();
+    expect(linkshu.autoswapCashu).not.toHaveBeenCalled();
+    expect(linkshu.meltCashuInvoice).not.toHaveBeenCalled();
   });
 
   it("reports a typed melt failure with its detail", async () => {

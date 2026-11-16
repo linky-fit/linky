@@ -13,6 +13,7 @@ const info = (overrides: Partial<MintInfo> = {}) =>
     inputFeePpk: 100,
     supportsMpp: true,
     supportsP2pk: false,
+    supportsAmountlessMelt: false,
     isFakeLightning: false,
     iconUrl: "https://cashu.example/icon.png",
     ...overrides,

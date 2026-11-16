@@ -8,7 +8,7 @@ import {
   Stack,
   Text,
 } from "@linky-fit/ui";
-import { useEffect, useState, type FC } from "react";
+import type { FC } from "react";
 import { useAtomValue } from "@linky-fit/linkstr-react";
 import { useOpenContactPay } from "../app/hooks/contacts/useContactActions";
 import {
@@ -16,6 +16,10 @@ import {
   useRoutePeopleContact,
 } from "../app/hooks/contacts/useDisplayContacts";
 import { useNostrPictureByNpub } from "../app/hooks/contacts/useProfileCache";
+import {
+  isVerifiedAddress,
+  useVerifiedNip05,
+} from "../app/hooks/contacts/useVerifiedNip05";
 import { useCopyText, useTranslation } from "../app/hooks/shell";
 import { useWalletBalance } from "../app/hooks/wallet/useWalletInventory";
 import { payWithCashuEnabledAtom } from "../app/state/wallet/prefs";
@@ -32,7 +36,6 @@ import {
   formatShortLightningAddress,
   formatShortNpub,
 } from "../utils/formatting";
-import { resolveVerifiedNip05Identifier } from "../utils/nostrNip05";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 import { contactPictureUrl } from "../derivedProfile";
 
@@ -58,44 +61,6 @@ interface ContactPageProps {
   t: Translate;
 }
 
-const useVerifiedNip05 = (npub: string | null): string | null => {
-  const [verifiedNip05, setVerifiedNip05] = useState<{
-    identifier: string;
-    npub: string;
-  } | null>(null);
-
-  useEffect(() => {
-    if (!npub) return;
-
-    // Contact pubkeys are watched, so the cached profile is authoritative.
-    const nip05 = loadCachedProfile(npub)?.metadata.nip05;
-    if (!nip05) return;
-
-    const controller = new AbortController();
-    let cancelled = false;
-
-    const load = async () => {
-      try {
-        const identifier = await resolveVerifiedNip05Identifier(nip05, npub, {
-          signal: controller.signal,
-        });
-        if (!cancelled && identifier) setVerifiedNip05({ identifier, npub });
-      } catch {
-        // A profile remains usable when its NIP-05 server is offline.
-      }
-    };
-
-    void load();
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [npub]);
-
-  return verifiedNip05?.npub === npub ? verifiedNip05.identifier : null;
-};
-
 export const ContactPage: FC<ContactPageProps> = ({
   cashuBalance,
   cashuIsBusy,
@@ -112,6 +77,8 @@ export const ContactPage: FC<ContactPageProps> = ({
   const selectedLnAddress = (selectedContact?.lnAddress ?? "").trim();
   const verifiedNip05 = useVerifiedNip05(
     selectedLnAddress ? selectedNpub : null,
+    // Contact pubkeys are watched, so the cached profile is authoritative.
+    selectedNpub ? loadCachedProfile(selectedNpub)?.metadata.nip05 : null,
   );
   if (!selectedContact) {
     return <EmptyState title={t("contactNotFound")} />;
@@ -126,8 +93,7 @@ export const ContactPage: FC<ContactPageProps> = ({
   const hasLightningAddress = ln.length > 0;
   const canMessage = Boolean(npub);
   const contactName = name || t("contact");
-  const isLightningAddressNip05Verified =
-    Boolean(verifiedNip05) && verifiedNip05?.toLowerCase() === ln.toLowerCase();
+  const isLightningAddressNip05Verified = isVerifiedAddress(verifiedNip05, ln);
   const canPayThisContact =
     hasLightningAddress || (payWithCashuEnabled && canMessage);
   const canStartPay = cashuBalance > 0 && canPayThisContact;

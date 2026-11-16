@@ -66,6 +66,7 @@ export const fakeWallet = (
     webSocketConnection: { onClose: () => undefined },
     disconnectWebSocket: () => undefined,
     restore: notUnderTest,
+    createMeltQuoteBolt11: notUnderTest,
   },
   on: { mintQuoteUpdates: notUnderTest },
   createMintQuoteBolt11: notUnderTest,

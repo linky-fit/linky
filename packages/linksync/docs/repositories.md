@@ -34,9 +34,9 @@ const all = await Effect.runPromise(contacts.all);
 
 The repository returns one row per id; deduplicating unsaved peers by npub is the consumer's.
 
-## Hidden listings
+## Hidden and pinned listings
 
-`makeHiddenListingsRepository(store)` is a `TableRepository` over `hiddenListing`, in the `contacts` scope: someone else's listings the user hid, whether or not the author is a contact. `setHidden(author, listingId, hidden)` hides a listing or shows it again and writes nothing when it is already in that state. Each listing has one row, `hiddenListingIdFor(author, listingId)`, so hiding it on two devices lands on one row, and showing it removes the row. `hiddenListingKeysOf(rows)` turns the rows into a set to test with `hiddenListingKey(author, listingId)`.
+`makeHiddenListingsRepository(store)` and `makePinnedListingsRepository(store)` are `TableRepository`s over `hiddenListing` and `pinnedListing`, in the `contacts` scope: someone else's listings the user hid or pinned to the top, whether or not the author is a contact. `setHidden(author, listingId, hidden)` hides a listing or shows it again, `setPinned(author, listingId, pinned)` pins or unpins it; either writes nothing when the listing is already in that state. Each listing has one row per table, `hiddenListingIdFor(author, listingId)` or `pinnedListingIdFor(author, listingId)`, so marking it on two devices lands on one row, and unmarking removes the row. The two tables are independent; keeping a listing out of both at once is the consumer's. `listingKeysOf(rows)` turns either table's rows into a set to test with `listingKey(author, listingId)`.
 
 ## Conversations
 
@@ -104,7 +104,7 @@ Insert `mintUrl`, `rail` and the initial `progress` with every new payment. `min
 
 `makeListingsRepository(store)` over `listing` in the `contacts` scope, which is never forgotten: one row per thing the user offers to, or wants from, their contacts. `all` returns `ListingRecord`s, whose creation time, kind, side, title, amount, currency and unit are present; a row still arriving column by column is skipped (`normalizeListing`).
 
-Adding a listing is `insert` with every column; editing is `update`; withdrawing it is `remove`. `side`, `unit`, `amount` and `currency` stay strings here and are validated into `@linky-fit/linkstr`'s `Listing` by the consumer that publishes them, and so are the optional `description`, the author's text, and `image`, the JSON of linkstr's `PrivateImage`, each left out of an insert when the listing has none; `priceByAgreement` is `1` when a zero `amount` means the price is to be agreed rather than free; `audience` says who sees the listing, as JSON the consumer validates (`{"kind":"network"}` or `{"kind":"group","group":<group name>}`), and is left out for a listing only the contacts see; the row id is the listing's stable id on the wire. The cash intent is the `cashIntent` setting, not a row.
+Adding a listing is `insert` with every column; editing is `update`; withdrawing it is `remove`. `side`, `unit`, `amount` and `currency` stay strings here and are validated into `@linky-fit/linkstr`'s `Listing` by the consumer that publishes them, and so are the optional `description`, the author's text, and `image`, the JSON of linkstr's `PrivateImage`, each left out of an insert when the listing has none; `priceByAgreement` is `1` when a zero `amount` means the price is to be agreed rather than free; `audience` says who sees the listing, as JSON the consumer validates (`{"kind":"network"}` or `{"kind":"group","group":<group name>}`), and is left out for a listing only the contacts see; `pausedAtSec` is set while the user paused the listing, which the consumer then leaves unpublished, and cleared with `null` to resume it; releases before the column ignore it and keep publishing the listing; the row id is the listing's stable id on the wire. The cash intent is the `cashIntent` setting, not a row.
 
 ## Keryx subscriptions
 

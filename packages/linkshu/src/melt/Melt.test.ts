@@ -1,11 +1,12 @@
 import type {
   MeltProofsResponse,
+  MeltQuoteBolt11Request,
   MeltQuoteBolt11Response,
   MeltQuoteState,
   Proof as CashuProof,
   SendResponse,
 } from "@cashu/cashu-ts";
-import { Amount, Keyset, MintOperationError } from "@cashu/cashu-ts";
+import { Amount, Keyset, MintInfo, MintOperationError } from "@cashu/cashu-ts";
 import { Effect, Exit, Layer } from "effect";
 import { TestClock } from "effect/testing";
 import {
@@ -30,6 +31,7 @@ import type { StoredProof } from "../ports/ProofStore";
 import { runOnTestClock } from "../testing/clock";
 import {
   fakeKeyChain,
+  fakeMintInfo,
   fakeWallet,
   KEYSET_HEX,
   proof,
@@ -343,31 +345,99 @@ describe("Melt.quote", () => {
     expect(JSON.stringify(events)).not.toContain("lnbc");
   });
 
-  it("asks the mint for the draft's amount in millisats and holds it to that amount", async () => {
-    const { wallet, quoteCalls } = makeWallet({});
+  describe("an amountless invoice", () => {
     const amountless = new MeltDraft({
       mint,
       invoice,
       amount: SatAmount.make(10),
     });
-    const { run } = makeHarness(wallet);
 
-    const exit = await run(
-      Effect.flatMap(Melt, (melt) => melt.quote(amountless)),
+    /** A wallet whose mint publishes `bolt11` as `method`, recording the quote payloads it gets. */
+    const amountlessWallet = (
+      method: Record<string, unknown>,
+      quote: () => Promise<MeltQuoteBolt11Response> = () =>
+        Promise.resolve(quoteResponse()),
+    ) => {
+      const { wallet, quoteCalls } = makeWallet({});
+      const payloads: MeltQuoteBolt11Request[] = [];
+      const info = new MintInfo({
+        ...fakeMintInfo().cache,
+        nuts: {
+          ...fakeMintInfo().cache.nuts,
+          "5": {
+            methods: [
+              {
+                method: "bolt11",
+                unit: "sat",
+                min_amount: 1,
+                max_amount: 1_000_000,
+                ...method,
+              },
+            ],
+            disabled: false,
+          },
+        },
+      });
+      return {
+        wallet: {
+          ...wallet,
+          getMintInfo: () => info,
+          mint: {
+            ...wallet.mint,
+            createMeltQuoteBolt11: (payload: MeltQuoteBolt11Request) => {
+              payloads.push(payload);
+              return quote();
+            },
+          },
+        },
+        payloads,
+        quoteCalls,
+      };
+    };
+
+    it.each([
+      ["inside options", { options: { amountless: true } }],
+      ["flat on the method", { amountless: true }],
+    ])(
+      "asks a mint advertising it %s for the amount in millisats",
+      async (_, method) => {
+        const { wallet, payloads, quoteCalls } = amountlessWallet(method);
+        const exit = await makeHarness(wallet).run(
+          Effect.flatMap(Melt, (melt) => melt.quote(amountless)),
+        );
+        assert(Exit.isSuccess(exit));
+        expect(exit.value.amount).toBe(10);
+        expect(payloads).toEqual([
+          {
+            unit: "sat",
+            request: invoice,
+            options: { amountless: { amount_msat: 10_000 } },
+          },
+        ]);
+        expect(quoteCalls).toEqual([]);
+      },
     );
-    assert(Exit.isSuccess(exit));
-    expect(exit.value.amount).toBe(10);
-    expect(quoteCalls).toEqual([{ invoice, amountMsat: 10_000 }]);
 
-    const other = makeWallet({
-      quote: () => Promise.resolve(quoteResponse({ amount: Amount.from(11) })),
+    it("refuses a mint that does not advertise it before asking for a quote", async () => {
+      const { wallet, payloads } = amountlessWallet({});
+      const exit = await makeHarness(wallet).run(
+        Effect.flatMap(Melt, (melt) => Effect.flip(melt.quote(amountless))),
+      );
+      assert(Exit.isSuccess(exit));
+      expect(exit.value).toMatchObject({ _tag: "MintRejected", mint });
+      expect(payloads).toEqual([]);
     });
-    const mismatch = await makeHarness(other.wallet).run(
-      Effect.flatMap(Melt, (melt) => Effect.flip(melt.quote(amountless))),
-    );
-    assert(Exit.isSuccess(mismatch));
-    expect(mismatch.value).toMatchObject({ _tag: "MintRejected", mint });
-    expect(other.quoteCalls).toEqual([{ invoice, amountMsat: 10_000 }]);
+
+    it("holds the quote to the draft's amount", async () => {
+      const { wallet } = amountlessWallet({ amountless: true }, () =>
+        Promise.resolve(quoteResponse({ amount: Amount.from(11) })),
+      );
+      const exit = await makeHarness(wallet).run(
+        Effect.flatMap(Melt, (melt) => Effect.flip(melt.quote(amountless))),
+      );
+      assert(Exit.isSuccess(exit));
+      expect(exit.value).toMatchObject({ _tag: "MintRejected", mint });
+    });
   });
 
   it("rejects a malformed melt quote as MintRejected", async () => {

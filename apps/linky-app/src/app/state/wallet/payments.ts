@@ -73,6 +73,12 @@ import {
   sendFeeAllowance,
   type PaymentRequestMintPlan,
 } from "./paymentRequestPlan";
+import {
+  reportAmountlessInvoiceMove,
+  reportAmountlessInvoiceRouted,
+  routeAmountlessInvoice,
+  type AmountlessInvoiceRoute,
+} from "./amountlessInvoiceRoute";
 import { walletOpsAtom, type WalletOps } from "./opQueue";
 import { logPayStep, paymentLogAtom, type PaymentLog } from "./paymentLog";
 
@@ -392,6 +398,68 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
     return { amountSat: valid ? entered : null, amountless: true };
   };
 
+  const UNSUPPORTED_AMOUNTLESS =
+    "no mint in your list pays invoices without an amount";
+
+  const routeAmountless = async (
+    invoice: string,
+    amountSat: number,
+    current: WalletBalances,
+  ): Promise<AmountlessInvoiceRoute> => {
+    const route = await routeAmountlessInvoice({
+      invoice,
+      amountSat,
+      balances: current,
+      defaultMint: deps.defaultMint,
+      allowTestMints: deps.allowTestMints,
+      userMints: deps.userMints(),
+      linkshu,
+    });
+    reportAmountlessInvoiceRouted(amountSat, route);
+    return route;
+  };
+
+  /** Moves the amount of an amountless invoice to the mint the route pays it from. */
+  const moveForAmountless = async (
+    route: Extract<AmountlessInvoiceRoute, { _tag: "Lightning" }>,
+  ): Promise<Result.Result<void, { detail: string; network: boolean }>> => {
+    const report = (
+      outcome: "moved" | "failed",
+      receipt: AutoswapReceipt | null,
+      detail: string | null,
+    ) =>
+      reportAmountlessInvoiceMove({
+        sourceMint: route.sourceMint,
+        targetMint: route.targetMint,
+        moveAmount: route.moveAmount,
+        outcome,
+        operationId: receipt?.operationId ?? null,
+        feePaid: receipt?.feePaid ?? null,
+        detail,
+      });
+    try {
+      const moved = await linkshu.autoswapCashu({
+        sourceMint: route.sourceMint,
+        targetMint: route.targetMint,
+        amountSat: route.moveAmount,
+      });
+      if (Result.isFailure(moved)) {
+        const detail = describeError(moved.failure);
+        report("failed", null, detail);
+        return Result.fail({
+          detail,
+          network: isNetworkFailure(moved.failure),
+        });
+      }
+      report("moved", moved.success, null);
+      return Result.succeed(undefined);
+    } catch (error) {
+      const detail = describeError(error);
+      report("failed", null, detail);
+      return Result.fail({ detail, network: isNetworkFailure(error) });
+    }
+  };
+
   const melt = async (
     invoice: string,
     mint: MintUrl,
@@ -474,14 +542,60 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
 
     const paid = await ops.runExclusiveTask(
       async (): Promise<PayInvoiceOutcome> => {
-        // An amountless invoice without an entered amount cannot pre-select
-        // by size; any funded mint may quote it, so fall back to the 1-sat
-        // threshold and let the mint answer.
-        const mint = sendMint(current, amountSat ?? 1);
-        if (mint === null) return { _tag: "Insufficient" };
-        options?.onSending?.();
         const details = { lightningInvoice: normalized };
         const note = preview?.description ?? null;
+        const logFailure = (mint: string | null, detail: string) =>
+          logPaymentEvent({
+            direction: "out",
+            status: "error",
+            amount: null,
+            details,
+            fee: null,
+            mint,
+            unit: "sat",
+            error: detail,
+            contactId: null,
+            method: "lightning_invoice",
+            paymentType: "lightning",
+            phase: "melt",
+          });
+        let mint: MintUrl;
+        if (amountless && amountSat !== null) {
+          const route = await routeAmountless(normalized, amountSat, current);
+          switch (route._tag) {
+            case "Insufficient":
+              return shortfall(current, amountSat);
+            case "Unsupported":
+              logFailure(null, UNSUPPORTED_AMOUNTLESS);
+              return { _tag: "Failed", detail: UNSUPPORTED_AMOUNTLESS };
+            case "Failed":
+              if (isNetworkFailure(route.error)) return NETWORK_FAILURE;
+              logFailure(null, describeError(route.error));
+              return { _tag: "Failed", detail: describeError(route.error) };
+            case "Direct":
+              options?.onSending?.();
+              mint = route.mint;
+              break;
+            case "Lightning": {
+              options?.onSending?.();
+              const moved = await moveForAmountless(route);
+              if (Result.isFailure(moved)) {
+                const { detail, network } = moved.failure;
+                logFailure(route.sourceMint, detail);
+                return network ? NETWORK_FAILURE : { _tag: "Failed", detail };
+              }
+              mint = route.targetMint;
+              break;
+            }
+          }
+        } else {
+          // Without an entered amount any funded mint may quote the
+          // invoice, so fall back to the 1-sat threshold and let it answer.
+          const chosen = sendMint(current, amountSat ?? 1);
+          if (chosen === null) return { _tag: "Insufficient" };
+          options?.onSending?.();
+          mint = chosen;
+        }
         const outcome = await melt(
           normalized,
           mint,
@@ -500,20 +614,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
             );
             return { _tag: "Pending", pending };
           }
-          logPaymentEvent({
-            direction: "out",
-            status: "error",
-            amount: null,
-            details,
-            fee: null,
-            mint,
-            unit: "sat",
-            error: detail,
-            contactId: null,
-            method: "lightning_invoice",
-            paymentType: "lightning",
-            phase: "melt",
-          });
+          logFailure(mint, detail);
           return network ? NETWORK_FAILURE : { _tag: "Failed", detail };
         }
         const receipt = outcome.success;
@@ -1022,7 +1123,30 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
       );
       if (amountSat === null) return { _tag: "Invalid" };
       if (!deps.isOnline()) return NETWORK_FAILURE;
-      const mint = sendMint(await balances(), amountSat);
+      const current = await balances();
+      let mint = sendMint(current, amountSat);
+      if (amountless) {
+        const route = await routeAmountless(normalized, amountSat, current);
+        switch (route._tag) {
+          case "Insufficient":
+            return { _tag: "Insufficient" };
+          case "Unsupported":
+            return { _tag: "Failed", detail: UNSUPPORTED_AMOUNTLESS };
+          case "Failed":
+            return isNetworkFailure(route.error)
+              ? NETWORK_FAILURE
+              : { _tag: "Failed", detail: describeError(route.error) };
+          case "Lightning":
+            return {
+              _tag: "Quoted",
+              amount: amountSat,
+              fee: route.fee,
+              mint: route.sourceMint,
+            };
+          case "Direct":
+            mint = route.mint;
+        }
+      }
       if (mint === null) return { _tag: "Insufficient" };
       try {
         const outcome = await linkshu.quoteCashuMelt({

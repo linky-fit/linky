@@ -4,6 +4,7 @@ import {
   Button,
   Chip,
   IconButton,
+  Icon,
   ListRow,
   LoadingState,
   NearbyAvatar,
@@ -26,6 +27,10 @@ import {
   useContactEditorParams,
 } from "../app/hooks/contacts/useContactEditor";
 import { useTranslation } from "../app/hooks/shell";
+import {
+  isVerifiedAddress,
+  useVerifiedNip05,
+} from "../app/hooks/contacts/useVerifiedNip05";
 import { useScanCommands } from "../app/hooks/shell/scan";
 import { contactGroupsAtom } from "../app/state/contacts/readModel";
 import type { Route } from "../types/route";
@@ -195,6 +200,7 @@ interface ContactSearchCandidate {
   isExactMatch: boolean;
   lnAddress: string;
   name: string;
+  nip05?: string;
   npub: string;
   pictureUrl: string | null;
   query: string;
@@ -238,6 +244,13 @@ function SearchCandidateRow({
 }: SearchCandidateRowProps) {
   const displayName =
     (candidate.name || candidate.query || "").trim() || t("contact");
+  const isLnAddressVerified = isVerifiedAddress(
+    useVerifiedNip05(
+      candidate.lnAddress ? candidate.npub : null,
+      candidate.nip05,
+    ),
+    candidate.lnAddress,
+  );
   const opens = Boolean(candidate.existingContactId || candidate.isSelf);
   return (
     <ListRow
@@ -254,9 +267,14 @@ function SearchCandidateRow({
       description={
         <Stack gap="$xxs">
           {candidate.lnAddress ? (
-            <Text variant="caption" color="$colorMuted" numberOfLines={1}>
-              {formatShortLightningAddress(candidate.lnAddress)}
-            </Text>
+            <Row gap="$xxs" alignItems="center">
+              {isLnAddressVerified ? (
+                <Icon name="Check" size="sm" color="$accent" />
+              ) : null}
+              <Text variant="caption" color="$colorMuted" numberOfLines={1}>
+                {formatShortLightningAddress(candidate.lnAddress)}
+              </Text>
+            </Row>
           ) : null}
           <Text variant="caption" color="$colorMuted" numberOfLines={1}>
             {formatShortNpub(candidate.npub)}

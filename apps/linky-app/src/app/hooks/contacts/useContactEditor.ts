@@ -77,6 +77,8 @@ export interface ContactSearchCandidate {
   isExactMatch: boolean;
   lnAddress: string;
   name: string;
+  /** The profile's unverified NIP-05 claim. */
+  nip05?: string;
   npub: string;
   pictureUrl: string | null;
   query: string;
@@ -720,6 +722,7 @@ export const useContactEditor = ({
         lnAddress:
           getMetadataLightningAddress(metadata, npub) || fallback.lnAddress,
         name: (metadata ? getBestNostrName(metadata) : null) ?? fallback.name,
+        ...(metadata?.nip05 ? { nip05: metadata.nip05 } : {}),
         npub,
         pictureUrl: getProfilePictureUrl(metadata),
         query,

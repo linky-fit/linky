@@ -10,7 +10,7 @@ import { ProofStore } from "../ports/ProofStore";
 import { findMintInfoIconValue, isTestMintUrl } from "./icons";
 import { MintInfo } from "./domain";
 import { collectKnownMints } from "./internal/knownMints";
-import { supportsP2pk } from "./internal/nutSupport";
+import { supportsAmountlessMelt, supportsP2pk } from "./internal/nutSupport";
 import { boundKeysetInputFeePpk } from "./internal/keysetFees";
 import { seenMintKey, WalletInstances } from "./internal/WalletInstances";
 import type { LoadedWallet } from "./internal/WalletInstances";
@@ -29,6 +29,7 @@ const buildMintInfo = (mint: MintUrl, wallet: LoadedWallet): MintInfo => {
     inputFeePpk: boundKeysetInputFeePpk(wallet),
     supportsMpp: published.isSupported(15).supported,
     supportsP2pk: supportsP2pk(wallet),
+    supportsAmountlessMelt: supportsAmountlessMelt(wallet),
     isFakeLightning:
       isTestMintUrl(mint) ||
       advertisedInfo.includes("fakewallet") ||

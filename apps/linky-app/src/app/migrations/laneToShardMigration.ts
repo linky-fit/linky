@@ -215,6 +215,7 @@ const REQUIRED_COLUMNS: {
   nostrIdentity: ["nsec"],
   contact: [],
   hiddenListing: ["authorPubkey", "listingId"],
+  pinnedListing: ["authorPubkey", "listingId"],
   conversation: ["kind"],
   message: ["conversationId", "direction", "content", "wrapId", "createdAtSec"],
   reaction: [

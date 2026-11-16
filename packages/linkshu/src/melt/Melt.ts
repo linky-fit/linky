@@ -75,6 +75,7 @@ import {
   WalletInstances,
 } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
+import { supportsAmountlessMelt } from "../mint/internal/nutSupport";
 import { CashuSeed } from "../ports/CashuSeed";
 import { KeyValueStore } from "../ports/KeyValueStore";
 import { OperationStore } from "../ports/OperationStore";
@@ -224,14 +225,29 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
       MintUnreachable | MintRejected
     > =>
       Effect.gen(function* () {
+        const amount = draft.amount;
+        if (amount !== undefined && !supportsAmountlessMelt(wallet))
+          return yield* new MintRejected({
+            mint: draft.mint,
+            code: null,
+            detail: "the mint does not pay invoices without an amount",
+          });
         const raw = yield* Effect.tryPromise({
           try: () =>
-            draft.amount === undefined
+            amount === undefined
               ? wallet.createMeltQuoteBolt11(draft.invoice)
-              : wallet.createMeltQuoteBolt11(
-                  draft.invoice,
-                  draft.amount * 1000,
-                ),
+              : // The wallet's own call drops the amount unless the mint
+                // nests its NUT-23 flag in `options`, which cdk-mintd does not.
+                wallet.mint
+                  .createMeltQuoteBolt11({
+                    unit: sat,
+                    request: draft.invoice,
+                    options: { amountless: { amount_msat: amount * 1000 } },
+                  })
+                  .then((quote) => ({
+                    ...quote,
+                    request: quote.request || draft.invoice,
+                  })),
           catch: (error) => classifyMintError(draft.mint, error),
         });
         const quote = yield* toMeltQuote(draft.mint, raw);

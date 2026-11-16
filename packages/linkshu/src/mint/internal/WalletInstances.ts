@@ -9,6 +9,7 @@ import {
   type KeyChain,
   type MeltProofsConfig,
   type MeltProofsResponse,
+  type MeltQuoteBolt11Request,
   type MeltQuoteBolt11Response,
   type MintProofsConfig,
   type MintQuoteBolt11Response,
@@ -88,6 +89,10 @@ export interface LoadedWallet {
     disconnectWebSocket(): void;
     /** NUT-09 over outputs the wallet built itself. */
     restore(payload: PostRestorePayload): Promise<PostRestoreResponse>;
+    /** Sends NUT-23 `options` as given, which the wallet's own call may drop. */
+    createMeltQuoteBolt11(
+      payload: MeltQuoteBolt11Request,
+    ): Promise<MeltQuoteBolt11Response>;
   };
   readonly on: {
     mintQuoteUpdates(

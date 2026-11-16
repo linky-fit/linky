@@ -1,3 +1,5 @@
+import type { Listing } from "@linky-fit/linkstr";
+import type { ListingId } from "@linky-fit/linksync";
 import { useAtomValue } from "@linky-fit/linkstr-react";
 import {
   Avatar,
@@ -7,7 +9,10 @@ import {
   ListRow,
   Row,
   Stack,
+  SwipeRow,
   Text,
+  type IconName,
+  type SwipeAction,
 } from "@linky-fit/ui";
 import React from "react";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
@@ -16,6 +21,11 @@ import {
   type PeerListing,
 } from "../app/hooks/useCollaboration";
 import { useListingRecords } from "../app/hooks/useLinksync";
+import {
+  useSetListingHidden,
+  useSetListingPaused,
+  useSetListingPinned,
+} from "../app/hooks/useListingMarks";
 import { formatListingPrice, listingOfRecord } from "../app/lib/listings";
 import {
   listingAudienceLabel,
@@ -69,66 +79,182 @@ function ListingByline({
   );
 }
 
+/** Where a row is listed, which decides what swiping it does. */
+type PeerListingPlace = "pinned" | "listed" | "hidden";
+
+/** Swiping left hides a listing, swiping right pins it, unpins it or shows a hidden one again. */
+function usePeerListingSwipes(
+  { author, listing }: PeerListing,
+  place: PeerListingPlace,
+  t: Translate,
+): { swipeLeft?: SwipeAction; swipeRight: SwipeAction } {
+  const setHidden = useSetListingHidden();
+  const setPinned = useSetListingPinned();
+  const hide: SwipeAction = {
+    icon: "EyeOff",
+    label: t("listingSwipeHide"),
+    tone: "neutral",
+    onTrigger: () => void setHidden(author, listing.id, true),
+  };
+  switch (place) {
+    case "pinned":
+      return {
+        swipeLeft: hide,
+        swipeRight: {
+          icon: "PinOff",
+          label: t("listingSwipeUnpin"),
+          tone: "accent",
+          onTrigger: () => void setPinned(author, listing.id, false),
+        },
+      };
+    case "listed":
+      return {
+        swipeLeft: hide,
+        swipeRight: {
+          icon: "Pin",
+          label: t("listingSwipePin"),
+          tone: "accent",
+          onTrigger: () => void setPinned(author, listing.id, true),
+        },
+      };
+    case "hidden":
+      return {
+        swipeRight: {
+          icon: "Eye",
+          label: t("listingSwipeShow"),
+          tone: "accent",
+          onTrigger: () => void setHidden(author, listing.id, false),
+        },
+      };
+  }
+}
+
 function PeerListingRow({
-  entry: { author, listing, seller, via },
+  entry,
+  place,
   display,
   t,
 }: {
   entry: PeerListing;
+  place: PeerListingPlace;
   display: DisplayAmountOptions;
   t: Translate;
 }): React.ReactElement {
+  const { author, listing, seller, via } = entry;
+  const swipes = usePeerListingSwipes(entry, place, t);
   return (
-    <ListRow
-      leading={
-        <ListingThumbnail
-          source={listing.image ?? null}
-          label={listing.title}
-        />
-      }
-      title={listing.title}
-      description={
-        seller ? (
-          <ListingByline
-            people={[
-              { name: seller.name, uri: seller.pictureUrl ?? undefined },
-            ]}
-            unit={listing.unit}
-            testID="listing-seller"
+    <SwipeRow {...swipes} testID={`peer-listing-swipe-${place}`}>
+      <ListRow
+        leading={
+          <ListingThumbnail
+            source={listing.image ?? null}
+            label={listing.title}
           />
-        ) : (
-          <ListingByline
-            people={via.map(({ name, pictureUrl }) => ({
-              name,
-              uri: pictureUrl ?? undefined,
-            }))}
-            prefix={t("listingVia")}
-            unit={listing.unit}
-            testID="listing-via"
+        }
+        title={listing.title}
+        description={
+          seller ? (
+            <ListingByline
+              people={[
+                { name: seller.name, uri: seller.pictureUrl ?? undefined },
+              ]}
+              unit={listing.unit}
+              testID="listing-seller"
+            />
+          ) : (
+            <ListingByline
+              people={via.map(({ name, pictureUrl }) => ({
+                name,
+                uri: pictureUrl ?? undefined,
+              }))}
+              prefix={t("listingVia")}
+              unit={listing.unit}
+              testID="listing-via"
+            />
+          )
+        }
+        trailing={<Price>{formatListingPrice(listing, display, t)}</Price>}
+        onPress={() =>
+          navigateTo({
+            route: "listing",
+            author,
+            listingId: listing.id,
+          })
+        }
+        testID="peer-listing"
+      />
+    </SwipeRow>
+  );
+}
+
+/** One of the user's own listings: swiping left pauses it, swiping right resumes a paused one. */
+function OwnListingRow({
+  id,
+  listing,
+  description,
+  paused,
+  price,
+  onPress,
+  t,
+}: {
+  id: ListingId;
+  listing: Listing;
+  description: string;
+  paused: boolean;
+  price: string;
+  onPress: () => void;
+  t: Translate;
+}): React.ReactElement {
+  const setPaused = useSetListingPaused();
+  const swipes: { swipeLeft?: SwipeAction; swipeRight?: SwipeAction } = paused
+    ? {
+        swipeRight: {
+          icon: "Play",
+          label: t("listingResume"),
+          tone: "accent",
+          onTrigger: () => void setPaused(id, false),
+        },
+      }
+    : {
+        swipeLeft: {
+          icon: "Pause",
+          label: t("listingPause"),
+          tone: "neutral",
+          onTrigger: () => void setPaused(id, true),
+        },
+      };
+  return (
+    <SwipeRow
+      {...swipes}
+      testID={`own-listing-swipe-${paused ? "paused" : "active"}`}
+    >
+      <ListRow
+        leading={
+          <ListingThumbnail
+            source={listing.image ?? null}
+            label={listing.title}
           />
-        )
-      }
-      trailing={<Price>{formatListingPrice(listing, display, t)}</Price>}
-      onPress={() =>
-        navigateTo({
-          route: "listing",
-          author,
-          listingId: listing.id,
-        })
-      }
-      testID="peer-listing"
-    />
+        }
+        title={listing.title}
+        description={description}
+        trailing={<Price>{price}</Price>}
+        onPress={onPress}
+        testID="own-listing"
+      />
+    </SwipeRow>
   );
 }
 
 function PeerSection({
   display,
   entries,
+  place,
   t,
   titleKey,
 }: {
   display: DisplayAmountOptions;
   entries: ReadonlyArray<PeerListing>;
+  place: PeerListingPlace;
   t: Translate;
   titleKey: I18nKey;
 }): React.ReactElement | null {
@@ -142,6 +268,7 @@ function PeerSection({
         <PeerListingRow
           key={`${entry.author}:${entry.listing.id}`}
           entry={entry}
+          place={place}
           display={display}
           t={t}
         />
@@ -151,23 +278,28 @@ function PeerSection({
 }
 
 /** The listings the user hid, folded under one row until the user opens it. */
-function HiddenSection({
-  display,
-  entries,
-  t,
+/** A section kept out of the way: a row with the count that unfolds the listings. */
+function CollapsedSection({
+  icon,
+  title,
+  count,
+  testID,
+  children,
 }: {
-  display: DisplayAmountOptions;
-  entries: ReadonlyArray<PeerListing>;
-  t: Translate;
+  icon: IconName;
+  title: string;
+  count: number;
+  testID: string;
+  children: React.ReactNode;
 }): React.ReactElement | null {
   const [open, setOpen] = React.useState(false);
-  if (entries.length === 0) return null;
+  if (count === 0) return null;
   return (
     <Stack gap="$sm">
       <ListRow
-        icon="EyeOff"
-        title={t("listingsHidden")}
-        value={entries.length}
+        icon={icon}
+        title={title}
+        value={count}
         chevron={false}
         trailing={
           <Icon
@@ -178,18 +310,9 @@ function HiddenSection({
         }
         expanded={open}
         onPress={() => setOpen((current) => !current)}
-        testID="hidden-listings"
+        testID={testID}
       />
-      {open
-        ? entries.map((entry) => (
-            <PeerListingRow
-              key={`${entry.author}:${entry.listing.id}`}
-              entry={entry}
-              display={display}
-              t={t}
-            />
-          ))
-        : null}
+      {open ? children : null}
     </Stack>
   );
 }
@@ -199,7 +322,7 @@ export function ListingsPage(): React.ReactElement {
   const { lang, t } = useTranslation();
   const { displayCurrency, fiatRates } = useDisplayAmounts();
   const display: DisplayAmountOptions = { displayCurrency, fiatRates, lang };
-  const { offered, wanted, hidden } = usePeerListings();
+  const { pinned, offered, wanted, hidden } = usePeerListings();
   const records = useListingRecords();
   const mine = React.useMemo(
     () =>
@@ -214,8 +337,29 @@ export function ListingsPage(): React.ReactElement {
     [records],
   );
 
+  const active = mine.filter(({ record }) => record.pausedAtSec === null);
+  const paused = mine.filter(({ record }) => record.pausedAtSec !== null);
+
   const ownPubkey = useAtomValue(currentPubkeyAtom);
   const { groupCounts } = useAtomValue(contactGroupsAtom);
+  const ownRow = ({ record, listing, audience }: (typeof mine)[number]) => (
+    <OwnListingRow
+      key={record.id}
+      id={record.id}
+      listing={listing}
+      description={`${t(listing.side === "offer" ? "listingSideOffer" : "listingSideWant")} · ${listingAudienceLabel(audience, t, groupCounts)}`}
+      paused={record.pausedAtSec !== null}
+      price={formatListingPrice(listing, display, t)}
+      onPress={() =>
+        navigateTo(
+          ownPubkey
+            ? { route: "listing", author: ownPubkey, listingId: record.id }
+            : { route: "listingEdit", id: record.id },
+        )
+      }
+      t={t}
+    />
+  );
   const addButton = (
     <FloatingActionButton
       icon="Plus"
@@ -226,6 +370,7 @@ export function ListingsPage(): React.ReactElement {
     />
   );
   if (
+    pinned.length === 0 &&
     offered.length === 0 &&
     wanted.length === 0 &&
     hidden.length === 0 &&
@@ -250,52 +395,57 @@ export function ListingsPage(): React.ReactElement {
         <Text color="$colorMuted">{t("listingsLead")}</Text>
         <PeerSection
           display={display}
+          entries={pinned}
+          place="pinned"
+          titleKey="listingsPinned"
+          t={t}
+        />
+        <PeerSection
+          display={display}
           entries={offered}
+          place="listed"
           titleKey="listingsOffered"
           t={t}
         />
         <PeerSection
           display={display}
           entries={wanted}
+          place="listed"
           titleKey="listingsWanted"
           t={t}
         />
-        {mine.length > 0 ? (
+        <CollapsedSection
+          icon="EyeOff"
+          title={t("listingsHidden")}
+          count={hidden.length}
+          testID="hidden-listings"
+        >
+          {hidden.map((entry) => (
+            <PeerListingRow
+              key={`${entry.author}:${entry.listing.id}`}
+              entry={entry}
+              place="hidden"
+              display={display}
+              t={t}
+            />
+          ))}
+        </CollapsedSection>
+        {active.length > 0 ? (
           <Stack gap="$sm">
             <Text variant="title" role="heading">
               {t("listingsMine")}
             </Text>
-            {mine.map(({ record, listing, audience }) => (
-              <ListRow
-                key={record.id}
-                leading={
-                  <ListingThumbnail
-                    source={listing.image ?? null}
-                    label={listing.title}
-                  />
-                }
-                title={listing.title}
-                description={`${t(listing.side === "offer" ? "listingSideOffer" : "listingSideWant")} · ${listingAudienceLabel(audience, t, groupCounts)}`}
-                trailing={
-                  <Price>{formatListingPrice(listing, display, t)}</Price>
-                }
-                onPress={() =>
-                  navigateTo(
-                    ownPubkey
-                      ? {
-                          route: "listing",
-                          author: ownPubkey,
-                          listingId: record.id,
-                        }
-                      : { route: "listingEdit", id: record.id },
-                  )
-                }
-                testID="own-listing"
-              />
-            ))}
+            {active.map(ownRow)}
           </Stack>
         ) : null}
-        <HiddenSection display={display} entries={hidden} t={t} />
+        <CollapsedSection
+          icon="Pause"
+          title={t("listingsPaused")}
+          count={paused.length}
+          testID="paused-listings"
+        >
+          {paused.map(ownRow)}
+        </CollapsedSection>
         <Text variant="label" fontWeight="$regular" color="$colorMuted">
           {t("listingsMutualOnly")}
         </Text>

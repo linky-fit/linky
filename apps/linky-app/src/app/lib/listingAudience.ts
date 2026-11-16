@@ -9,7 +9,7 @@ import {
   type Pubkey,
 } from "@linky-fit/linkstr";
 import {
-  hiddenListingKey,
+  listingKey,
   NonEmptyString1000,
   type ContactRow,
   type ListingRecord,
@@ -127,7 +127,7 @@ interface ListingsDraftInput {
   >;
   /** Whether the user passes the contacts' network listings on at all. */
   readonly passOn: boolean;
-  /** The listings the user hid, as `hiddenListingKey`s; never passed on. */
+  /** The listings the user hid, as `listingKey`s; never passed on. */
   readonly hidden: ReadonlySet<string>;
 }
 
@@ -161,7 +161,7 @@ const passedOnListings = (
         .filter(
           (listing) =>
             listing.reach === "network" &&
-            !hidden.has(hiddenListingKey(pubkey, listing.id)),
+            !hidden.has(listingKey(pubkey, listing.id)),
         )
         .reverse()
         .map((listing) => new SharedListing({ author: pubkey, listing })),
@@ -176,7 +176,8 @@ const passedOnListings = (
  * What to publish: the contacts' and the network's listings for every
  * recipient, the contacts' network listings passed on to them unless the user
  * opted out, and one audience per group with listings for its members only.
- * A group nobody is in publishes its listings to nobody.
+ * A group nobody is in publishes its listings to nobody, and a paused listing
+ * goes to nobody until it is resumed.
  */
 export const buildListingsDraft = ({
   records,
@@ -191,6 +192,7 @@ export const buildListingsDraft = ({
   for (const record of [...records].sort(
     (left, right) => left.createdAtSec - right.createdAtSec,
   )) {
+    if (record.pausedAtSec !== null) continue;
     const listing = listingOfRecord(record);
     const audience = listingAudienceOfRecord(record);
     if (listing === null || audience === null) continue;
@@ -286,4 +288,35 @@ export const peerListingEntries = (
     }
   }
   return [...direct, ...passed.values()];
+};
+
+/** Splits others' listings by where the list shows them; a listing both hidden and pinned, from two devices at once, stays hidden. */
+export const partitionPeerListings = <Entry extends PeerListingEntry>(
+  entries: ReadonlyArray<Entry>,
+  hidden: ReadonlySet<string>,
+  pinned: ReadonlySet<string>,
+): {
+  pinned: ReadonlyArray<Entry>;
+  offered: ReadonlyArray<Entry>;
+  wanted: ReadonlyArray<Entry>;
+  hidden: ReadonlyArray<Entry>;
+} => {
+  const placeOf = ({ author, listing }: Entry) => {
+    const key = listingKey(author, listing.id);
+    return hidden.has(key)
+      ? "hidden"
+      : pinned.has(key)
+        ? "pinned"
+        : listing.side === "offer"
+          ? "offered"
+          : "wanted";
+  };
+  const of = (place: ReturnType<typeof placeOf>) =>
+    entries.filter((entry) => placeOf(entry) === place);
+  return {
+    pinned: of("pinned"),
+    offered: of("offered"),
+    wanted: of("wanted"),
+    hidden: of("hidden"),
+  };
 };

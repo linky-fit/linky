@@ -118,7 +118,6 @@ const renderOffer = async ({
 
 describe("BankPaymentOfferDetailPage", () => {
   afterEach(() => {
-    document.body.innerHTML = "";
     window.location.hash = "";
     localStorage.clear();
     appShellMock.allowedDisplayCurrencies = ["sat"];
@@ -475,6 +474,13 @@ describe("BankPaymentOfferDetailPage", () => {
 
     await act(async () => {
       buttonByText(container, "bankPaymentOfferNotPaid")?.click();
+    });
+    expect(onRespondBankPaymentOffer).not.toHaveBeenCalled();
+    await act(async () => {
+      buttonByText(
+        document.querySelector<HTMLElement>('[role="dialog"]') ?? container,
+        "bankPaymentOfferNotPaid",
+      )?.click();
     });
 
     expect(onRespondBankPaymentOffer).toHaveBeenCalledWith(

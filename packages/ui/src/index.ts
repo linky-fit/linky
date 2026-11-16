@@ -76,6 +76,8 @@ export type {
 } from "./display";
 export { ContactRow, ListRow } from "./lists";
 export type { ContactRowProps, ListRowProps } from "./lists";
+export { SwipeRow } from "./swipe-row";
+export type { SwipeAction, SwipeRowProps } from "./swipe-row";
 export { NearbyAvatar, NearbyBanner, NearbyRow } from "./nearby";
 export { nearbyRowCapacity } from "./nearby-layout";
 export type {

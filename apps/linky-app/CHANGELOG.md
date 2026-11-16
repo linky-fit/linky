@@ -15,10 +15,18 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 ### en-US
 
 - The cashu.21m.lol mint is no longer offered; it stays listed for those who picked it as default or hold sats there.
+- Invoices without an amount, such as Phoenix's, are paid at the amount you enter instead of failing with "Invoice has no amount"; when your mint cannot pay them, the sats first move to one that can.
+- Logging out and canceling a proxy payment now ask for confirmation; logging out first asks whether your keys are backed up.
+- Swipe listings to hide or pin, your own to pause.
+- Contacts verified on domains like primal.net now get the check mark by their address too.
 
 ### cs-CZ
 
 - Mint cashu.21m.lol už není v nabídce; zůstane jen tomu, kdo ho má jako výchozí nebo u něj drží saty.
+- Faktury bez částky, třeba z Phoenixu, se zaplatí zadanou částkou místo chyby „Invoice has no amount“; když je tvůj mint zaplatit neumí, saty se nejdřív přesunou do mintu, který to umí.
+- Odhlášení a zrušení proxy platby si teď vyžádají potvrzení; před odhlášením se Linky zeptá, jestli máš zálohované klíče.
+- Nabídku swipem skryješ nebo připneš, svoji pozastavíš.
+- Kontakty ověřené na doménách jako primal.net teď mají u adresy taky fajfku.
 
 ## [26.11.3] - 2026-11-10
 

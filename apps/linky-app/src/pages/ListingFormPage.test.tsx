@@ -109,6 +109,7 @@ const storedEggs = (id: ListingId): ListingRecord => ({
   description: NonEmptyString1000.orThrow("Z volného chovu."),
   image: null,
   audience: null,
+  pausedAtSec: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
   isDeleted: 0,

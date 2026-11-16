@@ -33,6 +33,7 @@ import {
   useTiltSetting,
 } from "../app/hooks/settings/useDeviceSettings";
 import { useOpenFeedbackContact } from "../app/hooks/useFeedbackContact";
+import { LogoutRow } from "../components/LogoutRow";
 import { currentNsecAtom } from "../app/state/session/session";
 import { useAllowTestMints } from "../app/hooks/useAllowTestMints";
 import {
@@ -57,7 +58,7 @@ import { RECEIVE_METHOD_LABEL_KEYS } from "../utils/receiveMethod";
 
 export function AdvancedPage(): React.ReactElement {
   const route = useRouting();
-  const { logoutArmed, requestLogout, seedMnemonic } = useIdentitySettings();
+  const { requestLogout, seedMnemonic } = useIdentitySettings();
   const { dedupeContacts, dedupeContactsIsBusy } = useDedupeContacts();
   const defaultMintDisplay = useDefaultMintDisplay();
   const { evoluConnectedServerCount, evoluOverallStatus, evoluServerUrls } =
@@ -407,15 +408,19 @@ export function AdvancedPage(): React.ReactElement {
           active={isOpen("settingsNostrIdentity")}
           disabled={!hasCurrentNsec}
         />
-        <ListRow
-          icon="LogOut"
-          title={t("logout")}
-          destructive={logoutArmed}
-          onPress={() =>
+        <LogoutRow
+          evoluConnected={evoluOverallStatus === "connected"}
+          onBackUpKeys={
+            hasSeedMnemonic
+              ? () => navigateTo({ route: "settingsMasterKeys" })
+              : undefined
+          }
+          onConfirm={() =>
             requestLogout({
               evoluConnected: evoluOverallStatus === "connected",
             })
           }
+          t={t}
         />
       </Section>
 

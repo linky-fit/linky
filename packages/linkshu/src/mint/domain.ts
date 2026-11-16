@@ -14,6 +14,8 @@ export class MintInfo extends Schema.Class<MintInfo>("MintInfo")({
   supportsMpp: Schema.Boolean,
   /** NUT-11 P2PK: sends may lock their proofs to a key (`SendDraft.lockTo`). */
   supportsP2pk: Schema.Boolean,
+  /** NUT-23: melts take an amount for an invoice that names none (`MeltDraft.amount`). */
+  supportsAmountlessMelt: Schema.Boolean,
   /** Known test URL or published metadata advertising simulated Lightning. */
   isFakeLightning: Schema.Boolean,
   iconUrl: Schema.NullOr(Schema.String),

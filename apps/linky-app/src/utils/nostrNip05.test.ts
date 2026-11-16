@@ -124,6 +124,33 @@ describe("resolveNip05Input", () => {
     });
   });
 
+  it("retries through the same-origin proxy when the browser blocks the host", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+        .mockResolvedValueOnce({
+          json: async () => ({ names: { nvk: pubkeyHex } }),
+          ok: true,
+          type: "basic",
+        }),
+    );
+
+    const result = await resolveNip05Input("nvk@primal.net");
+
+    expect(fetch).toHaveBeenLastCalledWith(
+      `/api/lnurlp?url=${encodeURIComponent(
+        "https://primal.net/.well-known/nostr.json?name=nvk",
+      )}`,
+      { headers: { Accept: "application/json" }, redirect: "manual" },
+    );
+    expect(result).toMatchObject({
+      kind: "resolved",
+      npub: nip19.npubEncode(pubkeyHex),
+    });
+  });
+
   it("returns not_found when the name is missing", async () => {
     mockFetchJson({ names: {} });
 

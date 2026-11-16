@@ -87,6 +87,7 @@ const reachableMint = () =>
           inputFeePpk: 100,
           supportsMpp: true,
           supportsP2pk: false,
+          supportsAmountlessMelt: false,
           isFakeLightning: false,
           iconUrl: `${MINT}/icon.png`,
         }),
