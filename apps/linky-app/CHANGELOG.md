@@ -21,6 +21,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - All your devices show which contacts offer proxy payments, even when relays fail.
 - Contact search finds people you haven't added by npub or Linky name, to write to them first; results show who uses Linky.
 - People verified on domains like primal.net now get the check mark by their address too.
+- Search emojis by name when reacting, and type `:` with a name in a message to insert one, e.g. `:100`.
 
 ### cs-CZ
 
@@ -31,6 +32,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - Všechna tvoje zařízení ukazují, kdo z kontaktů nabízí proxy platby, i když relaye neodpovídají.
 - Hledání kontaktů najde podle npubu nebo Linky jména i lidi, které nemáš přidané, a můžeš jim rovnou napsat; výsledky ukazují, kdo používá Linky.
 - Lidé ověření na doménách jako primal.net teď mají u adresy taky fajfku.
+- Emoji při reakci najdeš podle názvu a ve zprávě je vložíš dvojtečkou a názvem, třeba `:100`.
 
 ## [26.11.3] - 2026-11-10
 

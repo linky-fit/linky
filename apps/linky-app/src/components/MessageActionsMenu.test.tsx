@@ -13,6 +13,16 @@ vi.mock("../app/lib/reactionEmojis", () => ({
   ],
 }));
 
+vi.mock("../app/hooks/messages/useEmojiSearchIndex", () => ({
+  useEmojiSearchIndex: (enabled: boolean) =>
+    enabled
+      ? [
+          { emoji: "😂", terms: ["face with tears of joy", "smich"] },
+          { emoji: "🇨🇿", terms: ["flag: czechia"] },
+        ]
+      : null,
+}));
+
 const defaultLabels = {
   copy: "Copy",
   delete: "Delete",
@@ -29,6 +39,9 @@ const defaultLabels = {
     flags: "Flags",
   },
   menu: "Message actions",
+  emojiSearch: "Search emoji",
+  emojiSearchClear: "Clear search",
+  emojiSearchEmpty: "No emoji found",
   moreEmojis: "More emojis",
   react: "React",
   reply: "Reply",
@@ -132,6 +145,57 @@ describe("MessageActionsMenu", () => {
         ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     expect(onReact).toHaveBeenCalledWith("🇨🇿");
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
+  it("searches the catalog by name and reacts with a result", async () => {
+    const onReact = vi.fn();
+    const root = await renderMenu({ onReact });
+    await act(async () => {
+      document.body
+        .querySelector('[aria-label="More emojis"]')
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    const field = document.body.querySelector<HTMLInputElement>(
+      'input[aria-label="Search emoji"]',
+    );
+    if (!field) throw new Error("expected the search field");
+    const typeQuery = async (value: string) => {
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(
+          HTMLInputElement.prototype,
+          "value",
+        )?.set?.call(field, value);
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    };
+    const resultCells = () =>
+      Array.from(
+        document.body.querySelectorAll(
+          '[role="group"][aria-label="React: Search emoji"] [aria-label]',
+        ),
+      );
+    const results = () =>
+      resultCells().map((cell) => cell.getAttribute("aria-label"));
+
+    await typeQuery("czech");
+    expect(results()).toEqual(["🇨🇿"]);
+    expect(document.body.querySelector('[role="tablist"]')).toBeNull();
+
+    await typeQuery("pizza");
+    expect(results()).toEqual([]);
+    expect(document.body.textContent).toContain("No emoji found");
+
+    await typeQuery("smich");
+    await act(async () => {
+      resultCells()[0]?.dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
+    });
+    expect(onReact).toHaveBeenCalledWith("😂");
 
     await act(async () => {
       root.unmount();

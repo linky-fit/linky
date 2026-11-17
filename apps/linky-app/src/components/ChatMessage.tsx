@@ -104,6 +104,9 @@ interface ChatMessageProps {
     edit: string;
     edited: string;
     emojiGroups: Record<ReactionEmojiGroupId, string>;
+    emojiSearch: string;
+    emojiSearchClear: string;
+    emojiSearchEmpty: string;
     menu: string;
     moreEmojis: string;
     react: string;

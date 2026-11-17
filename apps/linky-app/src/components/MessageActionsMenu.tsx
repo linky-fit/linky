@@ -7,6 +7,8 @@ import {
 } from "@linky-fit/ui";
 import type { IconName } from "@linky-fit/ui";
 import { useMemo, useState, type FC } from "react";
+import { useEmojiSearchIndex } from "../app/hooks/messages/useEmojiSearchIndex";
+import { searchEmojis } from "../app/lib/emojiSearch";
 import {
   QUICK_REACTION_EMOJIS,
   REACTION_EMOJI_GROUPS,
@@ -31,6 +33,9 @@ interface MessageActionsMenuProps {
     delete: string;
     edit: string;
     emojiGroups: Record<ReactionEmojiGroupId, string>;
+    emojiSearch: string;
+    emojiSearchClear: string;
+    emojiSearchEmpty: string;
     menu: string;
     moreEmojis: string;
     react: string;
@@ -78,6 +83,7 @@ export const MessageActionsMenu: FC<MessageActionsMenuProps> = ({
       })),
     [labels.emojiGroups],
   );
+  const emojiSearchIndex = useEmojiSearchIndex(isOpen && emojisExpanded);
   // Every message has its own menu and a closing Sheet lingers in the DOM, so mount it only while open.
   if (!isOpen) return null;
   const actions: MenuAction[] = [];
@@ -119,6 +125,13 @@ export const MessageActionsMenu: FC<MessageActionsMenuProps> = ({
           <EmojiCatalog
             accessibilityLabel={labels.react}
             groups={emojiGroups}
+            search={{
+              label: labels.emojiSearch,
+              clearLabel: labels.emojiSearchClear,
+              emptyLabel: labels.emojiSearchEmpty,
+              results: (query) =>
+                emojiSearchIndex ? searchEmojis(emojiSearchIndex, query) : [],
+            }}
             onSelect={(emoji) => {
               onReact(emoji);
               close();
