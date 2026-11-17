@@ -5,6 +5,7 @@ import {
   Avatar,
   Button,
   ComposerMenuItem,
+  EmojiPicker,
   EmptyState,
   IconButton,
   ListRow,
@@ -78,6 +79,12 @@ import {
 } from "../app/lib/bankPaymentOfferStorage";
 import { bankPaymentOfferToOpen } from "../app/lib/bankPaymentOfferRows";
 import { formatChatMessagePreviewText } from "../app/lib/chatMessageDisplay";
+import {
+  applyEmojiShortcode,
+  getEmojiShortcodeQuery,
+  searchEmojis,
+} from "../app/lib/emojiSearch";
+import { useEmojiSearchIndex } from "../app/hooks/messages/useEmojiSearchIndex";
 import {
   captureChatViewportAnchor,
   pinChatToBottom,
@@ -528,6 +535,9 @@ const ChatMessageList = memo(function ChatMessageList({
         symbols: t("chatEmojiGroupSymbols"),
         flags: t("chatEmojiGroupFlags"),
       },
+      emojiSearch: t("chatEmojiSearch"),
+      emojiSearchClear: t("chatEmojiSearchClear"),
+      emojiSearchEmpty: t("chatEmojiSearchEmpty"),
       menu: t("chatMessageActions"),
       moreEmojis: t("chatMoreEmojis"),
       react: t("chatReactAction"),
@@ -774,6 +784,8 @@ const ChatMessageList = memo(function ChatMessageList({
   );
 });
 
+const EMOJI_SUGGESTION_LIMIT = 8;
+
 interface ChatComposerProps {
   attachedListing: ChatPageProps["attachedListing"];
   mentionListings: ChatPageProps["mentionListings"];
@@ -876,6 +888,22 @@ export const ChatComposer = memo(function ChatComposer({
         ? getListingMentionSuggestions(mentionListings, mentionQuery.query)
         : [],
     [editContext, mentionListings, mentionQuery],
+  );
+  const emojiShortcode = useMemo(
+    () => getEmojiShortcodeQuery(draft, composeCaret),
+    [composeCaret, draft],
+  );
+  const emojiSearchIndex = useEmojiSearchIndex(emojiShortcode !== null);
+  const emojiSuggestions = useMemo(
+    () =>
+      emojiShortcode && emojiSearchIndex
+        ? searchEmojis(
+            emojiSearchIndex,
+            emojiShortcode.query,
+            EMOJI_SUGGESTION_LIMIT,
+          )
+        : [],
+    [emojiSearchIndex, emojiShortcode],
   );
   const listingPriceText = useListingPriceText();
   const hasDraftText = Boolean(draft.trim());
@@ -984,6 +1012,11 @@ export const ChatComposer = memo(function ChatComposer({
     );
   };
 
+  const selectEmojiSuggestion = (emoji: string) => {
+    if (!emojiShortcode) return;
+    replaceMentionQuery(applyEmojiShortcode(draft, emojiShortcode, emoji));
+  };
+
   const selectListingSuggestion = ({ shared }: MessageMentionListing) => {
     if (!mentionQuery) return;
     replaceMentionQuery(removeMessageMentionQuery(draft, mentionQuery));
@@ -1043,6 +1076,7 @@ export const ChatComposer = memo(function ChatComposer({
           editContext ||
           hasListingToSend ||
           chatAttachments.length > 0 ||
+          emojiSuggestions.length > 0 ||
           mentionSuggestions.length > 0 ||
           listingSuggestions.length > 0 ? (
             <>
@@ -1080,6 +1114,21 @@ export const ChatComposer = memo(function ChatComposer({
                   onRemove={removeChatAttachment}
                   removeLabel={t("chatAttachmentRemove")}
                 />
+              ) : null}
+              {emojiSuggestions.length > 0 ? (
+                <Stack
+                  paddingVertical="$xs"
+                  paddingHorizontal="$md"
+                  borderRadius="$control"
+                  backgroundColor="$surfaceRaised"
+                  onPointerDown={keepEditorFocus}
+                >
+                  <EmojiPicker
+                    accessibilityLabel={t("chatEmojiSuggestions")}
+                    emojis={emojiSuggestions}
+                    onSelect={selectEmojiSuggestion}
+                  />
+                </Stack>
               ) : null}
               {mentionSuggestions.length > 0 ||
               listingSuggestions.length > 0 ? (

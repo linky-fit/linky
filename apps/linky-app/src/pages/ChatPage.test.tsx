@@ -298,6 +298,23 @@ describe("ChatComposer", () => {
     expect(composer.editor.textContent).toBe("Hi ");
     await composer.unmount();
   });
+
+  it("offers emojis for a :query and puts the pick in its place", async () => {
+    const composer = await setup({ chatDraft: "" });
+    await composer.type("Super :10");
+    const suggestions = () =>
+      Array.from(
+        composer.container.querySelectorAll<HTMLElement>(
+          '[aria-label="chatEmojiSuggestions"] [aria-label]',
+        ),
+      );
+    await vi.waitFor(() => expect(suggestions()[0]?.textContent).toBe("💯"));
+
+    await act(async () => suggestions()[0]?.click());
+    expect(composer.editor.textContent).toBe("Super 💯 ");
+    expect(suggestions()).toEqual([]);
+    await composer.unmount();
+  });
 });
 
 describe("ChatNearbyBanner", () => {
