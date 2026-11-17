@@ -32,6 +32,19 @@ export const EsploraTransaction = Schema.Struct({
 });
 export type EsploraTransaction = typeof EsploraTransaction.Type;
 
+const AddressTxoStats = Schema.Struct({
+  funded_txo_sum: NonNegativeInt,
+  spent_txo_sum: NonNegativeInt,
+  tx_count: NonNegativeInt,
+});
+
+/** The fields of an Esplora address summary the operator needs; the rest is ignored. */
+export const EsploraAddressStats = Schema.Struct({
+  chain_stats: AddressTxoStats,
+  mempool_stats: AddressTxoStats,
+});
+export type EsploraAddressStats = typeof EsploraAddressStats.Type;
+
 export class EsploraError extends Schema.TaggedError<EsploraError>()(
   "EsploraError",
   {
@@ -54,6 +67,10 @@ export interface EsploraClient {
   readonly addressTransactions: (
     address: string,
   ) => Effect.Effect<ReadonlyArray<EsploraTransaction>, EsploraError>;
+  /** `GET /address/:address`: what its confirmed and its mempool transactions add up to. */
+  readonly addressStats: (
+    address: string,
+  ) => Effect.Effect<EsploraAddressStats, EsploraError>;
   /** `GET /blocks/tip/height`. */
   readonly tipHeight: () => Effect.Effect<number, EsploraError>;
   /** `GET /tx/:txid`. */
@@ -65,6 +82,7 @@ export interface EsploraClient {
 const AddressTransactionsJson = Schema.fromJsonString(
   Schema.Array(EsploraTransaction),
 );
+const AddressStatsJson = Schema.fromJsonString(EsploraAddressStats);
 const TipHeightJson = Schema.fromJsonString(NonNegativeInt);
 const TransactionJson = Schema.fromJsonString(EsploraTransaction);
 
@@ -109,6 +127,8 @@ export const makeEsploraClient = (options: {
         `/address/${encodeURIComponent(address)}/txs`,
         AddressTransactionsJson,
       ),
+    addressStats: (address) =>
+      get(`/address/${encodeURIComponent(address)}`, AddressStatsJson),
     tipHeight: () => get("/blocks/tip/height", TipHeightJson),
     transaction: (txid) =>
       get(`/tx/${encodeURIComponent(txid)}`, TransactionJson),

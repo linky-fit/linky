@@ -56,17 +56,19 @@ export const parseDepositXpub = (
 };
 
 /**
- * The BIP86 key-path Taproot address at receive index `index` (`0/index`
- * below the account key). Throws for a key that is not the network's (`xpub`
- * on mainnet, `tpub` elsewhere); validate it with `parseDepositXpub` first.
+ * The BIP86 key-path Taproot address at `chain/index` below the account key:
+ * chain 0 receives, chain 1 takes change. Throws for a key that is not the
+ * network's (`xpub` on mainnet, `tpub` elsewhere); validate it with
+ * `parseDepositXpub` first.
  */
-export const deriveDepositAddress = (args: {
+export const deriveAccountAddress = (args: {
   readonly xpub: string;
+  readonly chain: 0 | 1;
   readonly index: number;
   readonly network: BitcoinNetwork;
 }): string => {
   const publicKey = HDKey.fromExtendedKey(args.xpub, versionsFor(args.network))
-    .deriveChild(0)
+    .deriveChild(args.chain)
     .deriveChild(args.index).publicKey;
   if (publicKey === null) throw new Error("The extended key has no public key");
   const address = p2tr(
@@ -77,6 +79,13 @@ export const deriveDepositAddress = (args: {
   if (address === undefined) throw new Error("No Taproot address");
   return address;
 };
+
+/** The receive address at `index` (`0/index`), as `deriveAccountAddress` derives it. */
+export const deriveDepositAddress = (args: {
+  readonly xpub: string;
+  readonly index: number;
+  readonly network: BitcoinNetwork;
+}): string => deriveAccountAddress({ ...args, chain: 0 });
 
 const PAYABLE_TYPES = new Set(["pkh", "sh", "wpkh", "wsh", "tr"]);
 

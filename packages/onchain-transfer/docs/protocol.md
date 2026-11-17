@@ -29,7 +29,7 @@ Linky and the operator app release separately, so every message must keep valida
 ## On-chain receive
 
 1. Linky stores the transfer row and sends `OnchainTransferRequest` with the refund choice and the user's payment request.
-2. The operator answers `accepted` with a fresh `depositAddress` (see [deposit addresses](./bitcoin.md#deposit-addresses)), or `denied`. The operator app answers on arrival; only a request it cannot give an address to (no key, Esplora silent) waits for the operator.
+2. The operator answers `accepted` with an unused `depositAddress` (see [deposit addresses](./bitcoin.md#deposit-addresses)), or `denied`. The operator app answers on arrival; only a request it cannot give an address to (no key, Esplora silent) waits for the operator.
 3. The user sends `sendAmount` to the deposit address (`bitcoinPaymentUri`); on a receive of any amount, whatever they like within the config's limits, to the bare address.
 4. The operator watches the address: `fundsSeen` with `txid`, `confirmations` and `receivedAmount` whenever they change, then `fundsReceived` at `REQUIRED_CONFIRMATIONS` (2) once at least `sendAmount` arrived. A deposit short of `sendAmount` stays `fundsSeen` until more arrives or the operator refunds it. On a receive of any amount, `fee` and `sendAmount` are the minimum's until the deposit is seen, and `depositTerms` of the deposit from then on; a deposit short of the minimum with its fee stays short.
 5. Once at least `sendAmount` arrived, the operator pays the user's payment request `amount` (`sendAmount - fee`) and sends `completed`. Linky also counts the transfer completed once the receives naming the request's id brought in its amount, even before that update arrives.

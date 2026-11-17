@@ -183,6 +183,37 @@ describe("makeEsploraClient", () => {
     ]);
   });
 
+  it("reads what an address's confirmed and mempool transactions add up to", async () => {
+    const stats = (funded: number, spent: number, txs: number) => ({
+      funded_txo_count: txs,
+      funded_txo_sum: funded,
+      spent_txo_count: 0,
+      spent_txo_sum: spent,
+      tx_count: txs,
+    });
+    const { fetch } = fakeFetch({
+      [`${base}/address/${address}`]: {
+        body: JSON.stringify({
+          address,
+          chain_stats: stats(150_000, 50_000, 2),
+          mempool_stats: stats(10_000, 0, 1),
+        }),
+      },
+    });
+    const client = makeEsploraClient({ baseUrl: base, fetch });
+
+    await expect(
+      Effect.runPromise(client.addressStats(address)),
+    ).resolves.toEqual({
+      chain_stats: {
+        funded_txo_sum: 150_000,
+        spent_txo_sum: 50_000,
+        tx_count: 2,
+      },
+      mempool_stats: { funded_txo_sum: 10_000, spent_txo_sum: 0, tx_count: 1 },
+    });
+  });
+
   const failure = (
     route: { readonly status?: number; readonly body: string } | null,
   ) => {
