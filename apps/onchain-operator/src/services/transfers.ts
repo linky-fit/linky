@@ -39,12 +39,11 @@ import {
   checkPayout,
   depositProgress,
   ecashRefundAmount,
-  firstUnusedAddressIndex,
+  depositAddressIndexFor,
   isDepositNewlyConfirmed,
   isTransferEcash,
   isTxid,
   isTxidOfAnotherTransfer,
-  nextAddressIndex,
   nextUpdate,
   refundPaid,
   requestDenyReason,
@@ -332,8 +331,9 @@ export const createTransfers = ({
       deriveDepositAddress({ xpub, index, network: config.network });
     const scanned = await run(
       Effect.result(
-        firstUnusedAddressIndex(
-          nextAddressIndex(await run(readTransfers(transfers))),
+        depositAddressIndexFor(
+          transfer.user,
+          await run(readTransfers(transfers)),
           addressAt,
           esplora,
         ),

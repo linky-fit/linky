@@ -27,7 +27,7 @@ import {
   transferConcern,
 } from "../domain/rules";
 import {
-  isAnyAmountReceive,
+  isAmountUnknown,
   transferOutcome,
   transferStatus,
   transferTerms,
@@ -127,8 +127,7 @@ function TransferDetail({
   const { amount, fee, sendAmount } = transferTerms(transfer);
   const update = transfer.update;
   // Before the deposit, a receive of any amount holds the minimum's terms, not what the user gets.
-  const depositPending =
-    isAnyAmountReceive(transfer) && update?.receivedAmount === undefined;
+  const depositPending = isAmountUnknown(transfer);
   const txUrl = (txid: string) => explorerTxUrl(config.explorerUrl, txid);
   return (
     <Stack gap="$lg">
@@ -139,11 +138,17 @@ function TransferDetail({
       <Card gap="$md">
         <TransferField
           label={copy.transfer.amount}
-          value={formatSats(sendAmount)}
+          value={
+            depositPending ? copy.transfer.setByDeposit : formatSats(sendAmount)
+          }
         />
         <TransferField
           label={copy.transfer.fee}
-          value={`${formatSats(fee)} (${transfer.feeBasisPoints / 100} %)`}
+          value={
+            depositPending
+              ? `${transfer.feeBasisPoints / 100} %`
+              : `${formatSats(fee)} (${transfer.feeBasisPoints / 100} %)`
+          }
         />
         <TransferField
           label={copy.transfer.receive}

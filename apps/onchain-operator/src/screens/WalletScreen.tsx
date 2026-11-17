@@ -5,6 +5,7 @@ import {
   IconButton,
   ListRow,
   Notice,
+  Pressable,
   Row,
   Section,
   Stack,
@@ -12,8 +13,9 @@ import {
 } from "@linky-fit/ui";
 import { useEffect, useState } from "react";
 import { copy } from "../copy/en";
-import { fundedMints } from "../domain/wallet";
-import { formatDateTime, formatSats } from "../format";
+import { fundedMints, satsToCzk } from "../domain/wallet";
+import { formatDateTime, formatNumber, formatSats } from "../format";
+import { useCzkPerBtc } from "../platform/czkRate";
 import {
   useAppServices,
   useIssuedTokens,
@@ -21,23 +23,54 @@ import {
 } from "../services/react";
 import type { TakeBackOutcome } from "../services/wallet";
 import { Page } from "./Page";
-import { PayLightningSheet } from "./PayLightningSheet";
-import { SendTokenSheet } from "./SendTokenSheet";
+import { SendSheet } from "./SendSheet";
+import { TokenSheet } from "./TokenSheet";
 
 /** How often the mints are asked whether a listed token was claimed. */
 const CLAIM_CHECK_MS = 15_000;
 
 type Sheet =
-  | { readonly kind: "send"; readonly token: string | null }
-  | { readonly kind: "lightning" };
+  | { readonly kind: "token"; readonly token: string }
+  | { readonly kind: "send" };
 
-/** The operator's ecash at each mint, and moving it out: as a token or over Lightning. */
+/** The total of Cashu and the watch-only on-chain wallet, each below it, and sending Cashu out. */
 export function WalletScreen() {
-  const { wallet, config } = useAppServices();
+  const { wallet, config, onchainWallet } = useAppServices();
+  // `noKey` hides the row; reading every address takes a while, so it shows `…` until then.
+  const [onchain, setOnchain] = useState<
+    number | "loading" | "noKey" | "failed"
+  >("loading");
+  useEffect(() => {
+    let current = true;
+    onchainWallet.balance().then(
+      (sats) => {
+        if (current) setOnchain(sats ?? "noKey");
+      },
+      (error: unknown) => {
+        console.warn("[onchain-operator] on-chain balance not read", error);
+        if (current) setOnchain("failed");
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [onchainWallet]);
   const balances = useWalletBalance();
   const issued = useIssuedTokens() ?? [];
   const funds = fundedMints(balances, config.mintUrl);
   const [sheet, setSheet] = useState<Sheet | null>(null);
+  const czkPerBtc = useCzkPerBtc();
+  const [inCzk, setInCzk] = useState(false);
+  const showCzk = inCzk && czkPerBtc !== null;
+  const shown = (sats: number) =>
+    showCzk
+      ? { value: formatNumber(satsToCzk(sats, czkPerBtc)), unit: "CZK" }
+      : { value: formatNumber(sats), unit: "sat" };
+  const label = (sats: number) => {
+    const { value, unit } = shown(sats);
+    return `${value} ${unit}`;
+  };
+  const cashuSat = balances?.total ?? 0;
   const [takingBack, setTakingBack] = useState<OperationId | null>(null);
   const [takeBack, setTakeBack] = useState<{
     readonly outcome: TakeBackOutcome;
@@ -68,46 +101,58 @@ export function WalletScreen() {
 
   return (
     <Page title={copy.wallet.title} testID="wallet-screen">
-      <Stack alignItems="center" paddingVertical="$xl" gap="$lg">
-        <Amount
-          value={formatSats(balances?.total ?? 0).replace(/ sat$/u, "")}
-          unit="sat"
-          caption={copy.wallet.total}
-        />
-        <Row gap="$sm" flexWrap="wrap" justifyContent="center">
-          <Button
-            testID="wallet-send-token"
-            icon="Send"
-            variant="secondary"
-            onPress={() => setSheet({ kind: "send", token: null })}
-          >
-            {copy.wallet.sendToken}
-          </Button>
-          <Button
-            testID="wallet-pay-lightning"
-            icon="Zap"
-            variant="secondary"
-            onPress={() => setSheet({ kind: "lightning" })}
-          >
-            {copy.wallet.payLightning}
-          </Button>
-        </Row>
-        <Text variant="caption" color="$colorMuted" textAlign="center">
-          {copy.wallet.fundsHint}
-        </Text>
+      <Stack alignItems="center" paddingVertical="$xl">
+        <Pressable
+          testID="wallet-total"
+          tooltip={showCzk ? copy.wallet.showSats : copy.wallet.showCzk}
+          aria-label={showCzk ? copy.wallet.showSats : copy.wallet.showCzk}
+          onPress={() => setInCzk((czk) => !czk)}
+        >
+          <Amount
+            {...shown(cashuSat + (typeof onchain === "number" ? onchain : 0))}
+          />
+        </Pressable>
       </Stack>
-      <Section title={copy.wallet.perMint}>
-        {funds.length === 0 ? (
-          <Text color="$colorMuted">{copy.wallet.empty}</Text>
-        ) : (
-          funds.map(({ mint, sats }) => (
-            <ListRow
-              key={mint}
-              icon="Landmark"
-              title={mint}
-              value={formatSats(sats)}
-            />
-          ))
+      <Section>
+        <ListRow
+          testID="wallet-cashu"
+          icon="Bean"
+          title={
+            <Row gap="$sm" alignItems="center">
+              <Text>{copy.wallet.cashu}</Text>
+              <Button
+                testID="wallet-send"
+                size="sm"
+                variant="secondary"
+                icon="Send"
+                onPress={() => setSheet({ kind: "send" })}
+              >
+                {copy.wallet.send}
+              </Button>
+            </Row>
+          }
+          description={
+            funds.length > 1
+              ? funds
+                  .map(({ mint, sats }) => `${mint} ${label(sats)}`)
+                  .join(" · ")
+              : undefined
+          }
+          value={label(cashuSat)}
+        />
+        {onchain === "noKey" ? null : (
+          <ListRow
+            testID="wallet-onchain"
+            icon="Bitcoin"
+            title={copy.wallet.onchain}
+            value={
+              typeof onchain === "number"
+                ? label(onchain)
+                : onchain === "loading"
+                  ? "…"
+                  : "—"
+            }
+          />
         )}
       </Section>
       {hasIssued || takeBack !== null ? (
@@ -145,7 +190,7 @@ export function WalletScreen() {
                     size="sm"
                     accessibilityLabel={copy.wallet.showToken}
                     onPress={() =>
-                      setSheet({ kind: "send", token: token.tokenText })
+                      setSheet({ kind: "token", token: token.tokenText })
                     }
                   />
                   <Button
@@ -164,16 +209,12 @@ export function WalletScreen() {
           ))}
         </Section>
       ) : null}
-      <SendTokenSheet
-        open={sheet?.kind === "send"}
-        onOpenChange={(open) => {
-          if (!open) setSheet(null);
-        }}
-        funds={funds}
-        shownToken={sheet?.kind === "send" ? sheet.token : null}
+      <TokenSheet
+        token={sheet?.kind === "token" ? sheet.token : null}
+        onClose={() => setSheet(null)}
       />
-      <PayLightningSheet
-        open={sheet?.kind === "lightning"}
+      <SendSheet
+        open={sheet?.kind === "send"}
         onOpenChange={(open) => {
           if (!open) setSheet(null);
         }}

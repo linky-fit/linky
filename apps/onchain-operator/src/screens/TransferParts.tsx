@@ -9,7 +9,11 @@ import {
 } from "@linky-fit/ui";
 import type { Tone } from "@linky-fit/ui";
 import { copy } from "../copy/en";
-import { transferTerms, type OperatorTransfer } from "../domain/transfer";
+import {
+  isAmountUnknown,
+  transferTerms,
+  type OperatorTransfer,
+} from "../domain/transfer";
 import { formatDateTime, formatSats } from "../format";
 import { statusKey, transferTitle, type StatusKey } from "./labels";
 import { navigateTo } from "../platform/hashRoute";
@@ -83,7 +87,7 @@ export function TransferCard({
         <StatusPill transfer={transfer} />
       </Row>
       <Text variant="caption" color="$colorMuted">
-        {`${copy.transfer.receive}: ${formatSats(transferTerms(transfer).amount)} · ${formatDateTime(transfer.createdAtSec)}`}
+        {`${copy.transfer.receive}: ${isAmountUnknown(transfer) ? copy.transfer.setByDeposit : formatSats(transferTerms(transfer).amount)} · ${formatDateTime(transfer.createdAtSec)}`}
       </Text>
       <Button
         size="sm"

@@ -1,4 +1,5 @@
 import { decodePaymentRequest } from "@linky-fit/linkshu";
+import type { Pubkey } from "@linky-fit/linkstr";
 import {
   amountWithServiceFee,
   canOperatorMove,
@@ -23,6 +24,7 @@ import { profileFeeTerms, type OperatorProfile } from "./profile";
 import {
   isAnyAmountReceive,
   isOpen,
+  reservedDepositAddresses,
   transferStatus,
   transferTerms,
   type OperatorTransfer,
@@ -182,6 +184,34 @@ export const firstUnusedAddressIndex = (
       if (history.length === 0) return index;
     }
     return null;
+  });
+
+/**
+ * The receive index for `user`'s new on-chain receive: their newest reserved
+ * deposit address while it still has no on-chain history, so a user who asks
+ * again gets the address they may already have paid; else the first unused
+ * index past every stored one.
+ */
+export const depositAddressIndexFor = (
+  user: Pubkey,
+  transfers: readonly OperatorTransfer[],
+  addressAt: (index: number) => string,
+  esplora: Pick<EsploraClient, "addressTransactions">,
+): Effect.Effect<number | null, EsploraError> =>
+  Effect.gen(function* () {
+    // Saving another key changes what each index derives.
+    const reserved = reservedDepositAddresses(transfers, user).find(
+      ({ address, addressIndex }) => addressAt(addressIndex) === address,
+    );
+    if (reserved !== undefined) {
+      const history = yield* esplora.addressTransactions(reserved.address);
+      if (history.length === 0) return reserved.addressIndex;
+    }
+    return yield* firstUnusedAddressIndex(
+      nextAddressIndex(transfers),
+      addressAt,
+      esplora,
+    );
   });
 
 /** What a new update may set besides its status; `fee` and `sendAmount` only as a deposit sets them on a receive of any amount. */
@@ -395,14 +425,15 @@ export const isTxidOfAnotherTransfer = (
       (transfer.update?.txid === txid || transfer.update?.refundTxid === txid),
   );
 
-/** Deposit addresses more than one transfer holds, as when two devices accepted before they synced. */
+/** Deposit addresses more than one open transfer holds, as when two devices accepted before they synced; a closed one that handed its address on does not count. */
 export const sharedDepositAddresses = (
   transfers: readonly OperatorTransfer[],
 ): ReadonlySet<string> => {
   const seen = new Set<string>();
   const shared = new Set<string>();
-  for (const { depositAddress } of transfers) {
-    if (depositAddress === null) continue;
+  for (const transfer of transfers) {
+    const { depositAddress } = transfer;
+    if (depositAddress === null || !isOpen(transfer)) continue;
     (seen.has(depositAddress) ? shared : seen).add(depositAddress);
   }
   return shared;

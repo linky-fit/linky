@@ -1,7 +1,15 @@
 import { MintUrl, WalletBalances } from "@linky-fit/linkshu";
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
-import { fundedMints, parseLightningTarget, parseSats } from "./wallet";
+import { encodeNpub } from "@linky-fit/linkstr";
+import { makeIdentity } from "@linky-fit/linkstr/testing";
+import {
+  fundedMints,
+  parseLightningTarget,
+  parseSats,
+  parseSendTarget,
+  satsToCzk,
+} from "./wallet";
 
 // A FakeWallet invoice of a local dev mint for 2 084 sat.
 const invoice =
@@ -43,6 +51,44 @@ describe("parseLightningTarget", () => {
   ])("refuses %s", (text) => {
     expect(parseLightningTarget(text)).toBeNull();
   });
+});
+
+describe("parseSendTarget", () => {
+  it("reads an npub, also behind nostr:", () => {
+    const { pubkey } = makeIdentity();
+    expect(parseSendTarget(`nostr:${encodeNpub(pubkey)}`)).toEqual({
+      kind: "npub",
+      pubkey,
+    });
+  });
+
+  it("reads a Linky name, bare or on Linky's domain, as Cashu over Nostr", () => {
+    for (const text of ["Hynek", " hynek@linky.fit ", "HYNEK@LINKY.FIT"])
+      expect(parseSendTarget(text)).toEqual({
+        kind: "linkyName",
+        name: "hynek",
+      });
+  });
+
+  it("reads other addresses, invoices and LNURLs as Lightning", () => {
+    expect(parseSendTarget("alice@example.com")).toEqual({
+      kind: "lightning",
+      target: { kind: "address", target: "alice@example.com" },
+    });
+    expect(parseSendTarget(invoice)?.kind).toBe("lightning");
+    expect(
+      parseSendTarget(
+        "LNURL1DP68GURN8GHJ7UM9WFMXJCM99E3K7MF0V9CXJ0M385EKVCENXC6R2C35XVUKXEFCV5MKVV34X5EKZD3EV56NYD3HXQURZEPEXEJXXEPNXSCRVWFNV9NXZCN9XQ6XYEFHVGCXXCMYXYMNSERXFQ5FNS",
+      )?.kind,
+    ).toBe("lightning");
+  });
+
+  it.each(["", "two words", "a@b@linky.fit", "bc1qnotlightning?"])(
+    "reads nothing from %j",
+    (text) => {
+      expect(parseSendTarget(text)).toBeNull();
+    },
+  );
 });
 
 describe("parseSats", () => {
@@ -93,5 +139,12 @@ describe("fundedMints", () => {
 
   it("is empty before the balance is read", () => {
     expect(fundedMints(null, "https://transfer.test")).toEqual([]);
+  });
+});
+
+describe("satsToCzk", () => {
+  it("prices sats in whole crowns", () => {
+    expect(satsToCzk(100_000, 2_000_000)).toBe(2_000);
+    expect(satsToCzk(1, 2_000_000)).toBe(0);
   });
 });
