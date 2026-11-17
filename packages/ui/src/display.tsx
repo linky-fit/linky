@@ -2,7 +2,7 @@ import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { useWindowDimensions } from "react-native";
 import type { ReactNode } from "react";
 import { Image, View, isWeb, styled } from "tamagui";
-import type { TamaguiElement } from "tamagui";
+import type { ColorTokens, TamaguiElement } from "tamagui";
 import { IndicatorDot, Pressable } from "./controls";
 import { Icon } from "./icons";
 import type { IconName, IconSize } from "./icons";
@@ -208,17 +208,22 @@ export interface PillProps {
 }
 
 /** An inline entity: a token, a contact mention or a payment state. */
-export function Pill({
+export function Pill({ tone = "accent", ...props }: PillProps) {
+  return <PillFrame {...props} colors={toneColors[tone]} />;
+}
+
+function PillFrame({
   label,
   hint,
   leading,
-  tone = "accent",
+  colors,
   size = "md",
   onPress,
   accessibilityLabel,
   testID,
-}: PillProps) {
-  const colors = toneColors[tone];
+}: Omit<PillProps, "tone"> & {
+  colors: { background: ColorTokens; color: ColorTokens };
+}) {
   const Frame = onPress ? Pressable : Row;
   const small = size === "sm";
   return (
@@ -257,6 +262,52 @@ export function Pill({
         </Text>
       ) : null}
     </Frame>
+  );
+}
+
+/** How a payment moves: as Cashu ecash or as bitcoin on-chain. */
+export type PaymentRail = "cashu" | "onchain";
+
+const railStyles = {
+  cashu: {
+    icon: "Bean",
+    solid: { background: "$cashu", color: "$onCashu" },
+    soft: { background: "$cashuSoft", color: "$cashuText" },
+  },
+  onchain: {
+    icon: "Bitcoin",
+    solid: { background: "$onchain", color: "$onOnchain" },
+    soft: { background: "$onchainSoft", color: "$onchainText" },
+  },
+} as const satisfies Record<
+  PaymentRail,
+  {
+    icon: IconName;
+    solid: { background: ColorTokens; color: ColorTokens };
+    soft: { background: ColorTokens; color: ColorTokens };
+  }
+>;
+
+export interface RailPillProps extends Pick<
+  PillProps,
+  "label" | "hint" | "size" | "onPress" | "testID"
+> {
+  rail: PaymentRail;
+  /** A solid fill for what waits on the viewer; soft for what waits on someone else. */
+  emphasis?: "solid" | "soft" | undefined;
+  accessibilityLabel?: string | undefined;
+}
+
+/** A payment state tied to its rail: Cashu violet with the bean, on-chain gold with the bitcoin mark. */
+export function RailPill({ rail, emphasis = "soft", ...props }: RailPillProps) {
+  const style = railStyles[rail];
+  const colors = style[emphasis];
+  return (
+    <PillFrame
+      {...props}
+      colors={colors}
+      leading={<Icon name={style.icon} size="sm" color={colors.color} />}
+    />
   );
 }
 

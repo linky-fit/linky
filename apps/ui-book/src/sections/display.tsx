@@ -60,6 +60,28 @@ export const display: Section = {
         </UI.Stack>
       );
     },
+    RailPill: () => (
+      <UI.Stack>
+        <UI.Row flexWrap="wrap">
+          <UI.RailPill rail="cashu" label="Awaiting Cashu" size="sm" />
+          <UI.RailPill rail="onchain" label="Awaiting on-chain" size="sm" />
+        </UI.Row>
+        <UI.Row flexWrap="wrap">
+          <UI.RailPill
+            rail="cashu"
+            emphasis="solid"
+            label="Send Cashu"
+            size="sm"
+          />
+          <UI.RailPill
+            rail="onchain"
+            emphasis="solid"
+            label="Send on-chain"
+            hint="×2"
+          />
+        </UI.Row>
+      </UI.Stack>
+    ),
     StatusDot: () => (
       <UI.Row flexWrap="wrap">
         {tones.map((tone) => (

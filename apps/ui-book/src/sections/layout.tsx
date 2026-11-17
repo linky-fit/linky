@@ -139,6 +139,14 @@ export const layout: Section = {
               <UI.Text variant="caption">{size}</UI.Text>
             </UI.Stack>
           ))}
+          <UI.Stack gap="$xs" alignItems="center">
+            <UI.Icon
+              name="Bitcoin"
+              color="$onchainText"
+              tooltip="Hover for a tooltip"
+            />
+            <UI.Text variant="caption">tooltip</UI.Text>
+          </UI.Stack>
         </UI.Row>
         <UI.Row flexWrap="wrap" gap="$md">
           {Object.keys(UI.icons)

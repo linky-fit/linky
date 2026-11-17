@@ -65,13 +65,22 @@ export { Form, SubmitButton } from "./form";
 export type { FormProps, SubmitButtonProps } from "./form";
 
 // Display and lists
-export { Amount, Avatar, AvatarGroup, Pill, StatusDot } from "./display";
+export {
+  Amount,
+  Avatar,
+  AvatarGroup,
+  Pill,
+  RailPill,
+  StatusDot,
+} from "./display";
 export type {
   AmountProps,
   AvatarGroupProps,
   AvatarProps,
   AvatarSize,
   PillProps,
+  PaymentRail,
+  RailPillProps,
   StatusDotProps,
 } from "./display";
 export { ContactRow, ListRow } from "./lists";

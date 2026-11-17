@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { render } from "../test/render";
 import { Button, IconButton, OptionTile, Pressable } from "./controls";
 import { Form, SubmitButton } from "./form";
+import { Icon } from "./icons";
 
 describe("disabled press targets", () => {
   it.each([
@@ -105,6 +106,15 @@ describe("tooltip", () => {
       </Button>,
     );
     expect(container.querySelector("button")?.title).toBe("Not enough funds");
+  });
+
+  it("names an icon by its tooltip on the web", async () => {
+    const container = await render(
+      <Icon name="Bitcoin" tooltip="Holds a reserved address" />,
+    );
+    const icon = container.querySelector('[role="img"]');
+    expect(icon?.getAttribute("title")).toBe("Holds a reserved address");
+    expect(icon?.getAttribute("aria-label")).toBe("Holds a reserved address");
   });
 });
 
