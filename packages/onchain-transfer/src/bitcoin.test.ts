@@ -1,8 +1,8 @@
 import { HDKey } from "@scure/bip32";
-import { NETWORK, p2tr } from "@scure/btc-signer";
 import {
   bitcoinPaymentUri,
   canonicalBitcoinAddress,
+  deriveAccountAddress,
   deriveDepositAddress,
   explorerAddressUrl,
   explorerTxUrl,
@@ -42,13 +42,15 @@ describe("deriveDepositAddress", () => {
     ).toBe("bc1p4qhjn9zdvkux4e44uhx8tc55attvtyu358kutcqkudyccelu0was9fqzwh");
   });
 
-  it("builds the BIP86 change address with the same Taproot encoding", () => {
-    const change = HDKey.fromExtendedKey(BIP86_XPUB)
-      .deriveChild(1)
-      .deriveChild(0).publicKey;
-    expect(p2tr(change?.subarray(1) ?? "", undefined, NETWORK).address).toBe(
-      "bc1p3qkhfews2uk44qtvauqyr2ttdsw7svhkl9nkm9s9c3x4ax5h60wqwruhk7",
-    );
+  it("matches the BIP86 change address on chain 1", () => {
+    expect(
+      deriveAccountAddress({
+        xpub: BIP86_XPUB,
+        chain: 1,
+        index: 0,
+        network: "mainnet",
+      }),
+    ).toBe("bc1p3qkhfews2uk44qtvauqyr2ttdsw7svhkl9nkm9s9c3x4ax5h60wqwruhk7");
   });
 
   it("derives from a tpub with the network's address prefix", () => {
