@@ -3,6 +3,16 @@ import * as UI from "@linky-fit/ui";
 import type { Section } from "../section";
 import { sampleImage } from "../sample-image";
 
+const sampleEmojiNames: Record<string, string> = {
+  "😀": "grinning face",
+  "😂": "face with tears of joy",
+  "😍": "smiling face with heart-eyes",
+  "🍕": "pizza",
+  "☕": "hot beverage coffee",
+  "🏁": "chequered flag",
+  "🇨🇿": "flag czechia",
+};
+
 const sampleDrafts: UI.AttachmentDraft[] = [
   { id: "photo", name: "Color study", previewUri: sampleImage },
   { id: "pdf", name: "Weekend.pdf" },
@@ -201,6 +211,15 @@ export const messaging: Section = {
               },
             ]}
             onSelect={setEmoji}
+            search={{
+              label: "Search emoji",
+              clearLabel: "Clear",
+              emptyLabel: "No emoji found",
+              results: (query) =>
+                Object.entries(sampleEmojiNames)
+                  .filter(([, name]) => name.includes(query.toLowerCase()))
+                  .map(([emoji]) => emoji),
+            }}
           />
           <UI.Text variant="caption">Selected: {emoji}</UI.Text>
         </UI.Stack>
