@@ -3,6 +3,7 @@ import type { ReactNode, Ref } from "react";
 import { Anchor, Image, ScrollView, Theme, View } from "tamagui";
 import type { GetProps, TamaguiElement } from "tamagui";
 import { IconButton, Pressable } from "./controls";
+import { TextField } from "./fields";
 import type { LabeledAction, PressableProps } from "./controls";
 import { textVariant, toneColors } from "./styles";
 import { Icon } from "./icons";
@@ -694,10 +695,22 @@ export interface EmojiCatalogGroup {
   emojis: readonly string[];
 }
 
+export interface EmojiCatalogSearch {
+  /** The field's label and placeholder. */
+  label: string;
+  clearLabel: string;
+  /** Shown when `results` finds nothing. */
+  emptyLabel: string;
+  /** The emojis matching a non-empty query, best first. */
+  results: (query: string) => readonly string[];
+}
+
 export interface EmojiCatalogProps {
   accessibilityLabel: string;
   groups: readonly EmojiCatalogGroup[];
   onSelect: (emoji: string) => void;
+  /** A field above the tabs; while it holds a query, its results replace the tabs. */
+  search?: EmojiCatalogSearch | undefined;
 }
 
 /** The full emoji set behind icon tabs, one group shown at a time; the grid scrolls within a fixed height. */
@@ -705,35 +718,79 @@ export function EmojiCatalog({
   accessibilityLabel,
   groups,
   onSelect,
+  search,
 }: EmojiCatalogProps) {
   const [activeKey, setActiveKey] = useState(groups[0]?.key ?? "");
+  const [query, setQuery] = useState("");
   const active = groups.find((group) => group.key === activeKey) ?? groups[0];
+  const searching = search !== undefined && query.trim() !== "";
+  const results = searching ? search.results(query) : [];
   return (
     <Stack gap="$sm">
-      <Row role="tablist" gap="$xxs" justifyContent="space-between">
-        {groups.map((group) => (
-          <IconButton
-            key={group.key}
-            icon={group.icon}
-            accessibilityLabel={group.label}
-            size="sm"
-            variant={group.key === active?.key ? "secondary" : "ghost"}
-            role="tab"
-            aria-selected={group.key === active?.key}
-            onPress={() => setActiveKey(group.key)}
-          />
-        ))}
-      </Row>
-      {active ? (
-        // Remounting on a tab change starts the grid at its top.
-        <ScrollView key={active.key} maxHeight="$qr" flexGrow={0}>
-          <EmojiPicker
-            accessibilityLabel={`${accessibilityLabel}: ${active.label}`}
-            emojis={active.emojis}
-            onSelect={onSelect}
-          />
-        </ScrollView>
+      {search ? (
+        <TextField
+          label={search.label}
+          hideLabel
+          placeholder={search.label}
+          value={query}
+          onChangeText={setQuery}
+          autoCapitalize="none"
+          autoCorrect={false}
+          trailing={
+            query ? (
+              <IconButton
+                icon="X"
+                accessibilityLabel={search.clearLabel}
+                size="sm"
+                variant="ghost"
+                onPress={() => setQuery("")}
+              />
+            ) : undefined
+          }
+        />
       ) : null}
+      {searching ? (
+        results.length > 0 ? (
+          <ScrollView maxHeight="$qr" flexGrow={0}>
+            <EmojiPicker
+              accessibilityLabel={`${accessibilityLabel}: ${search.label}`}
+              emojis={results}
+              onSelect={onSelect}
+            />
+          </ScrollView>
+        ) : (
+          <Text color="$colorMuted" paddingVertical="$sm" textAlign="center">
+            {search.emptyLabel}
+          </Text>
+        )
+      ) : (
+        <>
+          <Row role="tablist" gap="$xxs" justifyContent="space-between">
+            {groups.map((group) => (
+              <IconButton
+                key={group.key}
+                icon={group.icon}
+                accessibilityLabel={group.label}
+                size="sm"
+                variant={group.key === active?.key ? "secondary" : "ghost"}
+                role="tab"
+                aria-selected={group.key === active?.key}
+                onPress={() => setActiveKey(group.key)}
+              />
+            ))}
+          </Row>
+          {active ? (
+            // Remounting on a tab change starts the grid at its top.
+            <ScrollView key={active.key} maxHeight="$qr" flexGrow={0}>
+              <EmojiPicker
+                accessibilityLabel={`${accessibilityLabel}: ${active.label}`}
+                emojis={active.emojis}
+                onSelect={onSelect}
+              />
+            </ScrollView>
+          ) : null}
+        </>
+      )}
     </Stack>
   );
 }

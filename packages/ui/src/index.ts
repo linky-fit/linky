@@ -163,6 +163,7 @@ export type {
   ComposerMenuItemProps,
   EmojiCatalogGroup,
   EmojiCatalogProps,
+  EmojiCatalogSearch,
   EmojiPickerProps,
   FileAttachmentProps,
   ImageAttachmentProps,
