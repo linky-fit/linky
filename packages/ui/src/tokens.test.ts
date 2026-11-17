@@ -76,6 +76,10 @@ describe.each(Object.entries(themes))(
       ["danger text on danger soft", theme.dangerText, theme.dangerSoft],
       ["warning text on warning soft", theme.warningText, theme.warningSoft],
       ["info text on info soft", theme.infoText, theme.infoSoft],
+      ["cashu action", theme.onCashu, theme.cashu],
+      ["cashu text on cashu soft", theme.cashuText, theme.cashuSoft],
+      ["on-chain action", theme.onOnchain, theme.onchain],
+      ["on-chain text on on-chain soft", theme.onchainText, theme.onchainSoft],
       ["body on incoming message", theme.color, theme.bubble],
       ["body on a soft fill", theme.color, theme.accentSoft],
     ])("keeps %s readable (WCAG AA)", (_name, foreground, background) => {
