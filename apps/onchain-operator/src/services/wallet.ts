@@ -49,11 +49,6 @@ export interface Wallet {
   /** Closes a send whose token reached its recipient. */
   readonly forgetSend: (operationId: string) => Promise<void>;
   readonly balances: () => Promise<WalletBalances>;
-  /** A token of `amount` at the mint for the operator to hand over; listed in `issuedTokens` until claimed or taken back. */
-  readonly issueToken: (
-    mint: MintUrl,
-    amount: number,
-  ) => Promise<Result.Result<SendReceipt, SendError>>;
   /** Issued tokens not known to be claimed, newest first; reads the store only. */
   readonly issuedTokens: () => Promise<readonly TokenTransfer[]>;
   /** Asks the mints which issued tokens were claimed and closes those. */
@@ -125,18 +120,6 @@ export const createWallet = (
     },
     balances: () =>
       runtime.runPromise(Effect.flatMap(Tokens, (tokens) => tokens.balances)),
-    issueToken: (mint, amount) =>
-      run(
-        Effect.flatMap(Send, (send) =>
-          send.send(
-            new SendDraft({
-              mint,
-              amount: Amount.make(amount),
-              produceAs: "issued",
-            }),
-          ),
-        ),
-      ),
     issuedTokens: async () =>
       (
         await runtime.runPromise(

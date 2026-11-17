@@ -435,6 +435,32 @@ describe("accepting", () => {
     ]);
   });
 
+  it("gives a user who cancelled before depositing the same address again, and a fresh one once it was paid", async () => {
+    const { send, stored, esplora, user } = setup();
+    const address = (index: number) =>
+      deriveDepositAddress({ xpub: tpub, index, network: "regtest" });
+    const cancelled = receiveRequest(user);
+    await send(cancelled);
+    await send({ v: 1, type: "cancel", transferId: cancelled.transferId });
+    const again = receiveRequest(user);
+    await send(again);
+    expect(await stored(again.transferId)).toMatchObject({
+      addressIndex: 0,
+      depositAddress: address(0),
+    });
+
+    await send({ v: 1, type: "cancel", transferId: again.transferId });
+    esplora.state.byAddress.set(address(0), [
+      txPaying("aa".repeat(32), address(0), 1_000),
+    ]);
+    const third = receiveRequest(user);
+    await send(third);
+    expect(await stored(third.transferId)).toMatchObject({
+      addressIndex: 1,
+      depositAddress: address(1),
+    });
+  });
+
   it("skips deposit addresses that already have on-chain history, and accepts nothing while Esplora cannot tell", async () => {
     const { transfers, send, stored, esplora, user } = setup();
     const address = (index: number) =>

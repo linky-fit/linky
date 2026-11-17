@@ -27,6 +27,7 @@ import {
   receivedMismatch,
   refundPaid,
   requestDenyReason,
+  depositAddressIndexFor,
   sharedDepositAddresses,
   transferConcern,
 } from "./rules";
@@ -34,6 +35,7 @@ import type { OperatorTransfer } from "./transfer";
 
 const mint = "http://localhost:3338";
 const user = makeIdentity().pubkey;
+const other = makeIdentity().pubkey;
 const payoutAddress =
   "bcrt1p8wpt9v4frpf3tkn0srd97pksgsxc5hs52lafxwru9kgeephvs7rqjeprhg";
 const transferId = createId<"OnchainTransfer">();
@@ -337,6 +339,51 @@ describe("firstUnusedAddressIndex", () => {
     expect(
       await Effect.runPromise(firstUnusedAddressIndex(0, addressAt, allUsed)),
     ).toBeNull();
+  });
+});
+
+describe("depositAddressIndexFor", () => {
+  const addressAt = (index: number) => `address-${index}`;
+  const used = (indexes: readonly number[]) => ({
+    addressTransactions: (address: string) =>
+      Effect.succeed(
+        indexes.map(addressAt).includes(address) ? [txOf([])] : [],
+      ),
+  });
+  const receiveAt = (
+    addressIndex: number,
+    overrides: Partial<OperatorTransfer> = {},
+  ) =>
+    transferOf({
+      id: createId<"OnchainTransfer">(),
+      depositAddress: addressAt(addressIndex),
+      addressIndex,
+      update: updateOf({ status: "cancelled" }),
+      ...overrides,
+    });
+  const pick = (
+    transfers: readonly OperatorTransfer[],
+    usedIndexes: readonly number[] = [],
+  ) =>
+    Effect.runPromise(
+      depositAddressIndexFor(user, transfers, addressAt, used(usedIndexes)),
+    );
+
+  it("hands the user their reserved address again while nothing paid it", async () => {
+    expect(await pick([receiveAt(0), receiveAt(1, { user: other })])).toBe(0);
+  });
+
+  it("takes a fresh address once the reserved one has history or derives from another key", async () => {
+    expect(await pick([receiveAt(0), receiveAt(1, { user: other })], [0])).toBe(
+      2,
+    );
+    expect(
+      await pick([receiveAt(0, { depositAddress: "from-an-old-key" })]),
+    ).toBe(1);
+  });
+
+  it("takes a fresh address while the user's last one belongs to an open transfer", async () => {
+    expect(await pick([receiveAt(0, { update: updateOf({}) })])).toBe(1);
   });
 });
 
@@ -743,7 +790,7 @@ describe("isTxidOfAnotherTransfer", () => {
 });
 
 describe("sharedDepositAddresses", () => {
-  it("lists the deposit addresses more than one transfer holds", () => {
+  it("lists the deposit addresses more than one open transfer holds", () => {
     const at = (depositAddress: string | null) =>
       transferOf({ id: createId<"OnchainTransfer">(), depositAddress });
     expect([
@@ -755,5 +802,16 @@ describe("sharedDepositAddresses", () => {
         at(null),
       ]),
     ]).toEqual(["a"]);
+  });
+
+  it("leaves out a closed transfer that handed its address on", () => {
+    const at = (depositAddress: string) =>
+      transferOf({ id: createId<"OnchainTransfer">(), depositAddress });
+    expect([
+      ...sharedDepositAddresses([
+        { ...at("a"), closedByHand: "cancelled" },
+        at("a"),
+      ]),
+    ]).toEqual([]);
   });
 });

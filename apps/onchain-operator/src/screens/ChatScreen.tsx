@@ -1,7 +1,9 @@
 import type { Pubkey } from "@linky-fit/linkstr";
+import { explorerAddressUrl } from "@linky-fit/onchain-transfer";
 import {
   CodeBlock,
   IconButton,
+  Notice,
   MessageBubble,
   MessageComposerFrame,
   ScrollView,
@@ -18,6 +20,7 @@ import {
   type ChatMessage,
   type RawLogEntry,
 } from "../domain/chat";
+import { reservedDepositAddresses } from "../domain/transfer";
 import { formatDateTime } from "../format";
 import { navigateTo } from "../platform/hashRoute";
 import { sectionRoute } from "../routing";
@@ -31,6 +34,7 @@ import { messageText } from "./labels";
 import { WithTopBar } from "./Page";
 import { PeerSummary } from "./Peer";
 import { TransferCard } from "./TransferParts";
+import { TransferField } from "./TransferField";
 
 const timeLabel = (message: ChatMessage) => {
   const time = formatDateTime(message.createdAtSec);
@@ -62,8 +66,9 @@ function RawLog({ entries }: { readonly entries: readonly RawLogEntry[] }) {
 export function ChatScreen({ peer }: { readonly peer: Pubkey }) {
   const { chats, config } = useAppServices();
   const chat = useChats()?.find((candidate) => candidate.peer === peer);
-  const transfers =
-    useTransfers()?.filter((transfer) => transfer.user === peer) ?? [];
+  const allTransfers = useTransfers() ?? [];
+  const transfers = allTransfers.filter((transfer) => transfer.user === peer);
+  const reserved = reservedDepositAddresses(allTransfers, peer);
   const transferLog = useTransferLog() ?? [];
   const [raw, setRaw] = useState(false);
   const [draft, setDraft] = useState("");
@@ -119,6 +124,38 @@ export function ChatScreen({ peer }: { readonly peer: Pubkey }) {
         />
       }
     >
+      {reserved.length === 0 ? null : (
+        <Stack
+          testID="chat-reserved-addresses"
+          width="100%"
+          maxWidth="$sheetWidth"
+          alignSelf="center"
+          gap="$sm"
+          paddingHorizontal="$xl"
+          paddingTop="$md"
+        >
+          {reserved.map(({ address, addressIndex }) => (
+            <Notice
+              key={address}
+              tone="info"
+              icon="Bitcoin"
+              title={copy.chats.reservedAddress}
+              description={
+                <Stack gap="$sm">
+                  <Text variant="caption">
+                    {copy.chats.reservedAddressHint}
+                  </Text>
+                  <TransferField
+                    label={`${copy.transfer.depositAddress} · ${copy.transfer.addressIndex(addressIndex)}`}
+                    value={address}
+                    href={explorerAddressUrl(config.explorerUrl, address)}
+                  />
+                </Stack>
+              }
+            />
+          ))}
+        </Stack>
+      )}
       <ScrollView
         ref={list}
         flex={1}

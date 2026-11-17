@@ -1,5 +1,7 @@
 import { TokenTransfer, WalletBalances } from "@linky-fit/linkshu";
 import { UIProvider } from "@linky-fit/ui";
+import { encodeNpub } from "@linky-fit/linkstr";
+import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { Result, Schema } from "effect";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
@@ -12,12 +14,26 @@ const token = "cashuBtesttoken";
 
 const state: {
   issued: readonly TokenTransfer[];
-  issueToken: Mock;
+  czkPerBtc: number | null;
+  resolveName: Mock;
+  sendCashu: Mock;
   takeBack: Mock<(id: string) => Promise<TakeBackOutcome>>;
   quote: Mock;
+  onchainSat: number | null | "loading";
+  onchainWallet: { balance: () => Promise<number | null> };
 } = vi.hoisted(() => ({
+  onchainSat: null,
+  // Stable like the real services, since the screen reads again whenever it changes.
+  onchainWallet: {
+    balance: () =>
+      state.onchainSat === "loading"
+        ? new Promise<never>(() => undefined)
+        : Promise.resolve(state.onchainSat),
+  },
   issued: [],
-  issueToken: vi.fn(),
+  czkPerBtc: null,
+  resolveName: vi.fn(),
+  sendCashu: vi.fn(),
   takeBack: vi.fn<(id: string) => Promise<TakeBackOutcome>>(),
   quote: vi.fn(),
 }));
@@ -26,11 +42,12 @@ vi.mock("../services/react", () => ({
   useAppServices: () => ({
     config: { mintUrl: mint },
     wallet: {
-      issueToken: state.issueToken,
       takeBack: state.takeBack,
       checkClaims: () => Promise.resolve(),
     },
     lightning: { quote: state.quote },
+    onchainWallet: state.onchainWallet,
+    cashuSends: { resolveName: state.resolveName, send: state.sendCashu },
   }),
   useWalletBalance: () =>
     Schema.decodeUnknownSync(WalletBalances)({
@@ -39,6 +56,10 @@ vi.mock("../services/react", () => ({
       perMint: [{ mint, amount: 500 }],
     }),
   useIssuedTokens: () => state.issued,
+}));
+
+vi.mock("../platform/czkRate", () => ({
+  useCzkPerBtc: () => state.czkPerBtc,
 }));
 
 const issuedToken = Schema.decodeUnknownSync(TokenTransfer)({
@@ -58,7 +79,10 @@ let root: ReturnType<typeof createRoot>;
 
 beforeEach(async () => {
   state.issued = [];
-  state.issueToken.mockReset();
+  state.onchainSat = null;
+  state.czkPerBtc = null;
+  state.resolveName.mockReset();
+  state.sendCashu.mockReset();
   state.takeBack.mockReset();
   state.quote.mockReset();
   container = document.body.appendChild(document.createElement("div"));
@@ -107,30 +131,62 @@ const typeInto = (testId: string, text: string) =>
 
 const sheetText = (testId: string) => byTestId(testId).textContent ?? "";
 
-it("issues a token only for a whole amount the mint holds, then shows it with the spend warning", async () => {
-  state.issueToken.mockResolvedValue(Result.succeed({ tokenText: token }));
+it("totals Cashu and the on-chain wallet, and shows each below, in sats or CZK", async () => {
+  state.onchainSat = 1_500;
+  state.czkPerBtc = 2_000_000;
   await render();
-  await press("wallet-send-token");
+  expect(byTestId("wallet-total").textContent).toBe("2 000 sat");
+  expect(byTestId("wallet-cashu").textContent).toContain("500 sat");
+  expect(byTestId("wallet-onchain").textContent).toContain("1 500 sat");
 
-  await typeInto("send-token-amount", "1.5");
-  await press("send-token-create");
-  expect(sheetText("send-token-sheet")).toContain(
-    "A whole number of sats above zero.",
-  );
+  await press("wallet-total");
+  expect(byTestId("wallet-total").textContent).toBe("40 CZK");
+  expect(byTestId("wallet-onchain").textContent).toContain("30 CZK");
 
-  await typeInto("send-token-amount", "501");
-  await press("send-token-create");
-  expect(sheetText("send-token-sheet")).toContain(
-    "The mint holds only 500 sat in this wallet.",
-  );
-  expect(state.issueToken).not.toHaveBeenCalled();
+  await press("wallet-total");
+  expect(byTestId("wallet-total").textContent).toBe("2 000 sat");
+});
 
-  await typeInto("send-token-amount", "21");
-  await press("send-token-create");
-  expect(state.issueToken).toHaveBeenCalledWith(mint, 21);
-  expect(sheetText("send-token-sheet")).toContain(
-    "Whoever holds this token can spend it",
+it("shows the on-chain row while its balance loads, and none without a key", async () => {
+  state.onchainSat = "loading";
+  await render();
+  expect(byTestId("wallet-onchain").textContent).toContain("…");
+  await act(() => root.unmount());
+  root = createRoot(container);
+  state.onchainSat = null;
+  await render();
+  expect(document.querySelector('[data-testid="wallet-onchain"]')).toBeNull();
+});
+
+it("sends Cashu to an npub as a token after review", async () => {
+  const { pubkey } = makeIdentity();
+  state.sendCashu.mockResolvedValue(Result.succeed(undefined));
+  await render();
+  await press("wallet-send");
+  await typeInto("send-target", encodeNpub(pubkey));
+  await typeInto("send-amount", "21");
+  await press("send-review");
+  await press("send-cashu");
+  expect(state.sendCashu).toHaveBeenCalledWith(
+    { pubkey, relays: [] },
+    expect.objectContaining({ sats: 500 }),
+    21,
   );
+  expect(sheetText("send-sheet")).toContain("Sent 21 sat to npub1");
+});
+
+it("looks up a Linky name before sending, and says when there is none", async () => {
+  state.resolveName.mockResolvedValue(Result.fail({ reason: "nameNotFound" }));
+  await render();
+  await press("wallet-send");
+  await typeInto("send-target", "hynek");
+  await typeInto("send-amount", "21");
+  await press("send-review");
+  expect(state.resolveName).toHaveBeenCalledWith("hynek");
+  expect(sheetText("send-sheet")).toContain(
+    "Linky has no account of that name.",
+  );
+  expect(state.sendCashu).not.toHaveBeenCalled();
 });
 
 it.each([
@@ -149,23 +205,23 @@ it.each([
   },
 );
 
-it("asks for an invoice or address before quoting, and an amount for an address", async () => {
+it("asks for a recipient before quoting, and an amount for a Lightning address", async () => {
   await render();
-  await press("wallet-pay-lightning");
+  await press("wallet-send");
 
-  await press("pay-lightning-review");
-  expect(sheetText("pay-lightning-sheet")).toContain(
-    "Paste a Lightning invoice or a Lightning address.",
+  await press("send-review");
+  expect(sheetText("send-sheet")).toContain(
+    "Enter an npub, a Linky name, a Lightning invoice or a Lightning address.",
   );
 
-  await typeInto("pay-lightning-target", "bc1qnotlightning");
-  expect(sheetText("pay-lightning-sheet")).toContain(
-    "Paste a Lightning invoice or a Lightning address.",
+  await typeInto("send-target", "bc1qnotlightning?");
+  expect(sheetText("send-sheet")).toContain(
+    "Enter an npub, a Linky name, a Lightning invoice or a Lightning address.",
   );
 
-  await typeInto("pay-lightning-target", "alice@example.com");
-  await press("pay-lightning-review");
-  expect(sheetText("pay-lightning-sheet")).toContain(
+  await typeInto("send-target", "alice@example.com");
+  await press("send-review");
+  expect(sheetText("send-sheet")).toContain(
     "A whole number of sats above zero.",
   );
   expect(state.quote).not.toHaveBeenCalled();

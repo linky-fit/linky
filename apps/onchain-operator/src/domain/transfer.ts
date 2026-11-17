@@ -115,20 +115,105 @@ export const isAnyAmountReceive = (transfer: OperatorTransfer): boolean =>
   transfer.userPaymentRequest !== null &&
   decodePaymentRequest(transfer.userPaymentRequest)?.amount === null;
 
-/** Open transfers first, the oldest on top since it waits longest; then the rest, newest first; test transfers apart, newest first. */
+/** Open transfers first, the oldest on top since it waits longest; then the rest, newest first; cancelled and test transfers apart, newest first. */
 export const sortTransfers = (
   transfers: readonly OperatorTransfer[],
 ): {
   readonly open: readonly OperatorTransfer[];
   readonly closed: readonly OperatorTransfer[];
+  readonly cancelled: readonly OperatorTransfer[];
   readonly tests: readonly OperatorTransfer[];
 } => {
   const real = transfers.filter((transfer) => !transfer.isTest);
   const newestFirst = (a: OperatorTransfer, b: OperatorTransfer) =>
     b.createdAtSec - a.createdAtSec;
+  const isCancelled = (transfer: OperatorTransfer) =>
+    transferOutcome(transfer) === "cancelled";
   return {
     open: real.filter(isOpen).sort((a, b) => a.createdAtSec - b.createdAtSec),
-    closed: real.filter((transfer) => !isOpen(transfer)).sort(newestFirst),
+    closed: real
+      .filter((transfer) => !isOpen(transfer) && !isCancelled(transfer))
+      .sort(newestFirst),
+    cancelled: real.filter(isCancelled).sort(newestFirst),
     tests: transfers.filter((transfer) => transfer.isTest).sort(newestFirst),
   };
 };
+
+/**
+ * Whose move an open transfer waits for and over which rail: `review` for a
+ * request the operator has not answered; a user who cancelled after paying
+ * gets their funds back over the rail they paid on.
+ */
+export type TransferWait =
+  | "review"
+  | "userCashu"
+  | "userOnchain"
+  | "operatorCashu"
+  | "operatorOnchain";
+
+export const transferWait = (
+  transfer: OperatorTransfer,
+): TransferWait | null => {
+  if (!isOpen(transfer)) return null;
+  const status = transferStatus(transfer);
+  if (status === null) return "review";
+  const cancelled = transfer.userCancelledAtSec !== null;
+  if (transfer.direction === "send")
+    return status === "fundsReceived"
+      ? cancelled
+        ? "operatorCashu"
+        : "operatorOnchain"
+      : "userCashu";
+  if (status === "fundsReceived")
+    return cancelled ? "operatorOnchain" : "operatorCashu";
+  return status === "fundsSeen" && cancelled
+    ? "operatorOnchain"
+    : "userOnchain";
+};
+
+/** Whether a deposit reached the transfer's deposit address, as its last update tells. */
+const depositArrived = (transfer: OperatorTransfer): boolean =>
+  transfer.update?.txid !== undefined ||
+  (transfer.update?.receivedAmount ?? 0) > 0;
+
+/** A deposit address handed to a user that no deposit reached, with the newest transfer holding it. */
+export interface ReservedDepositAddress {
+  readonly address: string;
+  readonly addressIndex: number;
+  readonly transfer: OperatorTransfer;
+}
+
+/**
+ * The deposit addresses of `user`'s closed on-chain receives that no deposit
+ * reached, newest first: no open transfer watches them, yet the user may still
+ * pay one, and their next on-chain receive gets the newest again.
+ */
+export const reservedDepositAddresses = (
+  transfers: readonly OperatorTransfer[],
+  user: Pubkey,
+): ReservedDepositAddress[] => {
+  const holders = new Map<string, OperatorTransfer[]>();
+  for (const transfer of transfers)
+    if (transfer.direction === "receive" && transfer.depositAddress !== null)
+      holders.set(transfer.depositAddress, [
+        ...(holders.get(transfer.depositAddress) ?? []),
+        transfer,
+      ]);
+  return [...holders.entries()]
+    .flatMap(([address, held]): ReservedDepositAddress[] => {
+      const newest = held.reduce((a, b) =>
+        b.createdAtSec > a.createdAtSec ? b : a,
+      );
+      return newest.user === user &&
+        newest.addressIndex !== null &&
+        !isOpen(newest) &&
+        !held.some(depositArrived)
+        ? [{ address, addressIndex: newest.addressIndex, transfer: newest }]
+        : [];
+    })
+    .sort((a, b) => b.transfer.createdAtSec - a.transfer.createdAtSec);
+};
+
+/** An on-chain receive whose amount the user has yet to set by depositing. */
+export const isAmountUnknown = (transfer: OperatorTransfer): boolean =>
+  isAnyAmountReceive(transfer) && !depositArrived(transfer);

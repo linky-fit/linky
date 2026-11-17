@@ -31,6 +31,7 @@ import {
 import {
   EsploraError,
   onchainTransferChannel,
+  paysAddress,
   type EsploraClient,
   type EsploraTransaction,
   type OnchainTransferMessage,
@@ -249,7 +250,6 @@ export const fakeWallet = (
       forgotten.push(operationId);
     },
     balances: () => Promise.reject(new Error("fake wallet")),
-    issueToken: () => Promise.reject(new Error("fake wallet")),
     issuedTokens: () => Promise.reject(new Error("fake wallet")),
     checkClaims: () => Promise.reject(new Error("fake wallet")),
     takeBack: async (operationId) => {
@@ -302,6 +302,32 @@ export const fakeEsplora = () => {
             }),
           )
         : Effect.succeed(state.byAddress.get(address) ?? []),
+    addressStats: (address) => {
+      const sums = (confirmed: boolean) => {
+        const txs = (state.byAddress.get(address) ?? []).filter(
+          (tx) => tx.status.confirmed === confirmed,
+        );
+        return {
+          funded_txo_sum: txs.reduce(
+            (sum, tx) => sum + paysAddress(tx, address),
+            0,
+          ),
+          spent_txo_sum: 0,
+          tx_count: txs.length,
+        };
+      };
+      return state.offline
+        ? Effect.fail(
+            new EsploraError({
+              url: `/address/${address}`,
+              message: "offline",
+            }),
+          )
+        : Effect.succeed({
+            chain_stats: sums(true),
+            mempool_stats: sums(false),
+          });
+    },
     tipHeight: () => Effect.sync(() => state.tipHeight),
     transaction: (txid) => {
       const tx = state.byTxid.get(txid);

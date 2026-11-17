@@ -50,6 +50,8 @@ import {
   type Transfers,
 } from "./transfers";
 import { createWallet, type Wallet } from "./wallet";
+import { createOnchainWallet, type OnchainWallet } from "./onchainWallet";
+import { createCashuSends, type CashuSends } from "./cashuSends";
 import {
   createLightningPayments,
   type LightningPayments,
@@ -84,6 +86,8 @@ export interface AppServices {
   readonly nostr: Nostr;
   readonly wallet: Wallet;
   readonly lightning: LightningPayments;
+  readonly onchainWallet: OnchainWallet;
+  readonly cashuSends: CashuSends;
   readonly chats: Chats;
   readonly transfers: Transfers;
   readonly profile: Profile;
@@ -107,6 +111,8 @@ export interface ServicePorts {
     readonly getItem: (key: string) => string | null;
     readonly setItem: (key: string, value: string) => void;
   };
+  /** The `fetch` Linky names are looked up with. */
+  readonly nip05Fetch: typeof fetch;
   /** The `fetch` profile pictures are uploaded with. */
   readonly blossomFetch: typeof fetch;
   /** Subscribes to the window getting the focus back. */
@@ -155,6 +161,11 @@ export const createAppServices = ({
   });
   const wallet = createWallet(linkshu, account.secretKey);
   const lightning = createLightningPayments({ wallet });
+  const cashuSends = createCashuSends({
+    wallet,
+    nostr,
+    nip05Fetch: ports.nip05Fetch,
+  });
   const loadProfile = () =>
     Effect.runPromise(readProfile(repositories.settings));
   const peerProfiles = createPeerProfiles(nostr.fetchProfiles);
@@ -173,15 +184,23 @@ export const createAppServices = ({
         });
     },
   });
+  const esplora = makeEsploraClient({
+    baseUrl: config.esploraUrl,
+    fetch: ports.esploraFetch,
+  });
+  const onchainWallet = createOnchainWallet({
+    esplora,
+    network: config.network,
+    loadProfile,
+    loadTransfers: () =>
+      Effect.runPromise(readTransfers(repositories.transfers)),
+  });
   const transfers = createTransfers({
     transfers: repositories.transfers,
     transferMessages: repositories.transferMessages,
     nostr,
     wallet,
-    esplora: makeEsploraClient({
-      baseUrl: config.esploraUrl,
-      fetch: ports.esploraFetch,
-    }),
+    esplora,
     config,
     loadProfile,
     alertWatchers,
@@ -213,6 +232,8 @@ export const createAppServices = ({
     nostr,
     wallet,
     lightning,
+    onchainWallet,
+    cashuSends,
     chats,
     transfers,
     peerProfiles,

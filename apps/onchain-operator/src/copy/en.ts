@@ -1,11 +1,12 @@
 import { MAX_WATCHERS } from "../domain/watchers";
 import type { OnchainTransferDirection } from "@linky-fit/onchain-transfer";
 import type { Period } from "../domain/analytics";
-import type { TransferOutcome } from "../domain/transfer";
+import type { TransferOutcome, TransferWait } from "../domain/transfer";
 import type { StatusKey } from "../screens/labels";
 import type { TransferActionFailure } from "../services/transfers";
 import type { SendError } from "@linky-fit/linkshu";
 import type { LightningFailure } from "../services/lightningPayments";
+import type { CashuSendFailure } from "../services/cashuSends";
 
 /** Every user-facing string of the operator console; English only. */
 export const copy = {
@@ -33,8 +34,8 @@ export const copy = {
     submit: "Sign in",
   },
   direction: {
-    send: "On-chain send",
-    receive: "On-chain receive",
+    send: "Send from Linky",
+    receive: "Receive to Linky",
   } satisfies Record<OnchainTransferDirection, string>,
   status: {
     requested: "Waiting for you",
@@ -52,6 +53,9 @@ export const copy = {
   transfers: {
     open: "Open",
     history: "History",
+    cancelled: "Cancelled transfers",
+    showCancelled: (count: number) => `Show cancelled transfers (${count})`,
+    hideCancelled: "Hide cancelled transfers",
     tests: "Test transfers",
     showTests: (count: number) => `Show test transfers (${count})`,
     hideTests: "Hide test transfers",
@@ -67,6 +71,7 @@ export const copy = {
     amount: "User sends",
     fee: "Service fee",
     receive: "User gets",
+    setByDeposit: "Set by the deposit",
     anyAmount: (min: string, max: string) =>
       `Any amount from ${min} to ${max}, set by the deposit`,
     user: "User",
@@ -219,8 +224,21 @@ export const copy = {
     emptyDescription:
       "Users who request a transfer or write to you appear here.",
     noMessages: "No messages yet",
-    openTransfers: (count: number) => `${count} open`,
+    waits: {
+      review: "Review request",
+      userCashu: "Awaiting Cashu",
+      userOnchain: "Awaiting on-chain",
+      operatorCashu: "Send Cashu",
+      operatorOnchain: "Send on-chain",
+    } satisfies Record<TransferWait, string>,
     unread: "Unread messages",
+    reservedAddress: "Reserved deposit address",
+    reservedAddressTooltip: (count: number) =>
+      count === 1
+        ? "Holds a reserved deposit address"
+        : `Holds ${count} reserved deposit addresses`,
+    reservedAddressHint:
+      "Given to this user for an on-chain receive that closed before any deposit. They may still pay it, and nothing watches it now; their next on-chain receive gets it again while it stays unused.",
     placeholder: "Message",
     send: "Send",
     sending: "Sending",
@@ -241,13 +259,32 @@ export const copy = {
   },
   wallet: {
     title: "Wallet",
-    total: "Balance",
-    perMint: "Per mint",
-    empty: "No Cashu yet.",
-    fundsHint:
-      "Sending Cashu for on-chain receives pays from this wallet, so keep Cashu at the transfer mint.",
-    sendToken: "Send Cashu",
-    payLightning: "Pay over Lightning",
+    cashu: "Cashu",
+    onchain: "Onchain",
+    showCzk: "Show in CZK",
+    showSats: "Show in sats",
+    send: "Send",
+    recipientField: "Recipient",
+    recipientPlaceholder: "npub…, Linky name, lnbc… or name@domain",
+    asCashu: (available: string) =>
+      `Sent as Cashu in a Nostr message · ${available} available`,
+    cashuAmount: "Cashu",
+    sendCashu: "Send Cashu",
+    cashuSentTitle: (amount: string, to: string) => `Sent ${amount} to ${to}`,
+    cashuSentDetail:
+      "The token leaves once a relay takes the message; if none does, it comes back to the wallet.",
+    cashuFailed: (failure: CashuSendFailure): string => {
+      switch (failure.reason) {
+        case "nameNotFound":
+          return "Linky has no account of that name.";
+        case "lookupFailed":
+          return "The Linky name could not be looked up; try again.";
+        case "sendFailed":
+          return copy.wallet.sendFailed(failure.error);
+        case "notQueued":
+          return "The message could not be queued; the Cashu is back in the wallet.";
+      }
+    },
     mint: "Mint",
     amount: "Amount",
     amountInvalid: "A whole number of sats above zero.",
@@ -255,7 +292,6 @@ export const copy = {
       `The mint holds only ${available} in this wallet.`,
     available: (available: string) => `${available} available`,
     noFunds: "The wallet holds no Cashu yet.",
-    createToken: "Create token",
     tokenTitle: "Cashu token",
     tokenWarning: "Whoever holds this token can spend it",
     tokenWarningDetail:
@@ -291,10 +327,9 @@ export const copy = {
       mintUnreachable: "The mint is not responding; try again.",
       failed: "The token could not be taken back; try again.",
     },
-    invoiceField: "Invoice or Lightning address",
-    invoicePlaceholder: "lnbc… or name@domain",
     paste: "Paste",
-    targetInvalid: "Paste a Lightning invoice or a Lightning address.",
+    targetInvalid:
+      "Enter an npub, a Linky name, a Lightning invoice or a Lightning address.",
     invoiceAmount: (amount: string) => `The invoice asks for ${amount}.`,
     review: "Review",
     to: "To",

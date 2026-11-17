@@ -1,7 +1,7 @@
 import { decodeNpub, type Pubkey } from "@linky-fit/linkstr";
 import { formatSats } from "../format";
 import {
-  isAnyAmountReceive,
+  isAmountUnknown,
   transferTerms,
   type OperatorTransfer,
 } from "./transfer";
@@ -44,7 +44,7 @@ export const parseWatchers = (text: string): readonly Pubkey[] | null => {
 /** "send 100 000 sat onchain", or "receive onchain" while a receive of any amount has no deposit yet. */
 const transferLabel = (transfer: OperatorTransfer): string => {
   const verb = transfer.direction === "send" ? "send" : "receive";
-  return isAnyAmountReceive(transfer) && transfer.update === null
+  return isAmountUnknown(transfer)
     ? `${verb} onchain`
     : `${verb} ${formatSats(transferTerms(transfer).amount)} onchain`;
 };

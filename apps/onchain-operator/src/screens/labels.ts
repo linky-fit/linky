@@ -3,6 +3,7 @@ import { copy } from "../copy/en";
 import { messageContent } from "../domain/chat";
 import { isTransferEcash } from "../domain/rules";
 import {
+  isAmountUnknown,
   transferStatus,
   transferTerms,
   type OperatorTransfer,
@@ -23,11 +24,14 @@ export const statusKey = (transfer: OperatorTransfer): StatusKey =>
       ? "closedCancelled"
       : (transferStatus(transfer) ?? "requested");
 
+/** The direction and what the user gets; just the direction while a receive of any amount waits for its deposit. */
 export const transferTitle = (transfer: OperatorTransfer): string =>
-  copy.transfers.summary(
-    copy.direction[transfer.direction],
-    formatSats(transferTerms(transfer).amount),
-  );
+  isAmountUnknown(transfer)
+    ? copy.direction[transfer.direction]
+    : copy.transfers.summary(
+        copy.direction[transfer.direction],
+        formatSats(transferTerms(transfer).amount),
+      );
 
 /** How a message reads in a list or a bubble: its text, or what ecash it carries and whether it can pay a transfer. */
 export const messageText = (text: string, mintUrl: string): string => {

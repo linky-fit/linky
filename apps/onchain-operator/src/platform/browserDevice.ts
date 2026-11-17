@@ -18,6 +18,7 @@ export const createBrowserDevice = (config: AppConfig): Device =>
       esploraFetch: (url) => fetch(url),
       earlyEcashKv: localStorageKv,
       blossomFetch: (input, init) => fetch(input, init),
+      nip05Fetch: (input, init) => fetch(input, init),
       onFocus,
     }),
     reload: reloadApp,

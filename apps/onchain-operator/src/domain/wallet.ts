@@ -8,6 +8,7 @@ import {
   type MintUrl,
   type WalletBalances,
 } from "@linky-fit/linkshu";
+import { decodeNpub, type Pubkey } from "@linky-fit/linkstr";
 
 /** Where a Lightning payment goes, read from pasted text. */
 export type LightningTarget =
@@ -54,6 +55,48 @@ export const parseLightningTarget = (text: string): LightningTarget | null => {
   }
   return lightningTarget(stripLightningPrefix(trimmed));
 };
+
+/** Where every Linky account has a name, e.g. `hynek@linky.fit`. */
+export const LINKY_NAME_DOMAIN = "linky.fit";
+
+const LINKY_NAME = /^[a-z0-9._-]+$/iu;
+
+/** Who a payment goes to: over Lightning, or as Cashu in a Nostr message to a key or a Linky name. */
+export type SendTarget =
+  | { readonly kind: "lightning"; readonly target: LightningTarget }
+  | { readonly kind: "npub"; readonly pubkey: Pubkey }
+  /** A NIP-05 name on Linky's domain, looked up before sending. */
+  | { readonly kind: "linkyName"; readonly name: string };
+
+/**
+ * An npub, a Linky name (bare or `@linky.fit`), or a Lightning target. A
+ * `name@linky.fit` is a Lightning address too, but Cashu reaches a Linky user
+ * without Lightning fees.
+ */
+export const parseSendTarget = (text: string): SendTarget | null => {
+  const trimmed = text.trim().replace(/^nostr:/iu, "");
+  const pubkey = decodeNpub(trimmed);
+  if (pubkey !== null) return { kind: "npub", pubkey };
+  const [local, domain, ...rest] = trimmed.split("@");
+  if (
+    rest.length === 0 &&
+    local !== undefined &&
+    LINKY_NAME.test(local) &&
+    domain?.toLowerCase() === LINKY_NAME_DOMAIN
+  )
+    return { kind: "linkyName", name: local.toLowerCase() };
+  const lightning = parseLightningTarget(trimmed);
+  if (lightning !== null) return { kind: "lightning", target: lightning };
+  return LINKY_NAME.test(trimmed)
+    ? { kind: "linkyName", name: trimmed.toLowerCase() }
+    : null;
+};
+
+const SATS_PER_BTC = 100_000_000;
+
+/** Sats in whole crowns at the rate. */
+export const satsToCzk = (sats: number, czkPerBtc: number): number =>
+  Math.round((sats * czkPerBtc) / SATS_PER_BTC);
 
 /** A positive whole number of sats; spaces and underscores inside it are ignored. */
 export const parseSats = (text: string): number | null => {
