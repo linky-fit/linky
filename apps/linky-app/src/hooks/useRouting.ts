@@ -165,136 +165,137 @@ export const navigateAwayTo = (url: string): void => {
   window.location.assign(url);
 };
 
-export const navigateTo = (action: NavigationAction): void => {
+/**
+ * Opens a route. `replace` swaps the current history entry, as a tab switch
+ * does, so the iOS back swipe never slides from one tab to another.
+ */
+export const navigateTo = (
+  action: NavigationAction,
+  { replace = false }: { replace?: boolean } = {},
+): void => {
+  const go = (hash: string) =>
+    replace ? window.location.replace(hash) : window.location.assign(hash);
   switch (action.route) {
     case "contacts":
-      window.location.assign("#contacts");
+      go("#contacts");
       break;
     case "settings":
-      window.location.assign("#settings");
+      go("#settings");
       break;
     case "settingsLanguage":
-      window.location.assign("#settings/language");
+      go("#settings/language");
       break;
     case "settingsAppearance":
-      window.location.assign("#settings/appearance");
+      go("#settings/appearance");
       break;
     case "settingsUnits":
-      window.location.assign("#settings/units");
+      go("#settings/units");
       break;
     case "settingsTutorial":
-      window.location.assign("#settings/tutorial");
+      go("#settings/tutorial");
       break;
     case "settingsSupport":
-      window.location.assign("#settings/support");
+      go("#settings/support");
       break;
     case "settingsWhatsNew":
-      window.location.assign("#settings/whats-new");
+      go("#settings/whats-new");
       break;
     case "settingsBlocked":
-      window.location.assign("#settings/blocked");
+      go("#settings/blocked");
       break;
     case "settingsReceiveMethod":
-      window.location.assign("#settings/receive-method");
+      go("#settings/receive-method");
       break;
     case "settingsMasterKeys":
-      window.location.assign("#settings/master-keys");
+      go("#settings/master-keys");
       break;
     case "settingsNostrIdentity":
-      window.location.assign("#settings/nostr-identity");
+      go("#settings/nostr-identity");
       break;
     case "keryxCompanies":
-      window.location.assign("#settings/keryx");
+      go("#settings/keryx");
       break;
     case "keryxCompanyNew":
-      window.location.assign("#settings/keryx/new");
+      go("#settings/keryx/new");
       break;
     case "keryxCompany":
-      window.location.assign(
-        `#settings/keryx/${encodeURIComponent(action.id)}`,
-      );
+      go(`#settings/keryx/${encodeURIComponent(action.id)}`);
       break;
     case "keryxAnnouncement":
-      window.location.assign(
+      go(
         `#settings/keryx/${encodeURIComponent(action.id)}/${encodeURIComponent(action.key)}`,
       );
       break;
     case "proxyPayments":
-      window.location.assign("#proxy");
+      go("#proxy");
       break;
     case "collaboration":
-      window.location.assign("#collaboration");
+      go("#collaboration");
       break;
     case "cash":
-      window.location.assign("#collaboration/cash");
+      go("#collaboration/cash");
       break;
     case "listings":
-      window.location.assign("#collaboration/listings");
+      go("#collaboration/listings");
       break;
     case "listingNew":
-      window.location.assign("#collaboration/listings/new");
+      go("#collaboration/listings/new");
       break;
     case "listingEdit":
-      window.location.assign(
-        `#collaboration/listings/${encodeURIComponent(action.id)}`,
-      );
+      go(`#collaboration/listings/${encodeURIComponent(action.id)}`);
       break;
     case "listing":
-      window.location.assign(
+      go(
         `#collaboration/listings/${encodeNpub(action.author)}/${encodeURIComponent(action.listingId)}${action.messageId ? `/m/${encodeURIComponent(action.messageId)}` : ""}`,
       );
       break;
     case "advanced":
-      window.location.assign("#advanced");
+      go("#advanced");
       break;
     case "advancedAutoPayLimit":
-      window.location.assign("#advanced/auto-pay-limit");
+      go("#advanced/auto-pay-limit");
       break;
     case "advancedInspector":
-      window.location.assign("#advanced/inspector");
+      go("#advanced/inspector");
       break;
     case "advancedInspectorTimeline":
-      window.location.assign("#advanced/inspector/timeline");
+      go("#advanced/inspector/timeline");
       break;
     case "advancedPushDebug":
-      window.location.assign("#advanced/push-debug");
+      go("#advanced/push-debug");
       break;
     case "mints":
-      window.location.assign("#advanced/mints");
+      go("#advanced/mints");
       break;
     case "mintNew":
-      window.location.assign("#advanced/mints/new");
+      go("#advanced/mints/new");
       break;
     case "mint":
-      window.location.assign(
-        `#advanced/mint/${encodeURIComponent(action.mintUrl.trim())}`,
-      );
+      go(`#advanced/mint/${encodeURIComponent(action.mintUrl.trim())}`);
       break;
     case "contact":
-      window.location.assign(`#contact/${encodeURIComponent(action.id)}`);
+      go(`#contact/${encodeURIComponent(action.id)}`);
       break;
     case "contactEdit":
-      window.location.assign(`#contact/${encodeURIComponent(action.id)}/edit`);
+      go(`#contact/${encodeURIComponent(action.id)}/edit`);
       break;
     case "contactPay":
-      window.location.assign(`#contact/${encodeURIComponent(action.id)}/pay`);
+      go(`#contact/${encodeURIComponent(action.id)}/pay`);
       break;
     case "chat":
-      window.location.assign(`#chat/${encodeURIComponent(action.id)}`);
+      go(`#chat/${encodeURIComponent(action.id)}`);
       break;
     case "contactNew":
-      window.location.assign("#contact/new");
+      go("#contact/new");
       break;
     case "wallet":
-      window.location.assign("#wallet");
+      go("#wallet");
       break;
     case "walletHistory":
-      window.location.assign("#wallet/history");
+      go("#wallet/history");
       break;
     case "transaction":
-      window.location.assign(
-        `#wallet/transactions/${encodeURIComponent(action.id)}`,
-      );
+      go(`#wallet/transactions/${encodeURIComponent(action.id)}`);
       break;
     case "recurringPaymentNew": {
       const query = new URLSearchParams();
@@ -304,119 +305,111 @@ export const navigateTo = (action: NavigationAction): void => {
         query.set("amount", String(action.prefill.amountSat));
       }
       const suffix = query.size > 0 ? `?${query.toString()}` : "";
-      window.location.assign(`#wallet/recurring/new${suffix}`);
+      go(`#wallet/recurring/new${suffix}`);
       break;
     }
     case "recurringPayment":
-      window.location.assign(
-        `#wallet/recurring/${encodeURIComponent(action.id)}`,
-      );
+      go(`#wallet/recurring/${encodeURIComponent(action.id)}`);
       break;
     case "recurringPaymentEdit":
-      window.location.assign(
-        `#wallet/recurring/${encodeURIComponent(action.id)}/edit`,
-      );
+      go(`#wallet/recurring/${encodeURIComponent(action.id)}/edit`);
       break;
     case "topup":
-      window.location.assign("#wallet/topup");
+      go("#wallet/topup");
       break;
     case "onchainSend": {
       const query = new URLSearchParams();
       if (action.payoutAddress) query.set("address", action.payoutAddress);
       if (action.amount) query.set("amount", String(action.amount));
       const suffix = query.size > 0 ? `?${query.toString()}` : "";
-      window.location.assign(`#wallet/onchain/send${suffix}`);
+      go(`#wallet/onchain/send${suffix}`);
       break;
     }
     case "onchainReceive":
-      window.location.assign("#wallet/onchain/receive");
+      go("#wallet/onchain/receive");
       break;
     case "onchainTransfer":
-      window.location.assign(
-        `#wallet/onchain/${encodeURIComponent(action.id)}`,
-      );
+      go(`#wallet/onchain/${encodeURIComponent(action.id)}`);
       break;
     case "topupNoAmount":
-      window.location.assign("#wallet/topup/no-amount");
+      go("#wallet/topup/no-amount");
       break;
     case "topupInvoice":
-      window.location.assign("#wallet/topup/invoice");
+      go("#wallet/topup/invoice");
       break;
     case "cashuProofs":
-      window.location.assign("#wallet/tokens/proofs");
+      go("#wallet/tokens/proofs");
       break;
     case "cashuTokens":
-      window.location.assign("#wallet/tokens");
+      go("#wallet/tokens");
       break;
     case "lnAddressPay":
-      window.location.assign(`#payln/${encodeURIComponent(action.lnAddress)}`);
+      go(`#payln/${encodeURIComponent(action.lnAddress)}`);
       break;
     case "lnInvoicePay":
-      window.location.assign(
-        `#payinvoice/${encodeURIComponent(action.invoice.trim())}`,
-      );
+      go(`#payinvoice/${encodeURIComponent(action.invoice.trim())}`);
       break;
     case "manualPay":
-      window.location.assign("#wallet/pay");
+      go("#wallet/pay");
       break;
     case "bankPayment":
-      window.location.assign(
+      go(
         `#wallet/bank-payment/${encodeURIComponent(action.spdPayload.trim())}${action.editing ? BANK_PAYMENT_EDIT_SUFFIX : ""}`,
       );
       break;
     case "bankPaymentNew":
-      window.location.assign("#wallet/bank-payment/new");
+      go("#wallet/bank-payment/new");
       break;
     case "bankPaymentOffer":
       rememberBankPaymentOfferReturnHash();
-      window.location.assign(
+      go(
         `#chat/${encodeURIComponent(action.chatId.trim())}/bank-payment-offer/${encodeURIComponent(action.offerId.trim())}`,
       );
       break;
     case "cashuTokenNew":
-      window.location.assign("#wallet/token/new");
+      go("#wallet/token/new");
       break;
     case "cashuTokenEmit":
-      window.location.assign("#wallet/token/emit");
+      go("#wallet/token/emit");
       break;
     case "cashuToken":
-      window.location.assign(`#wallet/token/${encodeURIComponent(action.id)}`);
+      go(`#wallet/token/${encodeURIComponent(action.id)}`);
       break;
     case "profile":
-      window.location.assign("#profile");
+      go("#profile");
       break;
     case "profileEdit":
-      window.location.assign("#profile/edit");
+      go("#profile/edit");
       break;
     case "nostrRelays":
-      window.location.assign("#nostr-relays");
+      go("#nostr-relays");
       break;
     case "nostrRelay":
-      window.location.assign(`#nostr-relay/${encodeURIComponent(action.id)}`);
+      go(`#nostr-relay/${encodeURIComponent(action.id)}`);
       break;
     case "nostrRelayNew":
-      window.location.assign("#nostr-relay/new");
+      go("#nostr-relay/new");
       break;
     case "chatStorage":
-      window.location.assign("#advanced/chat-storage");
+      go("#advanced/chat-storage");
       return;
     case "evoluServers":
-      window.location.assign("#evolu-servers");
+      go("#evolu-servers");
       break;
     case "evoluData":
-      window.location.assign("#evolu-data");
+      go("#evolu-data");
       break;
     case "evoluCurrentData":
-      window.location.assign("#evolu-current-data");
+      go("#evolu-current-data");
       break;
     case "evoluHistoryData":
-      window.location.assign("#evolu-history-data");
+      go("#evolu-history-data");
       break;
     case "evoluServer":
-      window.location.assign(`#evolu-server/${encodeURIComponent(action.id)}`);
+      go(`#evolu-server/${encodeURIComponent(action.id)}`);
       break;
     case "evoluServerNew":
-      window.location.assign("#evolu-server/new");
+      go("#evolu-server/new");
       break;
   }
 };

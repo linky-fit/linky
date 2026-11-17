@@ -16,4 +16,12 @@ describe("navigateTo", () => {
       "#wallet/recurring/new?contact=contact-1&amount=10",
     );
   });
+
+  it("replaces the current history entry when asked to", () => {
+    window.location.hash = "#wallet";
+    const length = window.history.length;
+    navigateTo({ route: "collaboration" }, { replace: true });
+    expect(window.location.hash).toBe("#collaboration");
+    expect(window.history.length).toBe(length);
+  });
 });

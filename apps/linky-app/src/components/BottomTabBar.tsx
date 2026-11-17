@@ -75,7 +75,7 @@ export function BottomTabBar({
 
   const changeTab = (tab: BottomTabKey) => {
     if (tab === activeTab) return;
-    navigateTo({ route: TAB_ROUTE[tab] });
+    navigateTo({ route: TAB_ROUTE[tab] }, { replace: true });
   };
 
   return (
