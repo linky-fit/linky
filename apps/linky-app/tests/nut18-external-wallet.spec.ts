@@ -241,6 +241,10 @@ test("external wallet: 7 Linky QR and conversation requests, 8 bare token, 9 wro
     const inboxReady = watchNostrInbox(page, identity.npub);
     await setBaseStorage(page);
     await setSeedLoginStorage(page, identity);
+    // The universal method copies only the invoice; this test pays the request.
+    await page.addInitScript(() => {
+      localStorage.setItem("linky.receive_method.v1", "cashu");
+    });
     await stubFiatRates(page);
     await stubThirdPartyAssets(page);
     // FakeWallet auto-settles invoices. Keep only this unpaid Lightning leg pending at the browser boundary.
@@ -280,10 +284,8 @@ test("external wallet: 7 Linky QR and conversation requests, 8 bare token, 9 wro
     const copied = await page.evaluate(() =>
       sessionStorage.getItem("test.nut18.clipboard"),
     );
-    expect(copied).toMatch(/^bitcoin:\?lightning=.+&creq=creqA/);
-    const uri = new URL(copied!);
-    expect(uri.searchParams.get("lightning")).toBeTruthy();
-    const encoded = uri.searchParams.get("creq")!;
+    expect(copied).toMatch(/^creqA/);
+    const encoded = copied!;
     const request = external.decodeLinkyRequest(encoded, {
       amount: 8,
       pubkey: pubkey.data,

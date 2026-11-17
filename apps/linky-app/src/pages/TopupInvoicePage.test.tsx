@@ -64,7 +64,7 @@ describe("TopupInvoicePage", () => {
     expect(qrValue(container)).toBeNull();
   });
 
-  it("shows the universal QR and copies its payload by default", async () => {
+  it("shows the universal QR and copies the bare invoice by default", async () => {
     const copied: string[] = [];
 
     const { container } = await renderIntoDocument(
@@ -90,9 +90,7 @@ describe("TopupInvoicePage", () => {
     expect(container.querySelector('[role="tab"]')).toBeNull();
 
     await pressCopy(container);
-    expect(copied).toEqual([
-      "bitcoin:?lightning=lnbc-invoice&creq=creqArequest",
-    ]);
+    expect(copied).toEqual(["lnbc-invoice"]);
   });
 
   it("renders the cashu request when cashu is the receive method", async () => {
@@ -121,9 +119,13 @@ describe("TopupInvoicePage", () => {
   });
 
   it("falls back to the universal QR when the cashu request is missing", async () => {
+    const copied: string[] = [];
+
     const { container } = await renderIntoDocument(
       <TopupInvoicePage
-        copyText={async () => {}}
+        copyText={async (text) => {
+          copied.push(text);
+        }}
         receiveMethod="cashu"
         t={translate}
         topupAmount="21"
@@ -137,6 +139,8 @@ describe("TopupInvoicePage", () => {
     );
 
     expect(qrValue(container)).toBe("bitcoin:?lightning=lnbc-invoice");
+    await pressCopy(container);
+    expect(copied).toEqual(["lnbc-invoice"]);
   });
 
   it("renders the lightning invoice when lightning is the receive method", async () => {

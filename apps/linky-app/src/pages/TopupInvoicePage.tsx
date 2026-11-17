@@ -57,8 +57,13 @@ export const TopupInvoicePage: FC<TopupInvoicePageProps> = ({
       ? optimizeCaseInsensitiveQrPayload(selectedPayload)
       : selectedPayload;
 
+  // Paste fields rarely parse the universal BIP-321 URI, so it copies as the bare invoice.
+  const copyValue =
+    selectedPayload === universalPayload
+      ? (lightningPayload ?? universalPayload)
+      : selectedPayload;
+
   const handleCopyInvoice = () => {
-    const copyValue = (selectedPayload ?? "").trim();
     if (!copyValue) return;
     void copyText(copyValue);
   };
