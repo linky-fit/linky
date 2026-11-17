@@ -23,6 +23,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - People verified on domains like primal.net now get the check mark by their address too.
 - Search emojis by name when reacting, and type `:` with a name in a message to insert one, e.g. `:100`.
 - Copying a receive invoice copies the bare Lightning invoice, which any wallet accepts when pasted.
+- Switching tabs no longer adds a back step, so swiping back on iPhone doesn't slide the tab bar along with the page.
 
 ### cs-CZ
 
@@ -35,6 +36,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - Lidé ověření na doménách jako primal.net teď mají u adresy taky fajfku.
 - Emoji při reakci najdeš podle názvu a ve zprávě je vložíš dvojtečkou a názvem, třeba `:100`.
 - Kopírování faktury pro příjem zkopíruje holou Lightning fakturu, kterou po vložení přijme každá peněženka.
+- Přepnutí záložky už nepřidává krok zpět, takže swipe zpět na iPhonu netáhne spodní lištu spolu se stránkou.
 
 ## [26.11.3] - 2026-11-10
 
