@@ -450,7 +450,9 @@ if (!servesNativeShell) {
 // open until the batch lands so a stopped worker does not lose them.
 self.addEventListener("install", (event) => {
   logSw("service worker install", { build: SW_BUILD_TAG });
-  event.waitUntil(flushPushDebugLog());
+  // Takes over at once, so tabs of the Evolu 7 build reload into this one
+  // instead of holding the database it migrates; see docs/releases.md.
+  event.waitUntil(Promise.all([flushPushDebugLog(), self.skipWaiting()]));
 });
 
 // platform/serviceWorker.ts posts SKIP_WAITING when the user accepts the

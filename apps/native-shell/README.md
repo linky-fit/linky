@@ -66,7 +66,7 @@ bun run native:aab:release
 
 An Android shell keeps its web app current without a store update, the way the browser does through its service worker.
 
-- `android:prepare` writes `native-runtime.json` into the web build: a hash of the tracked files in `android/`, `ios/`, `capacitor.config.ts` and the installed versions of the Capacitor packages. Any change there makes a new runtime.
+- `android:prepare` writes `native-runtime.json` into the web build: a hash of the tracked files in `android/`, `ios/`, `capacitor.config.ts`, the installed versions of the Capacitor packages and `WEB_DATA_FORMAT` in `scripts/write-native-runtime.ts`. Any change there makes a new runtime. Bump `WEB_DATA_FORMAT` when a web release stores data that older built-in bundles cannot read, so it ships only with a native release.
 - Each app release attaches `live-update-<runtime>.zip` and its signed manifest `live-update-<runtime>.json` to the GitHub release (`scripts/publish-live-update.ts`).
 - The app fetches `releases/latest/download/live-update-<its runtime>.json`. A shell whose runtime the latest release no longer matches gets a 404 and stays on its current bundle until the store update arrives.
 - A newer bundle with a valid signature and SHA-256 is unpacked into app storage and offered like a web update: applied right away on a fresh untouched launch, otherwise from the update banner, never in the middle of wallet work.
