@@ -31,16 +31,13 @@ beforeEach(() => {
 describe("reportLinkyEvoluEvent", () => {
   it.each<[LinkyEvoluEvent, Record<string, unknown>]>([
     [
-      {
-        _tag: "OwnerSyncFailed",
-        failure: { ownerId: app, error: "QuotaError", endsRound: false },
-      },
+      { _tag: "OwnerSyncFailed", ownerId: app, error: "ProtocolQuotaError" },
       {
         tag: "OwnerSyncFailed",
         summary:
-          "An Evolu relay answered with QuotaError before any error-free answer; the owner stays unsynced",
+          "An Evolu relay failed the owner's sync with ProtocolQuotaError",
         links: { owner: app },
-        payload: { ownerId: app, error: "QuotaError", endsRound: false },
+        payload: { ownerId: app, error: "ProtocolQuotaError" },
       },
     ],
     [
@@ -67,15 +64,14 @@ describe("reportLinkyEvoluEvent", () => {
     ],
     [
       {
-        _tag: "WriteUnconfirmed",
-        write: { table: "message", ownerId: shard, id: "row-1" },
+        _tag: "WriteFailed",
+        write: { tables: ["message"], rows: 2, error: "disk full" },
       },
       {
-        tag: "WriteUnconfirmed",
-        summary:
-          "Evolu did not confirm a message write within 10 s; it may have been dropped",
-        links: { owner: shard, row: "row-1" },
-        payload: { table: "message", ownerId: shard, id: "row-1" },
+        tag: "WriteFailed",
+        summary: "Evolu could not store a message write of 2 rows",
+        links: {},
+        payload: { tables: ["message"], rows: 2, error: "disk full" },
       },
     ],
     [

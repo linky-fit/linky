@@ -1,4 +1,4 @@
-import { NonEmptyString100, PositiveInt } from "@evolu/common";
+import { PositiveInt } from "@evolu/common";
 import { Effect } from "effect";
 import type { OwnerId } from "@evolu/common";
 import type { RowNotFound, ShardDbError } from "../core";
@@ -6,6 +6,7 @@ import {
   directConversationIdFor,
   type ContactId,
   type ConversationId,
+  NonEmptyString100,
 } from "@linky-fit/domain";
 import type {
   ConversationRow,

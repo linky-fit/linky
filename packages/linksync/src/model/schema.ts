@@ -1,8 +1,5 @@
-import type { EvoluSchema, InferType } from "@evolu/common";
+import type { EvoluSchema, StandardSchemaV1 } from "@evolu/common";
 import {
-  NonEmptyString,
-  NonEmptyString100,
-  NonEmptyString1000,
   NonNegativeInt,
   nullOr,
   PositiveInt,
@@ -28,6 +25,9 @@ import {
   OnchainTransferMessageId,
   PeerListingsId,
   TransactionId,
+  NonEmptyString,
+  NonEmptyString100,
+  NonEmptyString1000,
 } from "@linky-fit/domain";
 
 /** The columns a message has wherever it is stored. */
@@ -393,7 +393,7 @@ export const LinkySchema = {
 /** The column value types of an Evolu schema, the shape the shard store reads and writes. */
 export type InferDbSchema<ES extends EvoluSchema> = {
   readonly [T in keyof ES]: {
-    readonly [C in keyof ES[T]]: InferType<ES[T][C]>;
+    readonly [C in keyof ES[T]]: StandardSchemaV1.InferOutput<ES[T][C]>;
   };
 };
 

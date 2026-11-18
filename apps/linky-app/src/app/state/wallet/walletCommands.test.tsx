@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { usePaymentsCommands } from "../../hooks/wallet/paymentUi";
 import {
   makeTestAppRegistry,
+  openTestEvolu,
   signedInSession,
 } from "../../../testUtils/appRegistry";
 import { makeLightningInvoice } from "../../../testUtils/lightningInvoice";
@@ -16,13 +17,10 @@ import { linkshuRuntimeAtom } from "../linkshu/runtime";
 import { walletRepositoryAtom } from "../session/store";
 import { paymentsCommandsAtom, type PaymentsCommands } from "./payments";
 
-vi.mock("@evolu/common", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@evolu/common")>()),
-  createEvolu: () => () => ({}),
-}));
 const openLinkyStore = vi.hoisted(() => vi.fn());
 vi.mock("@linky-fit/linksync/evolu", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@linky-fit/linksync/evolu")>()),
+  openLinkyEvolu: () => Promise.resolve({}),
   openLinkyStore,
 }));
 vi.mock("../../migrations/linkshuStorageMigration", () => ({
@@ -48,6 +46,7 @@ const boot = async () => {
   const registry = makeTestAppRegistry({
     session: signedInSession({ appMnemonic: APP_MNEMONIC }),
   });
+  await openTestEvolu(registry);
   const wallet = await result(registry, walletRepositoryAtom);
   await Effect.runPromise(
     wallet.proofs.write({

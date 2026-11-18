@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import {
   createId,
   directConversationIdFor,
@@ -11,6 +12,7 @@ import { AtomRegistry } from "effect/reactivity";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   makeTestAppRegistry,
+  openTestEvolu,
   signedInSession,
 } from "../../../testUtils/appRegistry";
 import { makeTestLinkyStore } from "../../../testUtils/linkyStore";
@@ -31,13 +33,10 @@ import {
 } from "../session/store";
 import { messagesCommandsAtom } from "./commands";
 
-vi.mock("@evolu/common", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@evolu/common")>()),
-  createEvolu: () => () => ({}),
-}));
 const openLinkyStore = vi.hoisted(() => vi.fn());
 vi.mock("@linky-fit/linksync/evolu", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@linky-fit/linksync/evolu")>()),
+  openLinkyEvolu: () => Promise.resolve({}),
   openLinkyStore,
 }));
 const reportAppLog = vi.hoisted(() => vi.fn());
@@ -53,6 +52,7 @@ const result = <A, E>(
 const boot = async () => {
   openLinkyStore.mockResolvedValue(makeTestLinkyStore().store);
   const registry = makeTestAppRegistry({ session: signedInSession() });
+  await openTestEvolu(registry);
   return {
     commands: await result(registry, messagesCommandsAtom),
     contacts: await result(registry, contactsRepositoryAtom),
@@ -123,7 +123,8 @@ describe("messagesCommandsAtom", () => {
     registry.set(sessionAtom, signedInSession());
 
     expect(exit).toEqual(Exit.fail(new SessionSignedOut()));
-    expect(registry.get(evoluAtom)).not.toBeNull();
+    // Only boot opens the database; a sign-in reloads the page.
+    expect(registry.get(evoluAtom)).toBeNull();
   });
 });
 

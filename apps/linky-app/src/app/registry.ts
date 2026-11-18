@@ -1,7 +1,7 @@
 import { AtomRegistry, scheduleTask } from "@linky-fit/linkstr-react";
-import type { EvoluPlatform, PlatformPorts } from "../platform/ports";
+import type { PlatformPorts } from "../platform/ports";
 import type { SessionState } from "../platform/session";
-import { evoluPlatformAtom, platformAtom } from "./state/platform";
+import { platformAtom } from "./state/platform";
 import { sessionAtom } from "./state/session/session";
 
 /**
@@ -12,18 +12,15 @@ import { sessionAtom } from "./state/session/session";
 export const makeAppRegistry = ({
   ports,
   session,
-  evoluPlatform,
 }: {
   readonly ports: PlatformPorts;
   readonly session: SessionState;
-  readonly evoluPlatform: EvoluPlatform | null;
 }): AtomRegistry.AtomRegistry =>
   AtomRegistry.make({
     scheduleTask,
     defaultIdleTTL: 400,
     initialValues: [
       [platformAtom, ports],
-      [evoluPlatformAtom, evoluPlatform],
       [sessionAtom, session],
     ],
   });

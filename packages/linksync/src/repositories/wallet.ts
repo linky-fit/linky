@@ -1,7 +1,4 @@
 import {
-  NonEmptyString,
-  NonEmptyString100,
-  NonEmptyString1000,
   NonNegativeInt,
   PositiveInt,
   sqliteFalse,
@@ -34,6 +31,9 @@ import {
   cashuOperationIdFor,
   CashuProofId,
   cashuProofIdFor,
+  NonEmptyString,
+  NonEmptyString100,
+  NonEmptyString1000,
 } from "@linky-fit/domain";
 import type {
   CashuOperationRow,

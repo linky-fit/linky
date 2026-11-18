@@ -7,6 +7,7 @@ import {
   toyStore,
   type ToySchema,
 } from "../testing/toy";
+import type { Mutation } from "./ShardDb";
 import {
   createShardStore,
   shardPointerId,
@@ -118,8 +119,7 @@ describe("shard store", () => {
       run(store.insert("notes", "note", { ...note("old"), body: "kept" }));
       run(store.rotate("notes"));
       run(store.insert("notes", "note", note("active")));
-      const batches: Array<ReadonlyArray<{ kind: string; ownerId: string }>> =
-        [];
+      const batches: Array<ReadonlyArray<Mutation>> = [];
       const recording = createShardStore<ToySchema, typeof toyScopes>({
         db: {
           ...db,
@@ -146,9 +146,9 @@ describe("shard store", () => {
       const shard1 = store.shardOwner("notes", 1).id;
       expect(batches).toHaveLength(1);
       expect(
-        batches[0]?.map(({ kind, ownerId }) => [
+        batches[0]?.map(({ kind, owner }) => [
           kind,
-          ownerId === shard1 ? 1 : 0,
+          owner.id === shard1 ? 1 : 0,
         ]),
       ).toEqual([
         ["upsert", 1],
@@ -182,8 +182,8 @@ describe("shard store", () => {
   describe("merged reads", () => {
     it("returns the copy from the highest shard when an id exists in several", () => {
       const { db, store } = toyStore();
-      const shard0 = store.shardOwner("notes", 0).id;
-      const shard2 = store.shardOwner("notes", 2).id;
+      const shard0 = store.shardOwner("notes", 0);
+      const shard2 = store.shardOwner("notes", 2);
       run(store.rotate("notes"));
       run(store.rotate("notes"));
       run(
@@ -191,13 +191,13 @@ describe("shard store", () => {
           {
             kind: "upsert",
             table: "note",
-            ownerId: shard2,
+            owner: shard2,
             row: note("a", "new"),
           },
           {
             kind: "upsert",
             table: "note",
-            ownerId: shard0,
+            owner: shard0,
             row: note("a", "old"),
           },
         ]),
@@ -215,7 +215,7 @@ describe("shard store", () => {
           {
             kind: "upsert",
             table: "note",
-            ownerId: foreign.id,
+            owner: foreign,
             row: note("x"),
           },
         ]),
@@ -421,7 +421,7 @@ describe("shard store", () => {
           {
             kind: "upsert",
             table: "shardPointer",
-            ownerId: appOwner.id,
+            owner: appOwner,
             row: { id: shardPointerId("chats"), scope: "chats", index },
           },
         ]),
@@ -457,7 +457,7 @@ describe("shard store", () => {
           {
             kind: "upsert",
             table: "shardPointer",
-            ownerId: appOwner.id,
+            owner: appOwner,
             row: { id: shardPointerId("chats"), scope: "chats", index },
           },
         ]),
@@ -473,7 +473,7 @@ describe("shard store", () => {
         {
           kind: "upsert",
           table: "shardPointer",
-          ownerId: appOwner.id,
+          owner: appOwner,
           row: { id: shardPointerId("chats"), scope: "chats", index: 5 },
         },
       ]),
@@ -493,7 +493,7 @@ describe("shard store", () => {
           {
             kind: "upsert",
             table: "shardPointer",
-            ownerId: appOwner.id,
+            owner: appOwner,
             row: { id: shardPointerId("chats"), scope: "chats", index },
           },
         ]),
@@ -594,7 +594,7 @@ describe("shard store", () => {
           indexes.map((index) => ({
             kind: "upsert",
             table: "note",
-            ownerId: store.shardOwner("notes", index).id,
+            owner: store.shardOwner("notes", index),
             row: note(`n${index}`),
           })),
         ),
@@ -616,19 +616,19 @@ describe("shard store", () => {
           {
             kind: "update",
             table: "note",
-            ownerId: store.shardOwner("notes", 3).id,
+            owner: store.shardOwner("notes", 3),
             row: { id: "n3", isDeleted: true },
           },
           {
             kind: "upsert",
             table: "shardPointer",
-            ownerId: toy.appOwner.id,
+            owner: toy.appOwner,
             row: { id: pointerId, scope: "notes", index: 3, rotatedAtMs: 1 },
           },
           {
             kind: "update",
             table: "shardPointer",
-            ownerId: toy.appOwner.id,
+            owner: toy.appOwner,
             row: { id: pointerId, index: 0 },
           },
         ]),
@@ -721,12 +721,12 @@ describe("shard store", () => {
     const seedLegacy = (db: ReturnType<typeof toyStore>["db"]) =>
       run(
         db.mutate([
-          { kind: "upsert", table: "note", ownerId: legacy.id, row: note("a") },
-          { kind: "upsert", table: "note", ownerId: legacy.id, row: note("b") },
+          { kind: "upsert", table: "note", owner: legacy, row: note("a") },
+          { kind: "upsert", table: "note", owner: legacy, row: note("b") },
           {
             kind: "update",
             table: "note",
-            ownerId: legacy.id,
+            owner: legacy,
             row: { id: "b", isDeleted: true },
           },
         ]),
@@ -763,7 +763,7 @@ describe("shard store", () => {
           {
             kind: "update",
             table: "note",
-            ownerId: legacy.id,
+            owner: legacy,
             row: { id: "a", title: "later" },
           },
         ]),
@@ -798,7 +798,7 @@ describe("shard store", () => {
           {
             kind: "upsert",
             table: "note",
-            ownerId: store.shardOwner("notes", 0).id,
+            owner: store.shardOwner("notes", 0),
             row: note("a", "edited on another device"),
           },
         ]),
@@ -820,7 +820,7 @@ describe("shard store", () => {
           [...rows, big].map((row) => ({
             kind: "upsert" as const,
             table: "note",
-            ownerId: legacy.id,
+            owner: legacy,
             row,
           })),
         ),
@@ -882,7 +882,7 @@ describe("shard store", () => {
         {
           kind: "upsert",
           table: "shardPointer",
-          ownerId: appOwner.id,
+          owner: appOwner,
           row: { id: shardPointerId("notes"), scope: "notes", index: 2 },
         },
       ]),

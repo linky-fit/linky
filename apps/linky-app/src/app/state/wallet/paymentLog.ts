@@ -47,18 +47,18 @@ type TransactionInsertPayload = {
   >]: WriteRow<LinkyDbSchema["transaction"]>[K];
 };
 
-interface ColumnType<Input, Value> {
-  readonly from: (
-    value: Input,
+interface ColumnType<Value> {
+  readonly fromUnknown: (
+    value: unknown,
   ) => { readonly ok: true; readonly value: Value } | { readonly ok: false };
 }
 
 /** The column value, or undefined when the input does not fit the column (the payload then omits it). */
-const columnOrOmit = <Input, Value>(
-  type: ColumnType<Input, Value>,
-  value: Input,
+const columnOrOmit = <Value>(
+  type: ColumnType<Value>,
+  value: unknown,
 ): Value | undefined => {
-  const result = type.from(value);
+  const result = type.fromUnknown(value);
   return result.ok ? result.value : undefined;
 };
 

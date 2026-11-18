@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import {
   createId,
   directConversationIdFor,
@@ -11,6 +12,7 @@ import { AtomRegistry } from "effect/reactivity";
 import { describe, expect, it, vi } from "vitest";
 import {
   makeTestAppRegistry,
+  openTestEvolu,
   signedInSession,
 } from "../../../testUtils/appRegistry";
 import { makeTestLinkyStore } from "../../../testUtils/linkyStore";
@@ -24,13 +26,10 @@ import {
 import { contactsCommandsAtom, saveNpubContactAtom } from "./commands";
 import { contactsAtom } from "./readModel";
 
-vi.mock("@evolu/common", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@evolu/common")>()),
-  createEvolu: () => () => ({}),
-}));
 const openLinkyStore = vi.hoisted(() => vi.fn());
 vi.mock("@linky-fit/linksync/evolu", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@linky-fit/linksync/evolu")>()),
+  openLinkyEvolu: () => Promise.resolve({}),
   openLinkyStore,
 }));
 const reportAppLog = vi.hoisted(() => vi.fn());
@@ -44,6 +43,7 @@ const result = <A, E>(
 const boot = async () => {
   openLinkyStore.mockResolvedValue(makeTestLinkyStore().store);
   const registry = makeTestAppRegistry({ session: signedInSession() });
+  await openTestEvolu(registry);
   return {
     registry,
     commands: await result(registry, contactsCommandsAtom),

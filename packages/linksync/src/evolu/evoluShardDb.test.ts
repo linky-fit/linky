@@ -1,8 +1,19 @@
-import { ownerIdToOwnerIdBytes, type OwnerId } from "@evolu/common";
 import {
-  createQuery,
-  deserializeQuery,
-  evoluSchemaToDbSchema,
+  createIdFromString,
+  createStore,
+  createUnknownError,
+  Millis,
+  Name,
+  ownerIdToOwnerIdBytes,
+  sqliteQueryStringToSqliteQuery,
+  type MutationOptions,
+  type OwnerId,
+  type Row,
+} from "@evolu/common";
+import {
+  evoluSchemaToSqliteSchema,
+  type SyncRoute,
+  type SyncState,
 } from "@evolu/common/local-first";
 import { Effect } from "effect";
 import { DatabaseSync } from "node:sqlite";
@@ -10,428 +21,325 @@ import { testAppOwner } from "../testing/toy";
 import {
   createEvoluShardDb,
   type EvoluRuntime,
-  type UnconfirmedWrite,
+  type FailedWrite,
 } from "./evoluShardDb";
-import { LinkyEvoluSchema, linkyIndexes } from "./linkyEvolu";
-import type { OwnerSync } from "./ownerSync";
+import { LinkyEvoluSchema, linkyIndexes } from "./linkyEvoluSchema";
+
+const name = Name.orThrow("linky-test");
+
+interface Recorded {
+  readonly kind: string;
+  readonly table: string;
+  readonly row: Record<string, unknown>;
+  readonly options: MutationOptions;
+}
 
 /**
  * A stand-in for the Evolu instance: records every mutation and query, and
- * answers queries with the rows a test seeds. Enough to check what the
- * adapter hands Evolu, which the in-memory port cannot.
+ * answers queries with the rows a test seeds. Mutations succeed in a
+ * microtask unless the test holds them.
  */
-const fakeEvolu = (
-  rejects: (row: Record<string, unknown>) => boolean = () => false,
-) => {
-  const mutations: Array<{
-    kind: string;
-    table: string;
-    row: Record<string, unknown>;
-    options: Record<string, unknown>;
-  }> = [];
+const fakeEvolu = () => {
+  const mutations: Recorded[] = [];
   const queries: string[] = [];
-  let rows: ReadonlyArray<Record<string, unknown>> = [];
-  let held: Array<() => void> | null = null;
-  let heldCompletions: Array<() => void> | null = null;
+  let rows: ReadonlyArray<Row> = [];
+  let held: Recorded[] | null = null;
   const mutation =
     (kind: string) =>
-    (
-      table: string,
-      row: Record<string, unknown>,
-      options: Record<string, unknown>,
-    ) => {
-      mutations.push({ kind, table, row, options });
-      const { onComplete } = options;
-      if (typeof onComplete === "function") {
-        const complete = () => {
-          onComplete();
-        };
-        if (heldCompletions === null) queueMicrotask(complete);
-        else heldCompletions.push(complete);
-      }
-      return rejects(row) ? { ok: false, error: "invalid" } : { ok: true };
+    (table: string, row: Record<string, unknown>, options: MutationOptions) => {
+      const recorded = { kind, table, row, options };
+      mutations.push(recorded);
+      if (held === null) queueMicrotask(() => options.onSuccess?.());
+      else held.push(recorded);
+      return { id: row.id };
     };
-  const evolu = {
-    useOwner: () => () => {},
-    createQuery: (build: (db: unknown) => unknown) => {
-      type Arg = string | number | object;
-      const parts: Array<[string | symbol, ...Arg[]]> = [];
-      const builder: Record<string, unknown> = new Proxy(
-        {},
-        {
-          get:
-            (_target, method) =>
-            (...args: Arg[]) => {
-              parts.push([method, ...args]);
-              return builder;
-            },
-        },
-      );
-      build(builder);
-      return JSON.stringify(parts, (_key, value: unknown) =>
-        value instanceof Uint8Array ? `bytes:${value.length}` : value,
-      );
-    },
-    loadQuery: (query: string) => {
-      queries.push(query);
-      const answer = rows;
-      if (held === null) return Promise.resolve(answer);
-      const waiting = held;
-      return new Promise((resolve) => waiting.push(() => resolve(answer)));
+  const runtime: EvoluRuntime = {
+    name,
+    loadQuery: (query) => {
+      queries.push(sqliteQueryStringToSqliteQuery(query).sql);
+      return Promise.resolve(rows);
     },
     subscribeQuery: () => () => () => {},
     upsert: mutation("upsert"),
     update: mutation("update"),
+    getMutationSize: () => 1,
+    useOwner: () => () => {},
   };
-  const runtime: EvoluRuntime = evolu;
   return {
     runtime,
     mutations,
     queries,
-    seed: (next: ReadonlyArray<Record<string, unknown>>) => {
+    seed: (next: ReadonlyArray<Row>) => {
       rows = next;
     },
-    holdQueries: () => {
+    hold: () => {
       held = [];
     },
-    answerQueries: () => {
-      for (const answer of held ?? []) answer();
+    succeed: () => {
+      for (const { options } of held ?? []) options.onSuccess?.();
       held = null;
     },
-    holdCompletions: () => {
-      heldCompletions = [];
-    },
-    completeMutations: () => {
-      for (const complete of heldCompletions ?? []) complete();
-      heldCompletions = null;
+    fail: () => {
+      for (const { options } of held ?? [])
+        options.onError?.(createUnknownError("disk full"));
+      held = null;
     },
   };
 };
 
-/** The page side of the worker's owner sync reports, driven by the test. */
-const reportedOwnerSync = () => {
-  const synced = new Set<OwnerId>();
-  const listeners = new Set<() => void>();
-  const ownerSync: OwnerSync = {
-    syncedOwners: () => synced,
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
-    subscribeFailures: () => () => {},
-  };
-  return {
-    ownerSync,
-    report: (ownerId: OwnerId) => {
-      synced.add(ownerId);
-      for (const listener of listeners) listener();
-    },
-  };
+const syncStore = () => createStore<SyncState | null>(null);
+
+const complete: SyncRoute = {
+  type: "Complete",
+  transportId: createIdFromString<"SyncTransport">("transport"),
+  completeAt: Millis.orThrow(1),
+  lastSentAt: Millis.orThrow(1),
+  lastReceivedAt: null,
 };
+
+const stateWith = (
+  owners: ReadonlyArray<OwnerId>,
+  route: SyncRoute = complete,
+): SyncState => ({
+  transports: [],
+  tenants: [
+    {
+      type: "Active",
+      name,
+      owners: owners.map((ownerId) => ({
+        type: "Writable",
+        ownerId,
+        routes: [route],
+      })),
+    },
+  ],
+});
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+const open = (
+  runtime: EvoluRuntime,
+  options: {
+    readonly syncState?: ReturnType<typeof syncStore>;
+    readonly hasEvoluRelay?: boolean;
+    readonly onWriteFailed?: (write: FailedWrite) => void;
+  } = {},
+) =>
+  createEvoluShardDb(runtime, {
+    syncState: options.syncState ?? syncStore(),
+    hasEvoluRelay: options.hasEvoluRelay ?? true,
+    ...(options.onWriteFailed ? { onWriteFailed: options.onWriteFailed } : {}),
+  });
+
 describe("evolu shard db", () => {
-  it("hands Evolu a SqliteBoolean tombstone, not the port's boolean", async () => {
+  it("hands Evolu a SqliteBoolean tombstone and the owner with its write key", async () => {
     const fake = fakeEvolu();
-    const db = createEvoluShardDb(fake.runtime, reportedOwnerSync().ownerSync);
+    const db = open(fake.runtime);
     const owner = testAppOwner();
+    const id = createIdFromString("contact/c1");
     await Effect.runPromise(
       db.mutate([
         {
           kind: "update",
-          table: "cashuProof",
-          ownerId: owner.id,
-          row: { id: "p1", isDeleted: true },
-        },
-        {
-          kind: "update",
-          table: "cashuProof",
-          ownerId: owner.id,
-          row: { id: "p2", state: "spent" },
+          table: "contact",
+          owner,
+          row: { id, isDeleted: true },
         },
       ]),
     );
-    const applied = fake.mutations.filter(
-      (m) => m.options.onlyValidate !== true,
-    );
-    expect(applied.map((m) => m.row)).toEqual([
-      { id: "p1", isDeleted: 1 },
-      { id: "p2", state: "spent" },
-    ]);
-    expect(fake.mutations.map((m) => m.options.onlyValidate)).toEqual([
-      true,
-      true,
-      undefined,
-      undefined,
+    expect(fake.mutations).toEqual([
+      {
+        kind: "update",
+        table: "contact",
+        row: { id, isDeleted: 1 },
+        options: expect.objectContaining({ owner }),
+      },
     ]);
   });
 
-  it("queues a whole batch at once, and none of it when Evolu would reject one row", async () => {
-    const fake = fakeEvolu((row) => row.id === "bad");
-    const db = createEvoluShardDb(fake.runtime, reportedOwnerSync().ownerSync);
-    const owner = testAppOwner();
-    const queued = () =>
-      fake.mutations
-        .filter(({ options }) => options.onlyValidate !== true)
-        .map(({ row }) => row.id);
-    const proofRow = (id: string) => ({
-      kind: "upsert" as const,
-      table: "cashuProof",
-      ownerId: owner.id,
-      row: { id, state: "spent" },
-    });
-
-    const write = Effect.runPromise(
-      db.mutate([proofRow("p1"), proofRow("p2"), proofRow("p3")]),
-    );
-    // Evolu makes one transaction of what is queued before its microtask runs.
-    expect(queued()).toEqual(["p1", "p2", "p3"]);
-    await write;
-
-    const rejected = await Effect.runPromise(
-      Effect.flip(db.mutate([proofRow("p4"), proofRow("bad")])),
-    );
-    expect(rejected).toMatchObject({ _tag: "ShardDbError" });
-    expect(queued()).toEqual(["p1", "p2", "p3"]);
-    expect(
-      (await Effect.runPromise(db.readTable("cashuProof"))).map(
-        (row) => row.id,
-      ),
-    ).not.toContain("p4");
-  });
-
-  it("resolves a write only once Evolu has applied it", async () => {
+  it("queues none of a batch when one row does not fit its column type", async () => {
     const fake = fakeEvolu();
-    const db = createEvoluShardDb(fake.runtime, reportedOwnerSync().ownerSync);
+    const db = open(fake.runtime);
     const owner = testAppOwner();
-    fake.holdCompletions();
-    let written = false;
-    const write = Effect.runPromise(
+    const result = await Effect.runPromise(
+      Effect.result(
+        db.mutate([
+          { kind: "upsert", table: "setting", owner, row: valid("a") },
+          {
+            kind: "upsert",
+            table: "setting",
+            owner,
+            row: { ...valid("b"), value: "" },
+          },
+        ]),
+      ),
+    );
+    expect(result._tag).toBe("Failure");
+    expect(fake.mutations).toEqual([]);
+  });
+
+  it("requires every non-null column of an upserted row", async () => {
+    const fake = fakeEvolu();
+    const db = open(fake.runtime);
+    const result = await Effect.runPromise(
+      Effect.result(
+        db.mutate([
+          {
+            kind: "upsert",
+            table: "setting",
+            owner: testAppOwner(),
+            row: { id: valid("a").id },
+          },
+        ]),
+      ),
+    );
+    expect(result._tag).toBe("Failure");
+    expect(fake.mutations).toEqual([]);
+  });
+
+  it("resolves a write only once Evolu stored it", async () => {
+    const fake = fakeEvolu();
+    const db = open(fake.runtime);
+    fake.hold();
+    let done = false;
+    void Effect.runPromise(
       db.mutate([
         {
-          kind: "update",
-          table: "cashuProof",
-          ownerId: owner.id,
-          row: { id: "p1", state: "spent" },
+          kind: "upsert",
+          table: "setting",
+          owner: testAppOwner(),
+          row: valid("a"),
         },
       ]),
     ).then(() => {
-      written = true;
+      done = true;
     });
     await settle();
-    expect(written).toBe(false);
-
-    fake.completeMutations();
-    await write;
-    expect(written).toBe(true);
+    expect(done).toBe(false);
+    fake.succeed();
+    await settle();
+    expect(done).toBe(true);
   });
 
-  it("fails a write Evolu never confirms once the bound passes and stops serving it", async () => {
-    vi.useFakeTimers();
-    try {
-      const fake = fakeEvolu();
-      const unconfirmed: UnconfirmedWrite[] = [];
-      const db = createEvoluShardDb(
-        fake.runtime,
-        reportedOwnerSync().ownerSync,
-        { onWriteUnconfirmed: (write) => unconfirmed.push(write) },
-      );
-      const owner = testAppOwner();
-      fake.holdCompletions();
-      const write = Effect.runPromise(
-        Effect.flip(
-          db.mutate([
-            {
-              kind: "upsert",
-              table: "cashuProof",
-              ownerId: owner.id,
-              row: { id: "p1", state: "spent" },
-            },
-          ]),
-        ),
-      );
-      await vi.advanceTimersByTimeAsync(9_000);
-      expect(unconfirmed).toEqual([]);
-      expect(
-        (await Effect.runPromise(db.readTable("cashuProof"))).map(
-          (row) => row.id,
-        ),
-      ).toEqual(["p1"]);
-
-      await vi.advanceTimersByTimeAsync(1_000);
-      expect(await write).toMatchObject({
-        _tag: "ShardDbError",
-        message: "Evolu did not confirm the write",
-      });
-      expect(unconfirmed).toEqual([
-        { table: "cashuProof", ownerId: owner.id, id: "p1" },
-      ]);
-      expect(await Effect.runPromise(db.readTable("cashuProof"))).toEqual([]);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("reads omitted columns as null before a sparse write reaches the query", async () => {
+  it("fails a write Evolu could not store and reports it", async () => {
     const fake = fakeEvolu();
-    const db = createEvoluShardDb(fake.runtime, reportedOwnerSync().ownerSync);
-    await Effect.runPromise(
-      db.mutate([
-        {
-          kind: "upsert",
-          table: "onchainTransfer",
-          ownerId: testAppOwner().id,
-          row: { id: "transfer-1", amount: 100_000 },
-        },
-      ]),
+    const failed: FailedWrite[] = [];
+    const db = open(fake.runtime, {
+      onWriteFailed: (write) => failed.push(write),
+    });
+    fake.hold();
+    const write = Effect.runPromise(
+      Effect.result(
+        db.mutate([
+          {
+            kind: "upsert",
+            table: "setting",
+            owner: testAppOwner(),
+            row: valid("a"),
+          },
+        ]),
+      ),
     );
-    for (const rows of [
-      await Effect.runPromise(db.readTable("onchainTransfer")),
-      await Effect.runPromise(db.readCopies("onchainTransfer", ["transfer-1"])),
-    ]) {
-      expect(rows).toHaveLength(1);
-      expect(rows[0]).toMatchObject({
-        id: "transfer-1",
-        amount: 100_000,
-        createdAtSec: null,
-        cancelledAtSec: null,
-        refundAddress: null,
-      });
-    }
+    await settle();
+    fake.fail();
+    expect((await write)._tag).toBe("Failure");
+    expect(failed).toEqual([
+      { tables: ["setting"], rows: 1, error: expect.stringContaining("") },
+    ]);
   });
 
-  it("serves its own tombstone from the overlay until the row reflects it", async () => {
+  it("reads back a tombstone an Evolu 7 update created, which has no createdAt", async () => {
     const fake = fakeEvolu();
-    const db = createEvoluShardDb(fake.runtime, reportedOwnerSync().ownerSync);
-    const owner = testAppOwner();
+    const db = open(fake.runtime);
+    const ownerId = testAppOwner().id;
+    const at = "2026-01-01T00:00:00.000Z";
     fake.seed([
-      {
-        id: "p1",
-        ownerId: owner.id,
-        createdAt: "2026-01-01T00:00:00.000Z",
-        updatedAt: null,
-        isDeleted: null,
-        state: "available",
-      },
+      { id: "c1", ownerId, createdAt: null, updatedAt: at, isDeleted: 1 },
     ]);
-    await Effect.runPromise(
-      db.mutate([
-        {
-          kind: "update",
-          table: "cashuProof",
-          ownerId: owner.id,
-          row: { id: "p1", isDeleted: true },
-        },
-      ]),
-    );
-    const rows = await Effect.runPromise(db.readTable("cashuProof"));
-    expect(rows.map((row) => row.isDeleted)).toEqual([1]);
-  });
-
-  it("reads back a tombstone an update created, which has no createdAt", async () => {
-    const fake = fakeEvolu();
-    const db = createEvoluShardDb(fake.runtime, reportedOwnerSync().ownerSync);
-    const owner = testAppOwner();
-    fake.seed([
-      {
-        id: "r1",
-        ownerId: owner.id,
-        createdAt: null,
-        updatedAt: "2026-01-02T00:00:00.000Z",
-        isDeleted: 1,
-        reactorPubkey: "pk",
-      },
+    expect(await Effect.runPromise(db.readTable("contact"))).toEqual([
+      { id: "c1", ownerId, createdAt: at, updatedAt: at, isDeleted: 1 },
     ]);
-    const rows = await Effect.runPromise(db.readTable("reaction"));
-    expect(rows).toEqual([
-      expect.objectContaining({
-        id: "r1",
-        isDeleted: 1,
-        createdAt: "2026-01-02T00:00:00.000Z",
-        updatedAt: "2026-01-02T00:00:00.000Z",
-      }),
-    ]);
-  });
-
-  it("reads one row's copies by id, its own pending write included", async () => {
-    const fake = fakeEvolu();
-    const db = createEvoluShardDb(fake.runtime, reportedOwnerSync().ownerSync);
-    const owner = testAppOwner();
-    await Effect.runPromise(
-      db.mutate([
-        {
-          kind: "upsert",
-          table: "reaction",
-          ownerId: owner.id,
-          row: { id: "r1", emoji: "👍" },
-        },
-        {
-          kind: "upsert",
-          table: "reaction",
-          ownerId: owner.id,
-          row: { id: "r2", emoji: "👎" },
-        },
-      ]),
-    );
-    const copies = await Effect.runPromise(db.readCopies("reaction", ["r1"]));
-    expect(copies.map((row) => [row.id, row.emoji])).toEqual([["r1", "👍"]]);
-    expect(fake.queries.at(-1)).toContain('["where","id","in",["r1"]]');
   });
 
   it("asks evolu_history for the owner id's bytes", async () => {
     const fake = fakeEvolu();
-    const db = createEvoluShardDb(fake.runtime, reportedOwnerSync().ownerSync);
-    const owner = testAppOwner();
-    fake.seed([{ mutations: 3, bytes: 40 }]);
-    expect(await Effect.runPromise(db.ownerUsage(owner.id))).toEqual({
-      mutations: 3,
-      bytes: 40,
-    });
-    expect(fake.queries[0]).toContain(
-      `"=","bytes:${ownerIdToOwnerIdBytes(owner.id).length}"`,
-    );
-    expect(fake.queries[0]).not.toContain(owner.id);
+    const db = open(fake.runtime);
+    const ownerId = testAppOwner().id;
+    expect(ownerIdToOwnerIdBytes(ownerId)).toHaveLength(16);
+    await Effect.runPromise(db.ownerUsage(ownerId));
+    expect(fake.queries).toEqual([
+      expect.stringContaining(`from "evolu_history"`),
+    ]);
   });
 
-  it("counts a reported owner synced once a fresh query has answered", async () => {
+  it("counts an owner synced once a route completed and a fresh query answered", async () => {
     const fake = fakeEvolu();
-    const sync = reportedOwnerSync();
+    const syncState = syncStore();
+    const db = open(fake.runtime, { syncState });
     const owner = testAppOwner();
-    const db = createEvoluShardDb(fake.runtime, sync.ownerSync);
-    let notified = 0;
-    db.subscribeOwnerSync(() => {
-      notified += 1;
-    });
-    fake.holdQueries();
-    sync.report(owner.id);
+    const heard: string[] = [];
+    db.subscribeOwnerSync(() => heard.push("synced"));
+
+    syncState.set(stateWith([owner.id], { ...complete, type: "Complete" }));
+    expect(db.isOwnerSynced(owner.id)).toBe(false);
+    await settle();
+    expect(db.isOwnerSynced(owner.id)).toBe(true);
+    expect(heard).toEqual(["synced"]);
+  });
+
+  it("takes owners whose route completed before the db was created", async () => {
+    const fake = fakeEvolu();
+    const syncState = syncStore();
+    const owner = testAppOwner();
+    syncState.set(stateWith([owner.id]));
+    const db = open(fake.runtime, { syncState });
+    await settle();
+    expect(db.isOwnerSynced(owner.id)).toBe(true);
+  });
+
+  it("does not count an owner whose route never completed", async () => {
+    const fake = fakeEvolu();
+    const syncState = syncStore();
+    const owner = testAppOwner();
+    syncState.set(
+      stateWith([owner.id], {
+        type: "Pending",
+        transportId: complete.transportId,
+        failure: null,
+        skippedError: null,
+        completeAt: null,
+        lastSentAt: null,
+        lastReceivedAt: null,
+      }),
+    );
+    const db = open(fake.runtime, { syncState });
     await settle();
     expect(db.isOwnerSynced(owner.id)).toBe(false);
-    expect(fake.queries.at(-1)).toContain("linksync-barrier-1");
-
-    fake.answerQueries();
-    await settle();
-    expect(db.isOwnerSynced(owner.id)).toBe(true);
-    expect(notified).toBe(1);
   });
 
-  it("takes owners the worker reported before the db was created", async () => {
+  it("counts every owner synced and subscribes none without a relay", () => {
     const fake = fakeEvolu();
-    const sync = reportedOwnerSync();
+    const used: string[] = [];
+    const db = open(
+      { ...fake.runtime, useOwner: (owner) => (used.push(owner.id), () => {}) },
+      { hasEvoluRelay: false },
+    );
     const owner = testAppOwner();
-    sync.report(owner.id);
-    const db = createEvoluShardDb(fake.runtime, sync.ownerSync);
-    await settle();
+    db.useOwner(owner);
     expect(db.isOwnerSynced(owner.id)).toBe(true);
+    expect(used).toEqual([]);
   });
+});
+
+const valid = (key: string) => ({
+  id: createIdFromString(`setting/${key}`),
+  key,
+  value: "v",
 });
 
 /**
  * Evolu's own query compiler over a real SQLite table, so the SQL the
- * adapter builds is what decides which rows come back. Writes go through
- * the fake and stay in the adapter's overlay.
+ * adapter builds is what decides which rows come back.
  */
 const sqliteEvolu = () => {
   const sqlite = new DatabaseSync(":memory:");
@@ -441,15 +349,14 @@ const sqliteEvolu = () => {
       isDeleted integer, state text, operationId text, keysetId text, mint text,
       primary key (ownerId, id)) without rowid`,
   );
-  for (const index of evoluSchemaToDbSchema(LinkyEvoluSchema, linkyIndexes)
+  for (const index of evoluSchemaToSqliteSchema(LinkyEvoluSchema, linkyIndexes)
     .indexes)
     if (index.sql.includes(`on "cashuProof"`)) sqlite.exec(index.sql);
   const plans: string[] = [];
-  const evolu = {
+  const runtime: EvoluRuntime = {
     ...fakeEvolu().runtime,
-    createQuery,
-    loadQuery: (query: Parameters<typeof deserializeQuery>[0]) => {
-      const { sql, parameters } = deserializeQuery(query);
+    loadQuery: (query) => {
+      const { sql, parameters } = sqliteQueryStringToSqliteQuery(query);
       const bound = parameters.filter(
         (value) => typeof value === "string" || typeof value === "number",
       );
@@ -459,10 +366,22 @@ const sqliteEvolu = () => {
         plans.push(String(step.detail));
       const rows = sqlite.prepare(sql).all(...bound);
       loaded.push(rows);
-      return Promise.resolve(rows);
+      return Promise.resolve(
+        rows.map((row) => ({
+          id: String(row.id),
+          ownerId: String(row.ownerId),
+          createdAt: String(row.createdAt),
+          updatedAt: String(row.updatedAt),
+          isDeleted: row.isDeleted === null ? null : Number(row.isDeleted),
+          state: row.state === null ? null : String(row.state),
+          operationId:
+            row.operationId === null ? null : String(row.operationId),
+          keysetId: row.keysetId === null ? null : String(row.keysetId),
+          mint: row.mint === null ? null : String(row.mint),
+        })),
+      );
     },
   };
-  const runtime: EvoluRuntime = evolu;
   const insert = (row: {
     readonly id: string;
     readonly ownerId: OwnerId;
@@ -489,7 +408,7 @@ const sqliteEvolu = () => {
         row.keysetId ?? null,
         row.mint ?? null,
       );
-  return { runtime, insert, loaded, plans };
+  return { db: open(runtime), insert, loaded, plans };
 };
 
 describe("evolu shard db filtered reads over SQLite", () => {
@@ -502,8 +421,7 @@ describe("evolu shard db filtered reads over SQLite", () => {
     rows.map((row) => `${row.id}@${row.ownerId === older ? 0 : 1}`).sort();
 
   it("returns every copy of the ids with a live matching copy, tombstones and spent marks included", async () => {
-    const { runtime, insert, loaded } = sqliteEvolu();
-    const db = createEvoluShardDb(runtime, reportedOwnerSync().ownerSync);
+    const { db, insert, loaded } = sqliteEvolu();
     // Copied forward, then spent: only a tombstone matches.
     insert({
       id: "gone",
@@ -550,8 +468,7 @@ describe("evolu shard db filtered reads over SQLite", () => {
   });
 
   it("matches on tombstoned copies too when asked", async () => {
-    const { runtime, insert } = sqliteEvolu();
-    const db = createEvoluShardDb(runtime, reportedOwnerSync().ownerSync);
+    const { db, insert } = sqliteEvolu();
     // Spent under the send by another device after this one copied it forward.
     insert({
       id: "raced",
@@ -577,36 +494,8 @@ describe("evolu shard db filtered reads over SQLite", () => {
     expect(keysOf(any)).toEqual(["raced@0", "raced@1"]);
   });
 
-  it("returns a pending write that newly matches together with its stored copies", async () => {
-    const { runtime, insert } = sqliteEvolu();
-    const db = createEvoluShardDb(runtime, reportedOwnerSync().ownerSync);
-    insert({ id: "p1", ownerId: older, createdAt: at, state: "spent" });
-    await Effect.runPromise(
-      db.mutate([
-        {
-          kind: "upsert",
-          table: "cashuProof",
-          ownerId: newer,
-          row: { id: "p1", state: "available" },
-        },
-      ]),
-    );
-
-    const rows = await Effect.runPromise(
-      db.readCopiesWhere("cashuProof", "state", unspent),
-    );
-
-    expect(
-      rows.map((row) => [row.ownerId === older ? 0 : 1, row.state]).sort(),
-    ).toEqual([
-      [0, "spent"],
-      [1, "available"],
-    ]);
-  });
-
   it("reads the earliest created copy per value among the given owners", async () => {
-    const { runtime, insert } = sqliteEvolu();
-    const db = createEvoluShardDb(runtime, reportedOwnerSync().ownerSync);
+    const { db, insert } = sqliteEvolu();
     insert({
       id: "a",
       ownerId: unrelated,
@@ -651,8 +540,7 @@ describe("evolu shard db filtered reads over SQLite", () => {
   });
 
   it("breaks a tie on the creation time by the lowest tie-break column", async () => {
-    const { runtime, insert } = sqliteEvolu();
-    const db = createEvoluShardDb(runtime, reportedOwnerSync().ownerSync);
+    const { db, insert } = sqliteEvolu();
     for (const [id, mint] of [
       ["b", "https://b.example"],
       ["a", "https://a.example"],
@@ -668,8 +556,7 @@ describe("evolu shard db filtered reads over SQLite", () => {
   });
 
   it("finds the oldest proof of a keyset through its index, without sorting the history", async () => {
-    const { runtime, insert, plans } = sqliteEvolu();
-    const db = createEvoluShardDb(runtime, reportedOwnerSync().ownerSync);
+    const { db, insert, plans } = sqliteEvolu();
     insert({
       id: "a",
       ownerId: older,
@@ -688,8 +575,7 @@ describe("evolu shard db filtered reads over SQLite", () => {
   });
 
   it("ties rows created within the same second", async () => {
-    const { runtime, insert } = sqliteEvolu();
-    const db = createEvoluShardDb(runtime, reportedOwnerSync().ownerSync);
+    const { db, insert } = sqliteEvolu();
     for (const [id, mint, createdAt] of [
       ["z", "https://z.example", "2026-01-01T00:00:00.100Z"],
       ["a", "https://a.example", "2026-01-01T00:00:00.900Z"],

@@ -1,4 +1,4 @@
-import type { AppOwner, OwnerId, ShardOwner, SyncOwner } from "@evolu/common";
+import type { AppOwner, OwnerId, ShardOwner, Owner } from "@evolu/common";
 import { createIdFromString, deriveShardOwner } from "@evolu/common";
 import { Clock, Effect, Schema, Semaphore } from "effect";
 import {
@@ -38,7 +38,7 @@ export const shardPointerId = (scope: string): string =>
 
 export interface Shard {
   readonly index: number;
-  readonly owner: SyncOwner;
+  readonly owner: Owner;
 }
 
 export type RotationOutcome =
@@ -98,7 +98,7 @@ export interface ShardStore<
   readonly appOwner: AppOwner;
   /** The pointer's index, or a locally written rotation not yet observed. */
   readonly activeIndex: (scope: keyof R & string) => Effect.Effect<number>;
-  readonly shardOwner: (scope: keyof R & string, index: number) => SyncOwner;
+  readonly shardOwner: (scope: keyof R & string, index: number) => Owner;
   readonly visibleShards: (
     scope: keyof R & string,
   ) => Effect.Effect<ReadonlyArray<Shard>>;
@@ -258,7 +258,7 @@ export interface ShardStore<
     scope: keyof R & string,
   ) => Effect.Effect<RotationOutcome, ShardDbError | UnknownScope>;
   /** The app owner plus every visible shard of every scope. */
-  readonly syncOwners: () => Effect.Effect<ReadonlyArray<SyncOwner>>;
+  readonly syncOwners: () => Effect.Effect<ReadonlyArray<Owner>>;
   /** Uses the owners in `syncOwners` and unuses the rest. */
   readonly reconcileSync: () => Effect.Effect<void>;
   /**
@@ -400,6 +400,7 @@ export const createShardStore = <
   const rotatedLocallyAtMs = new Map<string, number>();
   const rotationInFlight = new Set<string>();
   const shardOwners = new Map<string, ShardOwner>();
+  const ownersById = new Map<OwnerId, Owner>([[appOwner.id, appOwner]]);
   const usedOwners = new Map<OwnerId, () => void>();
 
   const definition = (scope: string): ScopeDefinition<keyof S & string> => {
@@ -408,14 +409,22 @@ export const createShardStore = <
     return found;
   };
 
-  const shardOwner = (scope: string, index: number): SyncOwner => {
+  const shardOwner = (scope: string, index: number): Owner => {
     if (definition(scope).owner === "app") return appOwner;
     const key = `${scope}/${index}`;
     const cached = shardOwners.get(key);
     if (cached !== undefined) return cached;
     const derived = deriveShardOwner(appOwner, [scope, index]);
     shardOwners.set(key, derived);
+    ownersById.set(derived.id, derived);
     return derived;
+  };
+
+  // Every row the store writes was read from a shard it derived the owner of.
+  const ownerOf = (ownerId: OwnerId): Owner => {
+    const owner = ownersById.get(ownerId);
+    if (owner === undefined) throw new Error(`Unknown owner ${ownerId}`);
+    return owner;
   };
 
   const readPointer = (scope: string) =>
@@ -565,19 +574,19 @@ export const createShardStore = <
       ),
     );
 
-  const activeOwner = (scope: string): Effect.Effect<SyncOwner> =>
+  const activeOwner = (scope: string): Effect.Effect<Owner> =>
     Effect.map(activeIndex(scope), (index) => shardOwner(scope, index));
 
   const upsertInto = (
     table: string,
-    ownerId: OwnerId,
+    owner: Owner,
     row: Mutation["row"],
   ): Effect.Effect<void, ShardDbError> =>
-    db.mutate([{ kind: "upsert", table, ownerId, row }]);
+    db.mutate([{ kind: "upsert", table, owner, row }]);
 
   const upsertRows = (
     table: string,
-    ownerId: OwnerId,
+    owner: Owner,
     rows: ReadonlyArray<Row<Columns>>,
   ): Effect.Effect<void, ShardDbError> =>
     rows.length === 0
@@ -586,7 +595,7 @@ export const createShardStore = <
           rows.map((row) => ({
             kind: "upsert",
             table,
-            ownerId,
+            owner,
             row: columnsOf(row),
           })),
         );
@@ -606,25 +615,23 @@ export const createShardStore = <
   const patchMutations = (
     table: string,
     current: Row<Columns>,
-    active: OwnerId,
+    active: Owner,
     patch: Readonly<Record<string, unknown>>,
   ): ReadonlyArray<Mutation> => {
     const id = current.id;
-    if (current.ownerId === active)
-      return [
-        { kind: "update", table, ownerId: active, row: { ...patch, id } },
-      ];
+    if (current.ownerId === active.id)
+      return [{ kind: "update", table, owner: active, row: { ...patch, id } }];
     return [
       {
         kind: "upsert",
         table,
-        ownerId: active,
+        owner: active,
         row: { ...columnsOf(current), ...patch, id },
       },
       {
         kind: "update",
         table,
-        ownerId: current.ownerId,
+        owner: ownerOf(current.ownerId),
         row: { id, isDeleted: true },
       },
     ];
@@ -641,7 +648,7 @@ export const createShardStore = <
       const current = yield* locateLive(scope, table, id);
       yield* retainBeforeWrite(scope);
       const active = yield* activeOwner(scope);
-      yield* db.mutate(patchMutations(table, current, active.id, patch));
+      yield* db.mutate(patchMutations(table, current, active, patch));
     });
 
   const write = <T extends keyof S & string>(
@@ -660,7 +667,7 @@ export const createShardStore = <
         for (const copy of yield* copiesOfIds(scope, table, updatedIds))
           if (!newest.has(copy.id)) newest.set(copy.id, copy);
       yield* retainBeforeWrite(scope);
-      const active = (yield* activeOwner(scope)).id;
+      const active = yield* activeOwner(scope);
       const writtenHere = new Set<string>();
       const mutations: Mutation[] = [];
       for (const entry of writes) {
@@ -668,7 +675,7 @@ export const createShardStore = <
           mutations.push({
             kind: "upsert",
             table,
-            ownerId: active,
+            owner: active,
             row: entry.row,
           });
           writtenHere.add(entry.row.id);
@@ -679,7 +686,7 @@ export const createShardStore = <
           mutations.push({
             kind: "update",
             table,
-            ownerId: active,
+            owner: active,
             row: { ...entry.patch, id: entry.id },
           });
         } else if (current !== undefined && isLive(current)) {
@@ -707,7 +714,7 @@ export const createShardStore = <
         {
           kind: "update",
           table,
-          ownerId: current.ownerId,
+          owner: ownerOf(current.ownerId),
           row: { id, isDeleted: true },
         },
       ]);
@@ -735,7 +742,7 @@ export const createShardStore = <
       const rule =
         scopeDefinition.owner === "shard" ? scopeDefinition.rotation : null;
       if (rule === null) {
-        yield* upsertRows(table, active.id, fresh);
+        yield* upsertRows(table, active, fresh);
         return { ingested: fresh.length };
       }
       // A legacy history can hold many shards' worth of rows, so it fills each
@@ -750,7 +757,7 @@ export const createShardStore = <
           mutations > 0 &&
           (mutations + 1 > rule.maxMutations || bytes + size > rule.maxBytes)
         ) {
-          yield* upsertRows(table, owner.id, chunk);
+          yield* upsertRows(table, owner, chunk);
           chunk = [];
           const next = yield* rotate(scope).pipe(
             // `definition` above already resolved the scope.
@@ -763,7 +770,7 @@ export const createShardStore = <
         mutations += 1;
         bytes += size;
       }
-      yield* upsertRows(table, owner.id, chunk);
+      yield* upsertRows(table, owner, chunk);
       return { ingested: fresh.length };
     });
 
@@ -772,18 +779,18 @@ export const createShardStore = <
     index: number,
     nowMs: number,
   ): Effect.Effect<void, ShardDbError> =>
-    upsertInto("shardPointer", appOwner.id, {
+    upsertInto("shardPointer", appOwner, {
       id: shardPointerId(scope),
       scope,
       index,
       rotatedAtMs: nowMs,
     });
 
-  const syncOwners = (): Effect.Effect<ReadonlyArray<SyncOwner>> =>
+  const syncOwners = (): Effect.Effect<ReadonlyArray<Owner>> =>
     Effect.map(
       Effect.forEach(Object.keys(scopes), visibleShards),
       (perScope) => {
-        const byId = new Map<OwnerId, SyncOwner>([[appOwner.id, appOwner]]);
+        const byId = new Map<OwnerId, Owner>([[appOwner.id, appOwner]]);
         for (const shard of perScope.flat())
           byId.set(shard.owner.id, shard.owner);
         return [...byId.values()];
@@ -1106,7 +1113,7 @@ export const createShardStore = <
         const owner = yield* activeOwner(scope);
         yield* upsertInto(
           table,
-          owner.id,
+          owner,
           options?.revive === true ? { ...row, isDeleted: false } : row,
         );
       }),
@@ -1120,7 +1127,7 @@ export const createShardStore = <
           {
             kind: "update",
             table,
-            ownerId: owner.id,
+            owner,
             row: { ...row, isDeleted: true },
           },
         ]);

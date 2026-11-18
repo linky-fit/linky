@@ -1,4 +1,4 @@
-import { NonEmptyString100, NonEmptyString1000 } from "@evolu/common";
+import { NonEmptyString100, NonEmptyString1000 } from "@linky-fit/domain";
 import { Effect, Option, Schema } from "effect";
 import type { ShardDbError } from "../core";
 import { settingIdFor, type SettingId } from "../model/ids";

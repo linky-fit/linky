@@ -1,10 +1,8 @@
-import { createConsole, createRandomBytes, createTime } from "@evolu/common";
+import { createEvoluDeps, createRun } from "@evolu/web";
+import type { AtomRegistry } from "effect/reactivity";
 import { makeAppRegistry } from "../app/registry";
-import type {
-  EvoluPlatform,
-  PlatformPorts,
-  SecretRead,
-} from "../platform/ports";
+import { openSessionEvolu } from "../app/state/session/evolu";
+import type { PlatformPorts, SecretRead } from "../platform/ports";
 import type {
   SessionSecrets,
   SessionState,
@@ -56,25 +54,20 @@ export const signedInSession = (
   degraded: false,
 });
 
-/** Evolu's own deps over a worker that never answers; tests mock `createEvolu` on top. */
-export const testEvoluPlatform: EvoluPlatform = {
-  evoluDeps: {
-    console: createConsole(),
-    randomBytes: createRandomBytes(),
-    time: createTime(),
-    reloadApp: () => {},
-  },
-  createWorker: () => ({ postMessage: () => {}, onMessage: () => {} }),
-  inMemory: true,
-  enableLogging: false,
-};
-
 export const makeTestAppRegistry = ({
   ports = testPlatformPorts(),
   session = signedInSession(),
-  evoluPlatform = testEvoluPlatform,
 }: {
   readonly ports?: PlatformPorts;
   readonly session?: SessionState;
-  readonly evoluPlatform?: EvoluPlatform | null;
-} = {}) => makeAppRegistry({ ports, session, evoluPlatform });
+} = {}) => makeAppRegistry({ ports, session });
+
+/**
+ * Opens the session's database the way main.tsx does; the test mocks
+ * `openLinkyEvolu` and `openLinkyStore`, and runs in jsdom, which Evolu's web
+ * deps need.
+ */
+export const openTestEvolu = (registry: AtomRegistry.AtomRegistry) =>
+  openSessionEvolu(registry, createRun(createEvoluDeps()), {
+    memoryOnly: false,
+  });

@@ -22,7 +22,7 @@ describe("Evolu relay settings", () => {
   it.each([{ saved: [custom], configured: [...recommended, custom] }])(
     "keeps the recommended relays when saving $saved and reopening settings",
     async ({ saved, configured }) => {
-      const registry = makeTestAppRegistry({ evoluPlatform: null });
+      const registry = makeTestAppRegistry();
       function Settings() {
         const servers = useEvoluServers();
         return (
@@ -72,7 +72,7 @@ describe("Evolu relay settings", () => {
       close() {}
     }
     vi.stubGlobal("WebSocket", OpeningWebSocket);
-    const registry = makeTestAppRegistry({ evoluPlatform: null });
+    const registry = makeTestAppRegistry();
     function Shell() {
       useEvoluServerProbes();
       return null;

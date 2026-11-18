@@ -12,11 +12,16 @@ test.use({ serviceWorkers: "block" });
 test("security headers cover the shell, assets, WASM and errors", async ({
   request,
 }) => {
+  // Evolu's SQLite wasm is a hashed asset, which the service worker precaches.
+  const wasm = (await (await request.get("/sw.js")).text()).match(
+    /assets\/[\w.-]+\.wasm/,
+  )?.[0];
+  expect(wasm).toBeDefined();
   for (const path of [
     "/",
     "/index.html",
     "/icon.svg",
-    "/sqlite-wasm/sqlite3.wasm",
+    `/${wasm}`,
     "/missing-security-test",
   ]) {
     const response = await request.get(path);
@@ -28,11 +33,7 @@ test("security headers cover the shell, assets, WASM and errors", async ({
         value,
       );
     }
-    if (
-      path === "/" ||
-      path === "/index.html" ||
-      path.startsWith("/sqlite-wasm/")
-    ) {
+    if (path === "/" || path === "/index.html") {
       expect(response.headers()["cache-control"]).toBe("no-store");
     }
   }
