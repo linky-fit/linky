@@ -37,15 +37,26 @@ function writeMessage(owner, size, millis) {
   return message.unwrap();
 }
 
+// The relay also sends empty text frames as heartbeats; replies are binary.
+const nextReply = (socket) =>
+  new Promise((resolve) => {
+    const onMessage = (data, isBinary) => {
+      if (!isBinary) return;
+      socket.off("message", onMessage);
+      resolve(data);
+    };
+    socket.on("message", onMessage);
+  });
+
 async function exchange(
   socket,
   message,
   owner,
   errorCode = ProtocolErrorCode.NoError,
 ) {
-  const response = once(socket, "message");
+  const response = nextReply(socket);
   socket.send(message);
-  const [received] = await response;
+  const received = await response;
   const expected = createProtocolMessageBuffer(owner, {
     messageType: MessageType.Response,
     errorCode,
@@ -134,17 +145,18 @@ test(
   "real relay enforces cumulative per-owner quota without logging owners or malformed messages",
   { timeout: 10000 },
   async () => {
-    const logs = await withRelay("128", async (socket, relay) => {
+    // Changes are encrypted, so none is shorter than a nonce and a tag.
+    const logs = await withRelay("192", async (socket, relay) => {
       await exchange(socket, writeMessage(ownerId, 96, 1), ownerId);
-      await exchange(socket, writeMessage(ownerId, 32, 2), ownerId);
+      await exchange(socket, writeMessage(ownerId, 96, 2), ownerId);
       await exchange(
         socket,
-        writeMessage(ownerId, 1, 3),
+        writeMessage(ownerId, 48, 3),
         ownerId,
         ProtocolErrorCode.QuotaError,
       );
       await exchange(socket, writeMessage(otherOwnerId, 96, 1), otherOwnerId);
-      const malformed = writeMessage(otherOwnerId, 1, 2);
+      const malformed = writeMessage(otherOwnerId, 48, 2);
       socket.send(malformed.subarray(0, malformed.length - 1));
       const deadline = Date.now() + 2000;
       while (!relay.output().includes("invalid protocol message")) {
@@ -152,7 +164,7 @@ test(
         await setTimeout(10);
       }
     });
-    assert.match(logs, /ownerQuotaBytes=128/);
+    assert.match(logs, /ownerQuotaBytes=192/);
     assert.match(logs, /invalid protocol message/);
     assert.match(logs, /shutting down/);
     for (const privateValue of [
