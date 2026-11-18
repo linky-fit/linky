@@ -422,6 +422,11 @@ test("owner lanes migrate into shards, a fresh device reads them from the relay,
     });
 
     await test.step("a lane row written after the cutoff is re-ingested on the next boot", async () => {
+      // The hooks know the owners a test named since this page loaded.
+      await hooks.useOwners(
+        source.page,
+        await laneMnemonics(identity, [["contacts", 1]]),
+      );
       await hooks.upsert(
         source.page,
         "contact",
