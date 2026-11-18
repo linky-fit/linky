@@ -135,29 +135,24 @@ export const openLinkyEvolu = async (
     indexes: linkyIndexes,
     transports: toTransports(relayUrls),
   };
-  const openDeviceAppOwner = async (): Promise<LinkyEvolu> => {
-    const app = await run.orThrow(
-      createEvoluApp(LinkyEvoluSchema, {
-        ...config,
-        auth: { type: "InstantStart" },
-        createFirstAppOwner: true,
-      }),
-    );
-    const current = app.current.get();
-    if (current === null) throw new Error("Evolu opened no app owner");
-    return current.evolu;
-  };
-  const appOwner = mnemonic === null ? null : appOwnerFromMnemonic(mnemonic);
-  const evolu =
-    appOwner === null
-      ? await openDeviceAppOwner()
-      : await run.ok(
-          createEvolu(LinkyEvoluSchema, { ...config, appOwner, memoryOnly }),
-        );
   // Where the platform offers no storage, Evolu keeps the database in memory unasked.
-  if (!memoryOnly && (await evolu.devicePersistence) === "NotPersisted")
+  if (!memoryOnly && (await run.deps.getDevicePersistence()) === "NotPersisted")
     throw new Error("Device storage is unavailable");
-  return evolu;
+  const appOwner = mnemonic === null ? null : appOwnerFromMnemonic(mnemonic);
+  if (appOwner !== null)
+    return run.ok(
+      createEvolu(LinkyEvoluSchema, { ...config, appOwner, memoryOnly }),
+    );
+  const app = await run.orThrow(
+    createEvoluApp(LinkyEvoluSchema, {
+      ...config,
+      auth: { type: "InstantStart" },
+      createFirstAppOwner: true,
+    }),
+  );
+  const current = app.current.get();
+  if (current === null) throw new Error("Evolu opened no app owner");
+  return current.evolu;
 };
 
 /** Reports each relay failure of the database's owners once. */

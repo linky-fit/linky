@@ -672,7 +672,9 @@ export const useWipeEvoluStorage = (): (() => void) => {
   return useCallback(() => {
     markAwaitingFirstHydration(localStorageKv, evolu.appOwner.mnemonic);
     // Evolu reloads only for an owner opened from a mnemonic.
-    void evolu.deleteDatabase().then(() => window.location.reload());
+    void evolu.deleteDatabase().then((deleted) => {
+      if (deleted.ok) window.location.reload();
+    });
   }, [evolu]);
 };
 
