@@ -2,8 +2,8 @@ import {
   NonEmptyString,
   NonEmptyString100,
   NonEmptyString1000,
-  PositiveInt,
-} from "@evolu/common";
+} from "@linky-fit/domain";
+import { PositiveInt } from "@evolu/common";
 import { Pubkey, RumorId } from "@linky-fit/linkstr";
 import { messageContentColumns } from "../model/schema";
 import { createLinkyStore } from "../model/store";

@@ -78,12 +78,12 @@ type SelectedContactRow = ContactRowLike & { id: ContactId };
 
 type ContactFieldsPatch = {
   id: ContactId;
-  lnAddressSetByUser?: typeof SqliteBoolean.Type | null;
-  nameSetByUser?: typeof SqliteBoolean.Type | null;
+  lnAddressSetByUser?: typeof SqliteBoolean.Output | null;
+  nameSetByUser?: typeof SqliteBoolean.Output | null;
 } & Partial<
   Record<
     "groupName" | "groupNamesJson" | "lnAddress" | "name" | "npub",
-    typeof NonEmptyString1000.Type | null
+    typeof NonEmptyString1000.Output | null
   >
 >;
 
@@ -489,13 +489,13 @@ export const useContactEditor = ({
     };
 
     const createPayload: Partial<{
-      groupName: typeof NonEmptyString1000.Type;
-      groupNamesJson: typeof NonEmptyString1000.Type;
-      lnAddress: typeof NonEmptyString1000.Type;
-      lnAddressSetByUser: typeof SqliteBoolean.Type;
-      name: typeof NonEmptyString1000.Type;
-      nameSetByUser: typeof SqliteBoolean.Type;
-      npub: typeof NonEmptyString1000.Type;
+      groupName: typeof NonEmptyString1000.Output;
+      groupNamesJson: typeof NonEmptyString1000.Output;
+      lnAddress: typeof NonEmptyString1000.Output;
+      lnAddressSetByUser: typeof SqliteBoolean.Output;
+      name: typeof NonEmptyString1000.Output;
+      nameSetByUser: typeof SqliteBoolean.Output;
+      npub: typeof NonEmptyString1000.Output;
     }> = {};
     if (payload.name) {
       createPayload.name = payload.name;
@@ -771,7 +771,7 @@ export const useContactEditor = ({
         return;
       }
 
-      const parsedNpub = NonEmptyString1000.from(npub);
+      const parsedNpub = NonEmptyString1000.fromUnknown(npub);
       if (!parsedNpub.ok) {
         setStatus(t("contactIdentifierInvalid"));
         return;
@@ -779,15 +779,15 @@ export const useContactEditor = ({
       const name = candidate.name.trim();
       const lnAddress = candidate.lnAddress.trim();
       const createPayload: Partial<{
-        lnAddress: typeof NonEmptyString1000.Type;
-        name: typeof NonEmptyString1000.Type;
-        npub: typeof NonEmptyString1000.Type;
+        lnAddress: typeof NonEmptyString1000.Output;
+        name: typeof NonEmptyString1000.Output;
+        npub: typeof NonEmptyString1000.Output;
       }> = {
         npub: parsedNpub.value,
       };
-      const parsedName = NonEmptyString1000.from(name);
+      const parsedName = NonEmptyString1000.fromUnknown(name);
       if (parsedName.ok) createPayload.name = parsedName.value;
-      const parsedLnAddress = NonEmptyString1000.from(lnAddress);
+      const parsedLnAddress = NonEmptyString1000.fromUnknown(lnAddress);
       if (parsedLnAddress.ok) createPayload.lnAddress = parsedLnAddress.value;
 
       setIsSavingContact(true);

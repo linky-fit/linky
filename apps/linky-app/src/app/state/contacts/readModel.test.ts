@@ -1,9 +1,11 @@
+// @vitest-environment jsdom
 import { createId, NonEmptyString1000, PositiveInt } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { AtomRegistry } from "effect/reactivity";
 import { describe, expect, it, vi } from "vitest";
 import {
   makeTestAppRegistry,
+  openTestEvolu,
   signedInSession,
 } from "../../../testUtils/appRegistry";
 import { makeTestLinkyStore } from "../../../testUtils/linkyStore";
@@ -14,13 +16,10 @@ import {
 } from "../session/store";
 import { contactGroupsAtom, contactsAtom } from "./readModel";
 
-vi.mock("@evolu/common", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@evolu/common")>()),
-  createEvolu: () => () => ({}),
-}));
 const openLinkyStore = vi.hoisted(() => vi.fn());
 vi.mock("@linky-fit/linksync/evolu", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@linky-fit/linksync/evolu")>()),
+  openLinkyEvolu: () => Promise.resolve({}),
   openLinkyStore,
 }));
 
@@ -35,6 +34,7 @@ describe("contacts read model", () => {
   it("follows contact writes with their read cursor, and counts the groups of unarchived contacts", async () => {
     openLinkyStore.mockResolvedValue(makeTestLinkyStore().store);
     const registry = makeTestAppRegistry({ session: signedInSession() });
+    await openTestEvolu(registry);
     const contacts = await result(registry, contactsRepositoryAtom);
     const conversations = await result(registry, conversationsRepositoryAtom);
     const unsubscribe = registry.subscribe(contactGroupsAtom, () => {});

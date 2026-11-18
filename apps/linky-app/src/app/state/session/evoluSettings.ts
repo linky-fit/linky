@@ -30,7 +30,7 @@ export const evoluServerProbesReadyAtom = Atom.keepAlive(Atom.make(false));
 
 /** The error Evolu last reported, as the shell's error watch keeps it. */
 export const evoluLastErrorAtom = lazyStateAtom(
-  (get): EvoluError | null => get(evoluAtom)?.evolu.getError() ?? null,
+  (get): EvoluError | null => get(evoluAtom)?.run.deps.evoluError.get() ?? null,
 );
 
 export interface EvoluDatabaseInfo {

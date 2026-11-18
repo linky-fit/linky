@@ -61,7 +61,7 @@ const evoluImportPatterns = [
   {
     group: ["@evolu/*"],
     message:
-      "Take Evolu re-exports from @linky-fit/linksync; only src/evolu.ts, src/evoluDb.worker.ts, src/platform/evolu.web.ts and src/app/migrations import @evolu/* directly.",
+      "Take Evolu re-exports from @linky-fit/linksync; only src/evolu.ts, src/platform/evolu.web.ts and src/app/migrations import @evolu/* directly.",
   },
 ];
 const wipeImportPatterns = [
@@ -147,7 +147,6 @@ export const platformSeamRatchet = [
   "src/components/ProfileShareSheet.tsx",
   "src/components/SelfieCaptureModal.tsx",
   "src/evolu.ts",
-  "src/evoluDb.worker.ts",
   "src/hooks/useArmedAction.ts",
   "src/hooks/useDeferredOnlineReady.ts",
   "src/hooks/useDesktopSplitView.ts",
@@ -269,7 +268,6 @@ export default defineConfig([
   {
     files: [
       "src/evolu.ts",
-      "src/evoluDb.worker.ts",
       "src/platform/evolu.web.ts",
       "src/app/migrations/**",
     ],

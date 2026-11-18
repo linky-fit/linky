@@ -1,11 +1,24 @@
-import type { OwnerId, SyncOwner } from "@evolu/common";
+import type {
+  AppOwnerEvolu,
+  EvoluSchema,
+  LoadQueryOptions,
+  Owner,
+  OwnerId,
+  Query,
+  QueryRows,
+  ReadonlyStore,
+  Row as EvoluRow,
+  SyncState,
+} from "@evolu/common";
 import {
+  createQueryBuilder,
+  maxMutationSize,
   OwnerId as OwnerIdType,
   ownerIdToOwnerIdBytes,
   sqliteFalse,
   sqliteTrue,
 } from "@evolu/common";
-import { Deferred, Duration, Effect } from "effect";
+import { Duration, Effect } from "effect";
 import type {
   Columns,
   CopiesWhereOptions,
@@ -16,57 +29,74 @@ import type {
   SystemColumns,
 } from "../core";
 import { ShardDbError } from "../core";
-import { copiesMatching, oldestPerValue } from "../core/ShardDb";
-import {
-  LinkySchema,
-  linkyTableColumns,
-  type LinkyDbSchema,
-} from "../model/schema";
-import type { OwnerSync } from "./ownerSync";
+import { oldestPerValue } from "../core/ShardDb";
+import { LinkySchema, type LinkyDbSchema } from "../model/schema";
+import { LinkyEvoluSchema } from "./linkyEvoluSchema";
 
 /**
- * The `ShardDb` port over a live Evolu 7 instance: the one place the package
+ * The `ShardDb` port over a live Evolu 8 instance: the one place the package
  * touches Evolu's runtime.
  *
  * The port is table-dynamic while Evolu's query builder and mutation types
- * are per-table generics, so the dynamic calls (`createQuery`, `loadQuery`,
- * `subscribeQuery`, `upsert`, `update`) go through untyped references and
- * their results are validated at runtime, the same way the app's `evolu.ts`
- * reads `evolu_history`. Table names are checked against the schema first;
- * Evolu validates every row it is handed.
+ * are per-table generics, so queries are built and mutations called through
+ * untyped references, their results guarded at runtime. Table names are
+ * checked against the schema, and every column value against its Evolu type,
+ * which Evolu 8 leaves to the app.
  *
- * A query result lags a mutation, so an overlay of this adapter's own writes
- * is served until the loaded rows reflect them. That is what lets the store
- * chain a write and a read inside one operation.
+ * A write resolves once Evolu reports it stored (`onSuccess`), when its
+ * subscribed queries already reflect it, and fails with its whole batch: Evolu
+ * stores the mutations queued in one microtask as one transaction.
  *
- * Evolu runs every mutation queued in one microtask as a single transaction
- * and drops the whole batch when any of them fails validation, so each row is
- * validated (`onlyValidate`) before it is queued. A write resolves once
- * Evolu's worker has applied it (`onComplete`). A batch Evolu drops never
- * completes, so one still unapplied after a bound fails, leaves
- * the overlay and is reported through `onWriteUnconfirmed`.
- *
- * An owner the worker reports synced counts as synced only after a fresh
- * query has answered: the worker answers queries in order, so by then the
- * refresh its sync round triggered has reached the subscribed queries too.
+ * An owner counts as synced once a route of it completed in Evolu's sync state
+ * and a fresh query has answered after that: queries are answered in order,
+ * so by then the refresh the round triggered reached the subscribed queries.
  */
 
+export type LinkyEvolu = AppOwnerEvolu<typeof LinkyEvoluSchema>;
+
 /**
- * What the adapter needs from an Evolu instance: the typed `useOwner` and,
- * through untyped calls, the query and mutation methods. Structural so an app
- * whose schema is a superset of `LinkySchema` can pass its instance.
+ * What the adapter needs from the instance. The mutations are called
+ * untyped, so any function stands in for them.
  */
 export interface EvoluRuntime {
-  readonly useOwner: (owner: SyncOwner) => () => void;
+  readonly name: string;
+  readonly loadQuery: (
+    query: UntypedQuery,
+    options?: LoadQueryOptions,
+  ) => Promise<QueryRows<EvoluRow>>;
+  readonly subscribeQuery: (
+    query: UntypedQuery,
+  ) => (listener: () => void) => () => void;
+  readonly upsert: (...args: never[]) => unknown;
+  readonly update: (...args: never[]) => unknown;
+  readonly getMutationSize: (...args: never[]) => unknown;
+  readonly useOwner: (owner: Owner) => () => void;
 }
 
 type LinkyTable = keyof LinkyDbSchema & string;
-
-const MAX_WRITE_COMPLETION_WAIT = Duration.seconds(10);
+type UntypedRow = Readonly<Record<string, unknown>>;
+type UntypedQuery = Query<typeof LinkyEvoluSchema, EvoluRow>;
 
 const isTable = (table: string): table is LinkyTable => table in LinkySchema;
-const tableColumns: Readonly<Record<string, ReadonlyArray<string>>> =
-  linkyTableColumns;
+const schema: EvoluSchema = LinkyEvoluSchema;
+
+const createQuery = createQueryBuilder(LinkyEvoluSchema);
+
+// Evolu's queries are strings; this only brands what `createQuery` returned.
+const isQuery = (value: unknown): value is UntypedQuery =>
+  typeof value === "string";
+
+const untypedQuery = (
+  build: (db: UntypedSelect) => object,
+  options?: { readonly prepare: boolean },
+): UntypedQuery => {
+  const query: unknown = Reflect.apply(createQuery, undefined, [
+    build,
+    options,
+  ]);
+  if (!isQuery(query)) throw new Error("createQuery did not return a query");
+  return query;
+};
 
 type StoredRow = Columns &
   Omit<SystemColumns, "createdAt" | "updatedAt"> & {
@@ -80,40 +110,14 @@ const isStoredRow = (row: UntypedRow): row is StoredRow =>
   (row.createdAt === null || typeof row.createdAt === "string") &&
   (row.updatedAt === null || typeof row.updatedAt === "string");
 
-// Evolu stamps `createdAt` on insert and upsert and `updatedAt` only on
-// update, so a row that was never updated reads back with a null `updatedAt`,
-// and a row an update created (a tombstone of a row that has not arrived)
-// with a null `createdAt`; the port promises both times.
+// Evolu leaves `updatedAt` null until a change after the row's first one, and
+// Evolu 7 left `createdAt` null on a row an update created; the port promises both times.
 const withChangeTimes = (row: StoredRow): ReadonlyArray<Row<Columns>> => {
   const createdAt = row.createdAt ?? row.updatedAt;
   const updatedAt = row.updatedAt ?? row.createdAt;
   return createdAt === null || updatedAt === null
     ? []
     : [{ ...row, createdAt, updatedAt }];
-};
-
-const isMutationResult = (
-  value: unknown,
-): value is
-  | { readonly ok: true }
-  | { readonly ok: false; readonly error: unknown } =>
-  typeof value === "object" &&
-  value !== null &&
-  typeof Reflect.get(value, "ok") === "boolean";
-
-type UntypedRow = Readonly<Record<string, unknown>>;
-
-const isUntypedRow = (value: unknown): value is UntypedRow =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
-const callUntyped = (
-  target: object,
-  method: string,
-  ...args: ReadonlyArray<string | object>
-): unknown => {
-  const fn = Reflect.get(target, method);
-  if (typeof fn !== "function") throw new Error(`evolu.${method} is missing`);
-  return Reflect.apply(fn, target, args);
 };
 
 interface UntypedWhere {
@@ -141,519 +145,6 @@ interface UntypedSelect {
   };
 }
 
-// Keeps one `in` list's bound parameters far below SQLite's limit.
-const ID_CHUNK = 500;
-
-const chunked = <A>(items: ReadonlyArray<A>): ReadonlyArray<ReadonlyArray<A>> =>
-  Array.from({ length: Math.ceil(items.length / ID_CHUNK) }, (_, index) =>
-    items.slice(index * ID_CHUNK, (index + 1) * ID_CHUNK),
-  );
-
-const overlayKey = (table: string, ownerId: OwnerId, id: string): string =>
-  `${table}/${ownerId}/${id}`;
-
-interface OverlayEntry {
-  readonly table: string;
-  readonly ownerId: OwnerId;
-  readonly columns: Columns & { readonly isDeleted?: boolean };
-  readonly writtenAtIso: string;
-}
-
-const reflects = (loaded: Row<Columns>, entry: OverlayEntry): boolean =>
-  Object.entries(entry.columns).every(([column, value]) =>
-    column === "isDeleted"
-      ? loaded.isDeleted === (value === true ? 1 : 0)
-      : loaded[column] === value,
-  );
-
-const asRow = (entry: OverlayEntry, previous?: Row<Columns>): Row<Columns> => {
-  const { isDeleted, ...columns } = entry.columns;
-  const unset = Object.fromEntries(
-    (tableColumns[entry.table] ?? []).map((column) => [column, null]),
-  );
-  return {
-    ...unset,
-    ...previous,
-    ...columns,
-    ownerId: entry.ownerId,
-    createdAt: previous?.createdAt ?? entry.writtenAtIso,
-    updatedAt: entry.writtenAtIso,
-    isDeleted:
-      isDeleted === undefined
-        ? (previous?.isDeleted ?? null)
-        : isDeleted
-          ? 1
-          : 0,
-  };
-};
-
-/** A write Evolu never reported applied within the bound; it may have been dropped. */
-export interface UnconfirmedWrite {
-  readonly table: string;
-  readonly ownerId: OwnerId;
-  readonly id: string;
-}
-
-/** A write Evolu applied, with how long it took from queueing to `onComplete`. */
-export interface AppliedWrite {
-  readonly tables: ReadonlyArray<string>;
-  readonly rows: number;
-  readonly durationMs: number;
-}
-
-export interface EvoluShardDbOptions {
-  readonly onWriteUnconfirmed?: (write: UnconfirmedWrite) => void;
-  readonly onWriteApplied?: (write: AppliedWrite) => void;
-}
-
-export const createEvoluShardDb = (
-  evolu: EvoluRuntime,
-  ownerSync: OwnerSync,
-  { onWriteUnconfirmed, onWriteApplied }: EvoluShardDbOptions = {},
-): ShardDb<LinkyDbSchema> => {
-  const overlay = new Map<string, OverlayEntry>();
-  // Evolu queries are branded strings that Evolu keys its promise cache by;
-  // they are passed back exactly as received.
-  const queries = new Map<string, string>();
-
-  const asQuery = (value: unknown): string => {
-    if (typeof value !== "string")
-      throw new Error("evolu.createQuery did not return a query");
-    return value;
-  };
-
-  const tableQuery = (table: LinkyTable): string => {
-    const cached = queries.get(table);
-    if (cached !== undefined) return cached;
-    const query = asQuery(
-      callUntyped(evolu, "createQuery", (db: UntypedSelect) =>
-        db.selectFrom(table).selectAll(),
-      ),
-    );
-    queries.set(table, query);
-    return query;
-  };
-
-  const loadRows = (query: string): Effect.Effect<ReadonlyArray<UntypedRow>> =>
-    Effect.promise(async () => {
-      const rows = await callUntyped(evolu, "loadQuery", query);
-      return Array.isArray(rows) ? rows.filter(isUntypedRow) : [];
-    });
-
-  const mergeOverlay = (
-    table: string,
-    loaded: ReadonlyArray<Row<Columns>>,
-    includePending: (entry: OverlayEntry) => boolean = () => true,
-  ): ReadonlyArray<Row<Columns>> => {
-    if (![...overlay.values()].some((entry) => entry.table === table))
-      return loaded;
-    const seen = new Set<string>();
-    const merged = loaded.map((row) => {
-      const key = overlayKey(table, row.ownerId, row.id);
-      seen.add(key);
-      const entry = overlay.get(key);
-      if (entry === undefined) return row;
-      if (reflects(row, entry)) {
-        overlay.delete(key);
-        return row;
-      }
-      return asRow(entry, row);
-    });
-    const pending = [...overlay.values()].filter(
-      (entry) =>
-        entry.table === table &&
-        includePending(entry) &&
-        !seen.has(overlayKey(table, entry.ownerId, entry.columns.id)),
-    );
-    return [...merged, ...pending.map((entry) => asRow(entry))];
-  };
-
-  // The overload lets the untyped Evolu result satisfy the typed port; the
-  // table name was validated against the schema and every row was guarded.
-  function readTable<T extends LinkyTable>(
-    table: T,
-  ): Effect.Effect<ReadonlyArray<Row<LinkyDbSchema[T]>>>;
-  function readTable(
-    table: string,
-  ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
-    if (!isTable(table)) return Effect.succeed([]);
-    return Effect.map(loadQueryRows(tableQuery(table)), (rows) =>
-      mergeOverlay(table, rows),
-    );
-  }
-
-  const loadStoredRows = (
-    build: (db: UntypedSelect) => UntypedWhere,
-  ): Effect.Effect<ReadonlyArray<Row<Columns>>> =>
-    loadQueryRows(
-      asQuery(callUntyped(evolu, "createQuery", build, { prepare: true })),
-    );
-
-  // Evolu returns the same result array until the query's rows change.
-  const storedRowsByResult = new WeakMap<object, ReadonlyArray<Row<Columns>>>();
-  const loadQueryRows = (
-    query: string,
-  ): Effect.Effect<ReadonlyArray<Row<Columns>>> =>
-    Effect.promise(async () => {
-      const result = await callUntyped(evolu, "loadQuery", query);
-      if (!Array.isArray(result)) return [];
-      const cached = storedRowsByResult.get(result);
-      if (cached !== undefined) return cached;
-      const rows = result
-        .filter(isUntypedRow)
-        .filter(isStoredRow)
-        .flatMap(withChangeTimes);
-      storedRowsByResult.set(result, rows);
-      return rows;
-    });
-
-  function readCopies<T extends LinkyTable>(
-    table: T,
-    ids: ReadonlyArray<string>,
-  ): Effect.Effect<ReadonlyArray<Row<LinkyDbSchema[T]>>>;
-  function readCopies(
-    table: string,
-    ids: ReadonlyArray<string>,
-  ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
-    return copiesById(table, ids);
-  }
-
-  const copiesById = (
-    table: string,
-    ids: ReadonlyArray<string>,
-  ): Effect.Effect<ReadonlyArray<Row<Columns>>> => {
-    if (!isTable(table) || ids.length === 0) return Effect.succeed([]);
-    const wanted = new Set(ids);
-    return Effect.map(
-      Effect.forEach(chunked([...wanted]), (chunk) =>
-        loadStoredRows((db) =>
-          db.selectFrom(table).selectAll().where("id", "in", chunk),
-        ),
-      ),
-      (chunks) =>
-        mergeOverlay(table, chunks.flat(), (entry) =>
-          wanted.has(entry.columns.id),
-        ),
-    );
-  };
-
-  const copiesWhereQuery = (
-    table: LinkyTable,
-    column: string,
-    values: ReadonlyArray<string>,
-    { matchTombstones = false }: CopiesWhereOptions = {},
-  ): string =>
-    asQuery(
-      callUntyped(evolu, "createQuery", (db: UntypedSelect) => {
-        const matching = db
-          .selectFrom(table)
-          .select("id")
-          .where(column, "in", values);
-        return db
-          .selectFrom(table)
-          .selectAll()
-          .where(
-            "id",
-            "in",
-            matchTombstones
-              ? matching
-              : matching.where("isDeleted", "is not", 1),
-          );
-      }),
-    );
-
-  function readCopiesWhere<T extends LinkyTable>(
-    table: T,
-    column: keyof LinkyDbSchema[T] & string,
-    values: ReadonlyArray<string>,
-    options?: CopiesWhereOptions,
-  ): Effect.Effect<ReadonlyArray<Row<LinkyDbSchema[T]>>>;
-  function readCopiesWhere(
-    table: string,
-    column: string,
-    values: ReadonlyArray<string>,
-    options?: CopiesWhereOptions,
-  ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
-    if (!isTable(table)) return Effect.succeed([]);
-    return Effect.gen(function* () {
-      const loaded = yield* loadQueryRows(
-        copiesWhereQuery(table, column, values, options),
-      );
-      const loadedIds = new Set(loaded.map((row) => row.id));
-      const merged = mergeOverlay(table, loaded, (entry) =>
-        loadedIds.has(entry.columns.id),
-      );
-      // A pending write can make an id match whose other copies the query skipped.
-      const pending = yield* copiesById(
-        table,
-        [...overlay.values()]
-          .filter((entry) => entry.table === table)
-          .map((entry) => entry.columns.id)
-          .filter((id) => !loadedIds.has(id)),
-      );
-      return copiesMatching([...merged, ...pending], column, values, options);
-    });
-  }
-
-  function readOldest<T extends LinkyTable>(
-    table: T,
-    column: keyof LinkyDbSchema[T] & string,
-    values: ReadonlyArray<string>,
-    ownerIds: ReadonlyArray<OwnerId>,
-    thenBy: keyof LinkyDbSchema[T] & string,
-  ): Effect.Effect<ReadonlyArray<Row<LinkyDbSchema[T]>>>;
-  function readOldest(
-    table: string,
-    column: string,
-    values: ReadonlyArray<string>,
-    ownerIds: ReadonlyArray<OwnerId>,
-    thenBy: string,
-  ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
-    if (!isTable(table) || ownerIds.length === 0) return Effect.succeed([]);
-    const owners = new Set<string>(ownerIds);
-    return Effect.map(
-      Effect.forEach(values, (value) =>
-        loadStoredRows((db) =>
-          db
-            .selectFrom(table)
-            .selectAll()
-            .where(column, "=", value)
-            .where("ownerId", "in", ownerIds)
-            .where("createdAt", "is not", null)
-            .orderBy((eb) =>
-              eb.fn("substr", [eb.ref("createdAt"), eb.lit(1), eb.lit(19)]),
-            )
-            .orderBy(thenBy)
-            .limit(1),
-        ),
-      ),
-      (perValue) =>
-        oldestPerValue(
-          mergeOverlay(table, perValue.flat(), (entry) =>
-            owners.has(entry.ownerId),
-          ),
-          column,
-          values,
-          thenBy,
-        ),
-    );
-  }
-
-  const record = (mutation: Mutation, nowIso: string): OverlayEntry => {
-    const key = overlayKey(mutation.table, mutation.ownerId, mutation.row.id);
-    const previous = overlay.get(key);
-    const entry: OverlayEntry = {
-      table: mutation.table,
-      ownerId: mutation.ownerId,
-      columns:
-        mutation.kind === "upsert"
-          ? mutation.row
-          : { ...previous?.columns, ...mutation.row },
-      writtenAtIso: nowIso,
-    };
-    overlay.set(key, entry);
-    return entry;
-  };
-
-  // The port tombstones with a boolean; Evolu's mutation takes its SqliteBoolean.
-  const toEvoluRow = (row: Mutation["row"]): Columns => {
-    const { isDeleted, ...columns } = row;
-    return isDeleted === undefined
-      ? columns
-      : { ...columns, isDeleted: isDeleted ? sqliteTrue : sqliteFalse };
-  };
-
-  interface Queued {
-    readonly mutation: Mutation;
-    readonly entry: OverlayEntry;
-    readonly applied: Effect.Effect<void>;
-  }
-
-  /** Why Evolu would reject the mutation, or `null` when it would accept it. */
-  const rejection = (mutation: Mutation): string | null => {
-    if (!isTable(mutation.table)) return "unknown table";
-    const validation = callUntyped(
-      evolu,
-      mutation.kind,
-      mutation.table,
-      toEvoluRow(mutation.row),
-      { ownerId: mutation.ownerId, onlyValidate: true },
-    );
-    if (!isMutationResult(validation)) return "unexpected mutation result";
-    return validation.ok ? null : JSON.stringify(validation.error);
-  };
-
-  const queue = (mutation: Mutation, nowIso: string): Queued => {
-    const completed = Deferred.makeUnsafe<void>();
-    callUntyped(
-      evolu,
-      mutation.kind,
-      mutation.table,
-      toEvoluRow(mutation.row),
-      {
-        ownerId: mutation.ownerId,
-        onComplete: () => Deferred.doneUnsafe(completed, Effect.void),
-      },
-    );
-    return {
-      mutation,
-      entry: record(mutation, nowIso),
-      applied: Deferred.await(completed),
-    };
-  };
-
-  /**
-   * Validates every mutation before queueing any, then queues them all in
-   * one synchronous loop: Evolu runs the mutations queued within one
-   * microtask as one transaction, so a batch lands whole or not at all.
-   */
-  const queueAll = (
-    mutations: ReadonlyArray<Mutation>,
-  ): Effect.Effect<ReadonlyArray<Queued>, ShardDbError> =>
-    Effect.suspend(() => {
-      for (const mutation of mutations) {
-        const message = rejection(mutation);
-        if (message !== null)
-          return Effect.fail(
-            new ShardDbError({ table: mutation.table, message }),
-          );
-      }
-      const nowIso = new Date().toISOString();
-      return Effect.succeed(
-        mutations.map((mutation) => queue(mutation, nowIso)),
-      );
-    });
-
-  const unconfirm = ({ mutation, entry }: Queued): void => {
-    const key = overlayKey(mutation.table, mutation.ownerId, mutation.row.id);
-    if (overlay.get(key) === entry) overlay.delete(key);
-    onWriteUnconfirmed?.({
-      table: mutation.table,
-      ownerId: mutation.ownerId,
-      id: mutation.row.id,
-    });
-  };
-
-  const tablesOf = (mutations: ReadonlyArray<Mutation>) => [
-    ...new Set(mutations.map(({ table }) => table)),
-  ];
-
-  const mutate = (
-    mutations: ReadonlyArray<Mutation>,
-  ): Effect.Effect<void, ShardDbError> =>
-    Effect.flatMap(queueAll(mutations), (batch) =>
-      Effect.all(
-        batch.map(({ applied }) => applied),
-        { discard: true },
-      ).pipe(
-        Effect.timed,
-        Effect.flatMap(([took]) =>
-          Effect.sync(() =>
-            onWriteApplied?.({
-              tables: tablesOf(mutations),
-              rows: mutations.length,
-              durationMs: Math.round(Duration.toMillis(took)),
-            }),
-          ),
-        ),
-        Effect.timeoutOrElse({
-          duration: MAX_WRITE_COMPLETION_WAIT,
-          orElse: () =>
-            Effect.fail(
-              new ShardDbError({
-                table: tablesOf(mutations).join(","),
-                message: "Evolu did not confirm the write",
-              }),
-            ),
-        }),
-        Effect.tapError(() => Effect.sync(() => batch.forEach(unconfirm))),
-      ),
-    );
-
-  // `evolu_history` keys rows by the owner id's bytes, not its base64url text.
-  const ownerUsage = (ownerId: OwnerId): Effect.Effect<OwnerUsage> => {
-    const query = asQuery(
-      callUntyped(evolu, "createQuery", (db: UntypedHistorySelect) =>
-        db
-          .selectFrom("evolu_history")
-          .select((eb) => [
-            eb.fn.count("timestamp").distinct().as("mutations"),
-            eb.fn.sum(eb.fn("length", ["value"])).as("bytes"),
-          ])
-          .where("ownerId", "=", ownerIdToOwnerIdBytes(ownerId)),
-      ),
-    );
-    return Effect.map(loadRows(query), (rows) => {
-      const first = rows[0];
-      const read = (column: string): number => Number(first?.[column] ?? 0);
-      return { mutations: read("mutations"), bytes: read("bytes") };
-    });
-  };
-
-  const readable = new Set<OwnerId>();
-  const syncListeners = new Set<() => void>();
-  let barriers = 0;
-  let absorbing = Promise.resolve();
-  const absorbSyncedOwners = (): void => {
-    const reported = [...ownerSync.syncedOwners()].filter(
-      (ownerId) => !readable.has(ownerId),
-    );
-    if (reported.length === 0) return;
-    barriers += 1;
-    const barrier = asQuery(
-      callUntyped(evolu, "createQuery", (db: UntypedSelect) =>
-        db
-          .selectFrom("shardPointer")
-          .selectAll()
-          .where("id", "=", `linksync-barrier-${barriers}`),
-      ),
-    );
-    const markReadable = () => {
-      for (const ownerId of reported) readable.add(ownerId);
-      for (const listener of syncListeners) listener();
-    };
-    absorbing = absorbing
-      .then(() => callUntyped(evolu, "loadQuery", barrier))
-      .then(markReadable, markReadable);
-  };
-  ownerSync.subscribe(absorbSyncedOwners);
-  absorbSyncedOwners();
-
-  const subscribeQuery = (query: string, listener: () => void) => {
-    const unsubscribe = callUntyped(evolu, "subscribeQuery", query);
-    if (typeof unsubscribe !== "function")
-      throw new Error("evolu.subscribeQuery did not return a subscriber");
-    const stop = unsubscribe(listener);
-    return () => {
-      if (typeof stop === "function") stop();
-    };
-  };
-
-  return {
-    readTable,
-    readCopies,
-    readCopiesWhere,
-    readOldest,
-    mutate,
-    subscribe: (table, listener) => subscribeQuery(tableQuery(table), listener),
-    subscribeWhere: (table, column, values, listener, options) =>
-      subscribeQuery(
-        copiesWhereQuery(table, column, values, options),
-        listener,
-      ),
-    useOwner: (owner: SyncOwner) => evolu.useOwner(owner),
-    isOwnerSynced: (ownerId) => readable.has(ownerId),
-    subscribeOwnerSync: (listener) => {
-      syncListeners.add(listener);
-      return () => {
-        syncListeners.delete(listener);
-      };
-    },
-    ownerUsage,
-    deleteOwner: null,
-  };
-};
-
 interface UntypedHistorySelect {
   selectFrom: (table: "evolu_history") => {
     select: (
@@ -671,3 +162,356 @@ interface UntypedExpressionBuilder {
     (name: string, args: ReadonlyArray<string>): object;
   };
 }
+
+// Keeps one `in` list's bound parameters far below SQLite's limit.
+const ID_CHUNK = 500;
+
+const chunked = <A>(items: ReadonlyArray<A>): ReadonlyArray<ReadonlyArray<A>> =>
+  Array.from({ length: Math.ceil(items.length / ID_CHUNK) }, (_, index) =>
+    items.slice(index * ID_CHUNK, (index + 1) * ID_CHUNK),
+  );
+
+/** A write Evolu could not store, with the rest of its batch. */
+export interface FailedWrite {
+  readonly tables: ReadonlyArray<string>;
+  readonly rows: number;
+  readonly error: string;
+}
+
+/** A write Evolu stored, with how long it took from queueing to `onSuccess`. */
+export interface AppliedWrite {
+  readonly tables: ReadonlyArray<string>;
+  readonly rows: number;
+  readonly durationMs: number;
+}
+
+export interface EvoluShardDbOptions {
+  readonly syncState: ReadonlyStore<SyncState | null>;
+  /** Without a relay every owner counts as synced. */
+  readonly hasEvoluRelay: boolean;
+  readonly onWriteFailed?: (write: FailedWrite) => void;
+  readonly onWriteApplied?: (write: AppliedWrite) => void;
+}
+
+/** Owners of the database with a route that completed since its worker started. */
+export const completedOwners = (
+  state: SyncState | null,
+  name: string,
+): ReadonlyArray<OwnerId> => {
+  const tenant = state?.tenants.find((tenant) => tenant.name === name);
+  if (tenant?.type !== "Active") return [];
+  return tenant.owners.flatMap((owner) =>
+    owner.type === "Writable" &&
+    owner.routes.some((route) => route.completeAt !== null)
+      ? [owner.ownerId]
+      : [],
+  );
+};
+
+/** Why Evolu must not store the row, or `null` when every value fits its column. */
+const rejection = ({ kind, table, row }: Mutation): string | null => {
+  const columns = schema[table];
+  if (columns === undefined || !isTable(table)) return "unknown table";
+  const values: Readonly<Record<string, unknown>> = row;
+  for (const [column, type] of Object.entries(columns)) {
+    const value = values[column];
+    if (value === undefined && kind === "update") continue;
+    const result = type["~standard"].validate(
+      value === undefined ? null : value,
+    );
+    if (result instanceof Promise || result.issues !== undefined)
+      return `invalid ${column}`;
+  }
+  const unknown = Object.keys(row).find(
+    (column) => column !== "isDeleted" && !(column in columns),
+  );
+  return unknown === undefined ? null : `unknown column ${unknown}`;
+};
+
+// The port tombstones with a boolean; Evolu's mutation takes its SqliteBoolean.
+const toEvoluRow = (row: Mutation["row"]): Columns => {
+  const { isDeleted, ...columns } = row;
+  return isDeleted === undefined
+    ? columns
+    : { ...columns, isDeleted: isDeleted ? sqliteTrue : sqliteFalse };
+};
+
+const tablesOf = (mutations: ReadonlyArray<Mutation>) => [
+  ...new Set(mutations.map(({ table }) => table)),
+];
+
+export const createEvoluShardDb = (
+  evolu: EvoluRuntime,
+  {
+    syncState,
+    hasEvoluRelay,
+    onWriteFailed,
+    onWriteApplied,
+  }: EvoluShardDbOptions,
+): ShardDb<LinkyDbSchema> => {
+  const tableQueries = new Map<string, UntypedQuery>();
+  const tableQuery = (table: LinkyTable): UntypedQuery => {
+    const cached = tableQueries.get(table);
+    if (cached !== undefined) return cached;
+    const query = untypedQuery((db) => db.selectFrom(table).selectAll());
+    tableQueries.set(table, query);
+    return query;
+  };
+
+  // Evolu returns the same result array until the query's rows change.
+  const rowsByResult = new WeakMap<object, ReadonlyArray<Row<Columns>>>();
+  const loadRows = (
+    query: UntypedQuery,
+  ): Effect.Effect<ReadonlyArray<Row<Columns>>> =>
+    Effect.promise(async () => {
+      const result = await evolu.loadQuery(query);
+      const cached = rowsByResult.get(result);
+      if (cached !== undefined) return cached;
+      const rows = result.flatMap((row: UntypedRow) =>
+        isStoredRow(row) ? withChangeTimes(row) : [],
+      );
+      rowsByResult.set(result, rows);
+      return rows;
+    });
+
+  const loadWhere = (
+    build: (db: UntypedSelect) => UntypedWhere,
+  ): Effect.Effect<ReadonlyArray<Row<Columns>>> =>
+    loadRows(untypedQuery(build, { prepare: true }));
+
+  // The overloads let the untyped Evolu result satisfy the typed port; the
+  // table name was validated against the schema and every row was guarded.
+  function readTable<T extends LinkyTable>(
+    table: T,
+  ): Effect.Effect<ReadonlyArray<Row<LinkyDbSchema[T]>>>;
+  function readTable(
+    table: string,
+  ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
+    return isTable(table) ? loadRows(tableQuery(table)) : Effect.succeed([]);
+  }
+
+  function readCopies<T extends LinkyTable>(
+    table: T,
+    ids: ReadonlyArray<string>,
+  ): Effect.Effect<ReadonlyArray<Row<LinkyDbSchema[T]>>>;
+  function readCopies(
+    table: string,
+    ids: ReadonlyArray<string>,
+  ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
+    if (!isTable(table) || ids.length === 0) return Effect.succeed([]);
+    return Effect.map(
+      Effect.forEach(chunked([...new Set(ids)]), (chunk) =>
+        loadWhere((db) =>
+          db.selectFrom(table).selectAll().where("id", "in", chunk),
+        ),
+      ),
+      (chunks) => chunks.flat(),
+    );
+  }
+
+  const copiesWhereQuery = (
+    table: LinkyTable,
+    column: string,
+    values: ReadonlyArray<string>,
+    { matchTombstones = false }: CopiesWhereOptions = {},
+  ): UntypedQuery =>
+    untypedQuery((db) => {
+      const matching = db
+        .selectFrom(table)
+        .select("id")
+        .where(column, "in", values);
+      return db
+        .selectFrom(table)
+        .selectAll()
+        .where(
+          "id",
+          "in",
+          matchTombstones ? matching : matching.where("isDeleted", "is not", 1),
+        );
+    });
+
+  function readCopiesWhere<T extends LinkyTable>(
+    table: T,
+    column: keyof LinkyDbSchema[T] & string,
+    values: ReadonlyArray<string>,
+    options?: CopiesWhereOptions,
+  ): Effect.Effect<ReadonlyArray<Row<LinkyDbSchema[T]>>>;
+  function readCopiesWhere(
+    table: string,
+    column: string,
+    values: ReadonlyArray<string>,
+    options?: CopiesWhereOptions,
+  ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
+    if (!isTable(table)) return Effect.succeed([]);
+    return loadRows(copiesWhereQuery(table, column, values, options));
+  }
+
+  function readOldest<T extends LinkyTable>(
+    table: T,
+    column: keyof LinkyDbSchema[T] & string,
+    values: ReadonlyArray<string>,
+    ownerIds: ReadonlyArray<OwnerId>,
+    thenBy: keyof LinkyDbSchema[T] & string,
+  ): Effect.Effect<ReadonlyArray<Row<LinkyDbSchema[T]>>>;
+  function readOldest(
+    table: string,
+    column: string,
+    values: ReadonlyArray<string>,
+    ownerIds: ReadonlyArray<OwnerId>,
+    thenBy: string,
+  ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
+    if (!isTable(table) || ownerIds.length === 0) return Effect.succeed([]);
+    return Effect.map(
+      Effect.forEach(values, (value) =>
+        loadWhere((db) =>
+          db
+            .selectFrom(table)
+            .selectAll()
+            .where(column, "=", value)
+            .where("ownerId", "in", ownerIds)
+            .where("createdAt", "is not", null)
+            .orderBy((eb) =>
+              eb.fn("substr", [eb.ref("createdAt"), eb.lit(1), eb.lit(19)]),
+            )
+            .orderBy(thenBy)
+            .limit(1),
+        ),
+      ),
+      (perValue) => oldestPerValue(perValue.flat(), column, values, thenBy),
+    );
+  }
+
+  // Evolu throws for a mutation over the limit, which would split the batch.
+  const tooLarge = ({ table, row }: Mutation): boolean =>
+    Number(Reflect.apply(evolu.getMutationSize, evolu, [table, row])) >
+    maxMutationSize;
+
+  const queue = (mutation: Mutation): Promise<void> =>
+    new Promise((resolve, reject) => {
+      Reflect.apply(evolu[mutation.kind], evolu, [
+        mutation.table,
+        toEvoluRow(mutation.row),
+        { owner: mutation.owner, onSuccess: resolve, onError: reject },
+      ]);
+    });
+
+  /**
+   * Validates every mutation before queueing any, then queues them all in
+   * one synchronous loop, so the batch is stored whole or not at all.
+   */
+  const mutate = (
+    mutations: ReadonlyArray<Mutation>,
+  ): Effect.Effect<void, ShardDbError> =>
+    Effect.suspend(() => {
+      for (const mutation of mutations) {
+        const message =
+          rejection(mutation) ?? (tooLarge(mutation) ? "too large" : null);
+        if (message !== null)
+          return Effect.fail(
+            new ShardDbError({ table: mutation.table, message }),
+          );
+      }
+      const stored = Promise.all(mutations.map(queue));
+      return Effect.tryPromise({
+        try: () => stored,
+        catch: (error) =>
+          new ShardDbError({
+            table: tablesOf(mutations).join(","),
+            message: String(error),
+          }),
+      }).pipe(
+        Effect.timed,
+        Effect.flatMap(([took]) =>
+          Effect.sync(() =>
+            onWriteApplied?.({
+              tables: tablesOf(mutations),
+              rows: mutations.length,
+              durationMs: Math.round(Duration.toMillis(took)),
+            }),
+          ),
+        ),
+        Effect.tapError((error) =>
+          Effect.sync(() =>
+            onWriteFailed?.({
+              tables: tablesOf(mutations),
+              rows: mutations.length,
+              error: error.message,
+            }),
+          ),
+        ),
+      );
+    });
+
+  // `evolu_history` keys rows by the owner id's bytes, not its base64url text.
+  const ownerUsage = (ownerId: OwnerId): Effect.Effect<OwnerUsage> => {
+    const query: unknown = Reflect.apply(createQuery, undefined, [
+      (db: UntypedHistorySelect) =>
+        db
+          .selectFrom("evolu_history")
+          .select((eb) => [
+            eb.fn.count("timestamp").distinct().as("mutations"),
+            eb.fn.sum(eb.fn("length", ["value"])).as("bytes"),
+          ])
+          .where("ownerId", "=", ownerIdToOwnerIdBytes(ownerId)),
+    ]);
+    if (!isQuery(query)) return Effect.die("createQuery returned no query");
+    return Effect.promise(async () => {
+      const [first] = await evolu.loadQuery(query);
+      const read = (column: string): number => Number(first?.[column] ?? 0);
+      return { mutations: read("mutations"), bytes: read("bytes") };
+    });
+  };
+
+  const readable = new Set<OwnerId>();
+  const syncListeners = new Set<() => void>();
+  const barrier = untypedQuery((db) =>
+    db.selectFrom("shardPointer").select("id").limit(1),
+  );
+  let absorbing = Promise.resolve();
+  const absorbCompletedOwners = (): void => {
+    const completed = completedOwners(syncState.get(), evolu.name).filter(
+      (ownerId) => !readable.has(ownerId),
+    );
+    if (completed.length === 0) return;
+    const markReadable = () => {
+      for (const ownerId of completed) readable.add(ownerId);
+      for (const listener of syncListeners) listener();
+    };
+    absorbing = absorbing
+      .then(() => evolu.loadQuery(barrier, { cache: false }))
+      .then(markReadable, markReadable);
+  };
+  if (hasEvoluRelay) {
+    syncState.subscribe(absorbCompletedOwners);
+    absorbCompletedOwners();
+  }
+
+  const subscribeQuery = (query: UntypedQuery, listener: () => void) =>
+    evolu.subscribeQuery(query)(listener);
+
+  return {
+    readTable,
+    readCopies,
+    readCopiesWhere,
+    readOldest,
+    mutate,
+    subscribe: (table, listener) => subscribeQuery(tableQuery(table), listener),
+    subscribeWhere: (table, column, values, listener, options) =>
+      subscribeQuery(
+        copiesWhereQuery(table, column, values, options),
+        listener,
+      ),
+    // Without relays Evolu syncs nothing and `useOwner` would throw.
+    useOwner: (owner: Owner) =>
+      hasEvoluRelay ? evolu.useOwner(owner) : () => {},
+    isOwnerSynced: (ownerId) => !hasEvoluRelay || readable.has(ownerId),
+    subscribeOwnerSync: (listener) => {
+      syncListeners.add(listener);
+      return () => {
+        syncListeners.delete(listener);
+      };
+    },
+    ownerUsage,
+    deleteOwner: null,
+  };
+};

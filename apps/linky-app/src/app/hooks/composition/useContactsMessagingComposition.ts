@@ -650,10 +650,10 @@ export const useContactsMessagingComposition = ({
 
   const advanceContactPeerSeen = React.useCallback(
     (contactId: string, seenWindow: PeerSeenWindow): Promise<WriteOutcome> => {
-      const id = ContactId.from(contactId);
-      const atSec = PositiveInt.from(seenWindow.seenUpToSec);
+      const id = ContactId.fromUnknown(contactId);
+      const atSec = PositiveInt.fromUnknown(seenWindow.seenUpToSec);
       if (!id.ok || !atSec.ok) return NO_WRITE;
-      const sinceSec = PositiveInt.from(seenWindow.sinceSec);
+      const sinceSec = PositiveInt.fromUnknown(seenWindow.sinceSec);
       peerSeenWrittenByContactIdRef.current.set(contactId, seenWindow);
       const written = runWrite(
         Effect.flatMap(conversationsRepository.ensureDirect(id.value), (chat) =>

@@ -49,7 +49,8 @@ export const linkyStoreAtom = Atom.keepAlive(
     if (opened === null) return Effect.fail(new SessionSignedOut());
     const { kv } = get.once(platformAtom);
     return Effect.promise(() =>
-      openLinkyStore(opened.evolu, opened.ownerSync, {
+      openLinkyStore(opened.evolu, {
+        syncState: opened.run.deps.syncState,
         kv,
         scopes: appScopes,
         hasEvoluRelay: opened.hasEvoluRelay,

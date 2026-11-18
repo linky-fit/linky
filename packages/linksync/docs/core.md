@@ -57,7 +57,7 @@ A pointer is one synced row whose columns merge last-writer-wins, so a device th
 
 ## Ids and owners
 
-Row ids are the caller's: `createId<"Table">()` makes random ones, `createIdFromString<"Table">(text)` derives one from text. `appOwnerFromMnemonic(text)` turns a BIP-39 mnemonic into its Evolu `AppOwner`, or `null` when the text is not a mnemonic; the owner types (`AppOwner`, `SyncOwner`, `OwnerId`) are re-exported, so a consumer never imports Evolu's owner functions.
+Row ids are the caller's: `createId<"Table">()` makes random ones, `createIdFromString<"Table">(text)` derives one from text. `appOwnerFromMnemonic(text)` turns a BIP-39 mnemonic, in any case and spacing, into its Evolu `AppOwner`, or `null` when the text is not a mnemonic; `laneOwnerFromMnemonic(text)` gives the same keys as an owner the database syncs beside its app owner, as the legacy lanes need, because Evolu refuses another `AppOwner`; the owner types (`AppOwner`, `Owner`, `OwnerId`) are re-exported, so a consumer never imports Evolu's owner functions.
 
 ## Device-local retention
 

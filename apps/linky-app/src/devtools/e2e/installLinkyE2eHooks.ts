@@ -1,15 +1,16 @@
 import {
   activeNostrIdentityId,
-  appOwnerFromMnemonic,
   ContactId,
   createId,
   directConversationIdFor,
   linkyScopes,
   makeRecurringPaymentsRepository,
   mergeShardRows,
+  laneOwnerFromMnemonic,
   PositiveInt,
   type LinkyScope,
   type LinkyTable,
+  type Owner,
 } from "@linky-fit/linksync";
 import {
   createEvoluShardDb,
@@ -41,11 +42,11 @@ import { seedCashuHistory, type CashuHistory } from "./seedCashuHistory";
 export interface LinkyE2eHooks {
   readonly setMessagesRotation: (enabled: boolean) => void;
   readonly appOwnerId: () => Promise<string>;
-  /** Opts BIP-39 mnemonics' app owners into sync and returns their ids, in order. */
+  /** Opts the owners of BIP-39 mnemonics into sync, as legacy lanes, and returns their ids, in order. */
   readonly useOwners: (
     mnemonics: ReadonlyArray<string>,
   ) => ReadonlyArray<string>;
-  /** A raw Evolu upsert under the given owner; resolves once the row is applied. */
+  /** A raw Evolu upsert under the app owner or one a test named; resolves once the row is stored. */
   readonly upsert: (
     table: string,
     row: Readonly<Record<string, unknown>>,
@@ -90,37 +91,24 @@ const isScope = (scope: string): scope is LinkyScope => scope in linkyScopes;
 const isShardTable = (scope: LinkyScope, table: string): table is LinkyTable =>
   linkyScopes[scope].tables.some((known) => known === table);
 
-const isMutationResult = (
-  value: unknown,
-): value is { readonly ok: boolean; readonly error?: unknown } =>
-  typeof value === "object" &&
-  value !== null &&
-  typeof Reflect.get(value, "ok") === "boolean";
-
 // removal gate in app/migrations/AGENTS.md
 const upsert = (
   { evolu }: OpenedEvolu,
-  ...[table, row, ownerId]: Parameters<LinkyE2eHooks["upsert"]>
+  owner: Owner,
+  table: string,
+  row: Readonly<Record<string, unknown>>,
 ): Promise<void> =>
   new Promise((resolve, reject) => {
     if (!isSchemaTable(table)) {
       reject(new Error(`unknown table ${table}`));
       return;
     }
-    // Evolu's upsert is typed per table; the hook is table-dynamic and Evolu
-    // validates the row at runtime.
-    const mutation = Reflect.get(evolu, "upsert");
-    if (typeof mutation !== "function") {
-      reject(new Error("evolu.upsert is missing"));
-      return;
-    }
-    const result: unknown = Reflect.apply(mutation, evolu, [
+    // Evolu's upsert is typed per table; the hook is table-dynamic.
+    Reflect.apply(evolu.upsert, evolu, [
       table,
       row,
-      { ownerId, onComplete: () => resolve() },
+      { owner, onSuccess: resolve, onError: reject },
     ]);
-    if (!isMutationResult(result) || !result.ok)
-      reject(new Error(`upsert rejected: ${JSON.stringify(result)}`));
   });
 
 export const installLinkyE2eHooks = (
@@ -133,9 +121,20 @@ export const installLinkyE2eHooks = (
   };
   let shardDb: ReturnType<typeof createEvoluShardDb> | null = null;
   const db = () => {
-    const { evolu, ownerSync } = opened();
-    shardDb ??= createEvoluShardDb(evolu, ownerSync);
+    const { evolu, run, hasEvoluRelay } = opened();
+    shardDb ??= createEvoluShardDb(evolu, {
+      syncState: run.deps.syncState,
+      hasEvoluRelay,
+    });
     return shardDb;
+  };
+  // The owners a test named, which `upsert` writes under.
+  const owners = new Map<string, Owner>();
+  const ownerOf = (ownerId: string): Owner => {
+    const { appOwner } = opened().evolu;
+    const owner = ownerId === appOwner.id ? appOwner : owners.get(ownerId);
+    if (owner === undefined) throw new Error(`unknown owner ${ownerId}`);
+    return owner;
   };
   const getLinkyStore = () => readLinkyStore(registry);
   const walletStore = makeLocalStorageKeyValueStore();
@@ -145,15 +144,17 @@ export const installLinkyE2eHooks = (
         throw new Error("E2E build required");
       setMessagesRotation(enabled);
     },
-    appOwnerId: () => opened().evolu.appOwner.then((owner) => owner.id),
+    appOwnerId: () => Promise.resolve(opened().evolu.appOwner.id),
     useOwners: (mnemonics) =>
       mnemonics.map((mnemonic) => {
-        const owner = appOwnerFromMnemonic(mnemonic);
+        const owner = laneOwnerFromMnemonic(mnemonic);
         if (owner === null) throw new Error("not a mnemonic");
+        owners.set(owner.id, owner);
         opened().evolu.useOwner(owner);
         return owner.id;
       }),
-    upsert: (...args) => upsert(opened(), ...args),
+    upsert: (table, row, ownerId) =>
+      upsert(opened(), ownerOf(ownerId), table, row),
     shardRows: async (scope, table) => {
       if (!isScope(scope)) throw new Error(`unknown scope ${scope}`);
       if (!isShardTable(scope, table))
@@ -170,8 +171,9 @@ export const installLinkyE2eHooks = (
     },
     shardOwnerId: async (scope, index) => {
       if (!isScope(scope)) throw new Error(`unknown scope ${scope}`);
-      const store = await getLinkyStore();
-      return store.shardOwner(scope, index).id;
+      const owner = (await getLinkyStore()).shardOwner(scope, index);
+      owners.set(owner.id, owner);
+      return owner.id;
     },
     forget: async () => {
       const store = await getLinkyStore();

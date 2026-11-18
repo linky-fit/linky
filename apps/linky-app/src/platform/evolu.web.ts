@@ -1,8 +1,6 @@
-import { createSharedWebWorker, evoluWebDeps } from "@evolu/web";
-import { flushSync } from "react-dom";
+import { createConsole } from "@evolu/common";
+import { createEvoluDeps, createRun } from "@evolu/web";
 import { safeLocalStorageGet } from "../utils/storage";
-import { shouldUseInMemoryEvoluStorage } from "./evoluWebStorage";
-import type { EvoluPlatform } from "./ports";
 import { isDevBuild } from "./buildEnv";
 
 // SQL logging is very noisy, so dev builds log only on request:
@@ -10,17 +8,12 @@ import { isDevBuild } from "./buildEnv";
 const isEvoluLoggingEnabled = (): boolean =>
   isDevBuild && safeLocalStorageGet("linky_debug_evolu_sql") === "1";
 
-/** Read after `prepareEvoluWebStorage`, which decides whether this session runs in memory. */
-export const makeWebEvoluPlatform = (): EvoluPlatform => ({
-  evoluDeps: { ...evoluWebDeps, flushSync },
-  createWorker: (name) =>
-    createSharedWebWorker(
-      name,
-      () =>
-        new Worker(new URL("../evoluDb.worker.ts", import.meta.url), {
-          type: "module",
-        }),
+/** The page's one Evolu run; creating it starts Evolu's shared worker. */
+export const createEvoluRun = () =>
+  createRun(
+    createEvoluDeps(
+      isEvoluLoggingEnabled()
+        ? { console: createConsole({ level: "debug" }) }
+        : {},
     ),
-  inMemory: shouldUseInMemoryEvoluStorage(),
-  enableLogging: isEvoluLoggingEnabled(),
-});
+  );

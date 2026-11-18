@@ -28,7 +28,10 @@ import { getPublicKey } from "nostr-tools";
 import { RegistryContext } from "@linky-fit/linkstr-react";
 import { AtomRegistry } from "effect/reactivity";
 import { describe, expect, it, vi } from "vitest";
-import { makeTestAppRegistry } from "../../testUtils/appRegistry";
+import {
+  makeTestAppRegistry,
+  openTestEvolu,
+} from "../../testUtils/appRegistry";
 import { makeTestLinkyStore } from "../../testUtils/linkyStore";
 import { createSecretKey } from "../../testUtils/nostrKeys";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
@@ -39,13 +42,10 @@ import { contactsAtom } from "../state/contacts/readModel";
 import { chatWritesAtom } from "../state/messages/chatWrites";
 import { applyChatMessageReceived } from "./messages/chatInbox";
 
-vi.mock("@evolu/common", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@evolu/common")>()),
-  createEvolu: () => () => ({}),
-}));
 const openLinkyStore = vi.hoisted(() => vi.fn());
 vi.mock("@linky-fit/linksync/evolu", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@linky-fit/linksync/evolu")>()),
+  openLinkyEvolu: () => Promise.resolve({}),
   openLinkyStore,
 }));
 
@@ -85,6 +85,7 @@ const domainParams = (
 const storeRegistry = async (store: LinkyStore) => {
   openLinkyStore.mockResolvedValue(store);
   const registry = makeTestAppRegistry();
+  await openTestEvolu(registry);
   const chatWrites = await Effect.runPromise(
     AtomRegistry.getResult(registry, chatWritesAtom),
   );

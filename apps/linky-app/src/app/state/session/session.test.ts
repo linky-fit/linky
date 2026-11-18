@@ -1,5 +1,7 @@
+// @vitest-environment jsdom
 import { encodeNpub, encodeNsec } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
+import { createEvoluDeps, createRun } from "@evolu/web";
 import { Effect } from "effect";
 import { AtomRegistry } from "effect/reactivity";
 import { describe, expect, it, vi } from "vitest";
@@ -8,16 +10,14 @@ import {
   signedInSession,
 } from "../../../testUtils/appRegistry";
 import { makeTestLinkyStore } from "../../../testUtils/linkyStore";
+import { openSessionEvolu } from "./evolu";
 import { currentNpubAtom } from "./session";
 import { appOwnerIdAtom } from "./store";
 
-vi.mock("@evolu/common", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@evolu/common")>()),
-  createEvolu: () => () => ({}),
-}));
 const openLinkyStore = vi.hoisted(() => vi.fn());
 vi.mock("@linky-fit/linksync/evolu", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@linky-fit/linksync/evolu")>()),
+  openLinkyEvolu: () => Promise.resolve({}),
   openLinkyStore,
 }));
 
@@ -39,6 +39,9 @@ describe("session identity atoms", () => {
     const { appOwner, store } = makeTestLinkyStore();
     openLinkyStore.mockResolvedValue(store);
     const registry = makeTestAppRegistry();
+    await openSessionEvolu(registry, createRun(createEvoluDeps()), {
+      memoryOnly: false,
+    });
     await expect(
       Effect.runPromise(AtomRegistry.getResult(registry, appOwnerIdAtom)),
     ).resolves.toBe(appOwner.id);

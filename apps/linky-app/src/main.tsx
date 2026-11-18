@@ -19,11 +19,11 @@ import { BootCommitSignal } from "./components/BootCommitSignal";
 import "./index.css";
 import {
   enableInMemoryEvoluStorageForSession,
+  hasEvolu7Database,
   type OpfsProbeIssue,
   prepareEvoluWebStorage,
   shouldUseInMemoryEvoluStorage,
 } from "./platform/evoluWebStorage";
-import { applyEvoluWebCompatPolyfills } from "./platform/evoluWebCompat";
 import { installIosViewportHeal } from "./platform/iosViewportHeal";
 import {
   finishPendingLogout,
@@ -52,6 +52,7 @@ import {
   recordPwaRegistered,
 } from "./utils/pwaUpdate";
 import { getUnknownErrorMessage, isRecord } from "./utils/unknown";
+import type { EvoluError } from "./evolu";
 import { isDevBuild, isE2eBuild } from "./platform/buildEnv";
 import { registerServiceWorker } from "./platform/serviceWorker";
 
@@ -348,7 +349,6 @@ const dynamicImportFetchRetry = createReloadGuard(
   "linky.boot.dynamic_import_fetch_reload.v3",
   1,
 );
-const evoluOpenRetry = createReloadGuard("linky.boot.evolu_open_reload.v1", 3);
 
 const isLocalDevOrigin = (): boolean => {
   const host = window.location.hostname;
@@ -517,7 +517,10 @@ const renderBootError = (error: unknown, source: string) => {
   const actions = document.createElement("div");
   actions.style.cssText = `display:flex;flex-wrap:wrap;gap:${space.sm}px;margin-top:${space.lg}px`;
 
-  if (snapshot.currentStage === "await-initial-local-data") {
+  if (
+    snapshot.currentStage === "open-evolu" ||
+    snapshot.currentStage === "await-initial-local-data"
+  ) {
     const temporaryDescription = document.createElement("p");
     temporaryDescription.style.cssText = `${bootFont("label", "regular")};color:${bootTheme.colorSubtle};margin:${space.lg}px 0 0`;
     temporaryDescription.textContent = text.temporaryDescription;
@@ -621,6 +624,132 @@ const removeTemporarySessionPrompt = () => {
   document.getElementById(TEMPORARY_SESSION_PROMPT_ID)?.remove();
 };
 
+const getEvoluBootText = () => {
+  const language = navigator.language.toLowerCase();
+  if (language.startsWith("cs"))
+    return {
+      movingTitle: "Přesouváme vaše data",
+      movingDescription:
+        "Linky přesouvá vaše data do nového úložiště. U velkého účtu to může trvat několik minut. Nechte tuto obrazovku otevřenou.",
+      tabsTitle: "Linky je otevřené v jiné záložce",
+      tabsDescription:
+        "Zavřete ostatní záložky s Linky a načtěte stránku znovu.",
+      reload: "Načíst znovu",
+    };
+  if (language.startsWith("de"))
+    return {
+      movingTitle: "Deine Daten werden umgezogen",
+      movingDescription:
+        "Linky zieht deine Daten in den neuen Speicher um. Bei einem großen Konto kann das einige Minuten dauern. Lass diesen Bildschirm geöffnet.",
+      tabsTitle: "Linky ist in einem anderen Tab geöffnet",
+      tabsDescription: "Schließe die anderen Tabs mit Linky und lade neu.",
+      reload: "Neu laden",
+    };
+  if (language.startsWith("pt"))
+    return {
+      movingTitle: "Movendo seus dados",
+      movingDescription:
+        "O Linky está movendo seus dados para o novo armazenamento. Em uma conta grande, isso pode levar alguns minutos. Mantenha esta tela aberta.",
+      tabsTitle: "O Linky está aberto em outra aba",
+      tabsDescription: "Feche as outras abas do Linky e recarregue.",
+      reload: "Recarregar",
+    };
+  return {
+    movingTitle: "Moving your data",
+    movingDescription:
+      "Linky is moving your data to its new storage. On a large account this can take a few minutes. Keep this screen open.",
+    tabsTitle: "Linky is open in another tab",
+    tabsDescription: "Close Linky's other tabs and reload.",
+    reload: "Reload",
+  };
+};
+
+/** A full-screen boot message: a title, a description and an optional button. */
+const bootMessagePanel = (
+  title: string,
+  description: string,
+  action?: { readonly label: string; readonly onPress: () => void },
+): HTMLElement => {
+  const panel = document.createElement("div");
+  panel.style.cssText = `position:fixed;inset:0;z-index:${zIndex.toast};display:grid;place-items:center;padding:${space.xxl}px;background:${bootTheme.background};color:${bootTheme.colorStrong};font-family:${fontFamily.body};text-align:center`;
+  const content = document.createElement("div");
+  content.style.cssText = `display:grid;gap:${space.md}px;max-width:${size.sheetWidth}px;justify-items:center`;
+  const heading = document.createElement("h1");
+  heading.style.cssText = `${bootFont("title")};margin:0`;
+  heading.textContent = title;
+  const text = document.createElement("p");
+  text.style.cssText = `${bootFont("label", "regular")};color:${bootTheme.colorSubtle};margin:0`;
+  text.textContent = description;
+  content.append(heading, text);
+  if (action) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.style.cssText = bootButtonStyle("primary");
+    button.textContent = action.label;
+    button.addEventListener("click", action.onPress, { once: true });
+    content.append(button);
+  }
+  panel.append(content);
+  return panel;
+};
+
+const MOVING_DATA_NOTICE_ID = "linky-moving-data-notice";
+
+const showMovingDataNotice = () => {
+  const text = getEvoluBootText();
+  const panel = bootMessagePanel(text.movingTitle, text.movingDescription);
+  panel.id = MOVING_DATA_NOTICE_ID;
+  panel.setAttribute("role", "status");
+  document.body.append(panel);
+};
+
+const removeMovingDataNotice = () => {
+  document.getElementById(MOVING_DATA_NOTICE_ID)?.remove();
+};
+
+// Another tab, such as one still on the Evolu 7 build, holds the database or the shared worker.
+const OTHER_TAB_ERRORS = new Set([
+  "DatabaseHeldError",
+  "OtherBuildRunningError",
+]);
+
+/** The Evolu error a failed boot carries, also as the cause of the error Evolu threw. */
+const evoluBootError = (error: unknown): EvoluError | null => {
+  for (
+    let current: unknown = error;
+    isRecord(current);
+    current = current.cause ?? current.error
+  )
+    if (isEvoluError(current)) return current;
+  return null;
+};
+
+const isEvoluError = (value: unknown): value is EvoluError =>
+  isRecord(value) &&
+  typeof value.type === "string" &&
+  [
+    "DatabaseHeldError",
+    "OtherBuildRunningError",
+    "UnsupportedDbVersionError",
+  ].includes(value.type);
+
+const renderEvoluBootError = (error: EvoluError) => {
+  if (!OTHER_TAB_ERRORS.has(error.type)) {
+    renderBootError(error, "evolu");
+    return;
+  }
+  recordBootError(error, "evolu");
+  signalBootFailure();
+  removeMovingDataNotice();
+  const text = getEvoluBootText();
+  document.getElementById("root")?.replaceChildren(
+    bootMessagePanel(text.tabsTitle, text.tabsDescription, {
+      label: text.reload,
+      onPress: () => window.location.reload(),
+    }),
+  );
+};
+
 const bootstrap = async () => {
   let stage = "init";
   const setStage = (nextStage: string): void => {
@@ -643,10 +772,18 @@ const bootstrap = async () => {
     }, 15_000);
   };
   armStuckTimer();
+  // Boot waits on the user or on moving data; neither watchdog may replace the screen meanwhile.
+  const pauseWatchdogs = () => {
+    window.clearTimeout(stuckTimer);
+    window.dispatchEvent(new Event("linky-boot-paused"));
+  };
+  const resumeWatchdogs = () => {
+    armStuckTimer();
+    window.dispatchEvent(new Event("linky-boot-resumed"));
+  };
   try {
     console.log("[linky][boot] start");
     setStage("polyfills");
-    applyEvoluWebCompatPolyfills();
     installIosViewportHeal();
     console.log("[linky][boot] polyfills done");
 
@@ -675,15 +812,13 @@ const bootstrap = async () => {
         // neither the stuck-boot error nor the index.html shell recovery
         // reload replaces the screen in the meantime.
         storagePromptShown = true;
-        window.clearTimeout(stuckTimer);
-        window.dispatchEvent(new Event("linky-boot-decision-pending"));
+        pauseWatchdogs();
         return showTemporarySessionPrompt(issue);
       },
     });
     if (storagePromptShown) {
       removeTemporarySessionPrompt();
-      armStuckTimer();
-      window.dispatchEvent(new Event("linky-boot-decision-resolved"));
+      resumeWatchdogs();
     }
     console.log("[linky][boot] storage compatibility checked", {
       inMemory: shouldUseInMemoryEvoluStorage(),
@@ -694,10 +829,9 @@ const bootstrap = async () => {
       { default: App },
       { ErrorBoundary },
       { makeAppRegistry, RegistryContext },
-      { evoluAtom, evoluRelaySettingsAtom },
+      { evoluRelaySettingsAtom, openSessionEvolu },
       { makeWebPlatformPorts },
       { loadSession, mirrorPushNsec },
-      { probeLocalDatabase },
     ] = await Promise.all([
       import("./App.tsx"),
       import("./ErrorBoundary.tsx"),
@@ -705,7 +839,6 @@ const bootstrap = async () => {
       import("./app/state/session/evolu.ts"),
       import("./platform/ports.web.ts"),
       import("./platform/session.ts"),
-      import("./evolu.ts"),
     ]);
     console.log("[linky][boot] app modules loaded");
 
@@ -722,15 +855,45 @@ const bootstrap = async () => {
       await import("./platform/nativeBridge.ts").then(({ stopNativeBeacon }) =>
         stopNativeBeacon(),
       );
-    if (signedIn) setStage("import-evolu");
-    const evoluPlatform = signedIn
-      ? (await import("./platform/evolu.web.ts")).makeWebEvoluPlatform()
-      : null;
-    const registry = makeAppRegistry({ ports, session, evoluPlatform });
+    const registry = makeAppRegistry({ ports, session });
     // Built on every boot: building it migrates the stored relay list once.
     registry.get(evoluRelaySettingsAtom);
-    const opened = registry.get(evoluAtom);
-    console.log("[linky][boot] evolu loaded", { opened: opened !== null });
+    if (signedIn) {
+      setStage("import-evolu");
+      const [{ createEvoluRun }, { generateDbNameFromMnemonic }] =
+        await Promise.all([
+          import("./platform/evolu.web.ts"),
+          import("@linky-fit/linksync/evolu"),
+        ]);
+      const run = createEvoluRun();
+      const reportEvoluError = () => {
+        const error = run.deps.evoluError.get();
+        if (error !== null && !appCommitRecorded) {
+          window.clearTimeout(stuckTimer);
+          renderEvoluBootError(error);
+        }
+      };
+      run.deps.evoluError.subscribe(reportEvoluError);
+      reportEvoluError();
+      setStage("open-evolu");
+      const memoryOnly = shouldUseInMemoryEvoluStorage();
+      // Evolu 8 moves the Evolu 7 database in before it opens, which takes long on a big account.
+      const moving =
+        !memoryOnly &&
+        (await hasEvolu7Database(
+          generateDbNameFromMnemonic(session.secrets.appMnemonic),
+        ));
+      if (moving) {
+        pauseWatchdogs();
+        showMovingDataNotice();
+      }
+      await openSessionEvolu(registry, run, { memoryOnly });
+      if (moving) {
+        removeMovingDataNotice();
+        resumeWatchdogs();
+      }
+      console.log("[linky][boot] evolu opened", { moved: moving });
+    }
     if (isDevBuild || isE2eBuild) {
       const { installLinkyE2eHooks } =
         await import("./devtools/e2e/installLinkyE2eHooks.ts");
@@ -747,7 +910,6 @@ const bootstrap = async () => {
       appHasMounted = true;
       window.dispatchEvent(new Event("linky-app-mounted"));
       dynamicImportFetchRetry.clear();
-      evoluOpenRetry.clear();
       if (Capacitor.getPlatform() === "android" && !isDevBuild) {
         void import("./platform/nativeLiveUpdate.ts").then(
           ({ startNativeLiveUpdates }) => startNativeLiveUpdates(),
@@ -772,41 +934,15 @@ const bootstrap = async () => {
       );
     });
     console.log("[linky][boot] render scheduled");
-    if (opened === null) return;
-    // No root Suspense boundary on purpose: the shell suspends on the shard
-    // store until the database answers, and a boundary above the app would
-    // swap the mounted tree for a fallback. The probe tells a database that
-    // never answers apart from a render that never commits.
-    void probeLocalDatabase(opened.evolu).then(() => {
-      if (!appCommitRecorded) setStage("await-render-commit");
-    });
-    // A reload can start the new database worker while the previous page's
-    // worker still holds the OPFS access handles (it may be mid-transaction
-    // and take seconds to die); the open then fails and Evolu reports a
-    // SqliteError instead of ever answering a query. Retry with a growing
-    // pause, then land on the boot-error screen with the temporary-session
-    // option.
-    const unsubscribeEvoluError = opened.evolu.subscribeError(() => {
-      const error = opened.evolu.getError();
-      if (appCommitRecorded || error?.type !== "SqliteError") return;
-      unsubscribeEvoluError();
-      window.clearTimeout(stuckTimer);
-      if (!evoluOpenRetry.canRetry()) {
-        renderBootError(error.error, "evolu-sqlite");
-        return;
-      }
-      recordBootError(error.error, "evolu-sqlite");
-      const delayMs = 500 * 2 ** evoluOpenRetry.attempts();
-      evoluOpenRetry.markRetry();
-      console.warn("[linky][boot] local database failed to open, reloading", {
-        delayMs,
-      });
-      window.setTimeout(() => window.location.reload(), delayMs);
-    });
   } catch (error) {
     window.clearTimeout(stuckTimer);
     console.error(`Boot failed at stage ${stage}:`, error);
     if (await recoverFromLocalDynamicImportFetch(stage, error)) return;
+    const evoluError = evoluBootError(error);
+    if (evoluError !== null) {
+      renderEvoluBootError(evoluError);
+      return;
+    }
     const message = `[stage: ${stage}] ${getUnknownErrorMessage(error, "unknown")}`;
     const wrapped =
       error instanceof Error

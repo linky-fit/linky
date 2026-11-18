@@ -1,10 +1,11 @@
+import { PositiveInt } from "@evolu/common";
 import {
+  createId,
+  directConversationIdFor,
   NonEmptyString,
   NonEmptyString100,
   NonEmptyString1000,
-  PositiveInt,
-} from "@evolu/common";
-import { createId, directConversationIdFor } from "@linky-fit/domain";
+} from "@linky-fit/domain";
 import { linkyStore, runNow } from "../testing/linky";
 import { makeConversationsRepository } from "./conversations";
 

@@ -1,4 +1,4 @@
-import { NonEmptyString100, NonEmptyString1000 } from "@evolu/common";
+import { NonEmptyString100, NonEmptyString1000 } from "@linky-fit/domain";
 import type { Pubkey } from "@linky-fit/linkstr";
 import { Effect } from "effect";
 import type { RowNotFound, ShardDbError } from "../core";
