@@ -33,6 +33,7 @@ const phase = (
     readonly requestPaid?: boolean;
     readonly receivedAmount?: number;
     readonly confirmations?: number;
+    readonly payoutTxid?: string;
   } = {},
 ): OnchainTransferPhase =>
   onchainTransferPhase({
@@ -44,6 +45,7 @@ const phase = (
     userCancelledAtSec: options.cancelled === true ? 1_000 : null,
     sentAtSec: options.sent === true ? 900 : null,
     requestPaid: options.requestPaid ?? false,
+    payoutTxid: options.payoutTxid ?? null,
   });
 
 describe("onchainTransferPhase of a send", () => {
@@ -56,6 +58,15 @@ describe("onchainTransferPhase of a send", () => {
     expect(phase("send", "accepted")).toBe("readyToSend");
     expect(phase("send", "accepted", { sent: true })).toBe("sent");
     expect(phase("send", "fundsReceived")).toBe("sent");
+  });
+
+  it("completes a sent transfer once Linky found its payout on chain", () => {
+    const payoutTxid = "ab".repeat(32);
+    expect(phase("send", "fundsReceived", { payoutTxid })).toBe("completed");
+    expect(phase("send", null, { sent: true, payoutTxid })).toBe("completed");
+    expect(phase("send", "refunded", { sent: true, payoutTxid })).toBe(
+      "refunded",
+    );
   });
 
   it("follows completed, denied, cancelled and refunded updates", () => {

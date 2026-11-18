@@ -29,6 +29,8 @@ export interface OnchainTransferPhaseInput {
   readonly sentAtSec: number | null;
   /** receive: the user's request has received its amount. */
   readonly requestPaid: boolean;
+  /** send: the payout Linky found on chain itself (`findPayout`), for a transfer the operator closed without a `completed`. */
+  readonly payoutTxid: string | null;
 }
 
 /** The phases in which no funds have moved yet, so the user may still withdraw. */
@@ -38,6 +40,15 @@ export const canUserCancel = (phase: OnchainTransferPhase): boolean =>
   phase === "awaitingDeposit";
 
 const sendPhase = (
+  status: OperatorTransferStatus | null,
+  sent: boolean,
+  payoutFound: boolean,
+): OnchainTransferPhase => {
+  const phase = operatorSendPhase(status, sent);
+  return phase === "sent" && payoutFound ? "completed" : phase;
+};
+
+const operatorSendPhase = (
   status: OperatorTransferStatus | null,
   sent: boolean,
 ): OnchainTransferPhase => {
@@ -90,7 +101,11 @@ export const onchainTransferPhase = (
 ): OnchainTransferPhase => {
   const phase =
     input.direction === "send"
-      ? sendPhase(input.update?.status ?? null, input.sentAtSec !== null)
+      ? sendPhase(
+          input.update?.status ?? null,
+          input.sentAtSec !== null,
+          input.payoutTxid !== null,
+        )
       : receivePhase(input.update, input.requestPaid);
   return input.userCancelledAtSec !== null && canUserCancel(phase)
     ? "cancelled"

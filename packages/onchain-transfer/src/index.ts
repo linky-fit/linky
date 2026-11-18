@@ -4,5 +4,6 @@ export * from "./constants";
 export * from "./esplora";
 export * from "./fees";
 export * from "./messages";
+export * from "./payout";
 export * from "./phase";
 export * from "./status";

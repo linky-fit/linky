@@ -28,6 +28,8 @@ export const EsploraTransaction = Schema.Struct({
   status: Schema.Struct({
     confirmed: Schema.Boolean,
     block_height: Schema.optionalKey(NonNegativeInt),
+    /** Unix seconds of the block, absent while unconfirmed. */
+    block_time: Schema.optionalKey(NonNegativeInt),
   }),
 });
 export type EsploraTransaction = typeof EsploraTransaction.Type;
@@ -85,6 +87,10 @@ const AddressTransactionsJson = Schema.fromJsonString(
 const AddressStatsJson = Schema.fromJsonString(EsploraAddressStats);
 const TipHeightJson = Schema.fromJsonString(NonNegativeInt);
 const TransactionJson = Schema.fromJsonString(EsploraTransaction);
+
+/** The Esplora API root of a mempool.space or Blockstream explorer's web root, e.g. `https://mempool.space/testnet4` → `https://mempool.space/testnet4/api`. */
+export const esploraApiUrl = (explorerUrl: string): string =>
+  `${explorerUrl.replace(/\/+$/, "")}/api`;
 
 /** An Esplora HTTP API client (mempool.space, Blockstream, electrs). */
 export const makeEsploraClient = (options: {
