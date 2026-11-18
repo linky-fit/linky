@@ -166,3 +166,54 @@ it("restores a deleted contact instead of adding it again", async () => {
   expect(routing.navigateTo).toHaveBeenCalledWith({ route: "contacts" });
   await view.unmount();
 });
+
+it("drops search hits claiming a NIP-05 the domain verified to someone else", async () => {
+  const pubkeyOf = (seed: number) =>
+    derivePubkey(NostrSecretKey.make(new Uint8Array(32).fill(seed)));
+  const [owner, impostor, namesake] = [pubkeyOf(9), pubkeyOf(10), pubkeyOf(11)];
+  const hit = (pubkey: typeof owner, name: string, nip05: string) => ({
+    pubkey,
+    metadata: { name, nip05 },
+    updatedAt: 1,
+  });
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response(JSON.stringify({ names: { nvk: owner } })),
+  );
+  const hits = [
+    hit(owner, "N", "nvk@primal.net"),
+    hit(impostor, "fiatjaf", "NVK@primal.net"),
+    hit(namesake, "nvk fan", "fan@example.com"),
+  ];
+  relays.searchProfiles.mockImplementation(
+    async ({ options }: { options: { onHits: (h: typeof hits) => void } }) => {
+      options.onHits(hits);
+      return Exit.succeed(hits);
+    },
+  );
+  const searches: Array<
+    ReturnType<typeof useContactEditor>["searchNewContact"]
+  > = [];
+  const Search = () => {
+    const { searchNewContact } = useContactEditor({
+      ...params,
+      route: { kind: "contactNew" },
+    });
+    React.useEffect(() => {
+      searches.push(searchNewContact);
+    }, [searchNewContact]);
+    return null;
+  };
+  const view = await renderIntoDocument(<Search />);
+
+  const result = await searches.at(-1)?.("nvk@primal.net");
+
+  expect(result).toEqual({
+    kind: "found",
+    contacts: [
+      expect.objectContaining({ npub: encodeNpub(owner), nip05Verified: true }),
+      expect.objectContaining({ npub: encodeNpub(namesake) }),
+    ],
+  });
+  vi.restoreAllMocks();
+  await view.unmount();
+});
