@@ -37,10 +37,11 @@
     "@capacitor/ios": "^7.4.3",
     "@linky-fit/config": "workspace:*",
     "@types/node": "^24.10.1",
+    "@typescript/native": "npm:typescript@~7.0.2",
     "effect": "^4.0.0",
     "eslint": "^9.39.1",
     "fflate": "^0.8.3",
     "prettier": "^3.4.2",
-    "typescript": "~5.9.3"
+    "typescript": "npm:@typescript/typescript6@~6.0.2"
   }
 }
