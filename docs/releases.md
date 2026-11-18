@@ -58,6 +58,18 @@ Don't open a PR from a hotfix branch; the push already runs `CI`, and a PR would
 
 Use Instant Rollback in the Vercel linky-app project. It lasts until the next release moves `linky-production`. Google Play and Zapstore have no rollback; ship a hotfix instead.
 
+### Moving to Evolu 8
+
+The first release on Evolu 8 moves each device's Evolu 7 database into Evolu 8 on its first start, then deletes it. It ships differently from other releases:
+
+1. Before merging the change to `main`, deploy `docker/evolu-relay` to every Evolu relay Linky operates, keeping its `data/` volume; the relay keeps `evolu-relay.db` as it is and serves Evolu 7 and Evolu 8 clients. Nightly deploys on that merge against the production relays.
+2. Release it as a Linky release with a native build. `WEB_DATA_FORMAT` in `apps/native-shell/scripts/write-native-runtime.ts` gives the build a new native runtime, so Android shells built before it never get it as a live update; a live bundle that fails to mount would roll back to their Evolu 7 bundle.
+3. The service worker takes over on install (`skipWaiting` in `apps/linky-app/src/sw.ts`), so open tabs of the Evolu 7 build reload into Evolu 8 instead of holding its database. Remove that line in the next release, which restores the update prompt that waits for wallet work.
+4. Don't roll `app.linky.fit` back to an Evolu 7 build. Nothing is lost if it happens: that build starts with an empty database of the same owner, which syncs from the relay, and the next Evolu 8 start moves it again.
+5. Fazole moves with its next release the same way, after the relays.
+
+Evolu 7 and Evolu 8 sync with each other, but an Evolu 7 device receives none of an owner's changes while one of them is stamped more than five minutes ahead of its clock, so ask users to update every device.
+
 ## Fazole app
 
 The fazole app releases on its own, the same way as the [Linky app](#linky-app): its version is in `apps/fazole-app/package.json` and its notes in `apps/fazole-app/CHANGELOG.md`, and both stay apart from Linky's.

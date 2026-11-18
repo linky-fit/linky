@@ -40,7 +40,12 @@ const nativePackages = [
   ),
 ].sort();
 
+// A web bundle that older shells must not run, such as one storing data in a
+// format their built-in bundle cannot read, bumps this for a new runtime.
+const WEB_DATA_FORMAT = "evolu8";
+
 const hash = createHash("sha256");
+hash.update(`${WEB_DATA_FORMAT}\0`);
 for (const file of nativeSources) {
   hash.update(`${file}\0`).update(readFileSync(path.join(shellDir, file)));
 }
