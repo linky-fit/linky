@@ -5,6 +5,7 @@ import {
 import {
   createId,
   makeOnchainTransfersRepository,
+  NonEmptyString100,
   NonEmptyString1000,
   PositiveInt,
   sqliteTrue,
@@ -81,6 +82,8 @@ interface StoredOnchainTransferOptions {
   /** When the payment history paid the operator's request. */
   readonly paidAtSec?: number;
   readonly cancelledAtSec?: number;
+  /** The payout Linky found on chain itself. */
+  readonly payoutTxid?: string;
   readonly peer?: Pubkey;
 }
 
@@ -109,7 +112,7 @@ const storedOnchainTransfer = (
   });
   if (planned === null) throw new Error("unplannable draft");
   Effect.runSync(transfers.insert(planned.row));
-  const { update, sentAtSec, cancelledAtSec } = options;
+  const { update, sentAtSec, cancelledAtSec, payoutTxid } = options;
   Effect.runSync(
     transfers.update(id, {
       ...(update === undefined
@@ -125,6 +128,9 @@ const storedOnchainTransfer = (
       ...(cancelledAtSec === undefined
         ? {}
         : { cancelledAtSec: PositiveInt.orThrow(cancelledAtSec) }),
+      ...(payoutTxid === undefined
+        ? {}
+        : { payoutTxid: NonEmptyString100.orThrow(payoutTxid) }),
     }),
   );
   const [record] = Effect.runSync(transfers.all);
@@ -163,6 +169,17 @@ describe("onchainTransferView", () => {
     expect(
       storedOnchainTransfer(send, { update: accepted, paidAtSec: NOW })?.phase,
     ).toBe("sent");
+  });
+
+  it("completes a sent on-chain send once Linky found its payout on chain", () => {
+    const txid = "cd".repeat(32);
+    expect(
+      storedOnchainTransfer(send, {
+        update: (id) =>
+          onchainTransferUpdateFixture(id, { status: "fundsReceived" }),
+        payoutTxid: txid,
+      }),
+    ).toMatchObject({ phase: "completed", foundPayoutTxid: txid });
   });
 
   it("holds a receive of any amount at the config's minimum until the deposit sets the terms", () => {

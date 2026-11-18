@@ -63,6 +63,8 @@ export interface OnchainTransferView {
   readonly payoutAddress: string | null;
   readonly depositAddress: string | null;
   readonly operatorPaymentRequest: string | null;
+  /** send: the payout Linky found on chain itself, for a transfer the operator closed without a `completed`. */
+  readonly foundPayoutTxid: string | null;
   /** receive: for whatever the user deposits within the operator's limits; the deposit sets the amounts, which mean nothing before it. */
   readonly anyAmount: boolean;
 }
@@ -150,11 +152,13 @@ export const onchainTransferView = (
       requestPaid:
         direction === "receive" &&
         isUserRequestPaid(record.userPaymentRequest, history.received, amount),
+      payoutTxid: record.payoutTxid,
     }),
     update,
     payoutAddress: record.payoutAddress,
     depositAddress: record.depositAddress,
     operatorPaymentRequest: record.operatorPaymentRequest,
+    foundPayoutTxid: record.payoutTxid,
     anyAmount: isAnyAmountReceive(direction, record.userPaymentRequest),
   };
 };

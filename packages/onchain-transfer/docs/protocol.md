@@ -63,7 +63,7 @@ An update carries the whole state, not a change, numbered by `revision`: 1 for t
 
 ## Phases Linky shows
 
-`onchainTransferPhase({ direction, update, userCancelledAtSec, sentAtSec, requestPaid })` is pure: pass the newest update, the user's cancel time, `sentAtSec` (send) and whether the user's request is paid in full (receive).
+`onchainTransferPhase({ direction, update, userCancelledAtSec, sentAtSec, requestPaid, payoutTxid })` is pure: pass the newest update, the user's cancel time, `sentAtSec` (send), whether the user's request is paid in full (receive) and the payout Linky found on chain itself (send).
 
 | Update                            | Send                                  | Receive                                                        |
 | --------------------------------- | ------------------------------------- | -------------------------------------------------------------- |
@@ -74,6 +74,8 @@ An update carries the whole state, not a change, numbered by `revision`: 1 for t
 | either, `receivedAmount` short    | `sent`                                | `shortDeposit`                                                 |
 | `completed`                       | `completed`                           | `waitingForEcash`                                              |
 | `denied`, `cancelled`, `refunded` | the same                              | the same                                                       |
+
+An on-chain send that is `sent` turns `completed` once Linky found its payout on chain itself, since an operator may settle a transfer outside the protocol and never send `completed`. Linky looks it up with `findPayout` over `addressTransactions(payoutAddress)` from the Esplora API at `esploraApiUrl(config.explorerUrl)`: the oldest transaction paying the payout address at least `amount`, unconfirmed or mined at or after the request, that is not the payout of another of the user's transfers. Matching by address and amount is the only way an on-chain payout can be told apart; the operator's `completed` still wins with its own `txid`, and `refunded` or another outcome is shown as such.
 
 For an on-chain receive, a paid request is `completed` whatever the update, and only a paid request is: the operator's `completed` alone leaves it `waitingForEcash`, so Linky never shows sats as received before its own receives naming the request brought them in. A user cancel turns `waitingForDetails`, `readyToSend` and `awaitingDeposit` into `cancelled`, the phases `canUserCancel` allows; once funds moved it changes nothing. Linky shows the deposit's confirmations as these phases only, never as a count.
 

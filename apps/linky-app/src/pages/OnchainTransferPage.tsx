@@ -372,7 +372,7 @@ export function OnchainTransferDetail(
       <ExplorerLink
         explorerUrl={explorerUrl}
         label={t("onchainTransferViewTransaction")}
-        txid={update?.txid}
+        txid={update?.txid ?? transfer.foundPayoutTxid ?? undefined}
       />
       <ExplorerLink
         explorerUrl={explorerUrl}

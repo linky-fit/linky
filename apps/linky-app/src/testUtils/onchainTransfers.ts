@@ -84,6 +84,7 @@ export const onchainTransferViewFixture = (
   payoutAddress: REGTEST_ADDRESS,
   depositAddress: null,
   operatorPaymentRequest: null,
+  foundPayoutTxid: null,
   anyAmount: false,
   ...overrides,
 });

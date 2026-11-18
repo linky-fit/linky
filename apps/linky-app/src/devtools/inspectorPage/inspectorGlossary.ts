@@ -224,6 +224,10 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "An update from the on-chain operator moved one of the user's transfers to a newer revision and was stored. Only updates from the configured operator's pubkey, for a transfer held with that operator, and with a higher revision than the stored one are applied; inbox replays and older revisions write nothing and emit no row. A live update that makes the transfer ready, completed, declined or refunded also shows the user a toast or a PWA notification, unless that transfer is open.",
   "onchainTransfer.supportOpened":
     "The user tapped Contact support on an on-chain transfer screen. Linky saves the on-chain operator as a contact unless it is one and opens their chat, the user's support chat; opened false means saving the contact failed and the status line says why. The onchainTransfer link is missing when it came from the send or receive screen, before any transfer existed.",
+  "onchainTransfer.payoutChecked":
+    "Linky looked on chain (the Esplora API under the operator's explorer) for the payout of a paid on-chain send the operator has not completed, and found none yet, or the lookup failed (the payload says why). It checks every 10 minutes while such a send exists, since an operator may settle a transfer by hand without sending completed.",
+  "onchainTransfer.payoutFound":
+    "Linky found a transaction paying the send's payout address at least its amount, unconfirmed or mined after the request, that settles none of the user's other transfers, and stored its txid on the transfer, which completes it. stored false means the write failed and the next check tries again.",
   "onchainTransfer.sendTapped":
     "The user tapped Send on an accepted on-chain send. payable false means the operator's payment request does not name this transfer, its amount or the operator, and nothing was paid; otherwise the usual payment request flow (paymentRequest rows) pays it and the transfer is marked sent once paid.",
   "paymentRequest.paymentUnlinked":
