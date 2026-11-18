@@ -1543,6 +1543,8 @@ export const de = {
     "An eine On-Chain-Wallet kannst du nur die Beträge unten senden. Sprich dich deshalb mit dem Empfänger ab, bevor du einen anderen Betrag sendest.",
   onchainSendDifferentAmountChecked: "Andere Summe vereinbart",
   onchainTransferYouGet: "Du bekommst",
+  onchainSendToAddress: "An die Adresse:",
+  onchainSendOpenAddress: "Adresse im Browser öffnen",
   onchainSendPayoutAddress: "Bitcoin-Adresse, an die gesendet wird",
   onchainTransferAddressInvalid:
     "Das ist keine gültige Bitcoin-Adresse für dieses Netzwerk.",
