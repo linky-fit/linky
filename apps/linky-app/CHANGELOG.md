@@ -12,31 +12,27 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ## [Unreleased]
 
+## [26.11.4] - 2026-11-18
+
 ### en-US
 
-- The cashu.21m.lol mint is no longer offered; it stays listed for those who picked it as default or hold sats there.
-- Tapping the amount in a transaction, a recurring payment or a listing switches the display unit, like the wallet balance.
-- Logging out and canceling a proxy payment now ask for confirmation; logging out first asks whether your keys are backed up.
-- Swipe listings to hide or pin, your own to pause.
-- All your devices show which contacts offer proxy payments, even when relays fail.
-- Contact search finds people you haven't added by npub or Linky name, to write to them first; results show who uses Linky.
-- People verified on domains like primal.net now get the check mark by their address too.
-- Search emojis by name when reacting, and type `:` with a name in a message to insert one, e.g. `:100`.
-- Copying a receive invoice copies the bare Lightning invoice, which any wallet accepts when pasted.
-- Switching tabs no longer adds a back step, so swiping back on iPhone doesn't slide the tab bar along with the page.
+- Logging out and canceling a proxy payment ask to confirm; logging out checks your key backup.
+- Swipe a listing to hide or pin it, or to pause your own.
+- Tap an amount in a transaction, payment or listing to switch the unit.
+- Listings and proxy payments sync across devices.
+- Contact search suggests people not yet added and shows who uses Linky.
+- Addresses verified on domains like primal.net get a check mark.
+- Find emojis by name in reactions, or in messages after a colon, e.g. `:100`.
 
 ### cs-CZ
 
-- Mint cashu.21m.lol už není v nabídce; zůstane jen tomu, kdo ho má jako výchozí nebo u něj drží saty.
-- Klepnutí na částku v detailu transakce, pravidelné platby nebo nabídky přepne jednotku, stejně jako u zůstatku peněženky.
-- Odhlášení a zrušení proxy platby si teď vyžádají potvrzení; před odhlášením se Linky zeptá, jestli máš zálohované klíče.
+- Odhlášení a zrušení proxy platby chtějí potvrzení; před odhlášením Linky ověří zálohu klíčů.
 - Nabídku swipem skryješ nebo připneš, svoji pozastavíš.
-- Všechna tvoje zařízení ukazují, kdo z kontaktů nabízí proxy platby, i když relaye neodpovídají.
-- Hledání kontaktů najde podle npubu nebo Linky jména i lidi, které nemáš přidané, a můžeš jim rovnou napsat; výsledky ukazují, kdo používá Linky.
-- Lidé ověření na doménách jako primal.net teď mají u adresy taky fajfku.
-- Emoji při reakci najdeš podle názvu a ve zprávě je vložíš dvojtečkou a názvem, třeba `:100`.
-- Kopírování faktury pro příjem zkopíruje holou Lightning fakturu, kterou po vložení přijme každá peněženka.
-- Přepnutí záložky už nepřidává krok zpět, takže swipe zpět na iPhonu netáhne spodní lištu spolu se stránkou.
+- Klepnutím na částku v transakci, platbě nebo nabídce přepneš jednotku.
+- Nabídky a proxy platby se synchronizují mezi zařízeními.
+- Hledání kontaktů nabídne i nepřidané lidi a ukáže, kdo používá Linky.
+- Adresy ověřené na doménách jako primal.net mají fajfku.
+- Emoji najdeš podle názvu v reakcích i ve zprávě po dvojtečce, třeba `:100`.
 
 ## [26.11.3] - 2026-11-10
 
