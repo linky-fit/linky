@@ -1,17 +1,23 @@
+import { evoluWorkerPolyfills } from "@linky-fit/config/vite";
 import { linkyUi } from "@linky-fit/ui/vite";
 import react from "@vitejs/plugin-react-swc";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
+
+const workerPolyfills = evoluWorkerPolyfills(
+  fileURLToPath(new URL("./src/platform/browserPolyfills.ts", import.meta.url)),
+);
 
 export default defineConfig({
   define: { global: "globalThis" },
-  plugins: [linkyUi(), react()],
+  plugins: [workerPolyfills, linkyUi(), react()],
   // Evolu starts its workers and loads its wasm from URLs next to its own modules, which prebundling would move.
   optimizeDeps: {
     exclude: ["@evolu/web", "@evolu/sqlite-wasm"],
     // Found only once the database worker loads; listed so the dev server does not reload mid-boot.
     include: ["@evolu/common", "@evolu/common/local-first"],
   },
-  worker: { format: "es" },
+  worker: { format: "es", plugins: () => [workerPolyfills] },
   build: {
     rollupOptions: {
       output: {

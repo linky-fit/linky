@@ -872,11 +872,15 @@ const bootstrap = async () => {
     registry.get(evoluRelaySettingsAtom);
     if (signedIn) {
       setStage("import-evolu");
-      const [{ createEvoluRun }, { generateDbNameFromMnemonic }] =
-        await Promise.all([
-          import("./platform/evolu.web.ts"),
-          import("@linky-fit/linksync/evolu"),
-        ]);
+      const [
+        { createEvoluRun },
+        { generateDbNameFromMnemonic },
+        { probeLocalDatabase },
+      ] = await Promise.all([
+        import("./platform/evolu.web.ts"),
+        import("@linky-fit/linksync/evolu"),
+        import("./evolu.ts"),
+      ]);
       const run = createEvoluRun();
       const reportEvoluError = () => {
         const error = run.deps.evoluError.get();
@@ -889,7 +893,7 @@ const bootstrap = async () => {
       reportEvoluError();
       setStage("open-evolu");
       const memoryOnly = shouldUseInMemoryEvoluStorage();
-      // Evolu 8 moves the Evolu 7 database in before it opens, which takes long on a big account.
+      // Evolu 8 moves the Evolu 7 database in before it answers a query, which takes long on a big account.
       const moving =
         !memoryOnly &&
         (await hasEvolu7Database(
@@ -899,8 +903,9 @@ const bootstrap = async () => {
         pauseWatchdogs();
         showMovingDataNotice();
       }
-      await openSessionEvolu(registry, run, { memoryOnly });
+      const { evolu } = await openSessionEvolu(registry, run, { memoryOnly });
       if (moving) {
+        await probeLocalDatabase(evolu);
         removeMovingDataNotice();
         resumeWatchdogs();
       }

@@ -43,7 +43,7 @@ import {
   nostrReactionsAllQuery,
   ownerMetaAllQuery,
   transactionsAllQuery,
-  useLinkyEvolu,
+  useOpenedEvolu,
 } from "../../evolu";
 import { readStoredSlip39Seed } from "../../platform/identitySecrets";
 import { localStorageKeyValueStore } from "../../platform/linkshu/localStorageKeyValueStore";
@@ -166,6 +166,7 @@ const countsByScope = (report: LaneMigrationReport) => {
 
 const bootLaneMigration = async (
   evolu: LinkyEvolu,
+  syncLane: (owner: Owner) => void,
   store: LinkyStore,
   resolveSeed: () => Promise<Bip39Seed>,
 ): Promise<void> => {
@@ -189,7 +190,7 @@ const bootLaneMigration = async (
 
   // Legacy rows remain inputs; only terminal proof states are mirrored back.
   // After the grace period a first run ingests only the lanes held locally.
-  if (gracePeriodActive) for (const owner of laneOwners) evolu.useOwner(owner);
+  if (gracePeriodActive) for (const owner of laneOwners) syncLane(owner);
 
   emit(
     firstRun ? "LaneMigrationStarted" : "LaneGracePeriodReingestStarted",
@@ -300,7 +301,7 @@ const bootLaneMigration = async (
             if (legacyOwners.has(owner.id)) continue;
             legacyOwners.set(owner.id, owner);
             legacyOwnerIds.push(owner.id);
-            evolu.useOwner(owner);
+            syncLane(owner);
           }
           indexesKey = nextIndexesKey;
           watchLanes();
@@ -410,7 +411,7 @@ export const useLaneToShardMigration = (): boolean => {
   // database that never answers still reaches the boot watchdog instead of
   // committing a screen that cannot progress.
   const store = useLinkyStore();
-  const evolu = useLinkyEvolu();
+  const { evolu, hasEvoluRelay } = useOpenedEvolu();
   const registry = React.useContext(RegistryContext);
   const [migrating, setMigrating] = React.useState(
     () => !isLaneMigrationDoneLocally(),
@@ -433,7 +434,11 @@ export const useLaneToShardMigration = (): boolean => {
     // The wallet's own seed, so an nsec-only login never generates a second cashu mnemonic.
     const resolveSeed = () =>
       Effect.runPromise(AtomRegistry.getResult(registry, linkshuSeedAtom));
-    bootRun ??= bootLaneMigration(evolu, store, resolveSeed).catch(
+    // Evolu syncs nothing without a relay, and refuses an owner then.
+    const syncLane = (owner: Owner) => {
+      if (hasEvoluRelay) evolu.useOwner(owner);
+    };
+    bootRun ??= bootLaneMigration(evolu, syncLane, store, resolveSeed).catch(
       (error: unknown) => {
         console.warn("[linky] lane migration failed", error);
         reportAppLog({
@@ -449,7 +454,7 @@ export const useLaneToShardMigration = (): boolean => {
     return () => {
       cancelled = true;
     };
-  }, [evolu, registry, store]);
+  }, [evolu, hasEvoluRelay, registry, store]);
 
   return migrating;
 };

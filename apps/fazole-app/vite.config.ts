@@ -1,6 +1,8 @@
+import { evoluWorkerPolyfills } from "@linky-fit/config/vite";
 import { linkyUi } from "@linky-fit/ui/vite";
 import react from "@vitejs/plugin-react-swc";
 import { execSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 import packageJson from "./package.json" with { type: "json" };
@@ -38,6 +40,10 @@ const monetaProxy = {
   },
 };
 
+const workerPolyfills = evoluWorkerPolyfills(
+  fileURLToPath(new URL("./src/platform/browserPolyfills.ts", import.meta.url)),
+);
+
 export default defineConfig({
   define: {
     global: "globalThis",
@@ -45,6 +51,7 @@ export default defineConfig({
     __APP_COMMIT_SHA__: JSON.stringify(commitSha),
   },
   plugins: [
+    workerPolyfills,
     linkyUi(),
     react(),
     VitePWA({
@@ -88,7 +95,7 @@ export default defineConfig({
       "workbox-window",
     ],
   },
-  worker: { format: "es" },
+  worker: { format: "es", plugins: () => [workerPolyfills] },
   build: {
     rollupOptions: {
       output: {

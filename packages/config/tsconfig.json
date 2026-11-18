@@ -10,5 +10,10 @@
     "strict": true,
     "types": ["node"]
   },
-  "include": ["eslint/**/*.js", "prettier/**/*.js", "npm/index.ts"]
+  "include": [
+    "eslint/**/*.js",
+    "prettier/**/*.js",
+    "vite/**/*.js",
+    "npm/index.ts"
+  ]
 }
