@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@evolu/common": "7.4.1",
-    "@evolu/nodejs": "2.4.0"
+    "@evolu/common": "8.29.0",
+    "@evolu/nodejs": "4.6.0"
   },
   "scripts": {
     "test": "node --test relay.test.js"
