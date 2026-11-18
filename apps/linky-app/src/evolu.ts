@@ -201,7 +201,8 @@ export type { CashuOperationId, CashuProofId, NostrIdentityId };
 /** The database schema, legacy lane tables included; see `LinkyEvoluSchema`. */
 export const Schema = LinkyEvoluSchema;
 
-const useOpenedEvolu = (): OpenedEvolu => {
+/** The signed-in session's database with the run it opened on. */
+export const useOpenedEvolu = (): OpenedEvolu => {
   const opened = useAtomValue(evoluAtom);
   if (opened === null) throw new Error("No Evolu database while signed out");
   return opened;
@@ -241,6 +242,14 @@ export const forgetChatShards = async (store: LinkyStore) => {
   }
   return forgotten;
 };
+
+/** Resolves once the database answers a query, which Evolu does only after moving Evolu 7's data in. */
+export const probeLocalDatabase = (evolu: LinkyEvolu): Promise<void> =>
+  evolu
+    .loadQuery(
+      createQuery((db) => db.selectFrom("shardPointer").select("id").limit(1)),
+    )
+    .then(() => undefined);
 
 export const ownerMetaAllQuery = createQuery((db) =>
   db.selectFrom("ownerMeta").selectAll(),
