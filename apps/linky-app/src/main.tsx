@@ -481,6 +481,7 @@ const signalBootFailure = (): void => {
 };
 
 const renderBootError = (error: unknown, source: string) => {
+  removeMovingDataNotice();
   recordBootError(error, source);
   signalBootFailure();
   const root = document.getElementById("root");
