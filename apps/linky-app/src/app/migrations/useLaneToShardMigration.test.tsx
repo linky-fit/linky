@@ -30,7 +30,7 @@ vi.mock("../../evolu", () => {
     update: legacy.update,
   };
   return {
-    useLinkyEvolu: () => evolu,
+    useOpenedEvolu: () => ({ evolu, hasEvoluRelay: true }),
     loadLegacyRows: (_: unknown, table: string) => evolu.loadQuery(table),
     cashuOperationsAllQuery: "cashuOperation",
     cashuProofsAllQuery: "cashuProof",

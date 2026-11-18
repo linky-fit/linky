@@ -1,3 +1,4 @@
+import { evoluWorkerPolyfills } from "@linky-fit/config/vite";
 import { linkyUi } from "@linky-fit/ui/vite";
 import basicSsl from "@vitejs/plugin-basic-ssl";
 import react from "@vitejs/plugin-react-swc";
@@ -144,6 +145,10 @@ const linkPreviewApi = (): Plugin => ({
   },
 });
 
+const workerPolyfills = evoluWorkerPolyfills(
+  fileURLToPath(new URL("./src/platform/browserPolyfills.ts", import.meta.url)),
+);
+
 export default defineConfig({
   define: {
     global: "globalThis",
@@ -192,6 +197,7 @@ export default defineConfig({
     ],
   },
   plugins: [
+    workerPolyfills,
     linkyUi(),
     bootDiagnosticRedaction(),
     inspectorCollector(),
@@ -261,6 +267,7 @@ export default defineConfig({
     }),
     contentSecurityPolicyMeta(),
   ],
+  worker: { plugins: () => [workerPolyfills] },
   ...(useHttps ? { server: { host: true, https: {} } } : {}),
   build: {
     rollupOptions: {

@@ -10,7 +10,11 @@
     "./tsconfig/base": "./tsconfig/base.json",
     "./tsconfig/app": "./tsconfig/app.json",
     "./tsconfig/node": "./tsconfig/node.json",
-    "./npm": "./npm/index.ts"
+    "./npm": "./npm/index.ts",
+    "./vite": {
+      "types": "./vite/evoluWorkerPolyfills.d.ts",
+      "default": "./vite/evoluWorkerPolyfills.js"
+    }
   },
   "scripts": {
     "eslint": "eslint .",
