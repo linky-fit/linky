@@ -48,7 +48,6 @@ const untilDeadline = async (
 const removeOpfsEntries = async (): Promise<void> => {
   const root = await navigator.storage?.getDirectory?.();
   if (!root) return;
-  // @ts-expect-error OPFS FileSystemDirectoryHandle.keys() not yet in all TS libs
   for await (const name of root.keys()) {
     await root.removeEntry(name, { recursive: true });
   }

@@ -466,7 +466,6 @@ const getEvoluDatabaseInfo = async (
 
       let totalSize = 0;
       const allDirs: string[] = [];
-      // @ts-expect-error OPFS FileSystemDirectoryHandle.entries() not yet in all TS libs
       for await (const [name, handle] of root.entries()) {
         if (handle.kind === "directory") allDirs.push(name);
         if (name === expectedDir && handle.kind === "directory") {

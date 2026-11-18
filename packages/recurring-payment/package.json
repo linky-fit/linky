@@ -23,9 +23,10 @@
   "devDependencies": {
     "@linky-fit/config": "workspace:*",
     "@types/node": "^24.10.1",
+    "@typescript/native": "npm:typescript@~7.0.2",
     "eslint": "^9.39.1",
     "prettier": "^3.4.2",
-    "typescript": "~5.9.3",
+    "typescript": "npm:@typescript/typescript6@~6.0.2",
     "vitest": "^4.0.18"
   }
 }
