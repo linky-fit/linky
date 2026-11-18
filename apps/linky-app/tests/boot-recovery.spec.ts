@@ -125,9 +125,9 @@ test("recovers when the authenticated app never commits", async ({ page }) => {
     },
     [nsec, mnemonic],
   );
-  await page.route(EVOLU_WORKER_REQUEST, async (route) => {
+  // A database worker that never loads leaves the app waiting on it.
+  await page.route(EVOLU_WORKER_REQUEST, () => {
     databaseWorkerRequests += 1;
-    await route.abort();
   });
 
   await page.goto("/");
@@ -136,9 +136,21 @@ test("recovers when the authenticated app never commits", async ({ page }) => {
     page.getByRole("heading", { name: "The app failed to start" }),
   ).toBeVisible({ timeout: 15_000 });
   expect(databaseWorkerRequests).toBeGreaterThanOrEqual(1);
+
+  await test.step("a database worker that fails to load offers the temporary session", async () => {
+    await page.unroute(EVOLU_WORKER_REQUEST);
+    await page.route(EVOLU_WORKER_REQUEST, (route) => route.abort());
+    await page.reload();
+    await expect(
+      page.getByRole("heading", { name: "Boot error" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Continue with temporary session" }),
+    ).toBeVisible();
+  });
 });
 
-test("a SQLite pool lock failure before or after other acquisitions preserves local contacts", async ({
+test("Evolu's SQLite rides out a pool lock failure before or after other acquisitions and keeps local contacts", async ({
   page,
 }) => {
   await page.setViewportSize(MOBILE_VIEWPORT);
@@ -156,11 +168,9 @@ test("a SQLite pool lock failure before or after other acquisitions preserves lo
   await page.goto("/#contacts");
   await expect(page.locator('[data-guide="contact-card"]')).toHaveCount(1);
 
-  const recoveries: string[] = [];
+  let faults = 0;
   page.on("console", (message) => {
-    if (message.text().includes("local database failed to open")) {
-      recoveries.push(message.text());
-    }
+    if (message.text() === "pool lock fault injected") faults += 1;
   });
   let failureTiming: "before" | "after" | null = null;
   await page.route(EVOLU_WORKER_BUNDLE, async (route) => {
@@ -172,6 +182,7 @@ test("a SQLite pool lock failure before or after other acquisitions preserves lo
         if (this.name.startsWith(".")) return openHandle.apply(this, args);
         if (!failed) {
           failed = true;
+          console.log("pool lock fault injected");
           if (${failureTiming === "after"}) {
             await new Promise(resolve => setTimeout(resolve, 100));
           }
@@ -193,11 +204,12 @@ test("a SQLite pool lock failure before or after other acquisitions preserves lo
   // land after the pool gave up; "after" fails once the others are held.
   for (const timing of ["before", "after"] as const) {
     await test.step(`fail ${timing} the other acquisitions`, async () => {
-      const recoveriesBefore = recoveries.length;
+      const faultsBefore = faults;
       failureTiming = timing;
       await page.reload();
-      await expect.poll(() => recoveries.length).toBe(recoveriesBefore + 1);
       await expect(page.locator('[data-guide="contact-card"]')).toHaveCount(1);
+      // A reload would load the faulty worker again and count another fault.
+      expect(faults).toBe(faultsBefore + 1);
     });
   }
   await page.reload();
