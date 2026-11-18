@@ -1,9 +1,9 @@
+import { PositiveInt } from "@evolu/common";
 import {
+  createId,
   NonEmptyString100,
   NonEmptyString1000,
-  PositiveInt,
-} from "@evolu/common";
-import { createId } from "@linky-fit/domain";
+} from "@linky-fit/domain";
 import { NewOperation, ProofId } from "@linky-fit/linkshu";
 import { Schema } from "effect";
 import { linkyStore, runNow } from "../testing/linky";

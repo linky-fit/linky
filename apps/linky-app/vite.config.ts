@@ -3,7 +3,6 @@ import basicSsl from "@vitejs/plugin-basic-ssl";
 import react from "@vitejs/plugin-react-swc";
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import fs from "node:fs/promises";
 import type { ServerResponse } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,7 +18,6 @@ import { fetchLinkPreview } from "./server/linkPreview";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const sqliteWasmPath = path.join(__dirname, "public/sqlite-wasm/sqlite3.wasm");
 const packageJsonPath = path.join(__dirname, "package.json");
 
 const isUnknownRecord = (value: unknown): value is Record<string, unknown> => {
@@ -66,37 +64,6 @@ const appCommitSha = (() => {
 })();
 
 const useHttps = process.env.VITE_HTTPS === "1";
-
-const serveSqliteWasm = (): Plugin => ({
-  name: "serve-sqlite-wasm",
-  configureServer(server: ViteDevServer) {
-    server.middlewares.use(
-      async (
-        req: Connect.IncomingMessage,
-        res: ServerResponse,
-        next: Connect.NextFunction,
-      ) => {
-        const url = req.url ?? "";
-        if (!url.includes("sqlite3.wasm")) return next();
-
-        try {
-          const wasm = await fs.readFile(sqliteWasmPath);
-          res.statusCode = 200;
-          res.setHeader("Content-Type", "application/wasm");
-          res.setHeader("Cache-Control", "no-store");
-          res.end(wasm);
-        } catch (error) {
-          server.config.logger.error(
-            `Failed to serve sqlite3.wasm from ${sqliteWasmPath}: ${String(
-              error,
-            )}`,
-          );
-          next();
-        }
-      },
-    );
-  },
-});
 
 const lnurlProxy = (): Plugin => ({
   name: "lnurl-proxy",
@@ -184,7 +151,8 @@ export default defineConfig({
     __APP_COMMIT_SHA__: JSON.stringify(appCommitSha),
   },
   optimizeDeps: {
-    exclude: ["@evolu/web"],
+    // Evolu starts its workers and loads its wasm from URLs next to its own modules, which prebundling would move.
+    exclude: ["@evolu/web", "@evolu/sqlite-wasm"],
     // App is intentionally imported lazily from main.tsx so boot diagnostics
     // can catch module-load failures. Vite's dep scanner does not eagerly walk
     // that dynamic import, so include app/runtime deps here to avoid mid-boot
@@ -195,7 +163,6 @@ export default defineConfig({
       "@capacitor/push-notifications",
       "@capacitor/share",
       "@evolu/common",
-      "@evolu/react",
       "@noble/hashes/hmac.js",
       "@noble/hashes/sha2.js",
       "@scure/base",
@@ -224,15 +191,9 @@ export default defineConfig({
       "workbox-window",
     ],
   },
-  resolve: {
-    alias: {
-      "sqlite-wasm/jswasm/sqlite3.wasm": "/sqlite-wasm/sqlite3.wasm",
-    },
-  },
   plugins: [
     linkyUi(),
     bootDiagnosticRedaction(),
-    serveSqliteWasm(),
     inspectorCollector(),
     linkPreviewApi(),
     lnurlProxy(),
@@ -253,9 +214,8 @@ export default defineConfig({
       injectManifest: {
         globPatterns: ["**/*.{js,wasm,css,html,woff2}"],
         rollupFormat: "es",
-        // pdf.js is loaded on demand for PDF previews, and Evolu's own
-        // database worker never starts (src/evoluDb.worker.ts replaces it).
-        globIgnores: ["**/pdf.worker*", "**/pdfjs-*", "**/Db.worker*"],
+        // pdf.js is loaded on demand for PDF previews.
+        globIgnores: ["**/pdf.worker*", "**/pdfjs-*"],
       },
       manifest: {
         name: "Linky",

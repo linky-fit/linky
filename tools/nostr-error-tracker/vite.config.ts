@@ -11,6 +11,6 @@ export default defineConfig({
       "react/jsx-dev-runtime",
       "@evolu/common",
     ],
-    exclude: ["@evolu/react-web", "@evolu/web", "@evolu/sqlite-wasm"],
+    exclude: ["@evolu/web", "@evolu/sqlite-wasm"],
   },
 });

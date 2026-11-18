@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { NonEmptyString100, PositiveInt } from "@evolu/common";
+import { PositiveInt } from "@evolu/common";
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
-import { createId } from "@linky-fit/domain";
+import { createId, NonEmptyString100 } from "@linky-fit/domain";
 import { makeTransactionsRepository } from "../repositories/transactions";
 import { linkyStore, runNow } from "../testing/linky";
 import { makeInMemoryShardDb } from "../core";

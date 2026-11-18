@@ -1,4 +1,5 @@
-import { NonEmptyString, NonEmptyString100, PositiveInt } from "@evolu/common";
+import { NonEmptyString, NonEmptyString100 } from "@linky-fit/domain";
+import { PositiveInt } from "@evolu/common";
 import { Pubkey } from "@linky-fit/linkstr";
 import { Effect, Option, Schema } from "effect";
 import type { RowNotFound, ShardDbError } from "../core";

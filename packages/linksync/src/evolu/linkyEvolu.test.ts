@@ -1,47 +1,19 @@
+import { createIdFromString, createStore, Millis, Name } from "@evolu/common";
 import {
-  createConsole,
-  createRandomBytes,
-  createTime,
-  type EvoluConfig,
-  type EvoluDeps,
-} from "@evolu/common";
-import { evoluSchemaToDbSchema } from "@evolu/common/local-first";
+  evoluSchemaToSqliteSchema,
+  type SyncState,
+} from "@evolu/common/local-first";
 import { Effect } from "effect";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { appOwnerFromMnemonic } from "../core";
 import { LinkySchema, linkyScopes } from "../model";
 import { memoryKeyValueStorage } from "../testing/keyValueStorage";
-import type { WorkerMessage } from "./dbWorker";
 import {
-  createLinkyEvolu,
   generateDbNameFromMnemonic,
-  LinkyEvoluSchema,
   openLinkyStore,
   type LinkyEvoluEvent,
 } from "./linkyEvolu";
-
-const evoluMock = vi.hoisted(() => {
-  const state: {
-    calls: Array<{ schema: unknown; config: EvoluConfig }>;
-    instance: object;
-  } = { calls: [], instance: {} };
-  return state;
-});
-// Plays Evolu: records what it was opened with and starts the database worker.
-vi.mock("@evolu/common", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@evolu/common")>();
-  return {
-    ...original,
-    createEvolu:
-      (deps: EvoluDeps) => (schema: unknown, config: EvoluConfig) => {
-        evoluMock.calls.push({ schema, config });
-        deps
-          .createDbWorker(config.name ?? original.SimpleName.orThrow("evolu"))
-          .onMessage(() => {});
-        return evoluMock.instance;
-      },
-  };
-});
+import { LinkyEvoluSchema, linkyIndexes } from "./linkyEvoluSchema";
 
 const mnemonic =
   "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
@@ -49,43 +21,8 @@ const appOwner = appOwnerFromMnemonic(mnemonic);
 if (!appOwner) throw new Error("invalid test mnemonic");
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-const transports = [{ type: "WebSocket" as const, url: "wss://a.test" }];
-
-/** Opens the database over a worker the test speaks for. */
-const open = (
-  mnemonicGiven: string | null,
-  onEvent?: (event: LinkyEvoluEvent) => void,
-) => {
-  evoluMock.calls.length = 0;
-  let deliver: (message: WorkerMessage) => void = () => {};
-  const opened = createLinkyEvolu({
-    evoluDeps: {
-      console: createConsole(),
-      randomBytes: createRandomBytes(),
-      time: createTime(),
-      reloadApp: () => {},
-    },
-    createWorker: () => ({
-      postMessage: () => {},
-      onMessage: (callback) => {
-        deliver = callback;
-      },
-    }),
-    mnemonic: mnemonicGiven,
-    transports,
-    inMemory: true,
-    enableLogging: false,
-    ...(onEvent ? { onEvent } : {}),
-  });
-  return {
-    ...opened,
-    call: evoluMock.calls[0],
-    deliver: (message: WorkerMessage) => deliver(message),
-  };
-};
-
 describe("generateDbNameFromMnemonic", () => {
-  // Existing databases are opened by these names; they must never change.
+  // Evolu 8 finds the Evolu 7 databases by these names; they must never change.
   it.each([
     [null, "linky-anon"],
     ["", "linky-anon"],
@@ -103,26 +40,21 @@ describe("generateDbNameFromMnemonic", () => {
   });
 });
 
-describe("createLinkyEvolu", () => {
-  it("opens the mnemonic's database owned by its app owner", () => {
-    const { call } = open(mnemonic);
-    expect(call.schema).toBe(LinkyEvoluSchema);
-    expect(call.config).toEqual({
-      name: "linky-4cc788f4",
-      indexes: expect.any(Function),
-      transports,
-      enableLogging: false,
-      inMemory: true,
-      externalAppOwner: appOwner,
-    });
-  });
-
-  it("indexes every table's id and the proof columns the wallet filters on", () => {
-    const { call } = open(mnemonic);
+describe("appOwnerFromMnemonic", () => {
+  it("takes a mnemonic typed with capitals and extra spaces", () => {
     expect(
-      evoluSchemaToDbSchema(LinkyEvoluSchema, call.config.indexes).indexes.map(
-        (index) => index.sql,
-      ),
+      appOwnerFromMnemonic(`  ${mnemonic.toUpperCase().replace(/ /g, "  ")} `)
+        ?.id,
+    ).toBe(appOwner.id);
+  });
+});
+
+describe("linkyIndexes", () => {
+  it("indexes every table's id and the proof columns the wallet filters on", () => {
+    expect(
+      evoluSchemaToSqliteSchema(LinkyEvoluSchema, linkyIndexes)
+        .indexes.map((index) => index.sql)
+        .filter((sql) => !sql.includes(`"evolu_`)),
     ).toEqual([
       ...Object.keys(LinkySchema).map(
         (table) => `create index "${table}Id" on "${table}" ("id")`,
@@ -132,46 +64,27 @@ describe("createLinkyEvolu", () => {
       'create index "cashuProofKeysetCreatedSecond" on "cashuProof" ("keysetId", substr("createdAt", 1, 19), "mint")',
     ]);
   });
-
-  it("lets Evolu create its own owner without a mnemonic", () => {
-    const { call } = open(null);
-    expect(call.config).toEqual({
-      name: "linky-anon",
-      indexes: expect.any(Function),
-      transports,
-      enableLogging: false,
-      inMemory: true,
-    });
-  });
-
-  it("reports the relay protocol errors the worker hears", () => {
-    const events: LinkyEvoluEvent[] = [];
-    const { deliver } = open(mnemonic, (event) => events.push(event));
-    const failure = {
-      type: "linksync.ownerSyncFailed",
-      ownerId: appOwner.id,
-      error: "QuotaError",
-      endsRound: true,
-    } as const;
-    deliver(failure);
-    expect(events).toEqual([{ _tag: "OwnerSyncFailed", failure }]);
-  });
 });
 
 describe("openLinkyStore", () => {
   it("reports the subscribed owners, then hydration, and retains per app owner", async () => {
+    const name = Name.orThrow("linky-test");
+    const syncState = createStore<SyncState | null>(null);
     // An empty local database.
-    evoluMock.instance = {
-      appOwner: Promise.resolve(appOwner),
+    const evolu = {
+      name,
+      appOwner,
       useOwner: () => () => {},
-      createQuery: () => "query",
       loadQuery: () => Promise.resolve([]),
       subscribeQuery: () => () => () => {},
+      upsert: () => ({}),
+      update: () => ({}),
+      getMutationSize: () => 1,
     };
-    const { evolu, ownerSync, deliver } = open(mnemonic);
     const kv = memoryKeyValueStorage();
     const events: LinkyEvoluEvent[] = [];
-    const store = await openLinkyStore(evolu, ownerSync, {
+    const store = await openLinkyStore(evolu, {
+      syncState,
       kv,
       scopes: linkyScopes,
       hasEvoluRelay: true,
@@ -186,8 +99,43 @@ describe("openLinkyStore", () => {
       { _tag: "ShardsSubscribed", reason: "boot", owners },
     ]);
 
-    deliver({ type: "linksync.ownersSynced", ownerIds: owners });
+    syncState.set({
+      transports: [],
+      tenants: [
+        {
+          type: "Active",
+          name,
+          owners: owners.map((ownerId) => ({
+            type: "Writable",
+            ownerId,
+            routes: [
+              {
+                type: "Pending",
+                transportId: createIdFromString<"SyncTransport">("t"),
+                failure:
+                  ownerId === appOwner.id
+                    ? {
+                        type: "ProtocolQuotaError",
+                        ownerId,
+                        at: Millis.orThrow(1),
+                      }
+                    : null,
+                skippedError: null,
+                completeAt: Millis.orThrow(1),
+                lastSentAt: null,
+                lastReceivedAt: null,
+              },
+            ],
+          })),
+        },
+      ],
+    });
     await settle();
+    expect(events).toContainEqual({
+      _tag: "OwnerSyncFailed",
+      ownerId: appOwner.id,
+      error: "ProtocolQuotaError",
+    });
     expect(events.at(-1)).toEqual({ _tag: "AccountHydrated", owners });
     expect(
       kv.getItem(`linky.shards.retainedFrom.${appOwner.id}.messages`),

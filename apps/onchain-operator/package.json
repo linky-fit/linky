@@ -15,8 +15,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@evolu/common": "7.4.1",
-    "@evolu/web": "2.4.0",
+    "@evolu/common": "8.29.0",
+    "@evolu/web": "3.9.0",
     "@linky-fit/domain": "workspace:*",
     "@linky-fit/identity": "workspace:*",
     "@linky-fit/linkshu": "workspace:*",
@@ -35,7 +35,6 @@
     "react-native-web": "0.21.3"
   },
   "devDependencies": {
-    "@evolu/sqlite-wasm": "2.2.4",
     "@linky-fit/config": "workspace:*",
     "@types/node": "^24.10.1",
     "@types/react": "^19.0.0",

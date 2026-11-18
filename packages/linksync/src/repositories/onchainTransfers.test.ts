@@ -1,11 +1,11 @@
+import { NonNegativeInt, PositiveInt } from "@evolu/common";
 import {
+  createId,
+  onchainTransferMessageIdFor,
   NonEmptyString,
   NonEmptyString100,
   NonEmptyString1000,
-  NonNegativeInt,
-  PositiveInt,
-} from "@evolu/common";
-import { createId, onchainTransferMessageIdFor } from "@linky-fit/domain";
+} from "@linky-fit/domain";
 import { describe, expect, it } from "vitest";
 import { linkyStore, runNow } from "../testing/linky";
 import {
@@ -46,7 +46,7 @@ describe("on-chain transfers repository", () => {
         {
           kind: "update",
           table: "onchainTransfer",
-          ownerId: store.shardOwner("onchain", 0).id,
+          owner: store.shardOwner("onchain", 0),
           row: { id, role: transfer.role, amount: transfer.amount },
         },
       ]),

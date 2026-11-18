@@ -7,7 +7,10 @@ import { RegistryContext } from "@linky-fit/linkstr-react";
 import { Effect } from "effect";
 import { act, useEffect } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { makeTestAppRegistry } from "../../../testUtils/appRegistry";
+import {
+  makeTestAppRegistry,
+  openTestEvolu,
+} from "../../../testUtils/appRegistry";
 import { makeTestLinkyStore } from "../../../testUtils/linkyStore";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import { useDedupeContacts } from "./useDedupeContacts";
@@ -19,13 +22,10 @@ vi.mock("../shell", async () =>
   }),
 );
 
-vi.mock("@evolu/common", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@evolu/common")>()),
-  createEvolu: () => () => ({}),
-}));
 const openLinkyStore = vi.hoisted(() => vi.fn());
 vi.mock("@linky-fit/linksync/evolu", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@linky-fit/linksync/evolu")>()),
+  openLinkyEvolu: () => Promise.resolve({}),
   openLinkyStore,
 }));
 
@@ -65,8 +65,10 @@ describe("useDedupeContacts", () => {
       }, [dedupeContacts]);
       return null;
     };
+    const registry = makeTestAppRegistry();
+    await openTestEvolu(registry);
     const view = await renderIntoDocument(
-      <RegistryContext.Provider value={makeTestAppRegistry()}>
+      <RegistryContext.Provider value={registry}>
         <Probe />
       </RegistryContext.Provider>,
     );

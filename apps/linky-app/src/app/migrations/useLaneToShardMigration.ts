@@ -18,8 +18,9 @@ import {
 import {
   makeWalletRepository,
   NonEmptyString100,
-  type AppOwner,
   type LinkyStore,
+  type Owner,
+  type OwnerId,
 } from "@linky-fit/linksync";
 import type { LinkyEvolu } from "@linky-fit/linksync/evolu";
 import { RegistryContext } from "@linky-fit/linkstr-react";
@@ -30,17 +31,18 @@ import { reportAppLog } from "../../devtools/inspector/appLog";
 import { getInspectorEmissionEnabled } from "../../devtools/inspector/inspectorEnabled";
 import { reportInspectorRows } from "../../devtools/inspector/reportInspectorRows";
 import {
-  createCashuOperationsAllQuery,
-  createCashuProofsAllQuery,
-  createCashuTokensAllQuery,
-  createContactsAllQuery,
+  cashuOperationsAllQuery,
+  cashuProofsAllQuery,
+  cashuTokensAllQuery,
+  contactsAllQuery,
   createLegacyChangeCountQuery,
   createLegacyUnspentProofCopiesQuery,
-  createNostrIdentitiesAllQuery,
-  createNostrMessagesAllQuery,
-  createNostrReactionsAllQuery,
-  createOwnerMetaAllQuery,
-  createTransactionsAllQuery,
+  loadLegacyRows,
+  nostrIdentitiesAllQuery,
+  nostrMessagesAllQuery,
+  nostrReactionsAllQuery,
+  ownerMetaAllQuery,
+  transactionsAllQuery,
   useLinkyEvolu,
 } from "../../evolu";
 import { readStoredSlip39Seed } from "../../platform/identitySecrets";
@@ -102,15 +104,15 @@ const readLegacyLaneSnapshot = async (
     identities,
     ownerMeta,
   ] = await Promise.all([
-    evolu.loadQuery(createContactsAllQuery(evolu)),
-    evolu.loadQuery(createNostrMessagesAllQuery(evolu)),
-    evolu.loadQuery(createNostrReactionsAllQuery(evolu)),
-    evolu.loadQuery(createCashuTokensAllQuery(evolu)),
-    evolu.loadQuery(createCashuProofsAllQuery(evolu)),
-    evolu.loadQuery(createCashuOperationsAllQuery(evolu)),
-    evolu.loadQuery(createTransactionsAllQuery(evolu)),
-    evolu.loadQuery(createNostrIdentitiesAllQuery(evolu)),
-    evolu.loadQuery(createOwnerMetaAllQuery(evolu)),
+    loadLegacyRows(evolu, contactsAllQuery),
+    loadLegacyRows(evolu, nostrMessagesAllQuery),
+    loadLegacyRows(evolu, nostrReactionsAllQuery),
+    loadLegacyRows(evolu, cashuTokensAllQuery),
+    loadLegacyRows(evolu, cashuProofsAllQuery),
+    loadLegacyRows(evolu, cashuOperationsAllQuery),
+    loadLegacyRows(evolu, transactionsAllQuery),
+    loadLegacyRows(evolu, nostrIdentitiesAllQuery),
+    loadLegacyRows(evolu, ownerMetaAllQuery),
   ]);
   return {
     contacts,
@@ -172,15 +174,17 @@ const bootLaneMigration = async (
   const gracePeriodActive = isLaneGracePeriodActive(startedAtMs);
   if (!firstRun && !gracePeriodActive) return;
   const seed = (await readStoredSlip39Seed())?.trim() ?? "";
-  const ownerMeta = await evolu.loadQuery(createOwnerMetaAllQuery(evolu));
-  const laneOwners: ReadonlyArray<AppOwner> = seed
+  const ownerMeta = await loadLegacyRows(evolu, ownerMetaAllQuery);
+  const laneOwners: ReadonlyArray<Owner> = seed
     ? await deriveLegacyLaneOwners(
         seed,
         readLegacyLaneIndexes(ownerMeta, store.appOwner.id),
       )
     : [];
-  const legacyOwners = [store.appOwner, ...laneOwners];
-  const legacyOwnerIds = legacyOwners.map((owner) => owner.id);
+  const legacyOwners = new Map<OwnerId, Owner>(
+    [store.appOwner, ...laneOwners].map((owner) => [owner.id, owner]),
+  );
+  const legacyOwnerIds = [...legacyOwners.keys()];
   await Effect.runPromise(store.reconcileSync());
 
   // Legacy rows remain inputs; only terminal proof states are mirrored back.
@@ -203,7 +207,7 @@ const bootLaneMigration = async (
 
   const readIngestKey = async (): Promise<string> => {
     const [count] = await evolu.loadQuery(
-      createLegacyChangeCountQuery(evolu, legacyOwnerIds),
+      createLegacyChangeCountQuery(legacyOwnerIds),
     );
     return laneIngestKey(legacyOwnerIds, count?.changes ?? 0);
   };
@@ -236,7 +240,7 @@ const bootLaneMigration = async (
       while (dirty && isLaneGracePeriodActive(Date.now())) {
         dirty = false;
         const copies = await evolu.loadQuery(
-          createLegacyUnspentProofCopiesQuery(evolu, legacyOwnerIds),
+          createLegacyUnspentProofCopiesQuery(legacyOwnerIds),
         );
         const changed = legacyProofsToMarkSpent(
           copies,
@@ -244,12 +248,13 @@ const bootLaneMigration = async (
           new Set(legacyOwnerIds),
         );
         for (const proof of changed) {
-          const result = evolu.update(
+          const owner = legacyOwners.get(proof.ownerId);
+          if (owner === undefined) continue;
+          evolu.update(
             "cashuProof",
             { id: proof.id, state: NonEmptyString100.orThrow("spent") },
-            { ownerId: proof.ownerId },
+            { owner },
           );
-          if (!result.ok) throw new Error("Legacy spent proof write failed");
         }
         if (changed.length > 0)
           emit(
@@ -286,13 +291,14 @@ const bootLaneMigration = async (
         pending = false;
         if (!isLaneGracePeriodActive(Date.now())) return;
         const indexes = readLegacyLaneIndexes(
-          await evolu.loadQuery(createOwnerMetaAllQuery(evolu)),
+          await loadLegacyRows(evolu, ownerMetaAllQuery),
           store.appOwner.id,
         );
         const nextIndexesKey = JSON.stringify(indexes);
         if (seed && nextIndexesKey !== indexesKey) {
           for (const owner of await deriveLegacyLaneOwners(seed, indexes)) {
-            if (legacyOwnerIds.includes(owner.id)) continue;
+            if (legacyOwners.has(owner.id)) continue;
+            legacyOwners.set(owner.id, owner);
             legacyOwnerIds.push(owner.id);
             evolu.useOwner(owner);
           }
@@ -327,12 +333,12 @@ const bootLaneMigration = async (
   const watchLanes = (): void => {
     unwatchLanes();
     const stops = [
-      evolu.subscribeQuery(createLegacyChangeCountQuery(evolu, legacyOwnerIds))(
+      evolu.subscribeQuery(createLegacyChangeCountQuery(legacyOwnerIds))(
         () => void reingestLateRows(),
       ),
-      evolu.subscribeQuery(
-        createLegacyUnspentProofCopiesQuery(evolu, legacyOwnerIds),
-      )(() => void mirrorSpentProofs()),
+      evolu.subscribeQuery(createLegacyUnspentProofCopiesQuery(legacyOwnerIds))(
+        () => void mirrorSpentProofs(),
+      ),
     ];
     unwatchLanes = () => {
       for (const stop of stops) stop();

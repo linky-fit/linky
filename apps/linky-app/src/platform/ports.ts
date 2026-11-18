@@ -1,7 +1,4 @@
-import type {
-  createLinkyEvolu,
-  KeyValueStorage,
-} from "@linky-fit/linksync/evolu";
+import type { KeyValueStorage } from "@linky-fit/linksync/evolu";
 
 /** Synchronous device-local storage that swallows storage failures (localStorage on the web). */
 export type KeyValuePort = KeyValueStorage;
@@ -39,9 +36,3 @@ export interface PlatformPorts {
   readonly config: AppConfig;
   readonly lifecycle: LifecyclePort;
 }
-
-/** What opening the Linky database needs from the platform; see `createLinkyEvolu`. */
-export type EvoluPlatform = Pick<
-  Parameters<typeof createLinkyEvolu>[0],
-  "evoluDeps" | "createWorker" | "inMemory" | "enableLogging"
->;

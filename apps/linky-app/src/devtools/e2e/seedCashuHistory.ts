@@ -4,7 +4,7 @@ import {
   linkyScopes,
   type LinkyStore,
   type Mutation,
-  type OwnerId,
+  type Owner,
 } from "@linky-fit/linksync";
 import { MintUrl, operationKeyOf, TokenText } from "@linky-fit/linkshu";
 import { Effect } from "effect";
@@ -29,7 +29,7 @@ const hex = (bytes: number): string =>
 
 const spentProof = (
   { mint, keysetId }: CashuHistory,
-  ownerId: OwnerId,
+  owner: Owner,
   state: "handedOut" | "available",
   operationId?: string,
 ): ReadonlyArray<Mutation> => {
@@ -39,7 +39,7 @@ const spentProof = (
     {
       kind: "upsert",
       table: "cashuProof",
-      ownerId,
+      owner,
       row: {
         id,
         mint,
@@ -56,7 +56,7 @@ const spentProof = (
     {
       kind: "update",
       table: "cashuProof",
-      ownerId,
+      owner,
       row: { id, state: "spent" },
     },
   ];
@@ -65,7 +65,7 @@ const spentProof = (
 /** One settled send as the wallet leaves it: its operation, the proofs it handed out and the inputs it spent. */
 const pastSend = (
   history: CashuHistory,
-  ownerId: OwnerId,
+  owner: Owner,
   createdAtSec: number,
 ): ReadonlyArray<Mutation> => {
   const tokenText = `cashuB${hex(300)}`;
@@ -81,7 +81,7 @@ const pastSend = (
     {
       kind: "upsert",
       table: "cashuOperation",
-      ownerId,
+      owner,
       row: {
         id,
         kind: "send",
@@ -96,10 +96,10 @@ const pastSend = (
       },
     },
     ...Array.from({ length: HANDED_OUT_PER_SEND }, () =>
-      spentProof(history, ownerId, "handedOut", id),
+      spentProof(history, owner, "handedOut", id),
     ).flat(),
     ...Array.from({ length: INPUTS_PER_SEND }, () =>
-      spentProof(history, ownerId, "available"),
+      spentProof(history, owner, "available"),
     ).flat(),
   ];
 };
@@ -121,12 +121,12 @@ export const seedCashuHistory = async (
   for (let done = 0; done < history.sends; done += sendsPerShard) {
     if (done > 0) await Effect.runPromise(store.rotate("cashu"));
     const index = await Effect.runPromise(store.activeIndex("cashu"));
-    const ownerId = store.shardOwner("cashu", index).id;
+    const owner = store.shardOwner("cashu", index);
     const count = Math.min(sendsPerShard, history.sends - done);
     await Effect.runPromise(
       mutate(
         Array.from({ length: count }, (_, i) =>
-          pastSend(history, ownerId, startSec + (done + i) * 3600),
+          pastSend(history, owner, startSec + (done + i) * 3600),
         ).flat(),
       ),
     );

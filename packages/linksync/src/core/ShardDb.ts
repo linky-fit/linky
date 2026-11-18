@@ -1,4 +1,4 @@
-import type { OwnerId, SqliteBoolean, SyncOwner } from "@evolu/common";
+import type { Owner, OwnerId, SqliteBoolean } from "@evolu/common";
 import { Effect, Schema } from "effect";
 
 /**
@@ -57,7 +57,8 @@ export interface OwnerUsage {
 export interface Mutation {
   readonly kind: "upsert" | "update";
   readonly table: string;
-  readonly ownerId: OwnerId;
+  /** With its write key, which Evolu needs to sign the change. */
+  readonly owner: Owner;
   readonly row: Columns & { readonly isDeleted?: boolean };
 }
 
@@ -177,7 +178,7 @@ export interface ShardDb<S extends DbSchema> {
     options?: CopiesWhereOptions,
   ) => () => void;
   /** Opts the owner into sync; returns the unuse function. */
-  readonly useOwner: (owner: SyncOwner) => () => void;
+  readonly useOwner: (owner: Owner) => () => void;
   /**
    * Whether the owner finished a sync round with a relay since the database
    * opened, and `readTable` already returns what that round brought.

@@ -304,13 +304,13 @@
         };
         armWatchdog();
 
-        // Boot may pause on an explicit user decision (temporary-session
-        // consent when device storage is unavailable); don't reload from
-        // under the prompt.
-        window.addEventListener("linky-boot-decision-pending", () => {
+        // Boot may pause on a user decision (temporary-session consent when
+        // device storage is unavailable) or while Evolu moves the Evolu 7
+        // database in, which a reload would roll back; don't reload meanwhile.
+        window.addEventListener("linky-boot-paused", () => {
           window.clearTimeout(watchdog);
         });
-        window.addEventListener("linky-boot-decision-resolved", () => {
+        window.addEventListener("linky-boot-resumed", () => {
           if (!appMounted) armWatchdog();
         });
 

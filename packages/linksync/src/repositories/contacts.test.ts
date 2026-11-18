@@ -1,4 +1,5 @@
-import { NonEmptyString1000, PositiveInt } from "@evolu/common";
+import { NonEmptyString1000 } from "@linky-fit/domain";
+import { PositiveInt } from "@evolu/common";
 import { createId } from "../model/ids";
 import { linkyStore, runNow } from "../testing/linky";
 import { makeContactsRepository } from "./contacts";

@@ -59,7 +59,7 @@ export const useChatReadCursorSync = ({
       summarizeConversationReadTimes(chatMessages),
       lastSeenAtSec > 0 ? lastSeenAtSec : null,
     );
-    const atSec = target === null ? null : PositiveInt.from(target);
+    const atSec = target === null ? null : PositiveInt.fromUnknown(target);
     if (!atSec?.ok) return;
 
     lastWrittenAtSecByContactIdRef.current.set(contactId, atSec.value);

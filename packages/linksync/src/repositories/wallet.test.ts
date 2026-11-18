@@ -176,7 +176,7 @@ describe("wallet repository", () => {
           {
             kind: "upsert",
             table: "cashuProof",
-            ownerId: store.shardOwner("cashu", 1).id,
+            owner: store.shardOwner("cashu", 1),
             row: { ...toColumns(proof("s1")), id: stored.id },
           },
         ]),
@@ -200,7 +200,7 @@ describe("wallet repository", () => {
           {
             kind: "update",
             table: "cashuProof",
-            ownerId: store.shardOwner("cashu", 0).id,
+            owner: store.shardOwner("cashu", 0),
             row: { id: stored.id, state: "spent" },
           },
         ]),
@@ -314,7 +314,7 @@ describe("wallet repository", () => {
           {
             kind: "update",
             table: "cashuProof",
-            ownerId: store.shardOwner("cashu", 0).id,
+            owner: store.shardOwner("cashu", 0),
             row: { id: stored.id, state: "spent", operationId: send.id },
           },
         ]),
@@ -415,7 +415,7 @@ describe("wallet repository", () => {
           {
             kind: "upsert",
             table: "cashuProof",
-            ownerId: store.shardOwner("cashu", 0).id,
+            owner: store.shardOwner("cashu", 0),
             row: {
               ...toColumns(proof("bad")),
               id: cashuProofIdFor("bad"),
@@ -600,7 +600,7 @@ describe("wallet repository", () => {
           {
             kind: "upsert",
             table: "cashuProof",
-            ownerId: store.shardOwner("cashu", 0).id,
+            owner: store.shardOwner("cashu", 0),
             row: broken,
           },
         ]),
