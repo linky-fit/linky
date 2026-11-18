@@ -68,6 +68,16 @@ The first release on Evolu 8 moves each device's Evolu 7 database into Evolu 8 o
 4. Don't roll `app.linky.fit` back to an Evolu 7 build. Nothing is lost if it happens: that build starts with an empty database of the same owner, which syncs from the relay, and the next Evolu 8 start moves it again.
 5. Fazole moves with its next release the same way, after the relays.
 
+`apps/linky-app/tests/evolu7-migration.spec.ts` runs the Evolu 7 build, then this one, on one browser profile. It takes that build's files from `LINKY_E2E_EVOLU7_DIST` and skips without them. Build them from the last Evolu 7 release with the e2e stack's endpoints, the build arguments `docker-compose.dev.yml` gives the `linky-app` service, then copy them out of the image:
+
+```bash
+git archive linky-v26.11.4 | docker build -t linky-app:evolu7 -f docker/linky-app/Dockerfile \
+  --build-arg VITE_E2E=1 --build-arg VITE_ALLOW_INSECURE_LOCALHOST_RELAYS=1 \
+  --build-arg VITE_EVOLU_SERVER_URLS=ws://localhost:<evolu port> ... -
+docker cp "$(docker create linky-app:evolu7)":/usr/share/nginx/html/. <dir>
+LINKY_E2E_EVOLU7_DIST=<dir> bun run e2e tests/evolu7-migration.spec.ts
+```
+
 Evolu 7 and Evolu 8 sync with each other, but an Evolu 7 device receives none of an owner's changes while one of them is stamped more than five minutes ahead of its clock, so ask users to update every device.
 
 ## Fazole app
