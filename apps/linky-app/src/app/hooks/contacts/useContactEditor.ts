@@ -708,9 +708,15 @@ export const useContactEditor = ({
       let searched: ContactSearchCandidate[] = [];
       const mergeCandidates = (): ContactSearchCandidate[] => {
         const contacts: ContactSearchCandidate[] = exact ? [exact] : [];
+        // Once the domain verified the identifier, other profiles claiming it are impostors.
+        const verifiedNip05 = exact?.nip05Verified
+          ? exact.nip05.toLowerCase()
+          : null;
         for (const candidate of searched) {
           if (contacts.length >= CONTACT_SEARCH_RESULT_LIMIT) break;
           if (contacts.some((known) => known.npub === candidate.npub)) continue;
+          if (verifiedNip05 && candidate.nip05.toLowerCase() === verifiedNip05)
+            continue;
           contacts.push(candidate);
         }
         return contacts;
