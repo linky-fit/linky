@@ -13,6 +13,7 @@ import {
 import {
   bitcoinPaymentUri,
   canUserCancel,
+  explorerAddressUrl,
   explorerTxUrl,
 } from "@linky-fit/onchain-transfer";
 import type { OnchainTransferId } from "@linky-fit/linksync";
@@ -27,6 +28,7 @@ import {
   useOnchainTransferCommands,
   useOnchainTransfers,
 } from "../app/hooks/useOnchainTransfers";
+import { useOnchainPayoutCheck } from "../app/hooks/useOnchainPayoutCheck";
 import { useWalletBalance } from "../app/hooks/wallet/useWalletInventory";
 import {
   ONCHAIN_TRANSFER_PHASE_LABEL_KEYS,
@@ -51,6 +53,8 @@ interface OnchainTransferDetailProps {
   onCancel: () => void;
   onContactSupport: () => void;
   onCopy: (text: string) => void;
+  /** send: opens the payout address in the explorer; only then does Linky look for the payout itself. */
+  onOpenPayoutAddress: () => void;
   onSend: () => void;
 }
 
@@ -327,6 +331,7 @@ export function OnchainTransferDetail(
     onCancel,
     onContactSupport,
     onCopy,
+    onOpenPayoutAddress,
   } = props;
   const { t } = useTranslation();
   const { exact } = useExactAmountText();
@@ -363,10 +368,24 @@ export function OnchainTransferDetail(
         </Section>
       ) : null}
       {send && transfer.payoutAddress !== null ? (
-        <CopyableAddress
-          address={transfer.payoutAddress}
-          onCopy={onCopy}
-          testID="onchain-transfer-payout-address"
+        <Stack gap="$xs" alignItems="center">
+          <Text variant="caption" color="$colorMuted">
+            {t("onchainSendToAddress")}
+          </Text>
+          <CopyableAddress
+            address={transfer.payoutAddress}
+            onCopy={onCopy}
+            testID="onchain-transfer-payout-address"
+          />
+        </Stack>
+      ) : null}
+      {send && transfer.payoutAddress !== null && explorerUrl !== null ? (
+        <ListRow
+          icon="ArrowUpRight"
+          title={t("onchainSendOpenAddress")}
+          chevron={false}
+          onPress={onOpenPayoutAddress}
+          testID="onchain-transfer-payout-explorer"
         />
       ) : null}
       <ExplorerLink
@@ -443,6 +462,7 @@ export function OnchainTransferPage({
   const { cashuBalanceAfterMelt, cashuIsBusy } = useWalletBalance();
   const { cancelOnchainTransfer, contactSupport, sendOnchainTransferPayment } =
     useOnchainTransferCommands();
+  const checkPayout = useOnchainPayoutCheck();
   const transfer = transfers.find((candidate) => candidate.id === id) ?? null;
   if (transfer === null) {
     return <EmptyState title={t("onchainTransferNotFound")} />;
@@ -457,6 +477,13 @@ export function OnchainTransferPage({
       onCancel={() => void cancelOnchainTransfer(transfer)}
       onContactSupport={() => contactSupport(transfer.id)}
       onCopy={(text) => void copyText(text)}
+      onOpenPayoutAddress={() => {
+        if (config === null || transfer.payoutAddress === null) return;
+        openInBrowser(
+          explorerAddressUrl(config.explorerUrl, transfer.payoutAddress),
+        );
+        checkPayout(transfer.payoutAddress, config.explorerUrl);
+      }}
       onSend={() => {
         if (config !== null) sendOnchainTransferPayment(transfer, config);
       }}

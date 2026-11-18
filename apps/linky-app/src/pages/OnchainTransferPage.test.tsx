@@ -47,6 +47,7 @@ const renderDetail = async (
     onCancel: vi.fn(),
     onContactSupport: vi.fn(),
     onCopy: vi.fn(),
+    onOpenPayoutAddress: vi.fn(),
     onSend: vi.fn(),
   };
   const { container } = await renderIntoDocument(
@@ -266,6 +267,9 @@ describe("OnchainTransferDetail", () => {
       onchainTransferViewFixture({ phase: "sent" }),
     );
     expect(sent.container.textContent).toContain("~100 EUR on its way");
+    expect(sent.container.textContent).toContain("onchainSendToAddress");
+    await press(byTestId("onchain-transfer-payout-explorer"));
+    expect(sent.onOpenPayoutAddress).toHaveBeenCalledOnce();
 
     document.body.innerHTML = "";
     const { container } = await renderDetail(

@@ -1549,6 +1549,8 @@ export const pt = {
     "Para uma carteira on-chain, você só pode enviar os valores abaixo, então confirme com o destinatário antes de enviar um valor diferente.",
   onchainSendDifferentAmountChecked: "Outro valor combinado",
   onchainTransferYouGet: "Você recebe",
+  onchainSendToAddress: "Para o endereço:",
+  onchainSendOpenAddress: "Abrir endereço no navegador",
   onchainSendPayoutAddress: "Endereço bitcoin de destino",
   onchainTransferAddressInvalid:
     "Este não é um endereço bitcoin válido para esta rede.",

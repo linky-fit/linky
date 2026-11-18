@@ -43,7 +43,7 @@ const sent = (payoutAddress: string, createdAtSec: number) =>
   });
 
 describe("checkOnchainPayouts", () => {
-  it("gives two sends to one address their payouts oldest first, skipping one already settling a transfer", async () => {
+  it("gives the sends to the address their payouts oldest first, skipping one already settling a transfer and other addresses' sends", async () => {
     const completedId = createId<"OnchainTransfer">();
     const completed = onchainTransferViewFixture({
       id: completedId,
@@ -64,7 +64,11 @@ describe("checkOnchainPayouts", () => {
     });
 
     const checks = await Effect.runPromise(
-      checkOnchainPayouts([completed, newer, older], esplora),
+      checkOnchainPayouts(
+        [completed, newer, older, sent(OTHER_ADDRESS, 1_700_000_000)],
+        SHARED_ADDRESS,
+        esplora,
+      ),
     );
 
     expect(checks).toEqual([
@@ -73,20 +77,17 @@ describe("checkOnchainPayouts", () => {
     ]);
   });
 
-  it("reports a failed lookup and still checks the other sends", async () => {
-    const offline = sent("bcrt1qoffline", 1_700_000_000);
-    const other = sent(OTHER_ADDRESS, 1_700_000_000);
+  it("reports a failed lookup for every send to the address", async () => {
+    const first = sent("bcrt1qoffline", 1_700_000_000);
+    const second = sent("bcrt1qoffline", 1_700_000_050);
 
     const checks = await Effect.runPromise(
-      checkOnchainPayouts(
-        [offline, other],
-        esploraOf({ [OTHER_ADDRESS]: [payout("paid", OTHER_ADDRESS)] }),
-      ),
+      checkOnchainPayouts([first, second], "bcrt1qoffline", esploraOf({})),
     );
 
     expect(checks).toEqual([
-      { id: offline.id, check: { _tag: "failed", message: "offline" } },
-      { id: other.id, check: { _tag: "found", txid: "paid" } },
+      { id: first.id, check: { _tag: "failed", message: "offline" } },
+      { id: second.id, check: { _tag: "failed", message: "offline" } },
     ]);
   });
 });

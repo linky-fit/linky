@@ -22,15 +22,35 @@ export interface TransferPayoutCheck {
 }
 
 /**
- * Looks on chain for the payout of every send awaiting one, oldest first, so
- * two sends to one address of one amount take its payouts in order; a payout
- * already settling another transfer is never taken again.
+ * Looks on chain for the payouts of the sends to `payoutAddress` awaiting
+ * one, oldest first, so two sends to one address of one amount take its
+ * payouts in order; a payout already settling another transfer is never
+ * taken again.
  */
 export const checkOnchainPayouts = (
   transfers: readonly OnchainTransferView[],
+  payoutAddress: string,
   esplora: EsploraClient,
 ): Effect.Effect<ReadonlyArray<TransferPayoutCheck>> =>
   Effect.gen(function* () {
+    const awaiting = transfers
+      .filter(
+        (transfer) =>
+          isAwaitingPayout(transfer) &&
+          transfer.payoutAddress === payoutAddress,
+      )
+      .sort((a, b) => a.createdAtSec - b.createdAtSec);
+    if (awaiting.length === 0) return [];
+    const transactions = yield* Effect.result(
+      esplora.addressTransactions(payoutAddress),
+    );
+    if (Result.isFailure(transactions)) {
+      const message = transactions.failure.message;
+      return awaiting.map(({ id }) => ({
+        id,
+        check: { _tag: "failed", message } as const,
+      }));
+    }
     const claimed = new Set(
       transfers.flatMap((transfer) =>
         transfer.direction === "send"
@@ -40,34 +60,16 @@ export const checkOnchainPayouts = (
           : [],
       ),
     );
-    const awaiting = transfers
-      .filter(isAwaitingPayout)
-      .sort((a, b) => a.createdAtSec - b.createdAtSec);
-    const checks: TransferPayoutCheck[] = [];
-    for (const transfer of awaiting) {
-      if (transfer.payoutAddress === null) continue;
-      const transactions = yield* Effect.result(
-        esplora.addressTransactions(transfer.payoutAddress),
-      );
-      if (Result.isFailure(transactions)) {
-        checks.push({
-          id: transfer.id,
-          check: { _tag: "failed", message: transactions.failure.message },
-        });
-        continue;
-      }
+    return awaiting.map(({ id, amount, createdAtSec }) => {
       const txid = findPayout({
         transactions: transactions.success,
-        payoutAddress: transfer.payoutAddress,
-        amount: transfer.amount,
-        notBeforeSec: transfer.createdAtSec,
+        payoutAddress,
+        amount,
+        notBeforeSec: createdAtSec,
         claimedTxids: claimed,
       });
-      if (txid !== null) claimed.add(txid);
-      checks.push({
-        id: transfer.id,
-        check: txid === null ? { _tag: "notFound" } : { _tag: "found", txid },
-      });
-    }
-    return checks;
+      if (txid === null) return { id, check: { _tag: "notFound" } as const };
+      claimed.add(txid);
+      return { id, check: { _tag: "found", txid } as const };
+    });
   });

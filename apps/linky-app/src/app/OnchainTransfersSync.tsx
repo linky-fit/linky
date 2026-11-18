@@ -1,22 +1,9 @@
-import { useOnchainPayoutWatch } from "./hooks/useOnchainPayoutWatch";
-import {
-  useOnchainTransfers,
-  useOnchainTransfersSync,
-} from "./hooks/useOnchainTransfers";
-import { isAwaitingPayout } from "./lib/onchainPayouts";
+import { useOnchainTransfersSync } from "./hooks/useOnchainTransfers";
 import { onchainOperator } from "./lib/onchainOperator";
 
-const OnchainPayoutWatch = (): null => {
-  useOnchainPayoutWatch();
-  return null;
-};
-
-const OnchainTransfersViews = () => {
+const OnchainTransfersViews = (): null => {
   useOnchainTransfersSync();
-  // Follows the config and asks Esplora only while a payout is awaited.
-  return useOnchainTransfers().some(isAwaitingPayout) ? (
-    <OnchainPayoutWatch />
-  ) : null;
+  return null;
 };
 
 /** On-chain transfers show only with an on-chain operator configured. */

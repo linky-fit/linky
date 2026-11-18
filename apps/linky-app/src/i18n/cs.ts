@@ -1533,6 +1533,8 @@ export const cs = {
     "Do on-chain peněženky lze posílat jen částky níže, proto si před odesláním jiné částky ověřte u příjemce, že ji přijme.",
   onchainSendDifferentAmountChecked: "Jiná částka domluvena",
   onchainTransferYouGet: "Dostanete",
+  onchainSendToAddress: "Na adresu:",
+  onchainSendOpenAddress: "Otevřít adresu v prohlížeči",
   onchainSendPayoutAddress: "Bitcoinová adresa, kam peníze poslat",
   onchainTransferAddressInvalid:
     "Toto není platná bitcoinová adresa pro tuto síť.",

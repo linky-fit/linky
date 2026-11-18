@@ -14,11 +14,11 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ### en-US
 
-- An on-chain send shows as done once its payout appears on chain, even when the operator settled it without a message.
+- An on-chain send shows its payout address with a link to the explorer; opening it marks the send done once the payout is on chain.
 
 ### cs-CZ
 
-- Odeslání do on-chain peněženky se ukáže jako hotové, jakmile se výplata objeví na blockchainu, i když ji operátor vyřídil bez zprávy.
+- Odeslání do on-chain peněženky ukáže cílovou adresu s odkazem do prohlížeče; po jeho otevření se odeslání označí jako hotové, jakmile je výplata na blockchainu.
 
 ## [26.11.4] - 2026-11-18
 

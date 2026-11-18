@@ -225,7 +225,7 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "onchainTransfer.supportOpened":
     "The user tapped Contact support on an on-chain transfer screen. Linky saves the on-chain operator as a contact unless it is one and opens their chat, the user's support chat; opened false means saving the contact failed and the status line says why. The onchainTransfer link is missing when it came from the send or receive screen, before any transfer existed.",
   "onchainTransfer.payoutChecked":
-    "Linky looked on chain (the Esplora API under the operator's explorer) for the payout of a paid on-chain send the operator has not completed, and found none yet, or the lookup failed (the payload says why). It checks every 10 minutes while such a send exists, since an operator may settle a transfer by hand without sending completed.",
+    "Linky looked on chain (the Esplora API under the operator's explorer) for the payout of a paid on-chain send the operator has not completed, and found none yet, or the lookup failed (the payload says why). It checks only when the user opens the payout address in the explorer from the transfer screen, so the explorer learns the user's IP address by their own action; an operator may settle a transfer by hand without sending completed.",
   "onchainTransfer.payoutFound":
     "Linky found a transaction paying the send's payout address at least its amount, unconfirmed or mined after the request, that settles none of the user's other transfers, and stored its txid on the transfer, which completes it. stored false means the write failed and the next check tries again.",
   "onchainTransfer.sendTapped":

@@ -1524,6 +1524,8 @@ export const en = {
     "On-chain sends are only possible in the amounts below, so check with the recipient before you send a different amount.",
   onchainSendDifferentAmountChecked: "Different amount agreed",
   onchainTransferYouGet: "You get",
+  onchainSendToAddress: "To address:",
+  onchainSendOpenAddress: "Open address in browser",
   onchainSendPayoutAddress: "Bitcoin address to send to",
   onchainTransferAddressInvalid:
     "This isn't a valid bitcoin address for this network.",
