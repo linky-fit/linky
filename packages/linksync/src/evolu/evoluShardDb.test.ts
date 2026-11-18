@@ -44,9 +44,13 @@ const fakeEvolu = () => {
   const queries: string[] = [];
   let rows: ReadonlyArray<Row> = [];
   let held: Recorded[] | null = null;
+  const fresh: string[] = [];
+  let failFresh = false;
   const mutation =
     (kind: string) =>
     (table: string, row: Record<string, unknown>, options: MutationOptions) => {
+      // Evolu throws for an undefined column, with the batch's earlier rows queued.
+      if (Object.values(row).includes(undefined)) throw new Error("undefined");
       const recorded = { kind, table, row, options };
       mutations.push(recorded);
       if (held === null) queueMicrotask(() => options.onSuccess?.());
@@ -55,8 +59,11 @@ const fakeEvolu = () => {
     };
   const runtime: EvoluRuntime = {
     name,
-    loadQuery: (query) => {
-      queries.push(sqliteQueryStringToSqliteQuery(query).sql);
+    loadQuery: (query, options) => {
+      const { sql } = sqliteQueryStringToSqliteQuery(query);
+      if (options?.cache !== false) queries.push(sql);
+      else if (failFresh) return Promise.reject(new Error("refused"));
+      else fresh.push(sql);
       return Promise.resolve(rows);
     },
     subscribeQuery: () => () => () => {},
@@ -69,6 +76,10 @@ const fakeEvolu = () => {
     runtime,
     mutations,
     queries,
+    fresh,
+    failFreshLoads: () => {
+      failFresh = true;
+    },
     seed: (next: ReadonlyArray<Row>) => {
       rows = next;
     },
@@ -178,6 +189,25 @@ describe("evolu shard db", () => {
     expect(fake.mutations).toEqual([]);
   });
 
+  it("omits an undefined column, which Evolu would throw for mid-batch", async () => {
+    const fake = fakeEvolu();
+    const db = open(fake.runtime);
+    const owner = testAppOwner();
+    const id = createIdFromString("contact/c1");
+    await Effect.runPromise(
+      db.mutate([
+        { kind: "upsert", table: "setting", owner, row: valid("a") },
+        {
+          kind: "update",
+          table: "contact",
+          owner,
+          row: { id, name: undefined },
+        },
+      ]),
+    );
+    expect(fake.mutations.map(({ row }) => row)).toEqual([valid("a"), { id }]);
+  });
+
   it("requires every non-null column of an upserted row", async () => {
     const fake = fakeEvolu();
     const db = open(fake.runtime);
@@ -272,7 +302,7 @@ describe("evolu shard db", () => {
     ]);
   });
 
-  it("counts an owner synced once a route completed and a fresh query answered", async () => {
+  it("counts an owner synced once a route completed", async () => {
     const fake = fakeEvolu();
     const syncState = syncStore();
     const db = open(fake.runtime, { syncState });
@@ -285,6 +315,32 @@ describe("evolu shard db", () => {
     await settle();
     expect(db.isOwnerSynced(owner.id)).toBe(true);
     expect(heard).toEqual(["synced"]);
+  });
+
+  it("loads the tables read so far afresh before it counts an owner synced", async () => {
+    const fake = fakeEvolu();
+    const syncState = syncStore();
+    const db = open(fake.runtime, { syncState });
+    const owner = testAppOwner();
+    await Effect.runPromise(db.readTable("shardPointer"));
+
+    syncState.set(stateWith([owner.id]));
+    await settle();
+    expect(fake.fresh).toEqual(fake.queries);
+    expect(db.isOwnerSynced(owner.id)).toBe(true);
+  });
+
+  it("keeps an owner unsynced while the fresh load fails", async () => {
+    const fake = fakeEvolu();
+    const syncState = syncStore();
+    const db = open(fake.runtime, { syncState });
+    const owner = testAppOwner();
+    await Effect.runPromise(db.readTable("shardPointer"));
+    fake.failFreshLoads();
+
+    syncState.set(stateWith([owner.id]));
+    await settle();
+    expect(db.isOwnerSynced(owner.id)).toBe(false);
   });
 
   it("takes owners whose route completed before the db was created", async () => {

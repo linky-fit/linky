@@ -48,8 +48,8 @@ import { LinkyEvoluSchema } from "./linkyEvoluSchema";
  * stores the mutations queued in one microtask as one transaction.
  *
  * An owner counts as synced once a route of it completed in Evolu's sync state
- * and a fresh query has answered after that: queries are answered in order,
- * so by then the refresh the round triggered reached the subscribed queries.
+ * and every table read so far was loaded afresh after that: sync state and
+ * query refreshes reach the page on separate channels, in either order.
  */
 
 export type LinkyEvolu = AppOwnerEvolu<typeof LinkyEvoluSchema>;
@@ -145,24 +145,6 @@ interface UntypedSelect {
   };
 }
 
-interface UntypedHistorySelect {
-  selectFrom: (table: "evolu_history") => {
-    select: (
-      build: (eb: UntypedExpressionBuilder) => ReadonlyArray<object>,
-    ) => { where: (column: string, op: "=", value: Uint8Array) => object };
-  };
-}
-
-interface UntypedExpressionBuilder {
-  readonly fn: {
-    count: (column: string) => {
-      distinct: () => { as: (alias: string) => object };
-    };
-    sum: (expression: object) => { as: (alias: string) => object };
-    (name: string, args: ReadonlyArray<string>): object;
-  };
-}
-
 // Keeps one `in` list's bound parameters far below SQLite's limit.
 const ID_CHUNK = 500;
 
@@ -229,12 +211,19 @@ const rejection = ({ kind, table, row }: Mutation): string | null => {
 };
 
 // The port tombstones with a boolean; Evolu's mutation takes its SqliteBoolean.
-const toEvoluRow = (row: Mutation["row"]): Columns => {
-  const { isDeleted, ...columns } = row;
-  return isDeleted === undefined
-    ? columns
-    : { ...columns, isDeleted: isDeleted ? sqliteTrue : sqliteFalse };
-};
+// Evolu throws for an `undefined` column, after it queued the batch's earlier rows.
+const toEvoluRow = ({ isDeleted, ...columns }: Mutation["row"]) =>
+  Object.fromEntries(
+    Object.entries({
+      ...columns,
+      isDeleted:
+        isDeleted === undefined
+          ? undefined
+          : isDeleted
+            ? sqliteTrue
+            : sqliteFalse,
+    }).filter(([, value]) => value !== undefined),
+  );
 
 const tablesOf = (mutations: ReadonlyArray<Mutation>) => [
   ...new Set(mutations.map(({ table }) => table)),
@@ -444,42 +433,48 @@ export const createEvoluShardDb = (
 
   // `evolu_history` keys rows by the owner id's bytes, not its base64url text.
   const ownerUsage = (ownerId: OwnerId): Effect.Effect<OwnerUsage> => {
-    const query: unknown = Reflect.apply(createQuery, undefined, [
-      (db: UntypedHistorySelect) =>
-        db
-          .selectFrom("evolu_history")
-          .select((eb) => [
-            eb.fn.count("timestamp").distinct().as("mutations"),
-            eb.fn.sum(eb.fn("length", ["value"])).as("bytes"),
-          ])
-          .where("ownerId", "=", ownerIdToOwnerIdBytes(ownerId)),
-    ]);
-    if (!isQuery(query)) return Effect.die("createQuery returned no query");
+    const query = createQuery((db) =>
+      db
+        .selectFrom("evolu_history")
+        .select((eb) => [
+          eb.fn.count<number>("timestamp").distinct().as("mutations"),
+          eb.fn.sum<number>(eb.fn("length", ["value"])).as("bytes"),
+        ])
+        .where("ownerId", "=", ownerIdToOwnerIdBytes(ownerId)),
+    );
     return Effect.promise(async () => {
       const [first] = await evolu.loadQuery(query);
-      const read = (column: string): number => Number(first?.[column] ?? 0);
-      return { mutations: read("mutations"), bytes: read("bytes") };
+      return {
+        mutations: Number(first?.mutations ?? 0),
+        bytes: Number(first?.bytes ?? 0),
+      };
     });
   };
 
   const readable = new Set<OwnerId>();
   const syncListeners = new Set<() => void>();
-  const barrier = untypedQuery((db) =>
-    db.selectFrom("shardPointer").select("id").limit(1),
-  );
   let absorbing = Promise.resolve();
   const absorbCompletedOwners = (): void => {
     const completed = completedOwners(syncState.get(), evolu.name).filter(
       (ownerId) => !readable.has(ownerId),
     );
     if (completed.length === 0) return;
-    const markReadable = () => {
-      for (const ownerId of completed) readable.add(ownerId);
-      for (const listener of syncListeners) listener();
-    };
     absorbing = absorbing
-      .then(() => evolu.loadQuery(barrier, { cache: false }))
-      .then(markReadable, markReadable);
+      .then(() =>
+        Promise.all(
+          [...tableQueries.values()].map((query) =>
+            evolu.loadQuery(query, { cache: false }),
+          ),
+        ),
+      )
+      .then(
+        () => {
+          for (const ownerId of completed) readable.add(ownerId);
+          for (const listener of syncListeners) listener();
+        },
+        // The owners stay unsynced; the next sync state loads again.
+        () => {},
+      );
   };
   if (hasEvoluRelay) {
     syncState.subscribe(absorbCompletedOwners);
