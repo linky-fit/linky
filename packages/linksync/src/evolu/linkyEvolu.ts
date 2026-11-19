@@ -1,172 +1,70 @@
-import * as Evolu from "@evolu/common";
-import { createEvolu, kysely, SimpleName } from "@evolu/common";
-import type { IndexesConfig } from "@evolu/common/local-first";
-import { ContactId } from "@linky-fit/domain";
+import type {
+  EvoluDeps,
+  OwnerId,
+  ReadonlyStore,
+  Run,
+  SyncState,
+} from "@evolu/common";
+import {
+  AppName,
+  createEvolu,
+  createEvoluApp,
+  Name,
+  WebSocketUrlFromString,
+} from "@evolu/common";
 import { Effect, Schema } from "effect";
 import {
   appOwnerFromMnemonic,
   type PointerRepair,
   type ShardRotation,
 } from "../core";
-import {
-  LinkySchema,
-  type LinkyScope,
-  type LinkyScopes,
-  type LinkyStore,
-} from "../model";
-import type { PageMessage, WorkerMessage } from "./dbWorker";
+import type { LinkyScope, LinkyScopes, LinkyStore } from "../model";
 import {
   createEvoluShardDb,
   type AppliedWrite,
-  type UnconfirmedWrite,
+  type EvoluRuntime,
+  type FailedWrite,
+  type LinkyEvolu,
 } from "./evoluShardDb";
 import { createAccountStore } from "./firstHydration";
 import { readJson, writeJson, type KeyValueStorage } from "./keyValueStorage";
-import {
-  trackOwnerSync,
-  type OwnerSync,
-  type OwnerSyncFailure,
-} from "./ownerSync";
+import { LinkyEvoluSchema, linkyIndexes } from "./linkyEvoluSchema";
 
-const CashuTokenId = Evolu.id("CashuToken");
-export type CashuTokenId = typeof CashuTokenId.Type;
+export type { LinkyEvolu } from "./evoluShardDb";
 
-const NostrMessageId = Evolu.id("NostrMessage");
-
-const NostrReactionId = Evolu.id("NostrReaction");
-
-const OwnerMetaId = Evolu.id("OwnerMeta");
-
-/**
- * The Linky database schema: `LinkySchema` plus the legacy lane tables
- * (`nostrMessage`, `nostrReaction`, `cashuToken`, `ownerMeta`) and the legacy
- * columns older versions wrote (read cursors on `contact`, `category` and
- * `phase` on `transaction`), all of which only the lane migration reads. The
- * package's branded ids are the source of truth; only the legacy tables keep
- * ids of their own.
- * Legacy schema removal gate in app/migrations/AGENTS.md (web app).
- */
-export const LinkyEvoluSchema = {
-  ...LinkySchema,
-  contact: {
-    ...LinkySchema.contact,
-    // Read cursor: created_at (seconds) of the newest chat message the user
-    // has seen in this conversation.
-    chatLastSeenAtSec: Evolu.nullOr(Evolu.PositiveInt),
-    // Peer's reported seen window (createdAtSec bounds from their latest
-    // read receipt): our outgoing messages in (since, upTo] render as seen.
-    chatPeerSeenSinceSec: Evolu.nullOr(Evolu.PositiveInt),
-    chatPeerSeenAtSec: Evolu.nullOr(Evolu.PositiveInt),
-  },
-  nostrMessage: {
-    id: NostrMessageId,
-    contactId: ContactId,
-    // "in" | "out"
-    direction: Evolu.NonEmptyString100,
-    // Decrypted plaintext message.
-    content: Evolu.NonEmptyString,
-    // Incoming rows use the rumor id here as their de-duplication key.
-    wrapId: Evolu.NonEmptyString1000,
-    // Edits keep the original message's rumor id so reactions and replies resolve.
-    rumorId: Evolu.nullOr(Evolu.NonEmptyString1000),
-    // Sender pubkey hex (64 chars) of the inner message.
-    // Can be null for local-only queued placeholders.
-    pubkey: Evolu.nullOr(Evolu.NonEmptyString1000),
-    // created_at (seconds) from the inner event when available.
-    createdAtSec: Evolu.PositiveInt,
-    // Client-generated id for optimistic send/ack matching.
-    clientId: Evolu.nullOr(Evolu.NonEmptyString1000),
-    // "sent" | "pending"
-    status: Evolu.nullOr(Evolu.NonEmptyString100),
-    // "1" for local-only placeholders.
-    localOnly: Evolu.nullOr(Evolu.NonEmptyString100),
-    // Reply metadata (NIP-10).
-    replyToId: Evolu.nullOr(Evolu.NonEmptyString1000),
-    replyToContent: Evolu.nullOr(Evolu.NonEmptyString),
-    rootMessageId: Evolu.nullOr(Evolu.NonEmptyString1000),
-    // Edit metadata.
-    editedAtSec: Evolu.nullOr(Evolu.PositiveInt),
-    editedFromId: Evolu.nullOr(Evolu.NonEmptyString1000),
-    // "1" if the message content was edited.
-    isEdited: Evolu.nullOr(Evolu.NonEmptyString100),
-    // First known message content before edits.
-    originalContent: Evolu.nullOr(Evolu.NonEmptyString),
-  },
-  nostrReaction: {
-    id: NostrReactionId,
-    // Target message rumor id.
-    messageId: Evolu.NonEmptyString1000,
-    reactorPubkey: Evolu.NonEmptyString1000,
-    emoji: Evolu.NonEmptyString100,
-    createdAtSec: Evolu.PositiveInt,
-    // Gift-wrapped event id carrying the reaction or delete.
-    wrapId: Evolu.NonEmptyString1000,
-    // Client-generated id for optimistic send/ack matching.
-    clientId: Evolu.nullOr(Evolu.NonEmptyString1000),
-    // "sent" | "pending"
-    status: Evolu.nullOr(Evolu.NonEmptyString100),
-  },
-  cashuToken: {
-    id: CashuTokenId,
-    // Most recent (accepted) token.
-    token: Evolu.NonEmptyString,
-    // Token text the row was first created from — the row's stable identity
-    // for dedup. Reads fall back to rawToken/token for legacy rows.
-    originalTokenText: Evolu.nullOr(Evolu.NonEmptyString),
-    // Deprecated compatibility column. New rows use a deterministic id derived
-    // from the original token and only store the latest spendable token here.
-    rawToken: Evolu.nullOr(Evolu.NonEmptyString),
-    // Deprecated compatibility columns. New writes derive this metadata from
-    // token; keep the columns while older clients/data still use them.
-    mint: Evolu.nullOr(Evolu.NonEmptyString1000),
-    unit: Evolu.nullOr(Evolu.NonEmptyString100),
-    amount: Evolu.nullOr(Evolu.PositiveInt),
-    // "pending" | "accepted" | "error"
-    state: Evolu.nullOr(Evolu.NonEmptyString100),
-    error: Evolu.nullOr(Evolu.NonEmptyString1000),
-  },
-  transaction: {
-    ...LinkySchema.transaction,
-    // Deprecated compatibility column. New writes derive category from method.
-    category: Evolu.nullOr(Evolu.NonEmptyString100),
-    // Deprecated compatibility columns. New writes use method + status and
-    // derive labels/icons in the transaction view.
-    phase: Evolu.nullOr(Evolu.NonEmptyString100),
-  },
-  ownerMeta: {
-    id: OwnerMetaId,
-    scope: Evolu.NonEmptyString100,
-    value: Evolu.NonEmptyString1000,
-  },
-};
-
-export type LinkyEvolu = Evolu.Evolu<typeof LinkyEvoluSchema>;
+/** The page's Evolu run, whose deps hold the shared `evoluError` and `syncState` stores. */
+export type EvoluRun = Run<EvoluDeps>;
 
 /** What the package reports for the inspector; the consumer turns each into a row. */
 export type LinkyEvoluEvent =
-  | { readonly _tag: "OwnerSyncFailed"; readonly failure: OwnerSyncFailure }
+  | {
+      readonly _tag: "OwnerSyncFailed";
+      readonly ownerId: OwnerId;
+      /** Evolu's error type, such as `ProtocolQuotaError`. */
+      readonly error: string;
+    }
   | {
       readonly _tag: "ShardRotated";
       readonly rotation: ShardRotation<LinkyScope>;
-      readonly owner: Evolu.OwnerId;
+      readonly owner: OwnerId;
     }
   | {
       readonly _tag: "ShardsSubscribed";
       readonly reason: "boot" | "rotation";
       /** The app owner first, then every subscribed shard owner. */
-      readonly owners: ReadonlyArray<Evolu.OwnerId>;
+      readonly owners: ReadonlyArray<OwnerId>;
     }
   | {
       readonly _tag: "AccountHydrated";
-      readonly owners: ReadonlyArray<Evolu.OwnerId>;
+      readonly owners: ReadonlyArray<OwnerId>;
     }
-  | { readonly _tag: "WriteUnconfirmed"; readonly write: UnconfirmedWrite }
+  | { readonly _tag: "WriteFailed"; readonly write: FailedWrite }
   | { readonly _tag: "WriteApplied"; readonly write: AppliedWrite }
   | {
       readonly _tag: "ShardPointersRepaired";
       readonly repairs: ReadonlyArray<{
         readonly repair: PointerRepair<LinkyScope>;
-        readonly owner: Evolu.OwnerId;
+        readonly owner: OwnerId;
       }>;
     }
   | { readonly _tag: "ShardPointerRepairFailed"; readonly error: unknown }
@@ -192,120 +90,136 @@ const hashDbNameFromMnemonic = (mnemonic: string): string => {
 };
 
 /**
- * The name of the device's database (and of its OPFS directory) for the
- * stored mnemonic. Existing databases are found by it, so it never changes.
+ * The name Evolu 7 gave the device's database (and its OPFS directory
+ * `.<name>`) for the stored mnemonic. Evolu 8 finds that database by it to
+ * move its data in, so it never changes.
  */
-export const generateDbNameFromMnemonic = (
-  mnemonic: string | null,
-): SimpleName => {
-  const dbName = mnemonic ? hashDbNameFromMnemonic(mnemonic) : "linky-anon";
-  const validatedName = SimpleName.from(dbName);
-  return validatedName.ok
-    ? validatedName.value
-    : SimpleName.orThrow("linky-default");
-};
+export const generateDbNameFromMnemonic = (mnemonic: string | null): Name =>
+  Name.orThrow(mnemonic ? hashDbNameFromMnemonic(mnemonic) : "linky-anon");
 
-// Tables are keyed by (ownerId, id); the shard store looks rows up by id across owners.
-export const linkyIndexes: IndexesConfig = (create) => [
-  ...Object.keys(LinkySchema).map((table) =>
-    create(`${table}Id`).on(table).column("id"),
-  ),
-  create("cashuProofState").on("cashuProof").column("state"),
-  create("cashuProofOperationId").on("cashuProof").column("operationId"),
-  create("cashuProofKeysetCreatedSecond")
-    .on("cashuProof")
-    .column("keysetId")
-    .expression(kysely.sql`substr("createdAt", 1, 19)`)
-    .column("mint"),
+const appName = AppName.orThrow("linky");
+
+const toTransports = (urls: ReadonlyArray<string>) => [
+  ...new Map(
+    urls.flatMap((url) => {
+      const parsed = WebSocketUrlFromString.fromUnknown(url);
+      return parsed.ok
+        ? [[parsed.value, { type: "WebSocket" as const, url: parsed.value }]]
+        : [];
+    }),
+  ).values(),
 ];
 
 /**
- * Opens the Linky database over a worker started with `runOwnerSyncDbWorker`,
- * owned by the mnemonic's app owner (Evolu's own when `null`).
+ * Opens the Linky database owned by the mnemonic's app owner; the first time,
+ * Evolu moves the device's Evolu 7 database into it before it answers
+ * anything. A session without a valid mnemonic opens the app owner Evolu 7
+ * created for it, which Evolu keeps on the device from then on.
  */
-export const createLinkyEvolu = ({
-  evoluDeps,
-  createWorker,
-  mnemonic,
-  transports,
-  inMemory,
-  enableLogging,
-  onEvent,
-}: {
-  readonly evoluDeps: Omit<Evolu.EvoluDeps, "createDbWorker">;
-  readonly createWorker: (
-    name: SimpleName,
-  ) => Evolu.Worker<PageMessage, WorkerMessage>;
-  readonly mnemonic: string | null;
-  readonly transports: ReadonlyArray<{ type: "WebSocket"; url: string }>;
-  readonly inMemory: boolean;
-  readonly enableLogging: boolean;
-  readonly onEvent?: (event: LinkyEvoluEvent) => void;
-}): { readonly evolu: LinkyEvolu; readonly ownerSync: OwnerSync } => {
-  const { createDbWorker, ownerSync } = trackOwnerSync(createWorker);
-  ownerSync.subscribeFailures((failure) =>
-    onEvent?.({ _tag: "OwnerSyncFailed", failure }),
+export const openLinkyEvolu = async (
+  run: EvoluRun,
+  {
+    mnemonic,
+    relayUrls,
+    memoryOnly,
+  }: {
+    readonly mnemonic: string | null;
+    readonly relayUrls: ReadonlyArray<string>;
+    /** Applies only to a session with a mnemonic; Evolu decides for the others. */
+    readonly memoryOnly: boolean;
+  },
+): Promise<LinkyEvolu> => {
+  const config = {
+    appName,
+    evolu7Name: generateDbNameFromMnemonic(mnemonic),
+    indexes: linkyIndexes,
+    transports: toTransports(relayUrls),
+  };
+  // Where the platform offers no storage, Evolu keeps the database in memory unasked.
+  if (!memoryOnly && (await run.deps.getDevicePersistence()) === "NotPersisted")
+    throw new Error("Device storage is unavailable");
+  const appOwner = mnemonic === null ? null : appOwnerFromMnemonic(mnemonic);
+  if (appOwner !== null)
+    return run.ok(
+      createEvolu(LinkyEvoluSchema, { ...config, appOwner, memoryOnly }),
+    );
+  const app = await run.orThrow(
+    createEvoluApp(LinkyEvoluSchema, {
+      ...config,
+      auth: { type: "InstantStart" },
+      createFirstAppOwner: true,
+    }),
   );
-  const externalAppOwner = mnemonic ? appOwnerFromMnemonic(mnemonic) : null;
-  const evolu = createEvolu({ ...evoluDeps, createDbWorker })(
-    LinkyEvoluSchema,
-    {
-      name: generateDbNameFromMnemonic(mnemonic),
-      indexes: linkyIndexes,
-      transports,
-      enableLogging,
-      inMemory,
-      ...(externalAppOwner ? { externalAppOwner } : {}),
-    },
-  );
-  return { evolu, ownerSync };
+  const current = app.current.get();
+  if (current === null) throw new Error("Evolu opened no app owner");
+  return current.evolu;
 };
 
-const syncOwnerIds = (
-  store: LinkyStore,
-): Promise<ReadonlyArray<Evolu.OwnerId>> =>
+/** Reports each relay failure of the database's owners once. */
+const reportSyncFailures = (
+  syncState: ReadonlyStore<SyncState | null>,
+  name: string,
+  onEvent: (event: LinkyEvoluEvent) => void,
+): void => {
+  let reported = new Set<object>();
+  const report = () => {
+    const tenant = syncState.get()?.tenants.find((t) => t.name === name);
+    if (tenant?.type !== "Active") return;
+    const current = new Set<object>();
+    for (const owner of tenant.owners)
+      if (owner.type === "Writable")
+        for (const route of owner.routes)
+          if (route.type === "Pending" && route.failure !== null) {
+            current.add(route.failure);
+            if (!reported.has(route.failure))
+              onEvent({
+                _tag: "OwnerSyncFailed",
+                ownerId: owner.ownerId,
+                error: route.failure.type,
+              });
+          }
+    reported = current;
+  };
+  syncState.subscribe(report);
+  report();
+};
+
+const syncOwnerIds = (store: LinkyStore): Promise<ReadonlyArray<OwnerId>> =>
   Effect.runPromise(store.syncOwners()).then((owners) =>
     owners.map((owner) => owner.id),
   );
 
 /**
- * The account's shard store over this database. Resolves once the app owner
- * is known and the local database has answered a query; `appOwner` alone
- * resolves before the database worker is up. The store subscribes the app
+ * The account's shard store over this database. The store subscribes the app
  * owner and every visible shard for its lifetime and follows its pointers, so
  * a rotation here or on another device subscribes the new shard. Pointer
  * repair runs in the background. Retention is kept in `kv`, per app owner.
  */
 export const openLinkyStore = async (
-  evolu: LinkyEvolu,
-  ownerSync: OwnerSync,
+  evolu: EvoluRuntime & Pick<LinkyEvolu, "appOwner">,
   {
+    syncState,
     kv,
     scopes,
     hasEvoluRelay,
     onEvent,
   }: {
+    readonly syncState: ReadonlyStore<SyncState | null>;
     readonly kv: KeyValueStorage;
     readonly scopes: LinkyScopes;
     readonly hasEvoluRelay: boolean;
     readonly onEvent?: (event: LinkyEvoluEvent) => void;
   },
 ): Promise<LinkyStore> => {
-  const [owner] = await Promise.all([
-    evolu.appOwner,
-    // Waits for the database worker before any ShardDb exists.
-    evolu.loadQuery(
-      evolu.createQuery((db) =>
-        db.selectFrom("shardPointer").select("id").limit(1),
-      ),
-    ),
-  ]);
+  const owner = evolu.appOwner;
   const key = (scope: string) =>
     `linky.shards.retainedFrom.${owner.id}.${scope}`;
+  if (onEvent) reportSyncFailures(syncState, evolu.name, onEvent);
   const store = createAccountStore(
-    createEvoluShardDb(evolu, ownerSync, {
-      onWriteUnconfirmed: (write) =>
-        onEvent?.({ _tag: "WriteUnconfirmed", write }),
+    createEvoluShardDb(evolu, {
+      syncState,
+      hasEvoluRelay,
+      onWriteFailed: (write) => onEvent?.({ _tag: "WriteFailed", write }),
       onWriteApplied: (write) => onEvent?.({ _tag: "WriteApplied", write }),
     }),
     owner,

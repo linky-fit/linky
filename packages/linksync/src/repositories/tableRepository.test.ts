@@ -5,18 +5,18 @@ import {
   type Mutation,
   type ShardDb,
 } from "../core";
-import { createId } from "@linky-fit/domain";
+import {
+  createId,
+  NonEmptyString,
+  NonEmptyString100,
+  NonEmptyString1000,
+} from "@linky-fit/domain";
 import { linkyTableColumns, type LinkyDbSchema } from "../model/schema";
 import { createLinkyStore } from "../model/store";
 import { linkyStore, runNow } from "../testing/linky";
 import { testAppOwner } from "../testing/toy";
 import { tableRepository } from "./tableRepository";
-import {
-  NonEmptyString,
-  NonEmptyString100,
-  NonEmptyString1000,
-  PositiveInt,
-} from "@evolu/common";
+import { PositiveInt } from "@evolu/common";
 import { Pubkey, RumorId } from "@linky-fit/linkstr";
 import {
   directConversationIdFor,

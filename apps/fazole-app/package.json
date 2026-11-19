@@ -15,8 +15,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@evolu/common": "7.4.1",
-    "@evolu/web": "2.4.0",
+    "@evolu/common": "8.29.0",
+    "@evolu/web": "3.9.0",
     "@linky-fit/domain": "workspace:*",
     "@linky-fit/identity": "workspace:*",
     "@linky-fit/linkshu": "workspace:*",
@@ -38,17 +38,17 @@
     "workbox-window": "^7.3.0"
   },
   "devDependencies": {
-    "@evolu/sqlite-wasm": "2.2.4",
     "@linky-fit/config": "workspace:*",
     "@types/node": "^24.10.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@typescript/native": "npm:typescript@~7.0.2",
     "@vite-pwa/assets-generator": "^1.0.0",
     "@vitejs/plugin-react-swc": "^4.2.2",
     "eslint": "^9.39.1",
     "jsdom": "^28.1.0",
     "prettier": "^3.4.2",
-    "typescript": "~5.9.3",
+    "typescript": "npm:@typescript/typescript6@~6.0.2",
     "vite": "^7.2.4",
     "vite-plugin-pwa": "^1.2.0",
     "vitest": "^4.0.18"

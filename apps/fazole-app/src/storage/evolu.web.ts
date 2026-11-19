@@ -1,50 +1,37 @@
-import { createSharedWebWorker, evoluWebDeps } from "@evolu/web";
+import { createEvoluDeps, createRun } from "@evolu/web";
 import { linkyScopes, type LinkyStore } from "@linky-fit/linksync";
 import {
-  createLinkyEvolu,
   makeEvoluRelaySettings,
+  openLinkyEvolu,
   openLinkyStore,
 } from "@linky-fit/linksync/evolu";
-import { flushSync } from "react-dom";
 import type { AppConfig } from "../config";
 import { localStorageKv } from "../platform/storage";
 import type { Account } from "./account";
 
 /**
- * Opens the account's sharded Evolu database in this page, over a database
- * worker built on linksync's owner-sync worker. Evolu cannot be closed, so
- * call it once per page load.
+ * Opens the account's sharded Evolu database in this page; the first time,
+ * Evolu moves this origin's Evolu 7 database in. Call it once per page load.
  */
-export const openBrowserStore = (
+export const openBrowserStore = async (
   account: Account,
   config: AppConfig,
 ): Promise<LinkyStore> => {
-  const relays = makeEvoluRelaySettings(localStorageKv, {
+  const relayUrls = makeEvoluRelaySettings(localStorageKv, {
     envDefaults: config.evoluRelayDefaults,
     recommended: config.recommendedEvoluRelays,
     hasStoredAccount: false,
-  });
-  const transports = relays
-    .activeUrls()
-    .map((url) => ({ type: "WebSocket" as const, url }));
-  const { evolu, ownerSync } = createLinkyEvolu({
-    evoluDeps: { ...evoluWebDeps, flushSync },
-    createWorker: (name) =>
-      createSharedWebWorker(
-        name,
-        () =>
-          new Worker(new URL("../evoluDb.worker.ts", import.meta.url), {
-            type: "module",
-          }),
-      ),
+  }).activeUrls();
+  const run = createRun(createEvoluDeps());
+  const evolu = await openLinkyEvolu(run, {
     mnemonic: account.appMnemonic,
-    transports,
-    inMemory: false,
-    enableLogging: false,
+    relayUrls,
+    memoryOnly: false,
   });
-  return openLinkyStore(evolu, ownerSync, {
+  return openLinkyStore(evolu, {
+    syncState: run.deps.syncState,
     kv: localStorageKv,
     scopes: linkyScopes,
-    hasEvoluRelay: transports.length > 0,
+    hasEvoluRelay: relayUrls.length > 0,
   });
 };

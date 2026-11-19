@@ -5,6 +5,7 @@ import { AtomRegistry } from "effect/reactivity";
 import { describe, expect, it, vi } from "vitest";
 import {
   makeTestAppRegistry,
+  openTestEvolu,
   signedInSession,
 } from "../../../testUtils/appRegistry";
 import { makeTestLinkyStore } from "../../../testUtils/linkyStore";
@@ -16,13 +17,10 @@ import {
 } from "../session/store";
 import { chatWritesAtom } from "./chatWrites";
 
-vi.mock("@evolu/common", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@evolu/common")>()),
-  createEvolu: () => () => ({}),
-}));
 const openLinkyStore = vi.hoisted(() => vi.fn());
 vi.mock("@linky-fit/linksync/evolu", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@linky-fit/linksync/evolu")>()),
+  openLinkyEvolu: () => Promise.resolve({}),
   openLinkyStore,
 }));
 
@@ -34,6 +32,7 @@ const result = <A, E>(
 const boot = async () => {
   openLinkyStore.mockResolvedValue(makeTestLinkyStore().store);
   const registry = makeTestAppRegistry({ session: signedInSession() });
+  await openTestEvolu(registry);
   return {
     appOwnerId: await result(registry, appOwnerIdAtom),
     conversations: await result(registry, conversationsRepositoryAtom),

@@ -12,15 +12,16 @@ export function readOwnerQuotaBytes(env = process.env) {
   return value;
 }
 
-const ERROR_CATEGORIES = new Map([
-  ["storage", "storage error"],
-  ["error", "WebSocket error"],
-  ["applyProtocolMessageAsRelay", "invalid protocol message"],
-  ["applyProtocolMessageAsRelayUnknownError", "protocol processing error"],
+// The relay logs owner ids and payloads beside its messages; only these leave the process, without them.
+const LOGGED_MESSAGES = new Map([
+  ["invalid protocol request", "invalid protocol message"],
+  ["health check failed", "storage error"],
 ]);
 
-export function logRelayError(_tag, category) {
-  console.error(
-    `[evolu-relay] ${ERROR_CATEGORIES.get(category) ?? "relay error"}`,
-  );
-}
+export const relayConsoleOutput = {
+  write: ({ method, args }) => {
+    const message = LOGGED_MESSAGES.get(args[0]);
+    if (message) console.error(`[evolu-relay] ${message}`);
+    else if (method === "error") console.error("[evolu-relay] relay error");
+  },
+};

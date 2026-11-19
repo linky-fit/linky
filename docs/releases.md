@@ -58,6 +58,28 @@ Don't open a PR from a hotfix branch; the push already runs `CI`, and a PR would
 
 Use Instant Rollback in the Vercel linky-app project. It lasts until the next release moves `linky-production`. Google Play and Zapstore have no rollback; ship a hotfix instead.
 
+### Moving to Evolu 8
+
+The first release on Evolu 8 moves each device's Evolu 7 database into Evolu 8 on its first start, then deletes it. It ships differently from other releases:
+
+1. Before merging the change to `main`, deploy `docker/evolu-relay` to every Evolu relay Linky operates, keeping its `data/` volume; the relay keeps `evolu-relay.db` as it is and serves Evolu 7 and Evolu 8 clients. Nightly deploys on that merge against the production relays.
+2. Release it as a Linky release with a native build. `WEB_DATA_FORMAT` in `apps/native-shell/scripts/write-native-runtime.ts` gives the build a new native runtime, so Android shells built before it never get it as a live update; a live bundle that fails to mount would roll back to their Evolu 7 bundle.
+3. The service worker takes over on install (`skipWaiting` in `apps/linky-app/src/sw.ts`), so open tabs of the Evolu 7 build reload into Evolu 8 instead of holding its database. Remove that line in the next release, which restores the update prompt that waits for wallet work.
+4. Don't roll `app.linky.fit` back to an Evolu 7 build. Nothing is lost if it happens on a device with a stored app mnemonic: that build starts with an empty database of the same owner, which syncs from the relay, and the next Evolu 8 start moves it again. A session without one (`linky-anon`) gets a new owner from that build, and Evolu 8 leaves that database behind.
+5. Fazole moves with its next release the same way, after the relays.
+
+`apps/linky-app/tests/evolu7-migration.spec.ts` runs the Evolu 7 build, then this one, on one browser profile. It takes that build's files from `LINKY_E2E_EVOLU7_DIST` and skips without them. Build them from the last Evolu 7 release with the e2e stack's endpoints, the build arguments `docker-compose.dev.yml` gives the `linky-app` service, then copy them out of the image:
+
+```bash
+git archive linky-v26.11.4 | docker build -t linky-app:evolu7 -f docker/linky-app/Dockerfile \
+  --build-arg VITE_E2E=1 --build-arg VITE_ALLOW_INSECURE_LOCALHOST_RELAYS=1 \
+  --build-arg VITE_EVOLU_SERVER_URLS=ws://localhost:<evolu port> ... -
+docker cp "$(docker create linky-app:evolu7)":/usr/share/nginx/html/. <dir>
+LINKY_E2E_EVOLU7_DIST=<dir> bun run e2e tests/evolu7-migration.spec.ts
+```
+
+Evolu 7 and Evolu 8 sync with each other, but an Evolu 7 device receives none of an owner's changes while one of them is stamped more than five minutes ahead of its clock, so ask users to update every device.
+
 ## Fazole app
 
 The fazole app releases on its own, the same way as the [Linky app](#linky-app): its version is in `apps/fazole-app/package.json` and its notes in `apps/fazole-app/CHANGELOG.md`, and both stay apart from Linky's.

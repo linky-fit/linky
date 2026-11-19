@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useLinkshuComposition } from "../../hooks/composition/useLinkshuComposition";
 import {
   makeTestAppRegistry,
+  openTestEvolu,
   signedInSession,
 } from "../../../testUtils/appRegistry";
 import { INSPECTOR_REPORT_PATH } from "../../../devtools/inspector/inspectorRows";
@@ -37,13 +38,10 @@ import {
 } from "./runtime";
 import { WalletOpQueue } from "../wallet/opQueue";
 
-vi.mock("@evolu/common", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@evolu/common")>()),
-  createEvolu: () => () => ({}),
-}));
 const openLinkyStore = vi.hoisted(() => vi.fn());
 vi.mock("@linky-fit/linksync/evolu", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@linky-fit/linksync/evolu")>()),
+  openLinkyEvolu: () => Promise.resolve({}),
   openLinkyStore,
 }));
 
@@ -71,11 +69,13 @@ vi.mock("../../../platform/identitySecrets", () => ({
 const APP_MNEMONIC =
   "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 
-const boot = (
+const boot = async (
   session: SessionState = signedInSession({ appMnemonic: APP_MNEMONIC }),
 ) => {
   openLinkyStore.mockResolvedValue(makeTestLinkyStore().store);
-  return makeTestAppRegistry({ session });
+  const registry = makeTestAppRegistry({ session });
+  if (session._tag === "SignedIn") await openTestEvolu(registry);
+  return registry;
 };
 
 const result = <A, E>(
@@ -204,7 +204,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("linkshuSeedAtom", () => {
   it("migrates the legacy cashu state before it resolves the seed", async () => {
-    const registry = boot(signedInSession());
+    const registry = await boot(signedInSession());
     await result(registry, linkshuSeedAtom);
     expect(calls.order).toEqual([
       "migrate",
@@ -215,7 +215,7 @@ describe("linkshuSeedAtom", () => {
   });
 
   it("generates a cashu mnemonic once and never replaces it", async () => {
-    const registry = boot(signedInSession());
+    const registry = await boot(signedInSession());
     const seed = await result(registry, linkshuSeedAtom);
     registry.set(sessionAtom, signedInSession({ nsec: "nsec1other" }));
     registry.refresh(linkshuRuntimeAtom);
@@ -228,7 +228,7 @@ describe("linkshuSeedAtom", () => {
   });
 
   it("is not configured when the session could not read the cashu mnemonic", async () => {
-    const registry = boot({
+    const registry = await boot({
       ...signedInSession({ appMnemonic: APP_MNEMONIC }),
       degraded: true,
       cause: "bridge down",
@@ -246,7 +246,7 @@ describe("linkshuSeedAtom", () => {
 
 describe("linkshuRuntimeAtom", () => {
   it("closes the wallet scope when the runtime rebuilds", async () => {
-    const registry = boot();
+    const registry = await boot();
     const closed = vi.fn();
     const context = await result(registry, linkshuRuntimeAtom);
     await Effect.runPromiseWith(context)(
@@ -262,7 +262,7 @@ describe("linkshuRuntimeAtom", () => {
   });
 
   it("drops a wallet operation started while another runs", async () => {
-    const registry = boot();
+    const registry = await boot();
     const run = Effect.runPromiseWith(
       await result(registry, linkshuRuntimeAtom),
     );
@@ -293,7 +293,7 @@ describe("linkshuRuntimeAtom", () => {
 
 describe("walletReadModelAtom", () => {
   it("re-reads the inventory when the wallet repository changes", async () => {
-    const registry = boot();
+    const registry = await boot();
     const unmount = registry.mount(walletReadModelAtom);
     const loaded = await result(registry, walletReadModelAtom);
     expect(loaded.unspentProofs).toEqual([]);
@@ -314,7 +314,7 @@ describe("walletReadModelAtom", () => {
   });
 
   it("drops a spent proof from the working set while its operation's proofs keep it", async () => {
-    const registry = boot();
+    const registry = await boot();
     const wallet = await result(registry, walletRepositoryAtom);
     const send = await Effect.runPromise(
       wallet.operations.insert(sendOperation),
@@ -363,6 +363,7 @@ describe("walletReadModelAtom", () => {
     const registry = makeTestAppRegistry({
       session: signedInSession({ appMnemonic: APP_MNEMONIC }),
     });
+    await openTestEvolu(registry);
     const wallet = await result(registry, walletRepositoryAtom);
     const send = await Effect.runPromise(
       wallet.operations.insert(sendOperation),
@@ -395,7 +396,7 @@ describe("walletReadModelAtom", () => {
 describe("linkshu commands", () => {
   it("fetches a previewed mint's info without making it a known mint", async () => {
     stubMintEndpoints();
-    const registry = boot();
+    const registry = await boot();
     const commands = await commandsOf(registry);
 
     const outcome = await commands.fetchMintInfo("https://preset.example");
@@ -417,7 +418,7 @@ describe("linkshu commands", () => {
   });
 
   it("settles two concurrent receives, each with its own outcome", async () => {
-    const registry = boot();
+    const registry = await boot();
     const commands = await commandsOf(registry);
     const mints = gateMints();
 
@@ -450,7 +451,7 @@ describe("linkshu commands", () => {
     const identity = makeIdentity();
     const lockTo = (pubkey: Pubkey) =>
       parseP2pkPubkey(encodeNpub(pubkey)) ?? "";
-    const registry = boot(
+    const registry = await boot(
       signedInSession({
         appMnemonic: APP_MNEMONIC,
         nsec: encodeNsec(identity.secretKey),
@@ -482,7 +483,7 @@ describe("linkshu commands", () => {
   });
 
   it("keeps a send running when the screen that started it unmounts", async () => {
-    const registry = boot();
+    const registry = await boot();
     const wallet = await result(registry, walletRepositoryAtom);
     await Effect.runPromise(
       wallet.proofs.write({ insert: [proofAt("https://mint-a.test")] }),
@@ -527,7 +528,7 @@ describe("linkshu commands", () => {
   });
 
   it("does not re-run a finished command when the runtime rebuilds", async () => {
-    const registry = boot();
+    const registry = await boot();
     const unmount = registry.mount(linkshuCommandsAtom);
     const commands = await commandsOf(registry);
     const mints = gateMints();

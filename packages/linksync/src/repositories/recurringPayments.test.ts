@@ -1,10 +1,10 @@
+import { PositiveInt } from "@evolu/common";
+import { describe, expect, it } from "vitest";
 import {
+  createId,
   NonEmptyString100,
   NonEmptyString1000,
-  PositiveInt,
-} from "@evolu/common";
-import { describe, expect, it } from "vitest";
-import { createId } from "@linky-fit/domain";
+} from "@linky-fit/domain";
 import { linkyStore, runNow } from "../testing/linky";
 import { makeContactsRepository } from "./contacts";
 import {

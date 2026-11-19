@@ -82,3 +82,14 @@ export const prepareEvoluWebStorage = async (
 };
 
 export const shouldUseInMemoryEvoluStorage = (): boolean => useInMemoryStorage;
+
+/** Whether OPFS still holds the Evolu 7 database `name`, which Evolu 8 moves in and then deletes. */
+export const hasEvolu7Database = async (name: string): Promise<boolean> => {
+  try {
+    const root = await navigator.storage.getDirectory();
+    await root.getDirectoryHandle(`.${name}`);
+    return true;
+  } catch {
+    return false;
+  }
+};

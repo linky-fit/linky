@@ -23,7 +23,7 @@
 
 import {
   activeNostrIdentityId,
-  appOwnerFromMnemonic,
+  laneOwnerFromMnemonic,
   directConversationIdFor,
   linkyTableColumns,
   NonEmptyString100,
@@ -35,7 +35,7 @@ import {
   type LinkyStore,
   type LinkyTable,
   type Row,
-  type AppOwner,
+  type Owner,
   type SystemColumns,
   type TableOf,
 } from "@linky-fit/linksync";
@@ -163,7 +163,7 @@ export const readLegacyLaneIndexes = (
 export const deriveLegacyLaneOwners = async (
   slip39Seed: string,
   indexes: LegacyLaneIndexes,
-): Promise<ReadonlyArray<AppOwner>> => {
+): Promise<ReadonlyArray<Owner>> => {
   const requests = [
     { role: "identity" as const, index: 0 },
     ...LEGACY_LANE_SCOPES.flatMap((scope) =>
@@ -183,7 +183,7 @@ export const deriveLegacyLaneOwners = async (
     ),
   );
   return mnemonics.flatMap((mnemonic) => {
-    const owner = mnemonic === null ? null : appOwnerFromMnemonic(mnemonic);
+    const owner = mnemonic === null ? null : laneOwnerFromMnemonic(mnemonic);
     return owner === null ? [] : [owner];
   });
 };

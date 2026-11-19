@@ -163,8 +163,8 @@ const syncContactsFromProfile = (
     if (normalizeNpubIdentifier(contact.npub ?? "") !== npub) continue;
 
     const patch: Partial<{
-      lnAddress: typeof NonEmptyString1000.Type | null;
-      name: typeof NonEmptyString1000.Type | null;
+      lnAddress: typeof NonEmptyString1000.Output | null;
+      name: typeof NonEmptyString1000.Output | null;
     }> = {};
 
     // Non-overridden fields follow the profile. A value the profile never

@@ -30,18 +30,19 @@ vi.mock("../../evolu", () => {
     update: legacy.update,
   };
   return {
-    useLinkyEvolu: () => evolu,
-    createCashuOperationsAllQuery: query("cashuOperation"),
-    createCashuProofsAllQuery: query("cashuProof"),
-    createCashuTokensAllQuery: query("cashuToken"),
-    createContactsAllQuery: query("contact"),
+    useOpenedEvolu: () => ({ evolu, hasEvoluRelay: true }),
+    loadLegacyRows: (_: unknown, table: string) => evolu.loadQuery(table),
+    cashuOperationsAllQuery: "cashuOperation",
+    cashuProofsAllQuery: "cashuProof",
+    cashuTokensAllQuery: "cashuToken",
+    contactsAllQuery: "contact",
     createLegacyChangeCountQuery: query("legacyChanges"),
     createLegacyUnspentProofCopiesQuery: query("legacyUnspentProofCopies"),
-    createNostrIdentitiesAllQuery: query("nostrIdentity"),
-    createNostrMessagesAllQuery: query("nostrMessage"),
-    createNostrReactionsAllQuery: query("nostrReaction"),
-    createOwnerMetaAllQuery: query("ownerMeta"),
-    createTransactionsAllQuery: query("transaction"),
+    nostrIdentitiesAllQuery: "nostrIdentity",
+    nostrMessagesAllQuery: "nostrMessage",
+    nostrReactionsAllQuery: "nostrReaction",
+    ownerMetaAllQuery: "ownerMeta",
+    transactionsAllQuery: "transaction",
   };
 });
 vi.mock("../hooks/useLinksync", () => ({
@@ -170,7 +171,7 @@ describe("useLaneToShardMigration", () => {
       expect(legacy.update).toHaveBeenCalledWith(
         "cashuProof",
         { id: proof.id, state: "spent" },
-        { ownerId: appOwner.id },
+        { owner: appOwner },
       ),
     );
     expect(legacy.reportInspectorRows).toHaveBeenCalledWith([

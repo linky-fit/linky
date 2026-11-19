@@ -1,4 +1,4 @@
-import type { OwnerId, SqliteBoolean, SyncOwner } from "@evolu/common";
+import type { OwnerId, SqliteBoolean, Owner } from "@evolu/common";
 import { Clock, Effect } from "effect";
 import type {
   Columns,
@@ -70,11 +70,11 @@ export const makeInMemoryShardDb = <S extends DbSchema>(
 
   const apply = (mutation: Mutation, nowIso: string): void => {
     const rows = tableRows(mutation.table);
-    const key = rowKey(mutation.ownerId, mutation.row.id);
+    const key = rowKey(mutation.owner.id, mutation.row.id);
     const previous = rows.get(key);
     const { isDeleted, ...columns } = mutation.row;
     const system = {
-      ownerId: mutation.ownerId,
+      ownerId: mutation.owner.id,
       createdAt: previous?.createdAt ?? nowIso,
       updatedAt: nowIso,
       isDeleted:
@@ -88,7 +88,7 @@ export const makeInMemoryShardDb = <S extends DbSchema>(
         .map((column) => [column, null]),
     );
     rows.set(key, { ...unset, ...previous, ...columns, ...system });
-    recordUsage(mutation.ownerId, mutation.row);
+    recordUsage(mutation.owner.id, mutation.row);
   };
 
   const notify = (table: string): void => {
@@ -186,7 +186,7 @@ export const makeInMemoryShardDb = <S extends DbSchema>(
     subscribe,
     subscribeWhere: (table, _column, _values, listener) =>
       subscribe(table, listener),
-    useOwner: (owner: SyncOwner) => {
+    useOwner: (owner: Owner) => {
       used.set(owner.id, (used.get(owner.id) ?? 0) + 1);
       return () => {
         const count = (used.get(owner.id) ?? 1) - 1;

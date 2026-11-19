@@ -50,22 +50,18 @@ export const reportLinkyEvoluEvent = (event: LinkyEvoluEvent): void => {
     case "ShardsSubscribed":
       reportShardsSubscribed(event.reason, event.owners);
       return;
-    case "OwnerSyncFailed": {
-      const { ownerId, error, endsRound } = event.failure;
+    case "OwnerSyncFailed":
       reportInspectorRows([
         {
           at: Date.now(),
           channel: "evolu.sync",
           tag: "OwnerSyncFailed",
-          summary: endsRound
-            ? `An Evolu relay answered with ${error}; the owner's sync round ended there`
-            : `An Evolu relay answered with ${error} before any error-free answer; the owner stays unsynced`,
-          links: { owner: ownerId },
-          payload: { ownerId, error, endsRound },
+          summary: `An Evolu relay failed the owner's sync with ${event.error}`,
+          links: { owner: event.ownerId },
+          payload: { ownerId: event.ownerId, error: event.error },
         },
       ]);
       return;
-    }
     case "ShardRotated":
       reportInspectorRows([
         {
@@ -93,14 +89,14 @@ export const reportLinkyEvoluEvent = (event: LinkyEvoluEvent): void => {
         },
       ]);
       return;
-    case "WriteUnconfirmed":
+    case "WriteFailed":
       reportInspectorRows([
         {
           at: Date.now(),
           channel: "evolu.sync",
-          tag: "WriteUnconfirmed",
-          summary: `Evolu did not confirm a ${event.write.table} write within 10 s; it may have been dropped`,
-          links: { owner: event.write.ownerId, row: event.write.id },
+          tag: "WriteFailed",
+          summary: `Evolu could not store a ${event.write.tables.join(", ")} write of ${event.write.rows} rows`,
+          links: {},
           payload: event.write,
         },
       ]);

@@ -1,4 +1,5 @@
-import { NonEmptyString, NonEmptyString1000, PositiveInt } from "@evolu/common";
+import { NonEmptyString, NonEmptyString1000 } from "@linky-fit/domain";
+import { PositiveInt } from "@evolu/common";
 import { describe, expect, it } from "vitest";
 import { keryxSubscriptionIdFor } from "../model/ids";
 import { linkyStore, runNow } from "../testing/linky";
@@ -46,7 +47,7 @@ describe("keryx subscriptions repository", () => {
         {
           kind: "update",
           table: "keryxSubscription",
-          ownerId: store.shardOwner("keryx", 0).id,
+          owner: store.shardOwner("keryx", 0),
           row: { id, origin },
         },
       ]),

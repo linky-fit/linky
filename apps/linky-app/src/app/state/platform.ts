@@ -1,10 +1,6 @@
 import { Option } from "effect";
 import { Atom } from "effect/reactivity";
-import type {
-  EvoluPlatform,
-  KeyValuePort,
-  PlatformPorts,
-} from "../../platform/ports";
+import type { KeyValuePort, PlatformPorts } from "../../platform/ports";
 
 // Holds only the value `makeAppRegistry` seeds; reading it unseeded is a bug.
 const seededAtom = <A>(name: string): Atom.Atom<A> =>
@@ -55,8 +51,3 @@ export const lazyStateAtom = <A>(
       (ctx, value: A) => ctx.setSelf(value),
     ),
   );
-
-/** Seeded only for a signed-in session, which is the only one that opens the database. */
-export const evoluPlatformAtom = seededAtom<EvoluPlatform | null>(
-  "evoluPlatformAtom",
-);

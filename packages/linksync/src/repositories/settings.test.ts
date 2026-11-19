@@ -1,4 +1,4 @@
-import { NonEmptyString100, NonEmptyString1000 } from "@evolu/common";
+import { NonEmptyString100, NonEmptyString1000 } from "@linky-fit/domain";
 import { settingIdFor } from "../model/ids";
 import { linkyStore, runNow } from "../testing/linky";
 import { makeSettingsRepository } from "./settings";

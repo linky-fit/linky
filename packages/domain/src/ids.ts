@@ -3,61 +3,63 @@ import {
   createIdFromString,
   createRandomBytes,
   id,
+  type Brand,
+  type Id,
 } from "@evolu/common";
 
 export const ContactId = id("Contact");
-export type ContactId = typeof ContactId.Type;
+export type ContactId = typeof ContactId.Output;
 
 export const ConversationId = id("Conversation");
-export type ConversationId = typeof ConversationId.Type;
+export type ConversationId = typeof ConversationId.Output;
 
 export const MessageId = id("Message");
-export type MessageId = typeof MessageId.Type;
+export type MessageId = typeof MessageId.Output;
 
 export const ReactionId = id("Reaction");
-export type ReactionId = typeof ReactionId.Type;
+export type ReactionId = typeof ReactionId.Output;
 
 export const CashuProofId = id("CashuProof");
-export type CashuProofId = typeof CashuProofId.Type;
+export type CashuProofId = typeof CashuProofId.Output;
 
 export const CashuOperationId = id("CashuOperation");
-export type CashuOperationId = typeof CashuOperationId.Type;
+export type CashuOperationId = typeof CashuOperationId.Output;
 
 export const TransactionId = id("Transaction");
-export type TransactionId = typeof TransactionId.Type;
+export type TransactionId = typeof TransactionId.Output;
 
 export const RecurringPaymentId = id("RecurringPayment");
-export type RecurringPaymentId = typeof RecurringPaymentId.Type;
+export type RecurringPaymentId = typeof RecurringPaymentId.Output;
 
 export const ListingId = id("Listing");
-export type ListingId = typeof ListingId.Type;
+export type ListingId = typeof ListingId.Output;
 
 export const HiddenListingId = id("HiddenListing");
-export type HiddenListingId = typeof HiddenListingId.Type;
+export type HiddenListingId = typeof HiddenListingId.Output;
 
 export const PinnedListingId = id("PinnedListing");
-export type PinnedListingId = typeof PinnedListingId.Type;
+export type PinnedListingId = typeof PinnedListingId.Output;
 
 export const PeerListingsId = id("PeerListings");
-export type PeerListingsId = typeof PeerListingsId.Type;
+export type PeerListingsId = typeof PeerListingsId.Output;
 
 export const KeryxSubscriptionId = id("KeryxSubscription");
-export type KeryxSubscriptionId = typeof KeryxSubscriptionId.Type;
+export type KeryxSubscriptionId = typeof KeryxSubscriptionId.Output;
 
 export const OnchainTransferId = id("OnchainTransfer");
-export type OnchainTransferId = typeof OnchainTransferId.Type;
+export type OnchainTransferId = typeof OnchainTransferId.Output;
 
 export const OnchainTransferMessageId = id("OnchainTransferMessage");
-export type OnchainTransferMessageId = typeof OnchainTransferMessageId.Type;
+export type OnchainTransferMessageId = typeof OnchainTransferMessageId.Output;
 
 export const NostrIdentityId = id("NostrIdentity");
-export type NostrIdentityId = typeof NostrIdentityId.Type;
+export type NostrIdentityId = typeof NostrIdentityId.Output;
 
 export const ShardPointerId = id("ShardPointer");
-export type ShardPointerId = typeof ShardPointerId.Type;
+export type ShardPointerId = typeof ShardPointerId.Output;
 
 export const SettingId = id("Setting");
-export type SettingId = typeof SettingId.Type;
+export type SettingId = typeof SettingId.Output;
 
 /** Deterministic ids: every device that derives the same key lands on one row. */
 
@@ -88,5 +90,8 @@ export const activeNostrIdentityId: NostrIdentityId =
 const randomBytes = createRandomBytes();
 
 /** A fresh random id for a new row, branded by table (`createId<"Contact">()`). */
-export const createId = <B extends string = never>() =>
-  createEvoluId<B>({ randomBytes });
+export function createId<B extends string>(): Id & Brand<B>;
+// Evolu checks the brand only for a literal B, which this wrapper cannot pass on.
+export function createId(): Id {
+  return createEvoluId({ randomBytes });
+}

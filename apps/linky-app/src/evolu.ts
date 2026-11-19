@@ -1,7 +1,9 @@
 export { ContactId, TransactionId } from "./evoluIds";
 import * as Evolu from "@evolu/common";
+import type { ProtocolQuotaError, SyncState } from "@evolu/common/local-first";
 import {
   messageScopes,
+  NonEmptyString100,
   type CashuOperationId,
   type CashuProofId,
   type LinkyStore,
@@ -9,7 +11,6 @@ import {
 } from "@linky-fit/linksync";
 import {
   type LinkyEvolu,
-  generateDbNameFromMnemonic,
   LinkyEvoluSchema,
   markAwaitingFirstHydration,
   normalizeEvoluRelayUrl,
@@ -26,19 +27,24 @@ import { getInspectorEmissionEnabled } from "./devtools/inspector/inspectorEnabl
 import { reportInspectorRows } from "./devtools/inspector/reportInspectorRows";
 import { reportAppLog } from "./devtools/inspector/appLog";
 import { reportShardsSubscribed } from "./app/state/session/evoluInspector";
-import { evoluAtom, evoluRelaySettingsAtom } from "./app/state/session/evolu";
 import {
-  emptyEvoluDatabaseInfo,
+  evoluAtom,
+  evoluRelaySettingsAtom,
+  type OpenedEvolu,
+} from "./app/state/session/evolu";
+import {
   evoluDatabaseInfoAtom,
   evoluLastErrorAtom,
   evoluServerProbesReadyAtom,
   evoluServersAtom,
 } from "./app/state/session/evoluSettings";
-import { sessionAtom, sessionSecrets } from "./app/state/session/session";
 
 export type EvoluServerStatus = "checking" | "connected" | "disconnected";
-export type EvoluError = Evolu.EvoluError;
-export type EvoluErrorType = Evolu.EvoluError["type"];
+/** What blocks Evolu, or a relay that stores no more for the account. */
+export type EvoluError = Evolu.EvoluError | ProtocolQuotaError;
+export type EvoluErrorType = EvoluError["type"];
+
+const createQuery = Evolu.createQueryBuilder(LinkyEvoluSchema);
 
 const isJsonValue = (value: unknown): value is JsonValue => {
   if (
@@ -120,13 +126,8 @@ interface EvoluQueryBuilder {
 }
 
 const createUntypedQuery = (
-  instance: LinkyEvolu,
   cb: (db: EvoluQueryBuilder) => EvoluSelectBuilder,
-): unknown => {
-  const fn = Reflect.get(Object(instance), "createQuery");
-  if (typeof fn !== "function") return null;
-  return fn.call(instance, cb);
-};
+): unknown => Reflect.apply(createQuery, undefined, [cb]);
 
 const loadUntypedQueryRows = async (
   instance: LinkyEvolu,
@@ -200,16 +201,15 @@ export type { CashuOperationId, CashuProofId, NostrIdentityId };
 /** The database schema, legacy lane tables included; see `LinkyEvoluSchema`. */
 export const Schema = LinkyEvoluSchema;
 
-/** The signed-in session's database; only the authenticated shell renders this. */
-export const useLinkyEvolu = (): LinkyEvolu => {
+/** The signed-in session's database with the run it opened on. */
+export const useOpenedEvolu = (): OpenedEvolu => {
   const opened = useAtomValue(evoluAtom);
   if (opened === null) throw new Error("No Evolu database while signed out");
-  return opened.evolu;
+  return opened;
 };
 
-/** The session's app mnemonic, which names the database. */
-const useAppMnemonic = (): string | null =>
-  sessionSecrets(useAtomValue(sessionAtom))?.appMnemonic ?? null;
+/** The signed-in session's database; only the authenticated shell renders this. */
+export const useLinkyEvolu = (): LinkyEvolu => useOpenedEvolu().evolu;
 
 export const forgetChatShards = async (store: LinkyStore) => {
   const forgotten = (
@@ -243,27 +243,26 @@ export const forgetChatShards = async (store: LinkyStore) => {
   return forgotten;
 };
 
-/** Resolves once the local database has answered a query. */
+/** Resolves once the database answers a query, which Evolu does only after moving Evolu 7's data in. */
 export const probeLocalDatabase = (evolu: LinkyEvolu): Promise<void> =>
   evolu
     .loadQuery(
-      evolu.createQuery((db) =>
-        db.selectFrom("ownerMeta").select("id").limit(1),
-      ),
+      createQuery((db) => db.selectFrom("shardPointer").select("id").limit(1)),
     )
     .then(() => undefined);
 
-export const createOwnerMetaAllQuery = (evolu: LinkyEvolu) =>
-  evolu.createQuery((db) => db.selectFrom("ownerMeta").selectAll());
-export const createNostrIdentitiesAllQuery = (evolu: LinkyEvolu) =>
-  evolu.createQuery((db) => db.selectFrom("nostrIdentity").selectAll());
-export const createCashuTokensAllQuery = (evolu: LinkyEvolu) =>
-  evolu.createQuery((db) =>
-    db.selectFrom("cashuToken").selectAll().orderBy("createdAt", "desc"),
-  );
-
-export const createCashuProofsAllQuery = (evolu: LinkyEvolu) =>
-  evolu.createQuery((db) => db.selectFrom("cashuProof").selectAll());
+export const ownerMetaAllQuery = createQuery((db) =>
+  db.selectFrom("ownerMeta").selectAll(),
+);
+export const nostrIdentitiesAllQuery = createQuery((db) =>
+  db.selectFrom("nostrIdentity").selectAll(),
+);
+export const cashuTokensAllQuery = createQuery((db) =>
+  db.selectFrom("cashuToken").selectAll().orderBy("createdAt", "desc"),
+);
+export const cashuProofsAllQuery = createQuery((db) =>
+  db.selectFrom("cashuProof").selectAll(),
+);
 
 const LEGACY_LANE_TABLES = [
   "contact",
@@ -284,27 +283,23 @@ const LEGACY_LANE_TABLES = [
  * spend from the mint.
  */
 export const createLegacyChangeCountQuery = (
-  evolu: LinkyEvolu,
   ownerIds: ReadonlyArray<Evolu.OwnerId>,
 ) => {
-  const { sql } = Evolu.kysely;
+  const sql = Evolu.kyselySql;
   const owners = sql.join(ownerIds.map(Evolu.ownerIdToOwnerIdBytes));
   const history = sql<{ changes: number }>`(select count(*) as changes
     from evolu_history
     where "ownerId" in (${owners})
       and "table" in (${sql.join(LEGACY_LANE_TABLES)})
       and not ("table" = 'cashuProof' and "column" in ('state', 'updatedAt')))`;
-  return evolu.createQuery((db) =>
-    db.selectFrom(history.as("history")).selectAll(),
-  );
+  return createQuery((db) => db.selectFrom(history.as("history")).selectAll());
 };
 
 /** Every copy, in any owner, of a proof the lanes of `ownerIds` hold unspent. */
 export const createLegacyUnspentProofCopiesQuery = (
-  evolu: LinkyEvolu,
   ownerIds: ReadonlyArray<Evolu.OwnerId>,
 ) =>
-  evolu.createQuery((db) =>
+  createQuery((db) =>
     db
       .selectFrom("cashuProof")
       .select(["id", "ownerId", "state"])
@@ -318,63 +313,91 @@ export const createLegacyUnspentProofCopiesQuery = (
           .where((eb) =>
             eb.or([
               eb("state", "is", null),
-              eb("state", "!=", Evolu.NonEmptyString100.orThrow("spent")),
+              eb("state", "!=", NonEmptyString100.orThrow("spent")),
             ]),
           ),
       ),
   );
-export const createCashuOperationsAllQuery = (evolu: LinkyEvolu) =>
-  evolu.createQuery((db) => db.selectFrom("cashuOperation").selectAll());
+export const cashuOperationsAllQuery = createQuery((db) =>
+  db.selectFrom("cashuOperation").selectAll(),
+);
+export const contactsAllQuery = createQuery((db) =>
+  db.selectFrom("contact").selectAll(),
+);
+export const nostrMessagesAllQuery = createQuery((db) =>
+  db.selectFrom("nostrMessage").selectAll(),
+);
+export const nostrReactionsAllQuery = createQuery((db) =>
+  db.selectFrom("nostrReaction").selectAll(),
+);
+export const transactionsAllQuery = createQuery((db) =>
+  db.selectFrom("transaction").selectAll(),
+);
+/** A row whose `updatedAt` falls back to `createdAt`, which Evolu leaves null until a later change. */
+type LegacyRow<R extends { readonly createdAt: string }> = Omit<
+  R,
+  "updatedAt"
+> & { readonly updatedAt: R["createdAt"] };
 
-export const createContactsAllQuery = (evolu: LinkyEvolu) =>
-  evolu.createQuery((db) => db.selectFrom("contact").selectAll());
-export const createNostrMessagesAllQuery = (evolu: LinkyEvolu) =>
-  evolu.createQuery((db) => db.selectFrom("nostrMessage").selectAll());
-export const createNostrReactionsAllQuery = (evolu: LinkyEvolu) =>
-  evolu.createQuery((db) => db.selectFrom("nostrReaction").selectAll());
-export const createTransactionsAllQuery = (evolu: LinkyEvolu) =>
-  evolu.createQuery((db) => db.selectFrom("transaction").selectAll());
+/** The rows of a legacy query, with `updatedAt` always set as the lane migration reads it. */
+export const loadLegacyRows = async <
+  R extends Evolu.Row & {
+    readonly createdAt: Evolu.DateIso;
+    readonly updatedAt: Evolu.DateIso | null;
+  },
+>(
+  evolu: LinkyEvolu,
+  query: Evolu.Query<typeof LinkyEvoluSchema, R>,
+): Promise<ReadonlyArray<LegacyRow<R>>> =>
+  (await evolu.loadQuery(query)).map((row) => ({
+    ...row,
+    updatedAt: row.updatedAt ?? row.createdAt,
+  }));
+
 /** A `contact` row with its legacy chat columns; read only by the lane migration. */
-export type LegacyContactRow = Evolu.InferRow<
-  ReturnType<typeof createContactsAllQuery>
->;
-export type NostrMessageRow = Evolu.InferRow<
-  ReturnType<typeof createNostrMessagesAllQuery>
->;
-export type NostrReactionRow = Evolu.InferRow<
-  ReturnType<typeof createNostrReactionsAllQuery>
->;
-export type TransactionRow = Evolu.InferRow<
-  ReturnType<typeof createTransactionsAllQuery>
->;
+export type LegacyContactRow = LegacyRow<typeof contactsAllQuery.Row>;
+export type NostrMessageRow = LegacyRow<typeof nostrMessagesAllQuery.Row>;
+export type NostrReactionRow = LegacyRow<typeof nostrReactionsAllQuery.Row>;
+export type TransactionRow = LegacyRow<typeof transactionsAllQuery.Row>;
+export type CashuTokenRow = LegacyRow<typeof cashuTokensAllQuery.Row>;
+export type CashuProofRow = LegacyRow<typeof cashuProofsAllQuery.Row>;
+export type CashuOperationRow = LegacyRow<typeof cashuOperationsAllQuery.Row>;
+export type OwnerMetaRow = LegacyRow<typeof ownerMetaAllQuery.Row>;
+export type NostrIdentityRow = LegacyRow<typeof nostrIdentitiesAllQuery.Row>;
 
-export type CashuTokenRow = Evolu.InferRow<
-  ReturnType<typeof createCashuTokensAllQuery>
->;
-export type CashuProofRow = Evolu.InferRow<
-  ReturnType<typeof createCashuProofsAllQuery>
->;
-export type CashuOperationRow = Evolu.InferRow<
-  ReturnType<typeof createCashuOperationsAllQuery>
->;
-export type OwnerMetaRow = Evolu.InferRow<
-  ReturnType<typeof createOwnerMetaAllQuery>
->;
-export type NostrIdentityRow = Evolu.InferRow<
-  ReturnType<typeof createNostrIdentitiesAllQuery>
->;
+/** A relay's refusal to store more for one of the database's owners, from Evolu's sync state. */
+const quotaError = (
+  state: SyncState | null,
+  name: string,
+): ProtocolQuotaError | null => {
+  const tenant = state?.tenants.find((t) => t.name === name);
+  if (tenant?.type !== "Active") return null;
+  for (const owner of tenant.owners)
+    if (owner.type === "Writable")
+      for (const route of owner.routes)
+        if (
+          route.type === "Pending" &&
+          route.failure?.type === "ProtocolQuotaError"
+        )
+          return route.failure;
+  return null;
+};
 
 /** Keeps `evoluLastErrorAtom` current and reports each error; mounted once by the shell. */
 export const useEvoluLastError = (opts?: {
   logToConsole?: boolean;
-}): Evolu.EvoluError | null => {
+}): EvoluError | null => {
   const logToConsole = opts?.logToConsole ?? false;
-  const evolu = useLinkyEvolu();
+  const { evolu, run } = useOpenedEvolu();
   const [lastError, setLastError] = useAtom(evoluLastErrorAtom);
 
   useEffect(() => {
-    const unsub = evolu.subscribeError(() => {
-      const err = evolu.getError();
+    const { evoluError, syncState } = run.deps;
+    let last: EvoluError | null = null;
+    const update = () => {
+      const err = evoluError.get() ?? quotaError(syncState.get(), evolu.name);
+      if (err === last) return;
+      last = err;
       setLastError(err);
       if (!err) return;
       if (logToConsole) console.log("[linky][evolu] error", err.type);
@@ -390,23 +413,22 @@ export const useEvoluLastError = (opts?: {
           },
         ]);
       }
-    });
-
-    return () => {
-      try {
-        unsub();
-      } catch {
-        // ignore
-      }
     };
-  }, [evolu, logToConsole, setLastError]);
+    update();
+    const unsubscribes = [
+      evoluError.subscribe(update),
+      syncState.subscribe(update),
+    ];
+    return () => {
+      for (const unsubscribe of unsubscribes) unsubscribe();
+    };
+  }, [evolu, run, logToConsole, setLastError]);
 
   return lastError;
 };
 
 const getEvoluDatabaseInfo = async (
   evolu: LinkyEvolu,
-  mnemonic: string | null,
   isCurrent: () => boolean,
 ): Promise<{
   bytes: number;
@@ -440,11 +462,10 @@ const getEvoluDatabaseInfo = async (
       const root = await navigator.storage?.getDirectory?.();
       if (!root) return 0;
 
-      const expectedDir = `.${generateDbNameFromMnemonic(mnemonic)}`;
+      const expectedDir = `.${evolu.name}`;
 
       let totalSize = 0;
       const allDirs: string[] = [];
-      // @ts-expect-error OPFS FileSystemDirectoryHandle.entries() not yet in all TS libs
       for await (const [name, handle] of root.entries()) {
         if (handle.kind === "directory") allDirs.push(name);
         if (name === expectedDir && handle.kind === "directory") {
@@ -474,7 +495,7 @@ const getEvoluDatabaseInfo = async (
     for (const table of tables) {
       if (!isCurrent()) break;
       try {
-        const q = createUntypedQuery(evolu, (db) =>
+        const q = createUntypedQuery((db) =>
           db.selectFrom(table).select((eb) => eb.fn.countAll().as("count")),
         );
         const rows = await loadUntypedQueryRows(evolu, q);
@@ -489,7 +510,7 @@ const getEvoluDatabaseInfo = async (
   // Count history entries (time travel mutations)
   const historyCountPromise = (async () => {
     try {
-      const q = createUntypedQuery(evolu, (db) =>
+      const q = createUntypedQuery((db) =>
         db
           .selectFrom("evolu_history")
           .select((eb) => eb.fn.countAll().as("count")),
@@ -559,7 +580,7 @@ export const subscribeEvoluHistoryMutationVersion = (
   evolu: LinkyEvolu,
   listener: () => void,
 ): (() => void) => {
-  const q = createUntypedQuery(evolu, (db) =>
+  const q = createUntypedQuery((db) =>
     db.selectFrom("evolu_history").select((eb) => eb.fn.countAll().as("count")),
   );
   const subscribeQuery = Reflect.get(Object(evolu), "subscribeQuery");
@@ -576,7 +597,7 @@ export const loadEvoluHistoryData = async (
   offset = 0,
 ): Promise<EvoluHistoryRow[]> => {
   try {
-    const q = createUntypedQuery(evolu, (db) =>
+    const q = createUntypedQuery((db) =>
       db
         .selectFrom("evolu_history")
         .selectAll()
@@ -631,7 +652,7 @@ export const loadEvoluCurrentData = async (
 
   for (const table of tables) {
     try {
-      const q = createUntypedQuery(evolu, (db) =>
+      const q = createUntypedQuery((db) =>
         db.selectFrom(table).selectAll().limit(100),
       );
       const rows = await loadUntypedQueryRows(evolu, q);
@@ -644,19 +665,16 @@ export const loadEvoluCurrentData = async (
   return result;
 };
 
-/** Hard-wipes the local Evolu storage (journal and state) and reloads. */
+/** Deletes this device's copy of the database and reloads; the account syncs back from the relays. */
 export const useWipeEvoluStorage = (): (() => void) => {
   const evolu = useLinkyEvolu();
-  const mnemonic = useAppMnemonic();
   return useCallback(() => {
-    const mnemonicResult = Evolu.Mnemonic.fromUnknown(mnemonic);
-    if (!mnemonicResult.ok) {
-      throw new Error("Missing stored mnemonic");
-    }
-
-    markAwaitingFirstHydration(localStorageKv, mnemonicResult.value);
-    void evolu.restoreAppOwner(mnemonicResult.value, { reload: true });
-  }, [evolu, mnemonic]);
+    markAwaitingFirstHydration(localStorageKv, evolu.appOwner.mnemonic);
+    // Evolu reloads only for an owner opened from a mnemonic.
+    void evolu.deleteDatabase().then((deleted) => {
+      if (deleted.ok) window.location.reload();
+    });
+  }, [evolu]);
 };
 
 export const useEvoluDatabaseInfoState = (opts?: {
@@ -666,17 +684,15 @@ export const useEvoluDatabaseInfoState = (opts?: {
   const enabled = opts?.enabled ?? true;
   const onError = opts?.onError;
   const evolu = useLinkyEvolu();
-  const mnemonic = useAppMnemonic();
 
   const [info, setInfo] = useAtom(evoluDatabaseInfoAtom);
   const [isBusy, setIsBusy] = useState(false);
   const refreshing = useRef(false);
   const refreshRequested = useRef(false);
   const refreshGeneration = useRef(0);
-  const queryFailed = useRef(false);
 
   const refresh = useCallback(async () => {
-    if (!enabled || queryFailed.current) return;
+    if (!enabled) return;
     refreshRequested.current = true;
     if (refreshing.current) return;
     refreshing.current = true;
@@ -687,7 +703,6 @@ export const useEvoluDatabaseInfoState = (opts?: {
         refreshRequested.current = false;
         const next = await getEvoluDatabaseInfo(
           evolu,
-          mnemonic,
           () => generation === refreshGeneration.current,
         );
         if (generation !== refreshGeneration.current) return;
@@ -701,38 +716,25 @@ export const useEvoluDatabaseInfoState = (opts?: {
         setIsBusy(false);
       }
     }
-  }, [enabled, evolu, mnemonic, onError, setInfo]);
+  }, [enabled, evolu, onError, setInfo]);
 
   useEffect(() => {
     if (!enabled) return;
-    if (queryFailed.current) return;
     const cancelRefresh = () => {
       refreshGeneration.current += 1;
       refreshing.current = false;
       refreshRequested.current = false;
       setIsBusy(false);
     };
-    let unsubscribe = () => {};
-    const unsubscribeError = evolu.subscribeError(() => {
-      const error = evolu.getError();
-      if (error?.type !== "SqliteError") return;
-      // Evolu leaves a failed loadQuery promise cached and unresolved until reload.
-      queryFailed.current = true;
-      unsubscribe();
-      cancelRefresh();
-      setInfo(emptyEvoluDatabaseInfo);
-      onError?.(error);
-    });
-    unsubscribe = subscribeEvoluHistoryMutationVersion(evolu, () => {
+    const unsubscribe = subscribeEvoluHistoryMutationVersion(evolu, () => {
       void refresh();
     });
     void refresh();
     return () => {
       unsubscribe();
-      unsubscribeError();
       cancelRefresh();
     };
-  }, [enabled, evolu, onError, refresh, setInfo]);
+  }, [enabled, evolu, refresh]);
 
   return {
     info,

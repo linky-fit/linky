@@ -1,19 +1,11 @@
+import { evoluWorkerPolyfills } from "@linky-fit/config/vite";
 import { linkyUi } from "@linky-fit/ui/vite";
 import react from "@vitejs/plugin-react-swc";
 import { execSync } from "node:child_process";
-import fs from "node:fs/promises";
-import { createRequire } from "node:module";
-import path from "node:path";
-import type { Plugin } from "vite";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 import packageJson from "./package.json" with { type: "json" };
-
-const require = createRequire(import.meta.url);
-const sqliteWasmPath = path.join(
-  path.dirname(require.resolve("@evolu/sqlite-wasm/package.json")),
-  "sqlite-wasm/jswasm/sqlite3.wasm",
-);
 
 const shortCommitSha = (value: string | undefined) => {
   const sha = (value ?? "").trim();
@@ -37,28 +29,6 @@ const commitSha = (() => {
   }
 })();
 
-// Evolu's worker fetches sqlite3.wasm next to its module; the dev server must answer with the wasm MIME type.
-const serveSqliteWasm = (): Plugin => ({
-  name: "serve-sqlite-wasm",
-  configureServer(server) {
-    server.middlewares.use(async (req, res, next) => {
-      if (!(req.url ?? "").includes("sqlite3.wasm")) return next();
-      try {
-        const wasm = await fs.readFile(sqliteWasmPath);
-        res.statusCode = 200;
-        res.setHeader("Content-Type", "application/wasm");
-        res.setHeader("Cache-Control", "no-store");
-        res.end(wasm);
-      } catch (error) {
-        server.config.logger.error(
-          `Failed to serve sqlite3.wasm: ${String(error)}`,
-        );
-        next();
-      }
-    });
-  },
-});
-
 // MONETA's API answers no browser directly (no CORS), so the app calls
 // `/api/moneta/*` on its own origin: this proxy in development, `api/moneta.ts` on Vercel.
 const monetaProxy = {
@@ -70,6 +40,10 @@ const monetaProxy = {
   },
 };
 
+const workerPolyfills = evoluWorkerPolyfills(
+  fileURLToPath(new URL("./src/platform/browserPolyfills.ts", import.meta.url)),
+);
+
 export default defineConfig({
   define: {
     global: "globalThis",
@@ -77,8 +51,8 @@ export default defineConfig({
     __APP_COMMIT_SHA__: JSON.stringify(commitSha),
   },
   plugins: [
+    workerPolyfills,
     linkyUi(),
-    serveSqliteWasm(),
     react(),
     VitePWA({
       strategies: "injectManifest",
@@ -89,11 +63,9 @@ export default defineConfig({
       devOptions: { enabled: true, type: "module" },
       // Icons, favicon and apple-touch-icon are generated from public/logo.webp (pwa-assets.config.ts).
       pwaAssets: { config: true, injectThemeColor: false },
-      // sqlite3.wasm is precached too, so Evolu opens its database offline.
+      // Evolu's workers and sqlite3.wasm are precached too, so Evolu opens its database offline.
       injectManifest: {
         globPatterns: ["**/*.{js,css,html,svg,png,webp,woff2,wasm}"],
-        // Evolu's own database worker never starts (src/evoluDb.worker.ts replaces it).
-        globIgnores: ["**/Db.worker*"],
         rollupFormat: "es",
       },
       manifest: {
@@ -111,9 +83,9 @@ export default defineConfig({
       },
     }),
   ],
-  // Evolu's web package starts its database worker from a URL next to its own module, which prebundling would move.
+  // Evolu starts its workers and loads its wasm from URLs next to its own modules, which prebundling would move.
   optimizeDeps: {
-    exclude: ["@evolu/web"],
+    exclude: ["@evolu/web", "@evolu/sqlite-wasm"],
     // Found only once the database worker or the service worker loads; listed so the dev server does not reload mid-boot.
     include: [
       "@evolu/common",
@@ -123,7 +95,7 @@ export default defineConfig({
       "workbox-window",
     ],
   },
-  worker: { format: "es" },
+  worker: { format: "es", plugins: () => [workerPolyfills] },
   build: {
     rollupOptions: {
       output: {

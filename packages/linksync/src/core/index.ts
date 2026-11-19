@@ -27,7 +27,7 @@ export type {
   WriteRow,
 } from "./ShardDb";
 export { makeInMemoryShardDb } from "./inMemoryShardDb";
-export { appOwnerFromMnemonic } from "./owner";
+export { appOwnerFromMnemonic, laneOwnerFromMnemonic } from "./owner";
 export type { InMemoryShardDb, TableColumns } from "./inMemoryShardDb";
 export {
   createShardStore,

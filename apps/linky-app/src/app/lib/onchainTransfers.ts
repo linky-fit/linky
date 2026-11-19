@@ -246,7 +246,7 @@ export interface PlannedOnchainTransfer {
 const isOnchainTransferRequest = Schema.is(OnchainTransferRequest);
 
 const textColumn = (value: string | null): NonEmptyString1000 | null => {
-  const parsed = NonEmptyString1000.from(value ?? "");
+  const parsed = NonEmptyString1000.fromUnknown(value ?? "");
   return parsed.ok ? parsed.value : null;
 };
 
@@ -295,9 +295,9 @@ export const planOnchainTransfer = ({
         }),
   };
   if (!isOnchainTransferRequest(request)) return null;
-  const createdAtSec = PositiveInt.from(nowSec);
-  const amount = PositiveInt.from(rowAmount);
-  const feeColumn = NonNegativeInt.from(feeBasisPoints);
+  const createdAtSec = PositiveInt.fromUnknown(nowSec);
+  const amount = PositiveInt.fromUnknown(rowAmount);
+  const feeColumn = NonNegativeInt.fromUnknown(feeBasisPoints);
   if (!createdAtSec.ok || !amount.ok || !feeColumn.ok) return null;
   const payout = send ? textColumn(payoutAddress) : null;
   const userRequest = send ? null : textColumn(userPaymentRequest);
@@ -336,7 +336,7 @@ export const onchainTransferUpdatePatch = (
   if (!isUserOnchainTransferWith(row, operator)) return null;
   const current = decodeTransferUpdateColumn(row.updateJson);
   if (newerTransferUpdate(current, update) !== update) return null;
-  const updateJson = NonEmptyString1000.from(
+  const updateJson = NonEmptyString1000.fromUnknown(
     encodeTransferUpdateColumn(update),
   );
   if (!updateJson.ok) return null;

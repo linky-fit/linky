@@ -1,12 +1,12 @@
 import {
-  createLinkyEvolu,
   makeEvoluRelaySettings,
+  openLinkyEvolu,
+  type EvoluRun,
   type LinkyEvolu,
-  type OwnerSync,
 } from "@linky-fit/linksync/evolu";
-import { Atom } from "effect/reactivity";
+import { Atom, type AtomRegistry } from "effect/reactivity";
 import { loadRecommendedRelays } from "../../../utils/recommendedRelays";
-import { evoluPlatformAtom, platformAtom } from "../platform";
+import { platformAtom } from "../platform";
 import { reportLinkyEvoluEvent } from "./evoluInspector";
 import { sessionAtom, sessionSecrets } from "./session";
 
@@ -29,33 +29,46 @@ export const evoluRelaySettingsAtom = Atom.keepAlive(
 
 export interface OpenedEvolu {
   readonly evolu: LinkyEvolu;
-  readonly ownerSync: OwnerSync;
+  readonly run: EvoluRun;
   readonly hasEvoluRelay: boolean;
 }
 
+/** The session's database, set once per page load by `openSessionEvolu`; `null` while signed out. */
+export const evoluAtom = Atom.keepAlive(Atom.make<OpenedEvolu | null>(null));
+
+/** Thrown when secure storage could not say which account this device holds. */
+export class AppMnemonicUnreadable extends Error {
+  constructor() {
+    super("Secure storage did not return the account key; reload to retry");
+  }
+}
+
 /**
- * The session's database, opened once per page load: Evolu cannot be
- * disposed, so a later session change never reopens it. `null` while signed out.
+ * Opens the signed-in session's database and keeps it in `evoluAtom`. A
+ * session whose app mnemonic secure storage could not read opens nothing,
+ * since any database it opened would belong to another owner.
  */
-export const evoluAtom = Atom.keepAlive(
-  Atom.make((get): OpenedEvolu | null => {
-    const secrets = sessionSecrets(get.once(sessionAtom));
-    if (secrets === null) return null;
-    const platform = get.once(evoluPlatformAtom);
-    if (platform === null)
-      throw new Error("A signed-in session needs the Evolu platform");
-    const transports = get
-      .once(evoluRelaySettingsAtom)
-      .activeUrls()
-      .map((url) => ({ type: "WebSocket" as const, url }));
-    return {
-      ...createLinkyEvolu({
-        ...platform,
-        mnemonic: secrets.appMnemonic,
-        transports,
-        onEvent: reportLinkyEvoluEvent,
-      }),
-      hasEvoluRelay: transports.length > 0,
-    };
-  }),
-);
+export const openSessionEvolu = async (
+  registry: AtomRegistry.AtomRegistry,
+  run: EvoluRun,
+  { memoryOnly }: { readonly memoryOnly: boolean },
+): Promise<OpenedEvolu> => {
+  const session = registry.get(sessionAtom);
+  const secrets = sessionSecrets(session);
+  if (secrets === null) throw new Error("Only a signed-in session opens Evolu");
+  if (
+    session._tag === "SignedIn" &&
+    session.degraded &&
+    session.unreadable.has("appMnemonic")
+  )
+    throw new AppMnemonicUnreadable();
+  const relayUrls = registry.get(evoluRelaySettingsAtom).activeUrls();
+  const evolu = await openLinkyEvolu(run, {
+    mnemonic: secrets.appMnemonic,
+    relayUrls,
+    memoryOnly,
+  });
+  const opened = { evolu, run, hasEvoluRelay: relayUrls.length > 0 };
+  registry.set(evoluAtom, opened);
+  return opened;
+};

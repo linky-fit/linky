@@ -1,5 +1,5 @@
-export { createEvoluShardDb } from "./evoluShardDb";
-export type { EvoluRuntime, UnconfirmedWrite } from "./evoluShardDb";
+export { completedOwners, createEvoluShardDb } from "./evoluShardDb";
+export type { AppliedWrite, EvoluRuntime, FailedWrite } from "./evoluShardDb";
 export {
   makeEvoluRelaySettings,
   normalizeEvoluRelayUrl,
@@ -8,11 +8,10 @@ export type { EvoluRelaySettings } from "./evoluRelaySettings";
 export { markAwaitingFirstHydration } from "./firstHydration";
 export type { KeyValueStorage } from "./keyValueStorage";
 export {
-  createLinkyEvolu,
   generateDbNameFromMnemonic,
-  LinkyEvoluSchema,
+  openLinkyEvolu,
   openLinkyStore,
 } from "./linkyEvolu";
-export type { CashuTokenId, LinkyEvolu, LinkyEvoluEvent } from "./linkyEvolu";
-export { trackOwnerSync } from "./ownerSync";
-export type { OwnerSync, OwnerSyncFailure } from "./ownerSync";
+export type { EvoluRun, LinkyEvolu, LinkyEvoluEvent } from "./linkyEvolu";
+export { LinkyEvoluSchema, linkyIndexes } from "./linkyEvoluSchema";
+export type { CashuTokenId } from "./linkyEvoluSchema";

@@ -12,21 +12,10 @@ const removeNewBuiltins = () => {
   Reflect.deleteProperty(Promise, "withResolvers");
 };
 
-const removeCrossTabApis = () => {
-  Object.defineProperty(navigator, "locks", {
-    configurable: true,
-    value: undefined,
-  });
-  Object.defineProperty(window, "BroadcastChannel", {
-    configurable: true,
-    writable: true,
-    value: undefined,
-  });
-};
-
 test.use({ serviceWorkers: "block", viewport: MOBILE_VIEWPORT });
 
-test("an old Safari without newer built-ins, BroadcastChannel or Web Locks boots and keeps a contact", async ({
+// Evolu needs BroadcastChannel and Web Locks, which every browser since Safari 15.4 has.
+test("an old Safari without newer built-ins boots and keeps a contact", async ({
   page,
 }) => {
   const errors = watchAppErrors(page, "old Safari");
@@ -35,7 +24,6 @@ test("an old Safari without newer built-ins, BroadcastChannel or Web Locks boots
   await stubFiatRates(page);
   await stubThirdPartyAssets(page);
   await page.addInitScript(removeNewBuiltins);
-  await page.addInitScript(removeCrossTabApis);
   let workerRequests = 0;
   await page.route(EVOLU_WORKER_BUNDLE, async (route) => {
     workerRequests += 1;

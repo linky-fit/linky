@@ -8,6 +8,7 @@ import { act, useLayoutEffect } from "react";
 import { describe, expect, it, vi } from "vitest";
 import {
   makeTestAppRegistry,
+  openTestEvolu,
   signedInSession,
 } from "../../../testUtils/appRegistry";
 import { makeTestLinkyStore } from "../../../testUtils/linkyStore";
@@ -16,13 +17,10 @@ import { contactsRepositoryAtom } from "../../state/session/store";
 import { statusAtom } from "../../state/shell/status";
 import { useSaveNpubContact } from "./useSaveNpubContact";
 
-vi.mock("@evolu/common", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@evolu/common")>()),
-  createEvolu: () => () => ({}),
-}));
 const openLinkyStore = vi.hoisted(() => vi.fn());
 vi.mock("@linky-fit/linksync/evolu", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@linky-fit/linksync/evolu")>()),
+  openLinkyEvolu: () => Promise.resolve({}),
   openLinkyStore,
 }));
 vi.mock("../../../devtools/inspector/appLog", () => ({
@@ -37,6 +35,7 @@ const mountSaver = async () => {
   const registry = makeTestAppRegistry({
     session: signedInSession({ nsec: encodeNsec(me.secretKey) }),
   });
+  await openTestEvolu(registry);
   const contacts = await Effect.runPromise(
     AtomRegistry.getResult(registry, contactsRepositoryAtom),
   );

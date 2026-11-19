@@ -11,6 +11,9 @@ import {
   makeSettingsRepository,
   type LinkyDbSchema,
   type Mutation,
+  NonEmptyString,
+  NonEmptyString100,
+  NonEmptyString1000,
 } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -54,8 +57,8 @@ const system = (owner: Evolu.AppOwner, atSec: number) => ({
   isDeleted: null,
 });
 
-const text = (value: string) => Evolu.NonEmptyString1000.orThrow(value);
-const short = (value: string) => Evolu.NonEmptyString100.orThrow(value);
+const text = (value: string) => NonEmptyString1000.orThrow(value);
+const short = (value: string) => NonEmptyString100.orThrow(value);
 const positive = (value: number) => Evolu.PositiveInt.orThrow(value);
 
 const contact = (
@@ -87,7 +90,7 @@ const message = (
   id: createId<"NostrMessage">(),
   contactId,
   direction: short("in"),
-  content: Evolu.NonEmptyString.orThrow("hello"),
+  content: NonEmptyString.orThrow("hello"),
   wrapId: text(`wrap-${Math.random()}`),
   rumorId: null,
   pubkey: null,
@@ -165,7 +168,7 @@ const token = (
   overrides: Partial<CashuTokenRow> = {},
 ): CashuTokenRow => ({
   id: createId<"CashuToken">(),
-  token: Evolu.NonEmptyString.orThrow(tokenText),
+  token: NonEmptyString.orThrow(tokenText),
   originalTokenText: null,
   rawToken: null,
   mint: null,
@@ -450,7 +453,7 @@ describe("runLaneToShardMigration", () => {
         {
           kind: "upsert",
           table: "contact",
-          ownerId: store.shardOwner("contacts", 0).id,
+          owner: store.shardOwner("contacts", 0),
           row: { id: peer.id, name: text("Alice Edited") },
         },
       ]),

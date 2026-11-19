@@ -66,15 +66,7 @@ test("adding a relay with capacity syncs quota-rejected token history and spent 
     devices.push({ context, page, errors, label });
   }
   const [source, second] = devices;
-  let observingRecovery = false;
   const secondMintResponses: number[] = [];
-  second.page.on("response", (response) => {
-    if (
-      observingRecovery &&
-      new URL(response.url()).pathname === "/v1/checkstate"
-    )
-      secondMintResponses.push(response.status());
-  });
   try {
     await topUp(source.page, 512);
     for (const device of devices) {
@@ -84,11 +76,9 @@ test("adding a relay with capacity syncs quota-rejected token history and spent 
     await expect(
       second.page.getByLabel("Available", { exact: true }),
     ).toContainText("Available · 512 sat");
-    await second.page.goto("/#wallet");
-    await second.context.setOffline(true);
-    await second.page.route("**/v1/checkstate", (route) =>
-      route.abort("internetdisconnected"),
-    );
+    // Evolu syncs in a shared worker, which offline emulation misses; a
+    // device with no open tab syncs nothing.
+    await second.page.close();
 
     await test.step("new spends exceed the real relay quota and remain local", async () => {
       for (let index = 0; index < 12; index += 1) {
@@ -113,15 +103,22 @@ test("adding a relay with capacity syncs quota-rejected token history and spent 
           exact: true,
         }),
       ).toBeDisabled();
-      expect(await readBalanceSat(second.page)).toBe(512);
       await source.page.goto("/#wallet");
       await expect.poll(() => readBalanceSat(source.page)).toBe(476);
     });
 
     await test.step("existing local history uploads to a new relay without a database reset", async () => {
-      observingRecovery = true;
       await addRecoveryRelay(source.page);
-      await second.context.setOffline(false);
+      second.page = await second.context.newPage();
+      second.errors = watchAppErrors(second.page, second.label);
+      // The stale device must learn the spends through Evolu, not the mint.
+      await second.page.route("**/v1/checkstate", (route) =>
+        route.abort("internetdisconnected"),
+      );
+      second.page.on("response", (response) => {
+        if (new URL(response.url()).pathname === "/v1/checkstate")
+          secondMintResponses.push(response.status());
+      });
       await addRecoveryRelay(second.page);
       for (const device of devices) {
         await expect.poll(() => readBalanceSat(device.page)).toBe(476);

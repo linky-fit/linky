@@ -277,10 +277,10 @@ export const useProfileAuthDomain = ({
     ): Promise<void> => {
       if (!identityRepository) return;
       const npub = await deriveNpubFromNsec(nsec);
-      const nsecText = NonEmptyString1000.from(nsec);
-      const npubText = npub ? NonEmptyString1000.from(npub) : null;
+      const nsecText = NonEmptyString1000.fromUnknown(nsec);
+      const npubText = npub ? NonEmptyString1000.fromUnknown(npub) : null;
       const switchedAt =
-        switchedAtSec === null ? null : PositiveInt.from(switchedAtSec);
+        switchedAtSec === null ? null : PositiveInt.fromUnknown(switchedAtSec);
       if (!nsecText.ok || !npubText?.ok || switchedAt?.ok === false) return;
 
       await runWrite(
