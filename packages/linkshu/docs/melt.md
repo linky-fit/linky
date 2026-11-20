@@ -68,7 +68,7 @@ The receipt carries `paidAmount`, `feeReserve`, `feePaid` (what the melt inputs 
 
 ### `resumePending`
 
-A `PaymentPending` failure, or a crash after step 4, leaves a `pending` melt with `held` inputs. `resumePending` asks the mint about each one and returns a `MeltResumeResult` per melt. The shared rules (when to run it, why only the mint's answer retires a record) are in [concepts.md](./concepts.md#resuming-interrupted-operations).
+A `PaymentPending` failure, or a crash after step 4, leaves a `pending` melt with `held` inputs. `resumePending` asks the mint about each one and returns a `MeltResumeResult` per melt. A melt whose `melt` or `meltEnvelope` call is still running in another context sharing the key-value store (another tab, or the same runtime) is left alone and reported `pending` without asking the mint: from funding its inputs until it returns, the paying call holds a lease on the quote, because a mint that has not received the melt request yet answers `UNPAID`. So `resumePending` may run at any time, including on a timer while a payment is being made. The shared rules (when to run it, why only the mint's answer retires a record) are in [concepts.md](./concepts.md#resuming-interrupted-operations).
 
 | Mint answer      | `status`     | What happened                                                                                                     |
 | ---------------- | ------------ | ----------------------------------------------------------------------------------------------------------------- |
@@ -119,11 +119,11 @@ The envelope's proofs move `held` under the `melt` operation with the other inpu
 
 ## Errors
 
-| Tag              | Kind       | When                                                                       | Balance                                                                          |
-| ---------------- | ---------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `QuoteExpired`   | definitive | quote past `expiresAt`                                                     | intact; request a new quote                                                      |
-| `PaymentFailed`  | definitive | mint reported `UNPAID`, or the quote was not `UNPAID` when melting started | inputs back in balance; pay again with a new quote                               |
-| `PaymentPending` | pending    | the melt was sent and the mint has not settled it                          | inputs `held` under the `pending` melt `operationId`; `resumePending` settles it |
+| Tag              | Kind       | When                                                                                                                            | Balance                                                                          |
+| ---------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `QuoteExpired`   | definitive | quote past `expiresAt`                                                                                                          | intact; request a new quote                                                      |
+| `PaymentFailed`  | definitive | mint reported `UNPAID`, the quote was not `UNPAID` when melting started, or another context kept paying the same quote for 15 s | inputs back in balance; pay again with a new quote                               |
+| `PaymentPending` | pending    | the melt was sent and the mint has not settled it                                                                               | inputs `held` under the `pending` melt `operationId`; `resumePending` settles it |
 
 `InsufficientFunds` (`required` carries `amount + feeReserve`), `MintRejected`, `MintUnreachable`, and `CounterLockTimeout` are in [errors.md](./errors.md). A `MintUnreachable` from `melt` means the request never left: no melt operation exists and the balance is intact.
 

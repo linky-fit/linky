@@ -6,7 +6,7 @@ import type {
   SendResponse,
 } from "@cashu/cashu-ts";
 import { Amount, Keyset, MintOperationError } from "@cashu/cashu-ts";
-import { Effect, Exit, Layer } from "effect";
+import { Effect, Exit, Fiber, Layer } from "effect";
 import { TestClock } from "effect/testing";
 import {
   Amount as SatAmount,
@@ -1089,6 +1089,59 @@ describe("Melt.resumePending", () => {
         storage.kv.listKeys(LEGACY_PENDING_MELT_KEY_PREFIX),
       ),
     ).toEqual([]);
+  });
+
+  it("leaves a melt that is still being paid to its payer", async () => {
+    let meltSent = () => {};
+    const sent = new Promise<void>((resolve) => {
+      meltSent = resolve;
+    });
+    let answerMelt = () => {};
+    const { wallet, checkQuoteCalls } = makeWallet({
+      send: () => Promise.resolve(swappedThirteen()),
+      melt: () =>
+        new Promise((resolve) => {
+          answerMelt = () => resolve(meltResponse("PAID", [proof(1, "chg")]));
+          meltSent();
+        }),
+      // A mint that has not seen the melt request yet reports UNPAID.
+      checkQuote: () => Promise.resolve(quoteResponse({ state: "UNPAID" })),
+    });
+    const { run, events } = makeHarness(wallet);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* Effect.forEach([proofsA, proofsB], (proofs) =>
+          seedProofs(mint, proofs),
+        );
+        const melt = yield* Melt;
+        const paying = yield* Effect.forkChild(melt.melt(draft));
+        yield* Effect.promise(() => sent);
+        const resumed = yield* resumeAndInspect;
+        answerMelt();
+        const receipt = yield* Fiber.join(paying);
+        return { resumed, receipt, proofs: yield* allProofs };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    const { resumed, receipt, proofs } = exit.value;
+    expect(resumed.results).toEqual([
+      expect.objectContaining({ quoteId: "quote-1", status: "pending" }),
+    ]);
+    // The resume neither asked the mint nor released the held inputs.
+    expect(checkQuoteCalls).toEqual([]);
+    expect(proofsIn(resumed.proofs, "held")).toHaveLength(3);
+    expect(onlyMelt(resumed.operations).status).toBe("pending");
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        _tag: "OperationSucceeded",
+        name: "melt.resumeSkipped",
+        params: expect.objectContaining({ quoteId: "quote-1" }),
+      }),
+    );
+
+    expect(receipt).toMatchObject({ paidAmount: 10, changeAmount: 1 });
+    expect(proofsIn(proofs, "held")).toHaveLength(0);
   });
 
   it("does nothing without operations", async () => {

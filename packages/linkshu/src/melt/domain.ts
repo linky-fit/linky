@@ -89,8 +89,8 @@ export class MeltResumeResult extends Schema.Class<MeltResumeResult>(
   /**
    * `paid` — settled, change persisted, record closed; `unpaid` — inputs
    * back in balance, record closed; `pending` — the mint still reports the
-   * payment in flight, record kept; `unresolved` — no usable mint answer,
-   * record kept for the next pass.
+   * payment in flight, or another context is still paying it, record kept;
+   * `unresolved` — no usable mint answer, record kept for the next pass.
    */
   status: Schema.Literals(["paid", "unpaid", "pending", "unresolved"]),
   /** Set only for `paid`. */

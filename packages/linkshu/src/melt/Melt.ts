@@ -3,7 +3,15 @@ import type {
   MeltQuoteBolt11Response,
   SendResponse,
 } from "@cashu/cashu-ts";
-import { Context, Duration, Effect, Layer, Result, Schema } from "effect";
+import {
+  Context,
+  Duration,
+  Effect,
+  Layer,
+  Option,
+  Result,
+  Schema,
+} from "effect";
 import {
   EnvelopeNotFound,
   InsufficientFunds,
@@ -86,6 +94,7 @@ import { toDomainProofs } from "../token/internal/cashuProofs";
 import { MeltCost, MeltQuote, MeltReceipt, MeltResumeResult } from "./domain";
 import type { MeltDraft, MeltError } from "./domain";
 import { blankOutputCount } from "./internal/blankOutputs";
+import { tryWithMeltLease, withMeltLease } from "./internal/meltLease";
 import { meltRecords } from "./internal/meltRecords";
 import type { PendingMelt } from "./internal/meltRecords";
 
@@ -807,35 +816,42 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
         const wallet = yield* instances.get(draft.mint, sat);
         const scope = yield* scopeAt(wallet, draft.mint);
         const { raw, quote } = yield* payableQuote(wallet, draft);
-        const funded = yield* fundInputs(
-          wallet,
-          scope,
-          quote.amount + quote.feeReserve,
-          draft.maxTotal === undefined
-            ? undefined
-            : { maxTotal: draft.maxTotal, quoteId: quote.quoteId },
-        );
-        // The record, its held inputs, and the remainder all land before
-        // the consumed sources are marked spent, so the funds are never
-        // outside the store and a crash from here on is resumable.
-        const pending = yield* createRecord(
-          scope,
-          draft,
+        return yield* withMeltLease(
+          kv,
           quote,
-          funded.inputs,
-          null,
+        )(
+          Effect.gen(function* () {
+            const funded = yield* fundInputs(
+              wallet,
+              scope,
+              quote.amount + quote.feeReserve,
+              draft.maxTotal === undefined
+                ? undefined
+                : { maxTotal: draft.maxTotal, quoteId: quote.quoteId },
+            );
+            // The record, its held inputs, and the remainder all land before
+            // the consumed sources are marked spent, so the funds are never
+            // outside the store and a crash from here on is resumable.
+            const pending = yield* createRecord(
+              scope,
+              draft,
+              quote,
+              funded.inputs,
+              null,
+            );
+            const swapFee = yield* holdFunded(funded, pending);
+            const receipt = yield* executeMelt({
+              wallet,
+              raw,
+              inputs: funded.inputs,
+              pending,
+            });
+            return new MeltReceipt({
+              ...receipt,
+              swapFee: NonNegativeAmount.make(swapFee),
+            });
+          }),
         );
-        const swapFee = yield* holdFunded(funded, pending);
-        const receipt = yield* executeMelt({
-          wallet,
-          raw,
-          inputs: funded.inputs,
-          pending,
-        });
-        return new MeltReceipt({
-          ...receipt,
-          swapFee: NonNegativeAmount.make(swapFee),
-        });
       }).pipe(
         // The invoice never reaches the inspector; the receipt holds no secrets.
         inspectOperation(inspector, "melt.melt", { mint: draft.mint }),
@@ -884,24 +900,36 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
           }
           const extra =
             quote.feeReserve + inputFeeForProofs(wallet, envelope.proofs);
-          const funded =
-            extra > 0 ? yield* fundInputs(wallet, scope, extra) : null;
-          const inputs = [...envelope.proofs, ...(funded?.inputs ?? [])];
-          const pending = yield* createRecord(
-            scope,
-            draft,
+          return yield* withMeltLease(
+            kv,
             quote,
-            inputs,
-            envelope.tokenText,
+          )(
+            Effect.gen(function* () {
+              const funded =
+                extra > 0 ? yield* fundInputs(wallet, scope, extra) : null;
+              const inputs = [...envelope.proofs, ...(funded?.inputs ?? [])];
+              const pending = yield* createRecord(
+                scope,
+                draft,
+                quote,
+                inputs,
+                envelope.tokenText,
+              );
+              yield* setProofState(ctx, held, "held", "melt", pending.id);
+              const swapFee =
+                funded === null ? 0 : yield* holdFunded(funded, pending);
+              const receipt = yield* executeMelt({
+                wallet,
+                raw,
+                inputs,
+                pending,
+              });
+              return new MeltReceipt({
+                ...receipt,
+                swapFee: NonNegativeAmount.make(swapFee),
+              });
+            }),
           );
-          yield* setProofState(ctx, held, "held", "melt", pending.id);
-          const swapFee =
-            funded === null ? 0 : yield* holdFunded(funded, pending);
-          const receipt = yield* executeMelt({ wallet, raw, inputs, pending });
-          return new MeltReceipt({
-            ...receipt,
-            swapFee: NonNegativeAmount.make(swapFee),
-          });
         }),
       ).pipe(
         inspectOperation(inspector, "melt.meltEnvelope", {
@@ -964,7 +992,9 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
      * mint that will not load or answer says nothing about the payment, so
      * the record is kept — quote expiry is not an unlock deadline.
      */
-    const resumeOne = (pending: PendingMelt): Effect.Effect<MeltResumeResult> =>
+    const settleRecord = (
+      pending: PendingMelt,
+    ): Effect.Effect<MeltResumeResult> =>
       Effect.gen(function* () {
         const wallet = yield* instances.get(pending.mint, pending.unit);
         const state = quoteStateOf(yield* checkQuote(wallet, pending));
@@ -992,6 +1022,23 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
         Effect.catch(() =>
           Effect.succeed(resultOf(pending, "unresolved", null)),
         ),
+      );
+
+    /** A melt another context is still paying stays as it is, reported pending. */
+    const resumeOne = (pending: PendingMelt): Effect.Effect<MeltResumeResult> =>
+      Effect.flatMap(
+        tryWithMeltLease(kv, pending)(settleRecord(pending)),
+        Option.match({
+          onSome: Effect.succeed,
+          onNone: () =>
+            Effect.succeed(resultOf(pending, "pending", null)).pipe(
+              inspectOperation(inspector, "melt.resumeSkipped", {
+                mint: pending.mint,
+                quoteId: pending.quoteId,
+                operationId: pending.id,
+              }),
+            ),
+        }),
       );
 
     const resumePending: Effect.Effect<ReadonlyArray<MeltResumeResult>> =
