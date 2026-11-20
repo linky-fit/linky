@@ -73,7 +73,7 @@ A mint answer that never arrived is not a guess either: `Validation` changes onl
 
 Rules shared by all three:
 
-- Run them once when your runtime comes up and again whenever connectivity returns. Running one over the same record twice is safe.
+- Run them once when your runtime comes up and again whenever connectivity returns. Running one over the same record twice is safe. `Melt.resumePending` is also safe to run while payments are being made, so it can re-check pending melts on a timer.
 - They never fail. A mint that cannot be reached shows up in the per-record result and the record stays `pending`.
 - Only the mint's own answer retires a record. Local quote expiry is never an unlock deadline: a quote past `expiresAt` that the mint still reports pending stays pending, because the payment may yet settle. A quote without a mint-stated expiry gets a 24 h deadline, after which a mint-confirmed `UNPAID` closes it.
 - Resumed minting reuses the counter slot recorded on the operation, so an interrupted claim never mints twice; a quote the mint already issued is reclaimed via NUT-09.

@@ -25,6 +25,10 @@ export const isIssuedTransfer = (transfer: TokenTransfer): boolean =>
 export const isPendingDeferredReceive = (operation: StoredOperation): boolean =>
   operation.kind === "deferredReceive" && operation.status === "pending";
 
+/** A Lightning payment the mint has not settled yet; `Melt.resumePending` settles it. */
+export const isPendingMelt = (operation: StoredOperation): boolean =>
+  operation.kind === "melt" && operation.status === "pending";
+
 /** A pending deferral the wallet shows; its amount is summed and shown as sat. */
 export const isShownDeferredReceive = (operation: StoredOperation): boolean =>
   isPendingDeferredReceive(operation) && operation.unit === "sat";

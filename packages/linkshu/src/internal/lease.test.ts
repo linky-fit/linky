@@ -1,9 +1,9 @@
-import { Deferred, Effect, Exit, Fiber } from "effect";
+import { Deferred, Effect, Exit, Fiber, Option } from "effect";
 import { TestClock } from "effect/testing";
 import { inMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
 import type { KeyValueStoreService } from "../ports/KeyValueStore";
 import { KeyValueStore } from "../ports/KeyValueStore";
-import { withKeyLease } from "./lease";
+import { tryWithKeyLease, withKeyLease } from "./lease";
 
 const withStore = <A, E>(
   program: (kv: KeyValueStoreService) => Effect.Effect<A, E>,
@@ -88,5 +88,47 @@ describe("withKeyLease", () => {
       ),
     );
     expect(reclaimed).not.toBeNull();
+  });
+});
+
+describe("tryWithKeyLease", () => {
+  it("runs the effect under the lease and releases it afterwards", async () => {
+    const { result, whileRunning, after } = await Effect.runPromise(
+      withStore((kv) =>
+        Effect.gen(function* () {
+          let whileRunning: unknown = "unset";
+          const result = yield* Effect.gen(function* () {
+            whileRunning = yield* kv.tryAcquireLease("k", 60_000);
+            return 7;
+          }).pipe(tryWithKeyLease(kv, "k"));
+          const after = yield* kv.tryAcquireLease("k", 60_000);
+          return { result, whileRunning, after };
+        }),
+      ),
+    );
+    expect(result).toEqual(Option.some(7));
+    expect(whileRunning).toBeNull();
+    expect(after).not.toBeNull();
+  });
+
+  it("skips the effect without waiting when another holder has the key", async () => {
+    let ran = false;
+    const { result, holderStillLive } = await Effect.runPromise(
+      withStore((kv) =>
+        Effect.gen(function* () {
+          const held = yield* kv.tryAcquireLease("k", 60_000);
+          const result = yield* Effect.sync(() => {
+            ran = true;
+          }).pipe(tryWithKeyLease(kv, "k"));
+          const holderStillLive = yield* kv.tryAcquireLease("k", 60_000);
+          expect(held).not.toBeNull();
+          return { result, holderStillLive };
+        }),
+      ),
+    );
+    expect(result).toEqual(Option.none());
+    expect(ran).toBe(false);
+    // The skipped attempt did not release someone else's lease.
+    expect(holderStillLive).toBeNull();
   });
 });

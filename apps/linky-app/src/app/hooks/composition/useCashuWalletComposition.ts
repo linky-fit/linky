@@ -41,7 +41,10 @@ import { useOwnerStorage, usePaymentLog } from "../wallet/useWalletStorage";
 import { walletCommandsAtom } from "../../state/wallet/walletCommands";
 import { useProvideOwnerCommands } from "../shell/ownerCommands";
 import { usePaidOverlayCommands } from "../shell";
-import { isPendingDeferredReceive } from "../../lib/cashuTransfers";
+import {
+  isPendingDeferredReceive,
+  isPendingMelt,
+} from "../../lib/cashuTransfers";
 import { useContactsMessagingComposition } from "./useContactsMessagingComposition";
 import { useIdentityOwnersComposition } from "./useIdentityOwnersComposition";
 import { useLinkshuComposition } from "./useLinkshuComposition";
@@ -208,10 +211,14 @@ export const useCashuWalletComposition = ({
     walletTransfers,
   });
   useWalletResumes({
+    pendingMeltIds: walletOperations
+      .filter(isPendingMelt)
+      .map((operation) => operation.id),
     pushToast,
     receiveCashuToken,
     resumePendingCashuAutoswapClaims,
     resumePendingCashuMelts,
+    runQueued,
     t,
     transactions,
   });

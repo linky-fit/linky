@@ -7,24 +7,29 @@ import type {
   ResumePendingCashuAutoswapClaims,
   ResumePendingCashuMelts,
 } from "../../state/linkshu/commands";
+import type { RunQueuedTask } from "../../state/wallet/opQueue";
 import { useMeltRecovery } from "../payments/useMeltRecovery";
 import { useResumeOnLaunchAndOnline } from "../useResumeOnLaunchAndOnline";
 
 interface UseWalletResumesParams {
+  pendingMeltIds: ReadonlyArray<string>;
   pushToast: (message: string) => void;
   receiveCashuToken: ReceiveCashuToken | null;
   resumePendingCashuAutoswapClaims: ResumePendingCashuAutoswapClaims | null;
   resumePendingCashuMelts: ResumePendingCashuMelts | null;
+  runQueued: RunQueuedTask;
   t: Translate;
   transactions: Pick<TransactionsRepository, "all" | "update">;
 }
 
 /** Finishes wallet work an earlier session left: mint move claims, unsettled melts, a legacy token. */
 export const useWalletResumes = ({
+  pendingMeltIds,
   pushToast,
   receiveCashuToken,
   resumePendingCashuAutoswapClaims,
   resumePendingCashuMelts,
+  runQueued,
   t,
   transactions,
 }: UseWalletResumesParams) => {
@@ -45,5 +50,12 @@ export const useWalletResumes = ({
     }, [resumePendingCashuAutoswapClaims]),
   );
 
-  useMeltRecovery({ pushToast, resumePendingCashuMelts, t, transactions });
+  useMeltRecovery({
+    pendingMeltIds,
+    pushToast,
+    resumePendingCashuMelts,
+    runQueued,
+    t,
+    transactions,
+  });
 };

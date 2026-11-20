@@ -1,4 +1,4 @@
-import { Data, Duration, Effect, Schedule } from "effect";
+import { Data, Duration, Effect, Option, Schedule } from "effect";
 import type { KeyValueStoreService, LeaseId } from "../ports/KeyValueStore";
 
 /** Internal; the counter vertical maps it to the public `CounterLockTimeout`. */
@@ -67,5 +67,28 @@ export const withKeyLease =
       ),
       (lease) => Effect.raceFirst(effect, keepRenewed(kv, key, lease, ttlMs)),
       (lease) => kv.releaseLease(key, lease),
+    );
+  };
+
+/**
+ * `withKeyLease` that never waits: `effect` runs under the lease when the
+ * key is free, and `None` comes back without running it when another holder
+ * has the key.
+ */
+export const tryWithKeyLease =
+  (kv: KeyValueStoreService, key: string, options?: { ttlMs?: number }) =>
+  <A, E, R>(
+    effect: Effect.Effect<A, E, R>,
+  ): Effect.Effect<Option.Option<A>, E, R> => {
+    const ttlMs = options?.ttlMs ?? DEFAULT_TTL_MS;
+    return Effect.acquireUseRelease(
+      kv.tryAcquireLease(key, ttlMs),
+      (lease) =>
+        lease === null
+          ? Effect.succeedNone
+          : Effect.asSome(
+              Effect.raceFirst(effect, keepRenewed(kv, key, lease, ttlMs)),
+            ),
+      (lease) => (lease === null ? Effect.void : kv.releaseLease(key, lease)),
     );
   };

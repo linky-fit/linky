@@ -16,9 +16,11 @@ export const useResumeOnLaunchAndOnline = (
       resumedForRef.current = resume;
       resume();
     }
-    window.addEventListener("online", resume);
+    // Called bare, so `resume` never receives the event.
+    const onOnline = () => resume();
+    window.addEventListener("online", onOnline);
     return () => {
-      window.removeEventListener("online", resume);
+      window.removeEventListener("online", onOnline);
     };
   }, [resume]);
 };

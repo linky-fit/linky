@@ -387,7 +387,13 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "melt.resume":
     "linkshu asked the mint about one persisted unsettled melt (a payment that stayed PENDING or whose response was lost). The result says what happened: paid (change reclaimed, reserved inputs dropped), unpaid (inputs back in balance), pending (left alone), or a failure when the mint gave no usable answer. Row and quote links tie it to the original melt.melt and its lifecycle rows.",
   "melt.resumePending":
-    "One pass over every persisted unsettled melt, run when the wallet runtime comes up and when the browser comes back online; the payload lists each record's outcome.",
+    "One pass over every persisted unsettled melt, run when the wallet runtime comes up, when the browser comes back online, and while a melt is pending also when the page becomes visible and on a backoff (melt.recheckPending says which); the payload lists each record's outcome.",
+  "melt.resumeSkipped":
+    "melt.resumePending left one unsettled melt alone because its payment is still running in this or another tab (that tab holds the quote's lease from funding until the melt returns). The mint was not asked; the payer settles it, or a later pass does.",
+  "melt.recheckPending":
+    "The app started a melt.resumePending pass. trigger launchOrOnline: the wallet runtime came up or the browser came back online; visible: the page became visible while a Lightning payment was pending; timer: the backoff while one is pending (5 s, growing to 1 min, only while the page is visible and online). The operation links name the pending melts. A pass that starts while another runs joins it instead.",
+  "melt.resumePendingRejected":
+    "A melt.resumePending pass ended with an error instead of a result, usually because the wallet runtime shut down mid-pass. Pending payments stay pending; the next pass retries them.",
   "receive.resume":
     "linkshu retried one token kept because its mint could not be loaded or asked (a deferredReceive). A result with status received means it landed in the balance; status pending means the mint still cannot be used: nothing was written and the token stays kept. TokenAlreadyKnown, a TokenAlreadySpent from the state check, AmountConsumedByFee or TokenParseFailed close the deferral. A MintUnreachable, MintRejected or TokenAlreadySpent from the swap means the receive was already written: the deferral closed and the failed receive carries the token from here, retried quietly at the next launch when the failure was transient.",
   "receive.resumeDeferred":
