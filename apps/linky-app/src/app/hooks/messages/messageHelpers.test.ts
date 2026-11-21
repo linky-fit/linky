@@ -28,6 +28,19 @@ const makeMessage = (
 });
 
 describe("dedupeNostrMessagesByPriority", () => {
+  it("orders messages of one second by when their rows were stored", () => {
+    const at = (id: string, createdAt: string) =>
+      makeMessage(id, { createdAtSec: 1_700_000_000, createdAt });
+
+    const ordered = dedupeNostrMessagesByPriority([
+      at("b", "2026-11-21T18:00:00.300Z"),
+      at("c", "2026-11-21T18:00:00.500Z"),
+      at("a", "2026-11-21T18:00:00.100Z"),
+    ]);
+
+    expect(ordered.map((message) => message.id)).toEqual(["a", "b", "c"]);
+  });
+
   it("prefers wrap-id identity over client-id and rumor fallback", () => {
     const deduped = dedupeNostrMessagesByPriority([
       makeMessage("1", {

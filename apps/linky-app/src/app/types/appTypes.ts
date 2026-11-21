@@ -97,6 +97,8 @@ export interface LocalNostrMessage {
   clientId?: string;
   contactId: string;
   content: string;
+  /** When the row was first stored, to the millisecond; orders messages of one second. */
+  createdAt?: string;
   createdAtSec: number;
   /** Set once either side deleted it; the row stays as a placeholder. */
   deletedAtSec?: number | null;

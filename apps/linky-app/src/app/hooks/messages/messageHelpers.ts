@@ -118,11 +118,19 @@ const mergeMessageMetadata = (
   };
 };
 
+/** Oldest first; Nostr times are whole seconds, so the stored time orders messages of one second. */
+export const compareMessagesByTime = (
+  a: LocalNostrMessage,
+  b: LocalNostrMessage,
+): number =>
+  a.createdAtSec - b.createdAtSec ||
+  (a.createdAt ?? "").localeCompare(b.createdAt ?? "");
+
 export const dedupeNostrMessagesByPriority = (
   input: readonly LocalNostrMessage[],
 ): LocalNostrMessage[] => {
   const rows = [...input];
-  rows.sort((a, b) => a.createdAtSec - b.createdAtSec);
+  rows.sort(compareMessagesByTime);
 
   const deduped: LocalNostrMessage[] = [];
   const indexByWrapId = new Map<string, number>();
@@ -214,7 +222,7 @@ export const dedupeNostrMessagesByPriority = (
     if (droppedRumorKey) indexByRumorKey.set(droppedRumorKey, existingIndex);
   }
 
-  deduped.sort((a, b) => a.createdAtSec - b.createdAtSec);
+  deduped.sort(compareMessagesByTime);
   return applyDeletions(deduped);
 };
 
