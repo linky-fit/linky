@@ -30,6 +30,7 @@ describe("MessageEntityPreview", () => {
           mintDisplay: "mint.example",
           mintUrl: "https://mint.example",
           sent: null,
+          received: false,
           tokenRaw: "cashuABC123",
           unit: "sat",
         })}
@@ -63,6 +64,7 @@ describe("MessageEntityPreview", () => {
           mintDisplay: "cashu.cz",
           mintUrl: "https://cashu.cz",
           sent: null,
+          received: false,
           tokenRaw: "cashuAexample",
           unit: "sat",
         })}

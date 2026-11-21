@@ -12,6 +12,7 @@ import {
 } from "../../testUtils/cashuToken";
 import {
   isShownDeferredReceive,
+  receivedTokenProofs,
   sentTokenClaims,
   takenTokenProofs,
 } from "./cashuTransfers";
@@ -91,6 +92,19 @@ describe("takenTokenProofs", () => {
     const key = keyOf("handedover") ?? "";
     expect(takenTokenProofs([unreachable], [handedOver]).has(key)).toBe(false);
     expect(takenTokenProofs([spent], [handedOver]).has(key)).toBe(true);
+  });
+});
+
+describe("receivedTokenProofs", () => {
+  it("holds only the tokens whose receive is done", () => {
+    const received = receivedTokenProofs([
+      transfer("AQEBAQEBAQEBAQEBAQEBAQ", "send", "done"),
+      transfer("AgICAgICAgICAgICAgICAg", "receive", "done"),
+      transfer("AwMDAwMDAwMDAwMDAwMDAw", "receive", "failed"),
+      transfer("BAQEBAQEBAQEBAQEBAQEBA", "receive", "pending"),
+    ]);
+
+    expect([...received]).toEqual([keyOf("AgICAgICAgICAgICAgICAg")]);
   });
 });
 
