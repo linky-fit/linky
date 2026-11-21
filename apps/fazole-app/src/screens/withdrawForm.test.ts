@@ -56,6 +56,17 @@ describe("the withdraw form", () => {
     expect(missing.ready).toBe(false);
   });
 
+  it("pays a bare invoice instead of looking it up as a Linky name", () => {
+    // A FakeWallet invoice of a local dev mint for 2 084 sat.
+    const invoice =
+      "lnbc20840n1p4vf3079qypqqqdq6fdshdsapwfhxzgz4ypxv8tts0yxqrrsssp5p9n75rrkt7v9slzhqwmewr5pqjktywd064ge2wpn4jqwm3rr6tzspp5res2cd0mu7y3cg24dmrj90u28mxzll0vexp38elkdvggd53ulrusuhnauhksa5w3rz8ng9p37wr7x8z9v44v2rquk86z48qxuutzfljr3gzx8uxqka2sc2fyymm7jmeu7gent8yadv0nvqmzcmk0phurxtqpwmex3a";
+    expect(needsContactLookup(invoice)).toBe(false);
+    const form = readWithdrawForm(invoice, idle, "", false);
+    expect(form.target?.kind).toBe("lightning_invoice");
+    expect(form.amountSats).toBe(2084);
+    expect(form.ready).toBe(true);
+  });
+
   it("takes a Lightning address elsewhere with an editable amount", () => {
     const form = readWithdrawForm("jmeno@domena.cz", idle, "", false);
     expect(form.target?.kind).toBe("lightning_address");

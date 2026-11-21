@@ -28,11 +28,15 @@ export interface WithdrawForm {
 /**
  * Whether the text names a Linky user by NIP-05 (`hynek`, `hynek@linky.fit`),
  * which a lookup turns into a key. Other `name@domain` texts are Lightning
- * addresses.
+ * addresses, and a bare invoice or LNURL is paid as such.
  */
 export const needsContactLookup = (text: string): boolean => {
   const contact = parseContactInput(text);
-  return contact?.kind === "nip05" && contact.domain === DEFAULT_CONTACT_DOMAIN;
+  return (
+    contact?.kind === "nip05" &&
+    contact.domain === DEFAULT_CONTACT_DOMAIN &&
+    (text.includes("@") || parseWithdrawTarget(text) === null)
+  );
 };
 
 /** Whether a scanned or pasted text names a recipient. */
