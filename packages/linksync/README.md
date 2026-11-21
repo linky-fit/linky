@@ -1,6 +1,6 @@
 # @linky-fit/linksync
 
-Synced storage for Linky: the Evolu schema with branded ids, one repository per data scope, and the shard mechanics that keep every Evolu owner under the relay's per-owner quota. A consumer calls repositories and never sees an owner id, a table name or a shard index.
+Synced storage for Linky: the Evolu schema with branded ids, one repository per data scope, and the shard mechanics that keep every Evolu owner under the Evolu relay's per-owner quota. A consumer calls repositories and never sees an owner id, a table name or a shard index.
 
 Entry points: `@linky-fit/linksync` (schema, ids, store, repositories, ports), `@linky-fit/linksync/evolu` (the Evolu 8 adapter and the Linky database) and `@linky-fit/linksync/react` (hooks; React is a peer dependency of this entry only).
 
