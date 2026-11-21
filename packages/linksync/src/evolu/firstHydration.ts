@@ -16,17 +16,23 @@ import type { KeyValueStorage } from "./keyValueStorage";
 const awaitingFirstHydrationKey = (appOwnerId: AppOwner["id"]): string =>
   `linky.shards.awaitingFirstHydration.${appOwnerId}`;
 
+const newHydrationMarker = (): string =>
+  globalThis.crypto?.randomUUID?.() ??
+  `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+
 /**
  * Marks the account of `appMnemonic` as adopted by this device, so its store
- * holds every write until the account first hydrates. Call it on restore,
- * before the store opens.
+ * holds every write until the account first hydrates. Call it on restore or
+ * before clearing local data, before the store opens. Each call writes a fresh
+ * token so an already-open tab hydrating an older database cannot clear it.
  */
 export const markAwaitingFirstHydration = (
   kv: KeyValueStorage,
   appMnemonic: string,
 ): void => {
   const owner = appOwnerFromMnemonic(appMnemonic);
-  if (owner) kv.setItem(awaitingFirstHydrationKey(owner.id), "1");
+  if (owner)
+    kv.setItem(awaitingFirstHydrationKey(owner.id), newHydrationMarker());
 };
 
 // Without any Evolu relay, only a device awaiting its first hydration stays unhydrated.
@@ -58,13 +64,16 @@ export const createAccountStore = (
   },
 ): LinkyStore => {
   const key = awaitingFirstHydrationKey(appOwner.id);
-  const awaitingFirstHydration = kv.getItem(key) === "1";
+  const marker = kv.getItem(key);
+  const awaitingFirstHydration = marker !== null && marker !== "";
   const store = createLinkyStore(
     hasEvoluRelay ? db : withNoRelaySync(db, !awaitingFirstHydration),
     appOwner,
     { ...options, holdWritesUntilHydrated: awaitingFirstHydration },
   );
   if (awaitingFirstHydration)
-    store.subscribeHydration(() => kv.removeItem(key));
+    store.subscribeHydration(() => {
+      if (kv.getItem(key) === marker) kv.removeItem(key);
+    });
   return store;
 };
