@@ -43,17 +43,23 @@ export const createTrackerStore = (ownerMnemonic: string) => {
   const ownerSecret = Evolu.mnemonicToOwnerSecret(mnemonic.value);
   const owner = Evolu.createAppOwner(ownerSecret);
   ownerSecret.fill(0);
-  const evolu = run.ok(
-    Evolu.createEvolu(schema, {
-      appName: Evolu.AppName.orThrow("linky-errors"),
-      evolu7Name: Evolu.Name.orThrow(`linky-errors-${owner.id}`),
-      appOwner: owner,
-      transports: EVOLU_SERVERS.flatMap((url) => {
-        const parsed = Evolu.WebSocketUrlFromString.fromUnknown(url);
-        return parsed.ok ? [{ type: "WebSocket", url: parsed.value }] : [];
+  const evolu = (async () => {
+    if ((await run.deps.getDevicePersistence()) === "NotPersisted")
+      throw new Error("Device storage is not available");
+    return run.ok(
+      Evolu.createEvolu(schema, {
+        appName: Evolu.AppName.orThrow("linky-errors"),
+        evolu7Name: Evolu.Name.orThrow(`linky-errors-${owner.id}`),
+        appOwner: owner,
+        transports: EVOLU_SERVERS.flatMap((url) => {
+          const parsed = Evolu.WebSocketUrlFromString.fromUnknown(url);
+          return parsed.ok ? [{ type: "WebSocket", url: parsed.value }] : [];
+        }),
       }),
-    }),
-  );
+    );
+  })();
+  // Avoid unhandled rejections while the UI reads the error through `useIssueResolutions`.
+  void evolu.catch(() => {});
   return {
     evolu,
     solve: async (resolution: IssueResolution): Promise<void> => {
@@ -98,7 +104,7 @@ export const useIssueResolutions = (store: TrackerStore) => {
     let active = true;
     void store.evolu
       .then(async (evolu) => {
-        await evolu.loadQuery(query);
+        await evolu.loadQuery(query, { cache: false });
         if (active) setLoaded({ store, evolu });
       })
       .catch(() => {
@@ -137,11 +143,15 @@ export const useIssueResolutions = (store: TrackerStore) => {
       ),
     [rows],
   );
+  const otherTabError =
+    databaseError?.type === "DatabaseHeldError" ||
+    databaseError?.type === "OtherBuildRunningError";
   return {
     resolutions,
     ready: loaded?.store === store,
-    error:
-      databaseError || loadFailed
+    error: otherTabError
+      ? "The solved-issue database is held by another tab. Close other error-tracker tabs and reload."
+      : databaseError || loadFailed
         ? "The solved-issue database could not be updated. Reload and try again."
         : null,
     solve: store.solve,
