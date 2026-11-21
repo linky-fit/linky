@@ -888,11 +888,16 @@ const bootstrap = async () => {
         import("./evolu.ts"),
       ]);
       const run = createEvoluRun();
+      let otherTabBootErrorShown = false;
       const reportEvoluError = () => {
         const error = run.deps.evoluError.get();
-        if (error !== null && !appCommitRecorded) {
-          window.clearTimeout(stuckTimer);
+        if (appCommitRecorded) return;
+        if (error !== null) {
+          pauseWatchdogs();
+          if (OTHER_TAB_ERRORS.has(error.type)) otherTabBootErrorShown = true;
           renderEvoluBootError(error);
+        } else if (otherTabBootErrorShown) {
+          window.location.reload();
         }
       };
       run.deps.evoluError.subscribe(reportEvoluError);
@@ -910,8 +915,8 @@ const bootstrap = async () => {
         showMovingDataNotice();
       }
       const { evolu } = await openSessionEvolu(registry, run, { memoryOnly });
+      await probeLocalDatabase(evolu, run);
       if (moving) {
-        await probeLocalDatabase(evolu);
         removeMovingDataNotice();
         resumeWatchdogs();
       }
