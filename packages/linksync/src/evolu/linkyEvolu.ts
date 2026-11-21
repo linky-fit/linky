@@ -35,6 +35,15 @@ export type { LinkyEvolu } from "./evoluShardDb";
 /** The page's Evolu run, whose deps hold the shared `evoluError` and `syncState` stores. */
 export type EvoluRun = Run<EvoluDeps>;
 
+/** Thrown when a stored app mnemonic is present but cannot derive an Evolu owner. */
+export class InvalidAppMnemonic extends Error {
+  override readonly name = "InvalidAppMnemonic";
+
+  constructor() {
+    super("Stored account key is invalid; refusing to open another database");
+  }
+}
+
 /** What the package reports for the inspector; the consumer turns each into a row. */
 export type LinkyEvoluEvent =
   | {
@@ -114,7 +123,7 @@ const toTransports = (urls: ReadonlyArray<string>) => [
 /**
  * Opens the Linky database owned by the mnemonic's app owner; the first time,
  * Evolu moves the device's Evolu 7 database into it before it answers
- * anything. A session without a valid mnemonic opens the app owner Evolu 7
+ * anything. A session without an app mnemonic opens the app owner Evolu 7
  * created for it, which Evolu keeps on the device from then on.
  */
 export const openLinkyEvolu = async (
@@ -142,11 +151,13 @@ export const openLinkyEvolu = async (
   // Where the platform offers no storage, Evolu keeps the database in memory unasked.
   if (!memoryOnly && (await run.deps.getDevicePersistence()) === "NotPersisted")
     throw new Error("Device storage is unavailable");
-  const appOwner = mnemonic === null ? null : appOwnerFromMnemonic(mnemonic);
-  if (appOwner !== null)
+  if (mnemonic !== null) {
+    const appOwner = appOwnerFromMnemonic(mnemonic);
+    if (appOwner === null) throw new InvalidAppMnemonic();
     return run.ok(
       createEvolu(LinkyEvoluSchema, { ...config, appOwner, memoryOnly }),
     );
+  }
   const app = await run.orThrow(
     createEvoluApp(LinkyEvoluSchema, {
       ...config,

@@ -530,9 +530,14 @@ const renderBootError = (error: unknown, source: string) => {
   const actions = document.createElement("div");
   actions.style.cssText = `display:flex;flex-wrap:wrap;gap:${space.sm}px;margin-top:${space.lg}px`;
 
+  const isAccountKeyError =
+    getErrorName(error) === "AppMnemonicUnreadable" ||
+    getErrorName(error) === "InvalidAppMnemonic";
+
   if (
-    snapshot.currentStage === "open-evolu" ||
-    snapshot.currentStage === "await-initial-local-data"
+    !isAccountKeyError &&
+    (snapshot.currentStage === "open-evolu" ||
+      snapshot.currentStage === "await-initial-local-data")
   ) {
     const temporaryDescription = document.createElement("p");
     temporaryDescription.style.cssText = `${bootFont("label", "regular")};color:${bootTheme.colorSubtle};margin:${space.lg}px 0 0`;

@@ -40,6 +40,8 @@ export const evoluAtom = Atom.keepAlive(Atom.make<OpenedEvolu | null>(null));
 
 /** Thrown when secure storage could not say which account this device holds. */
 export class AppMnemonicUnreadable extends Error {
+  override readonly name = "AppMnemonicUnreadable";
+
   constructor() {
     super("Secure storage did not return the account key; reload to retry");
   }
