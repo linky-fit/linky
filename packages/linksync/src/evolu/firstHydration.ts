@@ -47,7 +47,8 @@ const withNoRelaySync = (
 
 /**
  * The account's store, holding every write while the device awaits the
- * account's first hydration; hydration ends the wait for good.
+ * account's first hydration or starts from an empty temporary database backed
+ * by an Evolu relay; hydration ends the wait for good.
  */
 export const createAccountStore = (
   db: ShardDb<LinkyDbSchema>,
@@ -55,23 +56,32 @@ export const createAccountStore = (
   {
     kv,
     hasEvoluRelay,
+    memoryOnly = false,
     ...options
   }: {
     readonly kv: KeyValueStorage;
     readonly scopes?: LinkyScopes;
     readonly retention?: ShardRetention;
     readonly hasEvoluRelay: boolean;
+    readonly memoryOnly?: boolean;
   },
 ): LinkyStore => {
   const key = awaitingFirstHydrationKey(appOwner.id);
   const marker = kv.getItem(key);
   const awaitingFirstHydration = marker !== null && marker !== "";
+  const holdWritesUntilHydrated =
+    awaitingFirstHydration || (memoryOnly && hasEvoluRelay);
+  const { retention, ...rest } = options;
   const store = createLinkyStore(
     hasEvoluRelay ? db : withNoRelaySync(db, !awaitingFirstHydration),
     appOwner,
-    { ...options, holdWritesUntilHydrated: awaitingFirstHydration },
+    {
+      ...rest,
+      ...(!memoryOnly && retention !== undefined ? { retention } : {}),
+      holdWritesUntilHydrated,
+    },
   );
-  if (awaitingFirstHydration)
+  if (awaitingFirstHydration && !memoryOnly)
     store.subscribeHydration(() => {
       if (kv.getItem(key) === marker) kv.removeItem(key);
     });

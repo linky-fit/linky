@@ -9,8 +9,10 @@ import type {
 } from "@evolu/common";
 import {
   AppName,
+  createAppOwner,
   createEvolu,
   createEvoluApp,
+  createOwnerSecret,
   createQueryBuilder,
   Name,
   WebSocketUrlFromString,
@@ -183,7 +185,8 @@ const deferDispose = (run: EvoluRun, resource: AsyncDisposable): void => {
  * Opens the Linky database owned by the mnemonic's app owner; the first time,
  * Evolu moves the device's Evolu 7 database into it before it answers
  * anything. A session without an app mnemonic opens the app owner Evolu 7
- * created for it, which Evolu keeps on the device from then on.
+ * created for it, unless `memoryOnly` is set, in which case an ephemeral
+ * in-memory owner opens without touching persistent storage or `.linky-anon`.
  */
 export const openLinkyEvolu = async (
   run: EvoluRun,
@@ -196,7 +199,6 @@ export const openLinkyEvolu = async (
   }: {
     readonly mnemonic: string | null;
     readonly relayUrls: ReadonlyArray<string>;
-    /** Applies only to a session with a mnemonic; Evolu decides for the others. */
     readonly memoryOnly: boolean;
     readonly onDatabaseDeleted?: () => void;
     readonly onOwnerDeleted?: (ownerId: OwnerId) => void;
@@ -221,6 +223,22 @@ export const openLinkyEvolu = async (
         evolu7Name: generateDbNameFromMnemonic(mnemonic),
         appOwner,
         memoryOnly,
+        ...(onDatabaseDeleted ? { onDatabaseDeleted } : {}),
+      }),
+    );
+    deferDispose(run, evolu);
+    return evolu;
+  }
+  if (memoryOnly) {
+    // `createEvoluApp` has no `memoryOnly` option and would touch/migrate
+    // `.linky-anon` if OPFS answered after a stalled probe. Open an ephemeral
+    // in-memory owner instead so temporary sessions never touch disk.
+    const appOwner = createAppOwner(createOwnerSecret(run.deps));
+    const evolu = await run.ok(
+      createEvolu(LinkyEvoluSchema, {
+        ...baseConfig,
+        appOwner,
+        memoryOnly: true,
         ...(onDatabaseDeleted ? { onDatabaseDeleted } : {}),
       }),
     );
@@ -343,6 +361,7 @@ export const openLinkyStore = async (
     kv,
     scopes,
     hasEvoluRelay,
+    memoryOnly = false,
     onOwnerDeleted,
     onEvent,
   }: {
@@ -350,6 +369,7 @@ export const openLinkyStore = async (
     readonly kv: KeyValueStorage;
     readonly scopes: LinkyScopes;
     readonly hasEvoluRelay: boolean;
+    readonly memoryOnly?: boolean;
     readonly onOwnerDeleted?: (
       listener: (ownerId: OwnerId) => void,
     ) => () => void;
@@ -375,6 +395,7 @@ export const openLinkyStore = async (
       kv,
       scopes,
       hasEvoluRelay,
+      memoryOnly,
       retention: {
         get: (scope) =>
           readJson(kv, key(scope), Schema.NullOr(Schema.Natural), null) ??

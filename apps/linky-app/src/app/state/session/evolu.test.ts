@@ -115,6 +115,31 @@ describe("session database", () => {
       expect.objectContaining({
         syncState: run.deps.syncState,
         hasEvoluRelay: true,
+        memoryOnly: false,
+      }),
+    );
+  });
+
+  it("propagates memoryOnly and derives hasEvoluRelay from valid WebSocket transports", async () => {
+    const { store } = makeTestLinkyStore();
+    openLinkyStore.mockResolvedValue(store);
+    const ports = makeWebPlatformPorts();
+    const registry = makeTestAppRegistry({
+      ports: {
+        ...ports,
+        config: { ...ports.config, evoluRelayDefaults: ["not-a-ws-url"] },
+      },
+      session: signedInSession(),
+    });
+    const opened = await openSessionEvolu(registry, run, { memoryOnly: true });
+    expect(opened.hasEvoluRelay).toBe(false);
+    expect(opened.memoryOnly).toBe(true);
+    await Effect.runPromise(AtomRegistry.getResult(registry, linkyStoreAtom));
+    expect(openLinkyStore).toHaveBeenCalledWith(
+      opened.evolu,
+      expect.objectContaining({
+        hasEvoluRelay: false,
+        memoryOnly: true,
       }),
     );
   });

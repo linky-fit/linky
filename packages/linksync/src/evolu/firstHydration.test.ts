@@ -97,6 +97,49 @@ describe("createAccountStore", () => {
     expect(kv.getItem(key)).toBe(marker);
   });
 
+  it("holds writes in a memory-only session until hydrated without mutating kv", async () => {
+    const kv = memoryKeyValueStorage();
+    const db = makeInMemoryShardDb<LinkyDbSchema>(linkyTableColumns, {
+      holdSync: true,
+    });
+    const store = createAccountStore(db, appOwner, {
+      kv,
+      hasEvoluRelay: true,
+      memoryOnly: true,
+    });
+    Effect.runSync(store.reconcileSync());
+    let written = false;
+    void Effect.runPromise(
+      makeSettingsRepository(store).set("allowTestMints", true),
+    ).then(() => {
+      written = true;
+    });
+    await settle();
+    expect(written).toBe(false);
+    for (const owner of Effect.runSync(store.syncOwners()))
+      db.finishSync(owner.id);
+    await settle();
+    expect(written).toBe(true);
+    expect(kv.items.size).toBe(0);
+  });
+
+  it("writes immediately in a memory-only session with no Evolu relay without mutating kv", async () => {
+    const kv = memoryKeyValueStorage();
+    const db = makeInMemoryShardDb<LinkyDbSchema>(linkyTableColumns, {
+      holdSync: true,
+    });
+    const store = createAccountStore(db, appOwner, {
+      kv,
+      hasEvoluRelay: false,
+      memoryOnly: true,
+    });
+    Effect.runSync(store.reconcileSync());
+    await Effect.runPromise(
+      makeSettingsRepository(store).set("allowTestMints", true),
+    );
+    expect(kv.items.size).toBe(0);
+  });
+
   it("marks nothing for text that is not a mnemonic", () => {
     const kv = memoryKeyValueStorage();
     markAwaitingFirstHydration(kv, "not a mnemonic");
