@@ -57,8 +57,10 @@ export const finishPendingWipe = async (): Promise<void> => {
       break;
     } catch (error) {
       if (Date.now() >= deadline) {
-        console.warn("[fazole] local database not removed", error);
-        break;
+        throw new Error(
+          "Close other Fazole tabs and reload to finish resetting.",
+          { cause: error },
+        );
       }
       await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
     }

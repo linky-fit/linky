@@ -69,6 +69,19 @@ export const cs = {
     apply: "Aktualizovat",
   },
 
+  openFailed: {
+    otherTabTitle: "Fazole je otevřená v jiné záložce",
+    otherTabDescription:
+      "Zavřete ostatní záložky s Fazolí a načtěte stránku znovu.",
+    storageUnavailableTitle: "Úložiště zařízení není dostupné",
+    storageUnavailableDescription:
+      "Tento prohlížeč nemůže ukládat data aplikace (typické pro anonymní režim). Otevřete Fazole v běžném okně.",
+    title: "Aplikaci se nepodařilo otevřít",
+    description:
+      "Lokální úložiště se nepodařilo načíst. Zavřete ostatní záložky s Fazolí a zkuste to znovu.",
+    reload: "Načíst znovu",
+  },
+
   navigation: "Hlavní sekce",
   sections: {
     terminal: "Terminál",

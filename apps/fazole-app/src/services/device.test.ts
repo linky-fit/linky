@@ -1,4 +1,8 @@
 import { KeyValueStore, makeInMemoryKeyValueStore } from "@linky-fit/linkshu";
+import {
+  DeviceStorageUnavailableError,
+  EvoluDatabaseRefusedError,
+} from "@linky-fit/linksync/evolu";
 import { Effect, Layer, Result } from "effect";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRecoverySeed } from "../storage/account";
@@ -131,5 +135,49 @@ describe("a device", () => {
     const restored = await device.restoreAccount("kavárna u fazole");
     expect(Result.isFailure(restored)).toBe(true);
     expect(device.session()._tag).toBe("SignedOut");
+  });
+
+  it("moves to Failed with reason otherTab when another tab holds the database", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const first = fakePlatform();
+    const device = open(first.platform);
+    await device.createAccount({ name: "Kavárna", iban: null, picture: null });
+
+    const second = fakePlatform(first.kv);
+    const restarted = open({
+      ...second.platform,
+      openStore: async () => {
+        throw new EvoluDatabaseRefusedError({
+          type: "OtherBuildRunningError",
+        });
+      },
+    });
+    await vi.waitFor(() =>
+      expect(restarted.session()).toEqual({
+        _tag: "Failed",
+        reason: "otherTab",
+      }),
+    );
+  });
+
+  it("moves to Failed with reason storageUnavailable when persistent storage is unavailable", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const first = fakePlatform();
+    const device = open(first.platform);
+    await device.createAccount({ name: "Kavárna", iban: null, picture: null });
+
+    const second = fakePlatform(first.kv);
+    const restarted = open({
+      ...second.platform,
+      openStore: async () => {
+        throw new DeviceStorageUnavailableError();
+      },
+    });
+    await vi.waitFor(() =>
+      expect(restarted.session()).toEqual({
+        _tag: "Failed",
+        reason: "storageUnavailable",
+      }),
+    );
   });
 });

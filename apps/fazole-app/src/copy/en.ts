@@ -72,6 +72,18 @@ export const en: Copy = {
     apply: "Update",
   },
 
+  openFailed: {
+    otherTabTitle: "Fazole is open in another tab",
+    otherTabDescription: "Close Fazole's other tabs and reload.",
+    storageUnavailableTitle: "Device storage is unavailable",
+    storageUnavailableDescription:
+      "This browser cannot save app data on this device (typical for private browsing). Open Fazole in a normal window.",
+    title: "Could not open the app",
+    description:
+      "Local storage could not be opened. Close Fazole's other tabs and try again.",
+    reload: "Reload",
+  },
+
   navigation: "Main sections",
   sections: {
     terminal: "Terminal",
