@@ -399,7 +399,7 @@ export const sk = {
   chatStorageSubscribed: "Odoberané na tomto zariadení",
   chatStorageForget: "Zabudnúť staré shardy chatov",
   chatStorageForgetHint:
-    "Staré správy zmiznú z histórie chatu na tomto zariadení; kontakty a peniaze zostanú kompletné. Dáta zatiaľ zostanú uložené na zariadení aj na serveri.",
+    "Staré správy sa zmažú z histórie chatu na tomto zariadení; kontakty a peniaze zostanú kompletné. Synchronizované kópie zostanú na Evolu serveri, ale nesynchronizované správy sa už nebudú dať obnoviť.",
   chatStorageForgotten:
     "Staré shardy chatov boli na tomto zariadení zabudnuté.",
   chatStorageFailed:
@@ -453,7 +453,6 @@ export const sk = {
   transactionCashuInserted: "Prijaté na adresu",
   transactionCashuRestored: "Obnovenie cashu tokenu",
   transactionCashuIssued: "Vystavenie cashu tokenu",
-  transactionCashuSwap: "Výmena cashu medzi mintami",
   transactionDetailError: "Chyba",
   transactionDetailMint: "Mint",
   transactionDetailUsedToken: "Použité tokeny",

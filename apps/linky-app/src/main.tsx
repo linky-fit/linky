@@ -679,6 +679,16 @@ const getEvoluBootText = () => {
       tabsDescription: "Feche as outras abas do Linky e recarregue.",
       reload: "Recarregar",
     };
+  if (language.startsWith("sk"))
+    return {
+      movingTitle: "Presúvame vaše dáta",
+      movingDescription:
+        "Linky presúva vaše dáta do nového úložiska. Pri veľkom účte to môže trvať niekoľko minút. Nechajte túto obrazovku otvorenú.",
+      tabsTitle: "Linky je otvorené v inej karte",
+      tabsDescription:
+        "Zatvorte ostatné karty s Linky a načítajte stránku znova.",
+      reload: "Načítať znova",
+    };
   return {
     movingTitle: "Moving your data",
     movingDescription:
