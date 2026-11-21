@@ -10,7 +10,12 @@ import {
   parseLinkyPaymentRequestDeclineMessage,
 } from "./paymentRequestMessage";
 import { extractCashuTokenFromText } from "./tokenText";
-import { parseJsonValue, readRequestIdFromDetails } from "./transactionHistory";
+import {
+  isPaymentRequestTransaction,
+  parseJsonValue,
+  readRequestIdFromDetails,
+  type TransactionItem,
+} from "./transactionHistory";
 
 type PaymentRequestAnswer = "declined" | "paid";
 export type PaymentRequestStatus = PaymentRequestAnswer | "requested";
@@ -99,6 +104,24 @@ export const isRequestPaidInFull = (
   return sat > 0 && sat >= (amount ?? 0);
 };
 
+/** What History shows for a request the user made; null for every other row. */
+export type TransactionRequestStatus = "declined" | "paid" | "pending" | null;
+
+/** A request the user made is paid once `received` holds its amount, whatever single payments named it. */
+export const transactionRequestStatus = (
+  item: TransactionItem,
+  received: ReceivedSatByRequestId,
+  declinedRequestIds: ReadonlySet<string>,
+): TransactionRequestStatus => {
+  if (!isPaymentRequestTransaction(item)) return null;
+  const requestId = readRequestIdFromDetails(item.details);
+  if (requestId === null) return null;
+  const id = PaymentRequestId.make(requestId);
+  if (isRequestPaidInFull(received, id, item.amount)) return "paid";
+  if (declinedRequestIds.has(requestId)) return "declined";
+  return "pending";
+};
+
 interface RequestParts {
   /** The id and amount of a payment request message; `requestId` is null for one without `i`. */
   request: { amount: number | null; requestId: PaymentRequestId | null } | null;
@@ -131,32 +154,26 @@ interface Request {
   rumorId: string;
 }
 
+/** Whether the user's own payment answers a request they received. */
 const pays = (
   payment: ConversationMessage,
   paymentRequestId: PaymentRequestId | null,
   request: Request,
-  received: ReceivedSatByRequestId,
 ): boolean => {
-  if (payment.direction === request.direction) return false;
-  if (request.requestId === null || paymentRequestId !== request.requestId) {
-    // Only the payer can tell which request its reply paid, a bare token from an older Linky included.
-    return (
-      payment.direction === "out" &&
-      trimString(payment.replyToId) === request.rumorId
-    );
+  if (payment.direction !== "out" || request.direction !== "in") return false;
+  if (request.requestId !== null && paymentRequestId === request.requestId) {
+    return true;
   }
-  return (
-    payment.direction === "out" ||
-    isRequestPaidInFull(received, request.requestId, request.amount)
-  );
+  // Only the payer can tell which request its reply paid, a bare token from an older Linky included.
+  return trimString(payment.replyToId) === request.rumorId;
 };
 
 /**
  * The answered payment requests of one conversation by their rumor id; the
  * latest answer wins. The user's own payment answers a request they received
  * when its payload names the request id or it replies to the request. A
- * request the user sent is paid by an incoming payload naming its id once
- * `received` holds at least its amount for that id.
+ * request the user sent is paid once `received` holds at least its amount
+ * for its id, whoever paid it and in whichever conversation.
  */
 export const paymentRequestAnswersByRumorId = (
   messages: readonly ConversationMessage[],
@@ -192,15 +209,25 @@ export const paymentRequestAnswersByRumorId = (
     if (isDecline && replyToId) answer(replyToId, atSec, "declined");
     if (!payment) continue;
     for (const request of requests) {
-      if (pays(message, payment.requestId, request, received)) {
+      if (pays(message, payment.requestId, request)) {
         answer(request.rumorId, atSec, "paid");
       }
     }
   }
 
-  return new Map(
+  const answers = new Map(
     [...latest].map(([rumorId, { status }]) => [rumorId, status] as const),
   );
+  for (const { amount, direction, requestId, rumorId } of requests) {
+    if (
+      direction === "out" &&
+      requestId !== null &&
+      isRequestPaidInFull(received, requestId, amount)
+    ) {
+      answers.set(rumorId, "paid");
+    }
+  }
+  return answers;
 };
 
 /**

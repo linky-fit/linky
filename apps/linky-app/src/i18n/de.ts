@@ -461,7 +461,6 @@ export const de = {
   transactionCashuInserted: "An deiner Adresse empfangen",
   transactionCashuRestored: "Cashu-Token wiederhergestellt",
   transactionCashuIssued: "Cashu-Token ausgestellt",
-  transactionCashuSwap: "Cashu-Mint-Wechsel",
   transactionDetailError: "Fehler",
   transactionDetailMint: "Mint",
   transactionDetailUsedToken: "Verwendete Token",

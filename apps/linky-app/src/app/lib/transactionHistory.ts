@@ -8,6 +8,7 @@ import {
   type TransactionStatus,
 } from "@linky-fit/linksync";
 import { Option, Schema } from "effect";
+import type { I18nKey } from "../../i18n";
 import { JsonValue } from "../../types/json";
 import { isRecord } from "../../utils/unknown";
 import { asNonEmptyString } from "../../utils/validation";
@@ -116,6 +117,32 @@ const mergeDetailRecords = (
     ...(primaryRecord ?? {}),
     ...(secondaryRecord ?? {}),
   };
+};
+
+/** The title of a history row that no contact names. */
+export const transactionTitleKey = ({
+  category,
+  direction,
+  method,
+}: Pick<TransactionItem, "category" | "direction" | "method">): I18nKey => {
+  if (category === "lightning") {
+    if (direction === "in") {
+      return method === "lightning_address"
+        ? "transactionTopupLnAddress"
+        : "transactionTopupInvoice";
+    }
+    return method === "lightning_address"
+      ? "transactionPaidLightningAddress"
+      : "transactionPaidLightningInvoice";
+  }
+  if (category === "contacts") {
+    return direction === "in"
+      ? "transactionReceivedFromContact"
+      : "transactionSentToContact";
+  }
+  if (method === "cashu_receive") return "transactionCashuInserted";
+  if (method === "cashu_restore") return "transactionCashuRestored";
+  return "transactionCashuIssued";
 };
 
 export const isPaymentRequestTransaction = (item: TransactionItem): boolean => {
@@ -268,7 +295,6 @@ export const buildTransactionHistory = (
   records: readonly TransactionRecord[],
   operations: readonly StoredOperation[],
 ): {
-  fulfilledRequestIds: Set<string>;
   transactions: TransactionItem[];
 } => {
   const operationFor = makeOperationLookup(operations);
@@ -395,10 +421,7 @@ export const buildTransactionHistory = (
     };
   });
 
-  return {
-    fulfilledRequestIds: new Set(fulfillmentByRequestId.keys()),
-    transactions,
-  };
+  return { transactions };
 };
 
 export const deriveDeclinedRequestIds = (

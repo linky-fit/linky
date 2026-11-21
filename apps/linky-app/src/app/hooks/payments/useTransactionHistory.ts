@@ -15,10 +15,15 @@ import {
   deriveDeclinedRequestIds,
   isPaymentRequestTransaction,
   readJsonRecord,
-  readRequestIdFromDetails,
   readStringArrayFromJson,
+  transactionTitleKey,
   type TransactionItem,
 } from "../../lib/transactionHistory";
+import {
+  receivedSatByRequestId,
+  transactionRequestStatus,
+  type TransactionRequestStatus,
+} from "../../lib/paymentRequestStatus";
 import { calculateTransactionHistoryFee } from "../../lib/transactionHistoryFee";
 import { useNostrPictureByNpub } from "../contacts/useProfileCache";
 import { useDisplayAmounts, useTranslation } from "../shell";
@@ -52,8 +57,6 @@ export interface TransactionStatusPill {
   label: string;
   tone: Tone;
 }
-
-export type TransactionRequestStatus = "declined" | "paid" | "pending" | null;
 
 const scoreContact = (contact: ContactSummary): number => {
   let score = 0;
@@ -169,9 +172,13 @@ export const useTransactionHistory = (): TransactionHistory => {
     return byId;
   }, [contactRows]);
 
-  const { fulfilledRequestIds, transactions: allTransactions } = React.useMemo(
+  const { transactions: allTransactions } = React.useMemo(
     () => buildTransactionHistory(transactionRecords, cashuOperations),
     [cashuOperations, transactionRecords],
+  );
+  const receivedByRequestId = React.useMemo(
+    () => receivedSatByRequestId(transactionRecords),
+    [transactionRecords],
   );
   const transactionsById = React.useMemo(
     () => new Map(allTransactions.map((item) => [item.id, item])),
@@ -206,25 +213,7 @@ export const useTransactionHistory = (): TransactionHistory => {
             : t("transactionSentToContact"))
         );
       }
-      if (item.category === "lightning") {
-        if (item.direction === "in") {
-          return item.method === "lightning_address"
-            ? t("transactionTopupLnAddress")
-            : t("transactionTopupInvoice");
-        }
-        return item.method === "lightning_address"
-          ? t("transactionPaidLightningAddress")
-          : t("transactionPaidLightningInvoice");
-      }
-      if (item.category === "contacts") {
-        return item.direction === "in"
-          ? t("transactionReceivedFromContact")
-          : t("transactionSentToContact");
-      }
-      if (item.method === "cashu_receive") return t("transactionCashuInserted");
-      if (item.method === "cashu_restore") return t("transactionCashuRestored");
-      if (item.method === "cashu_emit") return t("transactionCashuSwap");
-      return t("transactionCashuIssued");
+      return t(transactionTitleKey(item));
     },
     [contactsById, t],
   );
@@ -288,15 +277,9 @@ export const useTransactionHistory = (): TransactionHistory => {
   );
 
   const getRequestStatus = React.useCallback(
-    (item: TransactionItem): TransactionRequestStatus => {
-      if (!isPaymentRequestTransaction(item)) return null;
-      const requestId = readRequestIdFromDetails(item.details);
-      if (!requestId) return null;
-      if (fulfilledRequestIds.has(requestId)) return "paid";
-      if (declinedRequestIds.has(requestId)) return "declined";
-      return "pending";
-    },
-    [declinedRequestIds, fulfilledRequestIds],
+    (item: TransactionItem): TransactionRequestStatus =>
+      transactionRequestStatus(item, receivedByRequestId, declinedRequestIds),
+    [declinedRequestIds, receivedByRequestId],
   );
 
   const buildDetailEntries = React.useCallback(

@@ -460,7 +460,6 @@ export const pt = {
   transactionCashuInserted: "Recebido no seu endereço",
   transactionCashuRestored: "Token cashu restaurado",
   transactionCashuIssued: "Token cashu emitido",
-  transactionCashuSwap: "Troca no mint cashu",
   transactionDetailError: "Erro",
   transactionDetailMint: "Mint",
   transactionDetailUsedToken: "Tokens usados",

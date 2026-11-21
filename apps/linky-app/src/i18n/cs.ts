@@ -451,7 +451,6 @@ export const cs = {
   transactionCashuInserted: "Přijato na adresu",
   transactionCashuRestored: "Obnovení cashu tokenu",
   transactionCashuIssued: "Vystavení cashu tokenu",
-  transactionCashuSwap: "Směna cashu mezi minty",
   transactionDetailError: "Chyba",
   transactionDetailMint: "Mint",
   transactionDetailUsedToken: "Použité tokeny",
