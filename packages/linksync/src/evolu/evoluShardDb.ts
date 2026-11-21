@@ -127,6 +127,7 @@ const chunked = <A>(items: ReadonlyArray<A>): ReadonlyArray<ReadonlyArray<A>> =>
 /** A write Evolu could not store, with the rest of its batch. */
 export interface FailedWrite {
   readonly tables: ReadonlyArray<string>;
+  readonly ownerIds: ReadonlyArray<OwnerId>;
   readonly rows: number;
   readonly error: string;
 }
@@ -204,6 +205,10 @@ const toEvoluRow = ({ isDeleted, ...columns }: Mutation["row"]) =>
 
 const tablesOf = (mutations: ReadonlyArray<Mutation>) => [
   ...new Set(mutations.map(({ table }) => table)),
+];
+
+const ownerIdsOf = (mutations: ReadonlyArray<Mutation>) => [
+  ...new Set(mutations.map(({ owner }) => owner.id)),
 ];
 
 export const createEvoluShardDb = (
@@ -395,6 +400,7 @@ export const createEvoluShardDb = (
           Effect.sync(() =>
             onWriteFailed?.({
               tables: tablesOf(mutations),
+              ownerIds: ownerIdsOf(mutations),
               rows: mutations.length,
               error: error.message,
             }),

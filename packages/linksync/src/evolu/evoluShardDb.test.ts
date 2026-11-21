@@ -261,13 +261,14 @@ describe("evolu shard db", () => {
       onWriteFailed: (write) => failed.push(write),
     });
     fake.hold();
+    const owner = testAppOwner();
     const write = Effect.runPromise(
       Effect.result(
         db.mutate([
           {
             kind: "upsert",
             table: "setting",
-            owner: testAppOwner(),
+            owner,
             row: valid("a"),
           },
         ]),
@@ -277,7 +278,12 @@ describe("evolu shard db", () => {
     fake.fail();
     expect((await write)._tag).toBe("Failure");
     expect(failed).toEqual([
-      { tables: ["setting"], rows: 1, error: expect.stringContaining("") },
+      {
+        tables: ["setting"],
+        ownerIds: [owner.id],
+        rows: 1,
+        error: expect.stringContaining(""),
+      },
     ]);
   });
 

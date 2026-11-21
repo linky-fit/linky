@@ -65,13 +65,23 @@ describe("reportLinkyEvoluEvent", () => {
     [
       {
         _tag: "WriteFailed",
-        write: { tables: ["message"], rows: 2, error: "disk full" },
+        write: {
+          tables: ["message"],
+          ownerIds: [shard],
+          rows: 2,
+          error: "disk full",
+        },
       },
       {
         tag: "WriteFailed",
         summary: "Evolu could not store a message write of 2 rows",
-        links: {},
-        payload: { tables: ["message"], rows: 2, error: "disk full" },
+        links: { owner: [shard] },
+        payload: {
+          tables: ["message"],
+          ownerIds: [shard],
+          rows: 2,
+          error: "disk full",
+        },
       },
     ],
     [
