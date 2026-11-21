@@ -96,7 +96,7 @@ export const reportLinkyEvoluEvent = (event: LinkyEvoluEvent): void => {
           channel: "evolu.sync",
           tag: "WriteFailed",
           summary: `Evolu could not store a ${event.write.tables.join(", ")} write of ${event.write.rows} rows`,
-          links: {},
+          links: { owner: [...event.write.ownerIds] },
           payload: event.write,
         },
       ]);

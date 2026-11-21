@@ -121,7 +121,7 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   OwnerSyncFailed:
     "A route of the owner to an Evolu relay failed, as Evolu's sync state reports it, such as with ProtocolQuotaError when the relay stores no more for the owner. The owner stays unsynced through that relay until a later round succeeds, so hydration and pointer repair keep waiting for it. The owner link names the owner; the payload names the error.",
   WriteFailed:
-    "Evolu could not store a local write, so none of its batch was stored. The write fails, so its caller retries or reports it like any failed write. The payload names the tables, the row count and the error.",
+    "Evolu could not store a local write, so none of its batch was stored. The write fails, so its caller retries or reports it like any failed write. Owner links name the affected owners; the payload names the tables, the row count and the error.",
   WriteSlow:
     "A local write took 250 ms or more from being queued to Evolu's worker applying it. Evolu re-runs every subscribed query inside each write, so the time grows with what the app keeps subscribed and with how much data the device holds. The payload gives the tables, the row count and the duration.",
   ShardPointerRepaired:
