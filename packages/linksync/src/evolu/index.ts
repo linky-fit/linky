@@ -17,6 +17,7 @@ export {
   openLinkyDatabase,
   openLinkyEvolu,
   openLinkyStore,
+  syncStateQuotaErrors,
   toEvoluTransports,
 } from "./linkyEvolu";
 export type {

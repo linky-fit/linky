@@ -7,6 +7,7 @@ import type {
   Run,
   SyncState,
 } from "@evolu/common";
+import type { ProtocolQuotaError } from "@evolu/common/local-first";
 import {
   AppName,
   createAppOwner,
@@ -306,6 +307,33 @@ export const awaitDatabaseReady = (
       },
     );
   });
+
+/** Every owner currently failing a route with `ProtocolQuotaError` for this database. */
+export const syncStateQuotaErrors = (
+  state: SyncState | null,
+  name: string,
+): ReadonlyArray<{
+  readonly ownerId: OwnerId;
+  readonly error: ProtocolQuotaError;
+}> => {
+  const tenant = state?.tenants.find((t) => t.name === name);
+  if (tenant?.type !== "Active") return [];
+  const failures: Array<{
+    readonly ownerId: OwnerId;
+    readonly error: ProtocolQuotaError;
+  }> = [];
+  for (const owner of tenant.owners)
+    if (owner.type === "Writable")
+      for (const route of owner.routes)
+        if (
+          route.type === "Pending" &&
+          route.failure?.type === "ProtocolQuotaError"
+        ) {
+          failures.push({ ownerId: owner.ownerId, error: route.failure });
+          break;
+        }
+  return failures;
+};
 
 /** Reports each relay failure or skipped change of the database's owners once. */
 const reportSyncFailures = (

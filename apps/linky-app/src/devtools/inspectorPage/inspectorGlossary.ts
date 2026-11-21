@@ -163,7 +163,7 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "evolu.laneMigrationFailed":
     "The lane migration threw before it could finish; the done flag stays unset and the next launch retries. The app keeps running on the lanes meanwhile.",
   EvoluSyncRetry:
-    "The user reloads the app to retry Evolu sync after a quota or server configuration change. Local history is preserved.",
+    "The user retried Evolu sync after a quota error (via requestSync) or reloaded the app to apply server configuration changes. Local history is preserved.",
   EvoluError:
     "Evolu reported a database or sync error. The owner link identifies the affected sync account when available; relay reachability alone does not confirm its data synced.",
   WirePublished:

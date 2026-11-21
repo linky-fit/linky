@@ -22,6 +22,7 @@ import {
   EvoluDatabaseRefusedError,
   generateDbNameFromMnemonic,
   openLinkyStore,
+  syncStateQuotaErrors,
   type LinkyEvoluEvent,
 } from "./linkyEvolu";
 import { LinkyEvoluSchema, linkyIndexes } from "./linkyEvoluSchema";
@@ -91,6 +92,46 @@ describe("awaitDatabaseReady", () => {
         error instanceof EvoluDatabaseRefusedError &&
         error.evoluError === refusal,
     );
+  });
+});
+
+describe("syncStateQuotaErrors", () => {
+  it("lists every writable owner with a ProtocolQuotaError route failure", () => {
+    const name = Name.orThrow("linky-test");
+    const quotaError = {
+      type: "ProtocolQuotaError" as const,
+      ownerId: appOwner.id,
+      at: Millis.orThrow(1),
+    };
+    const state: SyncState = {
+      transports: [],
+      tenants: [
+        {
+          type: "Active",
+          name,
+          owners: [
+            {
+              type: "Writable",
+              ownerId: appOwner.id,
+              routes: [
+                {
+                  type: "Pending",
+                  transportId: createIdFromString<"SyncTransport">("t"),
+                  failure: quotaError,
+                  skippedError: null,
+                  completeAt: null,
+                  lastSentAt: null,
+                  lastReceivedAt: null,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    expect(syncStateQuotaErrors(state, name)).toEqual([
+      { ownerId: appOwner.id, error: quotaError },
+    ]);
   });
 });
 
