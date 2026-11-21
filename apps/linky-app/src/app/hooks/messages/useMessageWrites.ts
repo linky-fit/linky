@@ -4,9 +4,7 @@ import {
   createId,
   directConversationIdFor,
   MessageId,
-  NonEmptyString,
   nostrReactionIdFor,
-  PositiveInt,
   ReactionId,
   RowNotFound,
   type ConversationsRepository,
@@ -165,8 +163,8 @@ export const useMessageWrites = ({
       const messageId = parseMessageId(message.id);
       if (!messageId) return NO_WRITE;
       const patch = {
-        content: NonEmptyString.orThrow(DELETED_MESSAGE_CONTENT),
-        deletedAtSec: PositiveInt.orThrow(nowSeconds()),
+        content: DELETED_MESSAGE_CONTENT,
+        deletedAtSec: nowSeconds(),
         originalContent: null,
         replyToContent: null,
       };

@@ -1,4 +1,4 @@
-import type { OnchainTransferRow } from "@linky-fit/linksync";
+import type { OnchainTransferStoredRow } from "@linky-fit/linksync";
 import {
   OnchainTransferDirection,
   type OnchainTransferUpdate,
@@ -56,7 +56,10 @@ const isDirection = Schema.is(OnchainTransferDirection);
 /** Tells the user about a live update with a toast and a PWA notification, unless the transfer is open; an acceptance of a send the user already paid is no news. */
 export const notifyOnchainTransferUpdate = (
   update: OnchainTransferUpdate,
-  transfer: Pick<OnchainTransferRow, "amount" | "direction" | "sentAtSec">,
+  transfer: Pick<
+    OnchainTransferStoredRow,
+    "amount" | "direction" | "sentAtSec"
+  >,
   ctx: OnchainTransferNotificationsContext,
 ): void => {
   const { route } = ctx;

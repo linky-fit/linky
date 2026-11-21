@@ -1,18 +1,27 @@
-import type { PositiveInt } from "@evolu/common";
 import { Effect } from "effect";
 import type { RowNotFound, ShardDbError } from "../core";
 import type { ContactId } from "../model/ids";
 import type { LinkyDbSchema } from "../model/schema";
 import type { LinkyStore } from "../model/store";
 import { makeConversationsRepository } from "./conversations";
-import { tableRepository, type TableRepository } from "./tableRepository";
+import {
+  domainTableRepository,
+  type DomainPatch,
+  type DomainRow,
+  type DomainTableRepository,
+  type DomainWriteRow,
+} from "./domainRepository";
 
-export interface ContactsRepository extends TableRepository<
+export type ContactRecord = DomainRow<LinkyDbSchema["contact"]>;
+export type ContactInsert = DomainWriteRow<LinkyDbSchema["contact"]>;
+export type ContactPatch = DomainPatch<LinkyDbSchema["contact"]>;
+
+export interface ContactsRepository extends DomainTableRepository<
   LinkyDbSchema["contact"]
 > {
   readonly archive: (
     id: ContactId,
-    atSec: PositiveInt,
+    atSec: number,
   ) => Effect.Effect<void, ShardDbError | RowNotFound>;
   /** Clears the archive on the contact and on its conversation, where older app versions keep it. */
   readonly unarchive: (
@@ -24,7 +33,7 @@ export interface ContactsRepository extends TableRepository<
 export const makeContactsRepository = (
   store: LinkyStore,
 ): ContactsRepository => {
-  const contacts = tableRepository(store, "contacts", "contact");
+  const contacts = domainTableRepository(store, "contacts", "contact");
   const conversations = makeConversationsRepository(store);
   return {
     ...contacts,

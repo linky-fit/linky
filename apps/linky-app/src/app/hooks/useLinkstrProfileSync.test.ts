@@ -67,7 +67,7 @@ describe("applyProfileWatchEvent contact-row policy", () => {
 
   it("does not let a hostile profile rename a saved custom contact", () => {
     const { contactPatches, ctx } = makeCtx([
-      { id: c1, npub: NPUB, name: "My friend", nameSetByUser: 1 },
+      { id: c1, npub: NPUB, name: "My friend", nameSetByUser: true },
     ]);
     applyProfileWatchEvent(
       profileUpdated({ name: "Bank\u202e support" }, 100),
@@ -92,9 +92,9 @@ describe("applyProfileWatchEvent contact-row policy", () => {
       {
         id: c1,
         lnAddress: "custom@ln.example",
-        lnAddressSetByUser: 1,
+        lnAddressSetByUser: true,
         name: "Moje jméno",
-        nameSetByUser: 1,
+        nameSetByUser: true,
         npub: NPUB,
       },
     ]);

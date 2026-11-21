@@ -1,9 +1,4 @@
-import {
-  NonEmptyString1000,
-  SqliteBoolean,
-  sqliteTrue,
-} from "@linky-fit/linksync";
-import { toContactTextFields } from "../../lib/contactFields";
+import { toContactText, toContactTextFields } from "../../lib/contactFields";
 import {
   encodeNpub,
   type ProfileMetadata,
@@ -16,7 +11,12 @@ import {
   useAtomValue,
   useLinkstrCommands,
 } from "@linky-fit/linkstr-react";
-import { createId, type ContactsRepository } from "@linky-fit/linksync";
+import {
+  createId,
+  type ContactInsert,
+  type ContactPatch,
+  type ContactsRepository,
+} from "@linky-fit/linksync";
 import { Exit } from "effect";
 import React from "react";
 import { ContactId } from "../../../evoluIds";
@@ -76,16 +76,8 @@ export type ContactSearchResult =
 type ContactRow = ContactRowLike;
 type SelectedContactRow = ContactRowLike & { id: ContactId };
 
-type ContactFieldsPatch = {
-  id: ContactId;
-  lnAddressSetByUser?: typeof SqliteBoolean.Output | null;
-  nameSetByUser?: typeof SqliteBoolean.Output | null;
-} & Partial<
-  Record<
-    "groupName" | "groupNamesJson" | "lnAddress" | "name" | "npub",
-    typeof NonEmptyString1000.Output | null
-  >
->;
+type Mutable<T> = { -readonly [K in keyof T]: T[K] };
+type ContactFieldsPatch = Mutable<ContactPatch> & { id: ContactId };
 
 interface UseContactEditorParams {
   contacts: readonly ContactRow[];
@@ -483,37 +475,24 @@ export const useContactEditor = ({
       editingId && selectedContact && npub && selectedNpub === npub
         ? resolveContactProfile(selectedContact, cachedMetadata)
         : getContactPublicProfile(npub, cachedMetadata);
-    const parsePublicText = (value: string) => {
-      const parsed = value ? NonEmptyString1000.fromUnknown(value) : null;
-      return parsed?.ok ? parsed.value : null;
-    };
-
-    const createPayload: Partial<{
-      groupName: typeof NonEmptyString1000.Output;
-      groupNamesJson: typeof NonEmptyString1000.Output;
-      lnAddress: typeof NonEmptyString1000.Output;
-      lnAddressSetByUser: typeof SqliteBoolean.Output;
-      name: typeof NonEmptyString1000.Output;
-      nameSetByUser: typeof SqliteBoolean.Output;
-      npub: typeof NonEmptyString1000.Output;
-    }> = {};
+    const createPayload: Mutable<Omit<ContactInsert, "id">> = {};
     if (payload.name) {
       createPayload.name = payload.name;
       if (name !== publicProfile.name) {
-        createPayload.nameSetByUser = sqliteTrue;
+        createPayload.nameSetByUser = true;
       }
     } else {
-      const publicName = parsePublicText(publicProfile.name);
+      const publicName = toContactText(publicProfile.name);
       if (publicName) createPayload.name = publicName;
     }
     if (payload.npub) createPayload.npub = payload.npub;
     if (payload.lnAddress) {
       createPayload.lnAddress = payload.lnAddress;
       if (lnAddress.toLowerCase() !== publicProfile.lnAddress.toLowerCase()) {
-        createPayload.lnAddressSetByUser = sqliteTrue;
+        createPayload.lnAddressSetByUser = true;
       }
     } else {
-      const publicLnAddress = parsePublicText(publicProfile.lnAddress);
+      const publicLnAddress = toContactText(publicProfile.lnAddress);
       if (publicLnAddress) createPayload.lnAddress = publicLnAddress;
     }
     if (payload.groupName) createPayload.groupName = payload.groupName;
@@ -574,9 +553,9 @@ export const useContactEditor = ({
       // value (the row is the display source) and clear the flag.
       if (changedFields.name !== undefined) {
         const isNameOverride = Boolean(name) && name !== publicProfile.name;
-        changedFields.nameSetByUser = isNameOverride ? sqliteTrue : null;
+        changedFields.nameSetByUser = isNameOverride ? true : null;
         if (!isNameOverride) {
-          changedFields.name = parsePublicText(publicProfile.name);
+          changedFields.name = toContactText(publicProfile.name);
         }
       }
 
@@ -584,11 +563,9 @@ export const useContactEditor = ({
         const isLnAddressOverride =
           Boolean(lnAddress) &&
           lnAddress.toLowerCase() !== publicProfile.lnAddress.toLowerCase();
-        changedFields.lnAddressSetByUser = isLnAddressOverride
-          ? sqliteTrue
-          : null;
+        changedFields.lnAddressSetByUser = isLnAddressOverride ? true : null;
         if (!isLnAddressOverride) {
-          changedFields.lnAddress = parsePublicText(publicProfile.lnAddress);
+          changedFields.lnAddress = toContactText(publicProfile.lnAddress);
         }
       }
 
@@ -777,24 +754,18 @@ export const useContactEditor = ({
         return;
       }
 
-      const parsedNpub = NonEmptyString1000.fromUnknown(npub);
-      if (!parsedNpub.ok) {
+      const parsedNpub = toContactText(npub);
+      if (parsedNpub === null) {
         setStatus(t("contactIdentifierInvalid"));
         return;
       }
-      const name = candidate.name.trim();
-      const lnAddress = candidate.lnAddress.trim();
-      const createPayload: Partial<{
-        lnAddress: typeof NonEmptyString1000.Output;
-        name: typeof NonEmptyString1000.Output;
-        npub: typeof NonEmptyString1000.Output;
-      }> = {
-        npub: parsedNpub.value,
+      const createPayload: Mutable<Omit<ContactInsert, "id">> = {
+        npub: parsedNpub,
       };
-      const parsedName = NonEmptyString1000.fromUnknown(name);
-      if (parsedName.ok) createPayload.name = parsedName.value;
-      const parsedLnAddress = NonEmptyString1000.fromUnknown(lnAddress);
-      if (parsedLnAddress.ok) createPayload.lnAddress = parsedLnAddress.value;
+      const parsedName = toContactText(candidate.name);
+      if (parsedName !== null) createPayload.name = parsedName;
+      const parsedLnAddress = toContactText(candidate.lnAddress);
+      if (parsedLnAddress !== null) createPayload.lnAddress = parsedLnAddress;
 
       setIsSavingContact(true);
       const id = createId<"Contact">();
@@ -866,20 +837,16 @@ export const useContactEditor = ({
 
       if (field === "name") {
         const bestName = metadata ? getBestNostrName(metadata) : null;
-        const parsedName = bestName
-          ? NonEmptyString1000.fromUnknown(bestName)
-          : null;
         void updateContactFields({
           id: editingId,
-          name: parsedName?.ok ? parsedName.value : null,
+          name: toContactText(bestName),
           nameSetByUser: null,
         });
       } else {
         const ln = getContactPublicProfile(npub, metadata).lnAddress;
-        const parsedLn = ln ? NonEmptyString1000.fromUnknown(ln) : null;
         void updateContactFields({
           id: editingId,
-          lnAddress: parsedLn?.ok ? parsedLn.value : null,
+          lnAddress: toContactText(ln),
           lnAddressSetByUser: null,
         });
       }

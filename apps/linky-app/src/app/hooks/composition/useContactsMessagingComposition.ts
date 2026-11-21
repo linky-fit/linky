@@ -5,7 +5,6 @@ import type {
 } from "@linky-fit/linkstr";
 import {
   ContactId,
-  PositiveInt,
   type ContactsRepository,
   type ConversationsRepository,
 } from "@linky-fit/linksync";
@@ -277,7 +276,7 @@ export const useContactsMessagingComposition = ({
         name,
         npub,
         pubkey,
-        nameSetByUser: contact.nameSetByUser === 1,
+        nameSetByUser: contact.nameSetByUser === true,
       });
     }
 
@@ -651,15 +650,18 @@ export const useContactsMessagingComposition = ({
   const advanceContactPeerSeen = React.useCallback(
     (contactId: string, seenWindow: PeerSeenWindow): Promise<WriteOutcome> => {
       const id = ContactId.fromUnknown(contactId);
-      const atSec = PositiveInt.fromUnknown(seenWindow.seenUpToSec);
-      if (!id.ok || !atSec.ok) return NO_WRITE;
-      const sinceSec = PositiveInt.fromUnknown(seenWindow.sinceSec);
+      const atSec = seenWindow.seenUpToSec;
+      if (!id.ok || !Number.isSafeInteger(atSec) || atSec <= 0) return NO_WRITE;
+      const sinceSec =
+        Number.isSafeInteger(seenWindow.sinceSec) && seenWindow.sinceSec > 0
+          ? seenWindow.sinceSec
+          : null;
       peerSeenWrittenByContactIdRef.current.set(contactId, seenWindow);
       const written = runWrite(
         Effect.flatMap(conversationsRepository.ensureDirect(id.value), (chat) =>
           conversationsRepository.setPeerSeen(chat.id, {
-            sinceSec: sinceSec.ok ? sinceSec.value : null,
-            atSec: atSec.value,
+            sinceSec,
+            atSec,
           }),
         ),
       );

@@ -2,7 +2,6 @@ import {
   createId,
   makeContactsRepository,
   makeConversationsRepository,
-  PositiveInt,
 } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { act } from "react";
@@ -20,7 +19,7 @@ describe("useConversationArchiveMigration", () => {
     await Effect.runPromise(contacts.insert({ id }));
     const chat = await Effect.runPromise(conversations.ensureDirect(id));
     await Effect.runPromise(
-      conversations.update(chat.id, { archivedAtSec: PositiveInt.orThrow(50) }),
+      conversations.update(chat.id, { archivedAtSec: 50 }),
     );
     const contactRows = await Effect.runPromise(contacts.all);
     const conversationRows = await Effect.runPromise(conversations.all);

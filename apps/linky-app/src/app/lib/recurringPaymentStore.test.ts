@@ -1,5 +1,4 @@
 import type { RecurringPaymentRecord } from "@linky-fit/linksync";
-import { NonEmptyString100, PositiveInt } from "@linky-fit/linksync";
 import { describe, expect, it } from "vitest";
 import { makeTestLinkyStore } from "../../testUtils/linkyStore";
 import {
@@ -21,18 +20,17 @@ const record = (
   ownerId: appOwner.id,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
-  isDeleted: null,
-  createdAtSec: PositiveInt.orThrow(1_700_000_000),
+  createdAtSec: 1_700_000_000,
   contactId: contactIdFor("contact-1"),
   mintUrl: "https://mint.example",
   rail: "cashu",
-  amount: PositiveInt.orThrow(21_000),
+  amount: 21_000,
   unit: "sat",
   note: null,
   intervalUnit: "month",
-  intervalCount: PositiveInt.orThrow(1),
-  anchorAtSec: PositiveInt.orThrow(1_700_000_000),
-  timeZone: NonEmptyString100.orThrow("Europe/Prague"),
+  intervalCount: 1,
+  anchorAtSec: 1_700_000_000,
+  timeZone: "Europe/Prague",
   progress: recurringProgressColumn({
     runCount: 0,
     nextDueAtSec: 1_702_592_400,
@@ -68,7 +66,7 @@ describe("readRecurringPaymentOrder", () => {
 
   it("keeps a fiat amount in its own unit", () => {
     const order = readRecurringPaymentOrder(
-      record({ amount: PositiveInt.orThrow(15_050), unit: "czk" }),
+      record({ amount: 15_050, unit: "czk" }),
     );
     expect(order?.amount).toEqual({ amount: 15_050, unit: "czk" });
   });
@@ -76,7 +74,7 @@ describe("readRecurringPaymentOrder", () => {
   it("reads the run count and a known run status", () => {
     const order = readRecurringPaymentOrder(
       record({
-        lastRunStatus: NonEmptyString100.orThrow("paid"),
+        lastRunStatus: "paid",
         progress: recurringProgressColumn({
           runCount: 3,
           nextDueAtSec: 1_702_592_400,
@@ -90,7 +88,7 @@ describe("readRecurringPaymentOrder", () => {
   it("ignores an unknown run status", () => {
     const order = readRecurringPaymentOrder(
       record({
-        lastRunStatus: NonEmptyString100.orThrow("teleported"),
+        lastRunStatus: "teleported",
       }),
     );
     expect(order?.lastRunStatus).toBeNull();

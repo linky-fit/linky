@@ -1,9 +1,7 @@
 // Migration bridge; removal gate in app/migrations/AGENTS.md
 import {
   hiddenListingIdFor,
-  NonEmptyString100,
-  NonEmptyString1000,
-  type ContactRow,
+  type ContactRecord,
   type ContactsRepository,
   type HiddenListingsRepository,
 } from "@linky-fit/linksync";
@@ -40,7 +38,7 @@ export const useHiddenListingsMigration = ({
   hiddenListingsRepository,
   hydrated,
 }: {
-  readonly contactRows: ReadonlyArray<ContactRow>;
+  readonly contactRows: ReadonlyArray<ContactRecord>;
   readonly contactsRepository: Pick<ContactsRepository, "update">;
   readonly hiddenListingsRepository: Pick<
     HiddenListingsRepository,
@@ -64,8 +62,8 @@ export const useHiddenListingsMigration = ({
         for (const { author, listingId } of migration.moves)
           yield* hiddenListingsRepository.insertIfAbsent({
             id: hiddenListingIdFor(author, listingId),
-            authorPubkey: NonEmptyString100.orThrow(author),
-            listingId: NonEmptyString1000.orThrow(listingId),
+            authorPubkey: author,
+            listingId,
           });
         for (const id of migration.contactsToClear)
           yield* contactsRepository.update(id, { hiddenListingIdsJson: null });

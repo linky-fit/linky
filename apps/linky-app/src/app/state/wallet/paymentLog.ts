@@ -1,16 +1,11 @@
 import {
   ContactId,
   createId,
-  NonEmptyString,
-  NonEmptyString100,
-  NonEmptyString1000,
-  PositiveInt,
-  type LinkyDbSchema,
-  type Patch,
   type TransactionId,
-  type TransactionRow,
+  type TransactionInsert,
+  type TransactionPatch,
   type TransactionsRepository,
-  type WriteRow,
+  type TransactionStoredRow,
 } from "@linky-fit/linksync";
 import type { KeyValueStorage } from "@linky-fit/linksync/evolu";
 import { Effect, Option, Schema } from "effect";
@@ -41,24 +36,16 @@ import { appOwnerIdAtom, transactionsRepositoryAtom } from "../session/store";
 import { ownerStorageKey } from "./ownerStorage";
 
 type TransactionInsertPayload = {
-  -readonly [K in keyof Omit<
-    WriteRow<LinkyDbSchema["transaction"]>,
-    "id"
-  >]: WriteRow<LinkyDbSchema["transaction"]>[K];
+  -readonly [K in keyof Omit<TransactionInsert, "id">]: TransactionInsert[K];
 };
 
-interface ColumnType<Value> {
-  readonly fromUnknown: (
-    value: unknown,
-  ) => { readonly ok: true; readonly value: Value } | { readonly ok: false };
-}
+const nonEmptyMax = (value: string, max?: number): string | undefined =>
+  value.length > 0 && (max === undefined || value.length <= max)
+    ? value
+    : undefined;
 
-/** The column value, or undefined when the input does not fit the column (the payload then omits it). */
-const columnOrOmit = <Value>(
-  type: ColumnType<Value>,
-  value: unknown,
-): Value | undefined => {
-  const result = type.fromUnknown(value);
+const contactIdOrOmit = (value: string): ContactId | undefined => {
+  const result = ContactId.fromUnknown(value);
   return result.ok ? result.value : undefined;
 };
 
@@ -229,29 +216,29 @@ export const buildTransactionInsertPayload = (args: {
       : status;
 
   const payload: TransactionInsertPayload = {
-    createdAtSec: PositiveInt.orThrow(args.createdAtSec),
-    direction: NonEmptyString100.orThrow(args.event.direction),
-    status: NonEmptyString100.orThrow(transactionStatus),
+    createdAtSec: args.createdAtSec,
+    direction: args.event.direction,
+    status: transactionStatus,
   };
 
   const contactId = (args.event.contactId ?? "").trim();
   const storedContactId = isUnknownContactId(contactId)
     ? undefined
-    : columnOrOmit(ContactId, contactId);
+    : contactIdOrOmit(contactId);
   const detailsJson = serializeJsonValue(
     compactTransactionDetails(args.event.details),
   );
 
   const optional = {
-    amount: amount === null ? undefined : PositiveInt.orThrow(amount),
-    fee: fee === null ? undefined : PositiveInt.orThrow(fee),
-    mint: columnOrOmit(NonEmptyString1000, mint),
-    unit: columnOrOmit(NonEmptyString100, unit),
-    error: columnOrOmit(NonEmptyString1000, error.slice(0, 1000)),
-    note: columnOrOmit(NonEmptyString1000, note.slice(0, 1000)),
+    amount: amount === null ? undefined : amount,
+    fee: fee === null ? undefined : fee,
+    mint: nonEmptyMax(mint, 1000),
+    unit: nonEmptyMax(unit, 100),
+    error: nonEmptyMax(error.slice(0, 1000), 1000),
+    note: nonEmptyMax(note.slice(0, 1000), 1000),
     contactId: storedContactId,
-    detailsJson: columnOrOmit(NonEmptyString, detailsJson ?? ""),
-    method: columnOrOmit(NonEmptyString100, storedMethod),
+    detailsJson: nonEmptyMax(detailsJson ?? ""),
+    method: nonEmptyMax(storedMethod, 100),
   };
   if (optional.amount !== undefined) payload.amount = optional.amount;
   if (optional.fee !== undefined) payload.fee = optional.fee;
@@ -276,9 +263,9 @@ const readDetails = (json: string | null | undefined) =>
 
 /** A later write of one event adds what it knows; it never moves the event time or takes back a confirmed status. */
 export const mergeTransactionWrite = (
-  existing: TransactionRow,
+  existing: TransactionStoredRow,
   payload: TransactionInsertPayload,
-): Patch<LinkyDbSchema["transaction"]> => {
+): TransactionPatch => {
   const { detailsJson, status, ...columns } = payload;
   const details = {
     ...readDetails(existing.detailsJson),
@@ -290,7 +277,7 @@ export const mergeTransactionWrite = (
     ...(existing.status === "ok" ? {} : { status }),
     ...(detailsJson === undefined
       ? {}
-      : { detailsJson: NonEmptyString.orThrow(JSON.stringify(details)) }),
+      : { detailsJson: JSON.stringify(details) }),
   };
 };
 

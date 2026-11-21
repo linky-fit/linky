@@ -1,4 +1,3 @@
-import { sqliteTrue } from "@linky-fit/linksync";
 import { ProfileMetadata } from "@linky-fit/linkstr";
 import { describe, expect, it } from "vitest";
 import {
@@ -73,9 +72,9 @@ describe("resolveContactProfile", () => {
     const resolved = resolveContactProfile(
       {
         lnAddress: "custom@ln.example",
-        lnAddressSetByUser: sqliteTrue,
+        lnAddressSetByUser: true,
         name: "Moje jméno",
-        nameSetByUser: sqliteTrue,
+        nameSetByUser: true,
         npub: NPUB,
       },
       metadata({ lud16: "vitor@vitorpamplona.com", name: "Vitor" }),

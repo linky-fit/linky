@@ -52,7 +52,7 @@ export const listingOfRecord = (record: ListingRecord): Listing | null => {
       amount: record.amount,
       currency: record.currency,
       unit: record.unit,
-      ...(record.priceByAgreement === 1 ? { priceByAgreement: true } : {}),
+      ...(record.priceByAgreement === true ? { priceByAgreement: true } : {}),
       ...(record.description === null
         ? {}
         : { description: record.description }),

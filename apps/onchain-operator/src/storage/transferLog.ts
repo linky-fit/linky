@@ -3,12 +3,9 @@ import {
   type OnchainTransferId,
 } from "@linky-fit/domain";
 import { Pubkey, type AppMessageReceived } from "@linky-fit/linkstr";
-import {
-  NonEmptyString,
-  NonEmptyString100,
-  PositiveInt,
-  type OnchainTransferMessagesRepository,
-  type ShardDbError,
+import type {
+  OnchainTransferMessagesRepository,
+  ShardDbError,
 } from "@linky-fit/linksync";
 import { Effect, Schema } from "effect";
 import type { ReceivedTransferMessage } from "../domain/chat";
@@ -26,11 +23,11 @@ export const logTransferMessage = (
     : Effect.asVoid(
         messages.insertIfAbsent({
           id: onchainTransferMessageIdFor(event.messageId),
-          rumorId: NonEmptyString100.orThrow(event.messageId),
-          peerPubkey: NonEmptyString100.orThrow(event.from),
+          rumorId: event.messageId,
+          peerPubkey: event.from,
           ...(transferId === null ? {} : { transferId }),
-          content: NonEmptyString.orThrow(event.content),
-          sentAtSec: PositiveInt.orThrow(event.sentAt),
+          content: event.content,
+          sentAtSec: event.sentAt,
         }),
       );
 

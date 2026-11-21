@@ -1,9 +1,5 @@
 import { encodeNpub, Pubkey } from "@linky-fit/linkstr";
-import {
-  createId,
-  NonEmptyString,
-  NonEmptyString1000,
-} from "@linky-fit/linksync";
+import { createId } from "@linky-fit/linksync";
 import { expect, it } from "vitest";
 import { hiddenListingsToMove } from "./hiddenListingsMigration";
 
@@ -32,14 +28,14 @@ it("moves this device's hides, strangers' included, and the hides on contact row
       [
         {
           id: alice,
-          npub: NonEmptyString1000.orThrow(encodeNpub(ALICE)),
-          hiddenListingIdsJson: NonEmptyString.orThrow('["bike"]'),
+          npub: encodeNpub(ALICE),
+          hiddenListingIdsJson: '["bike"]',
         },
         // A row whose npub has not synced yet keeps its hides for later.
         {
           id: bob,
           npub: null,
-          hiddenListingIdsJson: NonEmptyString.orThrow('["lamp"]'),
+          hiddenListingIdsJson: '["lamp"]',
         },
         { id: plain, npub: null, hiddenListingIdsJson: null },
       ],

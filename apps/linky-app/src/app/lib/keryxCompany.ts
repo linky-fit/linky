@@ -7,16 +7,14 @@ import {
 } from "@linky-fit/keryx";
 import {
   keryxSubscriptionIdFor,
-  NonEmptyString,
-  NonEmptyString1000,
-  PositiveInt,
   type KeryxSubscriptionId,
+  type KeryxSubscriptionInsert,
+  type KeryxSubscriptionPatch,
   type KeryxSubscriptionRecord,
-  type LinkyDbSchema,
-  type Patch,
-  type WriteRow,
 } from "@linky-fit/linksync";
 import { Option, Schema } from "effect";
+
+export type { KeryxSubscriptionPatch };
 
 const TrustJson = Schema.fromJsonString(CompanyTrust);
 const IdentityJson = Schema.fromJsonString(CompanyIdentity);
@@ -30,9 +28,6 @@ const StoredSubscription = Schema.Struct({
   privateFeedsJson: Schema.NullOr(PrivateFeedsJson),
 });
 const decodeStored = Schema.decodeUnknownOption(StoredSubscription);
-
-type SubscriptionTable = LinkyDbSchema["keryxSubscription"];
-export type KeryxSubscriptionPatch = Patch<SubscriptionTable>;
 
 /**
  * A paired company as this device reads it from its synced row. Its private
@@ -65,16 +60,16 @@ export const readKeryxCompany = (
     })),
   );
 
-const json = <A>(schema: Schema.Codec<A, string>, value: A) =>
-  NonEmptyString.orThrow(Schema.encodeSync(schema)(value));
+const json = <A>(schema: Schema.Codec<A, string>, value: A): string =>
+  Schema.encodeSync(schema)(value);
 
-export const channelsColumn = (channels: ReadonlyArray<string>) =>
-  NonEmptyString1000.orThrow(Schema.encodeSync(ChannelsJson)(channels));
+export const channelsColumn = (channels: ReadonlyArray<string>): string =>
+  json(ChannelsJson, channels);
 
-export const identityColumn = (identity: CompanyIdentity) =>
+export const identityColumn = (identity: CompanyIdentity): string =>
   json(IdentityJson, identity);
 
-const privateFeedsColumn = (urls: ReadonlyArray<string>) =>
+const privateFeedsColumn = (urls: ReadonlyArray<string>): string =>
   json(PrivateFeedsJson, urls);
 
 /** The private feed URLs of a pairing: only those a master-signed pattern authorizes. */
@@ -90,15 +85,15 @@ export const keryxSubscriptionInsert = (
   snapshot: CompanySnapshot,
   channels: ReadonlyArray<string>,
   pairedAtSec: number,
-): WriteRow<SubscriptionTable> => {
+): KeryxSubscriptionInsert => {
   const privateFeeds = authorizedPrivateFeeds(snapshot);
   return {
     id: keryxSubscriptionIdFor(snapshot.origin),
-    origin: NonEmptyString1000.orThrow(snapshot.origin),
+    origin: snapshot.origin,
     trustJson: json(TrustJson, snapshot.trust),
     identityJson: identityColumn(snapshot.identity),
     channelsJson: channelsColumn(channels),
-    pairedAtSec: PositiveInt.orThrow(pairedAtSec),
+    pairedAtSec,
     // An explicit null, unlike other inserts: re-pairing clears the feeds of the pairing it overwrites.
     privateFeedsJson:
       privateFeeds.length > 0 ? privateFeedsColumn(privateFeeds) : null,

@@ -1,4 +1,4 @@
-import type { MessageRow, ReactionRow } from "@linky-fit/linksync";
+import type { MessageRecord, ReactionRecord } from "@linky-fit/linksync";
 import { Option } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
 import {
@@ -89,7 +89,7 @@ const messageRowsResultAtom = liveAtom(
 
 /** The stored messages of saved contacts; null until the first read answers. */
 export const messageRowsAtom = Atom.keepAlive(
-  Atom.readable((get): ReadonlyArray<MessageRow> | null =>
+  Atom.readable((get): ReadonlyArray<MessageRecord> | null =>
     Option.getOrNull(AsyncResult.value(get(messageRowsResultAtom))),
   ),
 );
@@ -196,7 +196,7 @@ export interface StoredReactions {
 
 export const storedReactionsAtom = Atom.keepAlive(
   Atom.readable((get): StoredReactions => {
-    const keyOf = (row: ReactionRow): string | null =>
+    const keyOf = (row: ReactionRecord): string | null =>
       storedReactionKey(row.reactorPubkey, row.wrapId);
     const deletedKeys = new Set<string>();
     const seenKeys = new Set<string>();

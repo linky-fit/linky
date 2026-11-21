@@ -9,13 +9,7 @@ import {
   RelayUrl,
 } from "@linky-fit/linkstr";
 import type { ListingRecord } from "@linky-fit/linksync";
-import {
-  createId,
-  NonEmptyString,
-  NonEmptyString1000,
-  OwnerId,
-  PositiveInt,
-} from "@linky-fit/linksync";
+import { createId, OwnerId } from "@linky-fit/linksync";
 import { describe, expect, it } from "vitest";
 import type { DisplayAmountOptions } from "../../utils/displayAmounts";
 import {
@@ -37,7 +31,7 @@ import {
 
 const record = (overrides: Partial<ListingRecord> = {}): ListingRecord => ({
   id: createId<"Listing">(),
-  createdAtSec: PositiveInt.orThrow(100),
+  createdAtSec: 100,
   side: "offer",
   title: "Domácí vajíčka",
   amount: "90",
@@ -50,7 +44,6 @@ const record = (overrides: Partial<ListingRecord> = {}): ListingRecord => ({
   pausedAtSec: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
-  isDeleted: 0,
   ownerId: OwnerId.orThrow(createId()),
   ...overrides,
 });
@@ -64,9 +57,7 @@ const bob = Pubkey.make(
 
 describe("listingOfRecord", () => {
   it("passes the stored description through and leaves it out when there is none", () => {
-    const description = NonEmptyString1000.orThrow(
-      "Volný chov.\nVyzvednutí v Brně.",
-    );
+    const description = "Volný chov.\nVyzvednutí v Brně.";
     expect(listingOfRecord(record({ description }))?.description).toBe(
       description,
     );
@@ -89,7 +80,7 @@ describe("listingOfRecord", () => {
 
   it("passes the stored image through and leaves out one that does not decode", () => {
     const listing = (value: string) =>
-      listingOfRecord(record({ image: NonEmptyString.orThrow(value) }));
+      listingOfRecord(record({ image: value }));
     expect(listing(encodeListingImage(image))?.image).toEqual(image);
     for (const broken of ["not json", '{"url":"x"}']) {
       expect(listing(broken)?.title).toBe("Domácí vajíčka");
@@ -100,7 +91,7 @@ describe("listingOfRecord", () => {
 
   it("publishes the price-by-agreement flag only when the row sets it", () => {
     expect(
-      listingOfRecord(record({ amount: "0", priceByAgreement: 1 }))
+      listingOfRecord(record({ amount: "0", priceByAgreement: true }))
         ?.priceByAgreement,
     ).toBe(true);
     expect(listingOfRecord(record({ amount: "0" }))).not.toHaveProperty(

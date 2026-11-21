@@ -1,19 +1,17 @@
 import {
   directConversationIdFor,
-  NonEmptyString,
-  NonEmptyString100,
-  NonEmptyString1000,
-  PositiveInt,
   type ContactId,
   type ConversationId,
-  type ConversationRow,
-  type LinkyDbSchema,
+  type ConversationRecord,
   type MessageId,
-  type MessageRow,
-  type Patch,
+  type MessageInsert,
+  type MessagePatch,
+  type MessageRecord,
   type ReactionId,
-  type ReactionRow,
-  type WriteRow,
+  type ReactionInsert,
+  type ReactionPatch,
+  type ReactionRecord,
+  type UnknownSenderMessageInsert,
 } from "@linky-fit/linksync";
 import type { Pubkey } from "@linky-fit/linkstr";
 import type {
@@ -32,9 +30,6 @@ import type {
   NostrReactionUpdatePayload,
 } from "./messageUpdates";
 
-type MessageColumns = LinkyDbSchema["message"];
-type ReactionColumns = LinkyDbSchema["reaction"];
-type UnknownSenderMessageColumns = LinkyDbSchema["unknownSenderMessage"];
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 const toText = (value: unknown): string =>
@@ -58,6 +53,35 @@ const toPositiveInt = (value: unknown, fallback: number): number => {
   return rounded > 0 ? rounded : fallback;
 };
 
+const validPositiveInt = (value: number): number | undefined =>
+  Number.isSafeInteger(value) && value > 0 ? value : undefined;
+
+const nonEmptyText = (
+  value: string | null | undefined,
+  maxLength?: number,
+): string | undefined => {
+  if (typeof value !== "string" || value.length === 0) return undefined;
+  if (maxLength !== undefined && value.length > maxLength) return undefined;
+  return value;
+};
+
+/** Empty text is treated as absent: the columns are non-empty strings. */
+const optionalText = (
+  value: string | null | undefined,
+  maxLength?: number,
+): string | undefined =>
+  asNonEmptyString(value) === null ? undefined : nonEmptyText(value, maxLength);
+
+const textPatch = (
+  value: string | null | undefined,
+  maxLength?: number,
+): string | null | undefined =>
+  value === undefined
+    ? undefined
+    : value === null
+      ? null
+      : nonEmptyText(value, maxLength);
+
 export const isSqliteTrueish = (value: unknown): boolean => {
   if (value === true || value === 1 || value === "1") return true;
   return trimString(value).toLowerCase() === "true";
@@ -71,7 +95,7 @@ const nowSec = (): number => Math.ceil(Date.now() / 1000);
  * recover the mapping when a conversation row lives in a forgotten shard.
  */
 export const contactIdByConversationId = (
-  conversations: ReadonlyArray<ConversationRow>,
+  conversations: ReadonlyArray<ConversationRecord>,
   contacts: ReadonlyArray<{ readonly id: ContactId }>,
 ): ReadonlyMap<string, string> => {
   const byConversation = new Map<string, string>();
@@ -84,7 +108,7 @@ export const contactIdByConversationId = (
 };
 
 export const toLocalNostrMessage = (
-  row: Omit<MessageRow, "conversationId">,
+  row: Omit<MessageRecord, "conversationId">,
   contactId: string | undefined,
 ): LocalNostrMessage | null => {
   const directionRaw = trimString(row.direction);
@@ -125,7 +149,7 @@ export const toLocalNostrMessage = (
 };
 
 export const toLocalNostrReaction = (
-  row: ReactionRow,
+  row: ReactionRecord,
 ): LocalNostrReaction | null => {
   const messageId = trimString(row.messageId);
   const reactorPubkey = trimString(row.reactorPubkey);
@@ -219,25 +243,7 @@ export const normalizeLegacyLocalMessage = (
   );
 };
 
-interface Decoder<T> {
-  readonly fromUnknown: (
-    value: unknown,
-  ) => { ok: true; value: T } | { ok: false };
-}
-
-const decode = <T>(type: Decoder<T>, value: unknown): T | undefined => {
-  const result = type.fromUnknown(value);
-  return result.ok ? result.value : undefined;
-};
-
-/** Empty text is treated as absent: the columns are non-empty strings. */
-const optionalText = <T>(
-  type: Decoder<T>,
-  value: string | null | undefined,
-): T | undefined =>
-  asNonEmptyString(value) === null ? undefined : decode(type, value);
-
-type MessageContent = Omit<WriteRow<MessageColumns>, "id" | "conversationId">;
+type MessageContent = Omit<MessageInsert, "id" | "conversationId">;
 
 /** The whole message the UI hands over, as the columns every message table shares. */
 const toMessageContent = (
@@ -247,46 +253,45 @@ const toMessageContent = (
   const directionRaw = trimString(message.direction);
   const direction =
     directionRaw === "in" || directionRaw === "out" ? directionRaw : null;
-  const content = decode(NonEmptyString, toText(message.content));
+  const content = nonEmptyText(toText(message.content));
   if (!direction || !content?.trim()) return null;
-  const wrapId = decode(NonEmptyString1000, wrapIdText);
-  const createdAtSec = decode(
-    PositiveInt,
+  const wrapId = nonEmptyText(wrapIdText, 1000);
+  const createdAtSec = validPositiveInt(
     toPositiveInt(message.createdAtSec, nowSec()),
   );
   if (!wrapId || !createdAtSec) return null;
   const editedAtSec = message.editedAtSec
-    ? decode(PositiveInt, toPositiveInt(message.editedAtSec, createdAtSec))
+    ? validPositiveInt(toPositiveInt(message.editedAtSec, createdAtSec))
     : undefined;
   const deletedAtSec = message.deletedAtSec
-    ? decode(PositiveInt, toPositiveInt(message.deletedAtSec, createdAtSec))
+    ? validPositiveInt(toPositiveInt(message.deletedAtSec, createdAtSec))
     : undefined;
 
   const row: Mutable<MessageContent> = {
-    direction: NonEmptyString100.orThrow(direction),
+    direction,
     content,
     wrapId,
     createdAtSec,
-    status: NonEmptyString100.orThrow(toStatus(message.status)),
+    status: toStatus(message.status),
   };
-  const rumorId = optionalText(NonEmptyString1000, message.rumorId);
+  const rumorId = optionalText(message.rumorId, 1000);
   if (rumorId) row.rumorId = rumorId;
-  const pubkey = optionalText(NonEmptyString1000, message.pubkey);
+  const pubkey = optionalText(message.pubkey, 1000);
   if (pubkey) row.pubkey = pubkey;
-  const clientId = optionalText(NonEmptyString1000, message.clientId);
+  const clientId = optionalText(message.clientId, 1000);
   if (clientId) row.clientId = clientId;
-  if (message.localOnly) row.localOnly = NonEmptyString100.orThrow("1");
-  const replyToId = optionalText(NonEmptyString1000, message.replyToId);
+  if (message.localOnly) row.localOnly = "1";
+  const replyToId = optionalText(message.replyToId, 1000);
   if (replyToId) row.replyToId = replyToId;
-  const replyToContent = optionalText(NonEmptyString, message.replyToContent);
+  const replyToContent = optionalText(message.replyToContent);
   if (replyToContent) row.replyToContent = replyToContent;
-  const rootMessageId = optionalText(NonEmptyString1000, message.rootMessageId);
+  const rootMessageId = optionalText(message.rootMessageId, 1000);
   if (rootMessageId) row.rootMessageId = rootMessageId;
   if (editedAtSec) row.editedAtSec = editedAtSec;
-  const editedFromId = optionalText(NonEmptyString1000, message.editedFromId);
+  const editedFromId = optionalText(message.editedFromId, 1000);
   if (editedFromId) row.editedFromId = editedFromId;
-  if (message.isEdited) row.isEdited = NonEmptyString100.orThrow("1");
-  const originalContent = optionalText(NonEmptyString, message.originalContent);
+  if (message.isEdited) row.isEdited = "1";
+  const originalContent = optionalText(message.originalContent);
   if (originalContent) row.originalContent = originalContent;
   if (deletedAtSec) row.deletedAtSec = deletedAtSec;
   return row;
@@ -298,7 +303,7 @@ export const toMessageWriteRow = (
   conversationId: ConversationId,
   message: NewLocalNostrMessage,
   wrapIdText: string,
-): WriteRow<MessageColumns> | null => {
+): MessageInsert | null => {
   const content = toMessageContent(message, wrapIdText);
   return content && { ...content, id, conversationId };
 };
@@ -309,9 +314,9 @@ export const toUnknownSenderWriteRow = (
   peerPubkey: Pubkey,
   message: NewLocalNostrMessage,
   wrapIdText: string,
-): WriteRow<UnknownSenderMessageColumns> | null => {
+): UnknownSenderMessageInsert | null => {
   const content = toMessageContent(message, wrapIdText);
-  const peer = decode(NonEmptyString1000, peerPubkey);
+  const peer = nonEmptyText(peerPubkey, 1000);
   return content && peer ? { ...content, id, peerPubkey: peer } : null;
 };
 
@@ -320,21 +325,17 @@ export const toReactionWriteRow = (
   conversationId: ConversationId,
   reaction: NewLocalNostrReaction,
   wrapIdText: string,
-): WriteRow<ReactionColumns> | null => {
-  const messageId = optionalText(NonEmptyString1000, reaction.messageId);
-  const reactorPubkey = optionalText(
-    NonEmptyString1000,
-    reaction.reactorPubkey,
-  );
-  const emoji = optionalText(NonEmptyString100, toText(reaction.emoji).trim());
-  const wrapId = decode(NonEmptyString1000, wrapIdText);
-  const createdAtSec = decode(
-    PositiveInt,
+): ReactionInsert | null => {
+  const messageId = optionalText(reaction.messageId, 1000);
+  const reactorPubkey = optionalText(reaction.reactorPubkey, 1000);
+  const emoji = optionalText(toText(reaction.emoji).trim(), 100);
+  const wrapId = nonEmptyText(wrapIdText, 1000);
+  const createdAtSec = validPositiveInt(
     toPositiveInt(reaction.createdAtSec, nowSec()),
   );
   if (!messageId || !reactorPubkey || !emoji || !wrapId || !createdAtSec)
     return null;
-  const row: Mutable<WriteRow<ReactionColumns>> = {
+  const row: Mutable<ReactionInsert> = {
     id,
     conversationId,
     messageId,
@@ -342,24 +343,18 @@ export const toReactionWriteRow = (
     emoji,
     wrapId,
     createdAtSec,
-    status: NonEmptyString100.orThrow(toStatus(reaction.status)),
+    status: toStatus(reaction.status),
   };
-  const clientId = optionalText(NonEmptyString1000, reaction.clientId);
+  const clientId = optionalText(reaction.clientId, 1000);
   if (clientId) row.clientId = clientId;
   return row;
 };
 
-const textPatch = <T>(
-  type: Decoder<T>,
-  value: string | null | undefined,
-): T | null | undefined =>
-  value === undefined ? undefined : value === null ? null : decode(type, value);
-
-/** The columns an update payload names, decoded; a value the column rejects is dropped. */
+/** The columns an update payload names, validated; a value the column rejects is dropped. */
 export const toMessagePatch = (
   payload: NostrMessageUpdatePayload,
-): Patch<MessageColumns> => {
-  const patch: Mutable<Patch<MessageColumns>> = {};
+): MessagePatch => {
+  const patch: Mutable<MessagePatch> = {};
   const text1000 = [
     "clientId",
     "editedFromId",
@@ -369,47 +364,47 @@ export const toMessagePatch = (
     "rumorId",
   ] as const;
   for (const field of text1000) {
-    const value = textPatch(NonEmptyString1000, payload[field]);
+    const value = textPatch(payload[field], 1000);
     if (value !== undefined) patch[field] = value;
   }
   for (const field of ["originalContent", "replyToContent"] as const) {
-    const value = textPatch(NonEmptyString, payload[field]);
+    const value = textPatch(payload[field]);
     if (value !== undefined) patch[field] = value;
   }
   for (const field of ["isEdited", "localOnly", "status"] as const) {
-    const value = textPatch(NonEmptyString100, payload[field]);
+    const value = textPatch(payload[field], 100);
     if (value !== undefined) patch[field] = value;
   }
-  const content = optionalText(NonEmptyString, payload.content);
+  const content = optionalText(payload.content);
   if (content) patch.content = content;
-  const wrapId = optionalText(NonEmptyString1000, payload.wrapId);
+  const wrapId = optionalText(payload.wrapId, 1000);
   if (wrapId) patch.wrapId = wrapId;
   if (payload.createdAtSec !== undefined) {
-    const value = decode(PositiveInt, payload.createdAtSec);
+    const value = validPositiveInt(payload.createdAtSec);
     if (value) patch.createdAtSec = value;
   }
   if (payload.editedAtSec !== undefined) {
     patch.editedAtSec =
       payload.editedAtSec === null
         ? null
-        : (decode(PositiveInt, payload.editedAtSec) ?? null);
+        : (validPositiveInt(payload.editedAtSec) ?? null);
   }
   return patch;
 };
 
 export const toReactionPatch = (
   payload: NostrReactionUpdatePayload,
-): Patch<ReactionColumns> => {
-  const patch: Mutable<Patch<ReactionColumns>> = {};
-  const clientId = textPatch(NonEmptyString1000, payload.clientId);
+): ReactionPatch => {
+  const patch: Mutable<ReactionPatch> = {};
+  const clientId = textPatch(payload.clientId, 1000);
   if (clientId !== undefined) patch.clientId = clientId;
   for (const field of ["messageId", "reactorPubkey", "wrapId"] as const) {
-    const value = optionalText(NonEmptyString1000, payload[field]);
+    const value = optionalText(payload[field], 1000);
     if (value) patch[field] = value;
   }
-  const emoji = optionalText(NonEmptyString100, payload.emoji);
+  const emoji = optionalText(payload.emoji, 100);
   if (emoji) patch.emoji = emoji;
-  const status = optionalText(NonEmptyString100, payload.status);
+  const status = optionalText(payload.status, 100);
   if (status) patch.status = status;
   return patch;
 };

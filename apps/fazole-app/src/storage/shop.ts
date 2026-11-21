@@ -1,27 +1,15 @@
-import { createIdFromString } from "@linky-fit/domain";
 import {
-  NonEmptyString100,
-  NonEmptyString1000,
-  tableRepository,
-  type LinkyDbSchema,
-  type LinkyStore,
+  makeSettingsRepository,
+  type SettingsRepository,
   type ShardDbError,
-  type TableRepository,
 } from "@linky-fit/linksync";
 import { Effect, Option, Schema } from "effect";
 import { CzechIban, type ShopProfile } from "../domain";
 
-export type SettingsRepository = TableRepository<LinkyDbSchema["setting"]>;
+export { makeSettingsRepository };
+export type { SettingsRepository };
 
-/** The account's synced settings: rows of the meta `setting` table. */
-export const makeSettingsRepository = (store: LinkyStore): SettingsRepository =>
-  tableRepository(store, "meta", "setting");
-
-const SHOP_KEY = "fazole.shop";
-// Mirrors linksync's `settingIdFor`, whose keys are Linky's own settings only.
-export const shopSettingId = createIdFromString<"Setting">(
-  `setting/${SHOP_KEY}`,
-);
+export const SHOP_SETTING_KEY = "fazole.shop";
 
 /** What the merchant may name the shop: trimmed, 1 to 100 characters. */
 export const ShopName = Schema.String.pipe(
@@ -48,10 +36,10 @@ const ShopJson = Schema.fromJsonString(
 export const readShop = (
   settings: SettingsRepository,
 ): Effect.Effect<ShopProfile | null> =>
-  Effect.map(settings.byId(shopSettingId), (row) =>
+  Effect.map(settings.getRaw(SHOP_SETTING_KEY), (value) =>
     Option.getOrNull(
       Option.map(
-        Schema.decodeUnknownOption(ShopJson)(row?.value),
+        Schema.decodeUnknownOption(ShopJson)(value),
         ({ name, iban, picture }) => ({
           name: name ?? null,
           iban: iban ?? null,
@@ -65,14 +53,11 @@ export const saveShop = (
   settings: SettingsRepository,
   shop: ShopProfile,
 ): Effect.Effect<void, ShardDbError> =>
-  settings.insert({
-    id: shopSettingId,
-    key: NonEmptyString100.orThrow(SHOP_KEY),
-    value: NonEmptyString1000.orThrow(
-      Schema.encodeSync(ShopJson)({
-        ...(shop.name === null ? {} : { name: shop.name }),
-        ...(shop.iban === null ? {} : { iban: shop.iban }),
-        ...(shop.picture === null ? {} : { picture: shop.picture }),
-      }),
-    ),
-  });
+  settings.setRaw(
+    SHOP_SETTING_KEY,
+    Schema.encodeSync(ShopJson)({
+      ...(shop.name === null ? {} : { name: shop.name }),
+      ...(shop.iban === null ? {} : { iban: shop.iban }),
+      ...(shop.picture === null ? {} : { picture: shop.picture }),
+    }),
+  );

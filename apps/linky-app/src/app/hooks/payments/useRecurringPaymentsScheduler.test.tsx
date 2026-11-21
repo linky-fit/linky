@@ -20,10 +20,7 @@ import {
 } from "@linky-fit/linkshu";
 import {
   makeRecurringPaymentsRepository,
-  NonEmptyString100,
-  NonEmptyString1000,
   normalizeRecurringPayment,
-  PositiveInt,
   type RecurringPaymentsRepository,
 } from "@linky-fit/linksync";
 import {
@@ -88,12 +85,8 @@ const lightningContact: ContactRowLike = {
   lnAddress: "bob@example.com",
 };
 
-const int = PositiveInt.orThrow;
-const text = NonEmptyString100.orThrow;
 const progressColumn = (runCount: number, nextDueAtSec: number) =>
-  NonEmptyString1000.orThrow(
-    recurringProgressColumn({ runCount, nextDueAtSec }),
-  );
+  recurringProgressColumn({ runCount, nextDueAtSec });
 
 const keyOf = (runIndex: number) => recurringEnvelopeKey(ORDER_ID, runIndex);
 const refOf = (runIndex: number) => ({ mint: MINT, key: keyOf(runIndex) });
@@ -193,26 +186,24 @@ const insertOrder = (
   Effect.runSync(
     repository.insert({
       id: ORDER_ID,
-      createdAtSec: int(DUE - HOUR),
+      createdAtSec: DUE - HOUR,
       contactId: overrides.contactId ?? NOSTR_CONTACT_ID,
-      mintUrl: NonEmptyString1000.orThrow(MINT),
-      rail: text(overrides.rail ?? "cashu"),
-      amount: int(overrides.amount ?? 100),
-      unit: text(overrides.unit ?? "sat"),
-      intervalUnit: text("hour"),
-      intervalCount: int(6),
-      anchorAtSec: int(DUE),
-      timeZone: text("UTC"),
+      mintUrl: MINT,
+      rail: overrides.rail ?? "cashu",
+      amount: overrides.amount ?? 100,
+      unit: overrides.unit ?? "sat",
+      intervalUnit: "hour",
+      intervalCount: 6,
+      anchorAtSec: DUE,
+      timeZone: "UTC",
       progress: progressColumn(overrides.runCount ?? 0, nextDueAtSec),
-      ...(overrides.note === undefined
-        ? {}
-        : { note: NonEmptyString1000.orThrow(overrides.note) }),
+      ...(overrides.note === undefined ? {} : { note: overrides.note }),
       ...(overrides.lastRunAtSec === undefined
         ? {}
-        : { lastRunAtSec: int(overrides.lastRunAtSec) }),
+        : { lastRunAtSec: overrides.lastRunAtSec }),
       ...(overrides.lastRunStatus === undefined
         ? {}
-        : { lastRunStatus: text(overrides.lastRunStatus) }),
+        : { lastRunStatus: overrides.lastRunStatus }),
     }),
   );
 };

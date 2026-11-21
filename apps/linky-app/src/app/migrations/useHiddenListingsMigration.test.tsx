@@ -5,8 +5,6 @@ import {
   listingKeysOf,
   makeContactsRepository,
   makeHiddenListingsRepository,
-  NonEmptyString,
-  NonEmptyString1000,
 } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { act } from "react";
@@ -33,8 +31,8 @@ it("moves the hides into the table without hiding again what another device show
   await Effect.runPromise(
     contacts.insert({
       id: alice,
-      npub: NonEmptyString1000.orThrow(encodeNpub(ALICE)),
-      hiddenListingIdsJson: NonEmptyString.orThrow('["bike","lamp"]'),
+      npub: encodeNpub(ALICE),
+      hiddenListingIdsJson: '["bike","lamp"]',
     }),
   );
   await Effect.runPromise(hidden.setHidden(ALICE, "lamp", true));

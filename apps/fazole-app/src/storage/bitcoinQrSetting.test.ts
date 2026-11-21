@@ -1,9 +1,8 @@
-import { NonEmptyString100, NonEmptyString1000 } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 import { testStore } from "../services/testing/fakes";
 import {
-  bitcoinQrSettingId,
+  BITCOIN_QR_SETTING_KEY,
   readBitcoinQrMode,
   saveBitcoinQrMode,
 } from "./bitcoinQrSetting";
@@ -30,11 +29,7 @@ describe("the Bitcoin QR setting", () => {
   it("reads the combined mode the first release stored as universal", async () => {
     const settings = makeSettingsRepository(testStore());
     await Effect.runPromise(
-      settings.insert({
-        id: bitcoinQrSettingId,
-        key: NonEmptyString100.orThrow("fazole.bitcoinQr"),
-        value: NonEmptyString1000.orThrow("combined"),
-      }),
+      settings.setRaw(BITCOIN_QR_SETTING_KEY, "combined"),
     );
     expect(await Effect.runPromise(readBitcoinQrMode(settings))).toBe(
       "universal",

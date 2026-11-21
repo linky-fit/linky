@@ -5,12 +5,8 @@ import {
   makeContactsRepository,
   makeConversationsRepository,
   makeUnknownSendersRepository,
-  NonEmptyString,
-  NonEmptyString100,
-  NonEmptyString1000,
   nostrMessageIdFor,
   nostrReactionIdFor,
-  PositiveInt,
   type ContactId,
   type LinkyStore,
 } from "@linky-fit/linksync";
@@ -103,7 +99,7 @@ const renderDomain = async (
     await Effect.runPromise(
       makeContactsRepository(store).insert({
         id,
-        name: NonEmptyString1000.orThrow("Contact"),
+        name: "Contact",
       }),
     );
   const { chatWrites, registry } = await storeRegistry(store);
@@ -311,12 +307,12 @@ describe("useMessagesDomain", () => {
     const conversationId = directConversationIdFor(contactId);
     const row = {
       conversationId,
-      direction: NonEmptyString100.orThrow("in"),
-      content: NonEmptyString.orThrow("hello"),
-      wrapId: NonEmptyString1000.orThrow(rumorId),
-      rumorId: NonEmptyString1000.orThrow(rumorId),
-      createdAtSec: PositiveInt.orThrow(100),
-      status: NonEmptyString100.orThrow("sent"),
+      direction: "in",
+      content: "hello",
+      wrapId: rumorId,
+      rumorId,
+      createdAtSec: 100,
+      status: "sent",
     };
     await Effect.runPromise(
       Effect.andThen(

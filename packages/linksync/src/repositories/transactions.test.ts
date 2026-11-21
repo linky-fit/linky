@@ -1,9 +1,4 @@
-import { PositiveInt } from "@evolu/common";
-import {
-  createId,
-  NonEmptyString100,
-  NonEmptyString1000,
-} from "@linky-fit/domain";
+import { createId } from "@linky-fit/domain";
 import { NewOperation, ProofId } from "@linky-fit/linkshu";
 import { Schema } from "effect";
 import { linkyStore, runNow } from "../testing/linky";
@@ -15,8 +10,6 @@ import {
   transactionIdForRestore,
 } from "./transactions";
 import { makeWalletRepository } from "./wallet";
-
-const text = (value: string) => NonEmptyString100.orThrow(value);
 
 describe("transactions repository", () => {
   it("derives the category from the method", () => {
@@ -33,18 +26,18 @@ describe("transactions repository", () => {
     runNow(
       transactions.insert({
         id: createId<"Transaction">(),
-        createdAtSec: PositiveInt.orThrow(10),
-        direction: text("out"),
-        status: text("ok"),
-        method: text("cashu_chat"),
+        createdAtSec: 10,
+        direction: "out",
+        status: "ok",
+        method: "cashu_chat",
       }),
     );
     runNow(
       transactions.insert({
         id: createId<"Transaction">(),
-        createdAtSec: PositiveInt.orThrow(11),
-        direction: text("sideways"),
-        status: text("ok"),
+        createdAtSec: 11,
+        direction: "sideways",
+        status: "ok",
       }),
     );
     expect(runNow(transactions.all)).toMatchObject([
@@ -57,10 +50,10 @@ describe("transactions repository", () => {
     const transactions = makeTransactionsRepository(store);
     const row = () => ({
       id: createId<"Transaction">(),
-      createdAtSec: PositiveInt.orThrow(1),
-      direction: text("in"),
-      status: text("ok"),
-      note: NonEmptyString1000.orThrow("x".repeat(1000)),
+      createdAtSec: 1,
+      direction: "in",
+      status: "ok",
+      note: "x".repeat(1000),
     });
     for (let i = 0; i < 300; i += 1) runNow(transactions.insert(row()));
     expect(runNow(store.activeIndex("transactions"))).toBe(1);

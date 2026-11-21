@@ -1,18 +1,9 @@
-import { createIdFromString } from "@linky-fit/domain";
-import {
-  NonEmptyString100,
-  NonEmptyString1000,
-  type ShardDbError,
-} from "@linky-fit/linksync";
+import type { ShardDbError } from "@linky-fit/linksync";
 import { Effect, Option, Schema } from "effect";
 import { CzechIban } from "../domain";
 import type { SettingsRepository } from "./shop";
 
-const MONETA_KEY = "fazole.moneta";
-// Mirrors linksync's `settingIdFor`, whose keys are Linky's own settings only.
-export const monetaSettingId = createIdFromString<"Setting">(
-  `setting/${MONETA_KEY}`,
-);
+export const MONETA_SETTING_KEY = "fazole.moneta";
 
 /** An API token as MONETA's Internet Banka issues it: one line, short enough to fit the setting row next to the account. */
 export const MonetaToken = Schema.String.pipe(
@@ -40,10 +31,10 @@ const MonetaJson = Schema.fromJsonString(
 export const readMonetaConnection = (
   settings: SettingsRepository,
 ): Effect.Effect<MonetaConnection | null> =>
-  Effect.map(settings.byId(monetaSettingId), (row) =>
+  Effect.map(settings.getRaw(MONETA_SETTING_KEY), (value) =>
     Option.getOrNull(
       Option.flatMap(
-        Schema.decodeUnknownOption(MonetaJson)(row?.value),
+        Schema.decodeUnknownOption(MonetaJson)(value),
         ({ token, accountId, iban }) =>
           token === undefined || accountId === undefined || iban === undefined
             ? Option.none()
@@ -57,21 +48,18 @@ export const saveMonetaConnection = (
   settings: SettingsRepository,
   connection: MonetaConnection | null,
 ): Effect.Effect<void, ShardDbError> =>
-  settings.insert({
-    id: monetaSettingId,
-    key: NonEmptyString100.orThrow(MONETA_KEY),
-    value: NonEmptyString1000.orThrow(
-      Schema.encodeSync(MonetaJson)(
-        connection === null
-          ? {}
-          : {
-              token: connection.token,
-              accountId: connection.accountId,
-              iban: connection.iban,
-            },
-      ),
+  settings.setRaw(
+    MONETA_SETTING_KEY,
+    Schema.encodeSync(MonetaJson)(
+      connection === null
+        ? {}
+        : {
+            token: connection.token,
+            accountId: connection.accountId,
+            iban: connection.iban,
+          },
     ),
-  });
+  );
 
 /** The token as the merchant pasted it, without the surrounding whitespace; `null` unless it looks like one. */
 export const parseMonetaTokenInput = (value: string): string | null => {

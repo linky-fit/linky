@@ -1,7 +1,4 @@
-import {
-  makeKeryxSubscriptionsRepository,
-  NonEmptyString,
-} from "@linky-fit/linksync";
+import { makeKeryxSubscriptionsRepository } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 import {
@@ -65,7 +62,7 @@ describe("keryx company rows", () => {
     expect(
       readKeryxCompany({
         ...record,
-        trustJson: NonEmptyString.orThrow('{"rootJson":1}'),
+        trustJson: '{"rootJson":1}',
       }),
     ).toBeNull();
   });

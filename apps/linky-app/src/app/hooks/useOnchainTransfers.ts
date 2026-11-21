@@ -1,9 +1,5 @@
 import { PaymentRequestId } from "@linky-fit/linkshu/payment-request";
-import {
-  createId,
-  PositiveInt,
-  type OnchainTransferId,
-} from "@linky-fit/linksync";
+import { createId, type OnchainTransferId } from "@linky-fit/linksync";
 import { OutboxRef, type Pubkey } from "@linky-fit/linkstr";
 import {
   AsyncResult,
@@ -204,7 +200,7 @@ export const useOnchainTransferCommands = () => {
         onPaid: () => {
           void runWrite(
             transfers.update(transfer.id, {
-              sentAtSec: PositiveInt.orThrow(nowSeconds()),
+              sentAtSec: nowSeconds(),
             }),
           ).then((outcome) => {
             if (!outcome.ok) fail(outcome.error);
@@ -317,7 +313,7 @@ export const useOnchainTransferCommands = () => {
       if (rumorId === null) return;
       const written = await runWrite(
         transfers.update(transfer.id, {
-          cancelledAtSec: PositiveInt.orThrow(nowSeconds()),
+          cancelledAtSec: nowSeconds(),
         }),
       );
       if (!written.ok) fail(written.error);

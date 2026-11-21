@@ -2,9 +2,8 @@ import { encodeNsec } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import {
   activeNostrIdentityId,
-  NonEmptyString1000,
   OwnerId,
-  type NostrIdentityRow,
+  type NostrIdentityRecord,
 } from "@linky-fit/linksync";
 import { AtomRegistry, RegistryContext } from "@linky-fit/linkstr-react";
 import { act } from "react";
@@ -19,7 +18,7 @@ import { sessionAtom, sessionSecrets } from "../../state/session/session";
 import { useIdentityOwnersComposition } from "./useIdentityOwnersComposition";
 
 const mocks = vi.hoisted(() => {
-  const synced: { row: NostrIdentityRow | null } = { row: null };
+  const synced: { row: NostrIdentityRecord | null } = { row: null };
   return { calls: new Array<string>(), synced };
 });
 
@@ -86,14 +85,13 @@ describe("an identity switch synced from another device", () => {
     mocks.calls.length = 0;
     mocks.synced.row = {
       id: activeNostrIdentityId,
-      nsec: NonEmptyString1000.orThrow(syncedNsec),
+      nsec: syncedNsec,
       npub: null,
       source: null,
       switchedAtSec: null,
       ownerId: OwnerId.orThrow("AAAAAAAAAAAAAAAAAAAAAA"),
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
-      isDeleted: null,
     };
 
     const registry = await mount();

@@ -1,20 +1,27 @@
-import { Effect } from "effect";
-import type { Patch, ShardDbError } from "../core";
 import { activeNostrIdentityId } from "@linky-fit/domain";
-import type { LinkyDbSchema, NostrIdentityRow } from "../model/schema";
+import { Effect } from "effect";
+import type { ShardDbError } from "../core";
+import type { LinkyDbSchema } from "../model/schema";
 import type { LinkyStore } from "../model/store";
-import { tableRepository } from "./tableRepository";
+import {
+  domainTableRepository,
+  type DomainPatch,
+  type DomainRow,
+} from "./domainRepository";
 
-type IdentityColumns = Omit<Patch<LinkyDbSchema["nostrIdentity"]>, "nsec"> & {
-  readonly nsec: LinkyDbSchema["nostrIdentity"]["nsec"];
+export type NostrIdentityRecord = DomainRow<LinkyDbSchema["nostrIdentity"]>;
+
+export type IdentityInput = Omit<
+  DomainPatch<LinkyDbSchema["nostrIdentity"]>,
+  "nsec"
+> & {
+  readonly nsec: string;
 };
 
 export interface IdentityRepository {
   /** The active identity as the newest row says; null before the first `set`. */
-  readonly current: Effect.Effect<NostrIdentityRow | null>;
-  readonly set: (
-    identity: IdentityColumns,
-  ) => Effect.Effect<void, ShardDbError>;
+  readonly current: Effect.Effect<NostrIdentityRecord | null>;
+  readonly set: (identity: IdentityInput) => Effect.Effect<void, ShardDbError>;
   readonly subscribe: (listener: () => void) => () => void;
 }
 
@@ -22,8 +29,8 @@ export interface IdentityRepository {
 export const makeIdentityRepository = (
   store: LinkyStore,
 ): IdentityRepository => {
-  const table = tableRepository(store, "identity", "nostrIdentity");
-  const newestFirst = (rows: ReadonlyArray<NostrIdentityRow>) =>
+  const table = domainTableRepository(store, "identity", "nostrIdentity");
+  const newestFirst = (rows: ReadonlyArray<NostrIdentityRecord>) =>
     [...rows].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   return {
     current: Effect.map(table.all, (rows) => newestFirst(rows)[0] ?? null),

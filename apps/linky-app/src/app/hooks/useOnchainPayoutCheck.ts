@@ -1,4 +1,3 @@
-import { NonEmptyString100 } from "@linky-fit/linksync";
 import { RegistryContext } from "@linky-fit/linkstr-react";
 import { esploraApiUrl, makeEsploraClient } from "@linky-fit/onchain-transfer";
 import { Effect } from "effect";
@@ -50,7 +49,7 @@ export const useOnchainPayoutCheck = (): ((
           }
           const written = await runWrite(
             repository.update(id, {
-              payoutTxid: NonEmptyString100.orThrow(check.txid),
+              payoutTxid: check.txid,
             }),
           );
           reportAppLog({

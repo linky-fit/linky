@@ -11,8 +11,7 @@ import {
 } from "@linky-fit/linkstr";
 import {
   listingKey,
-  NonEmptyString1000,
-  type ContactRow,
+  type ContactRecord,
   type ListingRecord,
 } from "@linky-fit/linksync";
 import { Option, Schema } from "effect";
@@ -57,10 +56,8 @@ export const listingAudienceOfRecord = (
 /** The `audience` column for `audience`: null for the contacts, the default. */
 export const listingAudienceColumn = (
   audience: ListingAudience,
-): NonEmptyString1000 | null =>
-  audience.kind === "contacts"
-    ? null
-    : NonEmptyString1000.orThrow(encodeStoredAudience(audience));
+): string | null =>
+  audience.kind === "contacts" ? null : encodeStoredAudience(audience);
 
 /** A group with how many contacts are in it: `Rodina (3)`. */
 export const contactGroupLabel = (
@@ -96,7 +93,10 @@ export interface ListingsRecipient {
  */
 export const listingsRecipients = (
   rows: ReadonlyArray<
-    Pick<ContactRow, "npub" | "groupName" | "groupNamesJson" | "archivedAtSec">
+    Pick<
+      ContactRecord,
+      "npub" | "groupName" | "groupNamesJson" | "archivedAtSec"
+    >
   >,
   blocked: ReadonlyArray<string>,
   ownPubkey: Pubkey | null,

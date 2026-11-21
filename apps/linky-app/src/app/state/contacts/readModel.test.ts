@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { createId, NonEmptyString1000, PositiveInt } from "@linky-fit/linksync";
+import { createId } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { AtomRegistry } from "effect/reactivity";
 import { describe, expect, it, vi } from "vitest";
@@ -23,8 +23,6 @@ vi.mock("@linky-fit/linksync/evolu", async (importOriginal) => ({
   openLinkyStore,
 }));
 
-const text = NonEmptyString1000.orThrow;
-
 const result = <A, E>(
   registry: AtomRegistry.AtomRegistry,
   atom: Parameters<typeof AtomRegistry.getResult<A, E>>[1],
@@ -40,22 +38,22 @@ describe("contacts read model", () => {
     const unsubscribe = registry.subscribe(contactGroupsAtom, () => {});
     const alice = createId<"Contact">();
     const bob = createId<"Contact">();
-    const team = text(serializeContactGroups(["Team"]));
+    const team = serializeContactGroups(["Team"]);
 
     await Effect.runPromise(
-      contacts.insert({ id: alice, name: text("Alice"), groupNamesJson: team }),
+      contacts.insert({ id: alice, name: "Alice", groupNamesJson: team }),
     );
     await Effect.runPromise(
       contacts.insert({
         id: bob,
-        name: text("Bob"),
+        name: "Bob",
         groupNamesJson: team,
-        archivedAtSec: PositiveInt.orThrow(10),
+        archivedAtSec: 10,
       }),
     );
     await Effect.runPromise(
       Effect.flatMap(conversations.ensureDirect(alice), (chat) =>
-        conversations.markSeen(chat.id, PositiveInt.orThrow(42)),
+        conversations.markSeen(chat.id, 42),
       ),
     );
 

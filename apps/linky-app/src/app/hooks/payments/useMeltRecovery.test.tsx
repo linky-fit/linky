@@ -8,13 +8,7 @@ import {
   QuoteId,
   OperationId,
 } from "@linky-fit/linkshu";
-import {
-  NonEmptyString100,
-  NonEmptyString1000,
-  PositiveInt,
-  TransactionId,
-  type TransactionRecord,
-} from "@linky-fit/linksync";
+import { TransactionId, type TransactionRecord } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -66,22 +60,19 @@ const pendingRow = (
   ownerId: OwnerId.orThrow("AAAAAAAAAAAAAAAAAAAAAA"),
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
-  isDeleted: null,
-  createdAtSec: PositiveInt.orThrow(1),
+  createdAtSec: 1,
   direction: "out",
   status,
   category: "lightning",
   amount: null,
   fee: null,
-  method: NonEmptyString100.orThrow("lightning_invoice"),
+  method: "lightning_invoice",
   note: null,
   detailsJson:
-    quoteId === null
-      ? null
-      : NonEmptyString100.orThrow(JSON.stringify({ meltQuoteId: quoteId })),
+    quoteId === null ? null : JSON.stringify({ meltQuoteId: quoteId }),
   iconKind: null,
   contactId: null,
-  mint: NonEmptyString1000.orThrow("https://mint.example"),
+  mint: "https://mint.example",
   unit: null,
   error: null,
   pendingLabel: null,
@@ -134,7 +125,7 @@ describe("useMeltRecovery", () => {
     allMock.mockReturnValue([
       {
         ...pendingRow("tx-1", "quote-1"),
-        mint: NonEmptyString1000.orThrow("https://other.example"),
+        mint: "https://other.example",
       },
     ]);
     const view = await mount([result("paid")]);

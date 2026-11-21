@@ -1,12 +1,16 @@
-import { NonEmptyString, NonEmptyString100 } from "@linky-fit/domain";
-import { PositiveInt } from "@evolu/common";
 import { Pubkey } from "@linky-fit/linkstr";
 import { Effect, Option, Schema } from "effect";
 import type { RowNotFound, ShardDbError } from "../core";
 import { peerListingsIdFor } from "../model/ids";
-import type { LinkyDbSchema, PeerListingsRow } from "../model/schema";
+import type { LinkyDbSchema } from "../model/schema";
 import type { LinkyStore } from "../model/store";
-import { tableRepository, type TableRepository } from "./tableRepository";
+import {
+  domainTableRepository,
+  type DomainRow,
+  type DomainTableRepository,
+} from "./domainRepository";
+
+export type PeerListingsStoredRow = DomainRow<LinkyDbSchema["peerListings"]>;
 
 /** One author's newest listings document as one of the user's identities read it. */
 export interface PeerListingsRecord {
@@ -21,7 +25,7 @@ const decodePubkey = Schema.decodeUnknownOption(Pubkey);
 
 /** The record of a row, or null while the row is still arriving column by column. */
 export const normalizePeerListings = (
-  row: PeerListingsRow,
+  row: PeerListingsStoredRow,
 ): PeerListingsRecord | null => {
   const reader = decodePubkey(row.readerPubkey);
   const author = decodePubkey(row.authorPubkey);
@@ -41,7 +45,7 @@ export const normalizePeerListings = (
   };
 };
 
-export interface PeerListingsRepository extends TableRepository<
+export interface PeerListingsRepository extends DomainTableRepository<
   LinkyDbSchema["peerListings"]
 > {
   /** The documents `reader` read, one per author. */
@@ -61,7 +65,7 @@ export interface PeerListingsRepository extends TableRepository<
 export const makePeerListingsRepository = (
   store: LinkyStore,
 ): PeerListingsRepository => {
-  const table = tableRepository(store, "peerListings", "peerListings");
+  const table = domainTableRepository(store, "peerListings", "peerListings");
   return {
     ...table,
     ofReader: (reader) =>
@@ -75,14 +79,13 @@ export const makePeerListingsRepository = (
       Effect.gen(function* () {
         const id = peerListingsIdFor(reader, author);
         const stored = yield* table.byId(id);
-        const publishedAt = PositiveInt.orThrow(publishedAtSec);
         if (stored === null) {
           yield* table.insert({
             id,
-            readerPubkey: NonEmptyString100.orThrow(reader),
-            authorPubkey: NonEmptyString100.orThrow(author),
-            document: NonEmptyString.orThrow(document),
-            publishedAtSec: publishedAt,
+            readerPubkey: reader,
+            authorPubkey: author,
+            document,
+            publishedAtSec,
           });
           return true;
         }
@@ -95,11 +98,8 @@ export const makePeerListingsRepository = (
         yield* table.update(
           id,
           stored.document === document
-            ? { publishedAtSec: publishedAt }
-            : {
-                document: NonEmptyString.orThrow(document),
-                publishedAtSec: publishedAt,
-              },
+            ? { publishedAtSec }
+            : { document, publishedAtSec },
         );
         return true;
       }),

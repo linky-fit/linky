@@ -1,10 +1,9 @@
-import { NonEmptyString100, NonEmptyString1000 } from "@linky-fit/linksync";
 import { Effect, Result } from "effect";
 import { describe, expect, it } from "vitest";
 import { czechAccountToIban, parseCzechAccount } from "../domain";
 import { testStore } from "../services/testing/fakes";
 import {
-  monetaSettingId,
+  MONETA_SETTING_KEY,
   parseMonetaTokenInput,
   readMonetaConnection,
   saveMonetaConnection,
@@ -31,13 +30,10 @@ describe("the MONETA connection", () => {
   it("is absent when the stored row is incomplete", async () => {
     const settings = makeSettingsRepository(testStore());
     await Effect.runPromise(
-      settings.insert({
-        id: monetaSettingId,
-        key: NonEmptyString100.orThrow("fazole.moneta"),
-        value: NonEmptyString1000.orThrow(
-          JSON.stringify({ token: connection.token, iban }),
-        ),
-      }),
+      settings.setRaw(
+        MONETA_SETTING_KEY,
+        JSON.stringify({ token: connection.token, iban }),
+      ),
     );
     expect(await Effect.runPromise(readMonetaConnection(settings))).toBeNull();
   });

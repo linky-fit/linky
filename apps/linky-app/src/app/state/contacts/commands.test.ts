@@ -2,7 +2,6 @@
 import {
   createId,
   directConversationIdFor,
-  NonEmptyString1000,
   ShardDbError,
 } from "@linky-fit/linksync";
 import { encodeNpub } from "@linky-fit/linkstr";
@@ -61,8 +60,8 @@ describe("contacts commands", () => {
     await Effect.runPromise(
       contacts.insert({
         id,
-        name: NonEmptyString1000.orThrow("Bob"),
-        npub: NonEmptyString1000.orThrow(encodeNpub(peer.pubkey)),
+        name: "Bob",
+        npub: encodeNpub(peer.pubkey),
       }),
     );
 
@@ -107,9 +106,7 @@ describe("contacts commands", () => {
   it("reports a restore that succeeded when reading the contact back fails", async () => {
     const { commands, contacts } = await boot();
     const id = createId<"Contact">();
-    await Effect.runPromise(
-      contacts.insert({ id, name: NonEmptyString1000.orThrow("Bob") }),
-    );
+    await Effect.runPromise(contacts.insert({ id, name: "Bob" }));
     expect(await commands.deleteContact(id)).toEqual({ ok: true });
     vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.spyOn(contacts, "byId").mockReturnValueOnce(

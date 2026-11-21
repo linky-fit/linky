@@ -1,4 +1,4 @@
-import type { NostrIdentityRow } from "@linky-fit/linksync";
+import type { NostrIdentityRecord } from "@linky-fit/linksync";
 import { trimString } from "../../utils/validation";
 
 export interface SyncedNostrIdentity {
@@ -10,7 +10,7 @@ export interface SyncedNostrIdentity {
 
 /** The identity row as the app reads it; null when the row carries no key yet. */
 export const toSyncedNostrIdentity = (
-  row: NostrIdentityRow,
+  row: NostrIdentityRecord,
 ): SyncedNostrIdentity | null => {
   const nsec = trimString(row.nsec);
   if (!nsec) return null;

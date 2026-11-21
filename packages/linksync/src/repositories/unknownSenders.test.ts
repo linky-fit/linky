@@ -1,17 +1,11 @@
-import {
-  NonEmptyString,
-  NonEmptyString100,
-  NonEmptyString1000,
-} from "@linky-fit/domain";
-import { PositiveInt } from "@evolu/common";
 import { Pubkey, RumorId } from "@linky-fit/linkstr";
-import { messageContentColumns } from "../model/schema";
-import { createLinkyStore } from "../model/store";
 import {
   createId,
   directConversationIdFor,
   nostrMessageIdFor,
 } from "../model/ids";
+import { messageContentColumns } from "../model/schema";
+import { createLinkyStore } from "../model/store";
 import { linkyStore, runNow } from "../testing/linky";
 import { makeConversationsRepository } from "./conversations";
 import { makeUnknownSendersRepository } from "./unknownSenders";
@@ -22,13 +16,13 @@ const rumor = (n: number) => RumorId.make(n.toString(16).padStart(64, "0"));
 
 const incoming = (from: Pubkey, n: number) => ({
   id: nostrMessageIdFor(rumor(n)),
-  peerPubkey: NonEmptyString1000.orThrow(from),
-  direction: NonEmptyString100.orThrow("in"),
-  content: NonEmptyString.orThrow(`hi ${n}`),
-  wrapId: NonEmptyString1000.orThrow(rumor(n)),
-  rumorId: NonEmptyString1000.orThrow(rumor(n)),
-  pubkey: NonEmptyString1000.orThrow(from),
-  createdAtSec: PositiveInt.orThrow(n),
+  peerPubkey: from,
+  direction: "in",
+  content: `hi ${n}`,
+  wrapId: rumor(n),
+  rumorId: rumor(n),
+  pubkey: from,
+  createdAtSec: n,
 });
 
 const messagesFrom = (
@@ -62,7 +56,7 @@ describe("unknown senders repository", () => {
     runNow(unknownSenders.insertIfAbsent(incoming(bob, 3)));
     runNow(
       unknownSenders.update(nostrMessageIdFor(rumor(2)), {
-        content: NonEmptyString.orThrow("hi 2, edited"),
+        content: "hi 2, edited",
       }),
     );
     const contactId = createId<"Contact">();
@@ -89,17 +83,17 @@ describe("unknown senders repository", () => {
     runNow(
       unknownSenders.insert({
         ...incoming(alice, 1),
-        clientId: NonEmptyString1000.orThrow("client-1"),
-        status: NonEmptyString100.orThrow("sent"),
-        localOnly: NonEmptyString100.orThrow("1"),
-        replyToId: NonEmptyString1000.orThrow(rumor(9)),
-        replyToContent: NonEmptyString.orThrow("earlier"),
-        rootMessageId: NonEmptyString1000.orThrow(rumor(8)),
-        editedAtSec: PositiveInt.orThrow(5),
-        editedFromId: NonEmptyString1000.orThrow(rumor(7)),
-        isEdited: NonEmptyString100.orThrow("1"),
-        originalContent: NonEmptyString.orThrow("hi"),
-        deletedAtSec: PositiveInt.orThrow(6),
+        clientId: "client-1",
+        status: "sent",
+        localOnly: "1",
+        replyToId: rumor(9),
+        replyToContent: "earlier",
+        rootMessageId: rumor(8),
+        editedAtSec: 5,
+        editedFromId: rumor(7),
+        isEdited: "1",
+        originalContent: "hi",
+        deletedAtSec: 6,
       }),
     );
     const [stored] = messagesFrom(unknownSenders, alice);
@@ -129,10 +123,12 @@ describe("unknown senders repository", () => {
     runNow(deviceA.insertIfAbsent(incoming(alice, 1)));
     const conversationsB = makeConversationsRepository(storeB);
     // B already holds the message from its own move whose removal has not synced.
+    const { peerPubkey: _peerPubkey, ...messageColumns } = incoming(alice, 1);
+    void _peerPubkey;
     runNow(
       conversationsB.messages.insertIfAbsent({
-        ...incoming(alice, 1),
-        content: NonEmptyString.orThrow("hi 1, edited on B"),
+        ...messageColumns,
+        content: "hi 1, edited on B",
         conversationId: directConversationIdFor(contactId),
       }),
     );

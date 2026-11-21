@@ -9,20 +9,19 @@
 
 import type {
   ContactId,
-  ContactRow,
-  ConversationRow,
-  PositiveInt,
+  ContactRecord,
+  ConversationRecord,
 } from "@linky-fit/linksync";
 
 export interface ArchiveCopy {
   readonly contactId: ContactId;
-  readonly conversationId: ConversationRow["id"];
-  readonly archivedAtSec: PositiveInt;
+  readonly conversationId: ConversationRecord["id"];
+  readonly archivedAtSec: number;
 }
 
 export const archivesToCopy = (
-  contacts: ReadonlyArray<ContactRow>,
-  conversations: ReadonlyArray<ConversationRow>,
+  contacts: ReadonlyArray<ContactRecord>,
+  conversations: ReadonlyArray<ConversationRecord>,
 ): ReadonlyArray<ArchiveCopy> => {
   const contactById = new Map(contacts.map((contact) => [contact.id, contact]));
   return conversations.flatMap((conversation) => {

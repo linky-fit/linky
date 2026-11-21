@@ -2,7 +2,6 @@
 import {
   createId,
   directConversationIdFor,
-  NonEmptyString1000,
   type ContactId,
   type ConversationId,
 } from "@linky-fit/linksync";
@@ -79,9 +78,7 @@ const message = (
 
 const addContact = async ({ contacts }: Booted): Promise<ContactId> => {
   const id = createId<"Contact">();
-  await Effect.runPromise(
-    contacts.insert({ id, name: NonEmptyString1000.orThrow("Alice") }),
-  );
+  await Effect.runPromise(contacts.insert({ id, name: "Alice" }));
   return id;
 };
 

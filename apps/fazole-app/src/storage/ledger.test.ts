@@ -1,11 +1,5 @@
 import { MintUrl, QuoteId } from "@linky-fit/linkshu";
-import {
-  createId,
-  NonEmptyString100,
-  NonEmptyString,
-  PositiveInt,
-  transactionIdForQuote,
-} from "@linky-fit/linksync";
+import { createId, transactionIdForQuote } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { describe, expect, it } from "vitest";
@@ -149,12 +143,12 @@ describe("records", () => {
     await Effect.runPromise(
       repositories.transactions.insert({
         id: createId<"Transaction">(),
-        createdAtSec: PositiveInt.orThrow(1_700_000_000),
-        direction: NonEmptyString100.orThrow("in"),
-        status: NonEmptyString100.orThrow("ok"),
-        method: NonEmptyString100.orThrow("cashu_chat"),
-        amount: PositiveInt.orThrow(21),
-        detailsJson: NonEmptyString.orThrow('{"note":"from Linky"}'),
+        createdAtSec: 1_700_000_000,
+        direction: "in",
+        status: "ok",
+        method: "cashu_chat",
+        amount: 21,
+        detailsJson: '{"note":"from Linky"}',
       }),
     );
     expect(await ledger.records()).toEqual({

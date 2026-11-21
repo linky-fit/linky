@@ -2,14 +2,11 @@ import {
   createId,
   makeContactsRepository,
   makeConversationsRepository,
-  PositiveInt,
 } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 import { makeTestLinkyStore } from "../../testUtils/linkyStore";
 import { archivesToCopy } from "./conversationArchiveMigration";
-
-const sec = (value: number) => PositiveInt.orThrow(value);
 
 const setup = () => {
   const { store } = makeTestLinkyStore();
@@ -22,7 +19,7 @@ const setup = () => {
     if (archivedOnChatAtSec !== null)
       await Effect.runPromise(
         conversations.update(chat.id, {
-          archivedAtSec: sec(archivedOnChatAtSec),
+          archivedAtSec: archivedOnChatAtSec,
         }),
       );
     return id;
@@ -49,7 +46,7 @@ describe("archivesToCopy", () => {
   it("leaves a contact that already carries an archive alone", async () => {
     const { contacts, contactWithChat, plan, run } = setup();
     const id = await contactWithChat(100);
-    await run(contacts.archive(id, sec(150)));
+    await run(contacts.archive(id, 150));
 
     expect(await plan()).toEqual([]);
   });
@@ -57,7 +54,7 @@ describe("archivesToCopy", () => {
   it("does not undo an unarchive with the conversation's archive", async () => {
     const { contacts, contactWithChat, plan, run } = setup();
     const id = await contactWithChat(100);
-    await run(contacts.archive(id, sec(100)));
+    await run(contacts.archive(id, 100));
     await run(contacts.unarchive(id));
 
     expect(await plan()).toEqual([]);

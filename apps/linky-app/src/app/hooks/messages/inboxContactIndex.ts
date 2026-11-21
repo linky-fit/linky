@@ -10,7 +10,7 @@ import type { InboxContact } from "./inboxNotifications";
 
 export type InboxContactRowLike = ContactNameRowLike & {
   npub?: string | null | undefined;
-  nameSetByUser?: number | null | undefined;
+  nameSetByUser?: boolean | number | null | undefined;
 };
 
 // Row order follows the physical createdAt, which a shard move resets, so

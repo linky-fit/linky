@@ -1,17 +1,25 @@
 import type { Pubkey } from "@linky-fit/linkstr";
 import { Effect } from "effect";
-import type { ShardDbError, WriteRow } from "../core";
+import type { ShardDbError } from "../core";
 import type { ContactId, ConversationId } from "../model/ids";
-import {
-  messageContentColumns,
-  type LinkyDbSchema,
-  type UnknownSenderMessageRow,
-} from "../model/schema";
+import { messageContentColumns, type LinkyDbSchema } from "../model/schema";
 import type { LinkyStore } from "../model/store";
 import { makeConversationsRepository } from "./conversations";
-import { tableRepository, type TableRepository } from "./tableRepository";
+import {
+  domainTableRepository,
+  type DomainRow,
+  type DomainTableRepository,
+  type DomainWriteRow,
+} from "./domainRepository";
 
-export interface UnknownSendersRepository extends TableRepository<
+export type UnknownSenderMessageRecord = DomainRow<
+  LinkyDbSchema["unknownSenderMessage"]
+>;
+export type UnknownSenderMessageInsert = DomainWriteRow<
+  LinkyDbSchema["unknownSenderMessage"]
+>;
+
+export interface UnknownSendersRepository extends DomainTableRepository<
   LinkyDbSchema["unknownSenderMessage"]
 > {
   /**
@@ -35,9 +43,9 @@ const isContentColumn = (column: string): column is ContentColumn =>
   column in messageContentColumns;
 
 /** The row's message content columns that hold a value: an insert omits empty optional ones. */
-const contentOf = (row: UnknownSenderMessageRow) => {
+const contentOf = (row: UnknownSenderMessageRecord) => {
   const content: {
-    -readonly [K in ContentColumn]?: UnknownSenderMessageRow[K];
+    -readonly [K in ContentColumn]?: UnknownSenderMessageRecord[K];
   } = {};
   const copy = <K extends ContentColumn>(column: K) => {
     const value = row[column];
@@ -49,9 +57,9 @@ const contentOf = (row: UnknownSenderMessageRow) => {
 
 /** The row as a message of the conversation; null while sync has not delivered its required columns. */
 const toMessageRow = (
-  row: UnknownSenderMessageRow,
+  row: UnknownSenderMessageRecord,
   conversationId: ConversationId,
-): WriteRow<LinkyDbSchema["message"]> | null => {
+): DomainWriteRow<LinkyDbSchema["message"]> | null => {
   const { direction, content, wrapId, createdAtSec } = row;
   if (
     direction === null ||
@@ -75,7 +83,7 @@ const toMessageRow = (
 export const makeUnknownSendersRepository = (
   store: LinkyStore,
 ): UnknownSendersRepository => {
-  const messages = tableRepository(
+  const messages = domainTableRepository(
     store,
     "unknownSenders",
     "unknownSenderMessage",
@@ -90,7 +98,7 @@ export const makeUnknownSendersRepository = (
   };
 
   // Another device may have removed the row since it was read; it is gone either way.
-  const removeQuietly = (row: UnknownSenderMessageRow) =>
+  const removeQuietly = (row: UnknownSenderMessageRecord) =>
     messages
       .remove(row.id)
       .pipe(Effect.catchTag("RowNotFound", () => Effect.void));

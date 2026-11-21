@@ -1,5 +1,5 @@
 import { decodeNpub, type Pubkey } from "@linky-fit/linkstr";
-import { NonEmptyString1000, type ContactId } from "@linky-fit/linksync";
+import type { ContactId } from "@linky-fit/linksync";
 import {
   RegistryContext,
   useAtom,
@@ -491,11 +491,14 @@ export const useNpubMessageContacts = () => {
       const groups = normalizeContactGroups([rawGroup]);
       if (groups.length === 0) return;
 
-      const groupName = NonEmptyString1000.fromUnknown(groups[0]);
-      const groupNamesJson = NonEmptyString1000.fromUnknown(
-        serializeContactGroups(groups),
-      );
-      if (!groupName.ok || !groupNamesJson.ok) {
+      const groupName = groups[0] ?? "";
+      const groupNamesJson = serializeContactGroups(groups);
+      if (
+        !groupName ||
+        groupName.length > 1000 ||
+        !groupNamesJson ||
+        groupNamesJson.length > 1000
+      ) {
         setStatus(`${t("errorPrefix")}: ${t("group")}`);
         return;
       }
@@ -503,8 +506,8 @@ export const useNpubMessageContacts = () => {
       for (const id of pending.savedContactIds) {
         const result = await runWrite(
           contactsRepository.update(id, {
-            groupName: groupName.value,
-            groupNamesJson: groupNamesJson.value,
+            groupName,
+            groupNamesJson,
           }),
         );
         if (!result.ok) {

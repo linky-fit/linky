@@ -1,4 +1,6 @@
 import { NonEmptyString100, NonEmptyString1000 } from "@linky-fit/domain";
+import { Effect, Result } from "effect";
+import { ShardDbError } from "../core";
 import { settingIdFor } from "../model/ids";
 import { linkyStore, runNow } from "../testing/linky";
 import { makeSettingsRepository } from "./settings";
@@ -42,5 +44,50 @@ describe("settings repository", () => {
     expect(
       runNow(makeSettingsRepository(store).get("allowTestMints")),
     ).toBeNull();
+  });
+
+  it("reads, writes and removes raw app settings under the shared setting id scheme", () => {
+    const { db, store } = linkyStore();
+    const settings = makeSettingsRepository(store);
+    expect(runNow(settings.getRaw("fazole.shop"))).toBeNull();
+    runNow(settings.setRaw("fazole.shop", '{"name":"Kavárna"}'));
+    expect(runNow(settings.getRaw("fazole.shop"))).toBe('{"name":"Kavárna"}');
+    runNow(settings.setRaw("fazole.shop", '{"name":"Pražírna"}'));
+    expect(runNow(settings.getRaw("fazole.shop"))).toBe('{"name":"Pražírna"}');
+    expect(runNow(db.readTable("setting"))).toHaveLength(1);
+    runNow(settings.removeRaw("fazole.shop"));
+    expect(runNow(settings.getRaw("fazole.shop"))).toBeNull();
+    // Re-writing after removal revives the row.
+    runNow(settings.setRaw("fazole.shop", '{"name":"Zpět"}'));
+    expect(runNow(settings.getRaw("fazole.shop"))).toBe('{"name":"Zpět"}');
+  });
+
+  it("writes raw settings via a single upsert without read-then-update", () => {
+    const { db, store } = linkyStore();
+    const settings = makeSettingsRepository(store);
+    runNow(settings.setRaw("operator.profile", '{"name":"A"}'));
+    const readSpy = vi.spyOn(db, "readTable");
+    const mutateSpy = vi.spyOn(db, "mutate");
+    runNow(settings.setRaw("operator.profile", '{"name":"B"}'));
+    expect(
+      readSpy.mock.calls.filter(([table]) => table === "setting"),
+    ).toHaveLength(0);
+    expect(mutateSpy).toHaveBeenCalledTimes(1);
+    expect(mutateSpy.mock.calls[0]?.[0]).toEqual([
+      expect.objectContaining({ kind: "upsert", table: "setting" }),
+    ]);
+    expect(runNow(settings.getRaw("operator.profile"))).toBe('{"name":"B"}');
+    expect(runNow(db.readTable("setting"))).toHaveLength(1);
+  });
+
+  it("defers invalid setting encoding into the Effect as ShardDbError", () => {
+    const { store } = linkyStore();
+    const settings = makeSettingsRepository(store);
+    const write = settings.set("defaultMint", "");
+    const outcome = runNow(Effect.result(write));
+    expect(Result.isFailure(outcome)).toBe(true);
+    if (Result.isFailure(outcome)) {
+      expect(outcome.failure).toBeInstanceOf(ShardDbError);
+    }
   });
 });

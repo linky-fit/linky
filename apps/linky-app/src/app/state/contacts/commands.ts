@@ -2,8 +2,6 @@ import { decodeNpub } from "@linky-fit/linkstr";
 import {
   createId,
   directConversationIdFor,
-  NonEmptyString1000,
-  PositiveInt,
   type ContactId,
   type ContactsRepository,
   type ConversationsRepository,
@@ -51,7 +49,7 @@ const makeContactsCommands = ({
   readonly messages: MessagesCommands;
 }): ContactsCommands => ({
   deleteContact: async (id) => {
-    const deletedAtSec = PositiveInt.orThrow(Math.ceil(Date.now() / 1e3));
+    const deletedAtSec = Math.ceil(Date.now() / 1e3);
     const outcome = await runWrite(
       Effect.andThen(
         contacts.archive(id, deletedAtSec),
@@ -170,10 +168,8 @@ export const saveNpubContactAtom = Atom.keepAlive(
               .name;
           const row = {
             id: createId<"Contact">(),
-            name: NonEmptyString1000.orThrow(
-              (bestName ?? "").trim() || formatShortNpub(npub),
-            ),
-            npub: NonEmptyString1000.orThrow(npub),
+            name: (bestName ?? "").trim() || formatShortNpub(npub),
+            npub,
           };
           const saved = { contact: row, created: true, npub };
           pending.set(npub, saved);

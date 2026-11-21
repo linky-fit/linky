@@ -1,8 +1,8 @@
 // Migration bridge; removal gate in app/migrations/AGENTS.md
 import type {
-  ContactRow,
+  ContactRecord,
   ContactsRepository,
-  ConversationRow,
+  ConversationRecord,
 } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import React from "react";
@@ -41,9 +41,9 @@ export const useConversationArchiveMigration = ({
   conversationRows,
   hydrated,
 }: {
-  readonly contactRows: ReadonlyArray<ContactRow>;
+  readonly contactRows: ReadonlyArray<ContactRecord>;
   readonly contactsRepository: Pick<ContactsRepository, "archive">;
-  readonly conversationRows: ReadonlyArray<ConversationRow>;
+  readonly conversationRows: ReadonlyArray<ConversationRecord>;
   readonly hydrated: boolean;
 }): void => {
   // Rows read back after the write can lag behind it; this keeps the copy from repeating.

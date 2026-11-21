@@ -7,7 +7,6 @@ import {
   makeRecurringPaymentsRepository,
   mergeShardRows,
   laneOwnerFromMnemonic,
-  PositiveInt,
   type LinkyScope,
   type LinkyTable,
   type Owner,
@@ -202,7 +201,7 @@ export const installLinkyE2eHooks = (
       if (!order) throw new Error(`unknown recurring payment ${id}`);
       await Effect.runPromise(
         payments.update(order.id, {
-          anchorAtSec: PositiveInt.orThrow(atSec),
+          anchorAtSec: atSec,
           ...recurringPaymentUpdate(editPatch(order, atSec)),
         }),
       );

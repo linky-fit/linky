@@ -2,8 +2,6 @@ import { decodePaymentRequest } from "@linky-fit/linkshu/payment-request";
 import {
   createId,
   makeOnchainTransfersRepository,
-  NonEmptyString1000,
-  sqliteTrue,
   type OnchainTransferRecord,
   type OnchainTransfersRepository,
   type OnchainTransferId,
@@ -121,13 +119,11 @@ const storedOnchainSend = (
   if (status !== null)
     Effect.runSync(
       transfers.update(id, {
-        updateJson: NonEmptyString1000.orThrow(
-          encodeTransferUpdateColumn(
-            onchainTransferUpdateFixture(id, {
-              status,
-              revision: status === "accepted" ? 1 : 2,
-            }),
-          ),
+        updateJson: encodeTransferUpdateColumn(
+          onchainTransferUpdateFixture(id, {
+            status,
+            revision: status === "accepted" ? 1 : 2,
+          }),
         ),
       }),
     );
@@ -264,7 +260,7 @@ describe("useOnchainTransferCommands", () => {
     expect(stored).toMatchObject({
       direction: "receive",
       amount: 100_000,
-      refundToSender: sqliteTrue,
+      refundToSender: true,
     });
     expect(
       decodePaymentRequest(stored?.userPaymentRequest ?? ""),

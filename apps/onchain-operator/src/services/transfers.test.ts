@@ -24,8 +24,6 @@ import { makeIdentity } from "@linky-fit/linkstr/testing";
 import {
   makeOnchainTransferMessagesRepository,
   makeOnchainTransfersRepository,
-  NonEmptyString1000,
-  NonNegativeInt,
 } from "@linky-fit/linksync";
 import {
   deriveDepositAddress,
@@ -798,8 +796,8 @@ describe("deposit watcher", () => {
     // What syncs when two devices accepted before seeing each other.
     await Effect.runPromise(
       repository.update(second.transferId, {
-        depositAddress: NonEmptyString1000.orThrow(address),
-        addressIndex: NonNegativeInt.orThrow(0),
+        depositAddress: address,
+        addressIndex: 0,
       }),
     );
     esplora.state.byAddress.set(address, [

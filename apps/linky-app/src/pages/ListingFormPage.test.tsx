@@ -1,11 +1,7 @@
 import {
   createId,
   createIdFromString,
-  NonEmptyString100,
-  NonEmptyString1000,
   OwnerId,
-  PositiveInt,
-  sqliteTrue,
   type ListingId,
   type ListingRecord,
 } from "@linky-fit/linksync";
@@ -99,20 +95,19 @@ const pressDisabled = async (element: HTMLButtonElement) => {
 
 const storedEggs = (id: ListingId): ListingRecord => ({
   id,
-  createdAtSec: PositiveInt.orThrow(100),
-  side: NonEmptyString100.orThrow("offer"),
-  title: NonEmptyString1000.orThrow("Domácí vajíčka"),
-  amount: NonEmptyString100.orThrow("90"),
-  currency: NonEmptyString100.orThrow("CZK"),
-  unit: NonEmptyString100.orThrow("za 10 ks"),
+  createdAtSec: 100,
+  side: "offer",
+  title: "Domácí vajíčka",
+  amount: "90",
+  currency: "CZK",
+  unit: "za 10 ks",
   priceByAgreement: null,
-  description: NonEmptyString1000.orThrow("Z volného chovu."),
+  description: "Z volného chovu.",
   image: null,
   audience: null,
   pausedAtSec: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
-  isDeleted: 0,
   ownerId: OwnerId.orThrow(createId()),
 });
 
@@ -249,7 +244,7 @@ describe("ListingFormPage", () => {
       button(container, "listing-save").click();
     });
     expect(insert).toHaveBeenLastCalledWith(
-      expect.objectContaining({ amount: "0", priceByAgreement: 1 }),
+      expect.objectContaining({ amount: "0", priceByAgreement: true }),
     );
 
     await type(input(container, "listing-amount"), "0");
@@ -266,8 +261,8 @@ describe("ListingFormPage", () => {
     const id = createIdFromString<"Listing">("babysitting");
     records.push({
       ...storedEggs(id),
-      amount: NonEmptyString100.orThrow("0"),
-      priceByAgreement: sqliteTrue,
+      amount: "0",
+      priceByAgreement: true,
     });
     const { container } = await renderIntoDocument(<ListingFormPage id={id} />);
     const amount = input(container, "listing-amount");
@@ -304,7 +299,7 @@ describe("ListingFormPage", () => {
     const id = createIdFromString<"Listing">("eggs");
     records.push({
       ...storedEggs(id),
-      audience: NonEmptyString1000.orThrow('{"kind":"everyone"}'),
+      audience: '{"kind":"everyone"}',
     });
     const { container } = await renderIntoDocument(<ListingFormPage id={id} />);
     await act(async () => {

@@ -1,4 +1,4 @@
-import { PositiveInt, type ConversationsRepository } from "@linky-fit/linksync";
+import type { ConversationsRepository } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import React from "react";
 import type { ContactId } from "../../../evolu";
@@ -59,13 +59,12 @@ export const useChatReadCursorSync = ({
       summarizeConversationReadTimes(chatMessages),
       lastSeenAtSec > 0 ? lastSeenAtSec : null,
     );
-    const atSec = target === null ? null : PositiveInt.fromUnknown(target);
-    if (!atSec?.ok) return;
+    if (target === null || !Number.isSafeInteger(target) || target <= 0) return;
 
-    lastWrittenAtSecByContactIdRef.current.set(contactId, atSec.value);
+    lastWrittenAtSecByContactIdRef.current.set(contactId, target);
     void runWrite(
       Effect.flatMap(conversations.ensureDirect(selectedContact.id), (chat) =>
-        conversations.markSeen(chat.id, atSec.value),
+        conversations.markSeen(chat.id, target),
       ),
     ).then((outcome) => {
       if (outcome.ok) return;

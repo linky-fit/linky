@@ -4,15 +4,7 @@ import {
   listingPriceKind,
   type ListingSide,
 } from "@linky-fit/linkstr";
-import {
-  createId,
-  NonEmptyString,
-  NonEmptyString100,
-  NonEmptyString1000,
-  PositiveInt,
-  sqliteTrue,
-  type ListingId,
-} from "@linky-fit/linksync";
+import { createId, type ListingId } from "@linky-fit/linksync";
 import {
   Button,
   Row,
@@ -217,7 +209,7 @@ export function ListingFormPage({
   };
 
   /** The `image` column to write: a fresh upload, null to clear, or undefined to leave it as it is. */
-  const imageColumn = async (): Promise<NonEmptyString | null | undefined> => {
+  const imageColumn = async (): Promise<string | null | undefined> => {
     if (pickedImage === null) {
       return storedImage !== null && !keepsStoredImage ? null : undefined;
     }
@@ -236,14 +228,14 @@ export function ListingFormPage({
         height: uploaded.height,
       },
     });
-    return NonEmptyString.orThrow(encodeListingImage(uploaded));
+    return encodeListingImage(uploaded);
   };
 
   const save = async () => {
     if (!canSave || normalizedAmount === null) return;
     setSaving(pickedImage ? "image" : "listing");
     setError(null);
-    let imageValue: NonEmptyString | null | undefined;
+    let imageValue: string | null | undefined;
     try {
       imageValue = await imageColumn();
     } catch (cause) {
@@ -258,19 +250,17 @@ export function ListingFormPage({
     }
     setSaving("listing");
     const trimmedDescription = description.trim();
-    const descriptionValue = trimmedDescription
-      ? NonEmptyString1000.orThrow(trimmedDescription)
-      : null;
+    const descriptionValue = trimmedDescription || null;
     const audienceValue = listingAudienceColumn(audience);
     const columns = {
-      side: NonEmptyString100.orThrow(side),
-      title: NonEmptyString1000.orThrow(title.trim()),
-      amount: NonEmptyString100.orThrow(normalizedAmount),
-      currency: NonEmptyString100.orThrow(listingWireCurrency(currency)),
-      unit: NonEmptyString100.orThrow(unit.trim()),
+      side,
+      title: title.trim(),
+      amount: normalizedAmount,
+      currency: listingWireCurrency(currency),
+      unit: unit.trim(),
       ...(imageValue === undefined ? {} : { image: imageValue }),
     };
-    const priceByAgreementValue = priceByAgreement ? sqliteTrue : null;
+    const priceByAgreementValue = priceByAgreement ? true : null;
     const outcome = await runWrite(
       existing
         ? repository.update(existing.id, {
@@ -281,7 +271,7 @@ export function ListingFormPage({
           })
         : repository.insert({
             id: createId<"Listing">(),
-            createdAtSec: PositiveInt.orThrow(nowSeconds()),
+            createdAtSec: nowSeconds(),
             ...columns,
             ...(descriptionValue === null
               ? {}

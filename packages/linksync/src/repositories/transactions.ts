@@ -1,4 +1,4 @@
-import { createIdFromString, type PositiveInt } from "@evolu/common";
+import { createIdFromString } from "@evolu/common";
 import {
   operationKeyOf,
   type MintUrl,
@@ -12,27 +12,37 @@ import {
   type CashuOperationId,
   type TransactionId,
 } from "../model/ids";
-import type { LinkyDbSchema, TransactionRow } from "../model/schema";
+import type { LinkyDbSchema } from "../model/schema";
 import type { LinkyStore } from "../model/store";
-import { tableRepository, type TableRepository } from "./tableRepository";
+import {
+  domainTableRepository,
+  type DomainPatch,
+  type DomainRow,
+  type DomainTableRepository,
+  type DomainWriteRow,
+} from "./domainRepository";
 
 export type TransactionDirection = "in" | "out";
 export type TransactionStatus = "declined" | "error" | "ok" | "pending";
 export type TransactionCategory = "cashu" | "contacts" | "lightning";
 
+export type TransactionStoredRow = DomainRow<LinkyDbSchema["transaction"]>;
+export type TransactionInsert = DomainWriteRow<LinkyDbSchema["transaction"]>;
+export type TransactionPatch = DomainPatch<LinkyDbSchema["transaction"]>;
+
 /** A transaction row with its legacy-derived fields normalized. */
 export interface TransactionRecord extends Omit<
-  TransactionRow,
+  TransactionStoredRow,
   "createdAtSec" | "direction" | "status"
 > {
-  readonly createdAtSec: PositiveInt;
+  readonly createdAtSec: number;
   readonly direction: TransactionDirection;
   readonly status: TransactionStatus;
   readonly category: TransactionCategory;
 }
 
 export interface TransactionsRepository extends Omit<
-  TableRepository<LinkyDbSchema["transaction"]>,
+  DomainTableRepository<LinkyDbSchema["transaction"]>,
   "all"
 > {
   /** Rows a reader can trust: event time, direction and status valid, category derived. Incomplete synced rows are skipped. */
@@ -92,7 +102,7 @@ const readStatus = (value: string | null): TransactionStatus | null =>
     : null;
 
 export const normalizeTransaction = (
-  row: TransactionRow,
+  row: TransactionStoredRow,
 ): TransactionRecord | null => {
   const direction = readDirection(row.direction);
   const status = readStatus(row.status);
@@ -110,7 +120,7 @@ export const normalizeTransaction = (
 export const makeTransactionsRepository = (
   store: LinkyStore,
 ): TransactionsRepository => {
-  const table = tableRepository(store, "transactions", "transaction");
+  const table = domainTableRepository(store, "transactions", "transaction");
   return {
     ...table,
     all: Effect.map(table.all, (rows) =>

@@ -1,4 +1,3 @@
-import { sqliteTrue } from "@linky-fit/linksync";
 import { Option, Schema } from "effect";
 import { JsonValue } from "../../../types/json";
 import { findMintInfoIconValue } from "@linky-fit/linkshu";
@@ -26,7 +25,7 @@ interface MintInfoRowLike {
 }
 
 export const isMintDeletedRow = (row: MintInfoRowLike): boolean =>
-  row.isDeleted === sqliteTrue || row.isDeleted === "1";
+  row.isDeleted === 1 || row.isDeleted === "1";
 
 const getLastSeenAtSec = (row: MintInfoRowLike): number =>
   (row.lastSeenAtSec ?? 0) || 0;
@@ -323,7 +322,7 @@ export const dedupeMintInfoRows = (
 
     for (const row of rows) {
       if (row.id === best.id) continue;
-      applyPatch({ id: row.id, isDeleted: sqliteTrue });
+      applyPatch({ id: row.id, isDeleted: 1 });
     }
   }
 

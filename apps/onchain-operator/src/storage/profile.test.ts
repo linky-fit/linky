@@ -1,11 +1,6 @@
-import { createIdFromString } from "@linky-fit/domain";
-import {
-  NonEmptyString100,
-  NonEmptyString1000,
-  tableRepository,
-} from "@linky-fit/linksync";
-import { Effect } from "effect";
+import { makeSettingsRepository } from "@linky-fit/linksync";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
+import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 import type { OperatorProfile } from "../domain/profile";
 import { testStore } from "../services/testing/fakes";
@@ -28,7 +23,7 @@ const profile: OperatorProfile = {
 
 describe("profile setting", () => {
   it("reads back what was saved, a whole-column description included", async () => {
-    const settings = tableRepository(testStore(), "meta", "setting");
+    const settings = makeSettingsRepository(testStore());
     expect(await Effect.runPromise(readProfile(settings))).toBeNull();
     await Effect.runPromise(saveProfile(settings, profile));
     expect(await Effect.runPromise(readProfile(settings))).toEqual(profile);
@@ -44,20 +39,17 @@ describe("profile setting", () => {
   });
 
   it("names a profile saved before the operator had a name, a picture, receive limits, a receive fee or a minimum Linky version", async () => {
-    const settings = tableRepository(testStore(), "meta", "setting");
+    const settings = makeSettingsRepository(testStore());
     await Effect.runPromise(
-      settings.insert({
-        id: createIdFromString<"Setting">("setting/onchain-operator.profile"),
-        key: NonEmptyString100.orThrow("onchain-operator.profile"),
-        value: NonEmptyString1000.orThrow(
-          JSON.stringify({
-            xpub: "tpub-key",
-            feeBasisPoints: 100,
-            paused: false,
-            amounts: [100_000],
-          }),
-        ),
-      }),
+      settings.setRaw(
+        "onchain-operator.profile",
+        JSON.stringify({
+          xpub: "tpub-key",
+          feeBasisPoints: 100,
+          paused: false,
+          amounts: [100_000],
+        }),
+      ),
     );
     expect(await Effect.runPromise(readProfile(settings))).toMatchObject({
       name: "Linky support",

@@ -2,33 +2,27 @@
 
 One repository per scope, each built over a `LinkyStore`. A repository returns rows merged across shards (one per id, the newest shard's copy) and writes to the active shard; the consumer never names an owner, a table or a shard index.
 
-## `TableRepository`
+## `DomainTableRepository`
 
-`tableRepository(store, scope, table)` is the shape every repository is or extends: `all`, `byId`, `insert`, `insertIfAbsent`, `removeIfAbsent`, `update`, `remove`, `maybeRotate` and `subscribe`. `insert` takes `id` plus the non-nullable columns; nullable ones may be omitted, and it overwrites the active shard's copy of that id, reviving a removed one: use it for a user action. `insertIfAbsent` writes only when no visible shard holds a copy of the id, live or tombstoned, and returns whether it wrote; it writes the columns without marking the row live, so a removal on another device that has not synced yet still wins. Use it for a deterministic id whose row may since have been updated or removed. `removeIfAbsent` records the removal of a row that has not arrived: unless a visible shard holds a copy of the id, it writes the columns given as a tombstone, required ones optional, so a later `insertIfAbsent` of the id is refused. `update` is copy-on-write and fails with `RowNotFound` when no visible shard holds a live copy; `remove` fails with `RowNotFound` when no visible shard holds any copy and is a no-op if the newest copy is already tombstoned. Column values are branded types (`NonEmptyString1000`, which keeps Evolu 7's rules because Evolu 7 devices sync these columns, `PositiveInt`, `SqliteBoolean`, ...), re-exported from the package entry.
+Every repository over a table is or extends `DomainTableRepository` (`domainTableRepository(store, scope, table)`): `all`, `byId`, `insert`, `insertIfAbsent`, `removeIfAbsent`, `update`, `remove`, `maybeRotate` and `subscribe`. Consumers read and write plain `string`, `number` and `boolean` values alongside the branded domain ids (`ContactId`, `MessageId`, ...); the repository validates and encodes Evolu's column rules (`NonEmptyString*`, `PositiveInt`, `NonNegativeInt`, `SqliteBoolean`) at its boundary and fails with `ShardDbError` when a value does not fit its column. `insert` takes `id` plus the non-nullable columns; nullable ones may be omitted (sparse insert), and it overwrites the active shard's copy of that id, reviving a removed one: use it for a user action. `insertIfAbsent` writes only when no visible shard holds a copy of the id, live or tombstoned, and returns whether it wrote; it writes the columns without marking the row live, so a removal on another device that has not synced yet still wins. Use it for a deterministic id whose row may since have been updated or removed. `removeIfAbsent` records the removal of a row that has not arrived: unless a visible shard holds a copy of the id, it writes the columns given as a tombstone, required ones optional, so a later `insertIfAbsent` of the id is refused. `update` is copy-on-write and fails with `RowNotFound` when no visible shard holds a live copy; `remove` fails with `RowNotFound` when no visible shard holds any copy and is a no-op if the newest copy is already tombstoned. `tableRepository(store, scope, table)` stays available as the low-level Evolu-typed layer underneath.
 
 Every write ends with the rotation check. A pointer write the port rejects does not fail the row write: the repository logs it and the next write repeats the check, so chained writes are never left halfway over bookkeeping.
 
 ## Contacts
 
-`makeContactsRepository(store)` is a `TableRepository` over `contact`: profile fields, the user's overrides and the archive state. Read cursors live in [conversations](#conversations). Contacts are never forgotten, so the archive state reaches every device however old it is.
+`makeContactsRepository(store)` is a `DomainTableRepository` over `contact`: profile fields, the user's overrides and the archive state. Read cursors live in [conversations](#conversations). Contacts are never forgotten, so the archive state reaches every device however old it is.
 
 - `archive(id, atSec)` sets `archivedAtSec`; an incoming message newer than it is the consumer's signal to unarchive.
 - `unarchive(id)` clears `archivedAtSec` on the contact and on its direct conversation, where older app versions archive; the conversation's fresh copy in the active shard hides any older archived copy. Copy a conversation's archive onto the contact only while the contact has none, and an unarchive is never undone by an older copy.
 
 ```ts
-import {
-  createId,
-  makeContactsRepository,
-  NonEmptyString1000,
-} from "@linky-fit/linksync";
+import { createId, makeContactsRepository } from "@linky-fit/linksync";
 import { Effect } from "effect";
 
 const contacts = makeContactsRepository(store);
 const id = createId<"Contact">();
 
-await Effect.runPromise(
-  contacts.insert({ id, name: NonEmptyString1000.orThrow("Alice") }),
-);
+await Effect.runPromise(contacts.insert({ id, name: "Alice" }));
 const all = await Effect.runPromise(contacts.all);
 ```
 
@@ -36,11 +30,11 @@ The repository returns one row per id; deduplicating unsaved peers by npub is th
 
 ## Hidden and pinned listings
 
-`makeHiddenListingsRepository(store)` and `makePinnedListingsRepository(store)` are `TableRepository`s over `hiddenListing` and `pinnedListing`, in the `contacts` scope: someone else's listings the user hid or pinned to the top, whether or not the author is a contact. `setHidden(author, listingId, hidden)` hides a listing or shows it again, `setPinned(author, listingId, pinned)` pins or unpins it; either writes nothing when the listing is already in that state. Each listing has one row per table, `hiddenListingIdFor(author, listingId)` or `pinnedListingIdFor(author, listingId)`, so marking it on two devices lands on one row, and unmarking removes the row. The two tables are independent; keeping a listing out of both at once is the consumer's. `listingKeysOf(rows)` turns either table's rows into a set to test with `listingKey(author, listingId)`.
+`makeHiddenListingsRepository(store)` and `makePinnedListingsRepository(store)` are `DomainTableRepository`s over `hiddenListing` and `pinnedListing`, in the `contacts` scope: someone else's listings the user hid or pinned to the top, whether or not the author is a contact. `setHidden(author, listingId, hidden)` hides a listing or shows it again, `setPinned(author, listingId, pinned)` pins or unpins it; either writes nothing when the listing is already in that state. Each listing has one row per table, `hiddenListingIdFor(author, listingId)` or `pinnedListingIdFor(author, listingId)`, so marking it on two devices lands on one row, and unmarking removes the row. The two tables are independent; keeping a listing out of both at once is the consumer's. `listingKeysOf(rows)` turns either table's rows into a set to test with `listingKey(author, listingId)`.
 
 ## Conversations
 
-`makeConversationsRepository(store)`: conversations with their read cursors, plus `messages` and `reactions`, `TableRepository`s over those two tables. All three live in the `messages` scope, which keeps the newest 4 shards.
+`makeConversationsRepository(store)`: conversations with their read cursors, plus `messages` and `reactions`, `DomainTableRepository`s over those two tables. All three live in the `messages` scope, which keeps the newest 4 shards.
 
 - `ensureDirect(contactId)` creates the contact's direct conversation on first use with the derived id `directConversationIdFor(contactId)`. Insert messages with the `conversationId` it returns; messages have no `contactId`. On a device that does not read the scope from its first shard, the conversation's row may sit in a forgotten shard, and the new copy in the active shard wins over it on every device; so the new row starts with its read cursor at `visibleSinceSec`, the same point a missing cursor is read from.
 - A message or reaction that arrived over Nostr takes `nostrMessageIdFor(rumorId)` / `nostrReactionIdFor(rumorId, reactor)` and goes in with `insertIfAbsent`, so a second relay, a later session or another device fetching it again neither duplicates it nor resets its edits and status, and a removed one stays removed. The id ignores the conversation, so moving the message to another contact keeps it. An own send is stored before its rumor exists, so its row has a random id; matching rows by rumor id across the two kinds is the consumer's.
@@ -52,7 +46,7 @@ The repository returns one row per id; deduplicating unsaved peers by npub is th
 
 ## Unknown senders
 
-`makeUnknownSendersRepository(store)` is a `TableRepository` over `unknownSenderMessage` in the `unknownSenders` scope, which keeps the newest 2 shards: conversations with peers who are not contacts, one row per message, keyed by the sender's `peerPubkey`. A message from Nostr takes `nostrMessageIdFor(rumorId)` and goes in with `insertIfAbsent`, as in [conversations](#conversations). Reactions and seen receipts from unknown senders have no table.
+`makeUnknownSendersRepository(store)` is a `DomainTableRepository` over `unknownSenderMessage` in the `unknownSenders` scope, which keeps the newest 2 shards: conversations with peers who are not contacts, one row per message, keyed by the sender's `peerPubkey`. A message from Nostr takes `nostrMessageIdFor(rumorId)` and goes in with `insertIfAbsent`, as in [conversations](#conversations). Reactions and seen receipts from unknown senders have no table.
 
 - `moveToContact(peerPubkey, contactId)` runs once the sender is a contact: it inserts each message into the contact's direct conversation with `insertIfAbsent` under the same id, then removes it here, and returns how many left. Repeating it, or another device doing it at the same time, moves nothing twice; a message whose required columns have not synced yet stays until the next call.
 - `removeSender(peerPubkey)` removes every message of the sender, for deleting or blocking the conversation.
@@ -104,7 +98,7 @@ Insert `mintUrl`, `rail` and the initial `progress` with every new payment. `min
 
 `makeListingsRepository(store)` over `listing` in the `contacts` scope, which is never forgotten: one row per thing the user offers to, or wants from, their contacts. `all` returns `ListingRecord`s, whose creation time, side, title, amount, currency and unit are present; a row still arriving column by column is skipped (`normalizeListing`).
 
-Adding a listing is `insert` with every column; editing is `update`; withdrawing it is `remove`. `side`, `unit`, `amount` and `currency` stay strings here and are validated into `@linky-fit/linkstr`'s `Listing` by the consumer that publishes them, and so are the optional `description`, the author's text, and `image`, the JSON of linkstr's `PrivateImage`, each left out of an insert when the listing has none; `priceByAgreement` is `1` when a zero `amount` means the price is to be agreed rather than free; `audience` says who sees the listing, as JSON the consumer validates (`{"kind":"network"}` or `{"kind":"group","group":<group name>}`), and is left out for a listing only the contacts see; `pausedAtSec` is set while the user paused the listing, which the consumer then leaves unpublished, and cleared with `null` to resume it; releases before the column ignore it and keep publishing the listing; the row id is the listing's stable id on the wire. The cash intent is the `cashIntent` setting, not a row, and the currencies the user pays proxy payments in are the `proxyPaymentCurrencies` setting.
+Adding a listing is `insert` with every column; editing is `update`; withdrawing it is `remove`. `side`, `unit`, `amount` and `currency` stay strings here and are validated into `@linky-fit/linkstr`'s `Listing` by the consumer that publishes them, and so are the optional `description`, the author's text, and `image`, the JSON of linkstr's `PrivateImage`, each left out of an insert when the listing has none; `priceByAgreement` is `true` when a zero `amount` means the price is to be agreed rather than free; `audience` says who sees the listing, as JSON the consumer validates (`{"kind":"network"}` or `{"kind":"group","group":<group name>}`), and is left out for a listing only the contacts see; `pausedAtSec` is set while the user paused the listing, which the consumer then leaves unpublished, and cleared with `null` to resume it; releases before the column ignore it and keep publishing the listing; the row id is the listing's stable id on the wire. The cash intent is the `cashIntent` setting, not a row, and the currencies the user pays proxy payments in are the `proxyPaymentCurrencies` setting.
 
 ## Peer listings
 
@@ -136,7 +130,7 @@ The JSON columns hold the Keryx protocol package's Schemas, encoded with `Schema
 
 ## Settings
 
-`makeSettingsRepository(store)`: small synced values in the app owner, one row per key (`settingIdFor(key)`). Only keys registered in `LinkySettings` compile; each key's schema maps its typed value to the stored text. `get` returns the decoded value, or `null` when the row is absent or holds text the schema rejects; `set` encodes the value and dies when the text is empty or over 1000 characters; `remove` is a no-op when absent. Shard pointers share the scope but have their own table; never write them through settings.
+`makeSettingsRepository(store)`: small synced values in the app owner, one row per key (`settingIdFor(key)`). `get`, `set` and `remove` operate on keys registered in `LinkySettings`; each key's schema maps its typed value to the stored text. `get` returns the decoded value, or `null` when the row is absent or holds text the schema rejects; `set` encodes the value and fails with `ShardDbError` when the text is empty or over 1000 characters; `remove` is a no-op when absent. Other apps sharing the account (such as Fazole and the on-chain operator) use `getRaw`, `setRaw` and `removeRaw` with their own namespaced keys under the same `setting/<key>` id scheme. Shard pointers share the scope but have their own table; never write them through settings.
 
 A new setting is a new `LinkySettings` entry. Keys and encodings are synced data that older app versions on other devices read, so never rename a key or change its encoding; add a new key instead.
 
