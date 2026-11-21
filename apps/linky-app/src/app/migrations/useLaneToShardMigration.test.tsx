@@ -13,7 +13,21 @@ const legacy = vi.hoisted(() => ({
   store: Promise.resolve<LinkyStore | null>(null),
   tables: new Map<string, ReadonlyArray<Readonly<Record<string, unknown>>>>(),
   loaded: new Array<string>(),
-  update: vi.fn(() => ({ ok: true })),
+  memoryOnly: false,
+  update: vi.fn(
+    (
+      _table: string,
+      _row: unknown,
+      options?: {
+        owner?: unknown;
+        onSuccess?: () => void;
+        onError?: (error: unknown) => void;
+      },
+    ) => {
+      options?.onSuccess?.();
+      return { ok: true };
+    },
+  ),
   reportAppLog: vi.fn(),
   reportInspectorRows: vi.fn(),
 }));
@@ -30,7 +44,11 @@ vi.mock("../../evolu", () => {
     update: legacy.update,
   };
   return {
-    useOpenedEvolu: () => ({ evolu, hasEvoluRelay: true }),
+    useOpenedEvolu: () => ({
+      evolu,
+      hasEvoluRelay: true,
+      memoryOnly: legacy.memoryOnly,
+    }),
     loadLegacyRows: (_: unknown, table: string) => evolu.loadQuery(table),
     cashuOperationsAllQuery: "cashuOperation",
     cashuProofsAllQuery: "cashuProof",
@@ -97,7 +115,12 @@ beforeEach(() => {
   vi.resetModules();
   legacy.tables.clear();
   legacy.loaded = [];
+  legacy.memoryOnly = false;
   legacy.update.mockClear();
+  legacy.update.mockImplementation((_table, _row, options) => {
+    options?.onSuccess?.();
+    return { ok: true };
+  });
   legacy.reportAppLog.mockClear();
   legacy.reportInspectorRows.mockClear();
 });
@@ -171,7 +194,7 @@ describe("useLaneToShardMigration", () => {
       expect(legacy.update).toHaveBeenCalledWith(
         "cashuProof",
         { id: proof.id, state: "spent" },
-        { owner: appOwner },
+        expect.objectContaining({ owner: appOwner }),
       ),
     );
     expect(legacy.reportInspectorRows).toHaveBeenCalledWith([
@@ -180,6 +203,58 @@ describe("useLaneToShardMigration", () => {
         summary: "Marked 1 legacy proofs spent",
       }),
     ]);
+    await view.unmount();
+  });
+
+  it("does not emit LaneSpentProofsMirrored when updating the legacy proof fails", async () => {
+    const { appOwner, store } = makeTestLinkyStore(1);
+    legacy.store = Promise.resolve(store);
+    const proofId = createId<"CashuProof">();
+    legacy.tables.set("legacyUnspentProofCopies", [
+      legacyRow(appOwner.id, { id: proofId, state: "held" }),
+      {
+        ownerId: store.shardOwner("cashu", 0).id,
+        id: proofId,
+        state: "spent",
+      },
+    ]);
+    legacy.update.mockImplementation((_table, _row, options) => {
+      options?.onError?.(new Error("disk full"));
+      return { ok: true };
+    });
+
+    const { view } = await mountMigration();
+    await vi.waitFor(() =>
+      expect(legacy.reportAppLog).toHaveBeenCalledWith(
+        expect.objectContaining({ tag: "evolu.legacySpentProofSyncFailed" }),
+      ),
+    );
+    const mirrored = legacy.reportInspectorRows.mock.calls.some(([rows]) =>
+      rows.some(
+        (row: { tag: string }) => row.tag === "LaneSpentProofsMirrored",
+      ),
+    );
+    expect(mirrored).toBe(false);
+    await view.unmount();
+  });
+
+  it("does not persist lane migration markers during a temporary memoryOnly session", async () => {
+    legacy.memoryOnly = true;
+    const { appOwner, store } = makeTestLinkyStore(1);
+    legacy.store = Promise.resolve(store);
+    legacy.tables.set("contact", [
+      legacyRow(appOwner.id, { id: createId(), name: "Temp contact" }),
+    ]);
+
+    const { view } = await mountMigration();
+    await vi.waitFor(() =>
+      expect(
+        Effect.runSync(store.rows("contacts", "contact")).map(
+          (row) => row.name,
+        ),
+      ).toEqual(["Temp contact"]),
+    );
+    expect(doneFlag()).toBeNull();
     await view.unmount();
   });
 

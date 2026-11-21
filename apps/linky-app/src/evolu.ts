@@ -346,7 +346,7 @@ type LegacyRow<R extends { readonly createdAt: string }> = Omit<
   "updatedAt"
 > & { readonly updatedAt: R["createdAt"] };
 
-/** The rows of a legacy query, with `updatedAt` always set as the lane migration reads it. */
+/** The rows of a legacy query, read fresh with `updatedAt` always set as the lane migration reads it. */
 export const loadLegacyRows = async <
   R extends Evolu.Row & {
     readonly createdAt: Evolu.DateIso;
@@ -356,7 +356,7 @@ export const loadLegacyRows = async <
   evolu: LinkyEvolu,
   query: Evolu.Query<typeof LinkyEvoluSchema, R>,
 ): Promise<ReadonlyArray<LegacyRow<R>>> =>
-  (await evolu.loadQuery(query)).map((row) => ({
+  (await evolu.loadQuery(query, { cache: false })).map((row) => ({
     ...row,
     updatedAt: row.updatedAt ?? row.createdAt,
   }));

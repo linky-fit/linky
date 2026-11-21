@@ -18,6 +18,7 @@ import {
 import {
   makeWalletRepository,
   NonEmptyString100,
+  type CashuProofId,
   type LinkyStore,
   type Owner,
   type OwnerId,
@@ -169,9 +170,10 @@ const bootLaneMigration = async (
   syncLane: (owner: Owner) => void,
   store: LinkyStore,
   resolveSeed: () => Promise<Bip39Seed>,
+  memoryOnly: boolean,
 ): Promise<void> => {
   const startedAtMs = Date.now();
-  const firstRun = !isLaneMigrationDoneLocally();
+  const firstRun = memoryOnly || !isLaneMigrationDoneLocally();
   const gracePeriodActive = isLaneGracePeriodActive(startedAtMs);
   if (!firstRun && !gracePeriodActive) return;
   const seed = (await readStoredSlip39Seed())?.trim() ?? "";
@@ -209,9 +211,13 @@ const bootLaneMigration = async (
   const readIngestKey = async (): Promise<string> => {
     const [count] = await evolu.loadQuery(
       createLegacyChangeCountQuery(legacyOwnerIds),
+      { cache: false },
     );
     return laneIngestKey(legacyOwnerIds, count?.changes ?? 0);
   };
+  let sessionIngestedKey: string | null = memoryOnly
+    ? null
+    : readIngestedLanesKey();
   const ingestLanes = async (key: string): Promise<LaneMigrationReport> => {
     const report = await runLaneToShardMigration({
       store,
@@ -220,16 +226,30 @@ const bootLaneMigration = async (
       ingestLegacyTokens: (rows) =>
         ingestLegacyTokensThroughShards(store, resolveSeed, rows),
     });
-    markLanesIngested(key);
+    sessionIngestedKey = key;
+    if (!memoryOnly) markLanesIngested(key);
     return report;
   };
 
   const bootKey = await readIngestKey();
   const report =
-    firstRun || bootKey !== readIngestedLanesKey()
+    firstRun || bootKey !== sessionIngestedKey
       ? await ingestLanes(bootKey)
       : null;
-  markLaneMigrationDoneLocally();
+  if (!memoryOnly) markLaneMigrationDoneLocally();
+
+  const markProofSpent = (id: CashuProofId, owner: Owner): Promise<void> =>
+    new Promise((resolve, reject) => {
+      evolu.update(
+        "cashuProof",
+        { id, state: NonEmptyString100.orThrow("spent") },
+        {
+          owner,
+          onSuccess: () => resolve(),
+          onError: (error) => reject(error),
+        },
+      );
+    });
 
   let mirroring = false;
   let dirty = false;
@@ -242,21 +262,20 @@ const bootLaneMigration = async (
         dirty = false;
         const copies = await evolu.loadQuery(
           createLegacyUnspentProofCopiesQuery(legacyOwnerIds),
+          { cache: false },
         );
         const changed = legacyProofsToMarkSpent(
           copies,
           copies,
           new Set(legacyOwnerIds),
         );
+        const updates: Array<Promise<void>> = [];
         for (const proof of changed) {
           const owner = legacyOwners.get(proof.ownerId);
           if (owner === undefined) continue;
-          evolu.update(
-            "cashuProof",
-            { id: proof.id, state: NonEmptyString100.orThrow("spent") },
-            { owner },
-          );
+          updates.push(markProofSpent(proof.id, owner));
         }
+        if (updates.length > 0) await Promise.all(updates);
         if (changed.length > 0)
           emit(
             "LaneSpentProofsMirrored",
@@ -307,7 +326,7 @@ const bootLaneMigration = async (
           watchLanes();
         }
         const key = await readIngestKey();
-        if (key === readIngestedLanesKey()) continue;
+        if (key === sessionIngestedKey) continue;
         const ingested = await ingestLanes(key);
         await mirrorSpentProofs();
         emit(
@@ -411,10 +430,10 @@ export const useLaneToShardMigration = (): boolean => {
   // database that never answers still reaches the boot watchdog instead of
   // committing a screen that cannot progress.
   const store = useLinkyStore();
-  const { evolu, hasEvoluRelay } = useOpenedEvolu();
+  const { evolu, hasEvoluRelay, memoryOnly } = useOpenedEvolu();
   const registry = React.useContext(RegistryContext);
   const [migrating, setMigrating] = React.useState(
-    () => !isLaneMigrationDoneLocally(),
+    () => memoryOnly || !isLaneMigrationDoneLocally(),
   );
   React.useEffect(() => {
     if (!migrating) return;
@@ -438,23 +457,27 @@ export const useLaneToShardMigration = (): boolean => {
     const syncLane = (owner: Owner) => {
       if (hasEvoluRelay) evolu.useOwner(owner);
     };
-    bootRun ??= bootLaneMigration(evolu, syncLane, store, resolveSeed).catch(
-      (error: unknown) => {
-        console.warn("[linky] lane migration failed", error);
-        reportAppLog({
-          tag: "evolu.laneMigrationFailed",
-          summary: "Owner lane migration failed; retrying on the next launch",
-          payload: { error: getUnknownErrorMessage(error, "unknown") },
-        });
-      },
-    );
+    bootRun ??= bootLaneMigration(
+      evolu,
+      syncLane,
+      store,
+      resolveSeed,
+      memoryOnly,
+    ).catch((error: unknown) => {
+      console.warn("[linky] lane migration failed", error);
+      reportAppLog({
+        tag: "evolu.laneMigrationFailed",
+        summary: "Owner lane migration failed; retrying on the next launch",
+        payload: { error: getUnknownErrorMessage(error, "unknown") },
+      });
+    });
     void bootRun.then(() => {
       if (!cancelled) setMigrating(false);
     });
     return () => {
       cancelled = true;
     };
-  }, [evolu, hasEvoluRelay, registry, store]);
+  }, [evolu, hasEvoluRelay, memoryOnly, registry, store]);
 
   return migrating;
 };
