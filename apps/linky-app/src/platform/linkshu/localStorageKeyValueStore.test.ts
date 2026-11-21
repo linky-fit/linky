@@ -209,4 +209,37 @@ describe("leases across tabs", () => {
       await run(second.tryAcquireLease("linkshu.lock", 60_000)),
     ).not.toBeNull();
   });
+
+  it("holds the wallet-work guard across a lease and refuses acquisition when the guard rejects", async () => {
+    let activeGuards = 0;
+    const store = makeLocalStorageKeyValueStore(fakeWebLocks(), async () => {
+      activeGuards += 1;
+      return () => {
+        activeGuards -= 1;
+      };
+    });
+
+    const lease = await run(store.tryAcquireLease("linkshu.lock", 60_000));
+    expect(lease).not.toBeNull();
+    expect(activeGuards).toBe(1);
+
+    // Contended lease immediately releases its temporary guard.
+    expect(await run(store.tryAcquireLease("linkshu.lock", 60_000))).toBeNull();
+    expect(activeGuards).toBe(1);
+
+    if (lease === null) throw new Error("lease not acquired");
+    // Wrong key does not release the guard.
+    await run(store.releaseLease("linkshu.other", lease));
+    expect(activeGuards).toBe(1);
+
+    await run(store.releaseLease("linkshu.lock", lease));
+    expect(activeGuards).toBe(0);
+
+    const blocked = makeLocalStorageKeyValueStore(fakeWebLocks(), () =>
+      Promise.reject(new Error("wipe pending")),
+    );
+    expect(
+      await run(blocked.tryAcquireLease("linkshu.lock", 60_000)),
+    ).toBeNull();
+  });
 });

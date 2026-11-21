@@ -37,8 +37,6 @@ export const useEvoluStorageWatchers = (route: Route): void => {
   useEvoluDatabaseInfoState({ enabled: EVOLU_PAGES.has(route.kind) });
 
   const wipeEvoluStorage = React.useCallback(async () => {
-    // Evolu keeps quota errors after another relay converges; successful probes
-    // and dismissed warnings are not proof of recovery.
     if (evoluLastError?.type === "ProtocolQuotaError") {
       pushToast(t("evoluQuotaRecoveryHint"));
       return;
@@ -47,7 +45,7 @@ export const useEvoluStorageWatchers = (route: Route): void => {
     setWipeIsBusy(true);
 
     try {
-      wipeEvoluStorageImpl();
+      await wipeEvoluStorageImpl();
     } catch {
       pushToast(t("evoluWipeStorageFailed"));
     } finally {

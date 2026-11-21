@@ -89,14 +89,20 @@ export const createEvoluReloadHandler = ({
 };
 
 /** The page's one Evolu run; creating it starts Evolu's shared worker. */
-export const createEvoluRun = () => {
+export const createEvoluRun = (options?: {
+  readonly reloadApp?: () => void;
+  readonly onSharedWorkerUnsupported?: () => void;
+}) => {
   let disposed = false;
   const reloadHandler = createEvoluReloadHandler();
   if (typeof window !== "undefined") {
     window.addEventListener("pagehide", reloadHandler.onPageHide);
   }
   const deps = createEvoluDeps({
-    reloadApp: reloadHandler.reloadApp,
+    reloadApp: options?.reloadApp ?? reloadHandler.reloadApp,
+    ...(options?.onSharedWorkerUnsupported
+      ? { onSharedWorkerUnsupported: options.onSharedWorkerUnsupported }
+      : {}),
     ...(isEvoluLoggingEnabled()
       ? { console: createConsole({ level: "debug" }) }
       : {}),

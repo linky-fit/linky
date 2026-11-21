@@ -43,6 +43,7 @@ export type RunQueuedTask = <A>(
 export const makeWalletOps = (
   onRunningChange: (running: boolean) => void,
   deferUpdateWhile: (work: Promise<void>) => void = () => {},
+  acquireWalletWorkGuard?: () => Promise<() => void>,
 ): WalletOps => {
   let running = 0;
   const queue = Semaphore.makeUnsafe(1);
@@ -57,38 +58,46 @@ export const makeWalletOps = (
   const tryEnter = Effect.suspend(() =>
     running > 0 ? Effect.succeed(false) : Effect.as(enter, true),
   );
+  const acquireGuard: Effect.Effect<() => void> = acquireWalletWorkGuard
+    ? Effect.promise(acquireWalletWorkGuard)
+    : Effect.sync(() => {
+        let settle = () => {};
+        deferUpdateWhile(
+          new Promise<void>((resolve) => {
+            settle = resolve;
+          }),
+        );
+        return settle;
+      });
 
   const runExclusive: WalletOps["runExclusive"] = (operation) =>
     Effect.acquireUseRelease(
       tryEnter,
-      (entered) => (entered ? Effect.asSome(operation) : Effect.succeedNone),
+      (entered) =>
+        entered
+          ? Effect.acquireUseRelease(
+              acquireGuard,
+              () => Effect.asSome(operation),
+              (release) => Effect.sync(release),
+            )
+          : Effect.succeedNone,
       (entered) => (entered ? leave : Effect.void),
     );
-  const holdUpdate = Effect.sync(() => {
-    let settle = () => {};
-    deferUpdateWhile(
-      new Promise<void>((resolve) => {
-        settle = resolve;
-      }),
-    );
-    return settle;
-  });
 
-  const runQueued: WalletOps["runQueued"] = (operation, options) =>
-    Effect.acquireUseRelease(
-      holdUpdate,
-      () =>
-        queue.withPermits(1)(
-          options?.background === true
-            ? operation
-            : Effect.acquireUseRelease(
-                enter,
-                () => operation,
-                () => leave,
-              ),
-        ),
-      (settle) => Effect.sync(settle),
+  const runQueued: WalletOps["runQueued"] = (operation, options) => {
+    const guarded = Effect.acquireUseRelease(
+      acquireGuard,
+      () => queue.withPermits(1)(operation),
+      (release) => Effect.sync(release),
     );
+    return options?.background === true
+      ? guarded
+      : Effect.acquireUseRelease(
+          enter,
+          () => guarded,
+          () => leave,
+        );
+  };
 
   return {
     runExclusive,
@@ -105,12 +114,14 @@ export const walletOpRunningAtom = Atom.keepAlive(Atom.make(false));
 
 /** The one wallet operation queue of the page, shared by every linkshu runtime build. */
 export const walletOpsAtom = Atom.keepAlive(
-  Atom.readable((get) =>
-    makeWalletOps(
+  Atom.readable((get) => {
+    const { lifecycle } = get(platformAtom);
+    return makeWalletOps(
       (running) => get.registry.set(walletOpRunningAtom, running),
-      get(platformAtom).lifecycle.deferUpdateWhile,
-    ),
-  ),
+      lifecycle.deferUpdateWhile,
+      lifecycle.acquireWalletWorkGuard,
+    );
+  }),
 );
 
 /** The page's wallet operation queue inside the linkshu runtime; see `WalletOps`. */

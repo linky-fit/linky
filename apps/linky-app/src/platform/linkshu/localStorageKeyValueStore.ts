@@ -1,6 +1,7 @@
 import { KeyValueStore, LeaseId } from "@linky-fit/linkshu";
 import type { KeyValueStoreService } from "@linky-fit/linkshu";
-import { Clock, Effect, Layer } from "effect";
+import { Clock, Effect, Layer, Result } from "effect";
+import { acquireWalletWorkGuard } from "../../utils/pwaUpdate";
 import { canLockAcrossTabs } from "../../utils/storage";
 
 /**
@@ -139,8 +140,62 @@ const localStorageLeases: Leases = {
 const browserLocks = (): LeaseLocks | null =>
   canLockAcrossTabs() ? navigator.locks : null;
 
+// Every mint-quote claim (topup, autoswap, melt, envelope) takes a counter
+// lease before reserving slots or calling the mint; holding the shared
+// wallet-work guard across that lease keeps wipes and reloads from cutting a
+// claim off mid-flight without blocking while an unpaid invoice waits.
+const withWalletWorkGuard = (
+  leases: Leases,
+  acquireGuard: () => Promise<() => void>,
+): Leases => {
+  const guards = new Map<
+    LeaseId,
+    { readonly key: string; readonly release: () => void }
+  >();
+  return {
+    tryAcquireLease: (key, ttlMs) =>
+      Effect.gen(function* () {
+        const guard = yield* Effect.result(
+          Effect.tryPromise({
+            try: acquireGuard,
+            catch: (error) => error,
+          }),
+        );
+        if (Result.isFailure(guard)) return null;
+        const releaseGuard = guard.success;
+        const lease = yield* Effect.catchCause(
+          leases.tryAcquireLease(key, ttlMs),
+          (cause) => {
+            releaseGuard();
+            return Effect.failCause(cause);
+          },
+        );
+        if (lease === null) {
+          releaseGuard();
+          return null;
+        }
+        guards.set(lease, { key, release: releaseGuard });
+        return lease;
+      }),
+
+    renewLease: leases.renewLease,
+
+    releaseLease: (key, lease) =>
+      Effect.ensuring(
+        leases.releaseLease(key, lease),
+        Effect.sync(() => {
+          const entry = guards.get(lease);
+          if (entry?.key !== key) return;
+          guards.delete(lease);
+          entry.release();
+        }),
+      ),
+  };
+};
+
 export const makeLocalStorageKeyValueStore = (
   locks: LeaseLocks | null = browserLocks(),
+  acquireGuard: () => Promise<() => void> = acquireWalletWorkGuard,
 ): KeyValueStoreService => ({
   get: (key) => Effect.sync(() => localStorage.getItem(VALUE_KEY_PREFIX + key)),
 
@@ -167,7 +222,10 @@ export const makeLocalStorageKeyValueStore = (
       return keys;
     }),
 
-  ...(locks === null ? localStorageLeases : webLockLeases(locks)),
+  ...withWalletWorkGuard(
+    locks === null ? localStorageLeases : webLockLeases(locks),
+    acquireGuard,
+  ),
 });
 
 export const localStorageKeyValueStore: Layer.Layer<KeyValueStore> = Layer.sync(
