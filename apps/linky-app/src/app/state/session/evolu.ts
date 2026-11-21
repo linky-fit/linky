@@ -2,6 +2,7 @@ import type { OwnerId } from "@linky-fit/linksync";
 import {
   makeEvoluRelaySettings,
   openLinkyEvolu,
+  toEvoluTransports,
   type EvoluRun,
   type LinkyEvolu,
 } from "@linky-fit/linksync/evolu";
@@ -66,12 +67,15 @@ export const openSessionEvolu = async (
     session.unreadable.has("appMnemonic")
   )
     throw new AppMnemonicUnreadable();
+  const { lifecycle } = registry.get(platformAtom);
   const relayUrls = registry.get(evoluRelaySettingsAtom).activeUrls();
+  const hasEvoluRelay = toEvoluTransports(relayUrls).length > 0;
   const ownerDeletedListeners = new Set<(ownerId: OwnerId) => void>();
   const evolu = await openLinkyEvolu(run, {
     mnemonic: secrets.appMnemonic,
     relayUrls,
     memoryOnly,
+    onDatabaseDeleted: lifecycle.reload,
     onOwnerDeleted: (ownerId) => {
       for (const listener of ownerDeletedListeners) listener(ownerId);
     },
@@ -79,7 +83,7 @@ export const openSessionEvolu = async (
   const opened: OpenedEvolu = {
     evolu,
     run,
-    hasEvoluRelay: relayUrls.length > 0,
+    hasEvoluRelay,
     onOwnerDeleted: (listener) => {
       ownerDeletedListeners.add(listener);
       return () => {

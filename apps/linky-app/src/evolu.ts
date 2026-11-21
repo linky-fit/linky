@@ -10,6 +10,8 @@ import {
   type NostrIdentityId,
 } from "@linky-fit/linksync";
 import {
+  awaitDatabaseReady,
+  type EvoluRun,
   type LinkyEvolu,
   LinkyEvoluSchema,
   markAwaitingFirstHydration,
@@ -244,13 +246,15 @@ export const forgetChatShards = async (store: LinkyStore) => {
   return forgotten;
 };
 
-/** Resolves once the database answers a query, which Evolu does only after moving Evolu 7's data in. */
-export const probeLocalDatabase = (evolu: LinkyEvolu): Promise<void> =>
-  evolu
-    .loadQuery(
-      createQuery((db) => db.selectFrom("shardPointer").select("id").limit(1)),
-    )
-    .then(() => undefined);
+/**
+ * Resolves once the database answers an uncached query (which Evolu does only
+ * after moving Evolu 7's data in) and rejects promptly if Evolu refuses the
+ * database.
+ */
+export const probeLocalDatabase = (
+  evolu: LinkyEvolu,
+  run: EvoluRun,
+): Promise<void> => awaitDatabaseReady(evolu, run.deps.evoluError);
 
 export const ownerMetaAllQuery = createQuery((db) =>
   db.selectFrom("ownerMeta").selectAll(),
