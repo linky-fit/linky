@@ -9,6 +9,7 @@ export { markAwaitingFirstHydration } from "./firstHydration";
 export type { KeyValueStorage } from "./keyValueStorage";
 export {
   generateDbNameFromMnemonic,
+  InvalidAppMnemonic,
   openLinkyEvolu,
   openLinkyStore,
 } from "./linkyEvolu";
