@@ -6,7 +6,7 @@ import {
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 import { appOwnerFromMnemonic } from "../core";
-import { LinkySchema, linkyScopes } from "../model";
+import { linkyScopes } from "../model";
 import { memoryKeyValueStorage } from "../testing/keyValueStorage";
 import {
   generateDbNameFromMnemonic,
@@ -50,15 +50,12 @@ describe("appOwnerFromMnemonic", () => {
 });
 
 describe("linkyIndexes", () => {
-  it("indexes every table's id and the proof columns the wallet filters on", () => {
+  it("adds only the proof query indexes and leaves id indexes to Evolu 8", () => {
     expect(
-      evoluSchemaToSqliteSchema(LinkyEvoluSchema, linkyIndexes)
-        .indexes.map((index) => index.sql)
-        .filter((sql) => !sql.includes(`"evolu_`)),
-    ).toEqual([
-      ...Object.keys(LinkySchema).map(
-        (table) => `create index "${table}Id" on "${table}" ("id")`,
+      evoluSchemaToSqliteSchema(LinkyEvoluSchema, linkyIndexes).indexes.map(
+        (index) => index.sql,
       ),
+    ).toEqual([
       'create index "cashuProofState" on "cashuProof" ("state")',
       'create index "cashuProofOperationId" on "cashuProof" ("operationId")',
       'create index "cashuProofKeysetCreatedSecond" on "cashuProof" ("keysetId", substr("createdAt", 1, 19), "mint")',

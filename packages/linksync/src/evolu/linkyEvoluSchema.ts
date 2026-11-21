@@ -121,11 +121,8 @@ export const LinkyEvoluSchema = {
   },
 };
 
-// Tables are keyed by (ownerId, id); the shard store looks rows up by id across owners.
+// Evolu 8 creates `evolu_<table>_id` on every table; only targeted query indexes belong here.
 export const linkyIndexes: IndexesConfig = (create) => [
-  ...Object.keys(LinkySchema).map((table) =>
-    create(`${table}Id`).on(table).column("id"),
-  ),
   create("cashuProofState").on("cashuProof").column("state"),
   create("cashuProofOperationId").on("cashuProof").column("operationId"),
   create("cashuProofKeysetCreatedSecond")
