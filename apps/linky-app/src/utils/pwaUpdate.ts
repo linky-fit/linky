@@ -9,6 +9,8 @@ const listeners = new Set<Listener>();
 const walletWork = new Set<Promise<void>>();
 let needRefresh = false;
 let applyingUpdate = false;
+let reloadingAfterWalletWork = false;
+let reloadRequested = false;
 let updateSW: ((reloadPage?: boolean) => Promise<void>) | null = null;
 
 const appStartTime = Date.now();
@@ -27,6 +29,8 @@ if (typeof window !== "undefined") {
 }
 
 const reloadPage = () => {
+  if (reloadRequested) return;
+  reloadRequested = true;
   if (typeof location !== "undefined") {
     location.reload();
   }
@@ -35,7 +39,7 @@ const reloadPage = () => {
 const scheduleReloadFallback = () => {
   if (typeof window === "undefined") return;
   window.setTimeout(() => {
-    if (applyingUpdate) reloadPage();
+    if (applyingUpdate) reloadAfterWalletWork();
   }, 1_500);
 };
 
@@ -68,6 +72,10 @@ export const subscribePwaNeedRefresh = (listener: Listener) => {
 
 export const isApplyingPwaUpdate = () => applyingUpdate;
 
+const waitForWalletWork = async (): Promise<void> => {
+  while (walletWork.size > 0) await Promise.allSettled(walletWork);
+};
+
 /** Holds the update's reload back until `work` settles, so it cannot cut a wallet operation short. */
 export const deferPwaUpdateWhile = (work: Promise<void>): void => {
   walletWork.add(work);
@@ -75,6 +83,13 @@ export const deferPwaUpdateWhile = (work: Promise<void>): void => {
     walletWork.delete(work);
   };
   void work.then(release, release);
+};
+
+/** Waits for all in-flight wallet operations to settle before reloading the page. */
+export const reloadAfterWalletWork = (): void => {
+  if (reloadingAfterWalletWork) return;
+  reloadingAfterWalletWork = true;
+  void waitForWalletWork().then(reloadPage);
 };
 
 const readClientCount = (data: unknown): number | null => {
@@ -133,9 +148,9 @@ export const applyPwaUpdate = async () => {
   if (applyingUpdate) return;
   applyingUpdate = true;
   markPwaNeedRefresh(false);
-  while (walletWork.size > 0) await Promise.allSettled(walletWork);
+  await waitForWalletWork();
   if (!updateSW) {
-    reloadPage();
+    reloadAfterWalletWork();
     return;
   }
   try {
@@ -145,6 +160,6 @@ export const applyPwaUpdate = async () => {
     applyingUpdate = false;
     markPwaNeedRefresh(true);
     console.warn("[linky][pwa] updateSW failed", error);
-    reloadPage();
+    reloadAfterWalletWork();
   }
 };

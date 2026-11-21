@@ -1,4 +1,5 @@
 import { Workbox } from "workbox-window";
+import { reloadAfterWalletWork } from "../utils/pwaUpdate";
 import { isDevBuild } from "./buildEnv";
 
 // vite-plugin-pwa serves the development worker as an ES module under its own
@@ -36,7 +37,7 @@ export const registerServiceWorker = ({
     if (!updatePrompted) {
       updatePrompted = true;
       workbox.addEventListener("controlling", (event) => {
-        if (event.isUpdate) window.location.reload();
+        if (event.isUpdate) reloadAfterWalletWork();
       });
     }
     onNeedRefresh();

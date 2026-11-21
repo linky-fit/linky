@@ -47,7 +47,8 @@ beforeEach(() => {
   workbox.messageSkipWaiting.mockClear();
   reload.mockClear();
   vi.stubGlobal("navigator", { serviceWorker: {} });
-  vi.stubGlobal("window", { location: { reload } });
+  vi.stubGlobal("location", { reload });
+  vi.stubGlobal("window", { location: { reload }, addEventListener: vi.fn() });
 });
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -92,7 +93,7 @@ it("prompts for a waiting update and reloads once the accepted worker takes cont
   expect(workbox.messageSkipWaiting).toHaveBeenCalledOnce();
 
   workbox.emit("controlling", { isUpdate: true });
-  expect(reload).toHaveBeenCalledOnce();
+  await vi.waitFor(() => expect(reload).toHaveBeenCalledOnce());
 });
 
 it("prompts for a worker another tab installed", () => {

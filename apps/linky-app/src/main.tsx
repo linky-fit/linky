@@ -50,6 +50,7 @@ import {
   isApplyingPwaUpdate,
   recordPwaControllerChange,
   recordPwaRegistered,
+  reloadAfterWalletWork,
 } from "./utils/pwaUpdate";
 import { getUnknownErrorMessage, isRecord } from "./utils/unknown";
 import type { EvoluError } from "./evolu";
@@ -253,7 +254,7 @@ if ("serviceWorker" in navigator) {
     // SW's purged precache. Skipped on first install (no controller at
     // load) and in the tab that initiated the update (it reloads itself).
     if (hadControllerAtLoad && !isApplyingPwaUpdate()) {
-      window.location.reload();
+      reloadAfterWalletWork();
     }
   });
 
