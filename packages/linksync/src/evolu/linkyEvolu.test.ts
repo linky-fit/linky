@@ -4,6 +4,7 @@ import {
   Millis,
   Name,
   ok,
+  type EvoluError,
 } from "@evolu/common";
 import {
   evoluSchemaToSqliteSchema,
@@ -15,6 +16,10 @@ import { appOwnerFromMnemonic } from "../core";
 import { linkyScopes } from "../model";
 import { memoryKeyValueStorage } from "../testing/keyValueStorage";
 import {
+  awaitDatabaseReady,
+  classifyEvoluOpenError,
+  DeviceStorageUnavailableError,
+  EvoluDatabaseRefusedError,
   generateDbNameFromMnemonic,
   openLinkyStore,
   type LinkyEvoluEvent,
@@ -66,6 +71,26 @@ describe("linkyIndexes", () => {
       'create index "cashuProofOperationId" on "cashuProof" ("operationId")',
       'create index "cashuProofKeysetCreatedSecond" on "cashuProof" ("keysetId", substr("createdAt", 1, 19), "mint")',
     ]);
+  });
+});
+
+describe("awaitDatabaseReady", () => {
+  it("rejects promptly when evoluError reports a refusal while the probe is pending", async () => {
+    const evoluError = createStore<EvoluError | null>(null);
+    const pending = awaitDatabaseReady(
+      { loadQuery: () => new Promise(() => {}) },
+      evoluError,
+    );
+    const refusal: EvoluError = {
+      type: "DatabaseHeldError",
+      name: Name.orThrow("linky-test"),
+    };
+    evoluError.set(refusal);
+    await expect(pending).rejects.toSatisfy(
+      (error: unknown) =>
+        error instanceof EvoluDatabaseRefusedError &&
+        error.evoluError === refusal,
+    );
   });
 });
 
@@ -144,5 +169,17 @@ describe("openLinkyStore", () => {
     expect(
       kv.getItem(`linky.shards.retainedFrom.${appOwner.id}.messages`),
     ).toBe("0");
+  });
+
+  it("classifies Evolu open failures consistently for recovery screens", () => {
+    expect(
+      classifyEvoluOpenError(
+        new EvoluDatabaseRefusedError({ type: "OtherBuildRunningError" }),
+      ),
+    ).toBe("otherTab");
+    expect(classifyEvoluOpenError(new DeviceStorageUnavailableError())).toBe(
+      "storageUnavailable",
+    );
+    expect(classifyEvoluOpenError(new Error("boom"))).toBe("other");
   });
 });
