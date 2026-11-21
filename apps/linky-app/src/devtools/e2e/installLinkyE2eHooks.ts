@@ -59,9 +59,9 @@ export interface LinkyE2eHooks {
   ) => Promise<ReadonlyArray<Readonly<Record<string, unknown>>>>;
   /** The owner id of one shard of a scope, whether or not it is visible. */
   readonly shardOwnerId: (scope: string, index: number) => Promise<string>;
-  /** Unsubscribes the shards outside every forgettable scope's window. */
+  /** Unsubscribes and deletes the local copy of shards outside every forgettable scope's window. */
   readonly forget: () => Promise<
-    ReadonlyArray<{ scope: string; index: number; deleted: boolean }>
+    ReadonlyArray<{ scope: string; index: number }>
   >;
   readonly syncOwnerIds: () => Promise<ReadonlyArray<string>>;
   /** Whether the shard store is hydrated. */

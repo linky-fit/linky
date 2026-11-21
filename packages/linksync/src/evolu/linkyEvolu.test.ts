@@ -1,4 +1,10 @@
-import { createIdFromString, createStore, Millis, Name } from "@evolu/common";
+import {
+  createIdFromString,
+  createStore,
+  Millis,
+  Name,
+  ok,
+} from "@evolu/common";
 import {
   evoluSchemaToSqliteSchema,
   type SyncState,
@@ -77,6 +83,7 @@ describe("openLinkyStore", () => {
       upsert: () => ({}),
       update: () => ({}),
       getMutationSize: () => 1,
+      deleteOwner: () => Promise.resolve(ok()),
     };
     const kv = memoryKeyValueStorage();
     const events: LinkyEvoluEvent[] = [];

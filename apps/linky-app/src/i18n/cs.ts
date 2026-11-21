@@ -398,7 +398,7 @@ export const cs = {
   chatStorageSubscribed: "Odebírané na tomto zařízení",
   chatStorageForget: "Zapomenout staré shardy chatů",
   chatStorageForgetHint:
-    "Staré zprávy zmizí z historie chatu na tomto zařízení; kontakty a peníze zůstanou kompletní. Data zatím zůstanou uložená na zařízení i na serveru.",
+    "Staré zprávy se smažou z historie chatu na tomto zařízení; kontakty a peníze zůstanou kompletní. Synchronizované kopie zůstanou na Evolu serveru, ale nesynchronizované zprávy už nepůjde obnovit.",
   chatStorageForgotten: "Staré shardy chatů byly na tomto zařízení zapomenuty.",
   chatStorageFailed:
     "Staré shardy chatů se nepodařilo zapomenout. Zkuste to znovu.",

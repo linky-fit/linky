@@ -58,6 +58,7 @@ export type LinkyEvoluEvent =
       readonly _tag: "AccountHydrated";
       readonly owners: ReadonlyArray<OwnerId>;
     }
+  | { readonly _tag: "OwnerDeleted"; readonly ownerId: OwnerId }
   | { readonly _tag: "WriteFailed"; readonly write: FailedWrite }
   | { readonly _tag: "WriteApplied"; readonly write: AppliedWrite }
   | {
@@ -122,11 +123,13 @@ export const openLinkyEvolu = async (
     mnemonic,
     relayUrls,
     memoryOnly,
+    onOwnerDeleted,
   }: {
     readonly mnemonic: string | null;
     readonly relayUrls: ReadonlyArray<string>;
     /** Applies only to a session with a mnemonic; Evolu decides for the others. */
     readonly memoryOnly: boolean;
+    readonly onOwnerDeleted?: (ownerId: OwnerId) => void;
   },
 ): Promise<LinkyEvolu> => {
   const config = {
@@ -134,6 +137,7 @@ export const openLinkyEvolu = async (
     evolu7Name: generateDbNameFromMnemonic(mnemonic),
     indexes: linkyIndexes,
     transports: toTransports(relayUrls),
+    ...(onOwnerDeleted ? { onOwnerDeleted } : {}),
   };
   // Where the platform offers no storage, Evolu keeps the database in memory unasked.
   if (!memoryOnly && (await run.deps.getDevicePersistence()) === "NotPersisted")
@@ -209,12 +213,16 @@ export const openLinkyStore = async (
     kv,
     scopes,
     hasEvoluRelay,
+    onOwnerDeleted,
     onEvent,
   }: {
     readonly syncState: ReadonlyStore<SyncState | null>;
     readonly kv: KeyValueStorage;
     readonly scopes: LinkyScopes;
     readonly hasEvoluRelay: boolean;
+    readonly onOwnerDeleted?: (
+      listener: (ownerId: OwnerId) => void,
+    ) => () => void;
     readonly onEvent?: (event: LinkyEvoluEvent) => void;
   },
 ): Promise<LinkyStore> => {
@@ -222,10 +230,13 @@ export const openLinkyStore = async (
   const key = (scope: string) =>
     `linky.shards.retainedFrom.${owner.id}.${scope}`;
   if (onEvent) reportSyncFailures(syncState, evolu.name, onEvent);
+  if (onOwnerDeleted && onEvent)
+    onOwnerDeleted((ownerId) => onEvent({ _tag: "OwnerDeleted", ownerId }));
   const store = createAccountStore(
     createEvoluShardDb(evolu, {
       syncState,
       hasEvoluRelay,
+      ...(onOwnerDeleted ? { onOwnerDeleted } : {}),
       onWriteFailed: (write) => onEvent?.({ _tag: "WriteFailed", write }),
       onWriteApplied: (write) => onEvent?.({ _tag: "WriteApplied", write }),
     }),

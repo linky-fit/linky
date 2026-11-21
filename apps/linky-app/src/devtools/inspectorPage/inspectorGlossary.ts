@@ -111,7 +111,11 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "contacts.restored":
     "A deleted contact came back, either by the user undoing the deletion or because an incoming message newer than the deletion time arrived; it clears archivedAtSec on the contact and on its conversation, where older app versions keep it.",
   ShardsForgotten:
-    "Explicit local forget of old chat shards, conversations and unknown senders' messages alike. Payload lists scope, index and whether owner data was deleted; owner links correlate with shard rotation and subscription rows. Evolu 7 reports deleted: false.",
+    "Explicit local forget of old chat shards, conversations and unknown senders' messages alike. Evolu deletes each forgotten shard's local rows and history while leaving relay history untouched. Payload lists scope, index and owner; owner links correlate with shard rotation and subscription rows.",
+  OwnerDeleted:
+    "Evolu deleted a shard owner's local rows and history (initiated in this tab or a sibling tab) and ended its sync subscriptions across tabs. The owner link names the deleted shard.",
+  "evolu.shardsForgetFailed":
+    "Forgetting one or more old chat shards failed (for example, the database was held). Retention stayed at the last confirmed deletion so surviving shards remain visible and retrying continues cleanly.",
   ShardsSubscribed:
     "The set of owners this device syncs was reconciled: the app owner plus every visible shard of every scope, at boot, after each rotation and after explicit forgetting. Owner links list the whole set; the payload says why and how many.",
   AccountHydrated:

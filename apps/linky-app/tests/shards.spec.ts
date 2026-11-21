@@ -308,7 +308,7 @@ test("shard rotations keep old rows, copy edited rows forward, sync new writes, 
         0,
       );
       expect(await hooks.forget(source.page)).toEqual([
-        { scope: "messages", index: 0, deleted: false },
+        { scope: "messages", index: 0 },
       ]);
       expect(await hooks.syncOwnerIds(source.page)).not.toContain(
         messagesShard0,
@@ -583,7 +583,10 @@ test("natural message rotations retain local history until forget and sync only 
           .first(),
       ).toBeVisible();
       await expect(detail.getByTestId("inspector-payload")).toContainText(
-        '"deleted": false',
+        '"scope": "messages"',
+      );
+      await expect(detail.getByTestId("inspector-payload")).not.toContainText(
+        '"deleted"',
       );
       await source.page.reload();
       await expect(source.page.getByTestId("timeline")).toBeVisible();

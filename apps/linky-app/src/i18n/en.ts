@@ -395,7 +395,7 @@ export const en = {
   chatStorageSubscribed: "Subscribed on this device",
   chatStorageForget: "Forget old chat shards",
   chatStorageForgetHint:
-    "Old messages leave this device’s chat history; contacts and money stay complete. The data stays stored on this device and the relay for now.",
+    "Old messages are deleted from this device’s chat history; contacts and money stay complete. Synced copies remain on the Evolu relay, but messages that were not synced cannot be recovered.",
   chatStorageForgotten: "Old chat shards forgotten on this device.",
   chatStorageFailed: "Could not forget old chat shards. Try again.",
   evoluShards: "Shards",

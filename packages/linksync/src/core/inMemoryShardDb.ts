@@ -1,4 +1,4 @@
-import type { OwnerId, SqliteBoolean, Owner } from "@evolu/common";
+import type { Owner, OwnerId, ShardOwner, SqliteBoolean } from "@evolu/common";
 import { Clock, Effect } from "effect";
 import type {
   Columns,
@@ -48,6 +48,7 @@ export const makeInMemoryShardDb = <S extends DbSchema>(
   const used = new Map<OwnerId, number>();
   const synced = new Set<OwnerId>();
   const syncListeners = new Set<() => void>();
+  const ownerDeletedListeners = new Set<(ownerId: OwnerId) => void>();
 
   const tableRows = (table: string): Map<string, Row<Columns>> => {
     const existing = tables.get(table);
@@ -196,15 +197,24 @@ export const makeInMemoryShardDb = <S extends DbSchema>(
     },
     ownerUsage: (ownerId): Effect.Effect<OwnerUsage> =>
       Effect.sync(() => usage.get(ownerId) ?? { mutations: 0, bytes: 0 }),
-    deleteOwner: (ownerId) =>
+    deleteOwner: (owner: ShardOwner) =>
       Effect.sync(() => {
+        const ownerId = owner.id;
         for (const [table, rows] of tables) {
           for (const [key, row] of rows)
             if (row.ownerId === ownerId) rows.delete(key);
           notify(table);
         }
         usage.delete(ownerId);
+        used.delete(ownerId);
+        for (const listener of ownerDeletedListeners) listener(ownerId);
       }),
+    onOwnerDeleted: (listener) => {
+      ownerDeletedListeners.add(listener);
+      return () => {
+        ownerDeletedListeners.delete(listener);
+      };
+    },
     isOwnerSynced: (ownerId) => !options.holdSync || synced.has(ownerId),
     subscribeOwnerSync: (listener) => {
       syncListeners.add(listener);

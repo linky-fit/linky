@@ -64,7 +64,6 @@ export interface PointerRepair<Scope extends string = string> {
 export interface ForgottenShard {
   readonly scope: string;
   readonly index: number;
-  readonly deleted: boolean;
 }
 
 export class RowNotFound extends Schema.TaggedError<RowNotFound>()(
@@ -279,10 +278,10 @@ export interface ShardStore<
     ReadonlyArray<PointerRepair<keyof R & string>>,
     ShardDbError
   >;
-  /** Shards outside a forgettable scope's window: unsubscribed, deleted when the port can. */
+  /** Shards outside a forgettable scope's window: unsubscribed and deleted locally. */
   readonly forget: (
     scope?: keyof R & string,
-  ) => Effect.Effect<ReadonlyArray<ForgottenShard>>;
+  ) => Effect.Effect<ReadonlyArray<ForgottenShard>, ShardDbError>;
   /** Fires after any change to a table of the scope. */
   readonly subscribe: (
     scope: keyof R & string,
@@ -389,17 +388,26 @@ export const createShardStore = <
 ): ShardStore<S, R> => {
   const { db, appOwner, scopes } = options;
   const retainedFrom = new Map<string, number>();
+  const persistedRetention = new Map<string, number>();
   const initialized = new Set<string>();
   const visibilityListeners = new Set<() => void>();
   const retain = (scope: string, first: number) => {
-    if (retainedFrom.get(scope) === first) return;
-    retainedFrom.set(scope, first);
-    options.retention?.set(scope, first);
+    // Another tab may have forgotten shards and advanced retention in storage; never move it back down.
+    const saved = options.retention?.get(scope);
+    const effective = saved === undefined ? first : Math.max(first, saved);
+    retainedFrom.set(scope, effective);
+    if (persistedRetention.get(scope) === effective) return;
+    persistedRetention.set(scope, effective);
+    if (saved !== effective) options.retention?.set(scope, effective);
   };
   const pendingIndex = new Map<string, number>();
   const rotatedLocallyAtMs = new Map<string, number>();
   const rotationInFlight = new Set<string>();
   const shardOwners = new Map<string, ShardOwner>();
+  const shardLocationById = new Map<
+    OwnerId,
+    { readonly scope: string; readonly index: number }
+  >();
   const ownersById = new Map<OwnerId, Owner>([[appOwner.id, appOwner]]);
   const usedOwners = new Map<OwnerId, () => void>();
 
@@ -409,16 +417,55 @@ export const createShardStore = <
     return found;
   };
 
-  const shardOwner = (scope: string, index: number): Owner => {
-    if (definition(scope).owner === "app") return appOwner;
+  const derivedShardOwner = (scope: string, index: number): ShardOwner => {
     const key = `${scope}/${index}`;
     const cached = shardOwners.get(key);
     if (cached !== undefined) return cached;
     const derived = deriveShardOwner(appOwner, [scope, index]);
     shardOwners.set(key, derived);
+    shardLocationById.set(derived.id, { scope, index });
     ownersById.set(derived.id, derived);
     return derived;
   };
+
+  const shardOwner = (scope: string, index: number): Owner =>
+    definition(scope).owner === "app"
+      ? appOwner
+      : derivedShardOwner(scope, index);
+
+  const syncSavedRetention = (scope: string): number | undefined => {
+    const saved = options.retention?.get(scope);
+    if (saved === undefined) return undefined;
+    const current = retainedFrom.get(scope);
+    if (current === undefined || saved > current)
+      retainedFrom.set(scope, saved);
+    return saved;
+  };
+
+  // Sync cross-tab owner deletions: Evolu only emits `onOwnerDeleted` once a
+  // shard's local data is deleted, and `retention` only stores confirmed
+  // deletions, so advancing past either never hides a surviving shard.
+  db.onOwnerDeleted?.((ownerId) => {
+    usedOwners.delete(ownerId);
+    const location = shardLocationById.get(ownerId);
+    if (location !== undefined) {
+      const policy = definition(location.scope);
+      if (policy.owner === "shard" && policy.forget !== "never") {
+        const current = retainedFrom.get(location.scope);
+        const next = location.index + 1;
+        if (current === undefined || next > current) {
+          retainedFrom.set(location.scope, next);
+          initialized.add(location.scope);
+        }
+      }
+    }
+    for (const scope of Object.keys(scopes)) {
+      const policy = definition(scope);
+      if (policy.owner !== "shard" || policy.forget === "never") continue;
+      if (syncSavedRetention(scope) !== undefined) initialized.add(scope);
+    }
+    for (const listener of visibilityListeners) listener();
+  });
 
   // Every row the store writes was read from a shard it derived the owner of.
   const ownerOf = (ownerId: OwnerId): Owner => {
@@ -455,14 +502,13 @@ export const createShardStore = <
           owner: shardOwner(scope, index),
         }));
       if (!initialized.has(scope)) {
-        const saved = options.retention?.get(scope);
         const localRows = yield* Effect.forEach(policy.tables, (table) =>
           db.readTable(table),
         );
         if (!initialized.has(scope)) {
           initialized.add(scope);
-          if (saved !== undefined) retainedFrom.set(scope, saved);
-          else {
+          const saved = options.retention?.get(scope);
+          if (saved === undefined) {
             const localOwners = new Set(
               localRows.flat().map((row) => row.ownerId),
             );
@@ -475,6 +521,7 @@ export const createShardStore = <
           }
         }
       }
+      syncSavedRetention(scope);
       const first = Math.min(retainedFrom.get(scope) ?? active, window[0] ?? 0);
 
       return Array.from({ length: active - first + 1 }, (_, offset) => {
@@ -786,19 +833,42 @@ export const createShardStore = <
       rotatedAtMs: nowMs,
     });
 
-  const syncOwners = (): Effect.Effect<ReadonlyArray<Owner>> =>
-    Effect.map(
-      Effect.forEach(Object.keys(scopes), visibleShards),
-      (perScope) => {
-        const byId = new Map<OwnerId, Owner>([[appOwner.id, appOwner]]);
-        for (const shard of perScope.flat())
-          byId.set(shard.owner.id, shard.owner);
-        return [...byId.values()];
-      },
+  const visibleShardsByScope = (): Effect.Effect<
+    ReadonlyArray<readonly [string, ReadonlyArray<Shard>]>
+  > =>
+    Effect.forEach(Object.keys(scopes), (scope) =>
+      Effect.map(visibleShards(scope), (shards) => [scope, shards] as const),
     );
 
+  // Revalidate against persisted retention synchronously after all async reads
+  // finish, so a sibling-tab forget that landed mid-pass cannot be re-subscribed.
+  const currentSyncOwners = (
+    perScope: ReadonlyArray<readonly [string, ReadonlyArray<Shard>]>,
+  ): ReadonlyArray<Owner> => {
+    const byId = new Map<OwnerId, Owner>([[appOwner.id, appOwner]]);
+    for (const [scope, shards] of perScope) {
+      const policy = definition(scope);
+      let first = 0;
+      if (policy.owner === "shard" && policy.forget !== "never") {
+        syncSavedRetention(scope);
+        const active = shards[shards.length - 1]?.index ?? 0;
+        first = Math.min(
+          retainedFrom.get(scope) ?? active,
+          visibleIndexes(policy, active)[0] ?? 0,
+        );
+      }
+      for (const shard of shards)
+        if (shard.index >= first) byId.set(shard.owner.id, shard.owner);
+    }
+    return [...byId.values()];
+  };
+
+  const syncOwners = (): Effect.Effect<ReadonlyArray<Owner>> =>
+    Effect.map(visibleShardsByScope(), currentSyncOwners);
+
   const reconcileSync = (): Effect.Effect<void> =>
-    Effect.map(syncOwners(), (wanted) => {
+    Effect.map(visibleShardsByScope(), (perScope) => {
+      const wanted = currentSyncOwners(perScope);
       const wantedIds = new Set(wanted.map((owner) => owner.id));
       for (const owner of wanted)
         if (!usedOwners.has(owner.id))
@@ -1006,25 +1076,45 @@ export const createShardStore = <
 
   const forget = (
     onlyScope?: string,
-  ): Effect.Effect<ReadonlyArray<ForgottenShard>> =>
+  ): Effect.Effect<ReadonlyArray<ForgottenShard>, ShardDbError> =>
     Effect.gen(function* () {
       const forgotten: ForgottenShard[] = [];
       for (const scope of onlyScope === undefined
         ? Object.keys(scopes)
         : [onlyScope]) {
+        const policy = definition(scope);
+        if (policy.owner !== "shard" || policy.forget === "never") continue;
+        const visible = yield* visibleShards(scope);
         const active = yield* activeIndex(scope);
-        const indexes = forgottenIndexes(definition(scope), active);
-        if (indexes.length === 0) continue;
-        retain(scope, indexes.length);
-        initialized.add(scope);
+        const firstVisible = visible[0]?.index ?? 0;
+        const localRows = yield* Effect.forEach(policy.tables, (table) =>
+          db.readTable(table),
+        );
+        const localOwners = new Set(localRows.flat().map((row) => row.ownerId));
+        const indexes = forgottenIndexes(policy, active).filter(
+          (index) =>
+            index >= firstVisible ||
+            localOwners.has(derivedShardOwner(scope, index).id),
+        );
         for (const index of indexes) {
-          const owner = shardOwner(scope, index);
-          if (db.deleteOwner !== null) yield* db.deleteOwner(owner.id);
-          forgotten.push({ scope, index, deleted: db.deleteOwner !== null });
+          const owner = derivedShardOwner(scope, index);
+          usedOwners.get(owner.id)?.();
+          usedOwners.delete(owner.id);
+          const deleted = yield* Effect.result(db.deleteOwner(owner));
+          if (deleted._tag === "Failure") {
+            yield* reconcileSync();
+            for (const listener of visibilityListeners) listener();
+            return yield* Effect.fail(deleted.failure);
+          }
+          // Advance persisted retention only after Evolu confirms deletion.
+          retain(scope, index + 1);
+          initialized.add(scope);
+          forgotten.push({ scope, index });
         }
       }
-      yield* reconcileSync();
-      for (const listener of visibilityListeners) listener();
+      if (forgotten.length > 0) {
+        for (const listener of visibilityListeners) listener();
+      }
       return forgotten;
     });
 
