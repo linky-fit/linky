@@ -1,7 +1,7 @@
 import type { KeyValueStorage } from "@linky-fit/linksync/evolu";
 import { getDefaultLang } from "./browserPreferences";
 
-export const LANGS = ["cs", "de", "en", "pt"] as const;
+export const LANGS = ["cs", "de", "en", "pt", "sk"] as const;
 export type Lang = (typeof LANGS)[number];
 
 export const isLang = (value: string | null | undefined): value is Lang =>

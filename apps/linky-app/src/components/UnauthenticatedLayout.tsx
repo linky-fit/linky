@@ -71,6 +71,7 @@ const LANGUAGE_LABEL_KEYS = {
   de: "german",
   en: "english",
   pt: "portuguese",
+  sk: "slovak",
 } as const satisfies Record<Lang, I18nKey>;
 
 const COLOR_MODE_ICONS = {

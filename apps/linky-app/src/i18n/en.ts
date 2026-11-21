@@ -608,6 +608,7 @@ export const en = {
   english: "English",
   german: "Deutsch",
   portuguese: "Português (Brasil)",
+  slovak: "Slovenčina",
 
   appearance: "Appearance",
   appearanceAuto: "Automatic",

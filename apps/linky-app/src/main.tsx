@@ -442,6 +442,18 @@ const getBootErrorText = () => {
       title: "Erro ao iniciar",
     };
   }
+  if (language.startsWith("sk")) {
+    return {
+      details: "Podrobnosti",
+      download: "Stiahnuť diagnostiku",
+      reload: "Vyčistiť cache a načítať znova",
+      stage: "Aplikácia sa zastavila vo fáze",
+      temporary: "Pokračovať v dočasnej relácii",
+      temporaryDescription:
+        "Lokálne úložisko neodpovedá. Dočasná relácia načíta synchronizované dáta, ale nové zmeny sa na tomto zariadení neuložia.",
+      title: "Chyba pri spustení",
+    };
+  }
   return {
     details: "Details",
     download: "Download diagnostics",
