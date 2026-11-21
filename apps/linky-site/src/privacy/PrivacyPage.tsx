@@ -74,6 +74,26 @@ const copy: Record<SiteLocale, PrivacyCopy> = {
       "Linky kann gelöschte Schlüssel nicht wiederherstellen und gelöschte lokale verschlüsselte Daten nicht rekonstruieren.",
     ],
   },
+  sk: {
+    documentTitle: "Linky Ochrana súkromia",
+    eyebrow: "Ochrana súkromia",
+    title: "Ochrana súkromia",
+    paragraphs: [
+      "Linky je local-first aplikácia na kontakty, súkromné správy a bitcoinové platby. Všetky dáta sú prístupné iba používateľovi. Prevádzkovateľ aplikácie nemá prístup ani k správam, ani ku kontaktom, ani k informácii o množstve tokenov.",
+      "Dáta sú synchronizované cez Evolu a Nostr relays. Čítať ich však dokáže opäť iba používateľ. Aplikácia využíva aj Cashu minty tretích strán na emisiu tokenov a ponúka voliteľné push notifikácie.",
+      "Súkromné kľúče sú plne pod kontrolou používateľa. Prevádzkovateľ aplikácie nedokáže obnovovať používateľské údaje, pretože nimi nedisponuje.",
+      "Tento web na linky.fit môže spracúvať bežné technické logy hostingu a zabezpečenia. Produktová aplikácia na app.linky.fit môže odosielať aj sieťové požiadavky nevyhnutné na fungovanie aplikácie vrátane požiadaviek na relays, minty, LNURL služby a voliteľnú Linky push službu.",
+      "Keďže Linky využíva decentralizované systémy a systémy prevádzkované tretími stranami, nie je vždy možné zaručiť úplné zmazanie dát, ktoré už boli mimo tvojho zariadenia zverejnené alebo ďalej relayované.",
+    ],
+    deleteTitle: "Ako zmazať svoje dáta",
+    deleteParagraphs: [
+      "Linky neprevádzkuje klasický serverový používateľský účet, v ktorom by prevádzkovateľ priamo uchovával alebo mohol mazať tvoje kontakty, súkromné správy alebo zostatok peňaženky. Väčšinu dát v Linky máš pod kontrolou ty sám vo svojom zariadení a pod svojou kryptografickou identitou.",
+      "Ak chceš zmazať dáta Linky uložené v zariadení, použi v aplikácii možnosti na odhlásenie a vyčistenie lokálnych dát v Nastaveniach alebo v Pokročilých voľbách, prípadne zmaž dáta aplikácie v zariadení a aplikáciu odinštaluj.",
+      "Ak máš zapnuté push notifikácie, vypni ich v aplikácii alebo v nastaveniach zariadenia, aby sa zastavilo budúce doručovanie. Súvisiace metadáta push odberu môžu na službe Linky push zostať obmedzený technický čas a následne sú odstránené v rámci odhlásenia alebo upratovacích procesov.",
+      "Dáta, ktoré si predtým zverejnil do decentralizovaných Nostr relayov alebo odoslal službám tretích strán, napríklad relayom, Cashu mintom alebo LNURL službám, nemusí byť možné po opustení tvojho zariadenia úplne odstrániť ani zo strany Linky, ani zo strany prevádzkovateľa Linky.",
+      "Linky nedokáže obnoviť zmazané kľúče ani znova zostaviť zmazané lokálne šifrované dáta.",
+    ],
+  },
 };
 
 function PrivacyPage() {

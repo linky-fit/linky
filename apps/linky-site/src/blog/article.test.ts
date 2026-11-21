@@ -36,6 +36,15 @@ describe("translateArticle", () => {
     });
   });
 
+  it("serves Slovak readers the Czech translation before the English one", () => {
+    const { language, title, bio } = translateArticle(article, "sk");
+    expect({ language, title, bio }).toEqual({
+      language: "cs",
+      title: "Česky",
+      bio: "Český životopis",
+    });
+  });
+
   it("falls back to the only language of an article without English", () => {
     const czechOnly: Article = {
       ...article,

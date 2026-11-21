@@ -46,6 +46,12 @@ const copy: Record<SiteLocale, ProfileCopy> = {
     notFound: "Profil nicht gefunden",
     notFoundDetail: "Prüfe den Link, den du bekommen hast.",
   },
+  sk: {
+    openInLinky: "Otvoriť v Linky",
+    provides: "Poskytne",
+    notFound: "Profil sa nenašiel",
+    notFoundDetail: "Skontrolujte odkaz, ktorý ste dostali.",
+  },
 };
 
 const profile = readSharedProfile();

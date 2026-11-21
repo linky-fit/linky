@@ -36,21 +36,22 @@ export interface Article {
   translations: ArticleTranslations;
 }
 
-/** The order in which a reader without the article's language is served: English first. */
-const fallbackLanguages: SiteLocale[] = ["en", "cs", "de"];
+/** The order in which a reader without the article's language is served: English first, Czech first for Slovak readers. */
+const fallbackLanguages = (locale: SiteLocale): SiteLocale[] =>
+  locale === "sk" ? ["cs", "en", "de"] : ["en", "cs", "de"];
 
 const pickTranslation = (
   translations: ArticleTranslations,
   locale: SiteLocale,
 ): { language: SiteLocale; translation: ArticleTranslation } => {
-  for (const language of [locale, ...fallbackLanguages]) {
+  for (const language of [locale, ...fallbackLanguages(locale)]) {
     const translation = translations[language];
     if (translation) return { language, translation };
   }
   throw new Error("An article needs at least one translation");
 };
 
-/** The article in the reader's language when it has one, in English or its only language otherwise. */
+/** The article in the reader's language when it has one, in its fallback language otherwise. */
 export const translateArticle = (article: Article, locale: SiteLocale) => {
   const { language, translation } = pickTranslation(
     article.translations,

@@ -1,4 +1,4 @@
-export type SiteLocale = "cs" | "de" | "en";
+export type SiteLocale = "cs" | "de" | "en" | "sk";
 
 export type SiteDisplayCurrency = "sat" | "btc" | "czk" | "eur" | "chf" | "usd";
 
@@ -30,7 +30,7 @@ const getPrimaryBrowserLanguage = (): string => {
 };
 
 const isSiteLocale = (value: string | null): value is SiteLocale => {
-  return value === "cs" || value === "de" || value === "en";
+  return value === "cs" || value === "de" || value === "en" || value === "sk";
 };
 
 export const getDefaultSiteLocale = (): SiteLocale => {
@@ -38,6 +38,7 @@ export const getDefaultSiteLocale = (): SiteLocale => {
 
   if (language.startsWith("cs")) return "cs";
   if (language.startsWith("de")) return "de";
+  if (language.startsWith("sk")) return "sk";
   return "en";
 };
 
@@ -52,6 +53,7 @@ const getDefaultSiteDisplayCurrency = (): SiteDisplayCurrency => {
 
   if (language.startsWith("cs")) return "czk";
   if (language.startsWith("de")) return "eur";
+  if (language.startsWith("sk")) return "eur";
   if (language.startsWith("en")) return "usd";
   return "sat";
 };

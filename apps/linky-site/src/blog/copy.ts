@@ -26,4 +26,10 @@ export const copy: Record<SiteLocale, BlogCopy> = {
     allArticlesLabel: "Alle Artikel",
     writtenByLabel: "Geschrieben von",
   },
+  sk: {
+    title: "Blog",
+    description: "Príbehy a nápady ľudí, ktorí stoja za Linky.",
+    allArticlesLabel: "Všetky články",
+    writtenByLabel: "Autor",
+  },
 };

@@ -88,6 +88,7 @@ const storeSiteFiatRates = (rates: SiteFiatRates) => {
 const normalizeLocale = (lang: SiteLocale): string => {
   if (lang === "cs") return "cs-CZ";
   if (lang === "de") return "de-DE";
+  if (lang === "sk") return "sk-SK";
   return "en-US";
 };
 
