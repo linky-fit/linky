@@ -51,10 +51,23 @@ vi.mock("../hooks/useRouting", () => ({
   navigateTo: vi.fn(),
 }));
 
+const evoluMocks = vi.hoisted(() => ({
+  requestSync: vi.fn(),
+  retryQuotaSync: vi.fn(() => ["owner-1"]),
+  syncState: { get: () => null },
+}));
+
 vi.mock("../evolu", () => ({
   loadEvoluCurrentData: vi.fn(),
   loadEvoluHistoryData: vi.fn(),
+  retryQuotaSync: evoluMocks.retryQuotaSync,
   useLinkyEvolu: () => ({}),
+  useOpenedEvolu: () => ({
+    evolu: { requestSync: evoluMocks.requestSync },
+    run: { deps: { syncState: evoluMocks.syncState } },
+    hasEvoluRelay: true,
+    memoryOnly: false,
+  }),
 }));
 
 const rowValue = (container: HTMLElement, label: string): string | null => {
@@ -69,6 +82,7 @@ beforeEach(() => {
   counts.reloadRequired = false;
   counts.servers = [];
   counts.disabled = [];
+  evoluMocks.retryQuotaSync.mockClear();
 });
 
 describe("Evolu row counts", () => {
@@ -98,10 +112,13 @@ describe("Evolu row counts", () => {
         .find((button) => button.textContent === "evoluClearDatabase")
         ?.getAttribute("aria-disabled"),
     ).toBe("true");
-    expect(
-      buttons.some((button) => button.textContent === "evoluRetrySync"),
-    ).toBe(true);
+    const retryButton = buttons.find(
+      (button) => button.textContent === "evoluRetrySync",
+    );
+    expect(retryButton).toBeDefined();
     expect(view.container.textContent).toContain("evoluQuotaRecoveryHint");
+    retryButton?.click();
+    expect(evoluMocks.retryQuotaSync).toHaveBeenCalledTimes(1);
     await view.unmount();
   });
 

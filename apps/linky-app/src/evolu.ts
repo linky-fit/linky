@@ -16,6 +16,7 @@ import {
   LinkyEvoluSchema,
   markAwaitingFirstHydration,
   normalizeEvoluRelayUrl,
+  syncStateQuotaErrors,
 } from "@linky-fit/linksync/evolu";
 import { useAtom, useAtomSet, useAtomValue } from "@linky-fit/linkstr-react";
 import { Effect } from "effect";
@@ -376,18 +377,21 @@ export type NostrIdentityRow = LegacyRow<typeof nostrIdentitiesAllQuery.Row>;
 const quotaError = (
   state: SyncState | null,
   name: string,
-): ProtocolQuotaError | null => {
-  const tenant = state?.tenants.find((t) => t.name === name);
-  if (tenant?.type !== "Active") return null;
-  for (const owner of tenant.owners)
-    if (owner.type === "Writable")
-      for (const route of owner.routes)
-        if (
-          route.type === "Pending" &&
-          route.failure?.type === "ProtocolQuotaError"
-        )
-          return route.failure;
-  return null;
+): ProtocolQuotaError | null =>
+  syncStateQuotaErrors(state, name)[0]?.error ?? null;
+
+/** Asks Evolu to resend every owner currently blocked on a relay quota error, without reloading. */
+export const retryQuotaSync = (
+  evolu: LinkyEvolu,
+  state: SyncState | null,
+): ReadonlyArray<Evolu.OwnerId> => {
+  const owners = [
+    ...new Set(
+      syncStateQuotaErrors(state, evolu.name).map(({ ownerId }) => ownerId),
+    ),
+  ];
+  for (const ownerId of owners) evolu.requestSync(ownerId);
+  return owners;
 };
 
 /** Keeps `evoluLastErrorAtom` current and reports each error; mounted once by the shell. */
