@@ -1,6 +1,8 @@
 import {
+  Button,
   LoadingState,
   NavigationRail,
+  Notice,
   Row,
   Stack,
   StatusLine,
@@ -14,13 +16,15 @@ import { navigateTo, useRoute } from "../platform/hashRoute";
 import { sectionRoute, sections, type Route, type Section } from "../routing";
 import { ChatScreen } from "../screens/ChatScreen";
 import { ChatsScreen } from "../screens/ChatsScreen";
+import { Page } from "../screens/Page";
 import { RestoreScreen } from "../screens/RestoreScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { StatsScreen } from "../screens/StatsScreen";
 import { TransferDetailScreen } from "../screens/TransferDetailScreen";
 import { TransfersScreen } from "../screens/TransfersScreen";
 import { WalletScreen } from "../screens/WalletScreen";
-import { useAccountHydrated, useSession } from "../services/react";
+import type { OpenFailureReason } from "../services/device";
+import { useAccountHydrated, useDevice, useSession } from "../services/react";
 
 const sectionIcons: Record<Section, NavItem<Section>["icon"]> = {
   transfers: "Repeat",
@@ -49,9 +53,39 @@ export function AppShell() {
       return <RestoreScreen />;
     case "Opening":
       return <LoadingState label={copy.loading} />;
+    case "Failed":
+      return <OpenFailed reason={session.reason} />;
     case "SignedIn":
       return <SignedIn />;
   }
+}
+
+function OpenFailed({ reason }: { readonly reason: OpenFailureReason }) {
+  const device = useDevice();
+  const message = {
+    otherTab: {
+      title: copy.openFailed.otherTabTitle,
+      description: copy.openFailed.otherTabDescription,
+    },
+    storageUnavailable: {
+      title: copy.openFailed.storageUnavailableTitle,
+      description: copy.openFailed.storageUnavailableDescription,
+    },
+    other: {
+      title: copy.openFailed.title,
+      description: copy.openFailed.description,
+    },
+  }[reason];
+  return (
+    <Page centered testID="open-failed-screen">
+      <Notice
+        tone="warning"
+        title={message.title}
+        description={message.description}
+      />
+      <Button onPress={device.reload}>{copy.openFailed.reload}</Button>
+    </Page>
+  );
 }
 
 function SignedIn() {
