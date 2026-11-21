@@ -50,7 +50,7 @@ describe("createAccountStore", () => {
   it("holds writes of a restored account until it hydrates, which ends the wait", async () => {
     const kv = memoryKeyValueStorage();
     markAwaitingFirstHydration(kv, mnemonic);
-    expect(kv.getItem(key)).toBe("1");
+    expect(kv.getItem(key)).toBeTruthy();
     const account = openAccount(kv);
     await settle();
     expect(account.written()).toBe(false);
@@ -61,14 +61,40 @@ describe("createAccountStore", () => {
     expect(kv.getItem(key)).toBeNull();
   });
 
+  it("does not clear a newer wipe marker when an older tab finishes hydrating", async () => {
+    const kv = memoryKeyValueStorage();
+    kv.setItem(key, "1");
+    const oldTab = openAccount(kv);
+    await settle();
+    expect(oldTab.written()).toBe(false);
+
+    markAwaitingFirstHydration(kv, mnemonic);
+    const wipeMarker = kv.getItem(key);
+    expect(wipeMarker).toBeTruthy();
+    expect(wipeMarker).not.toBe("1");
+
+    oldTab.hydrate();
+    await settle();
+    expect(kv.getItem(key)).toBe(wipeMarker);
+
+    const replacementTab = openAccount(kv);
+    await settle();
+    expect(replacementTab.written()).toBe(false);
+    replacementTab.hydrate();
+    await settle();
+    expect(replacementTab.written()).toBe(true);
+    expect(kv.getItem(key)).toBeNull();
+  });
+
   it("keeps a restored account unhydrated while no Evolu relay is enabled", async () => {
     const kv = memoryKeyValueStorage();
     markAwaitingFirstHydration(kv, mnemonic);
+    const marker = kv.getItem(key);
     const account = openAccount(kv, false);
     account.hydrate();
     await settle();
     expect(account.written()).toBe(false);
-    expect(kv.getItem(key)).toBe("1");
+    expect(kv.getItem(key)).toBe(marker);
   });
 
   it("marks nothing for text that is not a mnemonic", () => {
