@@ -10,6 +10,7 @@ import {
 } from "../../../utils/mint";
 import {
   isShownDeferredReceive,
+  receivedTokenProofs,
   sentTokenClaims,
   takenTokenProofs,
 } from "../../lib/cashuTransfers";
@@ -136,9 +137,19 @@ export const useCashuTokenMessageInfo = () => {
     () => sentTokenClaims(transfers, unspentProofs),
     [unspentProofs, transfers],
   );
+  const receivedProofs = React.useMemo(
+    () => receivedTokenProofs(transfers),
+    [transfers],
+  );
   return React.useCallback(
     (text: string) =>
-      getCashuTokenMessageInfo(text, takenProofs, allowTestMints, sentClaims),
-    [allowTestMints, takenProofs, sentClaims],
+      getCashuTokenMessageInfo(
+        text,
+        takenProofs,
+        allowTestMints,
+        sentClaims,
+        receivedProofs,
+      ),
+    [allowTestMints, takenProofs, sentClaims, receivedProofs],
   );
 };

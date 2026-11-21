@@ -68,6 +68,20 @@ export const takenTokenProofs = (
   );
 };
 
+/** Tokens, by `tokenProofsKey`, the wallet received into its balance. */
+export const receivedTokenProofs = (
+  transfers: ReadonlyArray<TokenTransfer>,
+): ReadonlySet<string> =>
+  new Set(
+    transfers.flatMap((transfer) => {
+      const key =
+        transfer.kind === "receive" && transfer.status === "done"
+          ? tokenProofsKey(transfer.tokenText)
+          : null;
+      return key === null ? [] : [key];
+    }),
+  );
+
 /**
  * The wallet's own sends by `tokenProofsKey`: true once the recipient claimed
  * it, i.e. the send closed `done` and none of its proofs is still unspent.

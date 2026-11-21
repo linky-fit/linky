@@ -15,6 +15,8 @@ export interface CashuTokenMessageInfo {
   memo: string | null;
   mintDisplay: string | null;
   mintUrl: string | null;
+  /** Whether the wallet received this token into its balance. */
+  received: boolean;
   /** Set when the wallet sent this token: whether its recipient claimed it. */
   sent: "claimed" | "unclaimed" | null;
   tokenRaw: string;
@@ -59,6 +61,8 @@ export const getCashuTokenMessageInfo = (
   allowTestMints = true,
   /** The wallet's own sends by `tokenProofsKey`, true once claimed. */
   sentTokenClaims: ReadonlyMap<string, boolean> = new Map(),
+  /** `tokenProofsKey`s of the tokens the wallet received. */
+  receivedTokenProofs: ReadonlySet<string> = new Set(),
 ): CashuTokenMessageInfo | null => {
   const token = tokenInMessage(text);
   if (!token) return null;
@@ -77,13 +81,15 @@ export const getCashuTokenMessageInfo = (
     // Best-effort: "valid" means no transfer carries these proofs yet; a token
     // whose proofs the wallet holds is caught by linkshu's receive dedup.
     isValid: !takenTokenProofs.has(proofsKey),
+    received: receivedTokenProofs.has(proofsKey),
     sent: claimed === undefined ? null : claimed ? "claimed" : "unclaimed",
   };
 };
 
 /**
- * What a token pill announces besides its amount: an own claimed send, or a
- * token taken elsewhere. An incoming copy of an own send is a token like any other.
+ * What a token pill announces besides its amount: an own claimed send, a
+ * received token, or a token taken elsewhere. An incoming copy of an own send
+ * is a token like any other.
  */
 export const cashuTokenStateKey = (
   info: CashuTokenMessageInfo,
@@ -92,5 +98,6 @@ export const cashuTokenStateKey = (
   const ownSend = outgoing ? info.sent : null;
   if (ownSend === "claimed") return "cashuTokenClaimed";
   if (ownSend !== null || info.isValid) return null;
+  if (!outgoing && info.received) return "cashuAccepted";
   return "cashuInvalid";
 };
