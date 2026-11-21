@@ -101,52 +101,39 @@ const toJsonRows = (
     return [normalized];
   });
 
-interface EvoluSelectBuilder {
-  groupBy(columns: string[]): EvoluSelectBuilder;
-  select(cb: (eb: EvoluExpressionBuilder) => unknown): EvoluSelectBuilder;
-  selectAll(): EvoluSelectBuilder;
-  orderBy(column: string, direction: string): EvoluSelectBuilder;
-  limit(n: number): EvoluSelectBuilder;
-  offset(n: number): EvoluSelectBuilder;
-  where(column: string, operator: string, value: unknown): EvoluSelectBuilder;
-}
+const SCHEMA_TABLES = Object.keys(LinkyEvoluSchema);
 
-interface EvoluExpressionBuilder {
-  fn: {
-    count(column: string): {
-      as(name: string): unknown;
-      distinct(): { as(name: string): unknown };
-    };
-    countAll(): { as(name: string): unknown };
-  };
-}
+const rawQuery = <R extends Evolu.Row>(
+  subquery: ReturnType<typeof Evolu.kyselySql<R>>,
+  alias: string,
+) => createQuery((db) => db.selectFrom(subquery.as(alias)).selectAll());
 
-interface EvoluQueryBuilder {
-  selectFrom(table: string): EvoluSelectBuilder;
-}
+const createTableCountQuery = (table: string) =>
+  rawQuery(
+    Evolu.kyselySql<{
+      count: number;
+    }>`(select count(*) as count from ${Evolu.kyselySql.table(table)})`,
+    "counts",
+  );
 
-const createUntypedQuery = (
-  cb: (db: EvoluQueryBuilder) => EvoluSelectBuilder,
-): unknown => Reflect.apply(createQuery, undefined, [cb]);
+const evoluHistoryCountQuery = rawQuery(
+  Evolu.kyselySql<{
+    count: number;
+  }>`(select count(*) as count from "evolu_history")`,
+  "history",
+);
 
-const loadUntypedQueryRows = async (
-  instance: LinkyEvolu,
-  query: unknown,
-): Promise<ReadonlyArray<EvoluQueryRow>> => {
-  const fn = Reflect.get(Object(instance), "loadQuery");
-  if (typeof fn !== "function") return [];
-  try {
-    const rows = await fn.call(instance, query);
-    if (!Array.isArray(rows)) return [];
-    const result: EvoluQueryRow[] = [];
-    for (const row of rows) {
-      if (isRecord(row)) result.push(row);
-    }
-    return result;
-  } catch {
-    return [];
-  }
-};
+const createTableSampleQuery = (table: string, limit: number) =>
+  rawQuery(
+    Evolu.kyselySql<Evolu.Row>`(select * from ${Evolu.kyselySql.table(table)} limit ${limit})`,
+    "rows",
+  );
+
+const createHistoryPageQuery = (limit: number, offset: number) =>
+  rawQuery(
+    Evolu.kyselySql<Evolu.Row>`(select * from "evolu_history" order by "timestamp" desc limit ${limit} offset ${offset})`,
+    "history",
+  );
 
 export const normalizeEvoluServerUrl = normalizeEvoluRelayUrl;
 
@@ -287,12 +274,14 @@ export const createLegacyChangeCountQuery = (
 ) => {
   const sql = Evolu.kyselySql;
   const owners = sql.join(ownerIds.map(Evolu.ownerIdToOwnerIdBytes));
-  const history = sql<{ changes: number }>`(select count(*) as changes
+  return rawQuery(
+    sql<{ changes: number }>`(select count(*) as changes
     from evolu_history
     where "ownerId" in (${owners})
       and "table" in (${sql.join(LEGACY_LANE_TABLES)})
-      and not ("table" = 'cashuProof' and "column" in ('state', 'updatedAt')))`;
-  return createQuery((db) => db.selectFrom(history.as("history")).selectAll());
+      and not ("table" = 'cashuProof' and "column" in ('state', 'updatedAt')))`,
+    "history",
+  );
 };
 
 /** Every copy, in any owner, of a proof the lanes of `ownerIds` hold unspent. */
@@ -435,28 +424,6 @@ const getEvoluDatabaseInfo = async (
   tableCounts: Record<string, number | null>;
   historyCount: number | null;
 }> => {
-  const tables = [
-    "contact",
-    "conversation",
-    "message",
-    "reaction",
-    "unknownSenderMessage",
-    "cashuToken",
-    "cashuProof",
-    "cashuOperation",
-    "nostrIdentity",
-    "nostrMessage",
-    "nostrReaction",
-    "transaction",
-    "recurringPayment",
-    "listing",
-    "keryxSubscription",
-    "onchainTransfer",
-    "ownerMeta",
-    "shardPointer",
-    "setting",
-  ] as const;
-
   const dbBytesPromise = (async () => {
     try {
       const root = await navigator.storage?.getDirectory?.();
@@ -465,9 +432,7 @@ const getEvoluDatabaseInfo = async (
       const expectedDir = `.${evolu.name}`;
 
       let totalSize = 0;
-      const allDirs: string[] = [];
       for await (const [name, handle] of root.entries()) {
-        if (handle.kind === "directory") allDirs.push(name);
         if (name === expectedDir && handle.kind === "directory") {
           for await (const [sub, subH] of handle.entries()) {
             if (sub === ".opaque" && subH.kind === "directory") {
@@ -492,13 +457,10 @@ const getEvoluDatabaseInfo = async (
 
   const tableCountsPromise = (async () => {
     const out: Record<string, number | null> = {};
-    for (const table of tables) {
+    for (const table of SCHEMA_TABLES) {
       if (!isCurrent()) break;
       try {
-        const q = createUntypedQuery((db) =>
-          db.selectFrom(table).select((eb) => eb.fn.countAll().as("count")),
-        );
-        const rows = await loadUntypedQueryRows(evolu, q);
+        const rows = await evolu.loadQuery(createTableCountQuery(table));
         out[table] = readCount(rows);
       } catch {
         out[table] = null;
@@ -510,12 +472,7 @@ const getEvoluDatabaseInfo = async (
   // Count history entries (time travel mutations)
   const historyCountPromise = (async () => {
     try {
-      const q = createUntypedQuery((db) =>
-        db
-          .selectFrom("evolu_history")
-          .select((eb) => eb.fn.countAll().as("count")),
-      );
-      const rows = await loadUntypedQueryRows(evolu, q);
+      const rows = await evolu.loadQuery(evoluHistoryCountQuery);
       return readCount(rows);
     } catch {
       return null;
@@ -579,17 +536,7 @@ export interface EvoluHistoryRow {
 export const subscribeEvoluHistoryMutationVersion = (
   evolu: LinkyEvolu,
   listener: () => void,
-): (() => void) => {
-  const q = createUntypedQuery((db) =>
-    db.selectFrom("evolu_history").select((eb) => eb.fn.countAll().as("count")),
-  );
-  const subscribeQuery = Reflect.get(Object(evolu), "subscribeQuery");
-  if (typeof subscribeQuery !== "function") return () => {};
-  const subscribe = Reflect.apply(subscribeQuery, evolu, [q]);
-  if (typeof subscribe !== "function") return () => {};
-  const unsubscribe = Reflect.apply(subscribe, undefined, [listener]);
-  return typeof unsubscribe === "function" ? unsubscribe : () => {};
-};
+): (() => void) => evolu.subscribeQuery(evoluHistoryCountQuery)(listener);
 
 export const loadEvoluHistoryData = async (
   evolu: LinkyEvolu,
@@ -597,15 +544,7 @@ export const loadEvoluHistoryData = async (
   offset = 0,
 ): Promise<EvoluHistoryRow[]> => {
   try {
-    const q = createUntypedQuery((db) =>
-      db
-        .selectFrom("evolu_history")
-        .selectAll()
-        .orderBy("timestamp", "desc")
-        .limit(limit)
-        .offset(offset),
-    );
-    const rows = await loadUntypedQueryRows(evolu, q);
+    const rows = await evolu.loadQuery(createHistoryPageQuery(limit, offset));
     const rawRows = toJsonRows(rows);
     const formattedRows: EvoluHistoryRow[] = rawRows.map((row) => ({
       ...row,
@@ -626,36 +565,11 @@ export const loadEvoluHistoryData = async (
 export const loadEvoluCurrentData = async (
   evolu: LinkyEvolu,
 ): Promise<Record<string, Record<string, JsonValue>[]>> => {
-  const tables = [
-    "contact",
-    "conversation",
-    "message",
-    "reaction",
-    "unknownSenderMessage",
-    "cashuToken",
-    "cashuProof",
-    "cashuOperation",
-    "nostrIdentity",
-    "nostrMessage",
-    "nostrReaction",
-    "transaction",
-    "recurringPayment",
-    "listing",
-    "keryxSubscription",
-    "onchainTransfer",
-    "ownerMeta",
-    "shardPointer",
-    "setting",
-  ] as const;
-
   const result: Record<string, Record<string, JsonValue>[]> = {};
 
-  for (const table of tables) {
+  for (const table of SCHEMA_TABLES) {
     try {
-      const q = createUntypedQuery((db) =>
-        db.selectFrom(table).selectAll().limit(100),
-      );
-      const rows = await loadUntypedQueryRows(evolu, q);
+      const rows = await evolu.loadQuery(createTableSampleQuery(table, 100));
       result[table] = toJsonRows(rows);
     } catch {
       result[table] = [];
