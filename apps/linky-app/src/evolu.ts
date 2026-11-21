@@ -199,18 +199,32 @@ export const useOpenedEvolu = (): OpenedEvolu => {
 export const useLinkyEvolu = (): LinkyEvolu => useOpenedEvolu().evolu;
 
 export const forgetChatShards = async (store: LinkyStore) => {
-  const forgotten = (
-    await Effect.runPromise(
-      Effect.forEach(messageScopes, (scope) =>
-        Effect.map(store.forget(scope), (shards) =>
-          shards.map((shard) => ({
-            ...shard,
-            owner: store.shardOwner(scope, shard.index).id,
-          })),
+  let forgotten;
+  try {
+    forgotten = (
+      await Effect.runPromise(
+        Effect.forEach(messageScopes, (scope) =>
+          Effect.map(store.forget(scope), (shards) =>
+            shards.map((shard) => ({
+              ...shard,
+              owner: store.shardOwner(scope, shard.index).id,
+            })),
+          ),
         ),
-      ),
-    )
-  ).flat();
+      )
+    ).flat();
+  } catch (error: unknown) {
+    if (getInspectorEmissionEnabled()) {
+      reportAppLog({
+        tag: "evolu.shardsForgetFailed",
+        summary: "Could not forget old chat shards locally",
+        payload: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+    }
+    throw error;
+  }
   if (getInspectorEmissionEnabled()) {
     reportInspectorRows([
       {

@@ -89,6 +89,18 @@ export const reportLinkyEvoluEvent = (event: LinkyEvoluEvent): void => {
         },
       ]);
       return;
+    case "OwnerDeleted":
+      reportInspectorRows([
+        {
+          at: Date.now(),
+          channel: "evolu.sync",
+          tag: "OwnerDeleted",
+          summary: "Local data for a forgotten shard owner was deleted",
+          links: { owner: event.ownerId },
+          payload: { ownerId: event.ownerId },
+        },
+      ]);
+      return;
     case "WriteFailed":
       reportInspectorRows([
         {

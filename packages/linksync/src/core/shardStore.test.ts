@@ -7,7 +7,7 @@ import {
   toyStore,
   type ToySchema,
 } from "../testing/toy";
-import type { Mutation } from "./ShardDb";
+import { ShardDbError, type Mutation } from "./ShardDb";
 import {
   createShardStore,
   shardPointerId,
@@ -380,7 +380,7 @@ describe("shard store", () => {
     };
     const reopen = () =>
       createShardStore<ToySchema, typeof toyScopes>({
-        db: { ...db, deleteOwner: null },
+        db,
         appOwner,
         scopes: toyScopes,
         retention,
@@ -392,12 +392,14 @@ describe("shard store", () => {
       changed += 1;
     });
     expect(run(existing.forget("chats"))).toEqual([
-      { scope: "chats", index: 0, deleted: false },
-      { scope: "chats", index: 1, deleted: false },
+      { scope: "chats", index: 0 },
+      { scope: "chats", index: 1 },
     ]);
-    expect(changed).toBe(1);
-    expect(run(db.readTable("chat"))).toHaveLength(1);
+    expect(changed).toBeGreaterThanOrEqual(1);
+    expect(run(db.readTable("chat"))).toEqual([]);
     expect(run(reopen().rows("chats", "chat"))).toEqual([]);
+    // A second forget on the same active window deletes nothing again.
+    expect(run(existing.forget("chats"))).toEqual([]);
     const freshDb = {
       ...db,
       readTable: <T extends keyof ToySchema & string>(table: T) =>
@@ -411,6 +413,138 @@ describe("shard store", () => {
     expect(
       run(fresh.visibleShards("chats")).map((shard) => shard.index),
     ).toEqual([2, 3]);
+  });
+
+  it("keeps sibling tabs on the confirmed retention boundary when a multi-shard forget fails midway", () => {
+    const { db, store: seedStore, appOwner } = toyStore();
+    run(seedStore.insert("chats", "chat", { id: "s0", text: "zero" }));
+    run(seedStore.rotate("chats"));
+    run(seedStore.insert("chats", "chat", { id: "s1", text: "one" }));
+    run(seedStore.rotate("chats"));
+    run(seedStore.insert("chats", "chat", { id: "s2", text: "two" }));
+    run(seedStore.rotate("chats"));
+
+    const saved = new Map<string, number>();
+    const retention = {
+      get: (scope: string) => saved.get(scope),
+      set: (scope: string, first: number) => {
+        saved.set(scope, first);
+      },
+    };
+    const shard1Id = seedStore.shardOwner("chats", 1).id;
+    let failShard1 = true;
+    const flakyDb = {
+      ...db,
+      deleteOwner: (owner: Parameters<typeof db.deleteOwner>[0]) =>
+        failShard1 && owner.id === shard1Id
+          ? Effect.fail(
+              new ShardDbError({
+                table: "owner",
+                message: "DatabaseHeldError",
+              }),
+            )
+          : db.deleteOwner(owner),
+    };
+    const tabA = createShardStore<ToySchema, typeof toyScopes>({
+      db: flakyDb,
+      appOwner,
+      scopes: toyScopes,
+      retention,
+    });
+    const tabB = createShardStore<ToySchema, typeof toyScopes>({
+      db: flakyDb,
+      appOwner,
+      scopes: toyScopes,
+      retention,
+    });
+    run(tabA.reconcileSync());
+    run(tabB.reconcileSync());
+
+    const result = run(Effect.result(tabA.forget("chats")));
+    expect(result._tag).toBe("Failure");
+    expect(saved.get("chats")).toBe(1);
+    expect(run(tabA.visibleShards("chats")).map((s) => s.index)).toEqual([
+      1, 2, 3,
+    ]);
+    expect(run(tabB.visibleShards("chats")).map((s) => s.index)).toEqual([
+      1, 2, 3,
+    ]);
+    expect(
+      run(tabA.rows("chats", "chat"))
+        .map((r) => r.id)
+        .sort(),
+    ).toEqual(["s1", "s2"]);
+    expect(
+      run(tabB.rows("chats", "chat"))
+        .map((r) => r.id)
+        .sort(),
+    ).toEqual(["s1", "s2"]);
+
+    failShard1 = false;
+    expect(run(tabA.forget("chats"))).toEqual([{ scope: "chats", index: 1 }]);
+    expect(saved.get("chats")).toBe(2);
+    expect(run(tabB.visibleShards("chats")).map((s) => s.index)).toEqual([
+      2, 3,
+    ]);
+    expect(run(tabB.rows("chats", "chat")).map((r) => r.id)).toEqual(["s2"]);
+  });
+
+  it("does not re-subscribe a deleted shard when a sibling tab boots mid-forget", async () => {
+    const { db, store: seedStore, appOwner } = toyStore();
+    run(seedStore.insert("chats", "chat", { id: "s0", text: "zero" }));
+    run(seedStore.rotate("chats"));
+    run(seedStore.insert("chats", "chat", { id: "s1", text: "one" }));
+    run(seedStore.rotate("chats"));
+    run(seedStore.insert("chats", "chat", { id: "s2", text: "two" }));
+
+    const saved = new Map<string, number>();
+    const retention = {
+      get: (scope: string) => saved.get(scope),
+      set: (scope: string, first: number) => {
+        saved.set(scope, first);
+      },
+    };
+    const tabA = createShardStore<ToySchema, typeof toyScopes>({
+      db,
+      appOwner,
+      scopes: toyScopes,
+      retention,
+    });
+    run(tabA.reconcileSync());
+
+    let releaseRead: (() => void) | undefined;
+    const delayedDb = {
+      ...db,
+      readTable: <T extends keyof ToySchema & string>(table: T) =>
+        table === "chat"
+          ? Effect.promise(async () => {
+              await new Promise<void>((resolve) => {
+                releaseRead = resolve;
+              });
+              return run(db.readTable(table));
+            })
+          : db.readTable(table),
+    };
+    const openingTab = createShardStore<ToySchema, typeof toyScopes>({
+      db: delayedDb,
+      appOwner,
+      scopes: toyScopes,
+      retention,
+    });
+    const opening = Effect.runPromise(openingTab.reconcileSync());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    // Tab A forgets shard 0 while openingTab's initial readTable is in flight.
+    expect(run(tabA.forget("chats"))).toEqual([{ scope: "chats", index: 0 }]);
+    expect(saved.get("chats")).toBe(1);
+    releaseRead?.();
+    await opening;
+
+    expect(
+      (await Effect.runPromise(openingTab.visibleShards("chats"))).map(
+        (s) => s.index,
+      ),
+    ).toEqual([1, 2]);
+    expect(db.usedOwners()).not.toContain(seedStore.shardOwner("chats", 0).id);
   });
 
   it("retains a subscribed shard zero when another device jumps several pointers ahead", () => {
@@ -697,16 +831,59 @@ describe("shard store", () => {
   });
 
   describe("forget", () => {
-    it("deletes shards that fell out of the window when the port can", () => {
+    it("deletes shards that fell out of the window locally", () => {
       const { db, store } = toyStore();
       run(store.insert("chats", "chat", { id: "old", text: "hi" }));
       for (let i = 0; i < 2; i += 1) run(store.rotate("chats"));
       run(store.insert("chats", "chat", { id: "new", text: "yo" }));
-      expect(run(store.forget())).toEqual([
-        { scope: "chats", index: 0, deleted: true },
-      ]);
+      expect(run(store.forget())).toEqual([{ scope: "chats", index: 0 }]);
       expect(run(db.readTable("chat")).map((row) => row.id)).toEqual(["new"]);
       expect(db.usedOwners()).not.toContain(store.shardOwner("chats", 0).id);
+      // Repeating forget does not delete shard 0 a second time.
+      expect(run(store.forget())).toEqual([]);
+    });
+
+    it("syncs retention across two stores sharing storage when one forgets a shard", () => {
+      const { db, appOwner } = toyStore();
+      const saved = new Map<string, number>();
+      const retention = {
+        get: (scope: string) => saved.get(scope),
+        set: (scope: string, first: number) => {
+          saved.set(scope, first);
+        },
+      };
+      const tabA = createShardStore<ToySchema, typeof toyScopes>({
+        db,
+        appOwner,
+        scopes: toyScopes,
+        retention,
+      });
+      const tabB = createShardStore<ToySchema, typeof toyScopes>({
+        db,
+        appOwner,
+        scopes: toyScopes,
+        retention,
+      });
+      run(tabA.insert("chats", "chat", { id: "old", text: "hi" }));
+      run(tabB.reconcileSync());
+      for (let i = 0; i < 2; i += 1) run(tabA.rotate("chats"));
+      run(tabA.insert("chats", "chat", { id: "new", text: "yo" }));
+      expect(run(tabB.visibleShards("chats")).map((s) => s.index)).toEqual([
+        0, 1, 2,
+      ]);
+
+      let tabBNotified = 0;
+      tabB.subscribe("chats", () => {
+        tabBNotified += 1;
+      });
+      expect(run(tabA.forget("chats"))).toEqual([{ scope: "chats", index: 0 }]);
+      expect(tabBNotified).toBeGreaterThan(0);
+      expect(run(tabB.visibleShards("chats")).map((s) => s.index)).toEqual([
+        1, 2,
+      ]);
+      // A subsequent write in Tab B must not roll stored retention back down.
+      run(tabB.insert("chats", "chat", { id: "after", text: "later" }));
+      expect(saved.get("chats")).toBe(1);
     });
 
     it("forgets nothing for never-forget scopes", () => {
@@ -921,5 +1098,95 @@ describe("shard store", () => {
     unsubscribe();
     run(store.insert("notes", "note", note("b")));
     expect(calls).toBe(1);
+  });
+
+  it("does not re-subscribe a shard forgotten by a sibling tab mid-reconcileSync", async () => {
+    const appOwner = testAppOwner();
+    const saved = new Map<string, number>();
+    const retention = {
+      get: (scope: string) => saved.get(scope),
+      set: (scope: string, first: number) => {
+        saved.set(scope, first);
+      },
+    };
+    const { db, store: tabA } = toyStore(appOwner, { retention });
+    run(tabA.insert("chats", "chat", { id: "c0", text: "old" }));
+    run(tabA.rotate("chats"));
+    run(tabA.rotate("chats"));
+
+    let pauseOnRead = 0;
+    let releaseNotesRead: () => void = () => {
+      throw new Error("expected paused read");
+    };
+    const pausedDb: typeof db = {
+      ...db,
+      readTable: (table) => {
+        if (table === "shardPointer" && pauseOnRead > 0) {
+          pauseOnRead -= 1;
+          if (pauseOnRead === 0) {
+            return Effect.callback((resume) => {
+              releaseNotesRead = () => resume(db.readTable(table));
+            });
+          }
+        }
+        return db.readTable(table);
+      },
+    };
+    const chatsBeforeNotes = {
+      meta: toyScopes.meta,
+      chats: toyScopes.chats,
+      notes: toyScopes.notes,
+    };
+    const tabB = createShardStore<ToySchema, typeof chatsBeforeNotes>({
+      db: pausedDb,
+      appOwner,
+      scopes: chatsBeforeNotes,
+      retention,
+    });
+    run(tabB.reconcileSync());
+
+    // Pause tab B on `notes` (3rd scope) after `chats` (2nd scope) already collected shards [0, 1, 2].
+    pauseOnRead = 3;
+    const reconciling = Effect.runPromise(tabB.reconcileSync());
+    await new Promise((resolve) => setTimeout(resolve));
+
+    // Meanwhile tab A forgets shard 0 and advances shared retention.
+    expect(run(tabA.forget("chats"))).toEqual([{ scope: "chats", index: 0 }]);
+
+    releaseNotesRead();
+    await reconciling;
+
+    expect(db.usedOwners()).not.toContain(tabB.shardOwner("chats", 0).id);
+  });
+
+  it("physically deletes legacy rows below a persisted retention boundary on forget", () => {
+    const appOwner = testAppOwner();
+    const saved = new Map<string, number>([["chats", 1]]);
+    const retention = {
+      get: (scope: string) => saved.get(scope),
+      set: (scope: string, first: number) => {
+        saved.set(scope, first);
+      },
+    };
+    const { db, store } = toyStore(appOwner, { retention });
+
+    // Simulate an Evolu 7 device that previously forgot shard 0 in kv without deleting its rows.
+    const legacyShard0 = store.shardOwner("chats", 0);
+    run(
+      db.mutate([
+        {
+          kind: "upsert",
+          table: "chat",
+          owner: legacyShard0,
+          row: { id: "c0", text: "legacy" },
+        },
+      ]),
+    );
+    run(store.rotate("chats"));
+    run(store.rotate("chats"));
+
+    expect(run(store.forget("chats"))).toEqual([{ scope: "chats", index: 0 }]);
+    expect(run(db.readTable("chat"))).toEqual([]);
+    expect(run(store.forget("chats"))).toEqual([]);
   });
 });

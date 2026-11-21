@@ -1,4 +1,4 @@
-import type { Owner, OwnerId, SqliteBoolean } from "@evolu/common";
+import type { Owner, OwnerId, ShardOwner, SqliteBoolean } from "@evolu/common";
 import { Effect, Schema } from "effect";
 
 /**
@@ -187,6 +187,12 @@ export interface ShardDb<S extends DbSchema> {
   /** Fires after more owners finished their sync round. */
   readonly subscribeOwnerSync: (listener: () => void) => () => void;
   readonly ownerUsage: (ownerId: OwnerId) => Effect.Effect<OwnerUsage>;
-  /** Evolu 7 cannot delete an owner; `null` until the port can. */
-  readonly deleteOwner: ((ownerId: OwnerId) => Effect.Effect<void>) | null;
+  /** Deletes the shard owner's local rows and history and stops syncing it. */
+  readonly deleteOwner: (
+    owner: ShardOwner,
+  ) => Effect.Effect<void, ShardDbError>;
+  /** Fires when an owner is deleted locally, in this tab or another. */
+  readonly onOwnerDeleted?: (
+    listener: (ownerId: OwnerId) => void,
+  ) => () => void;
 }

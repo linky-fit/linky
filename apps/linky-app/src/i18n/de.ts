@@ -407,7 +407,7 @@ export const de = {
   chatStorageSubscribed: "Auf diesem Gerät abonniert",
   chatStorageForget: "Alte Chat-Shards vergessen",
   chatStorageForgetHint:
-    "Alte Nachrichten verschwinden aus dem Chat-Verlauf dieses Geräts; Kontakte und Guthaben bleiben vollständig. Die Daten bleiben vorerst auf dem Gerät und dem Relay gespeichert.",
+    "Alte Nachrichten werden aus dem Chat-Verlauf dieses Geräts gelöscht; Kontakte und Guthaben bleiben vollständig. Synchronisierte Kopien bleiben auf dem Evolu-Relay erhalten, nicht synchronisierte Nachrichten können jedoch nicht wiederhergestellt werden.",
   chatStorageForgotten: "Alte Chat-Shards auf diesem Gerät vergessen.",
   chatStorageFailed:
     "Alte Chat-Shards konnten nicht vergessen werden. Versuche es erneut.",

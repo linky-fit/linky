@@ -1,5 +1,6 @@
 import type {
   AppOwnerEvolu,
+  DeleteOwnerError,
   EvoluSchema,
   LoadQueryOptions,
   Owner,
@@ -7,7 +8,9 @@ import type {
   Query,
   QueryRows,
   ReadonlyStore,
+  Result,
   Row as EvoluRow,
+  ShardOwner,
   SyncState,
 } from "@evolu/common";
 import {
@@ -73,6 +76,9 @@ export interface EvoluRuntime {
   readonly update: (...args: never[]) => unknown;
   readonly getMutationSize: (...args: never[]) => unknown;
   readonly useOwner: (owner: Owner) => () => void;
+  readonly deleteOwner: (
+    owner: ShardOwner,
+  ) => Promise<Result<void, DeleteOwnerError>>;
 }
 
 type LinkyTable = keyof LinkyDbSchema & string;
@@ -143,6 +149,9 @@ export interface EvoluShardDbOptions {
   readonly syncState: ReadonlyStore<SyncState | null>;
   /** Without a relay `useOwner` subscribes nothing, because Evolu syncs nothing then. */
   readonly hasEvoluRelay: boolean;
+  readonly onOwnerDeleted?: (
+    listener: (ownerId: OwnerId) => void,
+  ) => () => void;
   readonly onWriteFailed?: (write: FailedWrite) => void;
   readonly onWriteApplied?: (write: AppliedWrite) => void;
 }
@@ -211,11 +220,15 @@ const ownerIdsOf = (mutations: ReadonlyArray<Mutation>) => [
   ...new Set(mutations.map(({ owner }) => owner.id)),
 ];
 
+const formatDeleteOwnerError = (error: DeleteOwnerError): string =>
+  error.type === "UnknownError" ? String(error.error) : error.type;
+
 export const createEvoluShardDb = (
   evolu: EvoluRuntime,
   {
     syncState,
     hasEvoluRelay,
+    onOwnerDeleted,
     onWriteFailed,
     onWriteApplied,
   }: EvoluShardDbOptions,
@@ -429,6 +442,19 @@ export const createEvoluShardDb = (
     });
   };
 
+  const deleteOwner = (owner: ShardOwner): Effect.Effect<void, ShardDbError> =>
+    Effect.tryPromise({
+      try: async () => {
+        const result = await evolu.deleteOwner(owner);
+        if (!result.ok) throw new Error(formatDeleteOwnerError(result.error));
+      },
+      catch: (error) =>
+        new ShardDbError({
+          table: "owner",
+          message: error instanceof Error ? error.message : String(error),
+        }),
+    });
+
   const readable = new Set<OwnerId>();
   const syncListeners = new Set<() => void>();
   let absorbing = Promise.resolve();
@@ -495,6 +521,7 @@ export const createEvoluShardDb = (
       };
     },
     ownerUsage,
-    deleteOwner: null,
+    deleteOwner,
+    ...(onOwnerDeleted ? { onOwnerDeleted } : {}),
   };
 };

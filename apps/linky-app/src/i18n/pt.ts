@@ -407,7 +407,7 @@ export const pt = {
   chatStorageSubscribed: "Inscritos neste aparelho",
   chatStorageForget: "Esquecer shards de chat antigos",
   chatStorageForgetHint:
-    "Mensagens antigas saem do histórico deste aparelho; contatos e dinheiro continuam completos. Por enquanto os dados continuam guardados no aparelho e no relay.",
+    "Mensagens antigas são apagadas do histórico deste aparelho; contatos e dinheiro continuam completos. Cópias sincronizadas continuam no relay Evolu, mas mensagens não sincronizadas não podem ser recuperadas.",
   chatStorageForgotten: "Shards de chat antigos esquecidos neste aparelho.",
   chatStorageFailed:
     "Não foi possível esquecer os shards de chat antigos. Tente de novo.",

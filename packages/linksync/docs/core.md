@@ -25,7 +25,7 @@ Reads and writes are `Effect`s. Errors are `ShardDbError` (the port rejected or 
 2. `followPointers(onRotated)` once, kept for the store's lifetime. It reconciles subscriptions on its first read and every pointer change, so restored pointers already present when it starts subscribe their shards too. Later pointer changes report local and remote rotations through `onRotated`.
 3. Hold every write the user did not ask for until the store is [hydrated](#hydration), and every write on a device that has never been hydrated with the account (`holdWritesUntilHydrated`).
 4. `repairPointers()` once, in the background: it waits for hydration and then for the relay ([pointer repair](#pointer-repair)).
-5. `forget(scope?)` only on an explicit user action. It narrows one scope, or every forgettable scope, to its newest window, notifies readers and unsubscribes the rest; it deletes only when the port can.
+5. `forget(scope?)` only on an explicit user action. It narrows one scope, or every forgettable scope, to its newest window, deleting each forgotten shard owner locally in ascending order and persisting retention only after each confirmed deletion. If a deletion fails, previously deleted shards stay forgotten, later shards remain visible, and `forget` fails with `ShardDbError`.
 
 `subscribe(scope, listener)` fires after a change to the scope's tables or pointer and after explicit forgetting; `subscribeWhere(scope, { table, column, values }, listener)` fires for the filtered table only when what `copiesWhere` returns for it changes; `subscribePointers(listener)` after any pointer change, local or synced, and after forgetting.
 

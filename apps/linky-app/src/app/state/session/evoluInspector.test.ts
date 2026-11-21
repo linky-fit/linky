@@ -63,6 +63,15 @@ describe("reportLinkyEvoluEvent", () => {
       },
     ],
     [
+      { _tag: "OwnerDeleted", ownerId: shard },
+      {
+        tag: "OwnerDeleted",
+        summary: "Local data for a forgotten shard owner was deleted",
+        links: { owner: shard },
+        payload: { ownerId: shard },
+      },
+    ],
+    [
       {
         _tag: "WriteFailed",
         write: {

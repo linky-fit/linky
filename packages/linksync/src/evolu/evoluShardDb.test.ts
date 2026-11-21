@@ -2,15 +2,21 @@ import {
   createIdFromString,
   createStore,
   createUnknownError,
+  deriveShardOwner,
+  err,
   Millis,
   Name,
+  ok,
   ownerIdToOwnerIdBytes,
   PositiveInt,
   sqliteQueryStringToSqliteQuery,
   testCreateDeps,
+  type DeleteOwnerError,
   type MutationOptions,
   type OwnerId,
+  type Result,
   type Row,
+  type ShardOwner,
 } from "@evolu/common";
 import {
   createInitialTimestamp,
@@ -60,6 +66,8 @@ const fakeEvolu = () => {
       else held.push(recorded);
       return { id: row.id };
     };
+  const deletedOwners: ShardOwner[] = [];
+  let deleteOwnerResult: Result<void, DeleteOwnerError> = ok();
   const runtime: EvoluRuntime = {
     name,
     loadQuery: (query, options) => {
@@ -74,12 +82,20 @@ const fakeEvolu = () => {
     update: mutation("update"),
     getMutationSize: () => 1,
     useOwner: () => () => {},
+    deleteOwner: (owner) => {
+      deletedOwners.push(owner);
+      return Promise.resolve(deleteOwnerResult);
+    },
   };
   return {
     runtime,
     mutations,
     queries,
     fresh,
+    deletedOwners,
+    failDeleteOwner: (error: DeleteOwnerError) => {
+      deleteOwnerResult = err(error);
+    },
     failFreshLoads: () => {
       failFresh = true;
     },
@@ -445,6 +461,20 @@ describe("evolu shard db", () => {
     );
     await settle();
     expect(db.isOwnerSynced(owner.id)).toBe(true);
+  });
+
+  it("deletes a shard owner through Evolu and turns refusal errors into ShardDbError", async () => {
+    const fake = fakeEvolu();
+    const db = open(fake.runtime);
+    const shard = deriveShardOwner(testAppOwner(), ["messages", 0]);
+    await Effect.runPromise(db.deleteOwner(shard));
+    expect(fake.deletedOwners).toEqual([shard]);
+
+    fake.failDeleteOwner({ type: "DatabaseHeldError", name });
+    const failed = await Effect.runPromise(
+      Effect.result(db.deleteOwner(shard)),
+    );
+    expect(failed._tag).toBe("Failure");
   });
 
   it("subscribes no owners without a relay", () => {
