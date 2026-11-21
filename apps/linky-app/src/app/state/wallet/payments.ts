@@ -527,7 +527,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
           ),
           amount: receipt.paidAmount,
           details,
-          fee: receipt.feePaid,
+          fee: receipt.feePaid + receipt.swapFee,
           mint: receipt.mint,
           note,
           unit: "sat",
@@ -673,7 +673,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
                   }
                 : {}),
             },
-            fee: receipt.feePaid,
+            fee: receipt.feePaid + receipt.swapFee,
             mint: receipt.mint,
             note,
             unit: "sat",

@@ -226,7 +226,7 @@ const meltToAddress = async (
     contactId: run.order.contactId,
     details,
     direction: "out",
-    fee: receipt.feePaid,
+    fee: receipt.feePaid + receipt.swapFee,
     method: "lightning_address",
     mint: receipt.mint,
     note: run.order.note,

@@ -90,6 +90,7 @@ const meltReceipt = (paidAmount: number) =>
     feeReserve: NonNegativeAmount.make(2),
     feePaid: NonNegativeAmount.make(1),
     changeAmount: NonNegativeAmount.make(1),
+    swapFee: NonNegativeAmount.make(1),
   });
 
 const meltCost = (amount: number, feeReserve: number, inputFee: number) =>
@@ -459,7 +460,7 @@ describe("quoteLightningInvoice", () => {
 });
 
 describe("payLightningInvoice", () => {
-  it("pays through linkshu Melt and records the receipt", async () => {
+  it("pays through linkshu Melt and records the receipt with every fee it cost", async () => {
     const { commands, linkshu, logPaymentEvent } = setup();
     const onSending = vi.fn();
 
@@ -476,7 +477,7 @@ describe("payLightningInvoice", () => {
     expect(logPaymentEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         amount: 40,
-        fee: 1,
+        fee: 2,
         method: "lightning_invoice",
         mint: MINT_URL,
         paymentType: "lightning",
