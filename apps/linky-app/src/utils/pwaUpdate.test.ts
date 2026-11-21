@@ -75,6 +75,84 @@ describe("pwaUpdate", () => {
     expect(updateSW).toHaveBeenCalledWith(true);
   });
 
+  it("waits past 5s for live wallet work in applyPwaUpdate and reloadAfterWalletWork", async () => {
+    vi.useFakeTimers();
+    const pwaUpdate = await loadPwaUpdate();
+    const updateSW = vi.fn(() => Promise.resolve());
+    pwaUpdate.recordPwaRegistered(updateSW);
+    let finishMelt = (): void => undefined;
+    pwaUpdate.deferPwaUpdateWhile(
+      new Promise<void>((resolve) => {
+        finishMelt = resolve;
+      }),
+    );
+
+    const applied = pwaUpdate.applyPwaUpdate();
+    pwaUpdate.reloadAfterWalletWork();
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(updateSW).not.toHaveBeenCalled();
+    expect(location.reload).not.toHaveBeenCalled();
+
+    finishMelt();
+    await applied;
+    expect(updateSW).toHaveBeenCalledWith(true);
+    expect(location.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("defers the 1.5s applyPwaUpdate fallback reload when wallet work starts during activation", async () => {
+    vi.useFakeTimers();
+    const pwaUpdate = await loadPwaUpdate();
+    pwaUpdate.recordPwaRegistered(() => Promise.resolve());
+
+    await pwaUpdate.applyPwaUpdate();
+
+    let finishPayment = (): void => undefined;
+    pwaUpdate.deferPwaUpdateWhile(
+      new Promise<void>((resolve) => {
+        finishPayment = resolve;
+      }),
+    );
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(location.reload).not.toHaveBeenCalled();
+
+    finishPayment();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(location.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("defers the catch-path reload if wallet work starts while updateSW rejects", async () => {
+    vi.useFakeTimers();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const pwaUpdate = await loadPwaUpdate();
+    let rejectUpdate: (error: Error) => void = () => undefined;
+    pwaUpdate.recordPwaRegistered(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectUpdate = reject;
+        }),
+    );
+
+    const applied = pwaUpdate.applyPwaUpdate();
+    await Promise.resolve();
+
+    let finishPayment = (): void => undefined;
+    pwaUpdate.deferPwaUpdateWhile(
+      new Promise<void>((resolve) => {
+        finishPayment = resolve;
+      }),
+    );
+
+    rejectUpdate(new Error("sw failed"));
+    await applied;
+    expect(warn).toHaveBeenCalled();
+    expect(location.reload).not.toHaveBeenCalled();
+
+    finishPayment();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(location.reload).toHaveBeenCalledTimes(1);
+  });
+
   const stubSwController = (clientCount: number) => {
     vi.stubGlobal("navigator", {
       serviceWorker: {
