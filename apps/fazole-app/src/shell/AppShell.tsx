@@ -1,8 +1,10 @@
 import {
   Avatar,
+  Button,
   Image,
   LoadingState,
   NavigationRail,
+  Notice,
   Row,
   Stack,
   TabBar,
@@ -24,6 +26,7 @@ import {
   type Section,
 } from "../routing";
 import { HistoryScreen } from "../screens/HistoryScreen";
+import { Page } from "../screens/Page";
 import { PaymentScreen } from "../screens/PaymentScreen";
 import { RestoreScreen } from "../screens/RestoreScreen";
 import { RestoringScreen } from "../screens/RestoringScreen";
@@ -33,8 +36,10 @@ import { SupportChatScreen } from "../screens/SupportChatScreen";
 import { TerminalScreen } from "../screens/TerminalScreen";
 import { WalletScreen } from "../screens/WalletScreen";
 import { WelcomeScreen } from "../screens/WelcomeScreen";
+import type { OpenFailureReason } from "../services/device";
 import {
   useAccountHydrated,
+  useDevice,
   useSession,
   useShopProfile,
 } from "../services/react";
@@ -69,13 +74,41 @@ const sectionOf = (route: Route): Section | null =>
 /** Routes by where the device stands with its account. */
 export function AppShell() {
   const session = useSession();
-  return session._tag === "SignedIn" ? (
-    <SignedIn />
-  ) : (
+  if (session._tag === "SignedIn") return <SignedIn />;
+  if (session._tag === "Failed") return <OpenFailed reason={session.reason} />;
+  return (
     <Routed
       state={session._tag === "Opening" ? "opening" : "signedOut"}
       shop={null}
     />
+  );
+}
+
+function OpenFailed({ reason }: { readonly reason: OpenFailureReason }) {
+  const device = useDevice();
+  const message = {
+    otherTab: {
+      title: copy.openFailed.otherTabTitle,
+      description: copy.openFailed.otherTabDescription,
+    },
+    storageUnavailable: {
+      title: copy.openFailed.storageUnavailableTitle,
+      description: copy.openFailed.storageUnavailableDescription,
+    },
+    other: {
+      title: copy.openFailed.title,
+      description: copy.openFailed.description,
+    },
+  }[reason];
+  return (
+    <Page centered testID="open-failed-screen">
+      <Notice
+        tone="warning"
+        title={message.title}
+        description={message.description}
+      />
+      <Button onPress={device.reload}>{copy.openFailed.reload}</Button>
+    </Page>
   );
 }
 

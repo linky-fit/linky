@@ -12,5 +12,6 @@ export const fakeDevice = () =>
     prepareAccount: vi.fn<Device["prepareAccount"]>(),
     createAccount: vi.fn<Device["createAccount"]>(async () => {}),
     restoreAccount: vi.fn<Device["restoreAccount"]>(async () => Result.void),
+    reload: vi.fn<Device["reload"]>(),
     resetDevice: vi.fn<Device["resetDevice"]>(),
   }) satisfies Device;
