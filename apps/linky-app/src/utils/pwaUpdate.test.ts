@@ -99,6 +99,79 @@ describe("pwaUpdate", () => {
     expect(location.reload).toHaveBeenCalledTimes(1);
   });
 
+  it("waits past 15s while the database worker stays alive, even across repeated reload calls", async () => {
+    vi.useFakeTimers();
+    const pwaUpdate = await loadPwaUpdate();
+    let finishMelt = (): void => undefined;
+    pwaUpdate.deferPwaUpdateWhile(
+      new Promise<void>((resolve) => {
+        finishMelt = resolve;
+      }),
+    );
+
+    const alive = vi.fn(() => Promise.resolve(true));
+    pwaUpdate.reloadAfterWalletWorkWhileWorkerAlive(alive);
+    pwaUpdate.reloadAfterWalletWorkWhileWorkerAlive(alive);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(location.reload).not.toHaveBeenCalled();
+
+    finishMelt();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(location.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("reloads when a silent worker probe times out, even if an unbounded reload is already waiting", async () => {
+    vi.useFakeTimers();
+    const pwaUpdate = await loadPwaUpdate();
+    pwaUpdate.deferPwaUpdateWhile(new Promise<void>(() => {}));
+
+    pwaUpdate.reloadAfterWalletWork();
+    pwaUpdate.reloadAfterWalletWorkWhileWorkerAlive(
+      (timeoutMs) =>
+        new Promise<boolean>((resolve) => {
+          setTimeout(() => resolve(false), timeoutMs);
+        }),
+    );
+    await vi.advanceTimersByTimeAsync(9_999);
+    expect(location.reload).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(location.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("still reloads if the worker probe throws synchronously or rejects", async () => {
+    vi.useFakeTimers();
+    const pwaUpdate = await loadPwaUpdate();
+    pwaUpdate.deferPwaUpdateWhile(new Promise<void>(() => {}));
+
+    pwaUpdate.reloadAfterWalletWorkWhileWorkerAlive(() => {
+      throw new Error("closed port");
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(location.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("reloads once a live worker later goes silent mid-payment", async () => {
+    vi.useFakeTimers();
+    const pwaUpdate = await loadPwaUpdate();
+    pwaUpdate.deferPwaUpdateWhile(new Promise<void>(() => {}));
+
+    let workerAlive = true;
+    pwaUpdate.reloadAfterWalletWorkWhileWorkerAlive((timeoutMs) =>
+      workerAlive
+        ? Promise.resolve(true)
+        : new Promise<boolean>((resolve) => {
+            setTimeout(() => resolve(false), timeoutMs);
+          }),
+    );
+    await vi.advanceTimersByTimeAsync(7_000);
+    expect(location.reload).not.toHaveBeenCalled();
+
+    workerAlive = false;
+    await vi.advanceTimersByTimeAsync(13_000);
+    expect(location.reload).toHaveBeenCalledTimes(1);
+  });
+
   it("defers the 1.5s applyPwaUpdate fallback reload when wallet work starts during activation", async () => {
     vi.useFakeTimers();
     const pwaUpdate = await loadPwaUpdate();

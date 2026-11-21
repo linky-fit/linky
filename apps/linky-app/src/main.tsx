@@ -880,7 +880,7 @@ const bootstrap = async () => {
     if (signedIn) {
       setStage("import-evolu");
       const [
-        { createEvoluRun },
+        { createEvoluRun, registerEvoluWorkerProbe },
         { generateDbNameFromMnemonic },
         { probeLocalDatabase },
       ] = await Promise.all([
@@ -916,6 +916,7 @@ const bootstrap = async () => {
         showMovingDataNotice();
       }
       const { evolu } = await openSessionEvolu(registry, run, { memoryOnly });
+      registerEvoluWorkerProbe(run, evolu);
       await probeLocalDatabase(evolu, run);
       if (moving) {
         removeMovingDataNotice();

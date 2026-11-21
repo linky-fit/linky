@@ -1,15 +1,19 @@
 import { isDevBuild } from "../platform/buildEnv";
+import { sleep } from "./time";
 
 type Listener = (needRefresh: boolean) => void;
 
 const STARTUP_AUTO_UPDATE_WINDOW_MS = 5_000;
 const CLIENT_COUNT_TIMEOUT_MS = 1_000;
+const WORKER_PROBE_INTERVAL_MS = 5_000;
+const WORKER_PROBE_TIMEOUT_MS = 10_000;
 
 const listeners = new Set<Listener>();
 const walletWork = new Set<Promise<void>>();
 let needRefresh = false;
 let applyingUpdate = false;
 let reloadingAfterWalletWork = false;
+let reloadingWhileWorkerAlive = false;
 let reloadRequested = false;
 let updateSW: ((reloadPage?: boolean) => Promise<void>) | null = null;
 
@@ -90,6 +94,46 @@ export const reloadAfterWalletWork = (): void => {
   if (reloadingAfterWalletWork) return;
   reloadingAfterWalletWork = true;
   void waitForWalletWork().then(reloadPage);
+};
+
+/**
+ * Reloads once all in-flight wallet operations finish, polling `isWorkerAlive`
+ * while wallet work stays pending. A live database worker (e.g. a waiting newer
+ * build, even repeated) keeps the wait open until every payment settles; a dead,
+ * throwing, or bfcache-disposed worker breaks out and reloads once the probe fails.
+ */
+export const reloadAfterWalletWorkWhileWorkerAlive = (
+  isWorkerAlive: (timeoutMs: number) => Promise<boolean>,
+): void => {
+  if (reloadingWhileWorkerAlive) return;
+  reloadingWhileWorkerAlive = true;
+  const checkAlive = async (): Promise<boolean> => {
+    try {
+      return await isWorkerAlive(WORKER_PROBE_TIMEOUT_MS);
+    } catch {
+      return false;
+    }
+  };
+  void (async () => {
+    try {
+      while (walletWork.size > 0) {
+        const outcome = await Promise.race([
+          waitForWalletWork().then(() => "drained" as const),
+          checkAlive().then((alive) =>
+            alive ? ("alive" as const) : ("dead" as const),
+          ),
+        ]);
+        if (outcome !== "alive") break;
+        const drained = await Promise.race([
+          waitForWalletWork().then(() => true),
+          sleep(WORKER_PROBE_INTERVAL_MS).then(() => false),
+        ]);
+        if (drained) break;
+      }
+    } finally {
+      reloadPage();
+    }
+  })();
 };
 
 const readClientCount = (data: unknown): number | null => {
