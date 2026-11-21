@@ -12,7 +12,10 @@ import type { ContactRowLike, LocalNostrMessage } from "../app/types/appTypes";
 import { parseProfileGeneralStatus } from "../nostrStatus";
 import { isDeletedMessage } from "../app/lib/deletedMessage";
 import { getContactName } from "../utils/contactName";
-import { formatContactMessageTimestamp } from "../utils/formatting";
+import {
+  formatContactMessageTimestamp,
+  formatShortNpub,
+} from "../utils/formatting";
 import { CashuTokenPill } from "./CashuTokenPill";
 import type { NpubMessageContactInfo } from "./ChatMessage";
 import {
@@ -57,6 +60,10 @@ export const ContactCard: React.FC<ContactCardProps> = React.memo(
   }) => {
     const { t } = useTranslation();
     const { formatDisplayedAmountText } = useDisplayAmounts();
+    const displayName =
+      nameLabel ||
+      formatShortNpub(contact.npub ?? "") ||
+      (contact.lnAddress ?? "").trim();
     // The offered currencies belong on the contact's page, not in the list.
     const contactStatus = parseProfileGeneralStatus(statusText).text;
     const lastText = (lastMessage?.content ?? "").trim();
@@ -116,8 +123,8 @@ export const ContactCard: React.FC<ContactCardProps> = React.memo(
         data-unread={hasAttention || undefined}
       >
         <ContactRow
-          name={nameLabel}
-          avatarName={getContactName(contact) || nameLabel}
+          name={displayName}
+          avatarName={getContactName(contact) || displayName}
           avatarUri={avatarUrl ?? undefined}
           status={contactStatus || undefined}
           preview={previewContent}

@@ -22,7 +22,7 @@ afterEach(() => {
 });
 
 const renderCard = (
-  contact: { id: string; name: string; npub: string },
+  contact: { id: string; name: string; npub?: string; lnAddress?: string },
   nameLabel: string,
   statusText: string | null = null,
 ) =>
@@ -72,6 +72,26 @@ describe("contact identity labels", () => {
     const withoutStatus = await renderCard(contact, "Alice");
     expect(withoutStatus.container.textContent).toBe("AAlice");
     await withoutStatus.unmount();
+  });
+
+  it("labels a contact without any name by its short npub", async () => {
+    const npub =
+      "npub1fgrgs75jc9pve3l8wzgty3swpzv970h0vswau80ghcx2az2zz95s2vyk0h";
+    const { container, unmount } = await renderCard(
+      { id: "c", name: "", npub },
+      "",
+    );
+    expect(container.textContent).toContain("npub1fgrgs…2vyk0h");
+    await unmount();
+  });
+
+  it("labels a contact with only a Lightning address by that address", async () => {
+    const { container, unmount } = await renderCard(
+      { id: "c", name: "", lnAddress: "alice@example.com" },
+      "",
+    );
+    expect(container.textContent).toContain("alice@example.com");
+    await unmount();
   });
 });
 
