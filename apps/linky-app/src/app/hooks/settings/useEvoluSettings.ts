@@ -28,17 +28,23 @@ export const useClearEvoluDatabase = () => {
   const armed = useAtomValue(evoluClearArm.valueAtom) !== null;
   const arm = useAtomValue(evoluClearArm.commandsAtom);
   const commands = useAtomValue(evoluStorageCommandsAtom);
+  const { configuredUrls, isOffline } = useEvoluServers();
+  const hasNoBackup = configuredUrls.every(isOffline);
   const pushToast = usePushToast();
   const { t } = useTranslation();
   const requestClearDatabase = React.useCallback(() => {
     if (!armed) {
       arm.arm(true);
-      pushToast(t("deleteArmedHint"));
+      pushToast(
+        hasNoBackup
+          ? `${t("evoluNoBackupWarning")} ${t("deleteArmedHint")}`
+          : t("deleteArmedHint"),
+      );
       return;
     }
     arm.disarm();
     void commands?.read().wipeEvoluStorage();
-  }, [arm, armed, commands, pushToast, t]);
+  }, [arm, armed, commands, hasNoBackup, pushToast, t]);
   return {
     clearDatabaseArmed: armed,
     evoluWipeStorageIsBusy: useAtomValue(evoluWipeBusyAtom),
