@@ -12,6 +12,7 @@ import type {
 } from "@evolu/common";
 import {
   createQueryBuilder,
+  kyselySql,
   maxMutationSize,
   OwnerId as OwnerIdType,
   ownerIdToOwnerIdBytes,
@@ -37,11 +38,11 @@ import { LinkyEvoluSchema } from "./linkyEvoluSchema";
  * The `ShardDb` port over a live Evolu 8 instance: the one place the package
  * touches Evolu's runtime.
  *
- * The port is table-dynamic while Evolu's query builder and mutation types
- * are per-table generics, so queries are built and mutations called through
- * untyped references, their results guarded at runtime. Table names are
- * checked against the schema, and every column value against its Evolu type,
- * which Evolu 8 leaves to the app.
+ * The port is table-dynamic while Evolu's mutation types are per-table
+ * generics, so mutations are called through untyped references and queries
+ * compile with `kyselySql` over validated table and column names. Every column
+ * value is checked against its Evolu type before queueing, which Evolu 8 leaves
+ * to the app.
  *
  * A write resolves once Evolu reports it stored (`onSuccess`), when its
  * subscribed queries already reflect it, and fails with its whole batch: Evolu
@@ -80,23 +81,17 @@ type UntypedQuery = Query<typeof LinkyEvoluSchema, EvoluRow>;
 const isTable = (table: string): table is LinkyTable => table in LinkySchema;
 const schema: EvoluSchema = LinkyEvoluSchema;
 
+const isColumnOf = (table: LinkyTable, column: string): boolean =>
+  column in LinkySchema[table];
+
 const createQuery = createQueryBuilder(LinkyEvoluSchema);
 
-// Evolu's queries are strings; this only brands what `createQuery` returned.
-const isQuery = (value: unknown): value is UntypedQuery =>
-  typeof value === "string";
-
-const untypedQuery = (
-  build: (db: UntypedSelect) => object,
-  options?: { readonly prepare: boolean },
-): UntypedQuery => {
-  const query: unknown = Reflect.apply(createQuery, undefined, [
-    build,
-    options,
-  ]);
-  if (!isQuery(query)) throw new Error("createQuery did not return a query");
-  return query;
-};
+const rawQuery = <R extends EvoluRow>(
+  subquery: ReturnType<typeof kyselySql<R>>,
+  alias: string,
+  options?: { readonly prepare?: boolean },
+) =>
+  createQuery((db) => db.selectFrom(subquery.as(alias)).selectAll(), options);
 
 type StoredRow = Columns &
   Omit<SystemColumns, "createdAt" | "updatedAt"> & {
@@ -119,31 +114,6 @@ const withChangeTimes = (row: StoredRow): ReadonlyArray<Row<Columns>> => {
     ? []
     : [{ ...row, createdAt, updatedAt }];
 };
-
-interface UntypedWhere {
-  where: (
-    column: string,
-    op: "=" | "in" | "is not",
-    value: string | number | null | ReadonlyArray<string> | UntypedWhere,
-  ) => UntypedWhere;
-  orderBy: (
-    by: string | ((eb: UntypedOrderExpressions) => object),
-  ) => UntypedWhere;
-  limit: (count: number) => UntypedWhere;
-}
-
-interface UntypedOrderExpressions {
-  fn: (name: string, args: ReadonlyArray<object>) => object;
-  ref: (column: string) => object;
-  lit: (value: number) => object;
-}
-
-interface UntypedSelect {
-  selectFrom: (table: string) => {
-    selectAll: () => UntypedWhere;
-    select: (column: string) => UntypedWhere;
-  };
-}
 
 // Keeps one `in` list's bound parameters far below SQLite's limit.
 const ID_CHUNK = 500;
@@ -242,7 +212,7 @@ export const createEvoluShardDb = (
   const tableQuery = (table: LinkyTable): UntypedQuery => {
     const cached = tableQueries.get(table);
     if (cached !== undefined) return cached;
-    const query = untypedQuery((db) => db.selectFrom(table).selectAll());
+    const query = createQuery((db) => db.selectFrom(table).selectAll());
     tableQueries.set(table, query);
     return query;
   };
@@ -262,11 +232,6 @@ export const createEvoluShardDb = (
       rowsByResult.set(result, rows);
       return rows;
     });
-
-  const loadWhere = (
-    build: (db: UntypedSelect) => UntypedWhere,
-  ): Effect.Effect<ReadonlyArray<Row<Columns>>> =>
-    loadRows(untypedQuery(build, { prepare: true }));
 
   // The overloads let the untyped Evolu result satisfy the typed port; the
   // table name was validated against the schema and every row was guarded.
@@ -290,8 +255,12 @@ export const createEvoluShardDb = (
     if (!isTable(table) || ids.length === 0) return Effect.succeed([]);
     return Effect.map(
       Effect.forEach(chunked([...new Set(ids)]), (chunk) =>
-        loadWhere((db) =>
-          db.selectFrom(table).selectAll().where("id", "in", chunk),
+        loadRows(
+          rawQuery(
+            kyselySql<EvoluRow>`(select * from ${kyselySql.table(table)} where "id" in (${kyselySql.join(chunk)}))`,
+            "copies",
+            { prepare: true },
+          ),
         ),
       ),
       (chunks) => chunks.flat(),
@@ -303,21 +272,15 @@ export const createEvoluShardDb = (
     column: string,
     values: ReadonlyArray<string>,
     { matchTombstones = false }: CopiesWhereOptions = {},
-  ): UntypedQuery =>
-    untypedQuery((db) => {
-      const matching = db
-        .selectFrom(table)
-        .select("id")
-        .where(column, "in", values);
-      return db
-        .selectFrom(table)
-        .selectAll()
-        .where(
-          "id",
-          "in",
-          matchTombstones ? matching : matching.where("isDeleted", "is not", 1),
-        );
-    });
+  ): UntypedQuery => {
+    const filter = matchTombstones
+      ? kyselySql``
+      : kyselySql` and "isDeleted" is not 1`;
+    return rawQuery(
+      kyselySql<EvoluRow>`(select * from ${kyselySql.table(table)} where "id" in (select "id" from ${kyselySql.table(table)} where ${kyselySql.ref(column)} in (${kyselySql.join(values)})${filter}))`,
+      "copies",
+    );
+  };
 
   function readCopiesWhere<T extends LinkyTable>(
     table: T,
@@ -331,7 +294,8 @@ export const createEvoluShardDb = (
     values: ReadonlyArray<string>,
     options?: CopiesWhereOptions,
   ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
-    if (!isTable(table)) return Effect.succeed([]);
+    if (!isTable(table) || !isColumnOf(table, column) || values.length === 0)
+      return Effect.succeed([]);
     return loadRows(copiesWhereQuery(table, column, values, options));
   }
 
@@ -349,21 +313,22 @@ export const createEvoluShardDb = (
     ownerIds: ReadonlyArray<OwnerId>,
     thenBy: string,
   ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
-    if (!isTable(table) || ownerIds.length === 0) return Effect.succeed([]);
+    if (
+      !isTable(table) ||
+      !isColumnOf(table, column) ||
+      !isColumnOf(table, thenBy) ||
+      ownerIds.length === 0 ||
+      values.length === 0
+    )
+      return Effect.succeed([]);
     return Effect.map(
       Effect.forEach(values, (value) =>
-        loadWhere((db) =>
-          db
-            .selectFrom(table)
-            .selectAll()
-            .where(column, "=", value)
-            .where("ownerId", "in", ownerIds)
-            .where("createdAt", "is not", null)
-            .orderBy((eb) =>
-              eb.fn("substr", [eb.ref("createdAt"), eb.lit(1), eb.lit(19)]),
-            )
-            .orderBy(thenBy)
-            .limit(1),
+        loadRows(
+          rawQuery(
+            kyselySql<EvoluRow>`(select * from ${kyselySql.table(table)} where ${kyselySql.ref(column)} = ${value} and "ownerId" in (${kyselySql.join(ownerIds)}) and "createdAt" is not null order by substr("createdAt", 1, 19), ${kyselySql.ref(thenBy)} limit 1)`,
+            "oldest",
+            { prepare: true },
+          ),
         ),
       ),
       (perValue) => oldestPerValue(perValue.flat(), column, values, thenBy),
@@ -491,11 +456,13 @@ export const createEvoluShardDb = (
     readOldest,
     mutate,
     subscribe: (table, listener) => subscribeQuery(tableQuery(table), listener),
-    subscribeWhere: (table, column, values, listener, options) =>
-      subscribeQuery(
+    subscribeWhere: (table, column, values, listener, options) => {
+      if (!isColumnOf(table, column) || values.length === 0) return () => {};
+      return subscribeQuery(
         copiesWhereQuery(table, column, values, options),
         listener,
-      ),
+      );
+    },
     // Without relays Evolu syncs nothing and `useOwner` would throw.
     useOwner: (owner: Owner) =>
       hasEvoluRelay ? evolu.useOwner(owner) : () => {},
