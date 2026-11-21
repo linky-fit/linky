@@ -25,6 +25,7 @@ const languageLabels = {
   czechLabel: "Čeština",
   englishLabel: "English",
   germanLabel: "Deutsch",
+  slovakLabel: "Slovenčina",
 };
 
 const copy = {
@@ -63,6 +64,18 @@ const copy = {
     appearanceAuto: "Automatisch",
     appearanceLight: "Hell",
     appearanceDark: "Dunkel",
+  },
+  sk: {
+    ...languageLabels,
+    switchLabel: "Jazyk",
+    blogLabel: "Blog",
+    followUsLabel: "Sledujte nás",
+    privacyLabel: "Ochrana súkromia",
+    downloadLabel: "Stiahnuť aplikáciu",
+    appearanceLabel: "Vzhľad",
+    appearanceAuto: "Automaticky",
+    appearanceLight: "Svetlý",
+    appearanceDark: "Tmavý",
   },
 } satisfies Record<SiteLocale, Record<string, string>>;
 
@@ -120,6 +133,7 @@ export function SiteLayout({
     ["cs", activeCopy.czechLabel],
     ["de", activeCopy.germanLabel],
     ["en", activeCopy.englishLabel],
+    ["sk", activeCopy.slovakLabel],
   ];
   return (
     <Stack flexGrow={1} gap="$none" backgroundColor="$background">

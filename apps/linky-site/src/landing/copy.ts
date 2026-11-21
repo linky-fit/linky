@@ -205,4 +205,52 @@ export const copy: Record<SiteLocale, LandingCopy> = {
     closingImageAlt:
       "Vorschau der privaten Linky-Nutzung ohne persönliche Daten",
   },
+  sk: {
+    showAllLabel: "Zobraziť všetko",
+    getAppTitle: "Stiahnite si aplikáciu",
+    title: "Budujte svoju bitcoinovú sieť",
+    titleAccent: "bitcoinovú",
+    subtitle:
+      "Každou platbou vytvárate a posilňujete vzťahy s ľuďmi okolo seba. S Linky posielate bitcoin rovnako jednoducho ako bežnú správu - svojim blízkym aj komukoľvek ďalšiemu.",
+    ctaLabels: { ...ctaLabels, web: "Webová aplikácia" },
+    featuresTitle: "Funkcie",
+    features: [
+      {
+        title: "Posielajte bitcoin rovnako ako správu",
+        description:
+          "Vyberiete kontakt, zadáte sumu a pošlete platbu rovnako ako akúkoľvek správu.",
+        screen: "chat-payment",
+      },
+      {
+        title: "Vyžiadajte si platbu",
+        description:
+          "Pošlite žiadosť o zaplatenie priamo v chate a druhá strana ju môže potvrdiť jedným ťuknutím.",
+        screen: "chat-request",
+      },
+      {
+        title: "Prevod zaplatí kamarát. Vy mu pošlete bitcoin.",
+        description:
+          "Naskenujte QR kód bankového prevodu. Ponuku dostane niekoľko vašich priateľov, kto ju prijme prvý, prevod zaplatí zo svojej banky a vy mu pošlete sats.",
+        screen: "proxy-offer",
+      },
+      {
+        title: "Pravidelné platby",
+        description:
+          "Posielajte kontaktu pevnú sumu denne, týždenne alebo mesačne. Linky odošle každú platbu včas, kým ju nepozastavíte.",
+        screen: "recurring-list",
+      },
+    ],
+    tokenSection: {
+      title: "Bitcoin aj pre ľudí bez Linky",
+      description:
+        "Platbu môžete pripraviť aj pre niekoho, kto ešte nemá žiadnu peňaženku. Linky mu ju pomôže jednoducho prevziať.",
+      messenger: "Vložte ho do akejkoľvek aplikácie na správy",
+      qrCode: "Ukážte QR kód",
+      nfcCard: "Alebo odovzdajte NFC kartu",
+    },
+    closingSectionDescription:
+      "Nepotrebujete telefónne číslo, e-mail ani žiadne doklady.",
+    closingImageAlt:
+      "Ukážka súkromného používania aplikácie Linky bez osobných údajov",
+  },
 };

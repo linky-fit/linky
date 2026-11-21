@@ -48,6 +48,13 @@ const copy: Record<SiteLocale, FollowUsCopy> = {
     copyLabel: "Kopieren",
     copiedLabel: "Kopiert",
   },
+  sk: {
+    eyebrow: "Zostaňme v kontakte",
+    title: "Sledujte Linky",
+    starLabel: "Dajte nám hviezdičku",
+    copyLabel: "Kopírovať",
+    copiedLabel: "Skopírované",
+  },
 };
 
 interface SocialLinkProps {
