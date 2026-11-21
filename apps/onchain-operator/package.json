@@ -8,6 +8,8 @@
     "dev": "vite",
     "dev:prod": "vite --mode prod-services",
     "build": "tsc -b && vite build",
+    "daemon:build": "bun build ./src/daemon/index.ts --outdir ./dist/daemon --target bun",
+    "daemon:start": "bun run src/daemon/index.ts",
     "eslint": "eslint --fix .",
     "prettier": "prettier --write .",
     "typecheck": "tsc -b",

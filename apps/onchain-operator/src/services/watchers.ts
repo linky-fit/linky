@@ -1,5 +1,10 @@
 import { createId } from "@linky-fit/domain";
-import { ClientId, encodeNpub, MessageText } from "@linky-fit/linkstr";
+import {
+  ClientId,
+  encodeNpub,
+  MessageText,
+  type Pubkey,
+} from "@linky-fit/linkstr";
 import type { OperatorProfile } from "../domain/profile";
 import { watcherAlertText, type WatcherAlert } from "../domain/watchers";
 import type { Nostr } from "./nostr";
@@ -13,13 +18,21 @@ export const createWatcherAlerts =
   ({
     nostr,
     loadProfile,
+    extraWatchers = [],
   }: {
     readonly nostr: Pick<Nostr, "sendText">;
     readonly loadProfile: () => Promise<OperatorProfile | null>;
+    /** Additional watcher pubkeys merged with the synced profile's watchers (e.g. from daemon env). */
+    readonly extraWatchers?: readonly Pubkey[] | undefined;
   }): AlertWatchers =>
   async (alert) => {
     const user = alert._tag === "message" ? alert.from : alert.transfer.user;
-    const watchers = (await loadProfile())?.watchers ?? [];
+    const watchers = [
+      ...new Set([
+        ...((await loadProfile())?.watchers ?? []),
+        ...extraWatchers,
+      ]),
+    ];
     // A watcher's own message, e.g. a reply to an alert, is no news to the others.
     if (watchers.includes(user)) return;
     const text = MessageText.make(watcherAlertText(alert, encodeNpub(user)));

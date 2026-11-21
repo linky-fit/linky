@@ -7,6 +7,7 @@ import type {
   InboxCursorStore,
   NostrTransport,
   OutboxStore,
+  Pubkey,
 } from "@linky-fit/linkstr";
 import type { LinkyStore } from "@linky-fit/linksync";
 import type { LiveSource } from "@linky-fit/linksync/react";
@@ -16,7 +17,7 @@ import {
   type EsploraFetch,
 } from "@linky-fit/onchain-transfer";
 import { Effect, type Layer } from "effect";
-import type { AppConfig } from "../config";
+import type { AppConfig } from "../appConfig";
 import {
   messageContent,
   type Chat,
@@ -133,11 +134,14 @@ export const createAppServices = ({
   store,
   config,
   ports,
+  extraWatchers,
 }: {
   readonly account: Account;
   readonly store: LinkyStore;
   readonly config: AppConfig;
   readonly ports: ServicePorts;
+  /** Additional watcher pubkeys merged with the synced profile's watchers. */
+  readonly extraWatchers?: readonly Pubkey[] | undefined;
 }): AppServices => {
   const repositories = makeRepositories(store);
   const hydrated = () => whenHydrated(store);
@@ -169,7 +173,11 @@ export const createAppServices = ({
   const loadProfile = () =>
     Effect.runPromise(readProfile(repositories.settings));
   const peerProfiles = createPeerProfiles(nostr.fetchProfiles);
-  const alertWatchers = createWatcherAlerts({ nostr, loadProfile });
+  const alertWatchers = createWatcherAlerts({
+    nostr,
+    loadProfile,
+    extraWatchers,
+  });
   const chats = createChats({
     conversations: repositories.conversations,
     nostr,

@@ -25,6 +25,40 @@ bun run onchain-operator:dev                            # http://localhost:5295
 
 `.env.development` points the app at those services and at regtest. `bun run onchain-operator:dev:prod` uses the production defaults instead: Linky's recommended relays, `https://cashu.cz`, mainnet and mempool.space.
 
+## Headless daemon (Docker)
+
+To keep replying to on-chain transfers (accepting sends, handing out deposit addresses for receives, watching Esplora confirmations) and sending watcher alerts 24/7 without leaving a browser tab open, run the headless daemon in Docker. It syncs with the same Evolu account as the web console, so Settings edits (xpub, fees, amounts, pause switch, watchers) and completed/closed transfers propagate live both ways, and it only makes outbound connections (no open ports needed — ideal for a Raspberry Pi or home server).
+
+Build from the repository root (works on `linux/amd64` and `linux/arm64`):
+
+```bash
+docker build -f apps/onchain-operator/Dockerfile -t linky-onchain-operator .
+```
+
+Store the operator's recovery seed in a restricted file (`chmod 400`, readable by UID `1000` / `bun` inside the container) and run with a persistent `/data` volume (for Evolu SQLite, Nostr inbox cursor/outbox, Cashu counters, and early ecash):
+
+```bash
+docker run -d --restart unless-stopped \
+  --name linky-onchain-operator \
+  -v linky-operator-data:/data \
+  -v /path/to/operator-seed.txt:/run/secrets/operator_seed:ro \
+  -e OPERATOR_RECOVERY_SEED_FILE=/run/secrets/operator_seed \
+  linky-onchain-operator
+```
+
+Environment variables:
+
+- `OPERATOR_RECOVERY_SEED_FILE` (recommended) or `OPERATOR_RECOVERY_SEED` — required; the operator account's SLIP-39 recovery seed.
+- `OPERATOR_WATCHERS` — optional; comma- or space-separated npubs merged with the watchers saved in the web console's Settings.
+- `OPERATOR_DATA_DIR` — persistent data directory (defaults to `/data` in Docker, `./data` locally).
+- `OPERATOR_NETWORK` — `mainnet` (default), `testnet`, `signet`, or `regtest`.
+- `OPERATOR_MINT_URL` — transfer mint URL (defaults to `https://cashu.cz`).
+- `OPERATOR_ESPLORA_URL` — Esplora API URL (defaults to `https://mempool.space/api`).
+- `OPERATOR_EXPLORER_URL` — block explorer web root (defaults to `https://mempool.space`).
+- `OPERATOR_NOSTR_RELAYS` — optional comma-separated `wss://` relay list (defaults to Linky's recommended relays).
+- `OPERATOR_EVOLU_RELAYS` — optional comma-separated `wss://` Evolu relay list (defaults to Linky's recommended Evolu relays).
+- `OPERATOR_ALLOW_INSECURE_LOCALHOST_RELAYS` — set `1` or `true` for local `ws://localhost` dev relays.
+
 ## Deploy
 
 The console is a static build in the Vercel project `linky-swap-operator`, deployed by hand; a production build uses mainnet, `https://cashu.cz`, mempool.space and Linky's recommended relays.

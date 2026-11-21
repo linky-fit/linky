@@ -13,7 +13,7 @@ const evoluImportPatterns = [
   {
     group: ["@evolu/*"],
     message:
-      "Read and write through the @linky-fit/linksync repositories; only src/storage/evolu.web.ts imports @evolu/* directly.",
+      "Read and write through the @linky-fit/linksync repositories; only src/storage/evolu.web.ts and src/daemon/evolu.ts import @evolu/* directly.",
   },
 ];
 const envMessage = "Read build-time env from src/config.ts.";
@@ -50,7 +50,7 @@ export default defineConfig([
     rules: { "no-restricted-syntax": ["error", ...restrictedSyntax] },
   },
   {
-    files: ["src/storage/evolu.web.ts"],
+    files: ["src/storage/evolu.web.ts", "src/daemon/evolu.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
