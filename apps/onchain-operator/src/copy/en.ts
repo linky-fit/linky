@@ -23,6 +23,17 @@ export const copy = {
     stats: "Stats",
     settings: "Settings",
   },
+  openFailed: {
+    otherTabTitle: "Operator console is open in another tab",
+    otherTabDescription: "Close the other operator console tabs and reload.",
+    storageUnavailableTitle: "Device storage is unavailable",
+    storageUnavailableDescription:
+      "This browser cannot save app data on this device (typical for private browsing). Open the operator console in a normal window.",
+    title: "Could not open the operator console",
+    description:
+      "Local storage could not be opened. Close the other operator console tabs and try again.",
+    reload: "Reload",
+  },
   restore: {
     title: "On-chain operator",
     description:

@@ -1,7 +1,9 @@
 import { Restore, runLinkshu } from "@linky-fit/linkshu";
 import type { LinkyStore } from "@linky-fit/linksync";
 import {
+  classifyEvoluOpenError,
   markAwaitingFirstHydration,
+  type EvoluOpenFailureReason,
   type KeyValueStorage,
 } from "@linky-fit/linksync/evolu";
 import { Effect, Result } from "effect";
@@ -19,11 +21,16 @@ import {
   type ServicePorts,
 } from "./appServices";
 
+/** Why the device could not open its database. */
+export type OpenFailureReason = EvoluOpenFailureReason;
+
 /** Where this device stands with the operator's account. */
 export type Session =
   | { readonly _tag: "SignedOut" }
   /** The account is being restored, or its database is opening. */
   | { readonly _tag: "Opening" }
+  /** The database could not open (e.g. held by another tab or unavailable storage). */
+  | { readonly _tag: "Failed"; readonly reason: OpenFailureReason }
   | { readonly _tag: "SignedIn"; readonly services: AppServices };
 
 /** This device's account lifecycle: restore and reset. */
@@ -37,6 +44,8 @@ export interface Device {
   readonly restoreAccount: (
     recoverySeed: string,
   ) => Promise<Result.Result<void, InvalidRecoverySeed>>;
+  /** Reloads the app, e.g. after closing another tab that held the database. */
+  readonly reload: () => void;
   /** Deletes everything stored on this device and reloads to the restore screen. */
   readonly resetDevice: () => void;
 }
@@ -73,7 +82,7 @@ export const createDevice = (
       services.start();
       setSession({ _tag: "SignedIn", services });
     } catch (error) {
-      setSession({ _tag: "SignedOut" });
+      setSession({ _tag: "Failed", reason: classifyEvoluOpenError(error) });
       throw error;
     }
   };
@@ -89,7 +98,11 @@ export const createDevice = (
     );
 
   const stored = loadStoredAccount(platform.kv);
-  if (stored !== null) void open(stored);
+  if (stored !== null) {
+    void open(stored).catch((error: unknown) => {
+      console.warn("[onchain-operator] could not open local database", error);
+    });
+  }
 
   return {
     session: () => session,
@@ -117,6 +130,7 @@ export const createDevice = (
       else platform.reload();
       return Result.void;
     },
+    reload: platform.reload,
     resetDevice: platform.resetDevice,
   };
 };
