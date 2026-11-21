@@ -81,14 +81,25 @@ describe("wallet operation queue", () => {
     );
   });
 
-  it("holds back an app update for queued operations only, until they settle", async () => {
+  it("holds back an app update for both exclusive and queued operations until they settle", async () => {
     const held: Promise<void>[] = [];
     const ops = makeWalletOps(
       () => {},
       (work) => held.push(work),
     );
-    await ops.runExclusiveTask(async () => "paid");
-    expect(held).toHaveLength(0);
+    const payment = gate("paid");
+    const paying = ops.runExclusiveTask(payment.task);
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(held).toHaveLength(1);
+    let paymentReleased = false;
+    void held[0]?.then(() => {
+      paymentReleased = true;
+    });
+    await Promise.resolve();
+    expect(paymentReleased).toBe(false);
+    payment.open();
+    await Promise.all([paying, held[0]]);
+    expect(paymentReleased).toBe(true);
 
     const receive = gate("receive");
     let released = false;
@@ -101,11 +112,55 @@ describe("wallet operation queue", () => {
     });
     await new Promise((resolve) => setTimeout(resolve));
 
-    expect(held).toHaveLength(2);
+    expect(held).toHaveLength(3);
     expect(released).toBe(false);
     receive.open();
     await Promise.all([first, waiting, ...held]);
     expect(released).toBe(true);
+  });
+
+  it("waits for acquireWalletWorkGuard before starting either operation path and aborts if rejected", async () => {
+    let grantGuard: () => void = () => {
+      throw new Error("expected pending guard");
+    };
+    let guardReleaseCount = 0;
+    const started: string[] = [];
+    const changes: boolean[] = [];
+    const ops = makeWalletOps(
+      (running) => changes.push(running),
+      () => {},
+      () =>
+        new Promise<() => void>((resolve) => {
+          grantGuard = () =>
+            resolve(() => {
+              guardReleaseCount += 1;
+            });
+        }),
+    );
+
+    const queued = ops.runQueuedTask(async () => {
+      started.push("queued");
+      return "ok";
+    });
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(started).toEqual([]);
+    grantGuard();
+    expect(await queued).toBe("ok");
+    expect(guardReleaseCount).toBe(1);
+
+    const rejectedOps = makeWalletOps(
+      (running) => changes.push(running),
+      () => {},
+      () => Promise.reject(new Error("wipe pending")),
+    );
+    await expect(
+      rejectedOps.runExclusiveTask(async () => {
+        started.push("exclusive-blocked");
+        return "nope";
+      }),
+    ).rejects.toThrow("wipe pending");
+    expect(started).toEqual(["queued"]);
+    expect(changes.at(-1)).toBe(false);
   });
 
   it("holds back an app update through the platform's lifecycle", async () => {

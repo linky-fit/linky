@@ -1,3 +1,4 @@
+import { OwnerId } from "@linky-fit/linksync";
 import type { KeyValueStorage } from "@linky-fit/linksync/evolu";
 import { Option, Schema } from "effect";
 import {
@@ -415,6 +416,40 @@ export const getInitialNostrIdentitySwitchedAtSec = (): number | null => {
   const stored = readStoredInt(NOSTR_IDENTITY_SWITCHED_AT_SEC_STORAGE_KEY);
   return stored !== null && stored > 0 ? stored : null;
 };
+
+/** Set before reloading tabs to delete one account's local Evolu database before mounting `<App />`. */
+export const EVOLU_WIPE_PENDING_STORAGE_KEY = "linky.evolu.wipePending.v1";
+
+const OwnerIdSchema = Schema.declare((value): value is OwnerId =>
+  OwnerId.is(value),
+);
+
+const PendingEvoluWipeSchema = Schema.Struct({
+  ownerId: OwnerIdSchema,
+  token: Schema.String,
+});
+
+export type PendingEvoluWipe = Schema.Schema.Type<
+  typeof PendingEvoluWipeSchema
+>;
+
+/** Persists a pending local wipe bound to `ownerId`; returns false if storage refused the write. */
+export const writePendingEvoluWipe = (ownerId: OwnerId): boolean => {
+  const token =
+    globalThis.crypto?.randomUUID?.() ??
+    `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return tryLocalStorageSet(
+    EVOLU_WIPE_PENDING_STORAGE_KEY,
+    JSON.stringify({ ownerId, token }),
+  );
+};
+
+export const readPendingEvoluWipe = (): PendingEvoluWipe | null =>
+  safeLocalStorageGetJson(
+    EVOLU_WIPE_PENDING_STORAGE_KEY,
+    Schema.NullOr(PendingEvoluWipeSchema),
+    null,
+  );
 
 /** `localStorage` as linksync's device-local key-value port. */
 export const localStorageKv: KeyValueStorage = {

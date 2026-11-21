@@ -26,6 +26,11 @@ export interface LifecyclePort {
   readonly reload: () => void;
   /** Holds back an app update's reload until `work` settles. */
   readonly deferUpdateWhile: (work: Promise<void>) => void;
+  /**
+   * Acquires the cross-tab shared wallet-work lock and holds back reloads until
+   * the returned release callback runs; rejects when a local database wipe is pending.
+   */
+  readonly acquireWalletWorkGuard?: () => Promise<() => void>;
   /** False only while the device reports no network connection. */
   readonly isOnline: () => boolean;
 }

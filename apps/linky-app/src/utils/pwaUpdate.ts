@@ -1,4 +1,5 @@
 import { isDevBuild } from "../platform/buildEnv";
+import { EVOLU_WIPE_PENDING_STORAGE_KEY, safeLocalStorageGet } from "./storage";
 import { sleep } from "./time";
 
 type Listener = (needRefresh: boolean) => void;
@@ -8,8 +9,21 @@ const CLIENT_COUNT_TIMEOUT_MS = 1_000;
 const WORKER_PROBE_INTERVAL_MS = 5_000;
 const WORKER_PROBE_TIMEOUT_MS = 10_000;
 
+/** Shared Web Lock held by any tab with in-flight wallet operations; boot wipes take it exclusively. */
+export const WALLET_WORK_LOCK_NAME = "linky.walletWork";
+
+export class EvoluWipePendingError extends Error {
+  override readonly name = "EvoluWipePendingError";
+
+  constructor() {
+    super("Local database wipe is pending");
+  }
+}
+
 const listeners = new Set<Listener>();
 const walletWork = new Set<Promise<void>>();
+let sharedLockCount = 0;
+let releaseSharedLock: (() => void) | null = null;
 let needRefresh = false;
 let applyingUpdate = false;
 let reloadingAfterWalletWork = false;
@@ -80,6 +94,9 @@ const waitForWalletWork = async (): Promise<void> => {
   while (walletWork.size > 0) await Promise.allSettled(walletWork);
 };
 
+const isEvoluWipePending = (): boolean =>
+  safeLocalStorageGet(EVOLU_WIPE_PENDING_STORAGE_KEY) !== null;
+
 /** Holds the update's reload back until `work` settles, so it cannot cut a wallet operation short. */
 export const deferPwaUpdateWhile = (work: Promise<void>): void => {
   walletWork.add(work);
@@ -87,6 +104,154 @@ export const deferPwaUpdateWhile = (work: Promise<void>): void => {
     walletWork.delete(work);
   };
   void work.then(release, release);
+};
+
+/**
+ * Acquires the shared `"linky.walletWork"` Web Lock and holds back reloads
+ * before a wallet operation begins. Re-entrant within a tab while the shared
+ * lock is already held so nested operations never queue behind a sibling's
+ * exclusive wipe request. Rejects with `EvoluWipePendingError` if a local
+ * database wipe is pending, and aborts/releases on persisted `pagehide` so a
+ * bfcache-frozen tab cannot pin a boot wipe.
+ */
+export const acquireWalletWorkGuard = async (): Promise<() => void> => {
+  let releaseWork = () => {};
+  const work = new Promise<void>((resolve) => {
+    releaseWork = resolve;
+  });
+
+  const makeReleasingHandle = (
+    ownerLock: (() => void) | null,
+  ): (() => void) => {
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      releaseWork();
+      if (
+        ownerLock !== null &&
+        releaseSharedLock === ownerLock &&
+        sharedLockCount > 0
+      ) {
+        sharedLockCount -= 1;
+        if (sharedLockCount === 0) {
+          releaseSharedLock();
+        }
+      }
+    };
+  };
+
+  // Already holding this tab's shared lock: admit nested calls even if a wipe
+  // started meanwhile so the in-flight operation can finish before reloading.
+  if (sharedLockCount > 0) {
+    sharedLockCount += 1;
+    deferPwaUpdateWhile(work);
+    return makeReleasingHandle(releaseSharedLock);
+  }
+
+  if (isEvoluWipePending()) throw new EvoluWipePendingError();
+
+  const hasLocks =
+    typeof navigator !== "undefined" &&
+    "locks" in navigator &&
+    Boolean(navigator.locks);
+
+  if (!hasLocks) {
+    deferPwaUpdateWhile(work);
+    return releaseWork;
+  }
+
+  return new Promise<() => void>((resolveAcquire, rejectAcquire) => {
+    const abortController = new AbortController();
+    let granted = false;
+    let bfcacheAborted = false;
+    let releaseOwnedLock: (() => void) | null = null;
+
+    const onPageHide = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      bfcacheAborted = true;
+      abortController.abort();
+      releaseWork();
+      releaseOwnedLock?.();
+    };
+    const removePageHide = () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("pagehide", onPageHide);
+      }
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("pagehide", onPageHide);
+    }
+
+    void navigator.locks
+      .request(
+        WALLET_WORK_LOCK_NAME,
+        { mode: "shared", signal: abortController.signal },
+        () => {
+          granted = true;
+          if (bfcacheAborted || abortController.signal.aborted) {
+            removePageHide();
+            releaseWork();
+            rejectAcquire(new Error("Page entered back-forward cache"));
+            return;
+          }
+          if (sharedLockCount > 0) {
+            removePageHide();
+            sharedLockCount += 1;
+            deferPwaUpdateWhile(work);
+            resolveAcquire(makeReleasingHandle(releaseSharedLock));
+            return;
+          }
+          if (isEvoluWipePending()) {
+            removePageHide();
+            releaseWork();
+            rejectAcquire(new EvoluWipePendingError());
+            return;
+          }
+          let settleLock = () => {};
+          const lockHeld = new Promise<void>((resolve) => {
+            settleLock = resolve;
+          });
+          let lockSettled = false;
+          const releaseThisLock = () => {
+            if (lockSettled) return;
+            lockSettled = true;
+            removePageHide();
+            if (releaseSharedLock === releaseThisLock) {
+              sharedLockCount = 0;
+              releaseSharedLock = null;
+            }
+            settleLock();
+          };
+          releaseOwnedLock = releaseThisLock;
+          sharedLockCount = 1;
+          releaseSharedLock = releaseThisLock;
+          deferPwaUpdateWhile(work);
+          resolveAcquire(makeReleasingHandle(releaseThisLock));
+          return lockHeld;
+        },
+      )
+      .catch(() => {
+        removePageHide();
+        if (granted) {
+          releaseWork();
+          releaseOwnedLock?.();
+          return;
+        }
+        if (bfcacheAborted || abortController.signal.aborted) {
+          releaseWork();
+          rejectAcquire(new Error("Page entered back-forward cache"));
+          return;
+        }
+        if (isEvoluWipePending()) {
+          releaseWork();
+          rejectAcquire(new EvoluWipePendingError());
+          return;
+        }
+        deferPwaUpdateWhile(work);
+        resolveAcquire(releaseWork);
+      });
+  });
 };
 
 /** Waits for all in-flight wallet operations to settle before reloading the page. */

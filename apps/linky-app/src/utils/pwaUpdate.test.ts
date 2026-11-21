@@ -172,6 +172,104 @@ describe("pwaUpdate", () => {
     expect(location.reload).toHaveBeenCalledTimes(1);
   });
 
+  it("acquires the shared wallet-work lock before resolving, releases on persisted pagehide, and rejects during a pending wipe", async () => {
+    localStorage.clear();
+    let lockHeld = false;
+    let lockPromise: Promise<void> | null = null;
+    vi.stubGlobal("navigator", {
+      locks: {
+        request: vi.fn(
+          (
+            _name: string,
+            options: { readonly mode?: string },
+            callback: () => Promise<void>,
+          ) => {
+            expect(options.mode).toBe("shared");
+            lockHeld = true;
+            lockPromise = Promise.resolve(callback()).finally(() => {
+              lockHeld = false;
+            });
+            return lockPromise;
+          },
+        ),
+      },
+    });
+    const pwaUpdate = await loadPwaUpdate();
+    const release = await pwaUpdate.acquireWalletWorkGuard();
+    expect(lockHeld).toBe(true);
+    // Nested guard in the same tab reuses the shared lock without requesting a
+    // second lock, even if a wipe starts meanwhile so in-flight work finishes.
+    localStorage.setItem(
+      "linky.evolu.wipePending.v1",
+      JSON.stringify({ ownerId: "o", token: "t" }),
+    );
+    const releaseNested = await pwaUpdate.acquireWalletWorkGuard();
+    localStorage.clear();
+    expect(navigator.locks.request).toHaveBeenCalledTimes(1);
+    release();
+    expect(lockHeld).toBe(true);
+    releaseNested();
+    await lockPromise;
+    expect(lockHeld).toBe(false);
+
+    // Persisted pagehide releases the shared lock so bfcache cannot pin a boot wipe,
+    // and releasing a stale pre-pagehide handle cannot release a newer lock.
+    const staleHandle = await pwaUpdate.acquireWalletWorkGuard();
+    expect(lockHeld).toBe(true);
+    window.dispatchEvent(
+      new PageTransitionEvent("pagehide", { persisted: true }),
+    );
+    await lockPromise;
+    expect(lockHeld).toBe(false);
+
+    const freshHandle = await pwaUpdate.acquireWalletWorkGuard();
+    expect(lockHeld).toBe(true);
+    staleHandle();
+    expect(lockHeld).toBe(true);
+    freshHandle();
+    await lockPromise;
+    expect(lockHeld).toBe(false);
+
+    // Persisted pagehide while a lock request is still queued aborts the request
+    // and rejects even if a late grant callback fires.
+    let queuedSignal: AbortSignal | undefined;
+    let runLateGrant: () => Promise<void> | void = () => {
+      throw new Error("expected queued callback");
+    };
+    vi.stubGlobal("navigator", {
+      locks: {
+        request: vi.fn(
+          (
+            _name: string,
+            options: { readonly mode?: string; readonly signal?: AbortSignal },
+            callback: () => Promise<void> | void,
+          ) => {
+            queuedSignal = options.signal;
+            runLateGrant = callback;
+            return new Promise<void>(() => {});
+          },
+        ),
+      },
+    });
+    const pendingGuard = pwaUpdate.acquireWalletWorkGuard();
+    window.dispatchEvent(
+      new PageTransitionEvent("pagehide", { persisted: true }),
+    );
+    expect(queuedSignal?.aborted).toBe(true);
+    runLateGrant();
+    await expect(pendingGuard).rejects.toThrow("back-forward cache");
+
+    // Pending wipe rejects new wallet work before entering the operation body.
+    localStorage.setItem(
+      "linky.evolu.wipePending.v1",
+      JSON.stringify({ ownerId: "o", token: "t" }),
+    );
+    await expect(pwaUpdate.acquireWalletWorkGuard()).rejects.toThrow(
+      "Local database wipe is pending",
+    );
+    localStorage.clear();
+  });
+
   it("defers the 1.5s applyPwaUpdate fallback reload when wallet work starts during activation", async () => {
     vi.useFakeTimers();
     const pwaUpdate = await loadPwaUpdate();

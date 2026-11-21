@@ -41,9 +41,14 @@ import {
 } from "./utils/bootDiagnostics";
 import { appendPushDebugLog } from "./utils/pushDebugLog";
 import {
+  EVOLU_WIPE_PENDING_STORAGE_KEY,
+  readPendingEvoluWipe,
+  safeLocalStorageGet,
+  safeLocalStorageRemove,
   safeSessionStorageGet,
   safeSessionStorageRemove,
   safeSessionStorageSet,
+  tryLocalStorageSet,
 } from "./utils/storage";
 import {
   handlePwaUpdateAvailable,
@@ -51,6 +56,7 @@ import {
   recordPwaControllerChange,
   recordPwaRegistered,
   reloadAfterWalletWork,
+  WALLET_WORK_LOCK_NAME,
 } from "./utils/pwaUpdate";
 import { getUnknownErrorMessage, isRecord } from "./utils/unknown";
 import type { EvoluError } from "./evolu";
@@ -769,6 +775,45 @@ const renderEvoluBootError = (error: EvoluError) => {
   );
 };
 
+const WIPE_WALLET_LOCK_TIMEOUT_MS = 30_000;
+const WIPE_OPEN_TIMEOUT_MS = 15_000;
+// Last-resort bound for an unresponsive tab leader during deleteDatabase():
+// covers worst-case DbWorker startup waits (3 × 10 s databaseHeldTimeout) +
+// Evolu's 30 s deleteDatabaseWithDbWorkerTimeout + 30 s delivery margin.
+const WIPE_DELETE_TIMEOUT_MS = 90_000;
+
+const raceWithEvoluError = <T,>(
+  work: Promise<T>,
+  evoluError: {
+    readonly get: () => EvoluError | null;
+    readonly subscribe: (listener: () => void) => () => void;
+  },
+  matches: (error: EvoluError) => boolean = () => true,
+): Promise<T> =>
+  new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      unsubscribe();
+      fn();
+    };
+    const checkError = () => {
+      const error = evoluError.get();
+      if (error !== null && matches(error))
+        finish(() =>
+          reject(new Error("Could not wipe local database", { cause: error })),
+        );
+    };
+    const unsubscribe = evoluError.subscribe(checkError);
+    checkError();
+    if (settled) return;
+    void work.then(
+      (value) => finish(() => resolve(value)),
+      (error: unknown) => finish(() => reject(error)),
+    );
+  });
+
 const bootstrap = async () => {
   let stage = "init";
   const setStage = (nextStage: string): void => {
@@ -813,6 +858,10 @@ const bootstrap = async () => {
       return;
     }
     onLogoutInAnotherTab(() => window.location.reload());
+    window.addEventListener("storage", (event) => {
+      if (event.key === EVOLU_WIPE_PENDING_STORAGE_KEY && event.newValue)
+        reloadAfterWalletWork();
+    });
 
     if (Capacitor.isNativePlatform()) {
       setStage("secret-backfill");
@@ -867,8 +916,14 @@ const bootstrap = async () => {
     mirrorPushNsec(session);
     console.log("[linky][boot] session loaded", { session: session._tag });
 
-    // Only a signed-in session opens the database.
+    // Only a signed-in session opens the database. Preserve a pending wipe across
+    // transient `SecretsUnavailable` boots so it still runs once secure storage recovers.
     const signedIn = session._tag === "SignedIn";
+    if (
+      session._tag === "SignedOut" &&
+      safeLocalStorageGet(EVOLU_WIPE_PENDING_STORAGE_KEY)
+    )
+      safeLocalStorageRemove(EVOLU_WIPE_PENDING_STORAGE_KEY);
     // The native beacon outlives the page, so a signed-out boot stops whatever an earlier page left running.
     if (session._tag === "SignedOut" && Capacitor.isNativePlatform())
       await import("./platform/nativeBridge.ts").then(({ stopNativeBeacon }) =>
@@ -881,13 +936,355 @@ const bootstrap = async () => {
       setStage("import-evolu");
       const [
         { createEvoluRun, registerEvoluWorkerProbe },
-        { generateDbNameFromMnemonic },
+        { appOwnerFromMnemonic },
+        {
+          generateDbNameFromMnemonic,
+          markAwaitingFirstHydration,
+          openLinkyEvolu,
+          toEvoluTransports,
+        },
         { probeLocalDatabase },
       ] = await Promise.all([
         import("./platform/evolu.web.ts"),
+        import("@linky-fit/linksync"),
         import("@linky-fit/linksync/evolu"),
         import("./evolu.ts"),
       ]);
+      const memoryOnly = shouldUseInMemoryEvoluStorage();
+      if (!memoryOnly && safeLocalStorageGet(EVOLU_WIPE_PENDING_STORAGE_KEY)) {
+        const pending = readPendingEvoluWipe();
+        const currentMnemonicOwner =
+          session.secrets.appMnemonic !== null
+            ? appOwnerFromMnemonic(session.secrets.appMnemonic)
+            : null;
+        if (
+          pending === null ||
+          (currentMnemonicOwner !== null &&
+            currentMnemonicOwner.id !== pending.ownerId)
+        ) {
+          safeLocalStorageRemove(EVOLU_WIPE_PENDING_STORAGE_KEY);
+        } else {
+          setStage("evolu-wipe");
+          pauseWatchdogs();
+          // Abort queued wipe locks and dispose any active wipe run (which owns
+          // the opened Evolu/EvoluApp instance and deps via `run.defer`) on
+          // persisted `pagehide` so a bfcache-frozen tab never strands
+          // `linky.evoluWipe` or `linky.walletWork`; `EVOLU_WIPE_PENDING_STORAGE_KEY`
+          // stays set so a sibling tab or the next boot retries cleanly.
+          const pageHideAbort = new AbortController();
+          let activeWipeRun: AsyncDisposable | null = null;
+          const raceWithPageHide = <T,>(work: Promise<T>): Promise<T> => {
+            if (pageHideAbort.signal.aborted) {
+              return Promise.reject(
+                new Error("Page entered back-forward cache"),
+              );
+            }
+            return new Promise<T>((resolve, reject) => {
+              const onAbort = () =>
+                reject(new Error("Page entered back-forward cache"));
+              pageHideAbort.signal.addEventListener("abort", onAbort, {
+                once: true,
+              });
+              void work.then(
+                (value) => {
+                  pageHideAbort.signal.removeEventListener("abort", onAbort);
+                  resolve(value);
+                },
+                (error: unknown) => {
+                  pageHideAbort.signal.removeEventListener("abort", onAbort);
+                  reject(error);
+                },
+              );
+            });
+          };
+          const onWipePageHide = (event: PageTransitionEvent) => {
+            if (!event.persisted) return;
+            pageHideAbort.abort();
+            void Promise.resolve(activeWipeRun?.[Symbol.asyncDispose]()).catch(
+              () => {},
+            );
+            window.addEventListener(
+              "pageshow",
+              (showEvent) => {
+                if (showEvent.persisted) window.location.reload();
+              },
+              { once: true },
+            );
+          };
+          window.addEventListener("pagehide", onWipePageHide);
+          let wiped = false;
+          try {
+            wiped = await navigator.locks.request(
+              "linky.evoluWipe",
+              { signal: pageHideAbort.signal },
+              async () => {
+                if (pageHideAbort.signal.aborted) return false;
+                // Wait for any sibling tab's in-flight wallet operations to finish
+                // (shared lock) and reload before deleting the local database.
+                let lockGranted = false;
+                try {
+                  return await navigator.locks.request(
+                    WALLET_WORK_LOCK_NAME,
+                    {
+                      mode: "exclusive",
+                      signal: AbortSignal.any([
+                        AbortSignal.timeout(WIPE_WALLET_LOCK_TIMEOUT_MS),
+                        pageHideAbort.signal,
+                      ]),
+                    },
+                    async () => {
+                      lockGranted = true;
+                      if (pageHideAbort.signal.aborted) return false;
+                      const currentPending = readPendingEvoluWipe();
+                      if (
+                        currentPending === null ||
+                        currentPending.token !== pending.token
+                      )
+                        return false;
+                      if (
+                        session.degraded &&
+                        session.unreadable.has("appMnemonic")
+                      ) {
+                        const { AppMnemonicUnreadable } =
+                          await import("./app/state/session/evolu.ts");
+                        throw new AppMnemonicUnreadable();
+                      }
+                      const hasEvoluRelay =
+                        toEvoluTransports(
+                          registry.get(evoluRelaySettingsAtom).activeUrls(),
+                        ).length > 0;
+                      let pendingWipeFailure: Error | null = null;
+                      let rejectWipeSignal: ((error: Error) => void) | null =
+                        null;
+                      const wipeSignal = new Promise<never>(
+                        (_resolve, reject) => {
+                          rejectWipeSignal = reject;
+                        },
+                      );
+                      // Swallow rejection if the race already settled on the main path.
+                      wipeSignal.catch(() => {});
+                      const failWipeNow = (error: Error) => {
+                        if (pendingWipeFailure !== null) return;
+                        pendingWipeFailure = error;
+                        rejectWipeSignal?.(error);
+                      };
+                      let lastRefusalReloads = safeSessionStorageGet(
+                        "evolu:refusal-reloads",
+                      );
+                      const wipeRun = createEvoluRun({
+                        reloadApp: () => {
+                          if (pageHideAbort.signal.aborted) return;
+                          // `UnsupportedDbVersionError` first refusal and `BuildWaiting`
+                          // write their sessionStorage markers right before calling
+                          // `reloadApp` while the SharedWorker can still finish deleting.
+                          const refusalReloads = safeSessionStorageGet(
+                            "evolu:refusal-reloads",
+                          );
+                          if (refusalReloads !== lastRefusalReloads) {
+                            lastRefusalReloads = refusalReloads;
+                            return;
+                          }
+                          if (
+                            safeSessionStorageGet("evolu:automatic-reload") ===
+                            "1"
+                          ) {
+                            safeSessionStorageRemove("evolu:automatic-reload");
+                            return;
+                          }
+                          // WebKit SharedWorker restart (bug 318873) calls `reloadApp`
+                          // without either marker and drops the new connection.
+                          failWipeNow(
+                            new Error(
+                              "Local database worker restarted while wiping",
+                            ),
+                          );
+                        },
+                        // One-tab fallback when another tab holds the worker lock:
+                        // fail cleanly instead of blocking on alert() with locks held.
+                        onSharedWorkerUnsupported: () => {
+                          failWipeNow(
+                            new Error(
+                              "Close other Linky tabs to finish wiping local storage",
+                              {
+                                cause: {
+                                  type: "DatabaseHeldError",
+                                  name: generateDbNameFromMnemonic(
+                                    session.secrets.appMnemonic,
+                                  ),
+                                },
+                              },
+                            ),
+                          );
+                        },
+                      });
+                      activeWipeRun = wipeRun;
+                      let stopDeleteErrorWatch: (() => void) | null = null;
+                      let openTimeoutId: number | null = null;
+                      let deleteTimeoutId: number | null = null;
+                      try {
+                        openTimeoutId = window.setTimeout(() => {
+                          openTimeoutId = null;
+                          failWipeNow(
+                            new Error(
+                              "Timed out opening local database for wipe",
+                            ),
+                          );
+                        }, WIPE_OPEN_TIMEOUT_MS);
+                        const openPromise = openLinkyEvolu(wipeRun, {
+                          mnemonic: session.secrets.appMnemonic,
+                          relayUrls: [],
+                          memoryOnly: false,
+                          onDatabaseDeleted: () => {},
+                        });
+                        // Swallow late rejection if pagehide already aborted the wait.
+                        openPromise.catch(() => {});
+                        const evolu = await raceWithPageHide(
+                          Promise.race([
+                            raceWithEvoluError(
+                              openPromise,
+                              wipeRun.deps.evoluError,
+                            ),
+                            wipeSignal,
+                          ]),
+                        );
+                        if (openTimeoutId !== null) {
+                          window.clearTimeout(openTimeoutId);
+                          openTimeoutId = null;
+                        }
+                        if (pageHideAbort.signal.aborted) return false;
+                        if (evolu.appOwner.id !== currentPending.ownerId) {
+                          if (
+                            readPendingEvoluWipe()?.token ===
+                            currentPending.token
+                          )
+                            safeLocalStorageRemove(
+                              EVOLU_WIPE_PENDING_STORAGE_KEY,
+                            );
+                          return false;
+                        }
+                        if (hasEvoluRelay) {
+                          let wroteMarker = false;
+                          markAwaitingFirstHydration(
+                            {
+                              getItem: safeLocalStorageGet,
+                              setItem: (key, value) => {
+                                if (!tryLocalStorageSet(key, value)) {
+                                  throw new Error(
+                                    "Could not persist hydration guard before wiping local database",
+                                  );
+                                }
+                                wroteMarker = true;
+                              },
+                              removeItem: safeLocalStorageRemove,
+                            },
+                            evolu.appOwner.mnemonic,
+                          );
+                          if (!wroteMarker) {
+                            throw new Error(
+                              "Could not persist hydration guard before wiping local database",
+                            );
+                          }
+                        }
+                        if (pageHideAbort.signal.aborted) return false;
+                        // Fail immediately only on pre-connection / worker-script load
+                        // errors; database startup refusals still let Evolu finish
+                        // `deleteDatabase()` within its own bounded window.
+                        const watchDeleteError = () => {
+                          const error = wipeRun.deps.evoluError.get();
+                          if (error === null) return;
+                          const isWorkerScriptLoadFailure =
+                            error.type === "UnknownError" &&
+                            isRecord(error.error) &&
+                            (error.error.message ===
+                              "The SharedWorker failed to load." ||
+                              (typeof error.error.filename === "string" &&
+                                typeof error.error.lineno === "number"));
+                          if (
+                            error.type === "OtherBuildRunningError" ||
+                            isWorkerScriptLoadFailure
+                          ) {
+                            failWipeNow(
+                              new Error("Could not wipe local database", {
+                                cause: error,
+                              }),
+                            );
+                          }
+                        };
+                        stopDeleteErrorWatch =
+                          wipeRun.deps.evoluError.subscribe(watchDeleteError);
+                        watchDeleteError();
+                        if (pendingWipeFailure !== null)
+                          throw pendingWipeFailure;
+                        deleteTimeoutId = window.setTimeout(() => {
+                          deleteTimeoutId = null;
+                          failWipeNow(
+                            new Error("Timed out wiping local database"),
+                          );
+                        }, WIPE_DELETE_TIMEOUT_MS);
+                        const deleted = await Promise.race([
+                          evolu.deleteDatabase(),
+                          wipeSignal,
+                        ]);
+                        if (!deleted.ok) {
+                          if (pageHideAbort.signal.aborted) return false;
+                          throw new Error("Could not wipe local database", {
+                            cause: deleted.error,
+                          });
+                        }
+                        if (
+                          readPendingEvoluWipe()?.token === currentPending.token
+                        )
+                          safeLocalStorageRemove(
+                            EVOLU_WIPE_PENDING_STORAGE_KEY,
+                          );
+                        return true;
+                      } finally {
+                        stopDeleteErrorWatch?.();
+                        if (openTimeoutId !== null)
+                          window.clearTimeout(openTimeoutId);
+                        if (deleteTimeoutId !== null)
+                          window.clearTimeout(deleteTimeoutId);
+                        activeWipeRun = null;
+                        await wipeRun[Symbol.asyncDispose]();
+                      }
+                    },
+                  );
+                } catch (error) {
+                  if (pageHideAbort.signal.aborted) return false;
+                  if (
+                    !lockGranted &&
+                    isRecord(error) &&
+                    error.name === "TimeoutError"
+                  ) {
+                    throw new Error(
+                      "Close other Linky tabs to finish wiping local storage",
+                      {
+                        cause: {
+                          type: "DatabaseHeldError",
+                          name: generateDbNameFromMnemonic(
+                            session.secrets.appMnemonic,
+                          ),
+                        },
+                      },
+                    );
+                  }
+                  throw error;
+                }
+              },
+            );
+          } catch (error) {
+            if (!pageHideAbort.signal.aborted) throw error;
+          } finally {
+            window.removeEventListener("pagehide", onWipePageHide);
+          }
+          if (pageHideAbort.signal.aborted) return;
+          if (wiped) {
+            window.location.reload();
+            return;
+          }
+          resumeWatchdogs();
+        }
+      }
       const run = createEvoluRun();
       let otherTabBootErrorShown = false;
       const reportEvoluError = () => {
@@ -904,7 +1301,6 @@ const bootstrap = async () => {
       run.deps.evoluError.subscribe(reportEvoluError);
       reportEvoluError();
       setStage("open-evolu");
-      const memoryOnly = shouldUseInMemoryEvoluStorage();
       // Evolu 8 moves the Evolu 7 database in before it answers a query, which takes long on a big account.
       const moving =
         !memoryOnly &&

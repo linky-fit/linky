@@ -40,6 +40,7 @@ import type {
 } from "../../../utils/displayAmounts";
 import { formatShortNpub } from "../../../utils/formatting";
 import { formatMintHost } from "../../../utils/mint";
+import { acquireWalletWorkGuard } from "../../../utils/pwaUpdate";
 import { withTabLockIfFree } from "../../../utils/storage";
 import { nowSeconds } from "../../../utils/time";
 import {
@@ -587,17 +588,27 @@ export const useRecurringPaymentsScheduler = ({
     async (action: RecurringRunAction): Promise<RecurringRunOutcome> => {
       const { envelopes, logPaymentEvent, sendTokenMessage } = latest.current;
       if (envelopes === null) return "busy";
-      const { order } = action;
-      const result = await payRecurringRun(
-        { envelopes, logPaymentEvent, sendTokenMessage },
-        action,
-        recurringRecipient(findContact(order.contactId), order.rail),
-      );
-      if (foundEnvelope(result) && !isFunded(action)) {
-        markFunded(action, action.amountSat);
+      let releaseGuard: () => void;
+      try {
+        releaseGuard = await acquireWalletWorkGuard();
+      } catch {
+        return "busy";
       }
-      await settleRun(action, result);
-      return OUTCOME[result.kind];
+      try {
+        const { order } = action;
+        const result = await payRecurringRun(
+          { envelopes, logPaymentEvent, sendTokenMessage },
+          action,
+          recurringRecipient(findContact(order.contactId), order.rail),
+        );
+        if (foundEnvelope(result) && !isFunded(action)) {
+          markFunded(action, action.amountSat);
+        }
+        await settleRun(action, result);
+        return OUTCOME[result.kind];
+      } finally {
+        releaseGuard();
+      }
     },
     [findContact, isFunded, latest, markFunded, settleRun],
   );
@@ -621,30 +632,40 @@ export const useRecurringPaymentsScheduler = ({
     async (run: RecurringRun, state: EnvelopeState): Promise<boolean> => {
       const { envelopes, logPaymentEvent, sendTokenMessage } = latest.current;
       if (envelopes === null) return false;
-      const { order } = run;
-      const settlement = await settleDeletedRun(
-        { envelopes, logPaymentEvent, sendTokenMessage },
-        run,
-        state,
-        recurringRecipient(findContact(order.contactId), order.rail),
-      );
-      if (settlement === "settled") return true;
-      if (settlement === "later") return false;
-      const key = runKey(run);
-      const notice = DELETED_TOKEN_NOTICE[settlement];
-      notifyOnce(
-        order,
-        state.amount,
-        notice.body,
-        `recurring-deleted-${settlement}:${key}`,
-      );
-      reportAppLog({
-        tag: notice.tag,
-        summary: notice.summary,
-        links: orderLinks(order),
-        payload: { key, amountSat: state.amount },
-      });
-      return settlement === "delivered";
+      let releaseGuard: () => void;
+      try {
+        releaseGuard = await acquireWalletWorkGuard();
+      } catch {
+        return false;
+      }
+      try {
+        const { order } = run;
+        const settlement = await settleDeletedRun(
+          { envelopes, logPaymentEvent, sendTokenMessage },
+          run,
+          state,
+          recurringRecipient(findContact(order.contactId), order.rail),
+        );
+        if (settlement === "settled") return true;
+        if (settlement === "later") return false;
+        const key = runKey(run);
+        const notice = DELETED_TOKEN_NOTICE[settlement];
+        notifyOnce(
+          order,
+          state.amount,
+          notice.body,
+          `recurring-deleted-${settlement}:${key}`,
+        );
+        reportAppLog({
+          tag: notice.tag,
+          summary: notice.summary,
+          links: orderLinks(order),
+          payload: { key, amountSat: state.amount },
+        });
+        return settlement === "delivered";
+      } finally {
+        releaseGuard();
+      }
     },
     [findContact, latest, notifyOnce],
   );

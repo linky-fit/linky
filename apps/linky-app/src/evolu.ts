@@ -14,7 +14,6 @@ import {
   type EvoluRun,
   type LinkyEvolu,
   LinkyEvoluSchema,
-  markAwaitingFirstHydration,
   normalizeEvoluRelayUrl,
   syncStateQuotaErrors,
 } from "@linky-fit/linksync/evolu";
@@ -24,7 +23,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDeferredOnlineReady } from "./hooks/useDeferredOnlineReady";
 import type { JsonValue } from "./types/json";
 import { base64 } from "@scure/base";
-import { localStorageKv } from "./utils/storage";
+import { writePendingEvoluWipe } from "./utils/storage";
+import { reloadAfterWalletWork } from "./utils/pwaUpdate";
 import { isRecord } from "./utils/unknown";
 import { getInspectorEmissionEnabled } from "./devtools/inspector/inspectorEnabled";
 import { reportInspectorRows } from "./devtools/inspector/reportInspectorRows";
@@ -601,16 +601,15 @@ export const loadEvoluCurrentData = async (
   return result;
 };
 
-/** Deletes this device's copy of the database and reloads; the account syncs back from the relays. */
-export const useWipeEvoluStorage = (): (() => void) => {
-  const evolu = useLinkyEvolu();
-  return useCallback(() => {
-    markAwaitingFirstHydration(localStorageKv, evolu.appOwner.mnemonic);
-    // Evolu reloads only for an owner opened from a mnemonic.
-    void evolu.deleteDatabase().then((deleted) => {
-      if (deleted.ok) window.location.reload();
-    });
-  }, [evolu]);
+/** Marks a local database wipe for this account on the next boot and reloads once wallet work settles. */
+export const useWipeEvoluStorage = (): (() => Promise<void>) => {
+  const { evolu, memoryOnly } = useOpenedEvolu();
+  return useCallback(async () => {
+    if (!memoryOnly && !writePendingEvoluWipe(evolu.appOwner.id)) {
+      throw new Error("Could not persist pending local storage wipe");
+    }
+    reloadAfterWalletWork();
+  }, [evolu, memoryOnly]);
 };
 
 export const useEvoluDatabaseInfoState = (opts?: {

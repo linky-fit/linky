@@ -1,4 +1,7 @@
-import { deferPwaUpdateWhile } from "../utils/pwaUpdate";
+import {
+  acquireWalletWorkGuard,
+  deferPwaUpdateWhile,
+} from "../utils/pwaUpdate";
 import { localStorageKv, safeLocalStorageGet } from "../utils/storage";
 import { getUnknownErrorMessage } from "../utils/unknown";
 import { asNonEmptyString } from "../utils/validation";
@@ -44,6 +47,7 @@ export const makeWebPlatformPorts = (): PlatformPorts => ({
   lifecycle: {
     reload: () => globalThis.location.reload(),
     deferUpdateWhile: deferPwaUpdateWhile,
+    acquireWalletWorkGuard,
     isOnline: () =>
       typeof navigator === "undefined" || navigator.onLine !== false,
   },
