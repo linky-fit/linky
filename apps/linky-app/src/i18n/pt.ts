@@ -622,6 +622,7 @@ export const pt = {
   english: "English",
   german: "Deutsch",
   portuguese: "Português (Brasil)",
+  slovak: "Slovenčina",
 
   appearance: "Aparência",
   appearanceAuto: "Automático",

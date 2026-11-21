@@ -4,8 +4,9 @@ import { cs } from "./cs";
 import { de } from "./de";
 import { en } from "./en";
 import { pt } from "./pt";
+import { sk } from "./sk";
 
-export const translations = { cs, de, en, pt } as const satisfies Record<
+export const translations = { cs, de, en, pt, sk } as const satisfies Record<
   Lang,
   unknown
 >;

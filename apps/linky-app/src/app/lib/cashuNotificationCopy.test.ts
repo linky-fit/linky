@@ -60,6 +60,12 @@ describe("getRecurringReminderCopyForLanguage", () => {
     expect(
       getRecurringReminderCopyForLanguage("pt-BR", ["Aluguel"]).title,
     ).toBe("Pronto para enviar: Aluguel");
+    expect(
+      getRecurringReminderCopyForLanguage(
+        "sk-SK",
+        Array.from({ length: 5 }, () => null),
+      ).title,
+    ).toBe("Pripravené na odoslanie: 5 platieb");
   });
 });
 

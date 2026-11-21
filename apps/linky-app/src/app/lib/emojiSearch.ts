@@ -12,6 +12,7 @@ const keywordLoaders: Record<Lang, () => Promise<EmojiKeywords>> = {
   de: () => import("./emojiKeywords/de.json").then((data) => data.default),
   en: () => import("./emojiKeywords/en.json").then((data) => data.default),
   pt: () => import("./emojiKeywords/pt.json").then((data) => data.default),
+  sk: () => import("./emojiKeywords/sk.json").then((data) => data.default),
 };
 
 export interface EmojiSearchEntry {

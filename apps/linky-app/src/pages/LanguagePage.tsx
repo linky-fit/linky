@@ -5,13 +5,14 @@ import { useSetLang } from "../app/hooks/settings/useDeviceSettings";
 import type { Lang } from "../i18n";
 
 const LANGUAGES: ReadonlyArray<{
-  key: "czech" | "german" | "english" | "portuguese";
+  key: "czech" | "german" | "english" | "portuguese" | "slovak";
   value: Lang;
 }> = [
   { key: "czech", value: "cs" },
   { key: "german", value: "de" },
   { key: "english", value: "en" },
   { key: "portuguese", value: "pt" },
+  { key: "slovak", value: "sk" },
 ];
 
 export function LanguagePage(): React.ReactElement {

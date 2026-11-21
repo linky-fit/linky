@@ -624,6 +624,7 @@ export const de = {
   english: "English",
   german: "Deutsch",
   portuguese: "Português (Brasil)",
+  slovak: "Slovenčina",
 
   appearance: "Darstellung",
   appearanceAuto: "Automatisch",

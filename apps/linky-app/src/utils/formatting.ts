@@ -87,6 +87,7 @@ export const normalizeLocale = (lang?: string): string => {
     if (raw === "cs") return "cs-CZ";
     if (raw === "de") return "de-DE";
     if (raw === "pt") return "pt-BR";
+    if (raw === "sk") return "sk-SK";
     if (raw === "en") return "en-US";
     return raw;
   }
@@ -96,6 +97,7 @@ export const normalizeLocale = (lang?: string): string => {
       if (docLang === "cs") return "cs-CZ";
       if (docLang === "de") return "de-DE";
       if (docLang === "pt") return "pt-BR";
+      if (docLang === "sk") return "sk-SK";
       return docLang;
     }
   }
@@ -105,6 +107,7 @@ export const normalizeLocale = (lang?: string): string => {
       if (navLang === "cs") return "cs-CZ";
       if (navLang === "de") return "de-DE";
       if (navLang === "pt") return "pt-BR";
+      if (navLang === "sk") return "sk-SK";
       return navLang;
     }
   }
@@ -260,6 +263,7 @@ export const formatChatDayLabel = (
   const weekday = getDateTimeFormatter(locale, "weekday").format(d);
   const day = d.getDate();
   const month = d.getMonth() + 1;
-  if (locale.startsWith("cs")) return `${weekday} ${day}. ${month}.`;
+  if (locale.startsWith("cs") || locale.startsWith("sk"))
+    return `${weekday} ${day}. ${month}.`;
   return `${weekday} ${month}/${day}`;
 };

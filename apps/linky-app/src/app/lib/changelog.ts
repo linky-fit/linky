@@ -58,11 +58,11 @@ export const parseChangelog = (markdown: string): ChangelogRelease[] => {
   return releases;
 };
 
-/** The release's notes in the user's language, English where the changelog has no other. */
+/** The release's notes in the user's language (Czech for Slovak readers), English where the changelog has no other. */
 export const changelogNotesFor = (
   release: ChangelogRelease,
   lang: Lang,
 ): readonly string[] =>
-  (lang === "cs" ? release.notes["cs-CZ"] : undefined) ??
+  (lang === "cs" || lang === "sk" ? release.notes["cs-CZ"] : undefined) ??
   release.notes["en-US"] ??
   [];

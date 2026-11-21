@@ -38,6 +38,16 @@ const COPY = {
     refunded: "Sua transação on-chain foi reembolsada",
     updated: "Sua transação on-chain foi atualizada",
   },
+  sk: {
+    readyToSend:
+      "Pripravené: zaplaťte {total} a do vašej bitcoinovej peňaženky odošleme {amount}.",
+    readyToReceive:
+      "Pripravené: pošlite {total} zo svojej bitcoinovej peňaženky.",
+    completed: "Vaša on-chain transakcia je dokončená",
+    denied: "Vaša on-chain transakcia bola zamietnutá",
+    refunded: "Peniaze z vašej on-chain transakcie boli vrátené",
+    updated: "Vaša on-chain transakcia bola aktualizovaná",
+  },
   en: {
     readyToSend: "Ready: pay {total} to send {amount} to your bitcoin wallet.",
     readyToReceive: "Ready: send {total} from your bitcoin wallet.",
@@ -53,6 +63,7 @@ const copyFor = (language: string | null | undefined) => {
   if (normalized.startsWith("cs")) return COPY.cs;
   if (normalized.startsWith("de")) return COPY.de;
   if (normalized.startsWith("pt")) return COPY.pt;
+  if (normalized.startsWith("sk")) return COPY.sk;
   return COPY.en;
 };
 

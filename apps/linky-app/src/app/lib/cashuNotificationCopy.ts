@@ -13,6 +13,9 @@ export const getReceivedMoneyCopyForLanguage = (
   if (normalized.startsWith("pt")) {
     return "Você recebeu dinheiro";
   }
+  if (normalized.startsWith("sk")) {
+    return "Prijali ste peniaze";
+  }
   return "You received money";
 };
 
@@ -30,6 +33,9 @@ export const getChatAttachmentCopyForLanguage = (
   if (normalized.startsWith("pt")) {
     return kind === "pdf" ? "PDF" : "Imagem";
   }
+  if (normalized.startsWith("sk")) {
+    return kind === "pdf" ? "PDF" : "Obrázok";
+  }
   return kind === "pdf" ? "PDF" : "Image";
 };
 
@@ -38,6 +44,7 @@ const chatListingCopyFor = (language: string | null | undefined): string => {
   if (normalized.startsWith("cs")) return "Nabídka: {title}";
   if (normalized.startsWith("de")) return "Angebot: {title}";
   if (normalized.startsWith("pt")) return "Anúncio: {title}";
+  if (normalized.startsWith("sk")) return "Ponuka: {title}";
   return "Listing: {title}";
 };
 
@@ -88,6 +95,14 @@ const RECURRING_REMINDER_COPY = {
     body: "Abra o app para enviar o pagamento.",
     severalBody: "Abra o app para enviar os pagamentos.",
   },
+  sk: {
+    named: (note) => `Pripravené na odoslanie: ${note}`,
+    unnamed: "Platba je pripravená na odoslanie",
+    several: (count) =>
+      `Pripravené na odoslanie: ${count} ${count < 5 ? "platby" : "platieb"}`,
+    body: "Otvorte aplikáciu a odošlite platbu.",
+    severalBody: "Otvorte aplikáciu a odošlite platby.",
+  },
   en: {
     named: (note) => `Ready to send ${note}`,
     unnamed: "Ready to send payment",
@@ -104,6 +119,7 @@ const reminderCopyFor = (
   if (normalized.startsWith("cs")) return RECURRING_REMINDER_COPY.cs;
   if (normalized.startsWith("de")) return RECURRING_REMINDER_COPY.de;
   if (normalized.startsWith("pt")) return RECURRING_REMINDER_COPY.pt;
+  if (normalized.startsWith("sk")) return RECURRING_REMINDER_COPY.sk;
   return RECURRING_REMINDER_COPY.en;
 };
 
@@ -131,6 +147,9 @@ export const getBankPaymentReimbursementCopyForLanguage = (
   }
   if (normalized.startsWith("pt")) {
     return "Seus sats pelo pagamento bancário chegaram";
+  }
+  if (normalized.startsWith("sk")) {
+    return "Prišli vám saty za bankovú platbu";
   }
   return "Your sats for the bank payment have arrived";
 };
