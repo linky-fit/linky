@@ -7,6 +7,7 @@ import { TransactionId } from "../../evoluIds";
 import {
   buildTransactionHistory,
   readRepeatablePayment,
+  transactionTitleKey,
   type TransactionItem,
 } from "./transactionHistory";
 
@@ -298,5 +299,17 @@ describe("readRepeatablePayment", () => {
     ["an unknown contact", { contactId: "contact-2" }],
   ])("offers nothing for %s", (_name, overrides) => {
     expect(readRepeatablePayment(item(overrides), contacts)).toBeNull();
+  });
+});
+
+describe("transactionTitleKey", () => {
+  it("titles a token the user issued as an issued token", () => {
+    expect(
+      transactionTitleKey({
+        category: "cashu",
+        direction: "out",
+        method: "cashu_emit",
+      }),
+    ).toBe("transactionCashuIssued");
   });
 });

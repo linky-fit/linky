@@ -16,8 +16,10 @@ import {
   paymentRequestAnswersByRumorId,
   receivedSatByRequestId,
   requestIdFulfilledBy,
+  transactionRequestStatus,
   type ReceivedSatByRequestId,
 } from "./paymentRequestStatus";
+import type { TransactionItem } from "./transactionHistory";
 
 const REQUEST_ID = PaymentRequestId.make("request-1");
 // getPublicKey of the all-ones secret key; the parser checks it is on-curve.
@@ -90,8 +92,6 @@ const statusOf = (rows: Row[], received = receivedInFull) =>
 
 describe("paymentRequestAnswersByRumorId", () => {
   it.each([
-    ["a request I sent, paid by the peer", "out", "in", "paid"],
-    ["a request I sent, paid by my own payload", "out", "out", "requested"],
     ["a request I received, paid by me", "in", "out", "paid"],
     ["a request I received, paid by the requester", "in", "in", "requested"],
   ] as const)(
@@ -106,7 +106,7 @@ describe("paymentRequestAnswersByRumorId", () => {
     },
   );
 
-  describe("a request I sent, answered by a payload naming its id", () => {
+  describe("a request I sent, with receives naming its id", () => {
     const answeredWith = (
       received: ReceivedSatByRequestId,
       amount: number | null = 21,
@@ -144,23 +144,35 @@ describe("paymentRequestAnswersByRumorId", () => {
       expect(answeredWith(new Map(), null)).toBe("requested");
       expect(answeredWith(new Map([[REQUEST_ID, 1]]), null)).toBe("paid");
     });
+
+    it("is paid when someone outside the conversation paid it", () => {
+      expect(statusOf([row("req", "out", request(REQUEST_ID), 1)])).toBe(
+        "paid",
+      );
+    });
   });
 
   it("ignores an incoming payload naming another request id, even as a reply", () => {
     expect(
-      statusOf([
-        row("req", "out", request(REQUEST_ID), 1),
-        row("pay", "in", payload(PaymentRequestId.make("other")), 2, "req"),
-      ]),
+      statusOf(
+        [
+          row("req", "out", request(REQUEST_ID), 1),
+          row("pay", "in", payload(PaymentRequestId.make("other")), 2, "req"),
+        ],
+        new Map(),
+      ),
     ).toBe("requested");
   });
 
   it("ignores an incoming bare token replying to the request", () => {
     expect(
-      statusOf([
-        row("req", "out", request(REQUEST_ID), 1),
-        row("pay", "in", bareToken, 2, "req"),
-      ]),
+      statusOf(
+        [
+          row("req", "out", request(REQUEST_ID), 1),
+          row("pay", "in", bareToken, 2, "req"),
+        ],
+        new Map(),
+      ),
     ).toBe("requested");
   });
 
@@ -337,5 +349,61 @@ describe("paidAtSecByRequestId", () => {
     expect(paidAtSecByRequestId([payment("request-1", 10, overrides)])).toEqual(
       new Map(),
     );
+  });
+});
+
+describe("transactionRequestStatus", () => {
+  const requestRow: TransactionItem = {
+    amount: 70,
+    category: "cashu",
+    contactId: null,
+    createdAtSec: 1,
+    details: { requestId: REQUEST_ID },
+    direction: "in",
+    error: null,
+    fee: null,
+    hiddenReason: null,
+    id: "request-row",
+    isReturned: false,
+    method: "cashu_chat",
+    mint: null,
+    note: null,
+    pendingLabel: null,
+    status: "ok",
+    unit: "sat",
+  };
+  const receivedSat = (sat: number): ReceivedSatByRequestId =>
+    new Map([[REQUEST_ID, sat]]);
+
+  it("keeps a request pending while its receives fall short of its amount", () => {
+    expect(
+      transactionRequestStatus(requestRow, receivedSat(19), new Set()),
+    ).toBe("pending");
+  });
+
+  it("is paid once its receives brought in its amount", () => {
+    expect(
+      transactionRequestStatus(requestRow, receivedSat(70), new Set()),
+    ).toBe("paid");
+  });
+
+  it("is declined when declined and not paid in full", () => {
+    expect(
+      transactionRequestStatus(
+        requestRow,
+        receivedSat(19),
+        new Set([REQUEST_ID]),
+      ),
+    ).toBe("declined");
+  });
+
+  it("has no status for a row that is not a request", () => {
+    expect(
+      transactionRequestStatus(
+        { ...requestRow, method: "cashu_receive" },
+        receivedSat(70),
+        new Set(),
+      ),
+    ).toBeNull();
   });
 });

@@ -447,7 +447,6 @@ export const en = {
   transactionCashuInserted: "Received at your address",
   transactionCashuRestored: "Restored cashu token",
   transactionCashuIssued: "Issued cashu token",
-  transactionCashuSwap: "Cashu mint swap",
   transactionDetailError: "Error",
   transactionDetailMint: "Mint",
   transactionDetailUsedToken: "Used tokens",
