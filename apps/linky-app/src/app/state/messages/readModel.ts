@@ -10,6 +10,7 @@ import { trimString } from "../../../utils/validation";
 import { buildUnknownContactId } from "../../hooks/messages/contactIdentity";
 import {
   dedupeChatMessages,
+  compareMessagesByTime,
   dedupeNostrMessagesByPriority,
 } from "../../hooks/messages/messageHelpers";
 import {
@@ -144,9 +145,7 @@ export const contactMessagesAtom = Atom.keepAlive(
       );
       if (normalized) parsed.push(normalized);
     }
-    return dedupeNostrMessagesByPriority(parsed).sort(
-      (a, b) => a.createdAtSec - b.createdAtSec,
-    );
+    return dedupeNostrMessagesByPriority(parsed).sort(compareMessagesByTime);
   }),
 );
 
@@ -165,7 +164,7 @@ export const localMessagesAtom = Atom.keepAlive(
       dedupeNostrMessagesByPriority([
         ...get(contactMessagesAtom),
         ...unknownSenderMessages,
-      ]).sort((a, b) => a.createdAtSec - b.createdAtSec),
+      ]).sort(compareMessagesByTime),
     );
   }),
 );

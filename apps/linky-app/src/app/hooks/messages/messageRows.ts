@@ -127,6 +127,7 @@ export const toLocalNostrMessage = (
     wrapId,
     rumorId: asNonEmptyString(row.rumorId),
     pubkey: trimString(row.pubkey),
+    createdAt: row.createdAt,
     createdAtSec: toPositiveInt(row.createdAtSec, nowSec()),
     ...syncedStatus(row.status),
     localOnly: isSqliteTrueish(row.localOnly),
