@@ -33,6 +33,7 @@ export interface OpenedEvolu {
   readonly evolu: LinkyEvolu;
   readonly run: EvoluRun;
   readonly hasEvoluRelay: boolean;
+  readonly memoryOnly: boolean;
   readonly onOwnerDeleted: (listener: (ownerId: OwnerId) => void) => () => void;
 }
 
@@ -84,6 +85,7 @@ export const openSessionEvolu = async (
     evolu,
     run,
     hasEvoluRelay,
+    memoryOnly,
     onOwnerDeleted: (listener) => {
       ownerDeletedListeners.add(listener);
       return () => {

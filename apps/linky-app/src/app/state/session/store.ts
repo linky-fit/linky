@@ -54,6 +54,7 @@ export const linkyStoreAtom = Atom.keepAlive(
         kv,
         scopes: appScopes,
         hasEvoluRelay: opened.hasEvoluRelay,
+        memoryOnly: opened.memoryOnly,
         onOwnerDeleted: opened.onOwnerDeleted,
         onEvent: reportLinkyEvoluEvent,
       }),
