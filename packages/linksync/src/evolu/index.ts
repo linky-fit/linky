@@ -1,4 +1,4 @@
-export { completedOwners, createEvoluShardDb } from "./evoluShardDb";
+export { createEvoluShardDb } from "./evoluShardDb";
 export type { AppliedWrite, EvoluRuntime, FailedWrite } from "./evoluShardDb";
 export {
   makeEvoluRelaySettings,
