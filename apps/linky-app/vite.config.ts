@@ -267,7 +267,7 @@ export default defineConfig({
     }),
     contentSecurityPolicyMeta(),
   ],
-  worker: { plugins: () => [workerPolyfills] },
+  worker: { format: "es", plugins: () => [workerPolyfills] },
   ...(useHttps ? { server: { host: true, https: {} } } : {}),
   build: {
     rollupOptions: {
