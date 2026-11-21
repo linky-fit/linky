@@ -1,9 +1,4 @@
-import {
-  createId,
-  NonEmptyString100,
-  NonEmptyString1000,
-  PositiveInt,
-} from "@linky-fit/linksync";
+import { createId } from "@linky-fit/linksync";
 import {
   editPatch,
   pausePatch,
@@ -104,15 +99,13 @@ export const useRecurringPaymentsActions = (): RecurringPaymentsActions => {
       const outcome = await runWrite(
         repository.insert({
           id,
-          createdAtSec: PositiveInt.orThrow(nowSeconds()),
-          mintUrl: NonEmptyString1000.orThrow(defaultMintUrl),
-          rail: NonEmptyString100.orThrow(rail),
-          progress: NonEmptyString1000.orThrow(
-            recurringProgressColumn({
-              runCount: 0,
-              nextDueAtSec: input.firstDueAtSec,
-            }),
-          ),
+          createdAtSec: nowSeconds(),
+          mintUrl: defaultMintUrl,
+          rail,
+          progress: recurringProgressColumn({
+            runCount: 0,
+            nextDueAtSec: input.firstDueAtSec,
+          }),
           ...recurringPaymentColumns(input, contactId),
         }),
       );

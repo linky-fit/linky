@@ -9,13 +9,7 @@ import {
 } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import type { ListingRecord } from "@linky-fit/linksync";
-import {
-  listingKey,
-  createId,
-  NonEmptyString1000,
-  OwnerId,
-  PositiveInt,
-} from "@linky-fit/linksync";
+import { listingKey, createId, OwnerId } from "@linky-fit/linksync";
 import { describe, expect, it } from "vitest";
 import {
   buildListingsDraft,
@@ -29,7 +23,7 @@ import {
 
 const record = (overrides: Partial<ListingRecord> = {}): ListingRecord => ({
   id: createId<"Listing">(),
-  createdAtSec: PositiveInt.orThrow(100),
+  createdAtSec: 100,
   side: "offer",
   title: "Domácí vajíčka",
   amount: "90",
@@ -42,7 +36,6 @@ const record = (overrides: Partial<ListingRecord> = {}): ListingRecord => ({
   pausedAtSec: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
-  isDeleted: 0,
   ownerId: OwnerId.orThrow(createId()),
   ...overrides,
 });
@@ -85,7 +78,7 @@ describe("listing audience column", () => {
   });
 
   it("reads an unknown audience as none, so the listing goes to nobody", () => {
-    const unknown = NonEmptyString1000.orThrow('{"kind":"everyone"}');
+    const unknown = '{"kind":"everyone"}';
     expect(listingAudienceOfRecord({ audience: unknown })).toBeNull();
     const draft = buildListingsDraft({
       records: [record({ audience: unknown })],
@@ -106,7 +99,7 @@ describe("buildListingsDraft", () => {
     const draft = buildListingsDraft({
       records: [
         record({
-          createdAtSec: PositiveInt.orThrow(200),
+          createdAtSec: 200,
           title: "Med",
           ...audience({ kind: "network" }),
         }),
@@ -149,7 +142,7 @@ describe("buildListingsDraft", () => {
   });
 
   it("leaves a paused listing out, for the contacts and a group alike", () => {
-    const paused = { pausedAtSec: PositiveInt.orThrow(150) };
+    const paused = { pausedAtSec: 150 };
     const draft = buildListingsDraft({
       records: [
         record({ title: "Med", ...paused }),
@@ -287,9 +280,8 @@ describe("group listings from the contact rows", () => {
     identity: ReturnType<typeof makeIdentity>,
     groupName: string | null,
   ) => ({
-    npub: NonEmptyString1000.orThrow(encodeNpub(identity.pubkey)),
-    groupName:
-      groupName === null ? null : NonEmptyString1000.orThrow(groupName),
+    npub: encodeNpub(identity.pubkey),
+    groupName,
     groupNamesJson: null,
     archivedAtSec: null,
   });

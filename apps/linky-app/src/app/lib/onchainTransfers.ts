@@ -2,15 +2,10 @@ import {
   parseBip321Uri,
   PaymentRequestId,
 } from "@linky-fit/linkshu/payment-request";
-import {
-  NonEmptyString100,
-  NonEmptyString1000,
-  NonNegativeInt,
-  PositiveInt,
-  sqliteTrue,
-  type OnchainTransferRecord,
-  type OnchainTransfersRepository,
-  type OnchainTransferId,
+import type {
+  OnchainTransferId,
+  OnchainTransferInsert,
+  OnchainTransferRecord,
 } from "@linky-fit/linksync";
 import {
   encodeNprofile,
@@ -240,15 +235,19 @@ export const newOnchainTransferProblem = (
 
 export interface PlannedOnchainTransfer {
   readonly request: OnchainTransferRequest;
-  readonly row: Parameters<OnchainTransfersRepository["insert"]>[0];
+  readonly row: OnchainTransferInsert;
 }
 
 const isOnchainTransferRequest = Schema.is(OnchainTransferRequest);
 
-const textColumn = (value: string | null): NonEmptyString1000 | null => {
-  const parsed = NonEmptyString1000.fromUnknown(value ?? "");
-  return parsed.ok ? parsed.value : null;
-};
+const textColumn = (value: string | null): string | null =>
+  value !== null && value.length > 0 && value.length <= 1000 ? value : null;
+
+const isPositiveInt = (value: number): boolean =>
+  Number.isSafeInteger(value) && value > 0;
+
+const isNonNegativeInt = (value: number): boolean =>
+  Number.isSafeInteger(value) && value >= 0;
 
 /**
  * The request message and the row of a valid draft (see `newOnchainTransferProblem`).
@@ -295,33 +294,35 @@ export const planOnchainTransfer = ({
         }),
   };
   if (!isOnchainTransferRequest(request)) return null;
-  const createdAtSec = PositiveInt.fromUnknown(nowSec);
-  const amount = PositiveInt.fromUnknown(rowAmount);
-  const feeColumn = NonNegativeInt.fromUnknown(feeBasisPoints);
-  if (!createdAtSec.ok || !amount.ok || !feeColumn.ok) return null;
+  if (
+    !isPositiveInt(nowSec) ||
+    !isPositiveInt(rowAmount) ||
+    !isNonNegativeInt(feeBasisPoints)
+  )
+    return null;
   const payout = send ? textColumn(payoutAddress) : null;
   const userRequest = send ? null : textColumn(userPaymentRequest);
   return {
     request,
     row: {
       id,
-      createdAtSec: createdAtSec.value,
-      role: NonEmptyString100.orThrow("user"),
-      peerPubkey: NonEmptyString100.orThrow(operator),
-      direction: NonEmptyString100.orThrow(draft.direction),
-      amount: amount.value,
-      feeBasisPoints: feeColumn.value,
+      createdAtSec: nowSec,
+      role: "user",
+      peerPubkey: operator,
+      direction: draft.direction,
+      amount: rowAmount,
+      feeBasisPoints,
       ...(payout === null ? {} : { payoutAddress: payout }),
-      ...(send ? {} : { refundToSender: sqliteTrue }),
+      ...(send ? {} : { refundToSender: true }),
       ...(userRequest === null ? {} : { userPaymentRequest: userRequest }),
     },
   };
 };
 
 export interface OnchainTransferUpdatePatch {
-  readonly updateJson: NonEmptyString1000;
-  readonly depositAddress?: NonEmptyString1000;
-  readonly operatorPaymentRequest?: NonEmptyString1000;
+  readonly updateJson: string;
+  readonly depositAddress?: string;
+  readonly operatorPaymentRequest?: string;
 }
 
 /**
@@ -336,14 +337,12 @@ export const onchainTransferUpdatePatch = (
   if (!isUserOnchainTransferWith(row, operator)) return null;
   const current = decodeTransferUpdateColumn(row.updateJson);
   if (newerTransferUpdate(current, update) !== update) return null;
-  const updateJson = NonEmptyString1000.fromUnknown(
-    encodeTransferUpdateColumn(update),
-  );
-  if (!updateJson.ok) return null;
+  const updateJson = textColumn(encodeTransferUpdateColumn(update));
+  if (updateJson === null) return null;
   const depositAddress = textColumn(update.depositAddress ?? null);
   const paymentRequest = textColumn(update.paymentRequest ?? null);
   return {
-    updateJson: updateJson.value,
+    updateJson,
     ...(depositAddress === null ? {} : { depositAddress }),
     ...(paymentRequest === null
       ? {}

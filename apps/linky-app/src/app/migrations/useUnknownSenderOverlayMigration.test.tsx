@@ -1,7 +1,6 @@
 import { RumorId } from "@linky-fit/linkstr";
 import {
   makeUnknownSendersRepository,
-  NonEmptyString,
   ShardDbError,
 } from "@linky-fit/linksync";
 import { Effect } from "effect";
@@ -60,7 +59,7 @@ describe("useUnknownSenderOverlayMigration", () => {
     await Effect.runPromise(
       unknownSenders.insert({
         ...first,
-        content: NonEmptyString.orThrow("hello 1, edited"),
+        content: "hello 1, edited",
       }),
     );
     await view.rerender(<Probe hydrated />);

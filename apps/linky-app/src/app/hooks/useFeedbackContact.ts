@@ -1,4 +1,4 @@
-import { ContactId, createId, NonEmptyString1000 } from "@linky-fit/linksync";
+import { ContactId, createId } from "@linky-fit/linksync";
 import { useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
 import { navigateTo } from "../../hooks/useRouting";
@@ -94,7 +94,7 @@ export const useOpenFeedbackContact = () => {
     void runWrite(
       contactsRepository.insert({
         id: createId<"Contact">(),
-        npub: NonEmptyString1000.orThrow(FEEDBACK_CONTACT_NPUB),
+        npub: FEEDBACK_CONTACT_NPUB,
       }),
     ).then((outcome) => {
       if (outcome.ok) return;

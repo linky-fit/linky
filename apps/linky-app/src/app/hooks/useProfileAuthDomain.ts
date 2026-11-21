@@ -1,9 +1,6 @@
 import { navigateTo } from "../../hooks/useRouting";
 import {
   appOwnerFromMnemonic,
-  NonEmptyString100,
-  NonEmptyString1000,
-  PositiveInt,
   type IdentityRepository,
   type InboxCursorsRepository,
 } from "@linky-fit/linksync";
@@ -277,18 +274,22 @@ export const useProfileAuthDomain = ({
     ): Promise<void> => {
       if (!identityRepository) return;
       const npub = await deriveNpubFromNsec(nsec);
-      const nsecText = NonEmptyString1000.fromUnknown(nsec);
-      const npubText = npub ? NonEmptyString1000.fromUnknown(npub) : null;
-      const switchedAt =
-        switchedAtSec === null ? null : PositiveInt.fromUnknown(switchedAtSec);
-      if (!nsecText.ok || !npubText?.ok || switchedAt?.ok === false) return;
+      if (
+        !nsec ||
+        nsec.length > 1000 ||
+        !npub ||
+        npub.length > 1000 ||
+        (switchedAtSec !== null &&
+          (!Number.isSafeInteger(switchedAtSec) || switchedAtSec <= 0))
+      )
+        return;
 
       await runWrite(
         identityRepository.set({
-          nsec: nsecText.value,
-          npub: npubText.value,
-          source: NonEmptyString100.orThrow(source),
-          switchedAtSec: switchedAt?.value ?? null,
+          nsec,
+          npub,
+          source,
+          switchedAtSec,
         }),
       );
     },

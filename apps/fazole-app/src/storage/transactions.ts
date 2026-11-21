@@ -1,16 +1,11 @@
 import { TransactionId } from "@linky-fit/domain";
 import { Pubkey } from "@linky-fit/linkstr";
-import {
-  NonEmptyString,
-  NonEmptyString100,
-  NonEmptyString1000,
-  PositiveInt,
-  type LinkyDbSchema,
-  type Patch,
-  type TransactionRecord,
-  type TransactionsRepository,
-  type TransactionStatus,
-  type WriteRow,
+import type {
+  TransactionInsert,
+  TransactionPatch,
+  TransactionRecord,
+  TransactionsRepository,
+  TransactionStatus,
 } from "@linky-fit/linksync";
 import { Effect, Option, Schema } from "effect";
 import {
@@ -33,8 +28,6 @@ import {
  * (direction, status, method, sats, fee, mint, note); `detailsJson` carries
  * the fazole fields under `app: "fazole"`.
  */
-
-type TransactionColumns = LinkyDbSchema["transaction"];
 
 const TransactionIdString = Schema.String.pipe(
   Schema.check(Schema.makeFilter((value: string) => TransactionId.is(value))),
@@ -103,7 +96,7 @@ const Details = Schema.fromJsonString(
 );
 const decodeDetails = Schema.decodeUnknownOption(Details);
 const encodeDetails = (details: typeof Details.Type) =>
-  NonEmptyString.orThrow(Schema.encodeSync(Details)(details));
+  Schema.encodeSync(Details)(details);
 
 const isPaymentMethod = Schema.is(PaymentMethod);
 
@@ -237,20 +230,16 @@ export const readFazoleRecords = (
   Effect.map(transactions.all, toFazoleRecords);
 
 const positiveOrNull = (value: number | null) =>
-  value !== null && value > 0 ? PositiveInt.orThrow(value) : null;
+  value !== null && value > 0 ? value : null;
 
 const paymentColumns = (payment: Payment) => ({
-  createdAtSec: PositiveInt.orThrow(payment.createdAtSec),
-  direction: NonEmptyString100.orThrow("in"),
-  status: NonEmptyString100.orThrow(rowStatusOfPayment[payment.status]),
-  method:
-    payment.method === null ? null : NonEmptyString100.orThrow(payment.method),
+  createdAtSec: payment.createdAtSec,
+  direction: "in",
+  status: rowStatusOfPayment[payment.status],
+  method: payment.method,
   amount: positiveOrNull(payment.bitcoin?.sats ?? null),
-  mint:
-    payment.bitcoin === null
-      ? null
-      : NonEmptyString1000.orThrow(payment.bitcoin.mintUrl),
-  unit: payment.bitcoin === null ? null : NonEmptyString100.orThrow("sat"),
+  mint: payment.bitcoin === null ? null : payment.bitcoin.mintUrl,
+  unit: payment.bitcoin === null ? null : "sat",
   detailsJson: encodeDetails({
     app: "fazole",
     kind: "payment",
@@ -272,12 +261,12 @@ const paymentColumns = (payment: Payment) => ({
 });
 
 const receiptColumns = (receipt: Receipt) => ({
-  createdAtSec: PositiveInt.orThrow(receipt.receivedAtSec),
-  direction: NonEmptyString100.orThrow("in"),
-  status: NonEmptyString100.orThrow("ok"),
-  method: NonEmptyString100.orThrow(receipt.method),
-  amount: PositiveInt.orThrow(receipt.sats),
-  unit: NonEmptyString100.orThrow("sat"),
+  createdAtSec: receipt.receivedAtSec,
+  direction: "in",
+  status: "ok",
+  method: receipt.method,
+  amount: receipt.sats,
+  unit: "sat",
   detailsJson: encodeDetails({
     app: "fazole",
     kind: "receipt",
@@ -287,15 +276,14 @@ const receiptColumns = (receipt: Receipt) => ({
 });
 
 const directTransferColumns = (transfer: DirectTransfer) => ({
-  createdAtSec: PositiveInt.orThrow(transfer.receivedAtSec),
-  direction: NonEmptyString100.orThrow("in"),
-  status: NonEmptyString100.orThrow("ok"),
-  method: NonEmptyString100.orThrow("cashu"),
-  amount: PositiveInt.orThrow(transfer.sats),
-  mint: NonEmptyString1000.orThrow(transfer.mintUrl),
-  unit: NonEmptyString100.orThrow("sat"),
-  note:
-    transfer.note === null ? null : NonEmptyString1000.orThrow(transfer.note),
+  createdAtSec: transfer.receivedAtSec,
+  direction: "in",
+  status: "ok",
+  method: "cashu",
+  amount: transfer.sats,
+  mint: transfer.mintUrl,
+  unit: "sat",
+  note: transfer.note,
   detailsJson: encodeDetails({
     app: "fazole",
     kind: "direct",
@@ -309,18 +297,15 @@ const directTransferColumns = (transfer: DirectTransfer) => ({
 });
 
 const withdrawalColumns = (withdrawal: Withdrawal) => ({
-  createdAtSec: PositiveInt.orThrow(withdrawal.createdAtSec),
-  direction: NonEmptyString100.orThrow("out"),
-  status: NonEmptyString100.orThrow(rowStatusOfWithdrawal[withdrawal.status]),
-  method: NonEmptyString100.orThrow(withdrawal.kind),
-  amount: PositiveInt.orThrow(withdrawal.amountSats),
+  createdAtSec: withdrawal.createdAtSec,
+  direction: "out",
+  status: rowStatusOfWithdrawal[withdrawal.status],
+  method: withdrawal.kind,
+  amount: withdrawal.amountSats,
   fee: positiveOrNull(withdrawal.feeSats),
-  mint: NonEmptyString1000.orThrow(withdrawal.mintUrl),
-  unit: NonEmptyString100.orThrow("sat"),
-  error:
-    withdrawal.error === null
-      ? null
-      : NonEmptyString1000.orThrow(withdrawal.error.slice(0, 1000)),
+  mint: withdrawal.mintUrl,
+  unit: "sat",
+  error: withdrawal.error === null ? null : withdrawal.error.slice(0, 1000),
   detailsJson: encodeDetails({
     app: "fazole",
     kind: "withdrawal",
@@ -335,9 +320,9 @@ const withdrawalColumns = (withdrawal: Withdrawal) => ({
 });
 
 /** Evolu inserts omit empty optional columns instead of writing `null`. */
-const withoutNulls = <C extends Patch<TransactionColumns>>(
+const withoutNulls = <C extends TransactionPatch>(
   columns: C,
-): Patch<TransactionColumns> =>
+): TransactionPatch =>
   Object.fromEntries(
     Object.entries(columns).filter(([, value]) => value !== null),
   );
@@ -350,16 +335,15 @@ const insertRow = (
     | typeof directTransferColumns
     | typeof withdrawalColumns
   >,
-) => {
+): TransactionInsert => {
   const { createdAtSec, direction, status } = columns;
-  const row: WriteRow<TransactionColumns> = {
+  return {
     ...withoutNulls(columns),
     id,
     createdAtSec,
     direction,
     status,
   };
-  return row;
 };
 
 export const insertPayment = (

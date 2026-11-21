@@ -1,8 +1,3 @@
-import {
-  NonEmptyString1000,
-  SqliteBoolean,
-  sqliteTrue,
-} from "@linky-fit/linksync";
 import type {
   ProfileFetchEntry,
   ProfileFetchResult,
@@ -12,7 +7,11 @@ import type {
   StatusUpdated,
 } from "@linky-fit/linkstr";
 import { decodeNpub, encodeNpub, Pubkey } from "@linky-fit/linkstr";
-import type { ContactId, ContactsRepository } from "@linky-fit/linksync";
+import type {
+  ContactId,
+  ContactPatch,
+  ContactsRepository,
+} from "@linky-fit/linksync";
 import {
   linkstrConfigAtom,
   profileWatchAtom,
@@ -162,10 +161,10 @@ const syncContactsFromProfile = (
   for (const contact of ctx.contacts) {
     if (normalizeNpubIdentifier(contact.npub ?? "") !== npub) continue;
 
-    const patch: Partial<{
-      lnAddress: typeof NonEmptyString1000.Output | null;
-      name: typeof NonEmptyString1000.Output | null;
-    }> = {};
+    const patch: {
+      lnAddress?: ContactPatch["lnAddress"];
+      name?: ContactPatch["name"];
+    } = {};
 
     // Non-overridden fields follow the profile. A value the profile never
     // provided (legacy manual entry, search fallback) is never cleared:
@@ -173,25 +172,22 @@ const syncContactsFromProfile = (
     // said, i.e. the profile itself dropped the field.
     const currentName = (contact.name ?? "").trim();
     if (!contact.nameSetByUser) {
-      if (bestName && bestName !== currentName) {
-        const parsedName = NonEmptyString1000.fromUnknown(bestName);
-        if (parsedName.ok) patch.name = parsedName.value;
+      if (bestName && bestName !== currentName && bestName.length <= 1000) {
+        patch.name = bestName;
       } else if (!bestName && currentName && currentName === previousBestName) {
         patch.name = null;
       }
     }
 
-    const parsedLnAddressSetByUser = SqliteBoolean.fromUnknown(
-      contact.lnAddressSetByUser,
-    );
-    const hasLocalLnAddress =
-      parsedLnAddressSetByUser.ok &&
-      parsedLnAddressSetByUser.value === sqliteTrue;
+    const hasLocalLnAddress = contact.lnAddressSetByUser === true;
     const currentLn = (contact.lnAddress ?? "").trim().toLowerCase();
     if (!hasLocalLnAddress) {
-      if (profileLn && profileLn.toLowerCase() !== currentLn) {
-        const parsedLn = NonEmptyString1000.fromUnknown(profileLn);
-        if (parsedLn.ok) patch.lnAddress = parsedLn.value;
+      if (
+        profileLn &&
+        profileLn.toLowerCase() !== currentLn &&
+        profileLn.length <= 1000
+      ) {
+        patch.lnAddress = profileLn;
       } else if (!profileLn && currentLn && currentLn === previousProfileLn) {
         patch.lnAddress = null;
       }

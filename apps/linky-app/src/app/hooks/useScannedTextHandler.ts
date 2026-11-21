@@ -1,5 +1,4 @@
 import { isLinkauthLink } from "@linky-fit/linkauth/signer";
-import { NonEmptyString1000 } from "@linky-fit/linksync";
 import {
   decodeNpub,
   encodeNpub,
@@ -282,7 +281,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
           const result = await runWrite(
             contactsRepository.insert({
               id: createId<"Contact">(),
-              npub: NonEmptyString1000.orThrow(npub),
+              npub,
             }),
           );
 

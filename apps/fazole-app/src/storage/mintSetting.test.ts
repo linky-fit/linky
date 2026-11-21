@@ -1,9 +1,8 @@
-import { NonEmptyString100, NonEmptyString1000 } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 import { testStore } from "../services/testing/fakes";
 import {
-  mintSettingId,
+  MINT_SETTING_KEY,
   offeredMints,
   parseMintUrlInput,
   readMintUrl,
@@ -25,13 +24,7 @@ describe("the mint setting", () => {
 
   it("falls back to the config's mint when the stored value is no mint", async () => {
     const settings = makeSettingsRepository(testStore());
-    await Effect.runPromise(
-      settings.insert({
-        id: mintSettingId,
-        key: NonEmptyString100.orThrow("fazole.mintUrl"),
-        value: NonEmptyString1000.orThrow("not a url"),
-      }),
-    );
+    await Effect.runPromise(settings.setRaw(MINT_SETTING_KEY, "not a url"));
     expect(
       await Effect.runPromise(readMintUrl(settings, "https://cashu.cz")),
     ).toBe("https://cashu.cz");

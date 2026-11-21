@@ -1,9 +1,6 @@
 import {
   makeRecurringPaymentsRepository,
-  NonEmptyString100,
-  NonEmptyString1000,
   normalizeRecurringPayment,
-  PositiveInt,
   type RecurringPaymentRecord,
   type RecurringPaymentsRepository,
 } from "@linky-fit/linksync";
@@ -52,19 +49,17 @@ const insertOrder = (repository: RecurringPaymentsRepository) => {
   Effect.runSync(
     repository.insert({
       id: ORDER_ID,
-      createdAtSec: PositiveInt.orThrow(DUE - 60),
+      createdAtSec: DUE - 60,
       contactId: contactIdFor("alice"),
-      mintUrl: NonEmptyString1000.orThrow("https://mint.example"),
-      rail: NonEmptyString100.orThrow("cashu"),
-      amount: PositiveInt.orThrow(10),
-      unit: NonEmptyString100.orThrow("sat"),
-      intervalUnit: NonEmptyString100.orThrow("day"),
-      intervalCount: PositiveInt.orThrow(1),
-      anchorAtSec: PositiveInt.orThrow(DUE),
-      timeZone: NonEmptyString100.orThrow("UTC"),
-      progress: NonEmptyString1000.orThrow(
-        recurringProgressColumn({ runCount: 0, nextDueAtSec: DUE }),
-      ),
+      mintUrl: "https://mint.example",
+      rail: "cashu",
+      amount: 10,
+      unit: "sat",
+      intervalUnit: "day",
+      intervalCount: 1,
+      anchorAtSec: DUE,
+      timeZone: "UTC",
+      progress: recurringProgressColumn({ runCount: 0, nextDueAtSec: DUE }),
     }),
   );
   const row = Effect.runSync(repository.byId(ORDER_ID));

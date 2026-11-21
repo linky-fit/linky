@@ -1,7 +1,23 @@
 import { Effect } from "effect";
-import type { KeryxSubscriptionRow, LinkyDbSchema } from "../model/schema";
+import type { LinkyDbSchema } from "../model/schema";
 import type { LinkyStore } from "../model/store";
-import { tableRepository, type TableRepository } from "./tableRepository";
+import {
+  domainTableRepository,
+  type DomainPatch,
+  type DomainRow,
+  type DomainTableRepository,
+  type DomainWriteRow,
+} from "./domainRepository";
+
+export type KeryxSubscriptionStoredRow = DomainRow<
+  LinkyDbSchema["keryxSubscription"]
+>;
+export type KeryxSubscriptionInsert = DomainWriteRow<
+  LinkyDbSchema["keryxSubscription"]
+>;
+export type KeryxSubscriptionPatch = DomainPatch<
+  LinkyDbSchema["keryxSubscription"]
+>;
 
 const requiredColumns = [
   "origin",
@@ -12,14 +28,14 @@ const requiredColumns = [
 ] as const;
 
 /** A subscription row whose required columns have all arrived. */
-export type KeryxSubscriptionRecord = KeryxSubscriptionRow & {
+export type KeryxSubscriptionRecord = KeryxSubscriptionStoredRow & {
   readonly [C in (typeof requiredColumns)[number]]: NonNullable<
-    KeryxSubscriptionRow[C]
+    KeryxSubscriptionStoredRow[C]
   >;
 };
 
 export interface KeryxSubscriptionsRepository extends Omit<
-  TableRepository<LinkyDbSchema["keryxSubscription"]>,
+  DomainTableRepository<LinkyDbSchema["keryxSubscription"]>,
   "all"
 > {
   /** Complete subscriptions; a row still arriving column by column is skipped. */
@@ -27,7 +43,7 @@ export interface KeryxSubscriptionsRepository extends Omit<
 }
 
 const isComplete = (
-  row: KeryxSubscriptionRow,
+  row: KeryxSubscriptionStoredRow,
 ): row is KeryxSubscriptionRecord =>
   requiredColumns.every((column) => row[column] !== null);
 
@@ -35,7 +51,7 @@ const isComplete = (
 export const makeKeryxSubscriptionsRepository = (
   store: LinkyStore,
 ): KeryxSubscriptionsRepository => {
-  const table = tableRepository(store, "keryx", "keryxSubscription");
+  const table = domainTableRepository(store, "keryx", "keryxSubscription");
   return {
     ...table,
     all: Effect.map(table.all, (rows) => rows.filter(isComplete)),

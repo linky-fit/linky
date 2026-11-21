@@ -1,4 +1,3 @@
-import { NonEmptyString1000 } from "@linky-fit/linksync";
 import { Option } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { getContactGroups } from "../../../utils/contactGroups";
@@ -42,8 +41,7 @@ const withNormalizedName = (
 ): ContactWithChatState => {
   const name = getContactName(row);
   if (name === (row.name ?? "")) return row;
-  const parsed = NonEmptyString1000.fromUnknown(name);
-  return { ...row, name: parsed.ok ? parsed.value : null };
+  return { ...row, name: name.length > 0 && name.length <= 1000 ? name : null };
 };
 
 /** The saved contacts with their conversation's read cursors, newest first. */

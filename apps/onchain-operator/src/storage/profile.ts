@@ -1,10 +1,5 @@
-import { createIdFromString } from "@linky-fit/domain";
 import { Pubkey } from "@linky-fit/linkstr";
-import {
-  NonEmptyString100,
-  NonEmptyString1000,
-  type ShardDbError,
-} from "@linky-fit/linksync";
+import type { ShardDbError } from "@linky-fit/linksync";
 import {
   ClientVersion,
   DEFAULT_MAX_RECEIVE_AMOUNT,
@@ -19,13 +14,6 @@ const PROFILE_KEY = "onchain-operator.profile";
 const DESCRIPTION_KEY = "onchain-operator.description";
 const WATCHERS_KEY = "onchain-operator.watchers";
 const PICTURE_KEY = "onchain-operator.picture";
-// Mirrors linksync's `settingIdFor`, whose keys are Linky's own settings only.
-const settingId = (key: string) =>
-  createIdFromString<"Setting">(`setting/${key}`);
-const profileId = settingId(PROFILE_KEY);
-const descriptionId = settingId(DESCRIPTION_KEY);
-const watchersId = settingId(WATCHERS_KEY);
-const pictureId = settingId(PICTURE_KEY);
 
 /** An https URL that fits its setting row. */
 export const ProfilePicture = Schema.String.pipe(
@@ -67,15 +55,15 @@ export const readProfile = (
 ): Effect.Effect<OperatorProfile | null> =>
   Effect.map(
     Effect.all([
-      settings.byId(profileId),
-      settings.byId(descriptionId),
-      settings.byId(watchersId),
-      settings.byId(pictureId),
+      settings.getRaw(PROFILE_KEY),
+      settings.getRaw(DESCRIPTION_KEY),
+      settings.getRaw(WATCHERS_KEY),
+      settings.getRaw(PICTURE_KEY),
     ]),
     ([profile, description, watchers, picture]) =>
       Option.getOrNull(
         Option.map(
-          Schema.decodeUnknownOption(ProfileJson)(profile?.value),
+          Schema.decodeUnknownOption(ProfileJson)(profile),
           (stored) => ({
             ...Struct.omit(stored, ["feeBasisPoints"]),
             sendFeeBasisPoints: stored.feeBasisPoints,
@@ -87,35 +75,26 @@ export const readProfile = (
             minReceiveAmount:
               stored.minReceiveAmount ?? DEFAULT_MIN_RECEIVE_AMOUNT,
             minClientVersion: stored.minClientVersion ?? null,
-            description: description?.value ?? "",
+            description: description ?? "",
             watchers: Option.getOrElse(
-              Schema.decodeUnknownOption(WatchersJson)(watchers?.value),
+              Schema.decodeUnknownOption(WatchersJson)(watchers),
               () => [],
             ),
             picture: Option.getOrNull(
-              Schema.decodeUnknownOption(ProfilePicture)(picture?.value),
+              Schema.decodeUnknownOption(ProfilePicture)(picture),
             ),
           }),
         ),
       ),
   );
 
-/** Writes `value` to the setting row `id`, or removes the row for an empty value. */
+/** Writes `value` to the setting row `key`, or removes the row for an empty value. */
 const saveOptional = (
   settings: SettingsRepository,
-  id: typeof descriptionId,
   key: string,
   value: string,
 ): Effect.Effect<void, ShardDbError> =>
-  value === ""
-    ? settings
-        .remove(id)
-        .pipe(Effect.catchTag("RowNotFound", () => Effect.void))
-    : settings.insert({
-        id,
-        key: NonEmptyString100.orThrow(key),
-        value: NonEmptyString1000.orThrow(value),
-      });
+  value === "" ? settings.removeRaw(key) : settings.setRaw(key, value);
 
 export const saveProfile = (
   settings: SettingsRepository,
@@ -123,40 +102,31 @@ export const saveProfile = (
 ): Effect.Effect<void, ShardDbError> =>
   Effect.all(
     [
-      settings.insert({
-        id: profileId,
-        key: NonEmptyString100.orThrow(PROFILE_KEY),
-        value: NonEmptyString1000.orThrow(
-          Schema.encodeSync(ProfileJson)({
-            name: profile.name,
-            xpub: profile.xpub,
-            feeBasisPoints: profile.sendFeeBasisPoints,
-            receiveFeeBasisPoints: profile.receiveFeeBasisPoints,
-            paused: profile.paused,
-            amounts: profile.amounts,
-            maxReceiveAmount: profile.maxReceiveAmount,
-            minReceiveAmount: profile.minReceiveAmount,
-            ...(profile.minClientVersion === null
-              ? {}
-              : { minClientVersion: profile.minClientVersion }),
-          }),
-        ),
-      }),
-      saveOptional(
-        settings,
-        descriptionId,
-        DESCRIPTION_KEY,
-        profile.description,
+      settings.setRaw(
+        PROFILE_KEY,
+        Schema.encodeSync(ProfileJson)({
+          name: profile.name,
+          xpub: profile.xpub,
+          feeBasisPoints: profile.sendFeeBasisPoints,
+          receiveFeeBasisPoints: profile.receiveFeeBasisPoints,
+          paused: profile.paused,
+          amounts: profile.amounts,
+          maxReceiveAmount: profile.maxReceiveAmount,
+          minReceiveAmount: profile.minReceiveAmount,
+          ...(profile.minClientVersion === null
+            ? {}
+            : { minClientVersion: profile.minClientVersion }),
+        }),
       ),
+      saveOptional(settings, DESCRIPTION_KEY, profile.description),
       saveOptional(
         settings,
-        watchersId,
         WATCHERS_KEY,
         profile.watchers.length === 0
           ? ""
           : Schema.encodeSync(WatchersJson)(profile.watchers),
       ),
-      saveOptional(settings, pictureId, PICTURE_KEY, profile.picture ?? ""),
+      saveOptional(settings, PICTURE_KEY, profile.picture ?? ""),
     ],
     { discard: true },
   );

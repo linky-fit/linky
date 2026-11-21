@@ -10,8 +10,7 @@ import {
   createId,
   MessageId,
   nostrMessageIdFor,
-  type LinkyDbSchema,
-  type WriteRow,
+  type UnknownSenderMessageInsert,
 } from "@linky-fit/linksync";
 import { LOCAL_NOSTR_MESSAGES_STORAGE_KEY_PREFIX } from "../../utils/constants";
 import { trimString } from "../../utils/validation";
@@ -36,7 +35,7 @@ const messageIdOf = (message: LocalNostrMessage): MessageId => {
 export const overlayRowsToImport = (
   overlay: ReadonlyArray<Record<string, unknown>>,
   isBlockedPubkey: (pubkey: string) => boolean,
-): ReadonlyArray<WriteRow<LinkyDbSchema["unknownSenderMessage"]>> =>
+): ReadonlyArray<UnknownSenderMessageInsert> =>
   overlay.flatMap((entry) => {
     const message = normalizeLegacyLocalMessage(entry);
     const peerPubkey = message && readUnknownContactIdPubkey(message.contactId);

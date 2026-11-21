@@ -1,4 +1,3 @@
-import { PositiveInt, sqliteTrue } from "@linky-fit/linksync";
 import { Option, Schema } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { LOCAL_MINT_INFO_STORAGE_KEY_PREFIX } from "../../../utils/constants";
@@ -137,7 +136,7 @@ export const touchedMintInfoRows = (
   nowSec: number,
 ): LocalMintInfoRow[] | null => {
   const existing = getMintInfoByUrlMap(rows).get(mintUrl);
-  const now = PositiveInt.orThrow(Math.floor(nowSec));
+  const now = Math.max(1, Math.floor(nowSec));
   if (!existing || isMintDeletedRow(existing)) {
     return [
       ...rows,
@@ -207,7 +206,5 @@ export const deletedMintInfoRows = (
   mintUrl: string,
 ): LocalMintInfoRow[] =>
   rows.map((row) =>
-    normalizeMintUrl(row.url) === mintUrl
-      ? { ...row, isDeleted: sqliteTrue }
-      : row,
+    normalizeMintUrl(row.url) === mintUrl ? { ...row, isDeleted: 1 } : row,
   );

@@ -1,24 +1,22 @@
 import {
   activeNostrIdentityId,
-  NonEmptyString100,
-  NonEmptyString1000,
   OwnerId,
-  PositiveInt,
-  type NostrIdentityRow,
+  type NostrIdentityRecord,
 } from "@linky-fit/linksync";
 import { describe, expect, it } from "vitest";
 import { toSyncedNostrIdentity } from "./syncedNostrIdentity";
 
-const row = (overrides: Partial<NostrIdentityRow> = {}): NostrIdentityRow => ({
+const row = (
+  overrides: Partial<NostrIdentityRecord> = {},
+): NostrIdentityRecord => ({
   id: activeNostrIdentityId,
-  nsec: NonEmptyString1000.orThrow("nsec1abc"),
+  nsec: "nsec1abc",
   npub: null,
   source: null,
   switchedAtSec: null,
   ownerId: OwnerId.orThrow("AAAAAAAAAAAAAAAAAAAAAA"),
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
-  isDeleted: null,
   ...overrides,
 });
 
@@ -36,9 +34,9 @@ describe("toSyncedNostrIdentity", () => {
     expect(
       toSyncedNostrIdentity(
         row({
-          npub: NonEmptyString1000.orThrow("npub1xyz"),
-          source: NonEmptyString100.orThrow("derived"),
-          switchedAtSec: PositiveInt.orThrow(123),
+          npub: "npub1xyz",
+          source: "derived",
+          switchedAtSec: 123,
         }),
       ),
     ).toEqual({

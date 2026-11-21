@@ -1,7 +1,31 @@
 export { makeContactsRepository } from "./contacts";
-export type { ContactsRepository } from "./contacts";
+export type {
+  ContactInsert,
+  ContactPatch,
+  ContactRecord,
+  ContactsRepository,
+} from "./contacts";
 export { makeConversationsRepository } from "./conversations";
-export type { ConversationsRepository, PeerSeenWindow } from "./conversations";
+export type {
+  ConversationRecord,
+  ConversationsRepository,
+  MessageInsert,
+  MessagePatch,
+  MessageRecord,
+  PeerSeenWindow,
+  ReactionInsert,
+  ReactionPatch,
+  ReactionRecord,
+} from "./conversations";
+export { domainTableRepository } from "./domainRepository";
+export type {
+  DomainPatch,
+  DomainRow,
+  DomainTableRepository,
+  DomainValue,
+  DomainWriteRow,
+  RecordMeta,
+} from "./domainRepository";
 export {
   listingKey,
   listingKeysOf,
@@ -9,28 +33,49 @@ export {
   makePinnedListingsRepository,
 } from "./listingMarks";
 export type {
+  HiddenListingRecord,
   HiddenListingsRepository,
+  PinnedListingRecord,
   PinnedListingsRepository,
 } from "./listingMarks";
 export { makeIdentityRepository } from "./identity";
-export type { IdentityRepository } from "./identity";
+export type {
+  IdentityInput,
+  IdentityRepository,
+  NostrIdentityRecord,
+} from "./identity";
 export { makeInboxCursorsRepository } from "./inboxCursors";
+export type { InboxCursorsRepository } from "./inboxCursors";
 export { makeKeryxSubscriptionsRepository } from "./keryxSubscriptions";
 export type {
+  KeryxSubscriptionInsert,
+  KeryxSubscriptionPatch,
   KeryxSubscriptionRecord,
+  KeryxSubscriptionStoredRow,
   KeryxSubscriptionsRepository,
 } from "./keryxSubscriptions";
-export type { InboxCursorsRepository } from "./inboxCursors";
 export {
   makeOnchainTransferMessagesRepository,
   makeOnchainTransfersRepository,
 } from "./onchainTransfers";
 export type {
+  OnchainTransferInsert,
+  OnchainTransferMessageInsert,
+  OnchainTransferMessageRecord,
   OnchainTransferMessagesRepository,
+  OnchainTransferPatch,
   OnchainTransferRecord,
+  OnchainTransferStoredRow,
   OnchainTransfersRepository,
 } from "./onchainTransfers";
 export { makeListingsRepository, normalizeListing } from "./listings";
+export type {
+  ListingInsert,
+  ListingPatch,
+  ListingRecord,
+  ListingStoredRow,
+  ListingsRepository,
+} from "./listings";
 export {
   makePeerListingsRepository,
   normalizePeerListings,
@@ -38,8 +83,8 @@ export {
 export type {
   PeerListingsRecord,
   PeerListingsRepository,
+  PeerListingsStoredRow,
 } from "./peerListings";
-export type { ListingRecord, ListingsRepository } from "./listings";
 export { makeSettingsRepository } from "./settings";
 export type { SettingsRepository } from "./settings";
 export {
@@ -47,7 +92,10 @@ export {
   normalizeRecurringPayment,
 } from "./recurringPayments";
 export type {
+  RecurringPaymentInsert,
+  RecurringPaymentPatch,
   RecurringPaymentRecord,
+  RecurringPaymentStoredRow,
   RecurringPaymentsRepository,
 } from "./recurringPayments";
 export { tableRepository } from "./tableRepository";
@@ -64,12 +112,19 @@ export {
 export type {
   TransactionCategory,
   TransactionDirection,
+  TransactionInsert,
+  TransactionPatch,
   TransactionRecord,
   TransactionStatus,
+  TransactionStoredRow,
   TransactionsRepository,
 } from "./transactions";
 export { makeUnknownSendersRepository } from "./unknownSenders";
-export type { UnknownSendersRepository } from "./unknownSenders";
+export type {
+  UnknownSenderMessageInsert,
+  UnknownSenderMessageRecord,
+  UnknownSendersRepository,
+} from "./unknownSenders";
 export {
   makeWalletRepository,
   toStoredOperation,

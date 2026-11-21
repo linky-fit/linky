@@ -10,10 +10,7 @@ import {
   createId,
   createIdFromString,
   listingKey,
-  NonEmptyString100,
-  NonEmptyString1000,
   OwnerId,
-  PositiveInt,
   type ListingRecord,
 } from "@linky-fit/linksync";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
@@ -47,12 +44,12 @@ const bike = new Listing({ ...peerListing, id: "bike", title: "Old bike" });
 
 const ownRecord: ListingRecord = {
   id: ownId,
-  createdAtSec: PositiveInt.orThrow(100),
-  side: NonEmptyString100.orThrow("want"),
-  title: NonEmptyString1000.orThrow("Babysitting"),
-  amount: NonEmptyString100.orThrow("200"),
-  currency: NonEmptyString100.orThrow("CZK"),
-  unit: NonEmptyString100.orThrow("per hour"),
+  createdAtSec: 100,
+  side: "want",
+  title: "Babysitting",
+  amount: "200",
+  currency: "CZK",
+  unit: "per hour",
   priceByAgreement: null,
   description: null,
   image: null,
@@ -60,7 +57,6 @@ const ownRecord: ListingRecord = {
   pausedAtSec: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
-  isDeleted: 0,
   ownerId: OwnerId.orThrow(createId()),
 };
 
@@ -150,7 +146,7 @@ vi.mock("../app/hooks/useLinksync", () => ({
   useListingRecords: () => [
     {
       ...ownRecord,
-      pausedAtSec: state.ownPaused ? PositiveInt.orThrow(150) : null,
+      pausedAtSec: state.ownPaused ? 150 : null,
     },
   ],
 }));

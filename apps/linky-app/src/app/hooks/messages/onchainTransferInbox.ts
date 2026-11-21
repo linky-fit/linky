@@ -1,5 +1,5 @@
 import type {
-  OnchainTransferRow,
+  OnchainTransferStoredRow,
   OnchainTransfersRepository,
 } from "@linky-fit/linksync";
 import type { AppMessageReceived, Pubkey } from "@linky-fit/linkstr";
@@ -17,7 +17,7 @@ export interface OnchainTransferInboxContext {
   /** Runs once a newer update was stored, e.g. to tell the user. */
   readonly onUpdated?: (
     update: OnchainTransferUpdate,
-    transfer: OnchainTransferRow,
+    transfer: OnchainTransferStoredRow,
   ) => void;
 }
 

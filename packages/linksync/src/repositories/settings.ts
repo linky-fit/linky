@@ -1,6 +1,6 @@
-import { NonEmptyString100, NonEmptyString1000 } from "@linky-fit/domain";
+import { createIdFromString } from "@linky-fit/domain";
 import { Effect, Option, Schema } from "effect";
-import type { ShardDbError } from "../core";
+import { ShardDbError } from "../core";
 import { settingIdFor, type SettingId } from "../model/ids";
 import type { LinkyDbSchema } from "../model/schema";
 import {
@@ -9,7 +9,10 @@ import {
   type SettingValues,
 } from "../model/settings";
 import type { LinkyStore } from "../model/store";
-import { tableRepository, type TableRepository } from "./tableRepository";
+import {
+  domainTableRepository,
+  type DomainTableRepository,
+} from "./domainRepository";
 
 export interface SettingsRepository {
   readonly get: <K extends SettingKey>(
@@ -20,10 +23,22 @@ export interface SettingsRepository {
     value: SettingValues[K],
   ) => Effect.Effect<void, ShardDbError>;
   readonly remove: (key: SettingKey) => Effect.Effect<void, ShardDbError>;
+  /** Reads a setting outside `LinkySettings` (e.g. another app sharing the account), or `null` when absent. */
+  readonly getRaw: (key: string) => Effect.Effect<string | null>;
+  /** Writes a setting outside `LinkySettings`; key must be 1–100 chars and value 1–1000 chars. */
+  readonly setRaw: (
+    key: string,
+    value: string,
+  ) => Effect.Effect<void, ShardDbError>;
+  /** Removes a setting outside `LinkySettings`; a no-op when absent. */
+  readonly removeRaw: (key: string) => Effect.Effect<void, ShardDbError>;
   readonly subscribe: (listener: () => void) => () => void;
 }
 
-type SettingTable = TableRepository<LinkyDbSchema["setting"]>;
+type SettingTable = DomainTableRepository<LinkyDbSchema["setting"]>;
+
+const rawSettingIdFor = (key: string): SettingId =>
+  createIdFromString<"Setting">(`setting/${key}`);
 
 /** The decoded value of a setting row, or `null` when it is absent or unreadable. */
 export const readSetting = <A, I extends string>(
@@ -37,6 +52,13 @@ export const readSetting = <A, I extends string>(
       : Option.getOrNull(Schema.decodeUnknownOption(schema)(row.value)),
   );
 
+const writeRawSetting = (
+  table: SettingTable,
+  id: SettingId,
+  key: string,
+  value: string,
+): Effect.Effect<void, ShardDbError> => table.insert({ id, key, value });
+
 export const writeSetting = <A, I extends string>(
   table: SettingTable,
   id: SettingId,
@@ -44,20 +66,23 @@ export const writeSetting = <A, I extends string>(
   schema: Schema.Codec<A, I>,
   value: A,
 ): Effect.Effect<void, ShardDbError> =>
-  Effect.flatMap(table.byId(id), (existing) => {
-    const column = NonEmptyString1000.orThrow(Schema.encodeSync(schema)(value));
-    return existing === null
-      ? table.insert({ id, key: NonEmptyString100.orThrow(key), value: column })
-      : table
-          .update(id, { value: column })
-          .pipe(Effect.catchTag("RowNotFound", () => Effect.void));
-  });
+  Effect.flatMap(
+    Effect.try({
+      try: () => Schema.encodeSync(schema)(value),
+      catch: (error) =>
+        new ShardDbError({
+          table: "setting",
+          message: `invalid ${key}: ${error instanceof Error ? error.message : String(error)}`,
+        }),
+    }),
+    (encoded) => writeRawSetting(table, id, key, encoded),
+  );
 
-/** Small synced values in the app owner, one row per `LinkySettings` key. */
+/** Small synced values in the app owner, one row per setting key. */
 export const makeSettingsRepository = (
   store: LinkyStore,
 ): SettingsRepository => {
-  const table = tableRepository(store, "meta", "setting");
+  const table = domainTableRepository(store, "meta", "setting");
   return {
     get: (key) => readSetting(table, settingIdFor(key), LinkySettings[key]),
     set: (key, value) =>
@@ -65,6 +90,14 @@ export const makeSettingsRepository = (
     remove: (key) =>
       table
         .remove(settingIdFor(key))
+        .pipe(Effect.catchTag("RowNotFound", () => Effect.void)),
+    getRaw: (key) =>
+      Effect.map(table.byId(rawSettingIdFor(key)), (row) => row?.value ?? null),
+    setRaw: (key, value) =>
+      writeRawSetting(table, rawSettingIdFor(key), key, value),
+    removeRaw: (key) =>
+      table
+        .remove(rawSettingIdFor(key))
         .pipe(Effect.catchTag("RowNotFound", () => Effect.void)),
     subscribe: table.subscribe,
   };

@@ -1,13 +1,9 @@
 import {
   createId,
   directConversationIdFor,
-  NonEmptyString,
-  NonEmptyString100,
-  NonEmptyString1000,
   OwnerId,
-  PositiveInt,
-  type ConversationRow,
-  type MessageRow,
+  type ConversationRecord,
+  type MessageRecord,
 } from "@linky-fit/linksync";
 import { describe, expect, it } from "vitest";
 import {
@@ -25,21 +21,20 @@ const system = {
   ownerId: OwnerId.orThrow("AAAAAAAAAAAAAAAAAAAAAA"),
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
-  isDeleted: null,
 };
 
 const contactId = createId<"Contact">();
 const conversationId = directConversationIdFor(contactId);
 
-const messageRow = (overrides: Partial<MessageRow> = {}): MessageRow => ({
+const messageRow = (overrides: Partial<MessageRecord> = {}): MessageRecord => ({
   id: createId<"Message">(),
   conversationId,
-  direction: NonEmptyString100.orThrow("in"),
-  content: NonEmptyString.orThrow("hello"),
-  wrapId: NonEmptyString1000.orThrow("wrap-1"),
+  direction: "in",
+  content: "hello",
+  wrapId: "wrap-1",
   rumorId: null,
   pubkey: null,
-  createdAtSec: PositiveInt.orThrow(1_700_000_000),
+  createdAtSec: 1_700_000_000,
   clientId: null,
   status: null,
   localOnly: null,
@@ -58,9 +53,9 @@ const messageRow = (overrides: Partial<MessageRow> = {}): MessageRow => ({
 describe("contactIdByConversationId", () => {
   it("maps through the conversation rows and derives the rest from the contacts", () => {
     const other = createId<"Contact">();
-    const conversation: ConversationRow = {
+    const conversation: ConversationRecord = {
       id: createId<"Conversation">(),
-      kind: NonEmptyString100.orThrow("direct"),
+      kind: "direct",
       contactId: other,
       participantsJson: null,
       archivedAtSec: null,
@@ -78,9 +73,9 @@ describe("contactIdByConversationId", () => {
 describe("toLocalNostrMessage", () => {
   it("reads a row into the UI shape and drops one without a contact", () => {
     const row = messageRow({
-      clientId: NonEmptyString1000.orThrow("client-1"),
-      isEdited: NonEmptyString100.orThrow("1"),
-      status: NonEmptyString100.orThrow("pending"),
+      clientId: "client-1",
+      isEdited: "1",
+      status: "pending",
     });
     expect(toLocalNostrMessage(row, contactId)).toMatchObject({
       id: row.id,
@@ -250,6 +245,51 @@ describe("patches", () => {
       wrapId: "w2",
       status: "sent",
     });
+  });
+
+  it("drops unsafe integer timestamps so Evolu PositiveInt validation never rejects the row", () => {
+    const unsafeSec = Number.MAX_SAFE_INTEGER + 2;
+    expect(
+      toMessageWriteRow(
+        createId<"Message">(),
+        conversationId,
+        {
+          contactId,
+          direction: "in",
+          content: "hi",
+          wrapId: "wrap-unsafe",
+          rumorId: null,
+          pubkey: "",
+          createdAtSec: unsafeSec,
+        },
+        "wrap-unsafe",
+      ),
+    ).toBeNull();
+    const row = toMessageWriteRow(
+      createId<"Message">(),
+      conversationId,
+      {
+        contactId,
+        direction: "in",
+        content: "hi",
+        wrapId: "wrap-unsafe-opt",
+        rumorId: null,
+        pubkey: "",
+        createdAtSec: 1_700_000_001,
+        editedAtSec: unsafeSec,
+        deletedAtSec: unsafeSec,
+      },
+      "wrap-unsafe-opt",
+    );
+    expect(row).not.toBeNull();
+    expect(row?.editedAtSec).toBeUndefined();
+    expect(row?.deletedAtSec).toBeUndefined();
+    expect(
+      toMessagePatch({
+        id: "m",
+        editedAtSec: unsafeSec,
+      }),
+    ).toEqual({ editedAtSec: null });
   });
 });
 

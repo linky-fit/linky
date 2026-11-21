@@ -1,11 +1,5 @@
 import { OperationId, StoredOperation } from "@linky-fit/linkshu";
-import {
-  NonEmptyString,
-  NonEmptyString1000,
-  OwnerId,
-  PositiveInt,
-  transactionIdForOperation,
-} from "@linky-fit/linksync";
+import { OwnerId, transactionIdForOperation } from "@linky-fit/linksync";
 import type { TransactionRecord } from "@linky-fit/linksync";
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
@@ -24,8 +18,7 @@ const makeRow = (
   ownerId,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
-  isDeleted: null,
-  createdAtSec: PositiveInt.orThrow(1_700_000_000),
+  createdAtSec: 1_700_000_000,
   direction: "out",
   status: "ok",
   category: "cashu",
@@ -68,8 +61,7 @@ const operation = (
     ...overrides,
   });
 
-const details = (value: object) =>
-  NonEmptyString.orThrow(JSON.stringify(value));
+const details = (value: object) => JSON.stringify(value);
 
 describe("buildTransactionHistory", () => {
   it("preserves absent amounts and fees instead of displaying zero", () => {
@@ -88,20 +80,16 @@ describe("buildTransactionHistory", () => {
 
   it("merges emitted token details into its eventual spend", () => {
     const issued = makeRow({
-      detailsJson: NonEmptyString.orThrow(
-        JSON.stringify({
-          issuedTokenId: "token-id",
-          invoice: "stored invoice",
-        }),
-      ),
+      detailsJson: JSON.stringify({
+        issuedTokenId: "token-id",
+        invoice: "stored invoice",
+      }),
     });
     const spent = makeRow({
       id: TransactionId.orThrow("AQEBAQEBAQEBAQEBAQEBAQ"),
-      createdAtSec: PositiveInt.orThrow(1_700_000_001),
-      amount: PositiveInt.orThrow(42),
-      detailsJson: NonEmptyString.orThrow(
-        JSON.stringify({ usedTokenIds: ["token-id"] }),
-      ),
+      createdAtSec: 1_700_000_001,
+      amount: 42,
+      detailsJson: JSON.stringify({ usedTokenIds: ["token-id"] }),
     });
     const { transactions } = buildTransactionHistory([issued, spent], []);
     expect(transactions).toHaveLength(1);
@@ -126,7 +114,7 @@ describe("buildTransactionHistory", () => {
       [
         makeRow({
           status: "pending",
-          mint: NonEmptyString1000.orThrow("https://mint.example"),
+          mint: "https://mint.example",
           detailsJson: details({ meltQuoteId: "quote-1" }),
         }),
       ],
@@ -165,7 +153,7 @@ describe("buildTransactionHistory", () => {
         makeRow({ status: "error" }),
         makeRow({
           id: transactionIdForOperation(send.id),
-          createdAtSec: PositiveInt.orThrow(1_700_000_001),
+          createdAtSec: 1_700_000_001,
         }),
       ],
       [send],
@@ -233,7 +221,7 @@ describe("buildTransactionHistory", () => {
           id: transactionIdForOperation(receive.id),
           direction: "in",
           detailsJson: gained,
-          createdAtSec: PositiveInt.orThrow(1_700_000_001),
+          createdAtSec: 1_700_000_001,
         }),
       ],
       [receive],
@@ -246,7 +234,7 @@ describe("buildTransactionHistory", () => {
 
   it("keeps the best of rows that record one event and hides the rest", () => {
     const quote = details({ meltQuoteId: "quote-1" });
-    const mint = NonEmptyString1000.orThrow("https://mint.example");
+    const mint = "https://mint.example";
     const first = makeRow({
       id: TransactionId.orThrow("AQEBAQEBAQEBAQEBAQEBAQ"),
       mint,
@@ -256,7 +244,7 @@ describe("buildTransactionHistory", () => {
       id: TransactionId.orThrow("AgICAgICAgICAgICAgICAg"),
       mint,
       detailsJson: quote,
-      createdAtSec: PositiveInt.orThrow(1_700_000_005),
+      createdAtSec: 1_700_000_005,
     });
     const { transactions } = buildTransactionHistory(
       [later, first],

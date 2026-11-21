@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { toContactTextFields, toEvoluText } from "./contactFields";
+import { toContactText, toContactTextFields } from "./contactFields";
 
 describe("contact field conversion", () => {
   it("trims contact text and preserves the length boundary", () => {
-    expect(toEvoluText(" Alice ")).toBe("Alice");
-    expect(toEvoluText("a".repeat(1000))).toHaveLength(1000);
-    expect(toEvoluText("a".repeat(1001))).toBeNull();
-    expect(toEvoluText("   ")).toBeNull();
-    expect(toEvoluText(undefined)).toBeNull();
+    expect(toContactText(" Alice ")).toBe("Alice");
+    expect(toContactText("a".repeat(1000))).toHaveLength(1000);
+    expect(toContactText("a".repeat(1001))).toBeNull();
+    expect(toContactText("   ")).toBeNull();
+    expect(toContactText(undefined)).toBeNull();
   });
 
   it("converts imported and migrated contact fields consistently", () => {

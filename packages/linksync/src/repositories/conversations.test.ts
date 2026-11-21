@@ -1,15 +1,6 @@
-import { PositiveInt } from "@evolu/common";
-import {
-  createId,
-  directConversationIdFor,
-  NonEmptyString,
-  NonEmptyString100,
-  NonEmptyString1000,
-} from "@linky-fit/domain";
+import { createId, directConversationIdFor } from "@linky-fit/domain";
 import { linkyStore, runNow } from "../testing/linky";
 import { makeConversationsRepository } from "./conversations";
-
-const sec = (value: number) => PositiveInt.orThrow(value);
 
 describe("conversations repository", () => {
   it("creates the direct conversation of a contact once, with a derived id", () => {
@@ -28,8 +19,8 @@ describe("conversations repository", () => {
     const { store } = linkyStore();
     const conversations = makeConversationsRepository(store);
     const { id } = runNow(conversations.ensureDirect(createId<"Contact">()));
-    runNow(conversations.markSeen(id, sec(200)));
-    runNow(conversations.markSeen(id, sec(100)));
+    runNow(conversations.markSeen(id, 200));
+    runNow(conversations.markSeen(id, 100));
     expect(runNow(conversations.byId(id))?.lastSeenAtSec).toBe(200);
   });
 
@@ -37,9 +28,7 @@ describe("conversations repository", () => {
     const { store } = linkyStore();
     const conversations = makeConversationsRepository(store);
     const { id } = runNow(conversations.ensureDirect(createId<"Contact">()));
-    runNow(
-      conversations.setPeerSeen(id, { sinceSec: sec(10), atSec: sec(20) }),
-    );
+    runNow(conversations.setPeerSeen(id, { sinceSec: 10, atSec: 20 }));
     expect(runNow(conversations.byId(id))).toMatchObject({
       peerSeenSinceSec: 10,
       peerSeenAtSec: 20,
@@ -54,10 +43,10 @@ describe("conversations repository", () => {
     const message = (conversationId: typeof a.id, content: string) => ({
       id: createId<"Message">(),
       conversationId,
-      direction: NonEmptyString100.orThrow("in"),
-      content: NonEmptyString.orThrow(content),
-      wrapId: NonEmptyString1000.orThrow(`wrap-${content}`),
-      createdAtSec: sec(1),
+      direction: "in",
+      content,
+      wrapId: `wrap-${content}`,
+      createdAtSec: 1,
     });
     runNow(conversations.messages.insert(message(a.id, "hi a")));
     runNow(conversations.messages.insert(message(b.id, "hi b")));
@@ -65,11 +54,11 @@ describe("conversations repository", () => {
       conversations.reactions.insert({
         id: createId<"Reaction">(),
         conversationId: a.id,
-        messageId: NonEmptyString1000.orThrow("rumor"),
-        reactorPubkey: NonEmptyString1000.orThrow("pk"),
-        emoji: NonEmptyString100.orThrow("👍"),
-        createdAtSec: sec(2),
-        wrapId: NonEmptyString1000.orThrow("wrap-r"),
+        messageId: "rumor",
+        reactorPubkey: "pk",
+        emoji: "👍",
+        createdAtSec: 2,
+        wrapId: "wrap-r",
       }),
     );
     expect(
@@ -88,11 +77,11 @@ describe("conversations repository", () => {
       conversations.reactions.insert({
         id,
         conversationId: chat.id,
-        messageId: NonEmptyString1000.orThrow("rumor"),
-        reactorPubkey: NonEmptyString1000.orThrow("pk"),
-        emoji: NonEmptyString100.orThrow("👍"),
-        createdAtSec: sec(2),
-        wrapId: NonEmptyString1000.orThrow("wrap-removed"),
+        messageId: "rumor",
+        reactorPubkey: "pk",
+        emoji: "👍",
+        createdAtSec: 2,
+        wrapId: "wrap-removed",
       }),
     );
     runNow(conversations.reactions.remove(id));
@@ -107,7 +96,7 @@ describe("conversations repository", () => {
     const conversations = makeConversationsRepository(store);
     const { id } = runNow(conversations.ensureDirect(createId<"Contact">()));
     runNow(store.rotate("messages"));
-    runNow(conversations.markSeen(id, sec(50)));
+    runNow(conversations.markSeen(id, 50));
     const live = runNow(conversations.all);
     expect(live).toHaveLength(1);
     expect(live[0]?.ownerId).toBe(store.shardOwner("messages", 1).id);

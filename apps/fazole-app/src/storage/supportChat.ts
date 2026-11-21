@@ -2,13 +2,9 @@ import type { ClientId, Pubkey, RumorId } from "@linky-fit/linkstr";
 import {
   createIdFromString,
   directConversationIdFor,
-  NonEmptyString,
-  NonEmptyString100,
-  NonEmptyString1000,
   nostrMessageIdFor,
-  PositiveInt,
   type ConversationsRepository,
-  type MessageRow,
+  type MessageRecord,
   type ShardDbError,
 } from "@linky-fit/linksync";
 import { Effect } from "effect";
@@ -34,17 +30,17 @@ export interface SupportMessageRecord {
   readonly clientId: ClientId | null;
 }
 
-const directionOf = (row: MessageRow) =>
+const directionOf = (row: MessageRecord) =>
   row.direction === "in" ? "in" : row.direction === "out" ? "out" : null;
 
-const statusOf = (row: MessageRow): SupportMessageStatus =>
+const statusOf = (row: MessageRecord): SupportMessageStatus =>
   row.status === "pending"
     ? "pending"
     : row.status === "failed"
       ? "failed"
       : "sent";
 
-const toSupportMessage = (row: MessageRow): SupportMessage | null => {
+const toSupportMessage = (row: MessageRecord): SupportMessage | null => {
   const direction = directionOf(row);
   return direction !== null && row.content !== null && row.createdAtSec !== null
     ? {
@@ -102,16 +98,14 @@ export const storeSupportMessage = (
     conversations.messages.insertIfAbsent({
       id: nostrMessageIdFor(message.rumorId),
       conversationId: supportConversationId,
-      direction: NonEmptyString100.orThrow(message.direction),
-      content: NonEmptyString.orThrow(message.text),
-      wrapId: NonEmptyString1000.orThrow(`pending:${message.rumorId}`),
-      rumorId: NonEmptyString1000.orThrow(message.rumorId),
-      pubkey: NonEmptyString1000.orThrow(message.author),
-      createdAtSec: PositiveInt.orThrow(message.createdAtSec),
-      status: NonEmptyString100.orThrow(message.status),
-      ...(message.clientId === null
-        ? {}
-        : { clientId: NonEmptyString1000.orThrow(message.clientId) }),
+      direction: message.direction,
+      content: message.text,
+      wrapId: `pending:${message.rumorId}`,
+      rumorId: message.rumorId,
+      pubkey: message.author,
+      createdAtSec: message.createdAtSec,
+      status: message.status,
+      ...(message.clientId === null ? {} : { clientId: message.clientId }),
     }),
   );
 
@@ -131,7 +125,7 @@ export const setSupportMessageStatus = (
     return row === undefined || row.status === status || row.status === "sent"
       ? Effect.void
       : conversations.messages
-          .update(row.id, { status: NonEmptyString100.orThrow(status) })
+          .update(row.id, { status })
           .pipe(Effect.catchTag("RowNotFound", () => Effect.void));
   });
 
@@ -142,6 +136,6 @@ export const markSupportChatSeen = (
 ): Effect.Effect<void, ShardDbError> =>
   Effect.flatMap(conversations.ensureDirect(supportContactId), () =>
     conversations
-      .markSeen(supportConversationId, PositiveInt.orThrow(atSec))
+      .markSeen(supportConversationId, atSec)
       .pipe(Effect.catchTag("RowNotFound", () => Effect.void)),
   );

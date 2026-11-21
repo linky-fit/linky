@@ -1,5 +1,3 @@
-import { NonEmptyString, NonEmptyString1000 } from "@linky-fit/domain";
-import { PositiveInt } from "@evolu/common";
 import { describe, expect, it } from "vitest";
 import { keryxSubscriptionIdFor } from "../model/ids";
 import { linkyStore, runNow } from "../testing/linky";
@@ -8,24 +6,20 @@ import { makeKeryxSubscriptionsRepository } from "./keryxSubscriptions";
 const origin = "https://keryx-demo.github.io";
 const id = keryxSubscriptionIdFor(origin);
 const trust = (snapshotVersion: number) =>
-  NonEmptyString.orThrow(
-    JSON.stringify({
-      rootJson: "{}",
-      timestampVersion: 1,
-      snapshotVersion,
-      metaVersions: {},
-    }),
-  );
+  JSON.stringify({
+    rootJson: "{}",
+    timestampVersion: 1,
+    snapshotVersion,
+    metaVersions: {},
+  });
 
 const subscription = (channels: ReadonlyArray<string> = ["news"]) => ({
   id,
-  origin: NonEmptyString1000.orThrow(origin),
+  origin,
   trustJson: trust(1),
-  identityJson: NonEmptyString.orThrow(
-    JSON.stringify({ companyName: "Keryx Demo" }),
-  ),
-  channelsJson: NonEmptyString1000.orThrow(JSON.stringify(channels)),
-  pairedAtSec: PositiveInt.orThrow(1_000),
+  identityJson: JSON.stringify({ companyName: "Keryx Demo" }),
+  channelsJson: JSON.stringify(channels),
+  pairedAtSec: 1_000,
 });
 
 describe("keryx subscriptions repository", () => {
@@ -68,9 +62,7 @@ describe("keryx subscriptions repository", () => {
     const { store } = linkyStore();
     const subscriptions = makeKeryxSubscriptionsRepository(store);
     runNow(subscriptions.insert(subscription()));
-    const privateFeedsJson = NonEmptyString.orThrow(
-      JSON.stringify([`${origin}/feed.json`]),
-    );
+    const privateFeedsJson = JSON.stringify([`${origin}/feed.json`]);
     runNow(subscriptions.update(id, { trustJson: trust(2), privateFeedsJson }));
     expect(runNow(subscriptions.byId(id))).toMatchObject({
       trustJson: trust(2),

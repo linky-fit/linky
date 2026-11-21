@@ -1,11 +1,8 @@
 // @vitest-environment jsdom
 import {
-  NonEmptyString,
-  NonEmptyString100,
   OwnerId,
-  PositiveInt,
   transactionIdForRequest,
-  type TransactionRow,
+  type TransactionStoredRow,
   type TransactionsRepository,
 } from "@linky-fit/linksync";
 import { Effect } from "effect";
@@ -202,20 +199,19 @@ describe("makePaymentLog", () => {
     const insert = vi.fn<TransactionInsert>(() => Effect.void);
     const update = vi.fn<Transactions["update"]>(() => Effect.void);
     const transactionId = transactionIdForRequest("request-1");
-    const existing: TransactionRow = {
+    const existing: TransactionStoredRow = {
       id: transactionId,
       ownerId: appOwnerId,
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
-      isDeleted: null,
-      createdAtSec: PositiveInt.orThrow(100),
-      direction: NonEmptyString100.orThrow("out"),
-      status: NonEmptyString100.orThrow("ok"),
+      createdAtSec: 100,
+      direction: "out",
+      status: "ok",
       amount: null,
       fee: null,
       method: null,
       note: null,
-      detailsJson: NonEmptyString.orThrow(JSON.stringify({ requestId: "r" })),
+      detailsJson: JSON.stringify({ requestId: "r" }),
       iconKind: null,
       contactId: null,
       mint: null,

@@ -1,45 +1,53 @@
-import { PositiveInt } from "@evolu/common";
-import { Effect } from "effect";
-import type { OwnerId } from "@evolu/common";
-import type { RowNotFound, ShardDbError } from "../core";
+import { PositiveInt, type OwnerId } from "@evolu/common";
 import {
   directConversationIdFor,
   type ContactId,
   type ConversationId,
-  NonEmptyString100,
 } from "@linky-fit/domain";
-import type {
-  ConversationRow,
-  LinkyDbSchema,
-  MessageRow,
-  ReactionRow,
-} from "../model/schema";
+import { Effect } from "effect";
+import { ShardDbError, type RowNotFound } from "../core";
+import type { LinkyDbSchema } from "../model/schema";
 import type { LinkyStore } from "../model/store";
-import { tableRepository, type TableRepository } from "./tableRepository";
+import {
+  domainTableRepository,
+  toDomainRow,
+  type DomainPatch,
+  type DomainRow,
+  type DomainTableRepository,
+  type DomainWriteRow,
+} from "./domainRepository";
+
+export type ConversationRecord = DomainRow<LinkyDbSchema["conversation"]>;
+export type MessageRecord = DomainRow<LinkyDbSchema["message"]>;
+export type MessageInsert = DomainWriteRow<LinkyDbSchema["message"]>;
+export type MessagePatch = DomainPatch<LinkyDbSchema["message"]>;
+export type ReactionRecord = DomainRow<LinkyDbSchema["reaction"]>;
+export type ReactionInsert = DomainWriteRow<LinkyDbSchema["reaction"]>;
+export type ReactionPatch = DomainPatch<LinkyDbSchema["reaction"]>;
 
 export interface PeerSeenWindow {
-  readonly sinceSec: PositiveInt | null;
-  readonly atSec: PositiveInt;
+  readonly sinceSec: number | null;
+  readonly atSec: number;
 }
 
-export interface ConversationsRepository extends TableRepository<
+export interface ConversationsRepository extends DomainTableRepository<
   LinkyDbSchema["conversation"]
 > {
-  readonly messages: TableRepository<LinkyDbSchema["message"]>;
-  readonly reactions: TableRepository<LinkyDbSchema["reaction"]>;
+  readonly messages: DomainTableRepository<LinkyDbSchema["message"]>;
+  readonly reactions: DomainTableRepository<LinkyDbSchema["reaction"]>;
   /** The direct chat with a contact, created on first use; the id is derived from the contact id. */
   readonly ensureDirect: (
     contactId: ContactId,
-  ) => Effect.Effect<ConversationRow, ShardDbError>;
+  ) => Effect.Effect<ConversationRecord, ShardDbError>;
   readonly forContact: (
     contactId: ContactId,
-  ) => Effect.Effect<ConversationRow | null>;
+  ) => Effect.Effect<ConversationRecord | null>;
   readonly messagesIn: (
     conversationId: ConversationId,
-  ) => Effect.Effect<ReadonlyArray<MessageRow>>;
+  ) => Effect.Effect<ReadonlyArray<MessageRecord>>;
   readonly reactionsIn: (
     conversationId: ConversationId,
-  ) => Effect.Effect<ReadonlyArray<ReactionRow>>;
+  ) => Effect.Effect<ReadonlyArray<ReactionRecord>>;
   /**
    * When the oldest messages shard this device reads began (its earliest
    * row), or null when the device reads the scope from its first shard. Read
@@ -47,11 +55,11 @@ export interface ConversationsRepository extends TableRepository<
    */
   readonly visibleSinceSec: Effect.Effect<number | null>;
   /** Tombstoned reaction copies in the visible shards, so a removed reaction's wrap is still known. */
-  readonly removedReactions: Effect.Effect<ReadonlyArray<ReactionRow>>;
+  readonly removedReactions: Effect.Effect<ReadonlyArray<ReactionRecord>>;
   /** Moves the read cursor forward; never backwards. */
   readonly markSeen: (
     conversationId: ConversationId,
-    atSec: PositiveInt,
+    atSec: number,
   ) => Effect.Effect<void, ShardDbError | RowNotFound>;
   readonly setPeerSeen: (
     conversationId: ConversationId,
@@ -59,15 +67,17 @@ export interface ConversationsRepository extends TableRepository<
   ) => Effect.Effect<void, ShardDbError | RowNotFound>;
 }
 
-const DIRECT = NonEmptyString100.orThrow("direct");
-
 /** Chats with their cursors, plus the messages and reactions in them. */
 export const makeConversationsRepository = (
   store: LinkyStore,
 ): ConversationsRepository => {
-  const conversations = tableRepository(store, "messages", "conversation");
-  const messages = tableRepository(store, "messages", "message");
-  const reactions = tableRepository(store, "messages", "reaction");
+  const conversations = domainTableRepository(
+    store,
+    "messages",
+    "conversation",
+  );
+  const messages = domainTableRepository(store, "messages", "message");
+  const reactions = domainTableRepository(store, "messages", "reaction");
 
   const forContact = (contactId: ContactId) =>
     conversations.byId(directConversationIdFor(contactId));
@@ -121,11 +131,9 @@ export const makeConversationsRepository = (
           Effect.flatMap((sinceSec) =>
             conversations.insert({
               id,
-              kind: DIRECT,
+              kind: "direct",
               contactId,
-              ...(sinceSec === null
-                ? {}
-                : { lastSeenAtSec: PositiveInt.orThrow(sinceSec) }),
+              ...(sinceSec === null ? {} : { lastSeenAtSec: sinceSec }),
             }),
           ),
           Effect.flatMap(() => conversations.byId(id)),
@@ -146,14 +154,23 @@ export const makeConversationsRepository = (
       ),
     visibleSinceSec,
     removedReactions: Effect.map(store.copies("messages", "reaction"), (rows) =>
-      rows.filter((row) => row.isDeleted === 1),
+      rows
+        .filter((row) => row.isDeleted === 1)
+        .map((row) => toDomainRow("reaction", row)),
     ),
     markSeen: (conversationId, atSec) =>
-      Effect.flatMap(conversations.byId(conversationId), (row) =>
-        row !== null && (row.lastSeenAtSec ?? 0) >= atSec
-          ? Effect.void
-          : conversations.update(conversationId, { lastSeenAtSec: atSec }),
-      ),
+      !PositiveInt.is(atSec)
+        ? Effect.fail(
+            new ShardDbError({
+              table: "conversation",
+              message: "invalid lastSeenAtSec",
+            }),
+          )
+        : Effect.flatMap(conversations.byId(conversationId), (row) =>
+            row !== null && (row.lastSeenAtSec ?? 0) >= atSec
+              ? Effect.void
+              : conversations.update(conversationId, { lastSeenAtSec: atSec }),
+          ),
     setPeerSeen: (conversationId, window) =>
       conversations.update(conversationId, {
         peerSeenSinceSec: window.sinceSec,

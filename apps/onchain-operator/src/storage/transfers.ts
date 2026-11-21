@@ -1,16 +1,11 @@
 import type { OnchainTransferId } from "@linky-fit/domain";
 import { OperationId } from "@linky-fit/linkshu";
 import { Pubkey } from "@linky-fit/linkstr";
-import {
-  NonEmptyString100,
-  NonEmptyString1000,
-  NonNegativeInt,
-  PositiveInt,
-  sqliteTrue,
-  type OnchainTransferRecord,
-  type OnchainTransfersRepository,
-  type RowNotFound,
-  type ShardDbError,
+import type {
+  OnchainTransferRecord,
+  OnchainTransfersRepository,
+  RowNotFound,
+  ShardDbError,
 } from "@linky-fit/linksync";
 import {
   decodeTransferUpdateColumn,
@@ -35,7 +30,7 @@ const isClosedByHand = Schema.is(Schema.Literals(closedByHandOutcomes));
 const refundOf = (row: OnchainTransferRecord): OnchainTransferRefund | null =>
   row.refundAddress !== null
     ? { to: "address", address: row.refundAddress }
-    : row.refundToSender === sqliteTrue
+    : row.refundToSender === true
       ? { to: "sender" }
       : null;
 
@@ -67,7 +62,7 @@ export const toOperatorTransfer = (
         closedByHand: isClosedByHand(row.closedByHand)
           ? row.closedByHand
           : null,
-        isTest: row.isTest === sqliteTrue,
+        isTest: row.isTest === true,
       }
     : null;
 
@@ -101,27 +96,23 @@ export const insertRequest = (
 ): Effect.Effect<boolean, ShardDbError> =>
   transfers.insertIfAbsent({
     id: request.transferId,
-    createdAtSec: PositiveInt.orThrow(receivedAtSec),
-    role: NonEmptyString100.orThrow(OPERATOR),
-    peerPubkey: NonEmptyString100.orThrow(user),
-    direction: NonEmptyString100.orThrow(request.direction),
-    amount: PositiveInt.orThrow(request.amount ?? fallbackAmount),
-    feeBasisPoints: NonNegativeInt.orThrow(request.feeBasisPoints),
+    createdAtSec: receivedAtSec,
+    role: OPERATOR,
+    peerPubkey: user,
+    direction: request.direction,
+    amount: request.amount ?? fallbackAmount,
+    feeBasisPoints: request.feeBasisPoints,
     ...(request.payoutAddress === undefined
       ? {}
-      : { payoutAddress: NonEmptyString1000.orThrow(request.payoutAddress) }),
+      : { payoutAddress: request.payoutAddress }),
     ...(request.refund?.to === "address"
-      ? { refundAddress: NonEmptyString1000.orThrow(request.refund.address) }
+      ? { refundAddress: request.refund.address }
       : request.refund?.to === "sender"
-        ? { refundToSender: sqliteTrue }
+        ? { refundToSender: true }
         : {}),
     ...(request.paymentRequest === undefined
       ? {}
-      : {
-          userPaymentRequest: NonEmptyString1000.orThrow(
-            request.paymentRequest,
-          ),
-        }),
+      : { userPaymentRequest: request.paymentRequest }),
   });
 
 /** Stores the update the operator sends, with what accepting a transfer fixes. */
@@ -135,22 +126,16 @@ export const saveUpdate = (
   } = {},
 ): Effect.Effect<void, ShardDbError | RowNotFound> =>
   transfers.update(update.transferId, {
-    updateJson: NonEmptyString1000.orThrow(encodeTransferUpdateColumn(update)),
+    updateJson: encodeTransferUpdateColumn(update),
     ...(accepted.operatorPaymentRequest === undefined
       ? {}
-      : {
-          operatorPaymentRequest: NonEmptyString1000.orThrow(
-            accepted.operatorPaymentRequest,
-          ),
-        }),
+      : { operatorPaymentRequest: accepted.operatorPaymentRequest }),
     ...(accepted.depositAddress === undefined
       ? {}
-      : {
-          depositAddress: NonEmptyString1000.orThrow(accepted.depositAddress),
-        }),
+      : { depositAddress: accepted.depositAddress }),
     ...(accepted.addressIndex === undefined
       ? {}
-      : { addressIndex: NonNegativeInt.orThrow(accepted.addressIndex) }),
+      : { addressIndex: accepted.addressIndex }),
   });
 
 /** Records when the transfer's user asked to cancel it. */
@@ -159,7 +144,7 @@ export const markUserCancelled = (
   id: OnchainTransferId,
   atSec: number,
 ): Effect.Effect<void, ShardDbError | RowNotFound> =>
-  transfers.update(id, { cancelledAtSec: PositiveInt.orThrow(atSec) });
+  transfers.update(id, { cancelledAtSec: atSec });
 
 /** Records the wallet send carrying the transfer's Cashu before its message is queued; `null` once it left or was taken back. */
 export const saveEcashSend = (
@@ -167,10 +152,7 @@ export const saveEcashSend = (
   id: OnchainTransferId,
   operationId: OperationId | null,
 ): Effect.Effect<void, ShardDbError | RowNotFound> =>
-  transfers.update(id, {
-    ecashSendId:
-      operationId === null ? null : NonEmptyString100.orThrow(operationId),
-  });
+  transfers.update(id, { ecashSendId: operationId });
 
 /** Records the outcome the operator closed the transfer with by hand; `null` reopens it. */
 export const saveClosedByHand = (
@@ -178,9 +160,7 @@ export const saveClosedByHand = (
   id: OnchainTransferId,
   outcome: ClosedByHand | null,
 ): Effect.Effect<void, ShardDbError | RowNotFound> =>
-  transfers.update(id, {
-    closedByHand: outcome === null ? null : NonEmptyString100.orThrow(outcome),
-  });
+  transfers.update(id, { closedByHand: outcome });
 
 /** Marks the transfer a test transfer, or a real one again. */
 export const saveIsTest = (
@@ -188,4 +168,4 @@ export const saveIsTest = (
   id: OnchainTransferId,
   isTest: boolean,
 ): Effect.Effect<void, ShardDbError | RowNotFound> =>
-  transfers.update(id, { isTest: isTest ? sqliteTrue : null });
+  transfers.update(id, { isTest: isTest ? true : null });

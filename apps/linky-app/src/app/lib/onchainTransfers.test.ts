@@ -2,14 +2,7 @@ import {
   decodePaymentRequest,
   PaymentRequestId,
 } from "@linky-fit/linkshu/payment-request";
-import {
-  createId,
-  makeOnchainTransfersRepository,
-  NonEmptyString100,
-  NonEmptyString1000,
-  PositiveInt,
-  sqliteTrue,
-} from "@linky-fit/linksync";
+import { createId, makeOnchainTransfersRepository } from "@linky-fit/linksync";
 import {
   AppDataEvent,
   EventId,
@@ -118,19 +111,11 @@ const storedOnchainTransfer = (
       ...(update === undefined
         ? {}
         : {
-            updateJson: NonEmptyString1000.orThrow(
-              encodeTransferUpdateColumn(update(id)),
-            ),
+            updateJson: encodeTransferUpdateColumn(update(id)),
           }),
-      ...(sentAtSec === undefined
-        ? {}
-        : { sentAtSec: PositiveInt.orThrow(sentAtSec) }),
-      ...(cancelledAtSec === undefined
-        ? {}
-        : { cancelledAtSec: PositiveInt.orThrow(cancelledAtSec) }),
-      ...(payoutTxid === undefined
-        ? {}
-        : { payoutTxid: NonEmptyString100.orThrow(payoutTxid) }),
+      ...(sentAtSec === undefined ? {} : { sentAtSec }),
+      ...(cancelledAtSec === undefined ? {} : { cancelledAtSec }),
+      ...(payoutTxid === undefined ? {} : { payoutTxid }),
     }),
   );
   const [record] = Effect.runSync(transfers.all);
@@ -446,7 +431,7 @@ describe("planOnchainTransfer", () => {
       direction: "receive",
       amount: 100_000,
       feeBasisPoints: 100,
-      refundToSender: sqliteTrue,
+      refundToSender: true,
       userPaymentRequest: "creqAtest",
     });
   });

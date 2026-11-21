@@ -6,8 +6,8 @@ import {
 } from "@linky-fit/linkstr";
 import type {
   ContactId,
-  ConversationRow,
-  MessageRow,
+  ConversationRecord,
+  MessageRecord,
 } from "@linky-fit/linksync";
 import { useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
@@ -65,8 +65,8 @@ const useBeaconContacts = (
 
 const byLastMessage = (
   contacts: ReadonlyArray<BeaconContact>,
-  conversations: ReadonlyArray<ConversationRow>,
-  messages: ReadonlyArray<MessageRow>,
+  conversations: ReadonlyArray<ConversationRecord>,
+  messages: ReadonlyArray<MessageRecord>,
 ): ReadonlyArray<BeaconContact> => {
   const contactByConversation = contactIdByConversationId(
     conversations,

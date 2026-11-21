@@ -2,19 +2,18 @@ import {
   makeConversationsRepository,
   makeOnchainTransferMessagesRepository,
   makeOnchainTransfersRepository,
+  makeSettingsRepository,
   makeWalletRepository,
-  tableRepository,
   type ConversationsRepository,
-  type LinkyDbSchema,
   type LinkyStore,
   type OnchainTransferMessagesRepository,
   type OnchainTransfersRepository,
-  type TableRepository,
+  type SettingsRepository,
   type WalletRepository,
 } from "@linky-fit/linksync";
 import { Effect } from "effect";
 
-export type SettingsRepository = TableRepository<LinkyDbSchema["setting"]>;
+export type { SettingsRepository };
 
 /** The account's synced data, one repository per table the app uses. */
 export interface Repositories {
@@ -30,7 +29,7 @@ export interface Repositories {
 
 export const makeRepositories = (store: LinkyStore): Repositories => ({
   store,
-  settings: tableRepository(store, "meta", "setting"),
+  settings: makeSettingsRepository(store),
   wallet: makeWalletRepository(store),
   conversations: makeConversationsRepository(store),
   transfers: makeOnchainTransfersRepository(store),

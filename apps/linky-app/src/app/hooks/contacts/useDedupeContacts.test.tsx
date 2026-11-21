@@ -1,8 +1,4 @@
-import {
-  createId,
-  makeContactsRepository,
-  NonEmptyString1000,
-} from "@linky-fit/linksync";
+import { createId, makeContactsRepository } from "@linky-fit/linksync";
 import { RegistryContext } from "@linky-fit/linkstr-react";
 import { Effect } from "effect";
 import { act, useEffect } from "react";
@@ -29,11 +25,9 @@ vi.mock("@linky-fit/linksync/evolu", async (importOriginal) => ({
   openLinkyStore,
 }));
 
-const text = NonEmptyString1000.orThrow;
-const SHARED_ADDRESS = text("shared@pay.test");
-const CAROL_NPUB = text(
-  "npub1sg6plzptd64u62a878hep2kev88swjh3tw00gjsfl8f237lmu63q0uf63m",
-);
+const SHARED_ADDRESS = "shared@pay.test";
+const CAROL_NPUB =
+  "npub1sg6plzptd64u62a878hep2kev88swjh3tw00gjsfl8f237lmu63q0uf63m";
 
 describe("useDedupeContacts", () => {
   it("merges contacts by npub and never by a shared lightning address", async () => {
@@ -45,11 +39,11 @@ describe("useDedupeContacts", () => {
     const carol = createId<"Contact">();
     const carolAgain = createId<"Contact">();
     for (const row of [
-      { id: bob, name: text("Bob"), lnAddress: SHARED_ADDRESS },
-      { id: bobby, name: text("Bobby"), lnAddress: SHARED_ADDRESS },
+      { id: bob, name: "Bob", lnAddress: SHARED_ADDRESS },
+      { id: bobby, name: "Bobby", lnAddress: SHARED_ADDRESS },
       {
         id: carol,
-        name: text("Carol"),
+        name: "Carol",
         npub: CAROL_NPUB,
         lnAddress: SHARED_ADDRESS,
       },

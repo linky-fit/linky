@@ -1,7 +1,7 @@
 import type { StoredOperation } from "@linky-fit/linkshu";
 import {
   transactionIdForOperation,
-  type MessageRow,
+  type MessageRecord,
   type TransactionCategory,
   type TransactionDirection,
   type TransactionRecord,
@@ -403,7 +403,7 @@ export const buildTransactionHistory = (
 
 export const deriveDeclinedRequestIds = (
   nostrMessageRows: readonly Pick<
-    MessageRow,
+    MessageRecord,
     "content" | "rumorId" | "createdAtSec"
   >[],
 ): Set<string> => {

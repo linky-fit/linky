@@ -1,7 +1,7 @@
 import {
   directConversationIdFor,
-  type ContactRow,
-  type ConversationRow,
+  type ContactRecord,
+  type ConversationRecord,
 } from "@linky-fit/linksync";
 
 /** The direct conversation's read cursors, read alongside the contact for display. */
@@ -11,11 +11,11 @@ export interface ContactChatState {
   chatPeerSeenAtSec: number | null;
 }
 
-export type ContactWithChatState = ContactRow & ContactChatState;
+export type ContactWithChatState = ContactRecord & ContactChatState;
 
 export const joinContactChatState = (
-  contacts: ReadonlyArray<ContactRow>,
-  conversations: ReadonlyArray<ConversationRow>,
+  contacts: ReadonlyArray<ContactRecord>,
+  conversations: ReadonlyArray<ConversationRecord>,
 ): ContactWithChatState[] => {
   const conversationById = new Map(
     conversations.map((conversation) => [conversation.id, conversation]),

@@ -1,11 +1,17 @@
-import { NonEmptyString100, NonEmptyString1000 } from "@linky-fit/domain";
 import type { Pubkey } from "@linky-fit/linkstr";
 import { Effect } from "effect";
 import type { RowNotFound, ShardDbError } from "../core";
 import { hiddenListingIdFor, pinnedListingIdFor } from "../model/ids";
 import type { LinkyDbSchema } from "../model/schema";
 import type { LinkyStore } from "../model/store";
-import { tableRepository, type TableRepository } from "./tableRepository";
+import {
+  domainTableRepository,
+  type DomainRow,
+  type DomainTableRepository,
+} from "./domainRepository";
+
+export type HiddenListingRecord = DomainRow<LinkyDbSchema["hiddenListing"]>;
+export type PinnedListingRecord = DomainRow<LinkyDbSchema["pinnedListing"]>;
 
 /** What `listingKeysOf` holds for one listing. */
 export const listingKey = (author: string, listingId: string): string =>
@@ -26,12 +32,7 @@ export const listingKeysOf = (
     ),
   );
 
-const listingColumns = (author: Pubkey, listingId: string) => ({
-  authorPubkey: NonEmptyString100.orThrow(author),
-  listingId: NonEmptyString1000.orThrow(listingId),
-});
-
-export interface HiddenListingsRepository extends TableRepository<
+export interface HiddenListingsRepository extends DomainTableRepository<
   LinkyDbSchema["hiddenListing"]
 > {
   /** Hides someone's listing, or shows it again; a listing already in that state writes nothing. */
@@ -46,7 +47,7 @@ export interface HiddenListingsRepository extends TableRepository<
 export const makeHiddenListingsRepository = (
   store: LinkyStore,
 ): HiddenListingsRepository => {
-  const table = tableRepository(store, "contacts", "hiddenListing");
+  const table = domainTableRepository(store, "contacts", "hiddenListing");
   return {
     ...table,
     setHidden: (author, listingId, hidden) =>
@@ -54,13 +55,13 @@ export const makeHiddenListingsRepository = (
         const id = hiddenListingIdFor(author, listingId);
         if (((yield* table.byId(id)) !== null) === hidden) return;
         yield* hidden
-          ? table.insert({ id, ...listingColumns(author, listingId) })
+          ? table.insert({ id, authorPubkey: author, listingId })
           : table.remove(id);
       }),
   };
 };
 
-export interface PinnedListingsRepository extends TableRepository<
+export interface PinnedListingsRepository extends DomainTableRepository<
   LinkyDbSchema["pinnedListing"]
 > {
   /** Pins someone's listing, or unpins it; a listing already in that state writes nothing. */
@@ -75,7 +76,7 @@ export interface PinnedListingsRepository extends TableRepository<
 export const makePinnedListingsRepository = (
   store: LinkyStore,
 ): PinnedListingsRepository => {
-  const table = tableRepository(store, "contacts", "pinnedListing");
+  const table = domainTableRepository(store, "contacts", "pinnedListing");
   return {
     ...table,
     setPinned: (author, listingId, pinned) =>
@@ -83,7 +84,7 @@ export const makePinnedListingsRepository = (
         const id = pinnedListingIdFor(author, listingId);
         if (((yield* table.byId(id)) !== null) === pinned) return;
         yield* pinned
-          ? table.insert({ id, ...listingColumns(author, listingId) })
+          ? table.insert({ id, authorPubkey: author, listingId })
           : table.remove(id);
       }),
   };

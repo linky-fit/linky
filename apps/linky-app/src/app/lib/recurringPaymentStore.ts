@@ -1,9 +1,6 @@
 import {
   ContactId,
-  NonEmptyString100,
-  NonEmptyString1000,
-  PositiveInt,
-  type RecurringPaymentsRepository,
+  type RecurringPaymentPatch as RepositoryPatch,
 } from "@linky-fit/linksync";
 import {
   currentTimeZone,
@@ -22,8 +19,6 @@ export interface RecurringPaymentInput {
   note: string | null;
 }
 
-type RepositoryPatch = Parameters<RecurringPaymentsRepository["update"]>[1];
-
 /**
  * The schedule, amount and note columns a form writes, without an empty
  * note; the due time goes into `progress` through a patch.
@@ -32,16 +27,14 @@ export const recurringPaymentColumns = (
   input: RecurringPaymentInput,
   contactId: ContactId,
 ) => ({
-  ...(input.note === null
-    ? {}
-    : { note: NonEmptyString1000.orThrow(input.note) }),
+  ...(input.note === null ? {} : { note: input.note }),
   contactId,
-  amount: PositiveInt.orThrow(input.amount.amount),
-  unit: NonEmptyString100.orThrow(input.amount.unit),
-  intervalUnit: NonEmptyString100.orThrow(input.interval.unit),
-  intervalCount: PositiveInt.orThrow(input.interval.count),
-  anchorAtSec: PositiveInt.orThrow(input.firstDueAtSec),
-  timeZone: NonEmptyString100.orThrow(currentTimeZone()),
+  amount: input.amount.amount,
+  unit: input.amount.unit,
+  intervalUnit: input.interval.unit,
+  intervalCount: input.interval.count,
+  anchorAtSec: input.firstDueAtSec,
+  timeZone: currentTimeZone(),
 });
 
 export const readContactId = (contactId: string): ContactId | null => {
@@ -49,23 +42,18 @@ export const readContactId = (contactId: string): ContactId | null => {
   return decoded.ok ? decoded.value : null;
 };
 
-const positiveOrNull = (value: number | null): PositiveInt | null =>
-  value === null ? null : PositiveInt.orThrow(value);
-
-/** Brands a package patch for the repository; its values are ours, so a bad one is a bug. */
+/** Maps a package patch for the repository. */
 export const recurringPaymentUpdate = (
   patch: RecurringPaymentPatch,
 ): RepositoryPatch => ({
   ...(patch.lastRunAtSec !== undefined
-    ? { lastRunAtSec: positiveOrNull(patch.lastRunAtSec) }
+    ? { lastRunAtSec: patch.lastRunAtSec }
     : {}),
   ...(patch.lastRunStatus !== undefined
-    ? { lastRunStatus: NonEmptyString100.orThrow(patch.lastRunStatus) }
+    ? { lastRunStatus: patch.lastRunStatus }
     : {}),
   ...(patch.pausedAtSec !== undefined
-    ? { pausedAtSec: positiveOrNull(patch.pausedAtSec) }
+    ? { pausedAtSec: patch.pausedAtSec }
     : {}),
-  ...(patch.progress !== undefined
-    ? { progress: NonEmptyString1000.orThrow(patch.progress) }
-    : {}),
+  ...(patch.progress !== undefined ? { progress: patch.progress } : {}),
 });

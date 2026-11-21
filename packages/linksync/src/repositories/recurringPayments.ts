@@ -1,13 +1,29 @@
-import type { PositiveInt } from "@evolu/common";
-import { Effect } from "effect";
 import type { ContactId } from "@linky-fit/domain";
-import type { LinkyDbSchema, RecurringPaymentRow } from "../model/schema";
+import { Effect } from "effect";
+import type { LinkyDbSchema } from "../model/schema";
 import type { LinkyStore } from "../model/store";
-import { tableRepository, type TableRepository } from "./tableRepository";
+import {
+  domainTableRepository,
+  toDomainRow,
+  type DomainPatch,
+  type DomainRow,
+  type DomainTableRepository,
+  type DomainWriteRow,
+} from "./domainRepository";
+
+export type RecurringPaymentStoredRow = DomainRow<
+  LinkyDbSchema["recurringPayment"]
+>;
+export type RecurringPaymentInsert = DomainWriteRow<
+  LinkyDbSchema["recurringPayment"]
+>;
+export type RecurringPaymentPatch = DomainPatch<
+  LinkyDbSchema["recurringPayment"]
+>;
 
 /** A recurring payment row whose schedule, progress, mint, rail and recipient columns have all arrived. */
 export interface RecurringPaymentRecord extends Omit<
-  RecurringPaymentRow,
+  RecurringPaymentStoredRow,
   | "amount"
   | "anchorAtSec"
   | "contactId"
@@ -19,11 +35,11 @@ export interface RecurringPaymentRecord extends Omit<
   | "rail"
   | "unit"
 > {
-  readonly amount: PositiveInt;
-  readonly anchorAtSec: PositiveInt;
+  readonly amount: number;
+  readonly anchorAtSec: number;
   readonly contactId: ContactId;
-  readonly createdAtSec: PositiveInt;
-  readonly intervalCount: PositiveInt;
+  readonly createdAtSec: number;
+  readonly intervalCount: number;
   readonly intervalUnit: string;
   readonly mintUrl: string;
   readonly progress: string;
@@ -32,7 +48,7 @@ export interface RecurringPaymentRecord extends Omit<
 }
 
 export interface RecurringPaymentsRepository extends Omit<
-  TableRepository<LinkyDbSchema["recurringPayment"]>,
+  DomainTableRepository<LinkyDbSchema["recurringPayment"]>,
   "all"
 > {
   /** Rows the scheduler can act on; a row still arriving column by column is skipped. */
@@ -42,7 +58,7 @@ export interface RecurringPaymentsRepository extends Omit<
 }
 
 export const normalizeRecurringPayment = (
-  row: RecurringPaymentRow,
+  row: RecurringPaymentStoredRow,
 ): RecurringPaymentRecord | null => {
   if (
     row.amount === null ||
@@ -74,7 +90,7 @@ export const normalizeRecurringPayment = (
 };
 
 const toRecords = (
-  rows: ReadonlyArray<RecurringPaymentRow>,
+  rows: ReadonlyArray<RecurringPaymentStoredRow>,
 ): RecurringPaymentRecord[] =>
   rows.flatMap((row) => {
     const record = normalizeRecurringPayment(row);
@@ -82,10 +98,10 @@ const toRecords = (
   });
 
 /** The highest shard's copy of each id; `copies` come highest shard first. */
-const newestCopies = (
-  copies: ReadonlyArray<RecurringPaymentRow>,
-): RecurringPaymentRow[] => {
-  const newest = new Map<string, RecurringPaymentRow>();
+const newestCopies = <R extends { readonly id: string }>(
+  copies: ReadonlyArray<R>,
+): R[] => {
+  const newest = new Map<string, R>();
   for (const copy of copies) {
     if (!newest.has(copy.id)) newest.set(copy.id, copy);
   }
@@ -96,14 +112,18 @@ const newestCopies = (
 export const makeRecurringPaymentsRepository = (
   store: LinkyStore,
 ): RecurringPaymentsRepository => {
-  const table = tableRepository(store, "contacts", "recurringPayment");
+  const table = domainTableRepository(store, "contacts", "recurringPayment");
   return {
     ...table,
     all: Effect.map(table.all, toRecords),
     deleted: Effect.map(
       store.copies("contacts", "recurringPayment"),
       (copies) =>
-        toRecords(newestCopies(copies).filter((row) => row.isDeleted === 1)),
+        toRecords(
+          newestCopies(copies)
+            .filter((row) => row.isDeleted === 1)
+            .map((row) => toDomainRow("recurringPayment", row)),
+        ),
     ),
   };
 };

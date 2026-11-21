@@ -1,16 +1,25 @@
-import type { PositiveInt } from "@evolu/common";
 import { Effect } from "effect";
-import type { LinkyDbSchema, ListingRow } from "../model/schema";
+import type { LinkyDbSchema } from "../model/schema";
 import type { LinkyStore } from "../model/store";
-import { tableRepository, type TableRepository } from "./tableRepository";
+import {
+  domainTableRepository,
+  type DomainPatch,
+  type DomainRow,
+  type DomainTableRepository,
+  type DomainWriteRow,
+} from "./domainRepository";
+
+export type ListingStoredRow = DomainRow<LinkyDbSchema["listing"]>;
+export type ListingInsert = DomainWriteRow<LinkyDbSchema["listing"]>;
+export type ListingPatch = DomainPatch<LinkyDbSchema["listing"]>;
 
 /** A listing row whose columns have all arrived. */
 export interface ListingRecord extends Omit<
-  ListingRow,
+  ListingStoredRow,
   "amount" | "createdAtSec" | "currency" | "side" | "title" | "unit"
 > {
   readonly amount: string;
-  readonly createdAtSec: PositiveInt;
+  readonly createdAtSec: number;
   readonly currency: string;
   readonly side: string;
   readonly title: string;
@@ -18,14 +27,16 @@ export interface ListingRecord extends Omit<
 }
 
 export interface ListingsRepository extends Omit<
-  TableRepository<LinkyDbSchema["listing"]>,
+  DomainTableRepository<LinkyDbSchema["listing"]>,
   "all"
 > {
   /** Rows the app can publish; a row still arriving column by column is skipped. */
   readonly all: Effect.Effect<ReadonlyArray<ListingRecord>>;
 }
 
-export const normalizeListing = (row: ListingRow): ListingRecord | null => {
+export const normalizeListing = (
+  row: ListingStoredRow,
+): ListingRecord | null => {
   if (
     row.amount === null ||
     row.createdAtSec === null ||
@@ -51,7 +62,7 @@ export const normalizeListing = (row: ListingRow): ListingRecord | null => {
 export const makeListingsRepository = (
   store: LinkyStore,
 ): ListingsRepository => {
-  const table = tableRepository(store, "contacts", "listing");
+  const table = domainTableRepository(store, "contacts", "listing");
   return {
     ...table,
     all: Effect.map(table.all, (rows) =>

@@ -1,8 +1,8 @@
 import {
   linkyScopes,
-  type ContactRow,
+  type ContactRecord,
   type ContactsRepository,
-  type ConversationRow,
+  type ConversationRecord,
   type ConversationsRepository,
   type IdentityRepository,
   type InboxCursorsRepository,
@@ -12,11 +12,11 @@ import {
   type LinkyStore,
   type ListingRecord,
   type ListingsRepository,
-  type MessageRow,
+  type MessageRecord,
   type OnchainTransferRecord,
   type OnchainTransfersRepository,
-  type NostrIdentityRow,
-  type ReactionRow,
+  type NostrIdentityRecord,
+  type ReactionRecord,
   type SettingKey,
   type RecurringPaymentRecord,
   type RecurringPaymentsRepository,
@@ -67,13 +67,13 @@ export const useAppOwnerId = (): string =>
 export const useContactsRepository = (): ContactsRepository =>
   useAtomSuspense(contactsRepositoryAtom).value;
 
-export const useContactRows = (): ReadonlyArray<ContactRow> =>
+export const useContactRows = (): ReadonlyArray<ContactRecord> =>
   useRepositoryRows(useContactsRepository());
 
 export const useConversationsRepository = (): ConversationsRepository =>
   useAtomSuspense(conversationsRepositoryAtom).value;
 
-export const useConversationRows = (): ReadonlyArray<ConversationRow> =>
+export const useConversationRows = (): ReadonlyArray<ConversationRecord> =>
   useRepositoryRows(useConversationsRepository());
 
 export const useInboxCursorsRepository = (): InboxCursorsRepository =>
@@ -82,23 +82,23 @@ export const useInboxCursorsRepository = (): InboxCursorsRepository =>
 export const useUnknownSendersRepository = (): UnknownSendersRepository =>
   useAtomSuspense(unknownSendersRepositoryAtom).value;
 
-export const useMessageRows = (): ReadonlyArray<MessageRow> =>
+export const useMessageRows = (): ReadonlyArray<MessageRecord> =>
   useRepositoryRows(useConversationsRepository().messages);
 
-export const useReactionRows = (): ReadonlyArray<ReactionRow> =>
+export const useReactionRows = (): ReadonlyArray<ReactionRecord> =>
   useRepositoryRows(useConversationsRepository().reactions);
 
 export const useIdentityRepository = (): IdentityRepository =>
   useAtomSuspense(identityRepositoryAtom).value;
 
 /** The synced active Nostr identity row, kept current; null until one syncs. */
-export const useSyncedNostrIdentityRow = (): NostrIdentityRow | null => {
+export const useSyncedNostrIdentityRow = (): NostrIdentityRecord | null => {
   const { current, subscribe } = useIdentityRepository();
   const source = React.useMemo(
     () => ({ all: current, subscribe }),
     [current, subscribe],
   );
-  return useLiveValue<NostrIdentityRow | null>(source, null);
+  return useLiveValue<NostrIdentityRecord | null>(source, null);
 };
 
 export const useSettingsRepository = (): SettingsRepository =>

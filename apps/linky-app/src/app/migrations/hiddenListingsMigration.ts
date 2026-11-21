@@ -7,11 +7,7 @@
 // dropped and the contact column cleared.
 
 import { parsePubkey, type Pubkey } from "@linky-fit/linkstr";
-import {
-  NonEmptyString1000,
-  type ContactId,
-  type ContactRow,
-} from "@linky-fit/linksync";
+import type { ContactId, ContactRecord } from "@linky-fit/linksync";
 import { Option, Schema } from "effect";
 import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
 import {
@@ -50,12 +46,12 @@ const decodeContactColumn = Schema.decodeUnknownOption(
 export const hiddenListingsToMove = (
   keys: ReadonlyArray<string>,
   contacts: ReadonlyArray<
-    Pick<ContactRow, "id" | "npub" | "hiddenListingIdsJson">
+    Pick<ContactRecord, "id" | "npub" | "hiddenListingIdsJson">
   >,
 ): HiddenListingsMigration => {
   const moves: Array<HiddenListingMove> = [];
   const add = (author: Pubkey | null, listingId: string) => {
-    if (author !== null && NonEmptyString1000.is(listingId))
+    if (author !== null && listingId.length > 0 && listingId.length <= 1000)
       moves.push({ author, listingId });
   };
   for (const key of keys) {

@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
-import { PositiveInt } from "@evolu/common";
+import { createId } from "@linky-fit/domain";
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
-import { createId, NonEmptyString100 } from "@linky-fit/domain";
 import { makeTransactionsRepository } from "../repositories/transactions";
 import { linkyStore, runNow } from "../testing/linky";
 import { makeInMemoryShardDb } from "../core";
@@ -12,8 +11,6 @@ import { testAppOwner } from "../testing/toy";
 import { useHydrated, useRepositoryRows, useVisibleShards } from "./index";
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-
-const text = (value: string) => NonEmptyString100.orThrow(value);
 
 const mount = async (component: () => null) => {
   const root = createRoot(document.createElement("div"));
@@ -40,9 +37,9 @@ describe("react bindings", () => {
     runNow(
       transactions.insert({
         id: createId<"Transaction">(),
-        createdAtSec: PositiveInt.orThrow(1),
-        direction: text("in"),
-        status: text("ok"),
+        createdAtSec: 1,
+        direction: "in",
+        status: "ok",
       }),
     );
     await settle();

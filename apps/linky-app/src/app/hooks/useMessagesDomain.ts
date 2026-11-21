@@ -1,6 +1,5 @@
 import type { Pubkey, RumorId } from "@linky-fit/linkstr";
 import {
-  NonEmptyString1000,
   nostrReactionIdFor,
   type ConversationsRepository,
   type UnknownSendersRepository,
@@ -228,8 +227,8 @@ export const useMessagesDomain = ({
       const recordRemoval = Effect.tap(
         conversations.reactions.removeIfAbsent({
           id,
-          reactorPubkey: NonEmptyString1000.orThrow(retractor),
-          wrapId: NonEmptyString1000.orThrow(reactionId),
+          reactorPubkey: retractor,
+          wrapId: reactionId,
         }),
         (stored) =>
           Effect.sync(() => {

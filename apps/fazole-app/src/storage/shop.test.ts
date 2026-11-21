@@ -1,4 +1,3 @@
-import { NonEmptyString100, NonEmptyString1000 } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 import { CzechIban } from "../domain";
@@ -7,7 +6,7 @@ import {
   makeSettingsRepository,
   readShop,
   saveShop,
-  shopSettingId,
+  SHOP_SETTING_KEY,
 } from "./shop";
 
 describe("the shop profile", () => {
@@ -58,11 +57,7 @@ describe("the shop profile", () => {
   it("reads a profile saved before shops had pictures", async () => {
     const settings = makeSettingsRepository(testStore());
     await Effect.runPromise(
-      settings.insert({
-        id: shopSettingId,
-        key: NonEmptyString100.orThrow("fazole.shop"),
-        value: NonEmptyString1000.orThrow('{"name":"Kavárna"}'),
-      }),
+      settings.setRaw(SHOP_SETTING_KEY, '{"name":"Kavárna"}'),
     );
     expect(await Effect.runPromise(readShop(settings))).toEqual({
       name: "Kavárna",

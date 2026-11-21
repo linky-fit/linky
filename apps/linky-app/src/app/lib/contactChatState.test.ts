@@ -3,8 +3,6 @@ import {
   directConversationIdFor,
   makeContactsRepository,
   makeConversationsRepository,
-  NonEmptyString1000,
-  PositiveInt,
 } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
@@ -22,7 +20,7 @@ describe("joinContactChatState", () => {
       Effect.all([
         contacts.insert({
           id: withChat,
-          name: NonEmptyString1000.orThrow("A"),
+          name: "A",
         }),
         contacts.insert({ id: withoutChat }),
       ]),
@@ -30,11 +28,11 @@ describe("joinContactChatState", () => {
     const chat = await Effect.runPromise(conversations.ensureDirect(withChat));
     await Effect.runPromise(
       Effect.all([
-        conversations.markSeen(chat.id, PositiveInt.orThrow(50)),
-        contacts.archive(withChat, PositiveInt.orThrow(60)),
+        conversations.markSeen(chat.id, 50),
+        contacts.archive(withChat, 60),
         conversations.setPeerSeen(chat.id, {
-          sinceSec: PositiveInt.orThrow(10),
-          atSec: PositiveInt.orThrow(40),
+          sinceSec: 10,
+          atSec: 40,
         }),
       ]),
     );

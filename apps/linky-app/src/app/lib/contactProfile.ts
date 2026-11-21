@@ -1,5 +1,4 @@
 import { getContactName } from "../../utils/contactName";
-import { SqliteBoolean, sqliteTrue } from "@linky-fit/linksync";
 import type { ProfileMetadata } from "@linky-fit/linkstr";
 import { getBestNostrName } from "../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
@@ -17,11 +16,6 @@ interface ResolvedContactProfile extends ContactPublicProfile {
   localLnAddress: string;
   localName: string;
 }
-
-const readSqliteBool = (value: unknown): boolean => {
-  const parsed = SqliteBoolean.fromUnknown(value);
-  return parsed.ok && parsed.value === sqliteTrue;
-};
 
 export const getContactPublicProfile = (
   npub: string | null | undefined,
@@ -64,8 +58,8 @@ export const resolveContactProfile = (
     };
   }
 
-  const hasLocalName = readSqliteBool(contact.nameSetByUser);
-  const hasLocalLnAddress = readSqliteBool(contact.lnAddressSetByUser);
+  const hasLocalName = contact.nameSetByUser === true;
+  const hasLocalLnAddress = contact.lnAddressSetByUser === true;
   const publicProfile = getContactPublicProfile(normalizedNpub, metadata);
 
   return {

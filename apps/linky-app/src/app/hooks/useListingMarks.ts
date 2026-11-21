@@ -1,6 +1,5 @@
 import {
   listingKeysOf,
-  PositiveInt,
   type HiddenListingsRepository,
   type ListingId,
   type PinnedListingsRepository,
@@ -111,7 +110,7 @@ export const useSetListingPaused = (): ((
     async (listingId, paused) => {
       const outcome = await runWrite(
         listings.update(listingId, {
-          pausedAtSec: paused ? PositiveInt.orThrow(nowSeconds()) : null,
+          pausedAtSec: paused ? nowSeconds() : null,
         }),
       );
       if (outcome.ok)

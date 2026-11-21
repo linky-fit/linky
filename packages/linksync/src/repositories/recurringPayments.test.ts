@@ -1,10 +1,5 @@
-import { PositiveInt } from "@evolu/common";
+import { createId } from "@linky-fit/domain";
 import { describe, expect, it } from "vitest";
-import {
-  createId,
-  NonEmptyString100,
-  NonEmptyString1000,
-} from "@linky-fit/domain";
 import { linkyStore, runNow } from "../testing/linky";
 import { makeContactsRepository } from "./contacts";
 import {
@@ -12,22 +7,20 @@ import {
   normalizeRecurringPayment,
 } from "./recurringPayments";
 
-const text = (value: string) => NonEmptyString100.orThrow(value);
-const int = (value: number) => PositiveInt.orThrow(value);
 const progress = (runCount: number, nextDueAtSec: number) =>
-  NonEmptyString1000.orThrow(JSON.stringify({ runCount, nextDueAtSec }));
+  JSON.stringify({ runCount, nextDueAtSec });
 
 const payment = () => ({
   id: createId<"RecurringPayment">(),
-  createdAtSec: int(100),
+  createdAtSec: 100,
   contactId: createId<"Contact">(),
-  mintUrl: NonEmptyString1000.orThrow("https://mint.example"),
-  rail: text("cashu"),
-  amount: int(2100),
-  unit: text("sat"),
-  intervalUnit: text("month"),
-  intervalCount: int(1),
-  anchorAtSec: int(1_000),
+  mintUrl: "https://mint.example",
+  rail: "cashu",
+  amount: 2100,
+  unit: "sat",
+  intervalUnit: "month",
+  intervalCount: 1,
+  anchorAtSec: 1_000,
   progress: progress(0, 1_000),
 });
 
@@ -55,9 +48,9 @@ describe("recurring payments repository", () => {
     const payments = makeRecurringPaymentsRepository(store);
     const row = payment();
     runNow(payments.insert(row));
-    const [stored] = runNow(store.rows("contacts", "recurringPayment"));
-    expect(stored).toBeDefined();
-    if (!stored) return;
+    const stored = runNow(payments.byId(row.id));
+    expect(stored).not.toBeNull();
+    if (stored === null) return;
     expect(normalizeRecurringPayment(stored)).not.toBeNull();
     for (const column of [
       "intervalUnit",
@@ -81,7 +74,7 @@ describe("recurring payments repository", () => {
     runNow(
       payments.update(row.id, {
         progress: progress(1, 3_000),
-        lastRunStatus: text("paid"),
+        lastRunStatus: "paid",
       }),
     );
     expect(runNow(payments.byId(row.id))).toMatchObject({

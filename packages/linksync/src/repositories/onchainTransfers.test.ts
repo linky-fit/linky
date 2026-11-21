@@ -1,11 +1,4 @@
-import { NonNegativeInt, PositiveInt } from "@evolu/common";
-import {
-  createId,
-  onchainTransferMessageIdFor,
-  NonEmptyString,
-  NonEmptyString100,
-  NonEmptyString1000,
-} from "@linky-fit/domain";
+import { createId, onchainTransferMessageIdFor } from "@linky-fit/domain";
 import { describe, expect, it } from "vitest";
 import { linkyStore, runNow } from "../testing/linky";
 import {
@@ -17,15 +10,13 @@ const id = createId<"OnchainTransfer">();
 
 const transfer = {
   id,
-  createdAtSec: PositiveInt.orThrow(1_000),
-  role: NonEmptyString100.orThrow("user"),
-  peerPubkey: NonEmptyString100.orThrow("ab".repeat(32)),
-  direction: NonEmptyString100.orThrow("send"),
-  amount: PositiveInt.orThrow(100_000),
-  feeBasisPoints: NonNegativeInt.orThrow(100),
-  payoutAddress: NonEmptyString1000.orThrow(
-    "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
-  ),
+  createdAtSec: 1_000,
+  role: "user",
+  peerPubkey: "ab".repeat(32),
+  direction: "send",
+  amount: 100_000,
+  feeBasisPoints: 100,
+  payoutAddress: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
 };
 
 describe("on-chain transfers repository", () => {
@@ -59,11 +50,11 @@ describe("on-chain transfers repository", () => {
     const { store } = linkyStore();
     const transfers = makeOnchainTransfersRepository(store);
     runNow(transfers.insert(transfer));
-    const updateJson = NonEmptyString1000.orThrow('{"revision":1}');
+    const updateJson = '{"revision":1}';
     runNow(
       transfers.update(id, {
         updateJson,
-        sentAtSec: PositiveInt.orThrow(2_000),
+        sentAtSec: 2_000,
       }),
     );
     expect(runNow(transfers.byId(id))).toMatchObject({
@@ -78,11 +69,11 @@ describe("on-chain transfers repository", () => {
     const rumorId = "cd".repeat(32);
     const message = {
       id: onchainTransferMessageIdFor(rumorId),
-      rumorId: NonEmptyString100.orThrow(rumorId),
+      rumorId,
       peerPubkey: transfer.peerPubkey,
       transferId: id,
-      content: NonEmptyString.orThrow('{"type":"request"}'),
-      sentAtSec: PositiveInt.orThrow(1_000),
+      content: '{"type":"request"}',
+      sentAtSec: 1_000,
     };
     expect(runNow(messages.insertIfAbsent(message))).toBe(true);
     expect(runNow(messages.insertIfAbsent(message))).toBe(false);

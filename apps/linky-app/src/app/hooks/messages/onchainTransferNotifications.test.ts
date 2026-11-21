@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { createId, NonEmptyString100, PositiveInt } from "@linky-fit/linksync";
+import { createId } from "@linky-fit/linksync";
 import type { OperatorTransferStatus } from "@linky-fit/onchain-transfer";
 import { describe, expect, it, vi } from "vitest";
 import type { PushToastOptions } from "../../../hooks/useToasts";
@@ -72,9 +72,9 @@ describe("notifyOnchainTransferUpdate", () => {
     notifyOnchainTransferUpdate(
       onchainTransferUpdateFixture(id, { status }),
       {
-        direction: NonEmptyString100.orThrow("send"),
-        amount: PositiveInt.orThrow(100_000),
-        sentAtSec: sentAtSec === null ? null : PositiveInt.orThrow(sentAtSec),
+        direction: "send",
+        amount: 100_000,
+        sentAtSec,
       },
       {
         formatDisplayedAmountText: amountText,

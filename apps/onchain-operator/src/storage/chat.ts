@@ -1,13 +1,9 @@
 import { createIdFromString, directConversationIdFor } from "@linky-fit/domain";
 import { Pubkey, type ClientId, type RumorId } from "@linky-fit/linkstr";
 import {
-  NonEmptyString,
-  NonEmptyString100,
-  NonEmptyString1000,
   nostrMessageIdFor,
-  PositiveInt,
   type ConversationsRepository,
-  type MessageRow,
+  type MessageRecord,
   type ShardDbError,
 } from "@linky-fit/linksync";
 import { Effect, Schema } from "effect";
@@ -36,14 +32,14 @@ export interface ChatMessageRecord {
   readonly clientId: ClientId | null;
 }
 
-const statusOf = (row: MessageRow): ChatMessageStatus =>
+const statusOf = (row: MessageRecord): ChatMessageStatus =>
   row.status === "pending"
     ? "pending"
     : row.status === "failed"
       ? "failed"
       : "sent";
 
-const toChatMessage = (row: MessageRow): ChatMessage | null => {
+const toChatMessage = (row: MessageRecord): ChatMessage | null => {
   const direction =
     row.direction === "in" ? "in" : row.direction === "out" ? "out" : null;
   return direction !== null && row.content !== null && row.createdAtSec !== null
@@ -115,16 +111,14 @@ export const storeChatMessage = (
     conversations.messages.insertIfAbsent({
       id: nostrMessageIdFor(message.rumorId),
       conversationId: conversationIdFor(message.peer),
-      direction: NonEmptyString100.orThrow(message.direction),
-      content: NonEmptyString.orThrow(message.text),
-      wrapId: NonEmptyString1000.orThrow(`pending:${message.rumorId}`),
-      rumorId: NonEmptyString1000.orThrow(message.rumorId),
-      pubkey: NonEmptyString1000.orThrow(message.author),
-      createdAtSec: PositiveInt.orThrow(message.createdAtSec),
-      status: NonEmptyString100.orThrow(message.status),
-      ...(message.clientId === null
-        ? {}
-        : { clientId: NonEmptyString1000.orThrow(message.clientId) }),
+      direction: message.direction,
+      content: message.text,
+      wrapId: `pending:${message.rumorId}`,
+      rumorId: message.rumorId,
+      pubkey: message.author,
+      createdAtSec: message.createdAtSec,
+      status: message.status,
+      ...(message.clientId === null ? {} : { clientId: message.clientId }),
     }),
   );
 
@@ -144,7 +138,7 @@ export const setChatMessageStatus = (
     return row === undefined || row.status === status || row.status === "sent"
       ? Effect.void
       : conversations.messages
-          .update(row.id, { status: NonEmptyString100.orThrow(status) })
+          .update(row.id, { status })
           .pipe(Effect.catchTag("RowNotFound", () => Effect.void));
   });
 
@@ -156,6 +150,6 @@ export const markChatSeen = (
 ): Effect.Effect<void, ShardDbError> =>
   Effect.flatMap(conversations.ensureDirect(contactIdFor(peer)), () =>
     conversations
-      .markSeen(conversationIdFor(peer), PositiveInt.orThrow(atSec))
+      .markSeen(conversationIdFor(peer), atSec)
       .pipe(Effect.catchTag("RowNotFound", () => Effect.void)),
   );
