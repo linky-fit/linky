@@ -1,6 +1,8 @@
 import type {
   EvoluDeps,
+  EvoluError,
   OwnerId,
+  OwnerWebSocketTransport,
   ReadonlyStore,
   Run,
   SyncState,
@@ -9,6 +11,7 @@ import {
   AppName,
   createEvolu,
   createEvoluApp,
+  createQueryBuilder,
   Name,
   WebSocketUrlFromString,
 } from "@evolu/common";
@@ -19,6 +22,7 @@ import {
   type ShardRotation,
 } from "../core";
 import type { LinkyScope, LinkyScopes, LinkyStore } from "../model";
+import { makeEvoluRelaySettings } from "./evoluRelaySettings";
 import {
   createEvoluShardDb,
   type AppliedWrite,
@@ -43,6 +47,44 @@ export class InvalidAppMnemonic extends Error {
     super("Stored account key is invalid; refusing to open another database");
   }
 }
+
+/** Thrown when Evolu refuses to open the database (held by another tab, newer version, etc.). */
+export class EvoluDatabaseRefusedError extends Error {
+  override readonly name = "EvoluDatabaseRefusedError";
+  readonly evoluError: EvoluError;
+  constructor(evoluError: EvoluError) {
+    super(evoluError.type, { cause: evoluError });
+    this.evoluError = evoluError;
+  }
+}
+
+/** Thrown when persistent device storage is unavailable and `memoryOnly` was not requested. */
+export class DeviceStorageUnavailableError extends Error {
+  override readonly name = "DeviceStorageUnavailableError";
+  constructor() {
+    super("Device storage is unavailable");
+  }
+}
+
+/** Coarse classification for UI recovery screens when opening a Linky database fails. */
+export type EvoluOpenFailureReason =
+  | "otherTab"
+  | "storageUnavailable"
+  | "other";
+
+export const classifyEvoluOpenError = (
+  error: unknown,
+): EvoluOpenFailureReason => {
+  if (
+    error instanceof EvoluDatabaseRefusedError &&
+    (error.evoluError.type === "DatabaseHeldError" ||
+      error.evoluError.type === "OtherBuildRunningError")
+  )
+    return "otherTab";
+  if (error instanceof DeviceStorageUnavailableError)
+    return "storageUnavailable";
+  return "other";
+};
 
 /** What the package reports for the inspector; the consumer turns each into a row. */
 export type LinkyEvoluEvent =
@@ -85,7 +127,7 @@ export type LinkyEvoluEvent =
       readonly isExistingInstall: boolean;
     };
 
-// Generate a valid SimpleName (1-42 chars, alphanumeric + dash) from mnemonic
+// Generate a valid Evolu `Name` (1-42 chars, alphanumeric + dash) from mnemonic
 // Each user gets their own SQLite database file
 const hashDbNameFromMnemonic = (mnemonic: string): string => {
   // Simple hash function to create a short unique identifier
@@ -108,8 +150,15 @@ export const generateDbNameFromMnemonic = (mnemonic: string | null): Name =>
   Name.orThrow(mnemonic ? hashDbNameFromMnemonic(mnemonic) : "linky-anon");
 
 const appName = AppName.orThrow("linky");
+const createQuery = createQueryBuilder(LinkyEvoluSchema);
+const readinessQuery = createQuery((db) =>
+  db.selectFrom("shardPointer").select("id").limit(1),
+);
 
-const toTransports = (urls: ReadonlyArray<string>) => [
+/** Parses and deduplicates relay URLs into Evolu WebSocket transports. */
+export const toEvoluTransports = (
+  urls: ReadonlyArray<string>,
+): ReadonlyArray<OwnerWebSocketTransport> => [
   ...new Map(
     urls.flatMap((url) => {
       const parsed = WebSocketUrlFromString.fromUnknown(url);
@@ -119,6 +168,16 @@ const toTransports = (urls: ReadonlyArray<string>) => [
     }),
   ).values(),
 ];
+
+const deferDispose = (run: EvoluRun, resource: AsyncDisposable): void => {
+  if ("defer" in run && typeof run.defer === "function") {
+    try {
+      run.defer(() => resource[Symbol.asyncDispose]());
+    } catch {
+      void Promise.resolve(resource[Symbol.asyncDispose]()).catch(() => {});
+    }
+  }
+};
 
 /**
  * Opens the Linky database owned by the mnemonic's app owner; the first time,
@@ -132,43 +191,103 @@ export const openLinkyEvolu = async (
     mnemonic,
     relayUrls,
     memoryOnly,
+    onDatabaseDeleted,
     onOwnerDeleted,
   }: {
     readonly mnemonic: string | null;
     readonly relayUrls: ReadonlyArray<string>;
     /** Applies only to a session with a mnemonic; Evolu decides for the others. */
     readonly memoryOnly: boolean;
+    readonly onDatabaseDeleted?: () => void;
     readonly onOwnerDeleted?: (ownerId: OwnerId) => void;
   },
 ): Promise<LinkyEvolu> => {
-  const config = {
-    appName,
-    evolu7Name: generateDbNameFromMnemonic(mnemonic),
-    indexes: linkyIndexes,
-    transports: toTransports(relayUrls),
-    ...(onOwnerDeleted ? { onOwnerDeleted } : {}),
-  };
+  const transports = toEvoluTransports(relayUrls);
   // Where the platform offers no storage, Evolu keeps the database in memory unasked.
   if (!memoryOnly && (await run.deps.getDevicePersistence()) === "NotPersisted")
-    throw new Error("Device storage is unavailable");
+    throw new DeviceStorageUnavailableError();
+  const baseConfig = {
+    appName,
+    indexes: linkyIndexes,
+    transports,
+    ...(onOwnerDeleted ? { onOwnerDeleted } : {}),
+  };
   if (mnemonic !== null) {
     const appOwner = appOwnerFromMnemonic(mnemonic);
     if (appOwner === null) throw new InvalidAppMnemonic();
-    return run.ok(
-      createEvolu(LinkyEvoluSchema, { ...config, appOwner, memoryOnly }),
+    const evolu = await run.ok(
+      createEvolu(LinkyEvoluSchema, {
+        ...baseConfig,
+        evolu7Name: generateDbNameFromMnemonic(mnemonic),
+        appOwner,
+        memoryOnly,
+        ...(onDatabaseDeleted ? { onDatabaseDeleted } : {}),
+      }),
     );
+    deferDispose(run, evolu);
+    return evolu;
   }
   const app = await run.orThrow(
     createEvoluApp(LinkyEvoluSchema, {
-      ...config,
+      ...baseConfig,
+      evolu7Name: generateDbNameFromMnemonic(null),
       auth: { type: "InstantStart" },
       createFirstAppOwner: true,
     }),
   );
+  deferDispose(run, app);
   const current = app.current.get();
   if (current === null) throw new Error("Evolu opened no app owner");
+  if (onDatabaseDeleted) {
+    // `createEvoluApp` handles `deleteDatabase()` by replacing `app.current`.
+    app.current.subscribe(() => {
+      if (app.current.get()?.evolu !== current.evolu) onDatabaseDeleted();
+    });
+  }
   return current.evolu;
 };
+
+/**
+ * Resolves once the database answers an uncached query (after any Evolu 7
+ * import finishes), and rejects promptly if Evolu refuses startup or reports a
+ * fatal `evoluError` (such as `DatabaseHeldError` or `OtherBuildRunningError`).
+ */
+export const awaitDatabaseReady = (
+  evolu: Pick<LinkyEvolu, "loadQuery">,
+  evoluError: ReadonlyStore<EvoluError | null>,
+): Promise<void> =>
+  new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      unsubscribe();
+      fn();
+    };
+    const checkError = () => {
+      const error = evoluError.get();
+      if (error !== null)
+        finish(() => reject(new EvoluDatabaseRefusedError(error)));
+    };
+    const unsubscribe = evoluError.subscribe(checkError);
+    checkError();
+    if (settled) return;
+    void evolu.loadQuery(readinessQuery, { cache: false }).then(
+      () => finish(resolve),
+      (error: unknown) => {
+        const refused = evoluError.get();
+        finish(() =>
+          reject(
+            refused !== null
+              ? new EvoluDatabaseRefusedError(refused)
+              : error instanceof Error
+                ? error
+                : new Error(String(error)),
+          ),
+        );
+      },
+    );
+  });
 
 /** Reports each relay failure or skipped change of the database's owners once. */
 const reportSyncFailures = (
@@ -300,4 +419,64 @@ export const openLinkyStore = async (
     (error: unknown) => onEvent?.({ _tag: "ShardPointerRepairFailed", error }),
   );
   return store;
+};
+
+/**
+ * Opens an app's sharded Linky database from relay settings, waits for SQLite
+ * to answer (failing promptly on refusals like `DatabaseHeldError`), and
+ * returns the initialized store. Shared by Fazole and onchain-operator.
+ */
+export const openLinkyDatabase = async (
+  run: EvoluRun,
+  {
+    mnemonic,
+    kv,
+    envDefaults,
+    recommended,
+    scopes,
+    hasStoredAccount = false,
+    onEvent,
+    onDatabaseDeleted,
+  }: {
+    readonly mnemonic: string;
+    readonly kv: KeyValueStorage;
+    readonly envDefaults: ReadonlyArray<string>;
+    readonly recommended: ReadonlyArray<string>;
+    readonly scopes: LinkyScopes;
+    readonly hasStoredAccount?: boolean;
+    readonly onEvent?: (event: LinkyEvoluEvent) => void;
+    readonly onDatabaseDeleted?: () => void;
+  },
+): Promise<LinkyStore> => {
+  const relayUrls = makeEvoluRelaySettings(kv, {
+    envDefaults,
+    recommended,
+    hasStoredAccount,
+    ...(onEvent ? { onEvent } : {}),
+  }).activeUrls();
+  const hasEvoluRelay = toEvoluTransports(relayUrls).length > 0;
+  const ownerDeletedListeners = new Set<(ownerId: OwnerId) => void>();
+  const evolu = await openLinkyEvolu(run, {
+    mnemonic,
+    relayUrls,
+    memoryOnly: false,
+    onOwnerDeleted: (ownerId) => {
+      for (const listener of ownerDeletedListeners) listener(ownerId);
+    },
+    ...(onDatabaseDeleted ? { onDatabaseDeleted } : {}),
+  });
+  await awaitDatabaseReady(evolu, run.deps.evoluError);
+  return openLinkyStore(evolu, {
+    syncState: run.deps.syncState,
+    kv,
+    scopes,
+    hasEvoluRelay,
+    onOwnerDeleted: (listener) => {
+      ownerDeletedListeners.add(listener);
+      return () => {
+        ownerDeletedListeners.delete(listener);
+      };
+    },
+    ...(onEvent ? { onEvent } : {}),
+  });
 };
