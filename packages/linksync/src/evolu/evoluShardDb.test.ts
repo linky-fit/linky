@@ -5,12 +5,15 @@ import {
   Millis,
   Name,
   ownerIdToOwnerIdBytes,
+  PositiveInt,
   sqliteQueryStringToSqliteQuery,
+  testCreateDeps,
   type MutationOptions,
   type OwnerId,
   type Row,
 } from "@evolu/common";
 import {
+  createInitialTimestamp,
   evoluSchemaToSqliteSchema,
   type SyncRoute,
   type SyncState,
@@ -373,7 +376,72 @@ describe("evolu shard db", () => {
     expect(db.isOwnerSynced(owner.id)).toBe(false);
   });
 
-  it("counts every owner synced and subscribes none without a relay", () => {
+  it("does not count an owner synced when a Settled route has null completeAt", async () => {
+    const fake = fakeEvolu();
+    const syncState = syncStore();
+    const db = open(fake.runtime, { syncState });
+    const owner = testAppOwner();
+    syncState.set(
+      stateWith([owner.id], {
+        type: "Settled",
+        transportId: complete.transportId,
+        skippedError: {
+          type: "ProtocolChangeTooLargeError",
+          timestamp: createInitialTimestamp(testCreateDeps()),
+          size: PositiveInt.orThrow(100_000),
+          at: Millis.orThrow(1),
+        },
+        completeAt: null,
+        lastSentAt: Millis.orThrow(1),
+        lastReceivedAt: Millis.orThrow(1),
+      }),
+    );
+    await settle();
+    expect(db.isOwnerSynced(owner.id)).toBe(false);
+
+    syncState.set(
+      stateWith([owner.id], {
+        type: "Settled",
+        transportId: complete.transportId,
+        skippedError: {
+          type: "DecryptWithXChaCha20Poly1305Error",
+          error: createUnknownError("invalid tag"),
+          at: Millis.orThrow(1),
+        },
+        completeAt: null,
+        lastSentAt: Millis.orThrow(1),
+        lastReceivedAt: Millis.orThrow(1),
+      }),
+    );
+    await settle();
+    expect(db.isOwnerSynced(owner.id)).toBe(false);
+  });
+
+  it("counts an owner synced when a Settled route already completed cleanly earlier", async () => {
+    const fake = fakeEvolu();
+    const syncState = syncStore();
+    const db = open(fake.runtime, { syncState });
+    const owner = testAppOwner();
+    syncState.set(
+      stateWith([owner.id], {
+        type: "Settled",
+        transportId: complete.transportId,
+        skippedError: {
+          type: "ProtocolChangeTooLargeError",
+          timestamp: createInitialTimestamp(testCreateDeps()),
+          size: PositiveInt.orThrow(100_000),
+          at: Millis.orThrow(2),
+        },
+        completeAt: Millis.orThrow(1),
+        lastSentAt: Millis.orThrow(2),
+        lastReceivedAt: Millis.orThrow(2),
+      }),
+    );
+    await settle();
+    expect(db.isOwnerSynced(owner.id)).toBe(true);
+  });
+
+  it("subscribes no owners without a relay", () => {
     const fake = fakeEvolu();
     const used: string[] = [];
     const db = open(
@@ -382,7 +450,7 @@ describe("evolu shard db", () => {
     );
     const owner = testAppOwner();
     db.useOwner(owner);
-    expect(db.isOwnerSynced(owner.id)).toBe(true);
+    expect(db.isOwnerSynced(owner.id)).toBe(false);
     expect(used).toEqual([]);
   });
 });

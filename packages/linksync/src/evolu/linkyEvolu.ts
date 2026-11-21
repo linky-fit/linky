@@ -155,7 +155,7 @@ export const openLinkyEvolu = async (
   return current.evolu;
 };
 
-/** Reports each relay failure of the database's owners once. */
+/** Reports each relay failure or skipped change of the database's owners once. */
 const reportSyncFailures = (
   syncState: ReadonlyStore<SyncState | null>,
   name: string,
@@ -168,16 +168,23 @@ const reportSyncFailures = (
     const current = new Set<object>();
     for (const owner of tenant.owners)
       if (owner.type === "Writable")
-        for (const route of owner.routes)
-          if (route.type === "Pending" && route.failure !== null) {
-            current.add(route.failure);
-            if (!reported.has(route.failure))
+        for (const route of owner.routes) {
+          const error =
+            route.type === "Pending"
+              ? route.failure
+              : route.type === "Settled"
+                ? route.skippedError
+                : null;
+          if (error !== null) {
+            current.add(error);
+            if (!reported.has(error))
               onEvent({
                 _tag: "OwnerSyncFailed",
                 ownerId: owner.ownerId,
-                error: route.failure.type,
+                error: error.type,
               });
           }
+        }
     reported = current;
   };
   syncState.subscribe(report);

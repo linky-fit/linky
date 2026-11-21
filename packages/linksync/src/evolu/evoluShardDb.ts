@@ -48,9 +48,10 @@ import { LinkyEvoluSchema } from "./linkyEvoluSchema";
  * subscribed queries already reflect it, and fails with its whole batch: Evolu
  * stores the mutations queued in one microtask as one transaction.
  *
- * An owner counts as synced once a route of it completed in Evolu's sync state
- * and every table read so far was loaded afresh after that: sync state and
- * query refreshes reach the page on separate channels, in either order.
+ * An owner counts as synced once a route of it finished a clean sync round in
+ * Evolu's sync state (`completeAt !== null`) and every table read so far was
+ * loaded afresh after that: sync state and query refreshes reach the page on
+ * separate channels, in either order.
  */
 
 export type LinkyEvolu = AppOwnerEvolu<typeof LinkyEvoluSchema>;
@@ -139,14 +140,20 @@ export interface AppliedWrite {
 
 export interface EvoluShardDbOptions {
   readonly syncState: ReadonlyStore<SyncState | null>;
-  /** Without a relay every owner counts as synced. */
+  /** Without a relay `useOwner` subscribes nothing, because Evolu syncs nothing then. */
   readonly hasEvoluRelay: boolean;
   readonly onWriteFailed?: (write: FailedWrite) => void;
   readonly onWriteApplied?: (write: AppliedWrite) => void;
 }
 
-/** Owners of the database with a route that completed since its worker started. */
-export const completedOwners = (
+/**
+ * Owners of the database with a route that finished a clean sync round since
+ * its worker started. `Settled` routes with `completeAt === null` skipped at
+ * least one change, and Evolu exposes only one `skippedError` per route (so an
+ * outgoing oversized skip can mask an unreadable incoming change, and a relay
+ * can also send a crafted oversized change); require a clean completion.
+ */
+const completedOwners = (
   state: SyncState | null,
   name: string,
 ): ReadonlyArray<OwnerId> => {
@@ -419,26 +426,34 @@ export const createEvoluShardDb = (
   const readable = new Set<OwnerId>();
   const syncListeners = new Set<() => void>();
   let absorbing = Promise.resolve();
+  let absorbQueued = false;
   const absorbCompletedOwners = (): void => {
-    const completed = completedOwners(syncState.get(), evolu.name).filter(
+    if (absorbQueued) return;
+    const hasPending = completedOwners(syncState.get(), evolu.name).some(
       (ownerId) => !readable.has(ownerId),
     );
-    if (completed.length === 0) return;
+    if (!hasPending) return;
+    absorbQueued = true;
     absorbing = absorbing
-      .then(() =>
-        Promise.all(
+      .then(async () => {
+        absorbQueued = false;
+        const completed = completedOwners(syncState.get(), evolu.name).filter(
+          (ownerId) => !readable.has(ownerId),
+        );
+        if (completed.length === 0) return;
+        await Promise.all(
           [...tableQueries.values()].map((query) =>
             evolu.loadQuery(query, { cache: false }),
           ),
-        ),
-      )
-      .then(
-        () => {
-          for (const ownerId of completed) readable.add(ownerId);
-          for (const listener of syncListeners) listener();
-        },
+        );
+        for (const ownerId of completed) readable.add(ownerId);
+        for (const listener of syncListeners) listener();
+      })
+      .catch(
         // The owners stay unsynced; the next sync state loads again.
-        () => {},
+        () => {
+          absorbQueued = false;
+        },
       );
   };
   if (hasEvoluRelay) {
@@ -466,7 +481,7 @@ export const createEvoluShardDb = (
     // Without relays Evolu syncs nothing and `useOwner` would throw.
     useOwner: (owner: Owner) =>
       hasEvoluRelay ? evolu.useOwner(owner) : () => {},
-    isOwnerSynced: (ownerId) => !hasEvoluRelay || readable.has(ownerId),
+    isOwnerSynced: (ownerId) => readable.has(ownerId),
     subscribeOwnerSync: (listener) => {
       syncListeners.add(listener);
       return () => {

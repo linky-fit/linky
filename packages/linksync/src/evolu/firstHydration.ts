@@ -29,12 +29,13 @@ export const markAwaitingFirstHydration = (
   if (owner) kv.setItem(awaitingFirstHydrationKey(owner.id), "1");
 };
 
-// With no Evolu relay the worker counts every owner synced at once, though nothing of the account arrived.
-const withoutOwnerSync = (
+// Without any Evolu relay, only a device awaiting its first hydration stays unhydrated.
+const withNoRelaySync = (
   db: ShardDb<LinkyDbSchema>,
+  synced: boolean,
 ): ShardDb<LinkyDbSchema> => ({
   ...db,
-  isOwnerSynced: () => false,
+  isOwnerSynced: () => synced,
   subscribeOwnerSync: () => () => {},
 });
 
@@ -59,7 +60,7 @@ export const createAccountStore = (
   const key = awaitingFirstHydrationKey(appOwner.id);
   const awaitingFirstHydration = kv.getItem(key) === "1";
   const store = createLinkyStore(
-    awaitingFirstHydration && !hasEvoluRelay ? withoutOwnerSync(db) : db,
+    hasEvoluRelay ? db : withNoRelaySync(db, !awaitingFirstHydration),
     appOwner,
     { ...options, holdWritesUntilHydrated: awaitingFirstHydration },
   );
