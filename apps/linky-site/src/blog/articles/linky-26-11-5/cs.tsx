@@ -53,9 +53,9 @@ export function Body() {
 
       <Heading>Rychlejší platby a plynulejší synchronizace</Heading>
       <Paragraph>
-        Když Linky používáte pár měsíců, v peněžence se nastřádají stovky
-        drobných kousků ecash. Platby z takové peněženky jsou teď zhruba dvakrát
-        rychlejší než dřív.
+        Peněženka by teď měla být znatelně rychlejší, i když v ní máte spoustu
+        Cashu tokenů. Platby z delší dobu používané peněženky zvládá zhruba
+        dvakrát rychleji než dřív.
       </Paragraph>
       <Paragraph>
         Plynulejší je i synchronizace mezi zařízeními. Zprávy, kontakty, nabídky

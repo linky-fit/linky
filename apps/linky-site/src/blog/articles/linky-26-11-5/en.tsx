@@ -53,9 +53,9 @@ export function Body() {
 
       <Heading>Faster payments and steadier sync</Heading>
       <Paragraph>
-        Use Linky for a few months and your wallet collects hundreds of small
-        ecash pieces. Paying from a busy wallet is now roughly twice as fast as
-        before.
+        Your wallet should now feel noticeably faster even when it holds a lot
+        of Cashu tokens. Payments from a heavily used wallet run roughly twice
+        as fast as before.
       </Paragraph>
       <Paragraph>
         Syncing across devices is steadier too. Messages, contacts, listings and
