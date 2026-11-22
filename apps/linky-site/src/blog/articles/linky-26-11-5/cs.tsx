@@ -37,7 +37,7 @@ export function Body() {
         Odeslání na on-chain se navíc líp sleduje. Na obrazovce převodu teď
         vidíte svou cílovou adresu a tlačítko{" "}
         <Term>Otevřít adresu v prohlížeči</Term>, které ji otevře v prohlížeči
-        blockchainu. Jakmile výplata dorazí na chain, otevření odkazu transakci
+        blockchainu. Když platba dorazí na on-chain, otevření odkazu transakci
         zkontroluje a rovnou označí převod jako hotový.
       </Paragraph>
       <FigureRow>
