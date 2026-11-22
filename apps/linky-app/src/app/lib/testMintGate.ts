@@ -1,13 +1,20 @@
 import { NonNegativeAmount, WalletBalances } from "@linky-fit/linkshu";
-import { isHiddenTestMint } from "../../utils/mint";
-import { isDevBuild, isE2eBuild } from "../../platform/buildEnv";
+import {
+  isHiddenTestMint,
+  isTestMintUrl,
+  MAIN_MINT_URL,
+} from "../../utils/mint";
+import { isDevBuild } from "../../platform/buildEnv";
 
-/** Dev and E2E builds run against a local FakeWallet mint, so they allow test mints. */
-const allowTestMintsBuildDefault = isDevBuild || isE2eBuild;
+/** A build whose own main mint is a test mint would otherwise hide it and fall back to a production mint. */
+export const allowTestMintsByDefault = (
+  isDev: boolean,
+  mainMintUrl: string,
+): boolean => isDev || isTestMintUrl(mainMintUrl);
 
 export const resolveAllowTestMints = (
   stored: boolean | null,
-  buildDefault: boolean = allowTestMintsBuildDefault,
+  buildDefault: boolean = allowTestMintsByDefault(isDevBuild, MAIN_MINT_URL),
 ): boolean => stored ?? buildDefault;
 
 export const withoutHiddenTestMints = <T extends { readonly mint: string }>(

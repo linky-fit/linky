@@ -6,6 +6,7 @@ import {
 } from "@linky-fit/linkshu";
 import { describe, expect, it } from "vitest";
 import {
+  allowTestMintsByDefault,
   resolveAllowTestMints,
   visibleWalletBalances,
   withoutHiddenTestMints,
@@ -25,6 +26,14 @@ const balances = new WalletBalances({
     balance("https://cashu.cz", 150),
     balance("https://kashu.me", 50),
   ],
+});
+
+describe("allowTestMintsByDefault", () => {
+  it("allows test mints in a dev build and in a build whose main mint is one", () => {
+    expect(allowTestMintsByDefault(true, "https://cashu.cz")).toBe(true);
+    expect(allowTestMintsByDefault(false, "http://localhost:3338")).toBe(true);
+    expect(allowTestMintsByDefault(false, "https://cashu.cz")).toBe(false);
+  });
 });
 
 describe("resolveAllowTestMints", () => {
