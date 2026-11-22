@@ -62,7 +62,7 @@ import {
   settleSwap,
   swapProofsForAmount,
 } from "../internal/spend";
-import type { SpendContext } from "../internal/spend";
+import type { SpendContext, SpendSelection } from "../internal/spend";
 import { nowSeconds } from "../internal/time";
 import { sat } from "../internal/units";
 import {
@@ -690,6 +690,18 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
         : Effect.succeed(offered);
     };
 
+    const spendContextAt = (
+      wallet: LoadedWallet,
+      mint: MintUrl,
+    ): SpendContext => ({
+      proofStore,
+      inspector,
+      wallet,
+      mint,
+      unit: sat,
+      reason: "melt",
+    });
+
     /**
      * Swaps `amount` out of the balance at the scope's mint, fee-inclusive:
      * melt inputs must also cover their own cashu input fee, or the mint
@@ -700,18 +712,12 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
       scope: CounterScope,
       amount: number,
       limit?: { readonly maxTotal: number; readonly quoteId: QuoteId },
+      selection?: SpendSelection,
     ): Effect.Effect<FundedInputs, MeltError> =>
       Effect.gen(function* () {
-        const spendContext = {
-          proofStore,
-          inspector,
-          wallet,
-          mint: scope.mint,
-          unit: sat,
-          reason: "melt",
-        };
+        const spendContext = spendContextAt(wallet, scope.mint);
         const { spendable, available } =
-          yield* selectSpendableProofs(spendContext);
+          selection ?? (yield* selectSpendableProofs(spendContext));
         if (available < amount) {
           return yield* new InsufficientFunds({
             mint: scope.mint,
@@ -806,7 +812,13 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
       Effect.gen(function* () {
         const wallet = yield* instances.get(draft.mint, sat);
         const scope = yield* scopeAt(wallet, draft.mint);
-        const { raw, quote } = yield* payableQuote(wallet, draft);
+        const [{ raw, quote }, selection] = yield* Effect.all(
+          [
+            payableQuote(wallet, draft),
+            selectSpendableProofs(spendContextAt(wallet, scope.mint)),
+          ],
+          { concurrency: 2 },
+        );
         const funded = yield* fundInputs(
           wallet,
           scope,
@@ -814,6 +826,7 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
           draft.maxTotal === undefined
             ? undefined
             : { maxTotal: draft.maxTotal, quoteId: quote.quoteId },
+          selection,
         );
         // The record, its held inputs, and the remainder all land before
         // the consumed sources are marked spent, so the funds are never

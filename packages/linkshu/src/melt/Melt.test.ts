@@ -122,6 +122,8 @@ interface FakeWalletArgs {
     call: MeltCall,
   ) => Promise<MeltProofsResponse<MeltQuoteBolt11Response>>;
   checkQuote?: () => Promise<MeltQuoteBolt11Response>;
+  /** Custom NUT-07 responder, e.g. to synchronize with quote calls in tests. */
+  checkProofsStates?: LoadedWallet["checkProofsStates"];
   /** NUT-07 state per proof secret; defaults to UNSPENT. */
   stateOf?: (secret: string) => "UNSPENT" | "PENDING" | "SPENT";
   restore?: (
@@ -147,13 +149,15 @@ const makeWallet = (args: FakeWalletArgs) => {
       ),
     }),
     checkProofsStates: (proofs) =>
-      Promise.resolve(
-        proofs.map((entry) => ({
-          Y: entry.secret,
-          state: args.stateOf?.(entry.secret) ?? "UNSPENT",
-          witness: null,
-        })),
-      ),
+      args.checkProofsStates
+        ? args.checkProofsStates(proofs)
+        : Promise.resolve(
+            proofs.map((entry) => ({
+              Y: entry.secret,
+              state: args.stateOf?.(entry.secret) ?? "UNSPENT",
+              witness: null,
+            })),
+          ),
     send: (amount, proofs, config, outputConfig) => {
       const call: SendCall = {
         amount: typeof amount === "number" ? amount : -1,
@@ -800,6 +804,63 @@ describe("Melt.melt", () => {
       }),
     );
   });
+
+  it.each([
+    { label: "fresh quote", quoteId: undefined },
+    { label: "existing quote", quoteId: QuoteId.make("quote-1") },
+  ])(
+    "overlaps quote pricing and NUT-07 proof state checks concurrently ($label)",
+    async ({ quoteId }) => {
+      // Both calls wait on a two-party barrier: if Melt awaited pricing before
+      // starting checkProofsStates, this barrier would never open.
+      let arrived = 0;
+      let release = () => {};
+      const bothStarted = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const waitForOverlap = async () => {
+        arrived += 1;
+        if (arrived === 2) release();
+        await bothStarted;
+      };
+      const quoteCall = async () => {
+        await waitForOverlap();
+        return quoteResponse();
+      };
+      const { wallet } = makeWallet({
+        quote: quoteCall,
+        checkQuote: quoteCall,
+        checkProofsStates: async (proofs) => {
+          await waitForOverlap();
+          return proofs.map((entry) => ({
+            Y: entry.secret,
+            state: "UNSPENT" as const,
+            witness: null,
+          }));
+        },
+        send: () => Promise.resolve(swappedThirteen()),
+        melt: () => Promise.resolve(meltResponse("PAID", [proof(1, "chg")])),
+      });
+      const { run } = makeHarness(wallet);
+
+      const exit = await run(
+        Effect.gen(function* () {
+          yield* seedProofs(mint, [...proofsA, ...proofsB]);
+          return yield* (yield* Melt).melt(
+            new MeltDraft({
+              mint,
+              invoice,
+              ...(quoteId === undefined ? {} : { quoteId }),
+            }),
+          );
+        }),
+      );
+
+      assert(Exit.isSuccess(exit));
+      expect(arrived).toBe(2);
+      expect(exit.value).toMatchObject({ paidAmount: 10, changeAmount: 1 });
+    },
+  );
 });
 
 /** The bound keyset at 100 ppk, publishing keys for powers of two. */
