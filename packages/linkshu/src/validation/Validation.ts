@@ -125,7 +125,9 @@ export class Validation extends Context.Service<Validation>()(
               unavailableMints.push(group.mint);
               continue;
             }
-            checkedProofs += Math.min(states.length, group.proofs.length);
+            checkedProofs += group.proofs.filter(
+              (_, index) => answerAt(states, index) !== "unknown",
+            ).length;
             const spent = yield* applyAnswer(group, states, "validation");
             markedSpent.push(
               ...spent.map(
