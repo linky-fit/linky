@@ -110,6 +110,7 @@ export const shellHooksMock = (
     usePaidOverlayCommands: () => paidOverlayCommands,
     usePaidOverlay: () => ({
       paidOverlayDetails: null,
+      paidOverlayId: 0,
       paidOverlayIsOpen: false,
       paidOverlayPhase: "done",
       paidOverlayTitle: null,

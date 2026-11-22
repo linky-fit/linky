@@ -10,7 +10,7 @@ import {
 /** The payment that just arrived, over whatever the merchant is doing; closes on tap or by itself. */
 export function PaidBannerHost() {
   const banner = usePaidBanner();
-  return banner === null ? null : <Banner banner={banner} />;
+  return banner === null ? null : <Banner key={banner.key} banner={banner} />;
 }
 
 function Banner({ banner }: { readonly banner: PaidBanner }) {

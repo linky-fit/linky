@@ -5,6 +5,7 @@ import type {
 } from "../../lib/paidOverlay";
 
 export interface PaidOverlay {
+  readonly id: number;
   readonly details: PaidOverlayDetails | null;
   readonly phase: PaidOverlayPhase;
   readonly title: string | null;
@@ -34,6 +35,7 @@ export const paidOverlayAtom = Atom.keepAlive(
 const makePaidOverlayCommands = (
   registry: AtomRegistry.AtomRegistry,
 ): PaidOverlayCommands & { readonly clearTimer: () => void } => {
+  let nextId = 0;
   let timer: ReturnType<typeof setTimeout> | null = null;
   const clearTimer = () => {
     if (timer !== null) clearTimeout(timer);
@@ -43,7 +45,12 @@ const makePaidOverlayCommands = (
     clearTimer,
     showPaymentSending: (details) => {
       clearTimer();
-      registry.set(paidOverlayAtom, { details, phase: "sending", title: null });
+      registry.set(paidOverlayAtom, {
+        id: ++nextId,
+        details,
+        phase: "sending",
+        title: null,
+      });
     },
     dismissPaymentSending: () =>
       registry.update(paidOverlayAtom, (current) =>
@@ -56,7 +63,9 @@ const makePaidOverlayCommands = (
     },
     showPaid: (title, details) => {
       clearTimer();
-      registry.set(paidOverlayAtom, { details, phase: "done", title });
+      const current = registry.get(paidOverlayAtom);
+      const id = current?.phase === "sending" ? current.id : ++nextId;
+      registry.set(paidOverlayAtom, { id, details, phase: "done", title });
       timer = setTimeout(() => {
         registry.set(paidOverlayAtom, null);
         timer = null;

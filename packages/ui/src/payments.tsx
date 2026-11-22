@@ -1,5 +1,9 @@
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Animated, PanResponder, StyleSheet } from "react-native";
+import type { PanResponderGestureState } from "react-native";
 import QRCodeSvg from "react-native-qrcode-svg";
-import { getVariableValue, Portal, useTheme, View } from "tamagui";
+import { getVariableValue, isWeb, Portal, useTheme, View } from "tamagui";
+import type { TamaguiElement } from "tamagui";
 import { Button, Pressable } from "./controls";
 import { Amount, Avatar } from "./display";
 import { Spinner } from "./spinner";
@@ -7,7 +11,7 @@ import { Icon } from "./icons";
 import type { IconName } from "./icons";
 import { Row, Stack, Text } from "./layout";
 import { tooltipProps } from "./styles";
-import { enterScale, shadow, size as sizes, space } from "./tokens";
+import { duration, enterScale, shadow, size as sizes, space } from "./tokens";
 
 export type KeypadKey =
   | "0"
@@ -360,9 +364,25 @@ export interface PaymentBannerProps {
   pending?: boolean | undefined;
   /** Renders in place, at the top of the nearest positioned parent, instead of portaling over the whole app. */
   contained?: boolean | undefined;
-  /** Closes the banner on press; a pending banner cannot be dismissed. */
+  /** Closes the banner on press or upward swipe; a pending banner cannot be dismissed. */
   onDismiss?: (() => void) | undefined;
 }
+
+// Vertical travel before the banner claims the gesture, so taps keep closing it on press.
+const BANNER_SWIPE_SLOP = 8;
+// Upward travel past which releasing dismisses the banner; a quick flick dismisses sooner.
+const BANNER_SWIPE_DISMISS_DISTANCE = 32;
+const BANNER_SWIPE_DISMISS_VELOCITY = 0.4;
+const BANNER_EXIT_DISTANCE = 120;
+
+const bannerStyles = StyleSheet.create({
+  // StyleSheet compiles RN's `box-none` to CSS `pointer-events: none`, letting touches beside the card pass through.
+  swipeHost: {
+    pointerEvents: "box-none",
+    width: "100%",
+    alignItems: "center",
+  },
+});
 
 /**
  * A payment's progress as a card at the top edge: sending, sent or
@@ -381,6 +401,163 @@ export function PaymentBanner({
   onDismiss,
 }: PaymentBannerProps) {
   const dismiss = pending ? undefined : onDismiss;
+  const canDismiss = dismiss !== undefined;
+  const [offset] = useState(() => new Animated.Value(0));
+  const dismissRef = useRef(dismiss);
+  useLayoutEffect(() => {
+    dismissRef.current = dismiss;
+  }, [dismiss]);
+  const mounted = useRef(true);
+  const dismissing = useRef(false);
+  const swiped = useRef(false);
+  // PanResponder zeroes dy when it grants the gesture, so keep the travel that claimed it.
+  const claimDy = useRef(0);
+  const swipedReset = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  const card = useRef<TamaguiElement>(null);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      clearTimeout(swipedReset.current);
+      offset.stopAnimation();
+    };
+  }, [offset]);
+
+  // Returning to pending (or dropping onDismiss) cancels any swipe or exit animation in progress.
+  useEffect(() => {
+    if (canDismiss) return;
+    dismissing.current = false;
+    swiped.current = false;
+    claimDy.current = 0;
+    clearTimeout(swipedReset.current);
+    swipedReset.current = undefined;
+    offset.stopAnimation();
+    offset.setValue(0);
+  }, [canDismiss, offset]);
+
+  useEffect(() => {
+    const node = card.current;
+    if (
+      !canDismiss ||
+      typeof HTMLElement === "undefined" ||
+      !(node instanceof HTMLElement)
+    ) {
+      return;
+    }
+    const previousTouchAction = node.style.touchAction;
+    // Stops mobile browsers from taking an upward swipe as a page scroll.
+    node.style.touchAction = "none";
+    // Dragging an avatar photo would start browser drag-and-drop and cut the swipe short.
+    const keepDragging = (event: DragEvent) => event.preventDefault();
+    node.addEventListener("dragstart", keepDragging);
+    return () => {
+      node.style.touchAction = previousTouchAction;
+      node.removeEventListener("dragstart", keepDragging);
+    };
+  }, [canDismiss]);
+
+  const opacity = useMemo(
+    () =>
+      offset.interpolate({
+        inputRange: [-BANNER_EXIT_DISTANCE, 0],
+        outputRange: [0, 1],
+        extrapolate: "clamp",
+      }),
+    [offset],
+  );
+
+  const responder = useMemo(() => {
+    const isSwipeUp = (state: PanResponderGestureState) => {
+      const claimed =
+        dismissRef.current !== undefined &&
+        !dismissing.current &&
+        state.dy < -BANNER_SWIPE_SLOP &&
+        Math.abs(state.dy) > Math.abs(state.dx);
+      if (claimed) claimDy.current = state.dy;
+      return claimed;
+    };
+    const springBack = () => {
+      Animated.spring(offset, {
+        toValue: 0,
+        speed: 18,
+        bounciness: 2,
+        useNativeDriver: false,
+      }).start();
+    };
+    const scheduleSwipedReset = () => {
+      clearTimeout(swipedReset.current);
+      // A touch swipe never clicks, so only a click right after release belongs to the swipe.
+      swipedReset.current = setTimeout(() => {
+        swiped.current = false;
+        swipedReset.current = undefined;
+      }, 0);
+    };
+    // PanResponder stores these callbacks; it does not call them during render.
+    // eslint-disable-next-line react-hooks/refs
+    return PanResponder.create({
+      onMoveShouldSetPanResponder: (_event, state) => isSwipeUp(state),
+      onMoveShouldSetPanResponderCapture: (_event, state) => isSwipeUp(state),
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => {
+        swiped.current = true;
+        offset.stopAnimation();
+        offset.setValue(Math.min(0, claimDy.current));
+      },
+      onPanResponderMove: (_event, state) => {
+        offset.setValue(Math.min(0, claimDy.current + state.dy));
+      },
+      onPanResponderRelease: (_event, state) => {
+        scheduleSwipedReset();
+        const totalDy = claimDy.current + state.dy;
+        claimDy.current = 0;
+        const shouldDismiss =
+          dismissRef.current !== undefined &&
+          (totalDy <= -BANNER_SWIPE_DISMISS_DISTANCE ||
+            (totalDy < -BANNER_SWIPE_SLOP &&
+              state.vy <= -BANNER_SWIPE_DISMISS_VELOCITY));
+        if (!shouldDismiss) {
+          springBack();
+          return;
+        }
+        dismissing.current = true;
+        Animated.timing(offset, {
+          toValue: -BANNER_EXIT_DISTANCE,
+          duration: duration.fast,
+          useNativeDriver: false,
+        }).start(({ finished }) => {
+          if (finished && mounted.current && dismissing.current) {
+            dismissRef.current?.();
+          }
+        });
+      },
+      onPanResponderTerminate: () => {
+        claimDy.current = 0;
+        clearTimeout(swipedReset.current);
+        swipedReset.current = undefined;
+        swiped.current = false;
+        if (!dismissing.current) springBack();
+      },
+    });
+  }, [offset]);
+
+  const handlePress = () => {
+    if (swiped.current) {
+      swiped.current = false;
+      clearTimeout(swipedReset.current);
+      swipedReset.current = undefined;
+      return;
+    }
+    if (dismissing.current) return;
+    dismiss?.();
+  };
+
+  // React Native Web's PanResponder adds an onClickCapture that blocks taps for 250 ms after release;
+  // handlePress already swallows only the swipe's own trailing click.
+  const webPanOverride = isWeb ? { onClickCapture: undefined } : {};
+
   const Frame = dismiss ? Pressable : Row;
   const banner = (
     <View
@@ -394,103 +571,113 @@ export function PaymentBanner({
       pointerEvents="box-none"
       data-safe-area="top"
     >
-      <Frame
-        role="status"
-        aria-live="assertive"
-        cursor={dismiss ? "pointer" : "default"}
-        pointerEvents="auto"
-        onPress={dismiss}
-        width="100%"
-        maxWidth="$sheetWidth"
-        gap="$md"
-        alignItems="center"
-        paddingVertical="$md"
-        paddingHorizontal="$lg"
-        borderRadius="$card"
-        backgroundColor="$surface"
-        boxShadow={shadow.floating}
-        transition="slow"
-        enterStyle={{ opacity: 0, y: -space.huge }}
+      <Animated.View
+        {...responder.panHandlers}
+        {...webPanOverride}
+        style={[
+          bannerStyles.swipeHost,
+          { transform: [{ translateY: offset }], opacity },
+        ]}
       >
-        <View position="relative">
-          {avatar ? (
-            <Avatar name={avatar.name} uri={avatar.uri} size="md" raised />
-          ) : (
-            <View
-              width="$avatar"
-              height="$avatar"
-              borderRadius="$pill"
-              backgroundColor={pending ? "$neutralSoft" : "$accentSoft"}
-              alignItems="center"
-              justifyContent="center"
-            >
-              {pending ? (
-                <Icon
-                  name={direction === "in" ? "ArrowDown" : "ArrowUp"}
-                  size="lg"
-                  color="$warning"
-                />
-              ) : (
-                <Icon name="Check" size="lg" color="$accent" />
-              )}
-            </View>
-          )}
-          {/* Keyed so the badges never share an instance: `transition` adds hooks. */}
-          {pending ? (
-            <View
-              key="pending"
-              position="absolute"
-              right={-space.xs}
-              bottom={-space.xs}
-              width="$iconLg"
-              height="$iconLg"
-              borderRadius="$pill"
-              backgroundColor="$surface"
-              alignItems="center"
-              justifyContent="center"
-            >
-              <Spinner />
-            </View>
-          ) : direction ? (
-            <View
-              key={direction}
-              position="absolute"
-              right={-space.xs}
-              bottom={-space.xs}
-              transition="slow"
-              enterStyle={{ opacity: 0, scale: enterScale.pop }}
-            >
-              <DirectionBadge direction={direction} size="sm" />
-            </View>
-          ) : null}
-        </View>
-        <Stack flex={1} gap="$none">
-          <Text variant="label" numberOfLines={2}>
-            {title}
-          </Text>
-          {avatar?.name ? (
-            <Text variant="caption" color="$colorMuted" numberOfLines={1}>
-              {avatar.name}
+        <Frame
+          ref={card}
+          role="status"
+          aria-live="assertive"
+          cursor={dismiss ? "pointer" : "default"}
+          pointerEvents="auto"
+          onPress={dismiss ? handlePress : undefined}
+          width="100%"
+          maxWidth="$sheetWidth"
+          gap="$md"
+          alignItems="center"
+          paddingVertical="$md"
+          paddingHorizontal="$lg"
+          borderRadius="$card"
+          backgroundColor="$surface"
+          boxShadow={shadow.floating}
+          transition="slow"
+          enterStyle={{ opacity: 0, y: -space.huge }}
+        >
+          <View position="relative">
+            {avatar ? (
+              <Avatar name={avatar.name} uri={avatar.uri} size="md" raised />
+            ) : (
+              <View
+                width="$avatar"
+                height="$avatar"
+                borderRadius="$pill"
+                backgroundColor={pending ? "$neutralSoft" : "$accentSoft"}
+                alignItems="center"
+                justifyContent="center"
+              >
+                {pending ? (
+                  <Icon
+                    name={direction === "in" ? "ArrowDown" : "ArrowUp"}
+                    size="lg"
+                    color="$warning"
+                  />
+                ) : (
+                  <Icon name="Check" size="lg" color="$accent" />
+                )}
+              </View>
+            )}
+            {/* Keyed so the badges never share an instance: `transition` adds hooks. */}
+            {pending ? (
+              <View
+                key="pending"
+                position="absolute"
+                right={-space.xs}
+                bottom={-space.xs}
+                width="$iconLg"
+                height="$iconLg"
+                borderRadius="$pill"
+                backgroundColor="$surface"
+                alignItems="center"
+                justifyContent="center"
+              >
+                <Spinner />
+              </View>
+            ) : direction ? (
+              <View
+                key={direction}
+                position="absolute"
+                right={-space.xs}
+                bottom={-space.xs}
+                transition="slow"
+                enterStyle={{ opacity: 0, scale: enterScale.pop }}
+              >
+                <DirectionBadge direction={direction} size="sm" />
+              </View>
+            ) : null}
+          </View>
+          <Stack flex={1} gap="$none">
+            <Text variant="label" numberOfLines={2}>
+              {title}
             </Text>
-          ) : null}
-        </Stack>
-        {amount ? (
-          <Row gap="$xs" alignItems="baseline" flexShrink={0}>
-            <Text
-              variant="title"
-              color="$colorStrong"
-              fontVariant={["tabular-nums"]}
-            >
-              {amount}
-            </Text>
-            {unit ? (
-              <Text variant="caption" color="$colorMuted">
-                {unit}
+            {avatar?.name ? (
+              <Text variant="caption" color="$colorMuted" numberOfLines={1}>
+                {avatar.name}
               </Text>
             ) : null}
-          </Row>
-        ) : null}
-      </Frame>
+          </Stack>
+          {amount ? (
+            <Row gap="$xs" alignItems="baseline" flexShrink={0}>
+              <Text
+                variant="title"
+                color="$colorStrong"
+                fontVariant={["tabular-nums"]}
+              >
+                {amount}
+              </Text>
+              {unit ? (
+                <Text variant="caption" color="$colorMuted">
+                  {unit}
+                </Text>
+              ) : null}
+            </Row>
+          ) : null}
+        </Frame>
+      </Animated.View>
     </View>
   );
   return contained ? banner : <Portal zIndex="$overlay">{banner}</Portal>;
