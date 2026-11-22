@@ -14,11 +14,13 @@ Každá vydaná verze musí obsahovat nejprve `en-US` a potom `cs-CZ`.
 
 - With several terminals open on one shop, a payment under a pledge is forwarded to the pledger once, by the terminal that created the payment, instead of by every terminal.
 - A direct payment no longer repays a pledge, because several terminals could each forward it; the shop's payments repay it.
+- Money from a payment whose connection dropped mid-way returns to the balance with the next payment from that mint, without a manual restore.
 
 ### cs-CZ
 
 - Když je na jednom obchodě otevřeno víc terminálů, platbu během zástavy přepošle zastaviteli jen jednou terminál, na kterém byla zadaná, a ne každý terminál.
 - Přímá platba už zástavu nesplácí, protože by ji mohlo přeposlat víc terminálů; zástavu splácejí platby obchodu.
+- Peníze z platby, které vypadlo spojení, se vrátí do zůstatku s další platbou z daného mintu, bez ruční obnovy.
 
 ## [26.11.1] - 2026-11-22
 
