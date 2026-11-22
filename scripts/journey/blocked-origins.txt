@@ -1,0 +1,16 @@
+linky.fit
+*.linky.fit
+fazole.fit
+*.fazole.fit
+cashu.cz
+*.cashu.cz
+mint.minibits.cash
+kashu.me
+testnut.cashu.space
+npub.cash
+*.npub.cash
+operator.twoballers.dev
+mempool.space
+free.evoluhq.com
+*.freedomrelay.dev
+api.moneta.cz

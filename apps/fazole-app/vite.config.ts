@@ -31,9 +31,10 @@ const commitSha = (() => {
 
 // MONETA's API answers no browser directly (no CORS), so the app calls
 // `/api/moneta/*` on its own origin: this proxy in development, `api/moneta.ts` on Vercel.
+// The journey stack points it at its fake bank.
 const monetaProxy = {
   "/api/moneta": {
-    target: "https://api.moneta.cz",
+    target: process.env.MONETA_API_ORIGIN ?? "https://api.moneta.cz",
     changeOrigin: true,
     rewrite: (path: string) =>
       path.replace(/^\/api\/moneta/u, "/api/v4/vip/aisp/my"),
