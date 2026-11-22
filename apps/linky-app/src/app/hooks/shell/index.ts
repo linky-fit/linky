@@ -142,6 +142,7 @@ export const usePaidOverlay = () => {
   const overlay = useAtomValue(paidOverlayAtom);
   return {
     paidOverlayDetails: overlay?.details ?? null,
+    paidOverlayId: overlay?.id ?? 0,
     paidOverlayIsOpen: overlay !== null,
     paidOverlayPhase: overlay?.phase ?? "done",
     paidOverlayTitle: overlay?.title ?? null,

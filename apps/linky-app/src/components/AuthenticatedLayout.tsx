@@ -210,6 +210,7 @@ export function AuthenticatedLayout({
 
       {paidOverlay.paidOverlayIsOpen ? (
         <PaidOverlay
+          key={paidOverlay.paidOverlayId}
           details={paidOverlay.paidOverlayDetails}
           phase={paidOverlay.paidOverlayPhase}
           paidOverlayTitle={paidOverlay.paidOverlayTitle}

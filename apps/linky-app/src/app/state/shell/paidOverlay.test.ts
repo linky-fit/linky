@@ -32,9 +32,11 @@ describe("paid overlay", () => {
     const { commands, overlay } = setup();
 
     commands.showPaymentSending(sending);
+    const sendingId = overlay()?.id;
     commands.showPaid("paidSent", sending);
     commands.dismissPaymentSending();
     expect(overlay()).toEqual({
+      id: sendingId,
       details: sending,
       phase: "done",
       title: "paidSent",
@@ -42,6 +44,17 @@ describe("paid overlay", () => {
 
     vi.advanceTimersByTime(2000);
     expect(overlay()).toBeNull();
+  });
+
+  it("gives a replacement confirmation a fresh id so an old banner gesture cannot close it", () => {
+    vi.useFakeTimers();
+    const { commands, overlay } = setup();
+
+    commands.showPaid("paidSent", sending);
+    const firstId = overlay()?.id;
+
+    commands.showPaid("paidReceived", { direction: "in", amountSat: 42 });
+    expect(overlay()?.id).not.toBe(firstId);
   });
 
   it("closes a settled confirmation on dismiss, never a payment in flight", () => {
