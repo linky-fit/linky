@@ -14,7 +14,7 @@ You orchestrate. Each tester is a delegate that drives browsers and reports find
 3. Start one tester per lane. Give each its lane, its scenarios and [TESTER.md](TESTER.md), which holds the rules, the stack's limits and the finding format. Run about six testers at a time. Memory is the limit, and a swapping host produces timeouts that testers report as app bugs.
 4. Merge the testers' findings into `.journey/evidence/FINDINGS.md` as they report. Send back any finding without its "On last release" line: that line decides whether the change under test caused it.
 5. Before a release, run the payment benchmark on this checkout and on the last release, as [Benchmark](#benchmark) describes.
-6. Report to the user what passed, what failed, which scenarios nobody ran, and the two benchmark tables side by side. Then run `bun run journey down`, which also deletes the browser profiles and wallets. The evidence stays in `.journey/`, which git ignores.
+6. Write the HTML report to `.journey/evidence/report.html` and present it with a short text summary, as [Report](#report) describes. Then run `bun run journey down`, which also deletes the browser profiles and wallets. The evidence stays in `.journey/`, which git ignores.
 
 ## Lanes
 
@@ -39,3 +39,16 @@ A lane that touches wallets needs the outside world: `bun run journey wallet`, `
 Run both once the testers are done and the main mint is in `auto`, because testers load the same mints. Report both tables. A cell varies by 30 to 50 % between runs of one build, so name a difference only when it is larger than that and a second run repeats it.
 
 `BENCH_RUNS`, `BENCH_FLOWS`, `BENCH_PROOFS`, `BENCH_LATENCY` and `BENCH_CPU_THROTTLE` narrow or widen a run; `apps/linky-app/bench/payments.bench.ts` has their values.
+
+## Report
+
+Write a self-contained HTML report to `.journey/evidence/report.html`. When `html_preview` and `html_render` are available, check it with `html_preview` and show it inline with `html_render`; otherwise link the saved file. Follow it with a short text summary of what passed, what regressed, and which scenarios nobody ran.
+
+Include four sections:
+
+- **Lanes.** Each lane as passed, partial, or failed, with its passed, failed, and skipped scenario counts.
+- **Benchmark.** This checkout beside the last release across proof counts and added mint latencies, as an interactive chart and a table. Mark deltas larger than the 30 to 50 % run-to-run noise. Skip this section when no benchmark ran.
+- **Findings.** Every finding from `FINDINGS.md`, grouped by severity and split by `On last release`, with `different` before `same` and `not tried`.
+- **Not run.** Scenarios nobody ran and why.
+
+Style the page with `html_render`'s theme CSS variables so it matches light and dark themes.
