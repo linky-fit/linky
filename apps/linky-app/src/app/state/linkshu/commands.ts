@@ -27,6 +27,7 @@ import {
   Validation,
 } from "@linky-fit/linkshu";
 import type {
+  Amount,
   AutoswapClaimResult,
   AutoswapError,
   AutoswapEstimate,
@@ -60,6 +61,7 @@ import type {
   P2pkPubkey,
   OperationNotFound,
   ProofStateSnapshot,
+  QuoteId,
   ReceiveError,
   ReceiveReceipt,
   ReceiveUnlockOptions,
@@ -115,11 +117,18 @@ export type SendCashuToken = (
   args: SendCashuTokenArgs,
 ) => Promise<Result.Result<SendReceipt, SendError>>;
 
-interface MeltCashuInvoiceArgs {
+interface QuoteCashuMeltArgs {
   readonly invoice: string;
   readonly mint: string;
   /** The amount to pay an amountless invoice with; never given for an invoice with its own amount. */
   readonly amountSat?: number | undefined;
+}
+
+export interface MeltCashuInvoiceArgs extends QuoteCashuMeltArgs {
+  /** The quote the user confirmed and its `MeltCost.maxTotal`; without it the melt requests a fresh quote. */
+  readonly confirmed?:
+    | { readonly quoteId: QuoteId; readonly maxTotal: Amount }
+    | undefined;
 }
 
 /** linkshu Melt; invalid mint/invoice input and defects reject. */
@@ -129,7 +138,7 @@ export type MeltCashuInvoice = (
 
 /** linkshu `Melt.quote` then `Melt.cost`: the most paying the invoice from `mint` can take; nothing moves. */
 export type QuoteCashuMelt = (
-  args: MeltCashuInvoiceArgs,
+  args: QuoteCashuMeltArgs,
 ) => Promise<Result.Result<MeltCost, MeltError>>;
 
 export interface CashuEnvelopeRef {
@@ -447,11 +456,17 @@ const makeLinkshuCommands = (run: LinkshuRun) => {
       }),
     );
 
-  const meltDraft = ({ invoice, mint, amountSat }: MeltCashuInvoiceArgs) =>
+  const meltDraft = ({
+    invoice,
+    mint,
+    amountSat,
+    confirmed,
+  }: MeltCashuInvoiceArgs) =>
     decodeMeltDraft({
       invoice,
       mint,
       ...(amountSat === undefined ? {} : { amount: amountSat }),
+      ...confirmed,
     });
 
   const meltCashuInvoice: MeltCashuInvoice = (args) =>

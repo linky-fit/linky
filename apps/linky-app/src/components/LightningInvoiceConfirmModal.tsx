@@ -78,7 +78,12 @@ export function LightningInvoiceConfirmModal({
       : confirmation.expiresAtSec - nowMs / 1000,
   );
   const insufficientBalance =
-    confirmation.amountSat !== null && confirmation.amountSat > cashuBalance;
+    (confirmation.amountSat !== null &&
+      confirmation.amountSat > cashuBalance) ||
+    (quote !== null && quote !== "pending" && quote._tag === "Insufficient");
+  const unpriced =
+    confirmation.amountSat !== null &&
+    (quote === null || quote === "pending" || quote._tag !== "Quoted");
 
   const feeLines =
     quote === null
@@ -111,7 +116,7 @@ export function LightningInvoiceConfirmModal({
       }
       unknownAmountLabel={t("lightningInvoiceConfirmUnknownAmount")}
       isBusy={cashuIsBusy}
-      disabled={insufficientBalance}
+      disabled={insufficientBalance || unpriced}
       {...(insufficientBalance ? { disabledReason: t("payInsufficient") } : {})}
       onClose={onClose}
       onConfirm={onConfirm}

@@ -392,6 +392,8 @@ describe("quoteLightningInvoice", () => {
       amount: 40,
       fee: 3,
       mint: MINT_URL,
+      quoteId: "quote-1",
+      maxTotal: 43,
     });
     expect(linkshu.quoteCashuMelt).toHaveBeenCalledWith({
       invoice,
@@ -408,6 +410,8 @@ describe("quoteLightningInvoice", () => {
       amount: 40,
       fee: 3,
       mint: MINT_URL,
+      quoteId: "quote-1",
+      maxTotal: 43,
     });
     expect(linkshu.quoteCashuMelt).toHaveBeenCalledWith({
       invoice: amountless,
@@ -485,6 +489,29 @@ describe("payLightningInvoice", () => {
         status: "ok",
       }),
     );
+  });
+
+  it("pays the confirmed quote from its mint, never above its maximum total", async () => {
+    const { commands, linkshu } = setup({
+      balances: { [MINT_URL]: 1_000, [FOREIGN]: 1_000 },
+    });
+
+    await commands.payLightningInvoice("lnbc-mock-invoice", {
+      quote: {
+        _tag: "Quoted",
+        amount: 40,
+        fee: 3,
+        mint: MintUrl.make(FOREIGN),
+        quoteId: QuoteId.make("quote-1"),
+        maxTotal: Amount.make(43),
+      },
+    });
+
+    expect(linkshu.meltCashuInvoice).toHaveBeenCalledWith({
+      invoice: "lnbc-mock-invoice",
+      mint: FOREIGN,
+      confirmed: { quoteId: "quote-1", maxTotal: 43 },
+    });
   });
 
   it("pays an amountless invoice with the entered amount", async () => {

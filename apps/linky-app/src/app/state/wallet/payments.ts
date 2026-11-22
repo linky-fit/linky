@@ -13,11 +13,13 @@ import {
   mintMoveCovers,
   planSendMint,
   postPaymentRequestPayload,
+  type Amount,
   type AutoswapReceipt,
   type MeltReceipt,
   type MintUrl,
   type PaymentPending,
   type PostPaymentRequestPayloadOutcome,
+  type QuoteId,
   type SendReceipt,
   type WalletBalances,
 } from "@linky-fit/linkshu";
@@ -56,7 +58,11 @@ import type {
   PaymentTelemetryMethod,
   PaymentTelemetryPaymentType,
 } from "../../types/appTypes";
-import { linkshuCommandsAtom, type LinkshuCommands } from "../linkshu/commands";
+import {
+  linkshuCommandsAtom,
+  type LinkshuCommands,
+  type MeltCashuInvoiceArgs,
+} from "../linkshu/commands";
 import { chatWritesAtom, type ChatWrites } from "../messages/chatWrites";
 import {
   linkstrCommands,
@@ -236,6 +242,9 @@ export interface LightningInvoiceQuote {
   /** The most the payment can cost beyond `amount`: the Lightning fee reserve and cashu input fees; unused reserve comes back. */
   readonly fee: number;
   readonly mint: MintUrl;
+  readonly quoteId: QuoteId;
+  /** `amount + fee`: the most paying with this quote may take. */
+  readonly maxTotal: Amount;
 }
 
 export type QuoteLightningInvoiceOutcome =
@@ -253,6 +262,8 @@ interface SendingOptions {
 export interface PayInvoiceOptions extends SendingOptions {
   /** The amount to pay an amountless invoice with; ignored when the invoice names its own. */
   readonly amountSat?: number | undefined;
+  /** The quote the user confirmed; the payment uses it and never costs more than its `maxTotal`. */
+  readonly quote?: LightningInvoiceQuote | undefined;
 }
 
 /** A payment runs while the user waits: offline it fails with `NetworkError`, it is never queued for later. */
@@ -393,9 +404,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
   };
 
   const melt = async (
-    invoice: string,
-    mint: MintUrl,
-    amountSat?: number,
+    args: MeltCashuInvoiceArgs,
   ): Promise<
     Result.Result<
       MeltReceipt,
@@ -403,11 +412,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
     >
   > => {
     try {
-      const outcome = await linkshu.meltCashuInvoice({
-        invoice,
-        mint,
-        ...(amountSat === undefined ? {} : { amountSat }),
-      });
+      const outcome = await linkshu.meltCashuInvoice(args);
       if (Result.isSuccess(outcome)) return Result.succeed(outcome.success);
       return Result.fail({
         detail: describeError(outcome.failure),
@@ -477,16 +482,21 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
         // An amountless invoice without an entered amount cannot pre-select
         // by size; any funded mint may quote it, so fall back to the 1-sat
         // threshold and let the mint answer.
-        const mint = sendMint(current, amountSat ?? 1);
+        const quote = options?.quote;
+        const mint = quote?.mint ?? sendMint(current, amountSat ?? 1);
         if (mint === null) return { _tag: "Insufficient" };
         options?.onSending?.();
         const details = { lightningInvoice: normalized };
         const note = preview?.description ?? null;
-        const outcome = await melt(
-          normalized,
+        const outcome = await melt({
+          invoice: normalized,
           mint,
-          amountless && amountSat !== null ? amountSat : undefined,
-        );
+          amountSat: amountless && amountSat !== null ? amountSat : undefined,
+          confirmed: quote && {
+            quoteId: quote.quoteId,
+            maxTotal: quote.maxTotal,
+          },
+        });
         if (Result.isFailure(outcome)) {
           const { detail, pending, network } = outcome.failure;
           if (pending !== null) {
@@ -622,7 +632,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
             getLightningInvoicePreview(invoice)?.description ??
             null;
 
-          const outcome = await melt(invoice, mint);
+          const outcome = await melt({ invoice, mint });
           if (Result.isFailure(outcome)) {
             const { detail, pending, network } = outcome.failure;
             if (pending !== null) {
@@ -1041,6 +1051,8 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
           amount: quote.amount,
           fee: maxTotal - quote.amount,
           mint,
+          quoteId: quote.quoteId,
+          maxTotal,
         };
       } catch (error) {
         return isNetworkFailure(error)
