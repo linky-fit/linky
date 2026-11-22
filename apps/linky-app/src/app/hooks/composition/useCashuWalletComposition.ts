@@ -15,6 +15,7 @@ import { useAnonymousPaymentTelemetry } from "../useAnonymousPaymentTelemetry";
 import { useOwnNprofile } from "../useOwnNprofile";
 import { useCashuDomain } from "../useCashuDomain";
 import { useMintInfo, useMintInfoWatchers } from "../mint/useMintInfo";
+import { usePaymentMintWarmup } from "../mint/usePaymentMintWarmup";
 import { useAllowTestMints } from "../useAllowTestMints";
 import { useMoveMintFunds } from "../mint/useMoveMintFunds";
 import { useRequestMintUrls } from "../mint/useRequestMintUrls";
@@ -175,6 +176,7 @@ export const useCashuWalletComposition = ({
     resumePendingCashuTopups,
     sendCashuToken,
     startCashuTopup,
+    warmCashuMint,
     walletBalances,
     walletLoaded,
     walletOperations,
@@ -197,6 +199,11 @@ export const useCashuWalletComposition = ({
     touchMintInfo,
   } = useMintInfo();
   useMintInfoWatchers({ allowTestMints, defaultMintUrl, walletProofs });
+  usePaymentMintWarmup({
+    mintBalances: walletBalances.perMint,
+    routeKind: route.kind,
+    warmCashuMint,
+  });
 
   useTransferCleanup({
     chatMessages,

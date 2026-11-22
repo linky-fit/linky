@@ -1,5 +1,6 @@
 import {
   Mints,
+  MintUrl,
   NewOperation,
   NewProof,
   parseP2pkPubkey,
@@ -104,8 +105,8 @@ const gateMints = () => {
   return { fetch, release };
 };
 
-/** A mint answering NUT-06 info, keysets and keys for one v1 keyset. */
-const stubMintEndpoints = () => {
+/** Mint JSON fixtures matching v1 keyset 004cc88c4e270576. */
+const mintEndpointBodies = (name = "Preset mint"): Record<string, unknown> => {
   const keysetId = "004cc88c4e270576";
   const keys = {
     "1": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
@@ -119,9 +120,9 @@ const stubMintEndpoints = () => {
     active: true,
     input_fee_ppk: 100,
   };
-  const bodies: Record<string, unknown> = {
+  return {
     "/v1/info": {
-      name: "Preset mint",
+      name,
       pubkey: keys["1"],
       version: "Nutshell/0.16.0",
       nuts: { "15": { methods: [{ method: "bolt11", unit: "sat" }] } },
@@ -130,6 +131,11 @@ const stubMintEndpoints = () => {
     "/v1/keysets": { keysets: [keyset] },
     "/v1/keys": { keysets: [{ ...keyset, keys }] },
   };
+};
+
+/** A mint answering NUT-06 info, keysets and keys for one v1 keyset. */
+const stubMintEndpoints = () => {
+  const bodies = mintEndpointBodies();
   vi.stubGlobal("fetch", (input: RequestInfo | URL) => {
     const url = input instanceof Request ? input.url : String(input);
     const body = bodies[new URL(url, "http://localhost").pathname];
@@ -546,5 +552,135 @@ describe("linkshu commands", () => {
 
     expect(mints.fetch).toHaveBeenCalledTimes(mintCalls);
     unmount();
+  });
+
+  it("warms a mint once per runtime, deduplicates in-flight calls, and swallows failures", async () => {
+    const fetchSpy = vi.fn<(input: RequestInfo | URL) => Promise<Response>>();
+    let fail = true;
+    const bodies = mintEndpointBodies("Warm mint");
+    fetchSpy.mockImplementation((input) => {
+      const url = input instanceof Request ? input.url : String(input);
+      if (url === INSPECTOR_REPORT_PATH) {
+        return Promise.resolve(new Response(null, { status: 204 }));
+      }
+      if (fail) return Promise.reject(new TypeError("Failed to fetch"));
+      const body = bodies[new URL(url, "http://localhost").pathname];
+      return Promise.resolve(
+        new Response(JSON.stringify(body ?? null), {
+          status: body === undefined ? 404 : 200,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+    const mintFetches = () =>
+      fetchSpy.mock.calls.filter(([input]) =>
+        String(input).startsWith("https://warm.example"),
+      ).length;
+
+    const registry = await boot();
+    const context = await result(registry, linkshuRuntimeAtom);
+    const mintsService = await Effect.runPromiseWith(context)(Mints);
+    const infoSpy = vi.spyOn(mintsService, "info");
+    const commands = await commandsOf(registry);
+
+    // Invalid URLs and unreachable mints resolve quietly without throwing.
+    await expect(commands.warmCashuMint("not-a-url")).resolves.toBeUndefined();
+    expect(mintFetches()).toBe(0);
+    expect(infoSpy).not.toHaveBeenCalled();
+    await expect(
+      commands.warmCashuMint("https://warm.example"),
+    ).resolves.toBeUndefined();
+    const afterFailure = mintFetches();
+    expect(afterFailure).toBeGreaterThan(0);
+    expect(infoSpy).toHaveBeenCalledTimes(1);
+
+    // Failed warm-up is not cached: once reachable, concurrent calls share one promise.
+    fail = false;
+    const first = commands.warmCashuMint("https://warm.example");
+    const second = commands.warmCashuMint("https://warm.example");
+    expect(second).toBe(first);
+    await first;
+    const afterSuccess = mintFetches();
+    expect(afterSuccess).toBeGreaterThan(afterFailure);
+    expect(infoSpy).toHaveBeenCalledTimes(2);
+
+    // Repeat calls in the same runtime skip Mints.info completely.
+    await commands.warmCashuMint("https://warm.example");
+    expect(mintFetches()).toBe(afterSuccess);
+    expect(infoSpy).toHaveBeenCalledTimes(2);
+
+    // A fresh runtime starts with an empty warmed set.
+    registry.refresh(linkshuRuntimeAtom);
+    const nextCommands = await commandsOf(registry);
+    await nextCommands.warmCashuMint("https://warm.example");
+    expect(mintFetches()).toBeGreaterThan(afterSuccess);
+  });
+
+  it("keeps a stalled warm-up cached until the loader deadline aborts it, then retries fresh", async () => {
+    let stall = true;
+    const bodies = mintEndpointBodies("Warm mint");
+    const stalledSignals: AbortSignal[] = [];
+    const fetchSpy = vi.fn(
+      (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+        const url = input instanceof Request ? input.url : String(input);
+        if (url === INSPECTOR_REPORT_PATH) {
+          return Promise.resolve(new Response(null, { status: 204 }));
+        }
+        if (stall) {
+          return new Promise<Response>((_, reject) => {
+            const signal = init?.signal;
+            if (signal) {
+              stalledSignals.push(signal);
+              signal.addEventListener(
+                "abort",
+                () => reject(new DOMException("Aborted", "AbortError")),
+                { once: true },
+              );
+            }
+          });
+        }
+        const body = bodies[new URL(url, "http://localhost").pathname];
+        return Promise.resolve(
+          new Response(JSON.stringify(body ?? null), {
+            status: body === undefined ? 404 : 200,
+            headers: { "content-type": "application/json" },
+          }),
+        );
+      },
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const registry = await boot();
+    const commands = await commandsOf(registry);
+    vi.useFakeTimers();
+    try {
+      const first = commands.warmCashuMint("https://stalled.example");
+      await vi.advanceTimersByTimeAsync(8_000);
+      const callsBeforeDeadline = stalledSignals.length;
+      expect(callsBeforeDeadline).toBeGreaterThan(0);
+
+      // Before the loader deadline settles, a repeat warm-up shares the same
+      // in-flight load and launches no extra HTTP requests.
+      const second = commands.warmCashuMint("https://stalled.example");
+      expect(second).toBe(first);
+      expect(stalledSignals).toHaveLength(callsBeforeDeadline);
+
+      await vi.advanceTimersByTimeAsync(7_000);
+      await expect(first).resolves.toBeUndefined();
+      expect(stalledSignals.every((signal) => signal.aborted)).toBe(true);
+
+      stall = false;
+      const outcome = await Effect.runPromiseWith(
+        await result(registry, linkshuRuntimeAtom),
+      )(
+        Effect.flatMap(Mints, (mints) =>
+          mints.info(MintUrl.make("https://stalled.example")),
+        ),
+      );
+      expect(outcome.name).toBe("Warm mint");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

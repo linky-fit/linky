@@ -78,8 +78,7 @@ import type {
   ValidationReport,
   WalletBalances,
 } from "@linky-fit/linkshu";
-import { Effect, Schema, Scope } from "effect";
-import type { Result } from "effect";
+import { Effect, Result, Schema, Scope } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { storedMintSpelling } from "../../lib/mintSpelling";
 import {
@@ -188,6 +187,13 @@ export type ProbeLightningFee = (
 export type FetchMintInfo = (
   mint: string,
 ) => Promise<Result.Result<MintInfo, MintUnreachable | MintRejected>>;
+
+/**
+ * Preloads a mint's wallet instance into the current runtime via `Mints.info`
+ * so the first payment skips keyset/key fetches. Never rejects; warmed mints
+ * stay cached for this runtime so repeat calls are no-ops.
+ */
+export type WarmCashuMint = (mint: string) => Promise<void>;
 
 interface StartCashuTopupArgs {
   readonly amountSat: number;
@@ -346,6 +352,7 @@ const decodeTopupDraft = Schema.decodeUnknownSync(TopupDraft);
 const decodePaidQuoteDraft = Schema.decodeUnknownSync(PaidQuoteDraft);
 const decodeEnvelopeRef = Schema.decodeUnknownSync(EnvelopeRef);
 const decodeMintUrl = Schema.decodeUnknownSync(MintUrl);
+const decodeMintUrlOption = Schema.decodeUnknownOption(MintUrl);
 const decodeEnvelopeOpenDraft = Schema.decodeUnknownSync(EnvelopeOpenDraft);
 const decodeEnvelopeMeltDraft = Schema.decodeUnknownSync(EnvelopeMeltDraft);
 const decodeEnvelopeSendDraft = Schema.decodeUnknownSync(EnvelopeSendDraft);
@@ -578,6 +585,30 @@ const makeLinkshuCommands = (run: LinkshuRun) => {
       }),
     );
 
+  const warmedMints = new Set<string>();
+  const warmingMints = new Map<string, Promise<void>>();
+
+  const warmCashuMint: WarmCashuMint = (mint) => {
+    const url = decodeMintUrlOption(mint);
+    if (url._tag === "None") return Promise.resolve();
+    if (warmedMints.has(url.value)) return Promise.resolve();
+    const inFlight = warmingMints.get(url.value);
+    if (inFlight !== undefined) return inFlight;
+
+    const warming = runResult(
+      Effect.flatMap(Mints, (mints) => mints.info(url.value)),
+    )
+      .then((outcome) => {
+        if (Result.isSuccess(outcome)) warmedMints.add(url.value);
+      })
+      .catch(() => {})
+      .finally(() => {
+        warmingMints.delete(url.value);
+      });
+    warmingMints.set(url.value, warming);
+    return warming;
+  };
+
   const readWalletBalances: ReadWalletBalances = () =>
     run(Effect.flatMap(Tokens, (tokens) => tokens.balances));
 
@@ -749,6 +780,7 @@ const makeLinkshuCommands = (run: LinkshuRun) => {
     resumePendingCashuTopups,
     sendCashuToken,
     startCashuTopup,
+    warmCashuMint,
   };
 };
 
