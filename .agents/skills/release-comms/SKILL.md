@@ -3,106 +3,61 @@ name: release-comms
 description: Prepare Linky release communications: release blog post, demo videos, blog cover and editable social posts page. Use when preparing a Linky release announcement, social posts, demo videos or release blog post.
 ---
 
-Prepare a Linky release announcement end to end: interactive `@linky-fit/ui` demos in the `apps/linky-site` blog post, 4:5 demo videos and a 1280x720 blog cover captured from those demos, an editable static social posts page on Vercel, and a ready-for-review blog PR.
+A release announcement is a blog post in `apps/linky-site` with interactive `@linky-fit/ui` demos, 4:5 videos and a 1280x720 cover captured from those demos, and an editable social posts page on Vercel.
 
-Notation used below for a release such as `26.11.5`:
-
-- `<version>`: `26.11.5`
-- `<slug>`: `26-11-5` (branch, blog folder and `linky.fit/blog/linky-<slug>/`)
-- `<compact>`: `26115` (Vercel project, subdomain `linky-<compact>.twoballers.dev`, and `localStorage` prefix)
+For release `26.11.5`, `<slug>` is `26-11-5` and `<compact>` is `26115`. The last release's article (`apps/linky-site/src/blog/articles/linky-26-11-5/` with its `blog/` and `public/blog/` folders) and demo (`apps/linky-site/src/landing/demo/onchainSend.tsx`) are the template for file layout and wiring.
 
 ## Steps
 
-1. **Gather inputs and branch cleanly.** Read `apps/linky-app/CHANGELOG.md`, `GLOSSARY.md`, `apps/linky-app/src/i18n/` and the user's focus points. Create the blog branch from `origin/main` (`git fetch origin main && git checkout -b docs/blog-linky-<slug> origin/main`). Keep capture scripts and the static social posts site in a temp directory outside git (for example `/tmp/linky-<compact>` and `/tmp/linky-<compact>-site`).
-2. **Delegate mockups and copy in parallel.**
-   - **Interactive mockups.** Delegate each new `@linky-fit/ui` demo (`apps/linky-site/src/landing/demo/<name>.tsx`) to a Claude Opus delegate (`claudeAgent` / `claude-opus-5-5` when available). Restrict each delegate to its own demo files. Build every scene from the current screens in `apps/linky-app/src/pages/` and `apps/linky-app/src/components/`. Never copy older screens from `apps/linky-site/src/landing/demo/home.tsx` or earlier release demos without checking whether the app UI changed, because an outdated screen such as a pre-redesign Wallet view leaks old UI into the captured video. Export cue timestamps from a separate `<name>Cues.ts` file so `react-refresh/only-export-components` stays happy. Require exact copy from `apps/linky-app/src/i18n/`, `@linky-fit/ui` theme tokens only (working in both dark and light mode), and visual checks of every scene in both themes.
-   - **Copy.** Delegate the blog article (`en.tsx`, `cs.tsx`, plus `sk.tsx` only when relevant or requested) and social posts to a Gemini 4 Neon High delegate (`antigravity` / `gemini-4-neon`, `thought_level: "high"` when available). Pass all rules in [Copy and voice](#copy-and-voice), `GLOSSARY.md` and the `unslop` skill.
-3. **Wire the blog post.** Once delegates finish:
-   - Register each new demo screen in `apps/linky-site/src/landing/copy.ts` and `apps/linky-site/src/landing/demo/screens.tsx`.
-   - Create the blog files (`vite.config.ts` and `src/blog/articles.ts` auto-discover them by folder name):
-     - `apps/linky-site/blog/linky-<slug>/index.html` (title, description, `og:image` set to `/blog/linky-<slug>/cover.jpg`, 1280x720)
-     - `apps/linky-site/src/blog/articles/linky-<slug>/index.ts`
-     - `apps/linky-site/src/blog/articles/linky-<slug>/media.ts`
-     - `apps/linky-site/src/blog/articles/linky-<slug>/en.tsx` and `cs.tsx` (plus `sk.tsx` only when relevant or requested), mounting demos with `<DemoFigure>` inside `<FigureRow>`
-4. **Capture videos and blog cover.** Start `apps/linky-site` locally (`cd apps/linky-site && bunx vite --port <port> --strictPort`), capture 4:5 dark-mode demo videos and composite the 1280x720 `cover.jpg` as in [Video and cover capture](#video-and-cover-capture). Copy `cover.jpg` to `apps/linky-site/public/blog/linky-<slug>/cover.jpg` and to `<site-dir>/videos/cover.jpg`. Before encoding or deploying, inspect `cover.jpg` and captured frames from every scene of every demo against the current `apps/linky-app` UI so opening, intermediate and final scenes all match the shipped screens.
-5. **Build and deploy the social posts page.** Write the standalone editable `index.html` and `vercel.json` in `<site-dir>` and deploy to `https://linky-<compact>.twoballers.dev/` as in [Social posts page and Vercel deploy](#social-posts-page-and-vercel-deploy). Confirm HTTP 200 on `/` and every video and cover URL.
-6. **Verify and open the blog PR.** Run all four checks in order and fix anything that fails:
-   - `bun run check-changed`
-   - `bun run test-changed`
-   - `bun run site:build`
-   - `bun run e2e site` followed by `bun run e2e down`
+1. Read `apps/linky-app/CHANGELOG.md`, `GLOSSARY.md`, `apps/linky-app/src/i18n/` and the user's focus points. Branch `docs/blog-linky-<slug>` from `origin/main`. Capture scripts, frames and the social posts page live in a temp directory outside git.
+2. Delegate in parallel:
+   - **Demos** to Claude Opus delegates, one per new demo in `apps/linky-site/src/landing/demo/`, each restricted to its own files. Give each the rules in [Demos](#demos).
+   - **Copy** to a Gemini Neon High delegate: the article in English and Czech, plus Slovak when the release concerns Slovak users or the user asks, and the social posts. Give it [Copy](#copy), `GLOSSARY.md` and the `unslop` skill.
+3. Register the finished demos in `demo/screens.tsx` and `landing/copy.ts`, then add the article files. Vite discovers the article by its folder name.
+4. Capture the videos and `cover.jpg` as in [Capture](#capture). Copy the cover to `apps/linky-site/public/blog/linky-<slug>/cover.jpg`.
+5. Look at frames from the opening, middle and final scene of every video, and at `cover.jpg`, beside the current `apps/linky-app` UI. Every scene matches the shipped screens before anything deploys.
+6. Build and deploy the [social posts page](#social-posts-page).
+7. Run `bun run check-changed`, `bun run test-changed`, `bun run site:build`, then `bun run e2e site` and `bun run e2e down`. Open the PR with the `file-linky-pr` skill, embedding `https://linky-<compact>.twoballers.dev/videos/cover.jpg` in the body.
 
-   Push `docs/blog-linky-<slug>` and open a ready-for-review PR with `pull_request_create`, following `.agents/skills/file-linky-pr/SKILL.md` and `CONTRIBUTING.md`. Embed the live cover image (`https://linky-<compact>.twoballers.dev/videos/cover.jpg`) in the PR body and credit the models used.
+## Demos
 
-## Copy and voice
+- Build every scene from the current screens in `apps/linky-app/src/pages/` and `src/components/`. Existing demos in `landing/demo/` go stale when the app is redesigned, and a copied old Wallet screen ends up in the video.
+- Take copy verbatim from `apps/linky-app/src/i18n/` and colors from `@linky-fit/ui` theme tokens, so the demo works in dark and light mode.
+- Export cue timestamps from a separate `<name>Cues.ts`. ESLint's `react-refresh/only-export-components` rejects them in the component file, and the capture script reads them.
 
-Every piece of blog and social copy must follow these rules:
+## Copy
 
-- **Audience.** Regular non-developer users. Talk about product, UI and UX impact instead of internal library upgrades. Skip internal bumps (such as Evolu versions) and describe only practical effects, for example steadier multi-device sync and the need to update all devices.
-- **Tone.** Natural, concise and direct. Follow `unslop` and `GLOSSARY.md`.
-- **Terminology.**
-  - Use **Cashu** or **Cashu tokens** in user-facing copy, never `ecash`.
-  - In Czech and Slovak on-chain copy, use **platba** (for example `když platba dorazí na on-chain`), never `výplata`.
-- **X (Twitter) format.** Match `@LinkyFit`'s single-post shape:
-  - Opening line: `Linky <version> is out 🚀` (Czech: `Vyšel Linky <version> 🚀`)
-  - 3 to 4 short emoji-led highlight lines
-  - Blog link: `https://linky.fit/blog/linky-<slug>/`
-  - Strict limit: `<= 280` X-weighted characters (every URL counts 23, emojis and CJK count 2, standard Latin counts 1).
-  - Add at most one optional short reply, and only when needed for a second video or an extra note.
-- **Languages.**
-  - Social posts page: English and Czech only (`X (EN)`, `X (CS)`, `Nostr (EN + CS)`, `Signal (CS)`). Add Slovak only when the user asks for it.
-  - Blog post: English (`en.tsx`) and Czech (`cs.tsx`), plus Slovak (`sk.tsx`) only when relevant to the release or requested.
+- Readers are regular users, so describe what changes for them in the product. A library upgrade appears only as its effect, such as steadier sync across devices, without the library's name or version.
+- Say `Cashu` or `Cashu tokens`, never `ecash`. In Czech and Slovak on-chain copy say `platba`, never `výplata`.
+- An X post is a single post in `@LinkyFit`'s shape: `Linky <version> is out 🚀` (Czech `Vyšel Linky <version> 🚀`), three or four short emoji-led highlights, then `https://linky.fit/blog/linky-<slug>/`. It fits 280 X-weighted characters, where a URL counts 23, an emoji 2 and a Latin character 1.
+- Social posts are `X (EN)`, `X (CS)`, `Nostr (EN + CS)` and `Signal (CS)`. Slovak social posts are written only on request.
 
-## Video and cover capture
+## Capture
 
-Record each demo directly from the local `apps/linky-site` blog page (`/blog/linky-<slug>/`) using Playwright so videos match the live `@linky-fit/ui` components pixel for pixel.
+A Playwright script records each demo from the local blog page (`bunx vite --port <port> --strictPort` in `apps/linky-site`, then `/blog/linky-<slug>/`) frame by frame on a virtual clock, so every run produces the same video.
 
-- **Viewport and theme.** `540x675` at `deviceScaleFactor: 2` (`1080x1350`, 4:5), `colorScheme: "dark"`, `reducedMotion: "no-preference"`, `locale: "en"`, with `localStorage` seeded to `linky.color_mode = "dark"` and `linky.lang = "en"`.
-- **Deterministic frame stepping.**
-  - Before `page.goto`, replace `window.IntersectionObserver` with a stub that stores observers so the capture script starts only the target `figure` on demand.
-  - Wait for `document.fonts.ready` and image `.decode()`.
-  - Inject CSS that hides everything except `figure.capture`, centers the phone frame (`width: ~262px`, `border-radius: 30px`, inner `26px`), hides `figcaption`, and sets `cursor: none`.
-  - Install and pause Playwright's virtual clock (`page.clock.install`, `page.clock.pauseAt`), fire the stubbed `IntersectionObserver` callback for the target `figure`, then step 30 fps frames with `page.clock.runFor(delta)`.
-  - After each step, flush React with a `MessageChannel` tick, then pause and seek every Web Animation under `figure.capture` (`getAnimations({ subtree: true })`) to `Math.max(0, t - startTrigger)`, where `startTrigger` is the latest cue timestamp `<= t` from `<name>Cues.ts`.
-  - Capture each frame with `page.screenshot({ path, animations: "allow" })`.
-  - Inspect a captured frame from every scene against the current `apps/linky-app` UI before encoding.
-- **Encode with `ffmpeg`.**
-  ```sh
-  ffmpeg -y -loglevel error -framerate 30 -i "<frames>/%04d.png" \
-    -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -movflags +faststart -an \
-    "<out>/<name>.mp4"
-  ```
-  Verify dimensions (`1080x1350`), frame rate (`30/1`), `yuv420p`, duration and size with `ffprobe`.
-- **Blog cover (`1280x720`).** Open the same blog page in a `1280x720` dark viewport (`deviceScaleFactor: 2`), position the demo phones side by side over a subtle teal radial glow on `rgb(2, 6, 23)`, advance the virtual clock past the final cue and seek all animations to completion so every phone sits in its settled end state, capture PNG, and convert/resize to `1280x720` `cover.jpg`.
+- Viewport `540x675` at `deviceScaleFactor: 2` gives 1080x1350. Set `colorScheme: "dark"` and seed `localStorage` with `linky.color_mode = "dark"` and `linky.lang = "en"`.
+- Demos start from an `IntersectionObserver`. Stub it before `page.goto` and fire the callback for the target `figure` once fonts and images have loaded and the clock is paused (`page.clock.install`, `page.clock.pauseAt`).
+- Injected CSS hides everything except the target `figure`, its `figcaption` and the cursor.
+- Each frame advances `page.clock.runFor(1000 / 30)`, waits one `MessageChannel` tick for React to render, then pauses every Web Animation under the figure (`getAnimations({ subtree: true })`) and sets its `currentTime` to the time since the latest cue. CSS animations ignore the virtual clock, so skipping the seek leaves them frozen or racing.
+- Screenshot with `animations: "allow"`, or Playwright fast-forwards the animations to their end.
+- Encode with `ffmpeg -framerate 30 -i "%04d.png" -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -movflags +faststart -an <name>.mp4`.
+- The cover is the same page in a 1280x720 dark viewport: the demo phones side by side on `rgb(2, 6, 23)` with a faint teal glow, the clock advanced past the last cue and every animation seeked to its end, saved as a 1280x720 `cover.jpg`.
 
-## Social posts page and Vercel deploy
+## Social posts page
 
-Build a single self-contained `index.html` in `<site-dir>` with no external assets beyond `videos/*.mp4` and `videos/cover.jpg`:
+One self-contained `index.html`, with `videos/*.mp4` and `videos/cover.jpg` beside it and `<meta name="robots" content="noindex">`:
 
-- Include `<meta name="robots" content="noindex">` and `<meta name="color-scheme" content="light dark">`.
-- Render video players with download links plus a download link for `videos/cover.jpg`.
-- Render sections for `X (EN)`, `X (CS)`, `Nostr` (EN + CS) and `Signal (CS)`.
-- Make every `.post` block `contentEditable = "plaintext-only"` with `spellcheck = true`, persisted in `localStorage` under `linky-<compact>-post:<card-label>`, with Copy and Reset buttons and an `edited` indicator.
-- Show a live `N / 280` X-weighted character counter on X cards (URLs = 23, characters outside Latin light ranges = 2 after stripping `\uFE0F` and `\u200D`, light Latin = 1) that highlights over-limit counts.
+- Each video and the cover has a download link.
+- Each post is a `contentEditable="plaintext-only"` block saved to `localStorage` under `linky-<compact>-post:<label>`, with Copy and Reset buttons.
+- Each X post shows a live `N / 280` counter using the weights above, highlighted when over the limit.
 
-Add `vercel.json` in `<site-dir>`:
-
-```json
-{
-  "framework": null,
-  "buildCommand": "",
-  "installCommand": "",
-  "outputDirectory": "."
-}
-```
-
-Deploy with `CI=1` so the Vercel CLI never blocks on an upgrade prompt:
+A `vercel.json` with `"framework": null`, empty `buildCommand` and `installCommand`, and `"outputDirectory": "."` makes Vercel serve the folder as is. `CI=1` stops the CLI from blocking on its upgrade prompt:
 
 ```sh
-cd "<site-dir>"
 CI=1 vercel link --yes --project "linky-<compact>" --scope david-novaks-projects-ffea9efe
 CI=1 vercel deploy --prod --yes --scope david-novaks-projects-ffea9efe
 CI=1 vercel domains add "linky-<compact>.twoballers.dev" "linky-<compact>" --scope david-novaks-projects-ffea9efe
 ```
 
-Finish by curling `https://linky-<compact>.twoballers.dev/`, `videos/cover.jpg` and every `videos/*.mp4` and confirming HTTP 200 on each.
+The page is live once `https://linky-<compact>.twoballers.dev/`, the cover and every video return HTTP 200.
