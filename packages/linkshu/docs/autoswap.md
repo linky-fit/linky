@@ -38,8 +38,8 @@ const resumeSwaps = Effect.gen(function* () {
 
 ## How it works
 
-1. Size. `available` proofs at the source are NUT-07 filtered; spent ones are marked `spent`. A sweep starts at the confirmed unspent balance minus the source's cashu input-fee allowance. An explicit `amount` plus that allowance must fit the confirmed balance, else `InsufficientFunds` before any quote is created.
-2. Quote at the target for that amount.
+1. Size. `available` proofs at the source are NUT-07 filtered; spent ones are marked `spent`. A sweep starts at the confirmed unspent balance minus the source's cashu input-fee allowance. An explicit `amount` plus that allowance must fit the confirmed balance, else `InsufficientFunds` before any operation is written.
+2. Quote at the target for that amount. With an explicit `amount` the quote is asked for while step 1 runs, so an `InsufficientFunds` there leaves an unpaid target quote to expire.
 3. Persist the claim as a `pending` `autoswap` operation (`mint` is the target, `sourceMint` the source) before the invoice can be paid.
 4. Melt at the source against the target's invoice through [`Melt`](./melt.md): fee-inclusive swap, inputs `held` under a `melt` operation, change persisted.
 5. Wait for the target to see the payment, then mint through the same claim machinery as [topup](./topup.md): proofs stored `available` before the operation closes `done`.

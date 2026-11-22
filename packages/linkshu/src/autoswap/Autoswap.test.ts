@@ -86,6 +86,8 @@ interface FakeWalletArgs {
   }>;
   /** Input fee of the bound keyset at both mints; none published when unset. */
   readonly inputFeePpk?: number;
+  /** Awaited before a mint quote or NUT-07 check answers. */
+  readonly beforeQuoteOrCheck?: () => Promise<void>;
 }
 
 const makeWallets = (args: FakeWalletArgs) => {
@@ -93,6 +95,9 @@ const makeWallets = (args: FakeWalletArgs) => {
   const mintCounters: number[] = [];
   const restoreCalls: Array<{ start: number; count: number }> = [];
   let checks = 0;
+  const beforeQuoteOrCheck = () =>
+    args.beforeQuoteOrCheck?.() ?? Promise.resolve();
+  const answerStates = answerProofStates();
   const wallet = (): LoadedWallet =>
     fakeWallet({
       keysetId: KEYSET_HEX,
@@ -101,13 +106,15 @@ const makeWallets = (args: FakeWalletArgs) => {
           ? []
           : [new Keyset(KEYSET_HEX, "sat", true, args.inputFeePpk)],
       ),
-      checkProofsStates: answerProofStates(),
+      checkProofsStates: (proofs) =>
+        beforeQuoteOrCheck().then(() => answerStates(proofs)),
       // Every quote gets its own id, so each sizing attempt is its own
       // operation: target-quote-1, target-quote-2, ...
       createMintQuoteBolt11: (amount) => {
         quotedAmounts.push(typeof amount === "number" ? amount : -1);
-        return Promise.resolve(
-          mintQuoteResponse("UNPAID", `target-quote-${quotedAmounts.length}`),
+        const quoteId = `target-quote-${quotedAmounts.length}`;
+        return beforeQuoteOrCheck().then(() =>
+          mintQuoteResponse("UNPAID", quoteId),
         );
       },
       checkMintQuoteBolt11: () => {
@@ -446,7 +453,37 @@ describe("Autoswap.claim with an explicit amount", () => {
     });
   });
 
-  it("fails before quoting when the amount and input fee exceed the balance", async () => {
+  it("quotes the target while it checks the source's proof states", async () => {
+    const storage = freshStorage();
+    await seedSource(storage);
+    // Both calls wait on a two-party barrier, which never opens if the claim
+    // awaits the NUT-07 check before it asks the target for a quote.
+    let arrived = 0;
+    let release = () => {};
+    const bothStarted = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const harness = makeHarness(
+      storage,
+      {
+        states: ["PAID"],
+        beforeQuoteOrCheck: async () => {
+          arrived += 1;
+          if (arrived === 2) release();
+          await bothStarted;
+        },
+      },
+      makeMelt([paidReceipt]),
+    );
+
+    const exit = await harness.run(claimAmount(50));
+
+    assert(Exit.isSuccess(exit));
+    expect(arrived).toBe(2);
+    expect(harness.quotedAmounts).toEqual([50]);
+  });
+
+  it("fails without paying or recording when the amount and input fee exceed the balance", async () => {
     const storage = freshStorage();
     await seedSource(storage);
     const melt = makeMelt([paidReceipt]);
@@ -466,7 +503,8 @@ describe("Autoswap.claim with an explicit amount", () => {
       required: 101,
       available: 100,
     });
-    expect(harness.quotedAmounts).toEqual([]);
+    // The quote was asked for alongside the balance check and is left unpaid.
+    expect(harness.quotedAmounts).toEqual([98]);
     expect(melt.invoices).toEqual([]);
     expect(await claimOperations(storage)).toEqual([]);
   });
