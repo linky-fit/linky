@@ -115,6 +115,13 @@ bun run e2e site     # linky-site suite
 bun run e2e down     # stop the stack and drop its data
 ```
 
+Journey tests (agents clicking through the apps before a release, on a second stack with every app and backend and the last releases; never run by CI):
+
+```bash
+bun run journey up   # build and start it, then print the URLs
+bun run journey      # the other commands
+```
+
 [`AGENTS.md`](./AGENTS.md) lists the invariants and conventions; [`GLOSSARY.md`](./GLOSSARY.md) defines the domain terms.
 
 ## Contributing
