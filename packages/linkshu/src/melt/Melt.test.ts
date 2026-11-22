@@ -6,7 +6,7 @@ import type {
   SendResponse,
 } from "@cashu/cashu-ts";
 import { Amount, Keyset, MintOperationError } from "@cashu/cashu-ts";
-import { Effect, Exit, Layer } from "effect";
+import { Deferred, Effect, Exit, Fiber, Layer } from "effect";
 import { TestClock } from "effect/testing";
 import {
   Amount as SatAmount,
@@ -29,7 +29,7 @@ import type {
   OperationStoreService,
   StoredOperation,
 } from "../ports/OperationStore";
-import { ProofStore } from "../ports/ProofStore";
+import { NewProof, ProofStore } from "../ports/ProofStore";
 import type { StoredProof } from "../ports/ProofStore";
 import { runOnTestClock } from "../testing/clock";
 import {
@@ -679,7 +679,63 @@ describe("Melt.melt", () => {
     expect(await Effect.runPromise(storage.kv.get(counterKey))).toBe("102");
   });
 
-  it("books the swapped inputs under the record when the counter lock stays busy after the swap", async () => {
+  it("books the swapped inputs immediately without waiting on a busy counter lock", async () => {
+    const storage = freshStorage();
+    let lockBusy = false;
+    const booked = Deferred.makeUnsafe<void>();
+    const kv: KeyValueStoreService = {
+      ...storage.kv,
+      tryAcquireLease: (key, ttlMs) =>
+        lockBusy
+          ? Effect.succeed(null)
+          : storage.kv.tryAcquireLease(key, ttlMs),
+    };
+    const proofs: typeof storage.proofs = {
+      ...storage.proofs,
+      write: (batch) =>
+        Effect.tap(storage.proofs.write(batch), () =>
+          batch.insert?.some((proof) => proof.state === "held")
+            ? Effect.sync(() => Deferred.doneUnsafe(booked, Exit.void))
+            : Effect.void,
+        ),
+    };
+    const { wallet, meltCalls } = makeWallet({
+      send: () => {
+        lockBusy = true;
+        return Promise.resolve(swappedThirteen());
+      },
+    });
+
+    const exit = await makeHarness(wallet, { ...storage, kv, proofs }).run(
+      Effect.gen(function* () {
+        // Timestamps are positive unix seconds; the TestClock starts at 0.
+        yield* TestClock.adjust("1000 seconds");
+        const fiber = yield* Effect.forkChild(
+          meltAndInspect([proofsA, proofsB]),
+        );
+        // Must book held inputs without advancing the clock past the busy lock.
+        yield* Deferred.await(booked);
+        const bookedOperations = yield* storage.operations.loadAll;
+        const bookedProofs = yield* storage.proofs.loadUnspent;
+        const settled = yield* runOnTestClock(Fiber.join(fiber), "1 second");
+        return { bookedOperations, bookedProofs, settled };
+      }).pipe(Effect.provide(TestClock.layer())),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(onlyMelt(exit.value.bookedOperations)).toMatchObject({
+      status: "pending",
+      counter: null,
+    });
+    expect(amountIn(exit.value.bookedProofs, "held")).toBe(13);
+    expect(availableAmounts(exit.value.bookedProofs)).toEqual([1]);
+
+    const { settled } = exit.value;
+    assert(settled.receipt._tag === "Failure");
+    expect(settled.receipt.failure._tag).toBe("CounterLockTimeout");
+    expect(meltCalls).toEqual([]);
+  });
+
+  it("releases inputs when collision recovery hits a counter lock timeout", async () => {
     const storage = freshStorage();
     let lockBusy = false;
     const kv: KeyValueStoreService = {
@@ -690,15 +746,15 @@ describe("Melt.melt", () => {
           : storage.kv.tryAcquireLease(key, ttlMs),
     };
     const { wallet, meltCalls } = makeWallet({
-      send: () => {
+      send: () => Promise.resolve(swappedThirteen()),
+      melt: () => {
         lockBusy = true;
-        return Promise.resolve(swappedThirteen());
+        return Promise.reject(outputsAlreadySigned());
       },
     });
 
     const exit = await makeHarness(wallet, { ...storage, kv }).run(
       Effect.gen(function* () {
-        // Timestamps are positive unix seconds; the TestClock starts at 0.
         yield* TestClock.adjust("1000 seconds");
         return yield* runOnTestClock(
           meltAndInspect([proofsA, proofsB]),
@@ -709,11 +765,53 @@ describe("Melt.melt", () => {
     assert(Exit.isSuccess(exit));
     assert(exit.value.receipt._tag === "Failure");
     expect(exit.value.receipt.failure._tag).toBe("CounterLockTimeout");
-    expect(meltCalls).toEqual([]);
-    const operation = onlyMelt(exit.value.operations);
-    expect(operation).toMatchObject({ status: "pending", counter: null });
-    expect(amountIn(exit.value.proofs, "held")).toBe(13);
-    expect(availableAmounts(exit.value.proofs)).toEqual([1]);
+    expect(meltCalls).toHaveLength(1);
+    expect(onlyMelt(exit.value.operations).status).toBe("failed");
+    expect(amountIn(exit.value.proofs, "available")).toBe(14);
+    expect(proofsIn(exit.value.proofs, "held")).toHaveLength(0);
+  });
+
+  it("does not resurrect an already-spent change proof when finishing inline PAID", async () => {
+    const storage = freshStorage();
+    const { wallet } = makeWallet({
+      send: () => Promise.resolve(swappedThirteen()),
+      melt: async () => {
+        // Simulate a concurrent restore importing and spending the change before
+        // the melt response is settled locally.
+        const [imported] = await Effect.runPromise(
+          storage.proofs.write({
+            insert: [
+              new NewProof({
+                mint,
+                unit: CurrencyUnit.make("sat"),
+                keysetId: KeysetId.make(KEYSET_HEX),
+                amount: SatAmount.make(1),
+                secret: "chg",
+                C: "02" + "aa".repeat(32),
+                dleq: null,
+                state: "spent",
+                operationId: null,
+              }),
+            ],
+          }),
+        );
+        expect(imported?.state).toBe("spent");
+        return meltResponse("PAID", [proof(1, "chg")]);
+      },
+    });
+
+    const exit = await makeHarness(wallet, storage).run(
+      meltAndInspect([proofsA, proofsB]),
+    );
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Success");
+    expect(exit.value.receipt.success).toMatchObject({
+      paidAmount: 10,
+      changeAmount: 1,
+      feePaid: 2,
+    });
+    const changeRow = exit.value.proofs.find((p) => p.secret === "chg");
+    expect(changeRow?.state).toBe("spent");
   });
 
   it("recovers a blank-output counter collision via NUT-09 and retries", async () => {

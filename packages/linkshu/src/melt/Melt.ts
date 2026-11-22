@@ -42,6 +42,7 @@ import {
   withCounterLock,
 } from "../internal/counters";
 import type { CounterScope } from "../internal/counters";
+import type { KeyLeaseOptions } from "../internal/lease";
 import { inspectOperation } from "../internal/operations";
 import { isRecoverableOutputCollision } from "../internal/outputCollisions";
 import {
@@ -381,12 +382,15 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
           });
         }
         const inputs = yield* heldInputs(pending);
+        // A concurrent restore may already have imported these change proofs.
+        const known = yield* knownSecretsOf(proofStore, change);
+        const freshChange = change.filter((proof) => !known.has(proof.secret));
         yield* bookProofs(
           ctx,
           [
             {
               proofs: domainToNewProofs(
-                change,
+                freshChange,
                 pending.mint,
                 pending.unit,
                 "available",
@@ -523,10 +527,12 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
       scope: CounterScope,
       blanks: number,
       start: Effect.Effect<number>,
+      options?: KeyLeaseOptions,
     ): Effect.Effect<number, CounterLockTimeout> =>
       withCounterLock(
         kv,
         scope,
+        options,
       )(
         Effect.tap(start, (counter) =>
           advanceCounterTo(kv, inspector, scope, counter + blanks, "used"),
@@ -548,12 +554,12 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
           started.pending.inputsTotal - started.pending.amount,
         );
         let exec = started;
+        let nextCounter: number | null = exec.pending.counter;
         let lastCollision: unknown = null;
         for (let attempt = 0; attempt < MAX_MELT_ATTEMPTS; attempt += 1) {
           const counter =
-            attempt === 0 && exec.pending.counter !== null
-              ? exec.pending.counter
-              : yield* reserveBlanks(scope, blanks, readCounter(kv, scope));
+            nextCounter ??
+            (yield* reserveBlanks(scope, blanks, readCounter(kv, scope)));
           if (counter !== exec.pending.counter) {
             exec = {
               ...exec,
@@ -578,22 +584,30 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
           const raw = outcome.failure;
           if (isRecoverableOutputCollision(raw)) {
             lastCollision = raw;
-            yield* withCounterLock(
-              kv,
-              scope,
-            )(
-              recoverFromCollision(
-                {
-                  kv,
-                  inspector,
-                  wallet: exec.wallet,
-                  scope,
-                  fallbackBump: MELT_COLLISION_FALLBACK_BUMP,
-                },
-                counter,
-                raw,
+            if (attempt + 1 === MAX_MELT_ATTEMPTS) break;
+            const retryCounter = yield* Effect.result(
+              reserveBlanks(
+                scope,
+                blanks,
+                recoverFromCollision(
+                  {
+                    kv,
+                    inspector,
+                    wallet: exec.wallet,
+                    scope,
+                    fallbackBump: MELT_COLLISION_FALLBACK_BUMP,
+                  },
+                  counter,
+                  raw,
+                ),
               ),
             );
+            if (Result.isFailure(retryCounter)) {
+              // The last attempt was definitively rejected by the mint.
+              yield* releaseInputs(exec.pending, "failed", "melt-rejected");
+              return yield* Effect.fail(retryCounter.failure);
+            }
+            nextCounter = retryCounter.success;
             continue;
           }
           const failure = classifyMintError(scope.mint, raw);
@@ -808,9 +822,9 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
           scope,
           blankOutputCount(inputsTotal - quote.amount),
           readCounter(kv, scope),
+          // Do not wait on a busy lock before booking the swapped inputs.
+          { acquireTimeoutMs: 0 },
         ).pipe(
-          // The funded inputs are not booked yet, so a busy lock must not
-          // fail here: `executeMelt` reserves once the record holds them.
           Effect.catchTag("CounterLockTimeout", () => Effect.succeed(null)),
         );
         return yield* records.create({
