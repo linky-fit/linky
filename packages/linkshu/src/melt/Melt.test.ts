@@ -1738,6 +1738,31 @@ describe("persisted melt quotes", () => {
     expect(checkQuoteCalls).toEqual(["quote-1"]);
     expect(sendCalls).toEqual([]);
   });
+  it("pays an uppercase invoice with the quote the mint returned in lowercase", async () => {
+    const { wallet, meltCalls } = makeWallet({
+      send: () => Promise.resolve(swappedThirteen()),
+      melt: () => Promise.resolve(meltResponse("PAID", [])),
+      checkQuote: () => Promise.resolve(quoteResponse()),
+    });
+    const { run } = makeHarness(wallet);
+    const result = await run(
+      Effect.gen(function* () {
+        yield* seedProofs(mint, proofsA);
+        yield* seedProofs(mint, proofsB);
+        return yield* (yield* Melt).melt(
+          new MeltDraft({
+            mint,
+            invoice: Bolt11Invoice.make(invoice.toUpperCase()),
+            quoteId: QuoteId.make("quote-1"),
+          }),
+        );
+      }),
+    );
+    assert(Exit.isSuccess(result));
+    expect(result.value.paidAmount).toBe(10);
+    expect(meltCalls).toHaveLength(1);
+  });
+
   it("reports a settled quote without creating a second payment or exposing invoice text", async () => {
     const { wallet, sendCalls } = makeWallet({
       checkQuote: () => Promise.resolve(quoteResponse({ state: "PAID" })),

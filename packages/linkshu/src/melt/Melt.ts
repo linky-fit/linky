@@ -773,7 +773,8 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
                   try: () => wallet.checkMeltQuoteBolt11(quoteId),
                   catch: (error) => classifyMintError(target.mint, error),
                 });
-                if (raw.request !== target.invoice)
+                // BOLT11 is bech32, so case-insensitive; mints may return it lowercased.
+                if (raw.request.toLowerCase() !== target.invoice.toLowerCase())
                   return yield* new MintRejected({
                     mint: target.mint,
                     code: null,
