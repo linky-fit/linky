@@ -16,6 +16,7 @@ import { decodeMintQuote, emitQuoteState } from "../internal/quotes";
 import type { DecodedMintQuote } from "../internal/quotes";
 import { proofsAt, totalAmount } from "../internal/proofs";
 import { selectSpendableProofs } from "../internal/spend";
+import type { SpendSelection } from "../internal/spend";
 import { nowSeconds } from "../internal/time";
 import { sat } from "../internal/units";
 import { Melt } from "../melt/Melt";
@@ -155,16 +156,15 @@ export class Autoswap extends Context.Service<Autoswap>()("linkshu/Autoswap", {
       target: LoadedWallet,
       keysetId: PendingAutoswapClaim["keysetId"],
       amount: number,
+      prepared?: DecodedMintQuote,
     ): Effect.Effect<
       Result.Result<AutoswapReceipt, InsufficientFunds>,
       AutoswapError
     > =>
       Effect.gen(function* () {
-        const quote = yield* createTargetQuote(
-          target,
-          draft.targetMint,
-          amount,
-        );
+        const quote =
+          prepared ??
+          (yield* createTargetQuote(target, draft.targetMint, amount));
         // The record lands before the melt can pay the invoice.
         const record = yield* records.create({
           quoteId: quote.quoteId,
@@ -211,6 +211,7 @@ export class Autoswap extends Context.Service<Autoswap>()("linkshu/Autoswap", {
       target: LoadedWallet,
       keysetId: PendingAutoswapClaim["keysetId"],
       amount: Amount,
+      quote: DecodedMintQuote,
       inputFee: number,
       available: number,
     ): Effect.Effect<AutoswapReceipt, AutoswapError> =>
@@ -222,7 +223,13 @@ export class Autoswap extends Context.Service<Autoswap>()("linkshu/Autoswap", {
             available: NonNegativeAmount.make(available),
           });
         }
-        const outcome = yield* swapAmount(draft, target, keysetId, amount);
+        const outcome = yield* swapAmount(
+          draft,
+          target,
+          keysetId,
+          amount,
+          quote,
+        );
         return yield* Effect.fromResult(outcome);
       });
 
@@ -268,7 +275,7 @@ export class Autoswap extends Context.Service<Autoswap>()("linkshu/Autoswap", {
         const source = yield* instances.get(draft.sourceMint, sat);
         const target = yield* instances.get(draft.targetMint, sat);
         const keysetId = yield* boundKeysetId(draft.targetMint, target);
-        const { spendable, available } = yield* selectSpendableProofs({
+        const selectSource = selectSpendableProofs({
           kv,
           proofStore,
           inspector,
@@ -279,17 +286,34 @@ export class Autoswap extends Context.Service<Autoswap>()("linkshu/Autoswap", {
         });
         // Upper bound on what the melt's own swap pays the source mint in
         // cashu input fees; the Lightning fee reserve is learned per attempt.
-        const inputFee = inputFeeAllowance(source, spendable.length);
-        return draft.amount === undefined
-          ? yield* sweep(draft, target, keysetId, inputFee, available)
-          : yield* claimAmount(
-              draft,
-              target,
-              keysetId,
-              draft.amount,
-              inputFee,
-              available,
-            );
+        const inputFeeOf = (selection: SpendSelection) =>
+          inputFeeAllowance(source, selection.spendable.length);
+        if (draft.amount === undefined) {
+          const selection = yield* selectSource;
+          return yield* sweep(
+            draft,
+            target,
+            keysetId,
+            inputFeeOf(selection),
+            selection.available,
+          );
+        }
+        const [selection, quote] = yield* Effect.all(
+          [
+            selectSource,
+            createTargetQuote(target, draft.targetMint, draft.amount),
+          ],
+          { concurrency: 2 },
+        );
+        return yield* claimAmount(
+          draft,
+          target,
+          keysetId,
+          draft.amount,
+          quote,
+          inputFeeOf(selection),
+          selection.available,
+        );
       }).pipe(
         inspectOperationWith(
           inspector,
