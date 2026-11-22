@@ -36,6 +36,7 @@ import type { MeltOfEnvelope } from "../envelope/internal/envelopes";
 import { Inspector } from "../inspector/Inspector";
 import { cashuAmountToNumber } from "../internal/cashuAmounts";
 import { recoverFromCollision } from "../internal/collisionRecovery";
+import { errorMessage } from "../internal/errorMessage";
 import {
   advanceCounterTo,
   readCounter,
@@ -801,7 +802,7 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
      * The proofs a swap of `amount` spends, chosen up front so its input fee
      * is known: the swap picks among these alone, so it pays at most their
      * fee. Fails before anything moves when the inputs it mints plus that fee
-     * exceed `limit.maxTotal`.
+     * exceed `limit.maxTotal`, or when a proof's keyset fee is unknown.
      */
     const offerWithin = (
       wallet: LoadedWallet,
@@ -809,27 +810,33 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
       amount: number,
       limit: { readonly maxTotal: number; readonly quoteId: QuoteId },
       mint: MintUrl,
-    ): Effect.Effect<ReadonlyArray<StoredProof>, PaymentFailed> => {
-      const required = feeInclusiveTotal(wallet, amount);
-      const { send } = wallet.selectProofsToSend(
-        spendable.map(toDomainProof),
-        required,
-        true,
-      );
-      const chosen = new Set(send.map((proof) => proof.secret));
-      const offered = spendable.filter((proof) => chosen.has(proof.secret));
-      if (offered.length === 0) return Effect.succeed(spendable);
-      return required + inputFeeForProofs(wallet, send) > limit.maxTotal
-        ? Effect.fail(
-            new PaymentFailed({
-              mint,
-              quoteId: limit.quoteId,
-              detail:
-                "the melt would cost more than its maximum total; nothing was sent",
-            }),
-          )
-        : Effect.succeed(offered);
-    };
+    ): Effect.Effect<ReadonlyArray<StoredProof>, PaymentFailed> =>
+      Effect.gen(function* () {
+        const notSent = (detail: string) =>
+          new PaymentFailed({ mint, quoteId: limit.quoteId, detail });
+        const required = feeInclusiveTotal(wallet, amount);
+        const { send } = yield* Effect.try({
+          try: () =>
+            wallet.selectProofsToSend(
+              spendable.map(toDomainProof),
+              required,
+              true,
+            ),
+          catch: (error) =>
+            notSent(
+              `the melt inputs could not be priced (${errorMessage(error, "unknown keyset")}); nothing was sent`,
+            ),
+        });
+        const chosen = new Set(send.map((proof) => proof.secret));
+        const offered = spendable.filter((proof) => chosen.has(proof.secret));
+        if (offered.length === 0) return spendable;
+        if (required + inputFeeForProofs(wallet, send) > limit.maxTotal) {
+          return yield* notSent(
+            "the melt would cost more than its maximum total; nothing was sent",
+          );
+        }
+        return offered;
+      });
 
     const spendContextAt = (
       wallet: LoadedWallet,

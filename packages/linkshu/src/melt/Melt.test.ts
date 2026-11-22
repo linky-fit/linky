@@ -122,6 +122,8 @@ interface MeltCall {
 interface FakeWalletArgs {
   /** The mint's keysets as the wallet knows them; none (fee-free) by default. */
   keysets?: Keyset[];
+  /** Replaces the default selection, which spends every offered proof. */
+  selectProofsToSend?: LoadedWallet["selectProofsToSend"];
   quote?: () => Promise<MeltQuoteBolt11Response>;
   send?: (call: SendCall) => Promise<SendResponse>;
   melt?: (
@@ -148,12 +150,14 @@ const makeWallet = (args: FakeWalletArgs) => {
     keysetId: KEYSET_HEX,
     keyChain: fakeKeyChain(args.keysets ?? []),
     // Spends every offered proof, like a selection that needs them all.
-    selectProofsToSend: (proofs) => ({
-      keep: [],
-      send: proofs.map((entry) =>
-        proof(Amount.from(entry.amount).toNumber(), entry.secret),
-      ),
-    }),
+    selectProofsToSend:
+      args.selectProofsToSend ??
+      ((proofs) => ({
+        keep: [],
+        send: proofs.map((entry) =>
+          proof(Amount.from(entry.amount).toNumber(), entry.secret),
+        ),
+      })),
     checkProofsStates: (proofs) =>
       args.checkProofsStates
         ? args.checkProofsStates(proofs)
@@ -1325,9 +1329,13 @@ describe("Melt.cost", () => {
 });
 
 describe("Melt.melt with a maximum total", () => {
-  const meltWithin = (maxTotal: number) => {
+  const meltWithin = (
+    maxTotal: number,
+    selectProofsToSend?: LoadedWallet["selectProofsToSend"],
+  ) => {
     const { wallet, sendCalls } = makeWallet({
       keysets: [feeKeyset()],
+      ...(selectProofsToSend === undefined ? {} : { selectProofsToSend }),
       send: () => Promise.resolve({ keep: [], send: swappedThirteen().send }),
       melt: () => Promise.resolve(meltResponse("PAID", [])),
     });
@@ -1352,6 +1360,17 @@ describe("Melt.melt with a maximum total", () => {
 
   it("fails before swapping when the fees would exceed it", async () => {
     const { exit, sendCalls } = await meltWithin(13);
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure._tag).toBe("PaymentFailed");
+    expect(sendCalls).toEqual([]);
+    expect(proofsIn(exit.value.proofs, "available")).toHaveLength(3);
+  });
+
+  it("fails before swapping when a proof's keyset fee is unknown", async () => {
+    const { exit, sendCalls } = await meltWithin(14, () => {
+      throw new Error("Could not get fee. No keyset found for keyset id: 00");
+    });
     assert(Exit.isSuccess(exit));
     assert(exit.value.receipt._tag === "Failure");
     expect(exit.value.receipt.failure._tag).toBe("PaymentFailed");
