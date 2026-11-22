@@ -18,6 +18,10 @@ import { whenHydrated } from "../storage/repositories";
 import type { DaemonConfig } from "./config";
 import { openDaemonStore } from "./evolu";
 import { openDaemonStorage } from "./storage";
+import {
+  startTransferCountsWriter,
+  TRANSFER_COUNTS_FILE,
+} from "./transferCounts";
 
 const DAEMON_NPUB_KEY = "linky.onchainOperator.daemon.npub";
 
@@ -148,8 +152,17 @@ export const startOperatorDaemon = async (
     );
 
     let stopped = false;
+    let stopTransferCounts = () => {};
     void whenHydrated(opened.store).then(async () => {
       if (stopped) return;
+      if (!options.inMemory) {
+        stopTransferCounts = startTransferCountsWriter({
+          dataDir: config.dataDir,
+          loadTransfers: () => Effect.runPromise(services.live.transfers.all),
+          onError: (error) =>
+            logger.warn(`Could not write ${TRANSFER_COUNTS_FILE}`, error),
+        });
+      }
       const profile = await Effect.runPromise(
         readProfile(services.repositories.settings),
       );
@@ -174,6 +187,7 @@ export const startOperatorDaemon = async (
       stop: async () => {
         if (stopped) return;
         stopped = true;
+        stopTransferCounts();
         await services.dispose();
         await storeClose?.();
         storage.close();

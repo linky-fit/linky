@@ -122,6 +122,29 @@ export const transferAnalytics = (
   };
 };
 
+export interface TransferCounts {
+  readonly requests: number;
+  readonly completed: number;
+}
+
+/** Per direction, how many of the transfers whose request time `includes` accepts were requested and how many completed, as `transferAnalytics` counts them. */
+export const transferCounts = (
+  transfers: readonly OperatorTransfer[],
+  includes: (sec: number) => boolean,
+): Record<OnchainTransferDirection, TransferCounts> => {
+  const countsOf = (direction: OnchainTransferDirection): TransferCounts => {
+    const stats = transferAnalytics(
+      transfers.filter((transfer) => transfer.direction === direction),
+      includes,
+    );
+    return {
+      requests: Object.values(stats.outcomes).reduce((sum, n) => sum + n, 0),
+      completed: stats.completed.count,
+    };
+  };
+  return { receive: countsOf("receive"), send: countsOf("send") };
+};
+
 /** The share of finished transfers that completed, 0 to 1; `null` while none finished. */
 export const completionRate = (
   outcomes: Readonly<Record<TransferOutcome, number>>,

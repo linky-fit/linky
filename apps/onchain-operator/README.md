@@ -59,6 +59,8 @@ Environment variables:
 - `OPERATOR_EVOLU_RELAYS` — optional comma-separated `wss://` Evolu relay list (defaults to Linky's recommended Evolu relays).
 - `OPERATOR_ALLOW_INSECURE_LOCALHOST_RELAYS` — set `1` or `true` for local `ws://localhost` dev relays.
 
+Once its Evolu data has loaded, and then every minute, the daemon replaces `transfers-24h.json` in the data directory with the operator's transfers requested in the last 24 hours, counted as the Stats tab counts them, as one line of JSON: `{"receive":{"requests":3,"completed":2},"send":{"requests":1,"completed":1}}` (`receive` is on-chain → Cashu, `send` Cashu → on-chain).
+
 ## Deploy
 
 The console is a static build in the Vercel project `linky-swap-operator`, deployed by hand; a production build uses mainnet, `https://cashu.cz`, mempool.space and Linky's recommended relays.
