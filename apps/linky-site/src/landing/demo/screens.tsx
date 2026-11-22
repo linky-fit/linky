@@ -7,11 +7,13 @@ import { CashIntentScreen, ListingsScreen } from "./collaboration";
 import { ContactBlockScreen } from "./contactBlock";
 import { ContactsScreen, WalletScreen } from "./home";
 import { MessageActionsScreen } from "./messageActions";
+import { OnchainSendScreen } from "./onchainSend";
 import { ProfileOpenScreen, ProfileShareScreen } from "./profileShare";
 import { ProxyOfferScreen } from "./proxy";
 import { useInView } from "./playback";
 import { RecurringListScreen } from "./recurring";
 import { RestorePasteScreen } from "./restorePaste";
+import { SlovakLanguageScreen } from "./slovakLanguage";
 import { TokenShareScreen } from "./token";
 import { TutorialReplayScreen } from "./tutorialReplay";
 
@@ -23,12 +25,14 @@ const demoScreens: Record<Screen, ComponentType> = {
   contacts: ContactsScreen,
   listings: ListingsScreen,
   "message-actions": MessageActionsScreen,
+  "onchain-send": OnchainSendScreen,
   wallet: WalletScreen,
   "profile-open": ProfileOpenScreen,
   "profile-share": ProfileShareScreen,
   "proxy-offer": ProxyOfferScreen,
   "recurring-list": RecurringListScreen,
   "restore-paste": RestorePasteScreen,
+  "slovak-language": SlovakLanguageScreen,
   "token-share": TokenShareScreen,
   "tutorial-replay": TutorialReplayScreen,
 };
