@@ -112,7 +112,7 @@ export const insertOperation = (
 /** Patches an operation; a status change is reported. */
 export const patchOperation = (
   ctx: OperationContext,
-  operation: StoredOperation,
+  operation: Pick<StoredOperation, "id" | "kind" | "status">,
   patch: OperationPatch,
   reason: string,
 ): Effect.Effect<void> =>
