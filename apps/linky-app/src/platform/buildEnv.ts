@@ -12,6 +12,7 @@ export const envNostrSearchRelays = import.meta.env.VITE_NOSTR_SEARCH_RELAYS;
 export const envEvoluServerUrls = import.meta.env.VITE_EVOLU_SERVER_URLS;
 export const envMainMintUrl = import.meta.env.VITE_MAIN_MINT_URL;
 export const envPushServerUrl = import.meta.env.VITE_PUSH_SERVER_URL;
+export const envBlossomServerUrl = import.meta.env.VITE_BLOSSOM_SERVER_URL;
 export const envNpubCashServerUrl = import.meta.env.VITE_NPUB_CASH_SERVER_URL;
 export const envNpubCashUpstreamUrl = import.meta.env
   .VITE_NPUB_CASH_UPSTREAM_URL;

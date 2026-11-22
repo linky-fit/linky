@@ -8,7 +8,10 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { Schema } from "effect";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { decodeBase64Url, encodeBase64Url } from "../../utils/base64";
-import { getBlossomUploadProxyUrl } from "../../utils/blossomUploadProxy";
+import {
+  BLOSSOM_SERVER_URL,
+  getBlossomUploadProxyUrl,
+} from "../../utils/blossomUploadProxy";
 import { getUnknownErrorMessage, isRecord } from "../../utils/unknown";
 import { asNonEmptyString } from "../../utils/validation";
 import { nowSeconds } from "../../utils/time";
@@ -16,7 +19,7 @@ import type { I18nKey, Translate } from "../../i18n";
 
 const PRIVATE_IMAGE_MESSAGE_TYPE = "linky.private_image.v1";
 const PRIVATE_IMAGE_COMPACT_PREFIX = "linky:image:v1:";
-const BLOSSOM_UPLOAD_SERVERS = ["https://blossom.primal.net"];
+const BLOSSOM_UPLOAD_SERVERS = [BLOSSOM_SERVER_URL];
 const MAX_IMAGE_SOURCE_BYTES = 20 * 1024 * 1024;
 const MAX_PDF_BYTES = 2 * 1024 * 1024;
 const PDF_FILE_TYPE = "application/pdf";

@@ -30,6 +30,7 @@ export const testConfig: AppConfig = {
   recommendedEvoluRelays: [],
   mintUrl: testMint,
   allowInsecureLocalhostRelays: false,
+  blossomServerUrl: "https://blossom.example",
 };
 
 /** An account with throwaway keys; nothing derives from its recovery seed. */

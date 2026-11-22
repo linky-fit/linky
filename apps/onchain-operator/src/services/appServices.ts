@@ -250,6 +250,7 @@ export const createAppServices = ({
             : await uploadToBlossom(
                 image,
                 account.secretKey,
+                config.blossomServerUrl,
                 ports.blossomFetch,
               );
         const saved = await loadProfile();

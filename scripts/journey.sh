@@ -60,6 +60,7 @@ export LINKY_E2E_NPUBCASH_PORT=$((port + 12))
 export LINKY_E2E_BITCOIND_PORT=$((port + 13))
 export LINKY_E2E_ESPLORA_PORT=$((port + 14))
 export LINKY_E2E_EXPLORER_PORT=$((port + 15))
+export LINKY_JOURNEY_BLOSSOM_PORT=$((port + 16))
 export LINKY_JOURNEY_NOSTR_RELAY_URL="ws://localhost:$LINKY_E2E_NOSTR_PORT"
 export LINKSHU_MINT_URL="http://localhost:$LINKY_E2E_MINT_PORT"
 target_mint="http://localhost:$LINKY_E2E_TARGET_MINT_PORT"
@@ -82,6 +83,7 @@ urls() {
     "Lightning addresses" "<npub>@localhost:$LINKY_E2E_NPUBCASH_PORT" \
     "Push service" "http://localhost:$LINKY_JOURNEY_PUSH_PORT" \
     "Fake MONETA" "http://localhost:$LINKY_JOURNEY_BANK_PORT" \
+    "Blossom server" "https://localhost:$LINKY_JOURNEY_BLOSSOM_PORT" \
     "Block explorer" "http://localhost:$LINKY_E2E_EXPLORER_PORT"
 }
 
@@ -102,13 +104,15 @@ browser() {
       mkdir -p "$profile"
       echo "$engine" >"$profile.engine"
       # Production hosts the apps would otherwise reach from localhost fail instead.
+      # The stack's blossom server has a self-signed certificate. Chromium needs the flag as well,
+      # because ignoreHTTPSErrors leaves out the service worker, which fetches the images.
       jq -n --arg engine "$engine" --arg profile "$profile" --argjson headless "$([ -n "${HEADED-}" ] && echo false || echo true)" \
         --argjson blocked "$(jq -R . "$root/scripts/journey/blocked-origins.txt" | jq -s .)" '{
           browser: {
             browserName: $engine,
             userDataDir: $profile,
-            launchOptions: { headless: $headless },
-            contextOptions: { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true }
+            launchOptions: { headless: $headless, args: (if $engine == "chromium" then ["--ignore-certificate-errors"] else [] end) },
+            contextOptions: { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, ignoreHTTPSErrors: true }
           },
           network: { blockedOrigins: $blocked }
         }' >"$profile.json"

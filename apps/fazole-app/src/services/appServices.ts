@@ -276,7 +276,11 @@ export const createAppServices = ({
         const picture =
           image === null
             ? null
-            : await uploadToBlossom(image, account.secretKey);
+            : await uploadToBlossom(
+                image,
+                account.secretKey,
+                config.blossomServerUrl,
+              );
         const shop = await loadShop();
         if (shop === null) throw new Error("the account has no shop");
         await saveShopProfile({ ...shop, picture });

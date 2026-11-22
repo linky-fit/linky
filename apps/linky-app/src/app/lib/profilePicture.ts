@@ -8,11 +8,14 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 import { Schema } from "effect";
 import { reportAppLog } from "../../devtools/inspector/appLog";
 import { decodeBase64Url } from "../../utils/base64";
-import { getBlossomUploadProxyUrl } from "../../utils/blossomUploadProxy";
+import {
+  BLOSSOM_SERVER_URL,
+  getBlossomUploadProxyUrl,
+} from "../../utils/blossomUploadProxy";
 import { nowSeconds } from "../../utils/time";
 import { isHttpUrl } from "../../utils/validation";
 
-const UPLOAD_URL = "https://blossom.primal.net/upload";
+const UPLOAD_URL = `${BLOSSOM_SERVER_URL}/upload`;
 const decodeUpload = Schema.decodeUnknownSync(
   Schema.Struct({
     sha256: Schema.String,

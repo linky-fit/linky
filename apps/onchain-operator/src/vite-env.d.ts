@@ -8,6 +8,8 @@ interface ImportMetaEnv {
   readonly VITE_MAIN_MINT_URL?: string;
   /** "1" allows ws:// relays on localhost. */
   readonly VITE_ALLOW_INSECURE_LOCALHOST_RELAYS?: string;
+  /** The Blossom server pictures are uploaded to; Primal's when unset. */
+  readonly VITE_BLOSSOM_SERVER_URL?: string;
   /** `mainnet`, `testnet`, `signet` or `regtest`. */
   readonly VITE_BITCOIN_NETWORK?: string;
   readonly VITE_ESPLORA_URL?: string;

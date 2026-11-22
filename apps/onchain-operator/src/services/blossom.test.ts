@@ -4,6 +4,7 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 import { describe, expect, it } from "vitest";
 import { uploadToBlossom } from "./blossom";
 
+const SERVER = "https://blossom.example";
 const image = { bytes: new Uint8Array([1, 2, 3]), type: "image/webp" };
 const hash = bytesToHex(sha256(image.bytes));
 
@@ -22,12 +23,13 @@ describe("a Blossom upload", () => {
       await uploadToBlossom(
         image,
         makeIdentity().secretKey,
+        SERVER,
         answering(Response.json({ sha256: hash, url }), requests),
       ),
     ).toBe(url);
     const [request] = requests;
     if (request === undefined) throw new Error("nothing uploaded");
-    expect(request.url).toBe("https://blossom.primal.net/upload");
+    expect(request.url).toBe(`${SERVER}/upload`);
     expect(request.method).toBe("PUT");
     expect(request.headers.get("X-SHA-256")).toBe(hash);
     expect(request.headers.get("Content-Type")).toBe("image/webp");
@@ -41,6 +43,7 @@ describe("a Blossom upload", () => {
       uploadToBlossom(
         image,
         secretKey,
+        SERVER,
         answering(
           Response.json({ sha256: "00", url: "https://blossom.primal.net/00" }),
         ),
@@ -50,6 +53,7 @@ describe("a Blossom upload", () => {
       uploadToBlossom(
         image,
         secretKey,
+        SERVER,
         answering(
           Response.json({
             sha256: hash,
@@ -62,6 +66,7 @@ describe("a Blossom upload", () => {
       uploadToBlossom(
         image,
         secretKey,
+        SERVER,
         answering(new Response("nope", { status: 413 })),
       ),
     ).rejects.toThrow("upload failed: 413");

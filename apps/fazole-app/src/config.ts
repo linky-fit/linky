@@ -27,6 +27,8 @@ export interface AppConfig {
   /** The mint payments are received at. */
   readonly mintUrl: string;
   readonly allowInsecureLocalhostRelays: boolean;
+  /** The Blossom server pictures are uploaded to. */
+  readonly blossomServerUrl: string;
 }
 
 export const appConfig: AppConfig = {
@@ -39,4 +41,6 @@ export const appConfig: AppConfig = {
   mintUrl: env.VITE_MAIN_MINT_URL?.trim() || "https://cashu.cz",
   allowInsecureLocalhostRelays:
     env.VITE_ALLOW_INSECURE_LOCALHOST_RELAYS === "1",
+  blossomServerUrl:
+    env.VITE_BLOSSOM_SERVER_URL?.trim() || "https://blossom.primal.net",
 };
