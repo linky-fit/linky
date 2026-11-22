@@ -36,6 +36,7 @@ import { requestMintUrls } from "../../hooks/mint/useRequestMintUrls";
 import {
   fetchLnurlInvoiceForTarget,
   inferLightningAddressFromLnurlTarget,
+  type LnurlPayPreview,
   type LnurlPaySuccessAction,
 } from "../../../lnurlPay";
 import { normalizeMintUrl } from "../../../utils/mint";
@@ -287,6 +288,8 @@ export interface PaymentsCommands {
       readonly amountSat: number;
       readonly contact: ContactPayRowLike | null;
       readonly comment?: string | null;
+      /** The pay request the user confirmed, reused for the invoice request. */
+      readonly preview?: LnurlPayPreview | null;
     },
     options?: SendingOptions,
   ) => Promise<PayLightningAddressOutcome>;
@@ -554,7 +557,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
   };
 
   const payLightningAddress: PaymentsCommands["payLightningAddress"] = async (
-    { lnAddress, amountSat, contact, comment },
+    { lnAddress, amountSat, contact, comment, preview },
     options,
   ) => {
     const paymentTarget = lnAddress.trim();
@@ -613,6 +616,7 @@ export const makePaymentsCommands = (deps: PaymentsDeps): PaymentsCommands => {
               paymentTarget,
               attemptedAmount,
               commentNote ?? undefined,
+              preview,
             );
             if (fetched.lightningAddress)
               resolvedLightningAddress = fetched.lightningAddress;

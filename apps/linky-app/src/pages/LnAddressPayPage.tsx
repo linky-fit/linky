@@ -16,6 +16,7 @@ import {
 import {
   getLnurlPayDisplayText,
   inferLightningAddressFromLnurlTarget,
+  type LnurlPayPreview,
 } from "../lnurlPay";
 import { formatMiddleDots } from "../utils/formatting";
 import { useWalletCommands } from "../app/hooks/wallet/useWalletCommands";
@@ -35,6 +36,7 @@ interface LnAddressPayPageProps {
     lnAddress: string,
     amountSat: number,
     comment: string | null,
+    preview: LnurlPayPreview | null,
   ) => Promise<void>;
   setLnAddressPayAmount: (value: string | ((prev: string) => string)) => void;
   setLnAddressPayNote: (value: string) => void;
@@ -160,6 +162,7 @@ export const LnAddressPayPage: FC<LnAddressPayPageProps> = ({
           lnAddress,
           amountSat,
           commentAllowed > 0 ? lnAddressPayNote.trim() || null : null,
+          preview,
         );
       }}
       submitBusy={cashuIsBusy}

@@ -31,7 +31,15 @@ export const fetchLnurlInvoiceForTarget = (
   target: string,
   amount: number,
   comment?: string,
-) => lnurl.fetchLnurlInvoiceForTarget(target, amount, comment, fallback);
+  preview?: lnurl.LnurlPayPreview | null,
+) =>
+  lnurl.fetchLnurlInvoiceForTarget(
+    target,
+    amount,
+    comment,
+    fallback,
+    preview ?? undefined,
+  );
 export const fetchLnurlWithdrawPreview = (target: string) =>
   lnurl.fetchLnurlWithdrawPreview(target, fallback);
 export const redeemLnurlWithdraw = (

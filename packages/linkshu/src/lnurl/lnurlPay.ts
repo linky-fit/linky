@@ -392,31 +392,25 @@ export const fetchLnurlPayPreview = async (
   };
 };
 
-export const fetchLnurlInvoiceForTarget = async (
-  paymentTarget: string,
+const requestLnurlInvoice = async (
+  payRequest: LnurlPayPreview,
   amountSat: number,
-  comment?: string,
-  fallback?: LnurlFallback,
+  comment: string | undefined,
+  fallback: LnurlFallback | undefined,
 ): Promise<LnurlPayInvoiceResult> => {
-  if (!Number.isFinite(amountSat) || amountSat <= 0) {
-    throw new Error("Invalid amount");
-  }
-
-  const payRequest = await fetchLnurlPayPreview(paymentTarget, fallback);
-
   let amountMsat = Math.round(amountSat * 1000);
   // Fiat-denominated fixed-amount LNURLs re-quote min/max msat from the
   // exchange rate on every fetch, so the value confirmed from the preview
   // drifts by the time the invoice is requested (and sat rounding alone can
-  // put it outside a sub-sat-precise fixed range). Follow the fresh quote
+  // put it outside a sub-sat-precise fixed range). Follow the quote at hand
   // when it stays close to what the user confirmed.
   const isFixedAmount =
     payRequest.minSendableMsat === payRequest.maxSendableMsat;
   if (isFixedAmount) {
-    const freshFixedMsat = payRequest.minSendableMsat;
-    const drift = Math.abs(freshFixedMsat - amountMsat) / amountMsat;
+    const quotedFixedMsat = payRequest.minSendableMsat;
+    const drift = Math.abs(quotedFixedMsat - amountMsat) / amountMsat;
     if (drift <= FIXED_AMOUNT_REQUOTE_TOLERANCE) {
-      amountMsat = freshFixedMsat;
+      amountMsat = quotedFixedMsat;
     }
   }
   if (
@@ -500,6 +494,42 @@ export const fetchLnurlInvoiceForTarget = async (
     pr,
     successAction: parseLnurlPaySuccessAction(invoiceJson.successAction),
   };
+};
+
+/**
+ * Pass the `preview` the payer confirmed to skip refetching it; a preview of
+ * another target is ignored, and one whose invoice request fails is replaced
+ * by a fresh fetch, so a stale callback or range costs one retry.
+ */
+export const fetchLnurlInvoiceForTarget = async (
+  paymentTarget: string,
+  amountSat: number,
+  comment?: string,
+  fallback?: LnurlFallback,
+  preview?: LnurlPayPreview,
+): Promise<LnurlPayInvoiceResult> => {
+  if (!Number.isFinite(amountSat) || amountSat <= 0) {
+    throw new Error("Invalid amount");
+  }
+
+  const previewMatchesTarget =
+    preview?.target ===
+    getLnurlPayDisplayText(resolveLnurlPayRequestUrl(paymentTarget));
+  if (preview && previewMatchesTarget) {
+    const invoice = await requestLnurlInvoice(
+      preview,
+      amountSat,
+      comment,
+      fallback,
+    ).catch(() => null);
+    if (invoice) return invoice;
+  }
+  return requestLnurlInvoice(
+    await fetchLnurlPayPreview(paymentTarget, fallback),
+    amountSat,
+    comment,
+    fallback,
+  );
 };
 
 const resolveLnurlWithdrawRequestUrl = (value: string): string => {

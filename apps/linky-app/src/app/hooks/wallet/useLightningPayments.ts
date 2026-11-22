@@ -2,7 +2,10 @@ import { getLightningInvoicePreview } from "@linky-fit/linkshu";
 import { useAtom } from "@linky-fit/linkstr-react";
 import React from "react";
 import type { Translate } from "../../../i18n";
-import { getLnurlPayDisplayText } from "../../../lnurlPay";
+import {
+  getLnurlPayDisplayText,
+  type LnurlPayPreview,
+} from "../../../lnurlPay";
 import { navigateTo } from "../../../hooks/useRouting";
 import type { Route } from "../../../types/route";
 import { getUnknownErrorMessage } from "../../../utils/unknown";
@@ -193,6 +196,7 @@ export const useLightningPayments = ({
       lnAddress: string,
       amountSat: number,
       comment?: string | null,
+      preview?: LnurlPayPreview | null,
     ): Promise<void> => {
       if (commands === null) {
         setStatus(`${t("errorPrefix")}: ${NOT_READY}`);
@@ -209,6 +213,7 @@ export const useLightningPayments = ({
         amountSat,
         contact,
         comment: comment ?? null,
+        preview: preview ?? null,
       });
       dismissPaymentSending();
       switch (outcome._tag) {

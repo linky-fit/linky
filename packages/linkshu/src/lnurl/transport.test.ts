@@ -291,3 +291,84 @@ describe("LNURL-pay comments (LUD-12)", () => {
     expect(invoiceUrl(fetchSpy, 1).searchParams.has("comment")).toBe(false);
   });
 });
+
+describe("LNURL-pay with a confirmed preview", () => {
+  const callback = "https://example.com/callback";
+  const invoiceResponse = () => Response.json({ pr: "lnbc1testinvoice" });
+  const requestedPaths = () =>
+    vi
+      .mocked(fetch)
+      .mock.calls.map(([input]) => new URL(String(input)).pathname);
+
+  const previewOf = async (target: string) => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      Response.json(payRequest(callback)),
+    );
+    const preview = await fetchLnurlPayPreview(target);
+    vi.restoreAllMocks();
+    return preview;
+  };
+
+  it("asks the callback for the invoice without refetching the pay request", async () => {
+    const preview = await previewOf("alice@example.com");
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(invoiceResponse());
+
+    await expect(
+      fetchLnurlInvoiceForTarget(
+        "alice@example.com",
+        1,
+        undefined,
+        undefined,
+        preview,
+      ),
+    ).resolves.toMatchObject({ pr: "lnbc1testinvoice" });
+
+    expect(requestedPaths()).toEqual(["/callback"]);
+  });
+
+  it("refetches the pay request when the confirmed one's callback fails", async () => {
+    const preview = await previewOf("alice@example.com");
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        Response.json({ status: "ERROR", reason: "expired" }),
+      )
+      .mockResolvedValueOnce(Response.json(payRequest(callback)))
+      .mockResolvedValueOnce(invoiceResponse());
+
+    await expect(
+      fetchLnurlInvoiceForTarget(
+        "alice@example.com",
+        1,
+        undefined,
+        undefined,
+        preview,
+      ),
+    ).resolves.toMatchObject({ pr: "lnbc1testinvoice" });
+
+    expect(requestedPaths()).toEqual([
+      "/callback",
+      "/.well-known/lnurlp/alice",
+      "/callback",
+    ]);
+  });
+
+  it("ignores a preview of another target", async () => {
+    const preview = await previewOf("bob@example.com");
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json(payRequest(callback)))
+      .mockResolvedValueOnce(invoiceResponse());
+
+    await fetchLnurlInvoiceForTarget(
+      "alice@example.com",
+      1,
+      undefined,
+      undefined,
+      preview,
+    );
+
+    expect(requestedPaths()).toEqual([
+      "/.well-known/lnurlp/alice",
+      "/callback",
+    ]);
+  });
+});
