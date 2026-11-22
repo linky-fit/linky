@@ -52,12 +52,12 @@ One self-contained `index.html`, with `videos/*.mp4` and `videos/cover.jpg` besi
 - Each post is a `contentEditable="plaintext-only"` block saved to `localStorage` under `linky-<compact>-post:<label>`, with Copy and Reset buttons.
 - Each X post shows a live `N / 280` counter using the weights above, highlighted when over the limit.
 
-A `vercel.json` with `"framework": null`, empty `buildCommand` and `installCommand`, and `"outputDirectory": "."` makes Vercel serve the folder as is. `CI=1` stops the CLI from blocking on its upgrade prompt:
+A `vercel.json` with `"framework": null`, empty `buildCommand` and `installCommand`, and `"outputDirectory": "."` makes Vercel serve the folder as is. Deploy it with the Vercel CLI (`CI=1` stops the CLI from blocking on its upgrade prompt); if `vercel` is not installed or not logged in, ask the user before continuing. Pass `--scope <team>` on each command if the logged-in account belongs to multiple teams:
 
 ```sh
-CI=1 vercel link --yes --project "linky-<compact>" --scope david-novaks-projects-ffea9efe
-CI=1 vercel deploy --prod --yes --scope david-novaks-projects-ffea9efe
-CI=1 vercel domains add "linky-<compact>.twoballers.dev" "linky-<compact>" --scope david-novaks-projects-ffea9efe
+CI=1 vercel link --yes --project "linky-<compact>"
+CI=1 vercel deploy --prod --yes
+CI=1 vercel domains add "linky-<compact>.twoballers.dev" "linky-<compact>"
 ```
 
 The page is live once `https://linky-<compact>.twoballers.dev/`, the cover and every video return HTTP 200.
