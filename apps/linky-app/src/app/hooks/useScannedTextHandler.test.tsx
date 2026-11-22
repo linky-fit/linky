@@ -19,7 +19,6 @@ import {
   CALLBACK_URL,
   linkauthFragment,
 } from "../../testUtils/siteLoginFixtures";
-import { isKeryxJoinUrl, takeKeryxJoinOffer } from "../lib/keryxJoinOffer";
 
 const K1 = "b".repeat(64);
 const LOGIN_URL = `https://example.com/lnurl-auth?tag=login&k1=${K1}&action=login`;
@@ -47,7 +46,6 @@ const setup = async ({
   canPayFromHeldMint = true,
   contacts = [],
   currentNpub = null,
-  keryxEnabled = true,
   onchainSendEnabled = true,
   scanEntryPoint = null,
 }: {
@@ -55,7 +53,6 @@ const setup = async ({
   canPayFromHeldMint?: boolean;
   contacts?: ScanParams["contacts"];
   currentNpub?: string | null;
-  keryxEnabled?: boolean;
   onchainSendEnabled?: boolean;
   scanEntryPoint?: ScanParams["scanEntryPoint"];
 } = {}) => {
@@ -91,7 +88,6 @@ const setup = async ({
       contactsRepository: { insert: insertContact },
       currentNpub,
       extractCashuTokenFromText: () => null,
-      keryxEnabled,
       lightningInvoiceAutoPayLimit: autoPayLimit,
       onchainSendEnabled,
       onContactIdentifierScanned: null,
@@ -241,34 +237,6 @@ describe("scanned Nostr Connect logins", () => {
     await scan.handle(`nostrconnect://${CLIENT}?secret=s3cr3t`);
 
     expect(scan.requestSiteLoginConfirmation).not.toHaveBeenCalled();
-  });
-});
-
-describe("scanned Keryx join URLs", () => {
-  it("hands the join URL to Add company without putting it in the route", async () => {
-    const scan = await setup();
-    const join = "https://acme.example/join?p=eyJ2IjoxfQ";
-
-    await scan.handle(join);
-
-    expect(window.location.hash).toBe("#settings/keryx/new");
-    expect(takeKeryxJoinOffer()).toBe(join);
-  });
-
-  it("ignores join URLs while experimental features are off", async () => {
-    window.location.hash = "#contacts";
-    const scan = await setup({ keryxEnabled: false });
-
-    await scan.handle("https://acme.example/join?p=eyJ2IjoxfQ");
-
-    expect(window.location.hash).toBe("#contacts");
-    expect(takeKeryxJoinOffer()).toBeNull();
-  });
-
-  it("leaves other HTTPS URLs to the LNURL flows", () => {
-    expect(isKeryxJoinUrl(PAY_URL)).toBe(false);
-    expect(isKeryxJoinUrl("https://acme.example/join/")).toBe(true);
-    expect(isKeryxJoinUrl("http://acme.example/join")).toBe(false);
   });
 });
 

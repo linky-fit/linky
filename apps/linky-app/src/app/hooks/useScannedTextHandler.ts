@@ -34,7 +34,6 @@ import {
   parseCashuPaymentRequestMessage,
   type CashuPaymentRequestMessageInfo,
 } from "../lib/paymentRequestMessage";
-import { isKeryxJoinUrl, offerKeryxJoin } from "../lib/keryxJoinOffer";
 import { onchainPayoutTarget } from "../lib/onchainTransfers";
 import { runWrite } from "../lib/storeWrite";
 import type { ContactRowLike } from "../types/appTypes";
@@ -48,8 +47,6 @@ interface UseScannedTextHandlerParams<TContact extends ContactRowLike> {
   contacts: readonly TContact[];
   currentNpub: string | null;
   extractCashuTokenFromText: (text: string) => string | null;
-  /** Keryx is experimental; while off, join URLs fall through to the other flows. */
-  keryxEnabled: boolean;
   contactsRepository: Pick<ContactsRepository, "insert">;
   lightningInvoiceAutoPayLimit: number;
   /** Whether a bitcoin address opens the on-chain send instead of being unsupported. */
@@ -88,7 +85,6 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
   contacts,
   currentNpub,
   extractCashuTokenFromText,
-  keryxEnabled,
   contactsRepository,
   lightningInvoiceAutoPayLimit,
   onchainSendEnabled,
@@ -145,12 +141,6 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
       if (isLinkauthLink(scanText)) {
         closeScan();
         void requestLinkauthLogin(scanText);
-        return;
-      }
-
-      if (keryxEnabled && isKeryxJoinUrl(scanText)) {
-        closeScan();
-        offerKeryxJoin(scanText);
         return;
       }
 
@@ -397,7 +387,6 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
       contacts,
       currentNpub,
       extractCashuTokenFromText,
-      keryxEnabled,
       contactsRepository,
       lightningInvoiceAutoPayLimit,
       onchainSendEnabled,

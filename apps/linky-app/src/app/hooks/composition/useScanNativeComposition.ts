@@ -36,7 +36,6 @@ import type { LnurlAuthResult } from "../useLnurlAuth";
 import type { SiteLoginResult } from "../useSiteLogin";
 import { takeSiteLoginHashLink } from "../../../siteLogin";
 import { isAnimatedQrFrame } from "../../../utils/animatedQr";
-import { useExperimentalFeatures } from "../useExperimentalFeatures";
 import {
   onchainOperator,
   operatorTransferUpdate,
@@ -223,7 +222,6 @@ export const useScanNativeComposition = ({
     [addNewContactFromIdentifier],
   );
 
-  const { experimentalFeatures } = useExperimentalFeatures();
   const onchainSendEnabled = useOnchainTransfersShown();
   const openSavedContact = useSetNavIntent("openSavedContactNpub");
   const handleScannedText = useScannedTextHandler<(typeof contacts)[number]>({
@@ -233,7 +231,6 @@ export const useScanNativeComposition = ({
     contactsRepository,
     currentNpub,
     extractCashuTokenFromText,
-    keryxEnabled: experimentalFeatures,
     lightningInvoiceAutoPayLimit,
     onchainSendEnabled,
     onContactIdentifierScanned:

@@ -71,7 +71,6 @@ We also publish npm packages, to make it easier for other developers to work wit
 - [`packages/linkstr-react`](./packages/linkstr-react/): React bindings for linkstr; guide in [`linkstr/docs/react.md`](./packages/linkstr/docs/react.md)
 - [`packages/proxy-payment`](./packages/proxy-payment/README.md): proxy bank payments (bank QR parsing, offer rules); guides in [`docs/`](./packages/proxy-payment/docs/)
 - [`packages/recurring-payment`](./packages/recurring-payment/README.md): recurring payments (schedule math, the planner, claims between devices); guides in [`docs/`](./packages/recurring-payment/docs/)
-- [`packages/keryx`](./packages/keryx/README.md): Keryx client (join URLs, pairing, TUF and item verification for company announcements); guide in [`docs/keryx.md`](./packages/keryx/docs/keryx.md)
 - [`packages/ui`](./packages/ui/README.md): Tamagui design system for Expo and the web; catalog in [`apps/ui-book`](./apps/ui-book/README.md)
 - [`packages/domain`](./packages/domain/README.md): the branded ids every package and app share
 - [`packages/identity`](./packages/identity/): key derivation (SLIP-39, Nostr, LNURL auth)

@@ -133,7 +133,6 @@ const BOOLEAN_COLUMNS = {
   cashuProof: {},
   cashuOperation: { locked: true },
   transaction: {},
-  keryxSubscription: {},
   onchainTransfer: { refundToSender: true, isTest: true },
   onchainTransferMessage: {},
 } satisfies BooleanColumnMap;

@@ -12,8 +12,6 @@ export const de = {
   settingsNetwork: "Netzwerk",
   settingsSecurity: "Sicherheit",
   settingsDebug: "Debug",
-  settingsExperimental: "Experimentell",
-  experimentalFeatures: "Experimentelle Funktionen",
   nostrInspector: "Inspektor",
   nostrInspectorLogs: "Inspektorprotokolle sammeln",
   nostrInspectorLogsStats: "{count} Zeilen · {size} · älteste Zeile {age} alt",
@@ -1482,56 +1480,6 @@ export const de = {
   evoluWipeStorageFailed:
     "Gespeicherte Mnemonik fehlt (Evolu-Speicher kann nicht geleert werden).",
 
-  // Keryx
-  keryxNewsletters: "Newsletter (Keryx)",
-  keryxNewslettersTitle: "Newsletter",
-  keryxAddCompany: "Firma hinzufügen",
-  keryxEmptyTitle: "Noch keine Newsletter",
-  keryxEmptyBody:
-    "Folge einer Firma, um ihre verifizierten Ankündigungen hier zu erhalten.",
-  keryxCompany: "Firma",
-  keryxAnnouncement: "Mitteilung",
-  keryxJoinUrlLabel: "Beitrittslink der Firma",
-  keryxScanQr: "QR-Code scannen",
-  keryxJoinUrlInvalid: "Das ist kein Beitrittslink einer Firma.",
-  keryxJoinVersionUnsupported:
-    "Dieser Code braucht eine neuere Version von Linky. Aktualisiere Linky und scanne ihn erneut.",
-  keryxConfirmOriginTitle: "Ist das die Webadresse der Firma?",
-  keryxConfirmOriginHint:
-    "Fahre nur fort, wenn du genau diese Adresse erkennst. Alles, was dir die Firma schickt, wird anhand dieser Adresse geprüft.",
-  keryxPairing: "Firma wird geprüft…",
-  keryxPairFailed:
-    "Die Firma konnte nicht geprüft werden. Versuche es später erneut.",
-  keryxLiteModeUnsupported:
-    "Diese Firma veröffentlicht in einem Format, das Linky noch nicht unterstützt.",
-  keryxChannels: "Kanäle",
-  keryxPrivateFeeds: "Private Kanäle",
-  keryxPrivateFeedAutoSubscribed: "Automatisch abonniert, nur für dich",
-  keryxSubscribe: "Abonnieren",
-  keryxConsentHint: "Wähle, was du von dieser Firma erhalten möchtest.",
-  keryxNoAnnouncements: "Noch keine Mitteilungen",
-  keryxAnnouncements: "Mitteilungen",
-  keryxRemoveCompany: "Firma entfernen",
-  keryxRemoveArmedHint: "Tippe noch einmal, um die Firma zu entfernen.",
-  keryxSuspendedTitle: "Die Identität dieser Firma hat sich geändert",
-  keryxSuspendedBody:
-    "Das kann bedeuten, dass die Website oder die Signaturschlüssel der Firma kompromittiert wurden. Nachrichten werden nicht angezeigt.",
-  keryxRebrandedTitle: "Die Firma hat ihren Namen geändert",
-  keryxRebrandedBody:
-    "Sie nennt sich jetzt „{name}“. Ihre Nachrichten bleiben verborgen, bis du einen neuen QR-Code der Firma scannst und sie erneut verbindest.",
-  keryxRepair: "Neuen QR-Code scannen",
-  keryxLogoChanged: "Die Firma hat ihr Logo geändert.",
-  keryxLogoAcknowledge: "Neues Logo übernehmen",
-  keryxRefresh: "Aktualisieren",
-  keryxRefreshFailed:
-    "Aktualisierung fehlgeschlagen. Gespeicherte Mitteilungen werden angezeigt.",
-  keryxFooter:
-    "Dieser Kanal wird dich nie nach einem Passwort, Seed oder Code fragen.",
-  keryxPrivate: "Privat",
-  keryxAttachments: "Anhänge",
-  keryxMediaUnavailable:
-    "Die Datei stimmt nicht mit dem überein, was die Firma signiert hat, und wurde nicht geöffnet.",
-  keryxNotFound: "Nicht gefunden",
   // On-chain transfers
   onchainSendTitle: "An On-Chain-Wallet senden",
   onchainReceiveTitle: "Von On-Chain-Wallet empfangen",

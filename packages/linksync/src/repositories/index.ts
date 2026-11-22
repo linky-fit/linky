@@ -46,14 +46,6 @@ export type {
 } from "./identity";
 export { makeInboxCursorsRepository } from "./inboxCursors";
 export type { InboxCursorsRepository } from "./inboxCursors";
-export { makeKeryxSubscriptionsRepository } from "./keryxSubscriptions";
-export type {
-  KeryxSubscriptionInsert,
-  KeryxSubscriptionPatch,
-  KeryxSubscriptionRecord,
-  KeryxSubscriptionStoredRow,
-  KeryxSubscriptionsRepository,
-} from "./keryxSubscriptions";
 export {
   makeOnchainTransferMessagesRepository,
   makeOnchainTransfersRepository,

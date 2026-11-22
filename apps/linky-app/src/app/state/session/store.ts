@@ -5,7 +5,6 @@ import {
   makeHiddenListingsRepository,
   makeIdentityRepository,
   makeInboxCursorsRepository,
-  makeKeryxSubscriptionsRepository,
   makeOnchainTransfersRepository,
   makeListingsRepository,
   makePeerListingsRepository,
@@ -83,9 +82,6 @@ export const conversationsRepositoryAtom = repositoryAtom(
 export const identityRepositoryAtom = repositoryAtom(makeIdentityRepository);
 export const inboxCursorsRepositoryAtom = repositoryAtom(
   makeInboxCursorsRepository,
-);
-export const keryxSubscriptionsRepositoryAtom = repositoryAtom(
-  makeKeryxSubscriptionsRepository,
 );
 export const onchainTransfersRepositoryAtom = repositoryAtom(
   makeOnchainTransfersRepository,

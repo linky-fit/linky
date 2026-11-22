@@ -46,28 +46,6 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "Before switching identity (target custom: a pasted custom identity; default: back to the identity the recovery seed derives), Linky fetched that identity's profile from the current relays and looked up its bought linky.fit name on npub.linky.fit. profile none: relays answered with no profile, so the switch publishes the Linky profile right away. found: the user picks the Linky or the Nostr profile. unchecked: no relay answered, so the user may only publish the Linky profile or cancel. boughtName found makes the name the identity's address and handle; none or lookup-failed use its npub address. The pubkey link is the identity to switch to.",
   "identitySwitch.profileChosen":
     "The user answered the profile choice of an identity switch (target custom or default). check checking means the user cancelled before the check finished. choice linky publishes the Linky name, picture and about; nostr publishes the identity's own profile; both use the identity's Linky address and keep the fields of its own profile Linky does not model. cancel leaves the current identity and stores nothing.",
-  "keryx.paired":
-    "The user paired with a Keryx company: confirmed its join origin, chose channels and subscribed. The payload lists the chosen channels and how many private feeds a master-signed pattern authorized. The company link is the join origin, shared by every row about that company.",
-  "keryx.pairFailed":
-    "Pairing stopped after the user confirmed the join origin: its metadata could not be fetched or verified, or the company publishes in lite mode. Nothing was stored.",
-  "keryx.refreshed":
-    "A paired company was refreshed (settings opened, its page opened, or the user tapped refresh). The payload gives the announcement count and each channel's and private feed's status; private feeds appear as feed-<hash> keys, never as their capability URLs. Announcement links list the shown items.",
-  "keryx.refreshFailed":
-    "A refresh failed before any announcement was checked (network, expired or unverifiable metadata, rollback). The cached announcements stay on screen with a notice; nothing about the company changed.",
-  "keryx.verificationFailed":
-    "Something the company served did not verify: its metadata (with keryx.refreshFailed) or individual channel indexes, items or private feed documents (with keryx.refreshed). Failing items are not shown; keptCachedCopy means a transient download failure kept the earlier verified copy.",
-  "keryx.suspended":
-    "A validly signed root at the join origin does not chain to the root pinned at pairing. The company is suspended: nothing it publishes is shown and the only offered action is removing it.",
-  "keryx.rebranded":
-    "The company's signed name changed since the user acknowledged it. Its content is hidden until the user scans a fresh QR code and pairs again.",
-  "keryx.identityAcknowledged":
-    "The user accepted the company's new logo; the acknowledged identity synced to the subscription row.",
-  "keryx.channelsChanged":
-    "The user turned a company's public channel on or off. The payload lists the channels now followed.",
-  "keryx.unpaired":
-    "The user removed a company: its subscription row was removed on every device and this device's cached announcements were deleted.",
-  "keryx.mediaFailed":
-    "A linked logo, image or attachment could not be downloaded or its bytes did not match the SHA-256 the company signed, so it was not shown or opened.",
   "auth.loggedOut":
     "User confirmed logout. Every open tab reloads and the first one to boot deletes everything the site stored on this device: the Evolu databases, IndexedDB (including this inspector buffer), localStorage, caches and the service worker. The payload says whether Evolu was connected, i.e. whether unsynced data may have been lost.",
   "push.nativeRegistered":

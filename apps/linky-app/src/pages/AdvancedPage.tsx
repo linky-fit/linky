@@ -41,7 +41,6 @@ import {
   overallRelayStatus,
   useRelayHealth,
 } from "../app/hooks/useRelayHealth";
-import { useExperimentalFeatures } from "../app/hooks/useExperimentalFeatures";
 import { usePassOnListings } from "../app/hooks/usePassOnListings";
 import { usePushNotificationsSetting } from "../app/hooks/usePushNotificationsSetting";
 import { useColorModePreference } from "../hooks/useColorMode";
@@ -75,8 +74,6 @@ export function AdvancedPage(): React.ReactElement {
   const relayUrls = useAtomValue(nostrRelayUrlsAtom);
   const { allowTestMints, setAllowTestMints } = useAllowTestMints();
   const { passOnListings, setPassOnListings } = usePassOnListings();
-  const { experimentalFeatures, setExperimentalFeatures } =
-    useExperimentalFeatures();
   const relayHealth = useRelayHealth();
   const connectedRelayCount = countConnectedRelays(relayUrls, relayHealth);
   const nostrRelayOverallStatus = overallRelayStatus(relayUrls, relayHealth);
@@ -380,15 +377,6 @@ export function AdvancedPage(): React.ReactElement {
           undefined,
           isOpen("advancedInspector", "advancedInspectorTimeline"),
         )}
-        {toggleRow(
-          "FlaskConical",
-          t("experimentalFeatures"),
-          experimentalFeatures,
-          (checked) =>
-            void setExperimentalFeatures(checked).then((outcome) => {
-              if (!outcome.ok) pushToast(outcome.error);
-            }),
-        )}
       </Section>
 
       <Section grouped title={t("settingsSecurity")}>
@@ -423,25 +411,6 @@ export function AdvancedPage(): React.ReactElement {
           t={t}
         />
       </Section>
-
-      {experimentalFeatures ? (
-        <>
-          <Section grouped title={t("settingsExperimental")}>
-            {linkRow(
-              "Megaphone",
-              t("keryxNewsletters"),
-              () => navigateTo({ route: "keryxCompanies" }),
-              undefined,
-              isOpen(
-                "keryxCompanies",
-                "keryxCompany",
-                "keryxCompanyNew",
-                "keryxAnnouncement",
-              ),
-            )}
-          </Section>
-        </>
-      ) : null}
 
       <Text
         variant="caption"

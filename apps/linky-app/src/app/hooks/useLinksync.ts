@@ -6,8 +6,6 @@ import {
   type ConversationsRepository,
   type IdentityRepository,
   type InboxCursorsRepository,
-  type KeryxSubscriptionRecord,
-  type KeryxSubscriptionsRepository,
   type LinkyScope,
   type LinkyStore,
   type ListingRecord,
@@ -44,7 +42,6 @@ import {
   identityRepositoryAtom,
   appOwnerIdAtom,
   inboxCursorsRepositoryAtom,
-  keryxSubscriptionsRepositoryAtom,
   linkyStoreAtom,
   listingsRepositoryAtom,
   onchainTransfersRepositoryAtom,
@@ -134,14 +131,6 @@ export const useListingsRepository = (): ListingsRepository =>
 
 export const useListingRecords = (): ReadonlyArray<ListingRecord> =>
   useRepositoryRows(useListingsRepository());
-
-export const useKeryxSubscriptionsRepository =
-  (): KeryxSubscriptionsRepository =>
-    useAtomSuspense(keryxSubscriptionsRepositoryAtom).value;
-
-export const useKeryxSubscriptionRows =
-  (): ReadonlyArray<KeryxSubscriptionRecord> =>
-    useRepositoryRows(useKeryxSubscriptionsRepository());
 
 export const useOnchainTransfersRepository = (): OnchainTransfersRepository =>
   useAtomSuspense(onchainTransfersRepositoryAtom).value;

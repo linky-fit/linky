@@ -37,10 +37,6 @@ import {
   EvoluServerPage,
   EvoluServersPage,
   InspectorSettingsPage,
-  KeryxAnnouncementPage,
-  KeryxCompaniesPage,
-  KeryxCompanyNewPage,
-  KeryxCompanyPage,
   LanguagePage,
   AppearancePage,
   ReceiveMethodPage,
@@ -129,16 +125,6 @@ const RoutePage = (): React.ReactElement => {
       return <MasterKeysPage />;
     case "settingsNostrIdentity":
       return <NostrIdentityPage />;
-    case "keryxCompanies":
-      return <KeryxCompaniesPage />;
-    case "keryxCompanyNew":
-      return <KeryxCompanyNewPage />;
-    case "keryxCompany":
-      return <KeryxCompanyPage id={route.id} />;
-    case "keryxAnnouncement":
-      return (
-        <KeryxAnnouncementPage id={route.id} announcementKey={route.key} />
-      );
     case "collaboration":
       return <CollaborationPage />;
     case "proxyPayments":
