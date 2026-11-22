@@ -17,14 +17,14 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - An on-chain send shows its payout address with a link to the explorer; opening it marks the send done once the payout is on chain.
 - Searching a contact by a verified address no longer lists other profiles that falsely claim it.
 - Linky is available in Slovak.
-- Fixes: received tokens no longer read as invalid, quick messages keep their order, history shows the full fee and the right request status.
+- Fixes: received tokens no longer read as invalid, quick messages keep their order, history shows the full fee and the right request status, a pending Lightning payment shows as paid right after it settles.
 
 ### cs-CZ
 
 - Odeslání do on-chain peněženky ukáže cílovou adresu s odkazem do prohlížeče; po jeho otevření se odeslání označí jako hotové, jakmile je výplata na blockchainu.
 - Hledání kontaktu podle ověřené adresy už neukazuje další profily, které si ji jen přivlastňují.
 - Linky je dostupné ve slovenštině.
-- Opravy: přijaté tokeny už nevypadají jako neplatné, rychle poslané zprávy drží pořadí, historie ukazuje celý poplatek a správný stav žádosti.
+- Opravy: přijaté tokeny už nevypadají jako neplatné, rychle poslané zprávy drží pořadí, historie ukazuje celý poplatek a správný stav žádosti, čekající Lightning platba se hned ukáže jako zaplacená.
 
 ## [26.11.4] - 2026-11-18
 

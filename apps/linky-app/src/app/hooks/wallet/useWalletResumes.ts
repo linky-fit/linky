@@ -1,3 +1,4 @@
+import type { StoredOperation } from "@linky-fit/linkshu";
 import type { TransactionsRepository } from "@linky-fit/linksync";
 import React from "react";
 import type { Translate } from "../../../i18n";
@@ -8,19 +9,22 @@ import type {
   ResumePendingCashuMelts,
 } from "../../state/linkshu/commands";
 import { useMeltRecovery } from "../payments/useMeltRecovery";
+import { useTransactionRecords } from "../useLinksync";
 import { useResumeOnLaunchAndOnline } from "../useResumeOnLaunchAndOnline";
 
 interface UseWalletResumesParams {
+  operations: ReadonlyArray<StoredOperation>;
   pushToast: (message: string) => void;
   receiveCashuToken: ReceiveCashuToken | null;
   resumePendingCashuAutoswapClaims: ResumePendingCashuAutoswapClaims | null;
   resumePendingCashuMelts: ResumePendingCashuMelts | null;
   t: Translate;
-  transactions: Pick<TransactionsRepository, "all" | "update">;
+  transactions: Pick<TransactionsRepository, "update">;
 }
 
 /** Finishes wallet work an earlier session left: mint move claims, unsettled melts, a legacy token. */
 export const useWalletResumes = ({
+  operations,
   pushToast,
   receiveCashuToken,
   resumePendingCashuAutoswapClaims,
@@ -45,5 +49,13 @@ export const useWalletResumes = ({
     }, [resumePendingCashuAutoswapClaims]),
   );
 
-  useMeltRecovery({ pushToast, resumePendingCashuMelts, t, transactions });
+  const records = useTransactionRecords();
+  useMeltRecovery({
+    operations,
+    pushToast,
+    records,
+    resumePendingCashuMelts,
+    t,
+    transactions,
+  });
 };
