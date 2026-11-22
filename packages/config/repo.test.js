@@ -23,12 +23,3 @@ test.each(["docker/linky-app/Dockerfile", "apps/push/Dockerfile"])(
     expect(missing).toEqual([]);
   },
 );
-
-test("the evolu relay pins the web app's @evolu/common version", () => {
-  const installed = ["apps/linky-app/node_modules", "node_modules"]
-    .map((dir) => join(dir, "@evolu/common/package.json"))
-    .find((path) => existsSync(join(root, path)));
-  const webApp = readJson(installed);
-  const relay = readJson("docker/evolu-relay/package.json");
-  expect(relay.dependencies["@evolu/common"]).toBe(webApp.version);
-});

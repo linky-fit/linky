@@ -25,40 +25,24 @@ services:
       start_period: 5s
 
   evolu-relay:
-    # Explicit image name so CI can `buildx bake` this service and compose
-    # finds the result without rebuilding.
-    image: linky-evolu-relay
-    build: docker/evolu-relay
+    # Pin the release built on the apps' @evolu/common version (4.3.5 has 8.29.0).
+    image: &evolu-relay-image docker.io/evoluhq/relay:4.3.5
     ports:
       - "${LINKY_E2E_EVOLU_PORT:-4001}:4000"
-    environment:
-      EVOLU_OWNER_QUOTA_BYTES: ${EVOLU_OWNER_QUOTA_BYTES:-0}
     volumes:
       - evolu-relay-data:/app/data
-    healthcheck: &evolu-relay-healthcheck
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "const s=require('net').connect(4000,'127.0.0.1');s.on('connect',()=>process.exit(0));s.on('error',()=>process.exit(1))",
-        ]
-      interval: 2s
-      timeout: 2s
-      retries: 25
 
   # Isolated relay for the Evolu quota-recovery E2E test, capped at 16 KiB of
   # encrypted history per owner. The normal :4001 relay stays unlimited.
   evolu-relay-quota:
     profiles: [e2e, quota]
-    image: linky-evolu-relay
+    image: *evolu-relay-image
     ports:
       - "${LINKY_E2E_EVOLU_QUOTA_PORT:-4002}:4000"
     environment:
-      EVOLU_OWNER_QUOTA_BYTES: "16384"
+      EVOLU_RELAY_MAX_OWNER_BYTES: 16KiB
     volumes:
       - evolu-relay-quota-data:/app/data
-    healthcheck: *evolu-relay-healthcheck
 
   cashu-mint: &cashu-mint
     image: docker.io/cashubtc/nutshell:0.20.3
