@@ -67,12 +67,13 @@ export interface LoadedWallet {
     swapPreview: SwapPreview,
     privkey?: string,
   ): Promise<SendResponse>;
-  send(
+  /** Picks the swap's inputs and outputs offline; `completeSwap` sends it. */
+  prepareSwapToSend(
     amount: AmountLike,
     proofs: ProofLike[],
     config?: SendConfig,
     outputConfig?: OutputConfig,
-  ): Promise<SendResponse>;
+  ): Promise<SwapPreview>;
   /** The proofs a fee-inclusive swap of `amountToSend` would spend; offline. */
   selectProofsToSend(
     proofs: ProofLike[],

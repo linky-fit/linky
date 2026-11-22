@@ -43,6 +43,7 @@ import {
   RESTORE_GAP_LIMIT,
   scanKeyset,
 } from "./internal/scan";
+import { LOST_SWAP_KEY_PREFIX } from "../internal/lostSwap";
 import { sat } from "../internal/units";
 import { reclaimProofs } from "../token/internal/reclaim";
 
@@ -53,6 +54,7 @@ const SEED_BOUND_KEY_PREFIXES = [
   DETERMINISTIC_COUNTER_KEY_PREFIX,
   COUNTER_LOCK_KEY_PREFIX,
   RESTORE_CURSOR_KEY_PREFIX,
+  LOST_SWAP_KEY_PREFIX,
 ];
 
 const finitePosition = (value: number | undefined): number | null =>

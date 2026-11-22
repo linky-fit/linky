@@ -6,7 +6,10 @@ import { NonNegativeAmount } from "../domain/primitives";
 import type { Amount, CurrencyUnit, MintUrl } from "../domain/primitives";
 import type { P2pkPubkey } from "../domain/p2pk";
 import type { InspectorService } from "../inspector/Inspector";
-import { classifyMintError } from "../mint/internal/WalletInstances";
+import {
+  boundKeysetId,
+  classifyMintError,
+} from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import type { KeyValueStoreService } from "../ports/KeyValueStore";
 import type { ProofStoreService, StoredProof } from "../ports/ProofStore";
@@ -19,6 +22,12 @@ import {
   isInsufficientBalanceError,
   isRecoverableOutputCollision,
 } from "./outputCollisions";
+import {
+  hasSwapAttempt,
+  reclaimLostSwap,
+  recordSwapAttempt,
+  removeSwapAttempt,
+} from "./lostSwap";
 import {
   bookProofs,
   proofsAt,
@@ -54,7 +63,16 @@ export const malformedSwapProofs = (mint: MintUrl): MintRejected =>
     detail: "mint returned malformed proofs from the swap",
   });
 
+export interface SwapContext {
+  readonly kv: KeyValueStoreService;
+  readonly proofStore: ProofStoreService;
+  readonly inspector: InspectorService;
+  readonly wallet: LoadedWallet;
+  readonly scope: CounterScope;
+}
+
 export interface SpendContext {
+  readonly kv: KeyValueStoreService;
   readonly proofStore: ProofStoreService;
   readonly inspector: InspectorService;
   readonly wallet: LoadedWallet;
@@ -72,15 +90,27 @@ export interface SpendSelection {
 }
 
 /**
- * The spendable pool at one mint: `available` proofs, NUT-07 checked. Proofs
- * the mint reports spent are marked so — definitive spend knowledge sticks
- * even when the operation itself fails afterwards. `PENDING`, unanswered,
- * and unrecognized proofs stay `available` and are simply not offered.
+ * The spendable pool at one mint: `available` proofs, NUT-07 checked, after
+ * reclaiming a swap whose response was lost. Proofs the mint reports spent
+ * are marked so — definitive spend knowledge sticks even when the operation
+ * itself fails afterwards. `PENDING`, unanswered, and unrecognized proofs
+ * stay `available` and are simply not offered.
  */
 export const selectSpendableProofs = (
   ctx: SpendContext,
-): Effect.Effect<SpendSelection, MintUnreachable | MintRejected> =>
+): Effect.Effect<
+  SpendSelection,
+  MintUnreachable | MintRejected | CounterLockTimeout
+> =>
   Effect.gen(function* () {
+    const scope: CounterScope = {
+      mint: ctx.mint,
+      unit: ctx.unit,
+      keysetId: yield* boundKeysetId(ctx.mint, ctx.wallet),
+    };
+    if (yield* hasSwapAttempt(ctx.kv, scope)) {
+      yield* withCounterLock(ctx.kv, scope)(reclaimLostSwap({ ...ctx, scope }));
+    }
     const candidates = proofsAt(
       yield* ctx.proofStore.loadUnspent,
       ctx.mint,
@@ -102,13 +132,6 @@ export const selectSpendableProofs = (
     const spendable = candidates.filter((proof) => unspent.has(proof.secret));
     return { spendable, available: totalAmount(spendable) };
   });
-
-export interface SwapContext {
-  readonly kv: KeyValueStoreService;
-  readonly inspector: InspectorService;
-  readonly wallet: LoadedWallet;
-  readonly scope: CounterScope;
-}
 
 export interface SwapRequest {
   readonly amount: Amount;
@@ -147,7 +170,10 @@ const sendOutputType = (request: SwapRequest, counter: number): OutputType => {
  * Swaps `amount` out of the offered proofs with disjoint send/keep
  * deterministic counter blocks, recovering counter collisions under the
  * lease-locked counter. The counter is advanced past the full send block
- * plus every fresh keep output before the response is returned.
+ * plus every fresh keep output before the response is returned. Each
+ * attempt is recorded before its request leaves and settled by the next
+ * spend when no answer arrives; while an earlier unanswered attempt stays
+ * unresolved, new attempts go out unrecorded instead of replacing it.
  */
 export const swapProofsForAmount = (
   ctx: SwapContext,
@@ -165,16 +191,18 @@ export const swapProofsForAmount = (
         request.proofs.map((proof) => proof.secret),
       );
       const { fixedSend } = request;
+      let guarded = yield* reclaimLostSwap(ctx);
       let counter = yield* readCounter(ctx.kv, ctx.scope);
       let lastCollision: unknown = null;
       for (let attempt = 0; attempt < MAX_SWAP_ATTEMPTS; attempt += 1) {
         const send = sendOutputType(request, counter);
+        const sendCounter = send.type === "deterministic" ? counter : null;
         const keepCounter =
-          send.type === "deterministic" ? counter + SWAP_OUTPUT_BLOCK : counter;
+          sendCounter === null ? counter : counter + SWAP_OUTPUT_BLOCK;
         const outcome = yield* Effect.result(
           Effect.tryPromise({
             try: () =>
-              ctx.wallet.send(
+              ctx.wallet.prepareSwapToSend(
                 request.amount,
                 [...request.proofs],
                 request.includeFees === true
@@ -183,7 +211,25 @@ export const swapProofsForAmount = (
                 { send, keep: { type: "deterministic", counter: keepCounter } },
               ),
             catch: (error): unknown => error,
-          }),
+          }).pipe(
+            Effect.tap((preview) =>
+              guarded
+                ? recordSwapAttempt(
+                    ctx,
+                    request.proofs,
+                    preview,
+                    sendCounter,
+                    keepCounter,
+                  )
+                : Effect.void,
+            ),
+            Effect.flatMap((preview) =>
+              Effect.tryPromise({
+                try: () => ctx.wallet.completeSwap(preview),
+                catch: (error): unknown => error,
+              }),
+            ),
+          ),
         );
         if (Result.isSuccess(outcome)) {
           const swapped = outcome.success;
@@ -199,9 +245,24 @@ export const swapProofsForAmount = (
             keepCounter + freshKeepCount,
             "used",
           );
+          if (guarded) yield* removeSwapAttempt(ctx);
           return swapped;
         }
         const raw = outcome.failure;
+        // A cashu error means the mint processed the request (a cashu-ts retry
+        // can return one after the first request ran), so its inputs tell
+        // whether the swap ran. Any other failure may precede a request still
+        // queued at the mint, so the next spend settles the record.
+        const failure = classifyMintError(ctx.scope.mint, raw);
+        if (
+          guarded &&
+          failure._tag === "MintRejected" &&
+          failure.code !== null
+        ) {
+          guarded = yield* reclaimLostSwap(ctx).pipe(
+            Effect.orElseSucceed(() => false),
+          );
+        }
         if (isInsufficientBalanceError(raw)) {
           return yield* new InsufficientFunds({
             mint: ctx.scope.mint,

@@ -24,7 +24,7 @@ Pick `mint` from `Tokens.balances.perMint`; sends never cross mints. `planSendMi
 ## How it works
 
 1. Check the amount. Whoever redeems the token pays the mint's input fee on its proofs (NUT-02). `amount` has to exceed that fee, else `AmountConsumedByFee` before any inventory change.
-2. Select sources. Every `available` proof at `mint` goes into one NUT-07 check. Proofs reported `SPENT` are marked `spent` right away, whatever happens next. Only proofs reported `UNSPENT` are offered.
+2. Select sources. A previous swap at `mint` whose answer was lost is settled first ([concepts.md](./concepts.md#deterministic-counters-and-the-lease)). Every `available` proof at `mint` goes into one NUT-07 check. Proofs reported `SPENT` are marked `spent` right away, whatever happens next. Only proofs reported `UNSPENT` are offered.
 3. Check funds. Offered total below `amount` fails with `InsufficientFunds` before any mint write.
 4. Swap under the counter lock into fresh send proofs plus change; collisions are retried as in [receive.md](./receive.md).
 5. Persist the send: a `send` operation in the `produceAs` status with the token text, then the send proofs `handedOut` under it.

@@ -75,6 +75,7 @@ export class Send extends Context.Service<Send>()("linkshu/Send", {
           });
         }
         const spendContext = {
+          kv,
           proofStore,
           inspector,
           wallet,
@@ -98,7 +99,7 @@ export class Send extends Context.Service<Send>()("linkshu/Send", {
         }
 
         const swapped = yield* swapProofsForAmount(
-          { kv, inspector, wallet, scope },
+          { kv, proofStore, inspector, wallet, scope },
           {
             amount: draft.amount,
             proofs: spendable.map(toDomainProof),

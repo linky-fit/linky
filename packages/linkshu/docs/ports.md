@@ -15,7 +15,7 @@ A port is an Effect `Context.Service`; you satisfy it with a `Layer` that builds
 
 `linkshuServices(config)` and `runLinkshu(config, ...)` build `CashuSeed` from `config.bip39Seed` and fall back to the in-memory stores when you omit the others.
 
-What lives where: the `ProofStore` and `OperationStore` are the wallet; sync them between devices if you have sync. The `KeyValueStore` holds only device-local state (deterministic counters and their leases, the lease over each mint's receives and over each envelope, restore cursors, seen mints and keysets, the fee-probe cache). Sharing it between devices is not required, but every context on one device that uses the seed must share it (see the lease below). Keys are namespaced with a `linkshu.` prefix and values never contain seed material.
+What lives where: the `ProofStore` and `OperationStore` are the wallet; sync them between devices if you have sync. The `KeyValueStore` holds only device-local state (deterministic counters and their leases, the inputs and output slots of a swap awaiting its answer, the lease over each mint's receives and over each envelope, restore cursors, seen mints and keysets, the fee-probe cache). Sharing it between devices is not required, but every context on one device that uses the seed must share it (see the lease below). Keys are namespaced with a `linkshu.` prefix and values never contain seed material.
 
 Every port method returns an `Effect` that must not fail; throw only for genuine storage corruption.
 

@@ -1,9 +1,13 @@
 import type {
+  AmountLike,
   Keyset,
+  OutputConfig,
   OutputDataLike,
   Proof,
   ProofLike,
   ProofState,
+  SendConfig,
+  SendResponse,
   SwapPreview,
 } from "@cashu/cashu-ts";
 import { Amount as CashuAmount, MintInfo } from "@cashu/cashu-ts";
@@ -47,17 +51,82 @@ export const fakeKeyChain = (
   },
 });
 
+/** One whole spend swap, the shape of cashu-ts's own `send`. */
+export type FakeSwap = (
+  amount: AmountLike,
+  proofs: ProofLike[],
+  config?: SendConfig,
+  outputConfig?: OutputConfig,
+) => Promise<SendResponse>;
+
+/** Output amounts a prepared swap plans in its send and keep blocks. */
+export interface SwapPlan {
+  readonly send: ReadonlyArray<number>;
+  readonly keep: ReadonlyArray<number>;
+}
+
+export type FakeWalletOverrides = Partial<LoadedWallet> & {
+  /** Answers the prepared swap unless `prepareSwapToSend` is overridden. */
+  readonly send?: FakeSwap;
+  /** What each prepared swap plans; nothing by default. */
+  readonly swapPlan?: SwapPlan;
+};
+
+/**
+ * Splits `send` into the prepare and complete calls a spend makes. The
+ * preview spends every offered proof; other previews go to `completeOther`.
+ */
+const preparedSwaps = (
+  send: FakeSwap,
+  plan: SwapPlan,
+  completeOther: LoadedWallet["completeSwap"],
+): Pick<LoadedWallet, "prepareSwapToSend" | "completeSwap"> => {
+  const requests = new WeakMap<SwapPreview, Parameters<FakeSwap>>();
+  return {
+    prepareSwapToSend: (...request) => {
+      const preview: SwapPreview = {
+        amount: CashuAmount.from(0),
+        fees: CashuAmount.from(0),
+        keysetId: KEYSET_HEX,
+        inputs: request[1].map((input) => ({
+          ...input,
+          amount: CashuAmount.from(input.amount),
+        })),
+        sendOutputs: plan.send.map(plannedOutput),
+        keepOutputs: plan.keep.map(plannedOutput),
+      };
+      requests.set(preview, request);
+      return Promise.resolve(preview);
+    },
+    completeSwap: (preview, privkey) => {
+      const request = requests.get(preview);
+      return request === undefined
+        ? completeOther(preview, privkey)
+        : send(...request);
+    },
+  };
+};
+
 /** A wallet whose every call fails; tests override only what they exercise. */
-export const fakeWallet = (
-  overrides: Partial<LoadedWallet> = {},
-): LoadedWallet => ({
+export const fakeWallet = ({
+  send,
+  swapPlan = { send: [], keep: [] },
+  ...overrides
+}: FakeWalletOverrides = {}): LoadedWallet => {
+  const wallet = baseWallet(overrides);
+  return send === undefined || overrides.prepareSwapToSend !== undefined
+    ? wallet
+    : { ...wallet, ...preparedSwaps(send, swapPlan, wallet.completeSwap) };
+};
+
+const baseWallet = (overrides: Partial<LoadedWallet>): LoadedWallet => ({
   keysetId: KEYSET_HEX,
   keyChain: fakeKeyChain(),
   getMintInfo: () => fakeMintInfo(),
   loadMint: notUnderTest,
   prepareSwapToReceive: notUnderTest,
   completeSwap: notUnderTest,
-  send: notUnderTest,
+  prepareSwapToSend: notUnderTest,
   selectProofsToSend: () => {
     throw new Error("not under test");
   },
@@ -94,8 +163,9 @@ export const answerProofStates =
       })),
     );
 
-const placeholderOutput = (): OutputDataLike => ({
-  blindedMessage: { amount: CashuAmount.from(1), id: KEYSET_HEX, B_: "" },
+/** An output a preview plans; only its amount is read. */
+export const plannedOutput = (amount: number): OutputDataLike => ({
+  blindedMessage: { amount: CashuAmount.from(amount), id: KEYSET_HEX, B_: "" },
   blindingFactor: 0n,
   secret: new Uint8Array(),
   toProof: () => {
@@ -122,7 +192,7 @@ export const fakeReceiveSwap = (
         fees: CashuAmount.from(0),
         keysetId: KEYSET_HEX,
         inputs: [],
-        keepOutputs: Array.from({ length: outputs }, placeholderOutput),
+        keepOutputs: Array.from({ length: outputs }, () => plannedOutput(1)),
       };
       requests.set(preview, {
         token,

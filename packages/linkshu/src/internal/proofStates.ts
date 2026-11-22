@@ -45,10 +45,10 @@ const stateAt = (
   return entry === undefined ? null : entry.state.trim().toUpperCase();
 };
 
-const chunkProofs = (
-  proofs: ReadonlyArray<Proof>,
-): ReadonlyArray<ReadonlyArray<Proof>> => {
-  const chunks: Array<ReadonlyArray<Proof>> = [];
+const chunkProofs = <P>(
+  proofs: ReadonlyArray<P>,
+): ReadonlyArray<ReadonlyArray<P>> => {
+  const chunks: Array<ReadonlyArray<P>> = [];
   for (let i = 0; i < proofs.length; i += CHECK_STATE_CHUNK_SIZE) {
     chunks.push(proofs.slice(i, i + CHECK_STATE_CHUNK_SIZE));
   }
@@ -79,7 +79,7 @@ const alignChunkStates = (
 export const checkProofStates = (
   wallet: LoadedWallet,
   mint: MintUrl,
-  proofs: ReadonlyArray<Proof>,
+  proofs: ReadonlyArray<Pick<Proof, "secret" | "id">>,
 ): Effect.Effect<
   ReadonlyArray<ProofStateEntry>,
   MintUnreachable | MintRejected

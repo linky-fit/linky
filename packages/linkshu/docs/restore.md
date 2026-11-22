@@ -68,7 +68,7 @@ await runLinkshu(
 // then build the new runtime over the same stores
 ```
 
-The wipe removes the deterministic counters, their leases, and the restore cursors. It leaves proofs, operations (pending ones included), seen mints and keysets, and the fee-probe cache alone.
+The wipe removes the deterministic counters, their leases, the restore cursors, and the records of swaps whose answer was lost. It leaves proofs, operations (pending ones included), seen mints and keysets, and the fee-probe cache alone.
 
 ## Errors
 
