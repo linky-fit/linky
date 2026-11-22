@@ -7,14 +7,15 @@ import { readFileSync } from "node:fs";
 import type { ServerResponse } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Connect, Plugin, ViteDevServer } from "vite";
+import type { Connect, Plugin } from "vite";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
+import blossomUploadHandler from "./api/blossom-upload.js";
+import linkPreviewHandler from "./api/link-preview.js";
 import lnurlpHandler from "./api/lnurlp.js";
 import { contentSecurityPolicyMeta } from "./server/contentSecurityPolicy";
 import { bootDiagnosticRedaction } from "./server/bootDiagnosticRedaction";
 import { inspectorCollector } from "./server/inspectorCollector";
-import { fetchLinkPreview } from "./server/linkPreview";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -66,84 +67,71 @@ const appCommitSha = (() => {
 
 const useHttps = process.env.VITE_HTTPS === "1";
 
-const lnurlProxy = (): Plugin => ({
-  name: "lnurl-proxy",
-  configureServer(server: ViteDevServer) {
-    server.middlewares.use(
-      async (
-        req: Connect.IncomingMessage,
-        res: ServerResponse,
-        next: Connect.NextFunction,
-      ) => {
-        const url = new URL(req.url ?? "", "http://localhost");
-        if (url.pathname !== "/api/lnurlp") return next();
-        await lnurlpHandler(
-          {
-            method: req.method ?? "",
-            headers: req.headers,
-            query: Object.fromEntries(url.searchParams),
-          },
-          {
-            setHeader: (name, value) => {
-              res.setHeader(name, value);
+interface VercelRequest {
+  method: string;
+  headers: Connect.IncomingMessage["headers"];
+  query: Record<string, string>;
+  body: Buffer;
+}
+
+interface VercelResponse {
+  setHeader: (name: string, value: string) => void;
+  status: (code: number) => {
+    json: (body: unknown) => void;
+    send: (body: string) => void;
+  };
+}
+
+/** Serves a Vercel function of `api/` from the dev and preview servers, which have no Vercel in front. */
+const vercelFunction = (
+  route: string,
+  handler: (req: VercelRequest, res: VercelResponse) => Promise<void>,
+): Plugin => {
+  const middleware = async (
+    req: Connect.IncomingMessage,
+    res: ServerResponse,
+    next: Connect.NextFunction,
+  ) => {
+    const url = new URL(req.url ?? "", "http://localhost");
+    if (url.pathname !== route) return next();
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) chunks.push(Buffer.from(chunk));
+    await handler(
+      {
+        method: req.method ?? "",
+        headers: req.headers,
+        query: Object.fromEntries(url.searchParams),
+        body: Buffer.concat(chunks),
+      },
+      {
+        setHeader: (name, value) => {
+          res.setHeader(name, value);
+        },
+        status: (code) => {
+          res.statusCode = code;
+          return {
+            json: (body) => {
+              res.setHeader("Content-Type", "application/json");
+              res.end(JSON.stringify(body));
             },
-            status: (code) => {
-              res.statusCode = code;
-              return {
-                json: (body) => {
-                  res.end(JSON.stringify(body));
-                },
-                send: (body) => {
-                  res.end(body);
-                },
-              };
+            send: (body) => {
+              res.end(body);
             },
-          },
-        );
+          };
+        },
       },
     );
-  },
-});
-
-const linkPreviewApi = (): Plugin => ({
-  name: "link-preview-api",
-  configureServer(server: ViteDevServer) {
-    server.middlewares.use(
-      async (
-        req: Connect.IncomingMessage,
-        res: ServerResponse,
-        next: Connect.NextFunction,
-      ) => {
-        const requestUrl = req.url ?? "";
-        if (!requestUrl.startsWith("/api/link-preview")) return next();
-
-        if (req.method !== "GET") {
-          res.statusCode = 405;
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ error: "Method not allowed" }));
-          return;
-        }
-
-        try {
-          const parsed = new URL(requestUrl, "http://localhost");
-          const target = String(parsed.searchParams.get("url") ?? "").trim();
-          const preview = await fetchLinkPreview(target);
-          res.statusCode = 200;
-          res.setHeader("Content-Type", "application/json");
-          res.setHeader("Cache-Control", "no-store");
-          res.end(JSON.stringify(preview));
-        } catch (error) {
-          server.config.logger.warn(
-            `Link preview error: ${String(error ?? "unknown")}`,
-          );
-          res.statusCode = 422;
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ error: "Preview unavailable" }));
-        }
-      },
-    );
-  },
-});
+  };
+  return {
+    name: `vercel-function:${route}`,
+    configureServer: (server) => {
+      server.middlewares.use(middleware);
+    },
+    configurePreviewServer: (server) => {
+      server.middlewares.use(middleware);
+    },
+  };
+};
 
 const workerPolyfills = evoluWorkerPolyfills(
   fileURLToPath(new URL("./src/platform/browserPolyfills.ts", import.meta.url)),
@@ -201,8 +189,9 @@ export default defineConfig({
     linkyUi(),
     bootDiagnosticRedaction(),
     inspectorCollector(),
-    linkPreviewApi(),
-    lnurlProxy(),
+    vercelFunction("/api/link-preview", linkPreviewHandler),
+    vercelFunction("/api/lnurlp", lnurlpHandler),
+    vercelFunction("/api/blossom-upload", blossomUploadHandler),
     ...(useHttps ? [basicSsl()] : []),
     react(),
     VitePWA({

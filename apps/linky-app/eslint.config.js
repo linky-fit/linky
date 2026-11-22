@@ -166,7 +166,6 @@ export const platformSeamRatchet = [
   "src/sharedProfileLink.ts",
   "src/siteLogin.ts",
   "src/types/route.ts",
-  "src/utils/blossomUploadProxy.ts",
   "src/utils/bootDiagnostics.ts",
   "src/utils/browserPreferences.ts",
   "src/utils/colorMode.ts",
