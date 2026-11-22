@@ -16,6 +16,7 @@ export const createBrowserDevice = (config: AppConfig): Device =>
     openStore: (account) => openBrowserStore(account, config),
     servicePorts: (account) => ({
       ...linkstrStores(account.pubkey),
+      kv: localStorageKv,
       keyValueStore: localStorageKeyValueStore,
       onOnline,
       deferUpdateWhile,

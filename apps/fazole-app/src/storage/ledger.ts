@@ -7,6 +7,7 @@ import {
   type TransactionsRepository,
 } from "@linky-fit/linksync";
 import { MintUrl, QuoteId } from "@linky-fit/linkshu";
+import type { KeyValueStorage } from "@linky-fit/linksync/evolu";
 import { Effect } from "effect";
 import {
   canChangePaymentStatus,
@@ -23,6 +24,7 @@ import {
   type WithdrawalKind,
 } from "../domain";
 import { nowSeconds } from "../utils/time";
+import { addRecordedInflow, readRecordedInflows } from "./recordedInflows";
 import {
   insertDirectTransfer,
   insertPayment,
@@ -51,6 +53,8 @@ export type PaidBy =
 /** Payments, receipts, direct transfers and withdrawals over the transactions repository, as promises. */
 export interface Ledger {
   readonly records: () => Promise<FazoleRecords>;
+  /** The ids of the inflows this device recorded: every device sharing the account sees an inflow, one recorded it. */
+  readonly recordedHere: () => ReadonlySet<string>;
   readonly payment: (id: string) => Promise<Payment | null>;
   /**
    * A new pending payment of `amountCzk`, the tip included; its method is
@@ -118,7 +122,11 @@ const run = <A, E>(effect: Effect.Effect<A, E>) => Effect.runPromise(effect);
 export const receiptIdFor = (operationId: string): TransactionId =>
   transactionIdForOperation(OperationId.make(operationId));
 
-export const makeLedger = (transactions: TransactionsRepository): Ledger => {
+export const makeLedger = (
+  transactions: TransactionsRepository,
+  /** Device-local storage that never syncs. */
+  kv: KeyValueStorage,
+): Ledger => {
   const records = () => run(readFazoleRecords(transactions));
   const payment = async (id: string) =>
     (await records()).payments.find((candidate) => candidate.id === id) ?? null;
@@ -136,6 +144,7 @@ export const makeLedger = (transactions: TransactionsRepository): Ledger => {
 
   return {
     records,
+    recordedHere: () => new Set(readRecordedInflows(kv)),
     payment,
     createPayment: async (amountCzk, tipCzk = null) => {
       const created: Payment = {
@@ -166,6 +175,7 @@ export const makeLedger = (transactions: TransactionsRepository): Ledger => {
     },
     completePayment: async (current, paidBy) => {
       if (!canChangePaymentStatus(current.status, "paid")) return false;
+      if (paidBy !== "bank") addRecordedInflow(kv, current.id);
       await savePayment({
         ...current,
         status: "paid",
@@ -215,19 +225,23 @@ export const makeLedger = (transactions: TransactionsRepository): Ledger => {
       );
     },
     recordReceipt: async (receipt) => {
+      const id = receiptIdFor(receipt.operationId);
+      addRecordedInflow(kv, id);
       await run(
         insertReceipt(transactions, {
           ...receipt,
-          id: receiptIdFor(receipt.operationId),
+          id,
           receivedAtSec: nowSeconds(),
         }),
       );
     },
     recordDirectTransfer: async (transfer) => {
+      const id = receiptIdFor(transfer.operationId);
+      addRecordedInflow(kv, id);
       await run(
         insertDirectTransfer(transactions, {
           ...transfer,
-          id: receiptIdFor(transfer.operationId),
+          id,
           receivedAtSec: nowSeconds(),
           hiddenAtSec: null,
         }),

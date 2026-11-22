@@ -4,7 +4,8 @@ import { Effect } from "effect";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { describe, expect, it } from "vitest";
 import { CzkAmount, Sats } from "../domain";
-import { setup, testMint } from "../services/testing/fakes";
+import { memoryKv, setup, testMint } from "../services/testing/fakes";
+import { makeLedger, receiptIdFor } from "./ledger";
 
 const leg = {
   sats: Sats.make(1_000),
@@ -239,6 +240,42 @@ describe("records", () => {
       },
     ]);
     expect(await ledger.hasReceipt("receive-1")).toBe(true);
+  });
+});
+
+describe("inflows recorded here", () => {
+  it("are the Bitcoin payments, receipts and direct transfers this device recorded, kept across restarts", async () => {
+    const { repositories } = setup();
+    const kv = memoryKv();
+    const ledger = makeLedger(repositories.transactions, kv);
+    const minted = await ledger.createPayment(CzkAmount.make(25_000));
+    await ledger.completePayment(minted, "lightning");
+    const banked = await ledger.createPayment(CzkAmount.make(25_000));
+    await ledger.completePayment(banked, "bank");
+    await ledger.recordReceipt({
+      operationId: "receive-1",
+      method: "cashu",
+      sats: 10,
+      paymentId: null,
+    });
+    await ledger.recordDirectTransfer({
+      operationId: "receive-2",
+      sats: 20,
+      czkPerBtc: null,
+      mintUrl: testMint,
+      payerPubkey: makeIdentity().pubkey,
+      note: null,
+    });
+    expect(makeLedger(repositories.transactions, kv).recordedHere()).toEqual(
+      new Set([
+        minted.id,
+        receiptIdFor("receive-1"),
+        receiptIdFor("receive-2"),
+      ]),
+    );
+    expect(
+      makeLedger(repositories.transactions, memoryKv()).recordedHere(),
+    ).toEqual(new Set());
   });
 });
 

@@ -111,7 +111,11 @@ export const createPledges = ({
 
   const forward = async (pledge: Pledge, remainingCzk: CzkAmount) => {
     const records = await ledger.records();
-    const inflows = unforwardedInflows(pledge, records, nowSeconds());
+    const recordedHere = ledger.recordedHere();
+    // Only the device that recorded an inflow forwards it, so terminals sharing the shop never send it twice.
+    const inflows = unforwardedInflows(pledge, records, nowSeconds()).filter(
+      (inflow) => recordedHere.has(inflow.id),
+    );
     if (inflows.length === 0) return;
     const rate = await czkPerBtc();
     if (rate === null) {

@@ -29,6 +29,7 @@ const fakePlatform = (kv = memoryKv()) => {
     kv,
     openStore: async () => testStore(),
     servicePorts: () => ({
+      kv,
       outboxStore: sharedOutboxStore(),
       keyValueStore: Layer.succeed(KeyValueStore, linkshuKv),
     }),

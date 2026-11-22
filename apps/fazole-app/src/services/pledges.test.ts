@@ -13,9 +13,10 @@ import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import { CzkAmount } from "../domain";
-import type { Ledger } from "../storage/ledger";
+import { makeLedger, type Ledger } from "../storage/ledger";
+import type { Repositories } from "../storage/repositories";
 import { createPledges } from "./pledges";
-import { fakeNostr, setup, testMint } from "./testing/fakes";
+import { fakeNostr, memoryKv, setup, testMint } from "./testing/fakes";
 import type {
   WithdrawalQuote,
   Withdrawals,
@@ -97,9 +98,12 @@ const pledgesOver = (
     readonly balanceSats?: number;
     readonly failWith?: WithdrawFailure;
     readonly czkPerBtc?: number | null;
+    /** Another terminal's repositories: the same shop on a second device. */
+    readonly sharing?: Repositories;
   } = {},
 ) => {
-  const { ledger, repositories } = setup();
+  const repositories = options.sharing ?? setup().repositories;
+  const ledger = makeLedger(repositories.transactions, memoryKv());
   const texts: { to: Pubkey; text: string }[] = [];
   const { nostr } = fakeNostr({
     sendText: async (to, text, _clientId, ref) => {
@@ -126,7 +130,7 @@ const pledgesOver = (
       payerPubkey: makeIdentity().pubkey,
       note: null,
     });
-  return { ledger, pledges, texts, quotes, inflow };
+  return { repositories, ledger, pledges, texts, quotes, inflow };
 };
 
 describe("opening a pledge", () => {
@@ -236,6 +240,17 @@ describe("repaying a pledge", () => {
     expect((await unreachable.ledger.records()).withdrawals).toEqual([]);
     expect(unreachable.quotes).toEqual([1_000]);
     unreachable.pledges.stop();
+  });
+
+  it("leaves an inflow to the terminal that recorded it, so two terminals forward it once", async () => {
+    const terminal = pledgesOver();
+    const otherTerminal = pledgesOver({ sharing: terminal.repositories });
+    await terminal.pledges.open(contact, czk(10_000));
+    await otherTerminal.inflow(1_000);
+    await terminal.pledges.reconcile();
+    expect((await terminal.ledger.records()).withdrawals).toEqual([]);
+    await otherTerminal.pledges.reconcile();
+    expect((await terminal.ledger.records()).withdrawals).toHaveLength(1);
   });
 
   it("does nothing without a pledge", async () => {
