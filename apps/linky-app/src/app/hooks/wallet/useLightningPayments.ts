@@ -1,12 +1,16 @@
 import { getLightningInvoicePreview } from "@linky-fit/linkshu";
-import { useAtom, useAtomSet } from "@linky-fit/linkstr-react";
+import { useAtom } from "@linky-fit/linkstr-react";
 import React from "react";
 import type { Translate } from "../../../i18n";
 import { getLnurlPayDisplayText } from "../../../lnurlPay";
 import { navigateTo } from "../../../hooks/useRouting";
 import type { Route } from "../../../types/route";
 import { getUnknownErrorMessage } from "../../../utils/unknown";
-import type { QuoteLightningInvoiceOutcome } from "../../state/wallet/payments";
+import type {
+  LightningInvoiceQuote,
+  PayInvoiceOptions,
+  QuoteLightningInvoiceOutcome,
+} from "../../state/wallet/payments";
 import type { DisplayAmountParts } from "../../../utils/displayAmounts";
 import {
   paidOverlayContact,
@@ -14,6 +18,7 @@ import {
 } from "../../lib/paidOverlay";
 import {
   lightningInvoiceQuoteAtom,
+  type LightningInvoiceQuoteState,
   pendingLightningInvoiceAtom,
   postPaySaveContactAtom,
 } from "../../state/shell/confirmations";
@@ -38,6 +43,17 @@ interface UseLightningPaymentsParams {
 }
 
 const NOT_READY = "Cashu storage is not ready";
+
+/** The quote the confirm dialog showed for `invoice`, if it showed one. */
+const confirmedQuote = (
+  state: LightningInvoiceQuoteState | null,
+  invoice: string,
+): LightningInvoiceQuote | undefined =>
+  state?.invoice === invoice &&
+  state.outcome !== "pending" &&
+  state.outcome._tag === "Quoted"
+    ? state.outcome
+    : undefined;
 
 /**
  * Lightning payments from the cashu balance (linkshu Melt, LNURL for
@@ -64,7 +80,11 @@ export const useLightningPayments = ({
   const [postPaySaveContact, setPostPaySaveContact] = useAtom(
     postPaySaveContactAtom,
   );
-  const setInvoiceQuote = useAtomSet(lightningInvoiceQuoteAtom);
+  const [invoiceQuote, setInvoiceQuote] = useAtom(lightningInvoiceQuoteAtom);
+  const [quoteRound, requote] = React.useReducer(
+    (round: number) => round + 1,
+    0,
+  );
 
   const { knownLnAddressPayContact } = useKnownLnAddressPayContact(routeKind);
 
@@ -92,11 +112,15 @@ export const useLightningPayments = ({
     return () => {
       current = false;
     };
-  }, [commands, pendingLightningInvoiceConfirmation, setInvoiceQuote]);
+  }, [
+    commands,
+    pendingLightningInvoiceConfirmation,
+    quoteRound,
+    setInvoiceQuote,
+  ]);
 
-  /** Pays `invoice`; `amountSat` is what an amountless one is paid with. */
-  const payLightningInvoiceWithCashu = React.useCallback(
-    async (invoice: string, amountSat?: number): Promise<boolean> => {
+  const payInvoice = React.useCallback(
+    async (invoice: string, options?: PayInvoiceOptions): Promise<boolean> => {
       if (commands === null) {
         setStatus(`${t("errorPrefix")}: ${NOT_READY}`);
         return false;
@@ -106,13 +130,10 @@ export const useLightningPayments = ({
         direction: "out",
         amountSat:
           getLightningInvoicePreview(invoice.trim())?.amountSat ??
-          amountSat ??
+          options?.amountSat ??
           null,
       });
-      const outcome = await commands.payLightningInvoice(
-        invoice,
-        amountSat === undefined ? undefined : { amountSat },
-      );
+      const outcome = await commands.payLightningInvoice(invoice, options);
       dismissPaymentSending();
       switch (outcome._tag) {
         case "Paid": {
@@ -158,6 +179,13 @@ export const useLightningPayments = ({
       showPaymentSending,
       t,
     ],
+  );
+
+  /** Pays `invoice`; `amountSat` is what an amountless one is paid with. */
+  const payLightningInvoiceWithCashu = React.useCallback(
+    (invoice: string, amountSat?: number) =>
+      payInvoice(invoice, amountSat === undefined ? undefined : { amountSat }),
+    [payInvoice],
   );
 
   const payLightningAddressWithCashu = React.useCallback(
@@ -269,10 +297,15 @@ export const useLightningPayments = ({
   const confirmLightningInvoicePayment = React.useCallback(async () => {
     const pending = pendingLightningInvoiceConfirmation;
     if (!pending) return;
-    if (await payLightningInvoiceWithCashu(pending.invoice))
+    const quote = confirmedQuote(invoiceQuote, pending.invoice);
+    if (pending.amountSat !== null && !quote) return;
+    if (await payInvoice(pending.invoice, { quote }))
       setPendingLightningInvoiceConfirmation(null);
+    // A failed attempt may have used up or outlived the quote; the dialog shows a fresh one.
+    else if (quote) requote();
   }, [
-    payLightningInvoiceWithCashu,
+    invoiceQuote,
+    payInvoice,
     pendingLightningInvoiceConfirmation,
     setPendingLightningInvoiceConfirmation,
   ]);

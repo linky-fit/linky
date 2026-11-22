@@ -50,6 +50,22 @@ const pending = new PaymentPending({
   amount: Amount.make(40),
 });
 
+const quoted = {
+  _tag: "Quoted",
+  amount: 40,
+  fee: 3,
+  mint: MintUrl.make("https://mint.example"),
+  quoteId: QuoteId.make("quote-1"),
+  maxTotal: Amount.make(43),
+} as const;
+
+const preview = {
+  invoice: "lnbc-mock",
+  amountSat: 40,
+  description: null,
+  expiresAtSec: null,
+};
+
 const commandsAnswering = ({
   invoice = { _tag: "Paid", receipt },
   address = {
@@ -58,16 +74,11 @@ const commandsAnswering = ({
     lightningAddress: "alice@example.com",
     successAction: null,
   },
-  quote = {
-    _tag: "Quoted",
-    amount: 40,
-    fee: 3,
-    mint: MintUrl.make("https://mint.example"),
-  },
+  quote = quoted,
 }: {
   invoice?: PayInvoiceOutcome;
   address?: PayLightningAddressOutcome;
-  quote?: QuoteLightningInvoiceOutcome;
+  quote?: QuoteLightningInvoiceOutcome | Promise<QuoteLightningInvoiceOutcome>;
 }) => {
   commandsRef.current = {
     fundsFor: vi.fn(),
@@ -133,12 +144,6 @@ describe("useLightningPayments", () => {
   it("prices an invoice waiting for confirmation and drops the estimate with it", async () => {
     commandsAnswering({});
     const ui = await render();
-    const preview = {
-      invoice: "lnbc-mock",
-      amountSat: 40,
-      description: null,
-      expiresAtSec: null,
-    };
 
     await act(async () => {
       ui.current().setPendingLightningInvoiceConfirmation(preview);
@@ -150,20 +155,62 @@ describe("useLightningPayments", () => {
       invoice: "lnbc-mock",
       outcome: "pending",
     });
-    expect(ui.quotes.at(-1)).toEqual({
-      invoice: "lnbc-mock",
-      outcome: {
-        _tag: "Quoted",
-        amount: 40,
-        fee: 3,
-        mint: "https://mint.example",
-      },
-    });
+    expect(ui.quotes.at(-1)).toEqual({ invoice: "lnbc-mock", outcome: quoted });
 
     await act(async () => {
       ui.current().closeLightningInvoiceConfirmation();
     });
     expect(ui.quotes.at(-1)).toBeNull();
+    await ui.view.unmount();
+  });
+
+  it("pays the confirmed invoice with the quote the dialog showed", async () => {
+    commandsAnswering({});
+    const ui = await render();
+    await act(async () => {
+      ui.current().setPendingLightningInvoiceConfirmation(preview);
+    });
+
+    await act(() => ui.current().confirmLightningInvoicePayment());
+
+    expect(commandsRef.current?.payLightningInvoice).toHaveBeenCalledWith(
+      "lnbc-mock",
+      { quote: quoted },
+    );
+    expect(ui.current().pendingLightningInvoiceConfirmation).toBeNull();
+    await ui.view.unmount();
+  });
+
+  it("pays a confirmed invoice only once the dialog shows its quote", async () => {
+    commandsAnswering({ quote: new Promise(() => {}) });
+    const ui = await render();
+    await act(async () => {
+      ui.current().setPendingLightningInvoiceConfirmation(preview);
+    });
+
+    await act(() => ui.current().confirmLightningInvoicePayment());
+
+    expect(commandsRef.current?.payLightningInvoice).not.toHaveBeenCalled();
+    expect(ui.current().pendingLightningInvoiceConfirmation).toEqual(preview);
+    await ui.view.unmount();
+  });
+
+  it("keeps the dialog open with a fresh quote after a confirmed payment failed", async () => {
+    commandsAnswering({
+      invoice: { _tag: "Failed", detail: "The quote expired, try again" },
+    });
+    const ui = await render();
+    await act(async () => {
+      ui.current().setPendingLightningInvoiceConfirmation(preview);
+    });
+
+    await act(() => ui.current().confirmLightningInvoicePayment());
+
+    expect(ui.setStatus).toHaveBeenCalledWith(
+      "payFailed: The quote expired, try again",
+    );
+    expect(ui.current().pendingLightningInvoiceConfirmation).toEqual(preview);
+    expect(commandsRef.current?.quoteLightningInvoice).toHaveBeenCalledTimes(2);
     await ui.view.unmount();
   });
 

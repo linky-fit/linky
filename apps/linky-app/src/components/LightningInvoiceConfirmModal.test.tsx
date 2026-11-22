@@ -1,4 +1,4 @@
-import { MintUrl } from "@linky-fit/linkshu";
+import { Amount, MintUrl, QuoteId } from "@linky-fit/linkshu";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LightningInvoiceQuoteState } from "../app/state/shell/confirmations";
 import type { I18nKey } from "../i18n";
@@ -42,21 +42,29 @@ const render = async (
   );
   const dialogText = () =>
     document.querySelector('[role="dialog"]')?.textContent ?? "";
-  return { ...rendered, dialogText };
+  const payDisabled = () =>
+    Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent === "paySend",
+    )?.disabled;
+  return { ...rendered, dialogText, payDisabled };
 };
 
 afterEach(() => {
   document.body.innerHTML = "";
 });
 
+const quoted = {
+  _tag: "Quoted",
+  amount: 5_000,
+  fee: 52,
+  mint: MintUrl.make("https://mint.example"),
+  quoteId: QuoteId.make("quote-1"),
+  maxTotal: Amount.make(5_052),
+} as const;
+
 describe("LightningInvoiceConfirmModal", () => {
   it("shows the fee as a maximum once the invoice is priced", async () => {
-    const view = await render({
-      _tag: "Quoted",
-      amount: 5_000,
-      fee: 52,
-      mint: MintUrl.make("https://mint.example"),
-    });
+    const view = await render(quoted);
     expect(view.dialogText()).toContain("fees up to 52 sat");
     expect(view.dialogText()).not.toContain("5052");
     await view.unmount();
@@ -82,5 +90,24 @@ describe("LightningInvoiceConfirmModal", () => {
     expect(failed.dialogText()).toContain("fee estimate failed");
     expect(failed.dialogText()).not.toContain("fees up to");
     await failed.unmount();
+  });
+
+  it("enables Pay only once the invoice is priced", async () => {
+    for (const quote of [null, "pending", { _tag: "NetworkError" }] as const) {
+      const view = await render(quote);
+      expect(view.payDisabled()).toBe(true);
+      await view.unmount();
+    }
+
+    const priced = await render(quoted);
+    expect(priced.payDisabled()).toBe(false);
+    await priced.unmount();
+  });
+
+  it("says why Pay is off when no single mint can pay the invoice", async () => {
+    const view = await render({ _tag: "Insufficient" });
+    expect(view.payDisabled()).toBe(true);
+    expect(view.dialogText()).toContain("payInsufficient");
+    await view.unmount();
   });
 });
