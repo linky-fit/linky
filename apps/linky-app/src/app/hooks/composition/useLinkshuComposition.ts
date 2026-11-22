@@ -28,6 +28,7 @@ export type {
   ResumePendingCashuTopups,
   SendCashuToken,
   StartCashuTopup,
+  WarmCashuMint,
 } from "../../state/linkshu/commands";
 
 /** The linkshu commands, null until the runtime is up. */
@@ -66,6 +67,7 @@ export const useLinkshuComposition = () => {
     resumePendingCashuTopups: commands?.resumePendingCashuTopups ?? null,
     sendCashuToken: commands?.sendCashuToken ?? null,
     startCashuTopup: commands?.startCashuTopup ?? null,
+    warmCashuMint: commands?.warmCashuMint ?? null,
     walletBalances: inventory.balances,
     walletDeferredReceives: inventory.deferredReceives,
     walletLoaded: inventory.loaded,

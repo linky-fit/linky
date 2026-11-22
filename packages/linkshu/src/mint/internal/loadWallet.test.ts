@@ -1,4 +1,10 @@
-import { deriveKeysetId, Mint, Wallet } from "@cashu/cashu-ts";
+import {
+  deriveKeysetId,
+  Mint,
+  MintOperationError,
+  RateLimitError,
+  Wallet,
+} from "@cashu/cashu-ts";
 import type { GetInfoResponse, MintKeys, MintKeyset } from "@cashu/cashu-ts";
 import { loadWallet } from "./loadWallet";
 
@@ -114,5 +120,150 @@ describe("loadWallet", () => {
     const restored = await wallet.keyChain.ensureKeysetKeys(inactive.id);
     expect(restored.keys).toEqual(keys);
     expect(restored.verify()).toBe(true);
+  });
+
+  it("aborts in-flight HTTP requests when the loader deadline expires", async () => {
+    const signals: AbortSignal[] = [];
+    vi.stubGlobal(
+      "fetch",
+      (_input: Parameters<typeof fetch>[0], init?: RequestInit) =>
+        new Promise<Response>((_, reject) => {
+          const signal = init?.signal;
+          if (signal) {
+            signals.push(signal);
+            signal.addEventListener(
+              "abort",
+              () => reject(new DOMException("Aborted", "AbortError")),
+              { once: true },
+            );
+          }
+        }),
+    );
+    try {
+      await expect(
+        loadWallet({ Mint, Wallet, mintUrl, unit: "sat", timeoutMs: 15 }),
+      ).rejects.toThrow(/timed out/i);
+      expect(signals.length).toBeGreaterThan(0);
+      expect(signals.every((signal) => signal.aborted)).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("restores the mint's default methods after load completes", async () => {
+    const metadata = keyset(1);
+    serveMint([metadata], [{ ...metadata, keys }]);
+
+    const wallet = await load();
+
+    expect(Object.hasOwn(wallet.mint, "getInfo")).toBe(false);
+    expect(Object.hasOwn(wallet.mint, "getKeySets")).toBe(false);
+    expect(Object.hasOwn(wallet.mint, "getKeys")).toBe(false);
+  });
+
+  it("aborts sibling HTTP requests when one load request fails early", async () => {
+    const siblingSignals: AbortSignal[] = [];
+    vi.stubGlobal(
+      "fetch",
+      (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+        const url = input instanceof Request ? input.url : String(input);
+        if (url.endsWith("/v1/info")) {
+          return Promise.resolve(new Response("boom", { status: 500 }));
+        }
+        return new Promise<Response>((_, reject) => {
+          const signal = init?.signal;
+          if (signal) {
+            siblingSignals.push(signal);
+            signal.addEventListener(
+              "abort",
+              () => reject(new DOMException("Aborted", "AbortError")),
+              { once: true },
+            );
+          }
+        });
+      },
+    );
+    try {
+      await expect(load()).rejects.toThrow();
+      expect(siblingSignals.length).toBeGreaterThan(0);
+      expect(siblingSignals.every((signal) => signal.aborted)).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("preserves MintOperationError codes from HTTP 400 responses", async () => {
+    vi.stubGlobal("fetch", () =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({ code: 10000, detail: "mint rejected request" }),
+          { status: 400, headers: { "content-type": "application/json" } },
+        ),
+      ),
+    );
+    try {
+      const error = await load().catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(MintOperationError);
+      expect(error).toMatchObject({
+        code: 10000,
+        message: "mint rejected request",
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("preserves RateLimitError and Retry-After from HTTP 429 responses", async () => {
+    vi.stubGlobal("fetch", () =>
+      Promise.resolve(
+        new Response("slow down", {
+          status: 429,
+          headers: { "Retry-After": "30" },
+        }),
+      ),
+    );
+    try {
+      const error = await load().catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(RateLimitError);
+      expect(error).toMatchObject({ retryAfterMs: 30_000 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("preserves large integers via cashu-ts JSONInt parsing", async () => {
+    const metadata = keyset(1);
+    const infoJson = JSON.stringify({
+      ...info,
+      nuts: {
+        "4": {
+          methods: [{ method: "bolt11", unit: "sat", max_amount: "__MAX__" }],
+          disabled: false,
+        },
+        "5": { methods: [], disabled: false },
+      },
+    }).replace('"__MAX__"', "9007199254740993");
+    const responses: Record<string, string> = {
+      "/v1/info": infoJson,
+      "/v1/keysets": JSON.stringify({ keysets: [metadata] }),
+      "/v1/keys": JSON.stringify({ keysets: [{ ...metadata, keys }] }),
+    };
+    vi.stubGlobal("fetch", (input: Parameters<typeof fetch>[0]) => {
+      const url = input instanceof Request ? input.url : String(input);
+      const body = responses[new URL(url).pathname];
+      return Promise.resolve(
+        new Response(body ?? "null", {
+          status: body === undefined ? 404 : 200,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+    });
+    try {
+      const wallet = await load();
+      const nut4 = wallet.getMintInfo().cache.nuts["4"];
+      expect(nut4?.methods[0]?.max_amount).toBe(9007199254740993n);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
