@@ -12,6 +12,7 @@ import type {
   Pubkey,
 } from "@linky-fit/linkstr";
 import { createId, type LinkyStore } from "@linky-fit/linksync";
+import type { KeyValueStorage } from "@linky-fit/linksync/evolu";
 import type { LiveSource } from "@linky-fit/linksync/react";
 import { Effect, type Layer } from "effect";
 import type { AppConfig } from "../config";
@@ -151,6 +152,8 @@ export interface AppServices {
 
 /** Device-local and network pieces the browser supplies; tests pass in-memory ones. */
 export interface ServicePorts {
+  /** Device-local storage that never syncs. */
+  readonly kv: KeyValueStorage;
   readonly outboxStore: Layer.Layer<OutboxStore>;
   readonly inboxCursorStore?: Layer.Layer<InboxCursorStore> | undefined;
   readonly keyValueStore?: Layer.Layer<KeyValueStore> | undefined;
@@ -178,7 +181,7 @@ export const createAppServices = ({
   readonly ports: ServicePorts;
 }): AppServices => {
   const repositories = makeRepositories(store);
-  const ledger = makeLedger(repositories.transactions);
+  const ledger = makeLedger(repositories.transactions, ports.kv);
   const hydrated = () => whenHydrated(store);
   const linkstr = makeLinkstrRuntime({
     secretKey: account.secretKey,

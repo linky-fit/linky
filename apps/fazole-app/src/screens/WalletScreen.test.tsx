@@ -12,6 +12,7 @@ import { CzkAmount } from "../domain";
 import { createAppServices, type AppServices } from "../services/appServices";
 import type { Device } from "../services/device";
 import {
+  memoryKv,
   sharedOutboxStore,
   testAccount,
   testConfig,
@@ -46,6 +47,7 @@ const signedInDevice = (): { device: Device; services: AppServices } => {
     store: testStore(),
     config: testConfig,
     ports: {
+      kv: memoryKv(),
       outboxStore: sharedOutboxStore(),
       keyValueStore: Layer.succeed(KeyValueStore, makeInMemoryKeyValueStore()),
       fetchRates: async () => rates,

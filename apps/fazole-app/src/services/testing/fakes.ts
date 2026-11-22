@@ -76,7 +76,7 @@ export const setup = () => {
   const account = testAccount();
   const store = testStore();
   const repositories = makeRepositories(store);
-  const ledger = makeLedger(repositories.transactions);
+  const ledger = makeLedger(repositories.transactions, memoryKv());
   const wallet = createWallet(
     makeLinkshuRuntime({
       cashuSeed: account.cashuSeed,

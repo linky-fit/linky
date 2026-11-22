@@ -7,6 +7,7 @@ import { czechAccountToIban, parseCzechAccount } from "../domain";
 import { createAppServices, type AppServices } from "../services/appServices";
 import type { Device } from "../services/device";
 import {
+  memoryKv,
   sharedOutboxStore,
   testAccount,
   testConfig,
@@ -50,6 +51,7 @@ const signedInDevice = (
     store: testStore(),
     config: { ...testConfig, mintUrl: "https://cashu.cz" },
     ports: {
+      kv: memoryKv(),
       outboxStore: sharedOutboxStore(),
       keyValueStore: Layer.succeed(KeyValueStore, makeInMemoryKeyValueStore()),
       fetch: async (input, init) =>
