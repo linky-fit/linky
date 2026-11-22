@@ -20,7 +20,7 @@ const checkWallet = Effect.gen(function* () {
 
 ## How it works
 
-One batched checkstate call per mint and unit. Per proof:
+One batched checkstate per mint and unit (split into 100-proof chunks, up to 6 in flight). Per proof:
 
 | Mint's answer                         | What happens                                                                         |
 | ------------------------------------- | ------------------------------------------------------------------------------------ |
@@ -46,7 +46,7 @@ One batched checkstate call per mint and unit. Per proof:
 
 ### When to run it
 
-- `checkAll`: on an explicit "check all" action, not on every render; each run is one request per mint.
+- `checkAll`: on an explicit "check all" action, not on every render; each run queries each mint in 100-proof chunks (up to 6 concurrently).
 - `checkTransfer`: when opening a transfer's detail view.
 - `checkIssued`: while an `issued` token is on screen, and periodically in the background. Share one in-flight call instead of overlapping runs.
 - `inspectProofStates`: when opening or refreshing a list that shows available and pending amounts. Keep the snapshot in UI memory; do not persist mint answers as states.

@@ -4,6 +4,7 @@ import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import { fakeWallet } from "../testing/fakeWallet";
 import { Proof } from "../token/domain";
 import {
+  answerAt,
   checkProofStates,
   dedupeProofs,
   partitionGroupsByState,
@@ -211,6 +212,115 @@ describe("checkProofStates", () => {
 
     const failure = await Effect.runPromise(
       Effect.flip(checkProofStates(wallet, mint, [proof("a1")])),
+    );
+
+    expect(failure).toMatchObject({ _tag: "MintUnreachable", mint });
+  });
+
+  it("chunks >100 proofs into parallel 100-proof batches bounded to 6 in flight", async () => {
+    const inputs = Array.from({ length: 750 }, (_, index) =>
+      proof(`p-${index}`),
+    );
+    let inFlight = 0;
+    let peakInFlight = 0;
+    const resolvers: Array<() => void> = [];
+    const { wallet, calls } = walletAnswering(
+      (secrets) =>
+        new Promise((resolve) => {
+          inFlight += 1;
+          peakInFlight = Math.max(peakInFlight, inFlight);
+          resolvers.push(() => {
+            inFlight -= 1;
+            resolve(
+              secrets.map((secret) =>
+                secret === "p-0" || secret === "p-749" ? "SPENT" : "UNSPENT",
+              ),
+            );
+          });
+        }),
+    );
+
+    const pending = Effect.runPromise(checkProofStates(wallet, mint, inputs));
+    // First wave starts 6 chunks immediately without waiting for any to finish.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(calls.map((chunk) => chunk.length)).toEqual([
+      100, 100, 100, 100, 100, 100,
+    ]);
+    expect(peakInFlight).toBe(6);
+
+    // Resolve out of order (newest first) to verify input-order alignment.
+    while (resolvers.length > 0 || calls.length < 8) {
+      const next = resolvers.pop();
+      next?.();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    const result = await pending;
+    expect(calls.map((chunk) => chunk.length)).toEqual([
+      100, 100, 100, 100, 100, 100, 100, 50,
+    ]);
+    expect(peakInFlight).toBe(6);
+    expect(result).toHaveLength(750);
+    expect([...spentSecrets(inputs, result)]).toEqual(["p-0", "p-749"]);
+  });
+
+  it("preserves index alignment when a chunk returns fewer or more states than asked", async () => {
+    const inputs = Array.from({ length: 220 }, (_, index) =>
+      proof(`p-${index}`),
+    );
+    const { wallet } = walletAnswering((secrets) => {
+      const first = secrets[0];
+      if (first === "p-0") {
+        // Short chunk: only 2 answers for 100 proofs.
+        return Promise.resolve(["UNSPENT", "SPENT"]);
+      }
+      if (first === "p-100") {
+        // Overlong chunk: 103 answers for 100 proofs.
+        return Promise.resolve([
+          ...Array.from({ length: 100 }, () => "UNSPENT" as const),
+          "SPENT",
+          "SPENT",
+          "SPENT",
+        ]);
+      }
+      return Promise.resolve(secrets.map(() => "SPENT" as const));
+    });
+
+    const result = await Effect.runPromise(
+      checkProofStates(wallet, mint, inputs),
+    );
+
+    expect(result).toHaveLength(220);
+    expect(answerAt(result, 0)).toBe("unspent");
+    expect(answerAt(result, 1)).toBe("spent");
+    // Unanswered tail of chunk 1 must stay unknown — never shifted to chunk 2/3.
+    expect(answerAt(result, 2)).toBe("unknown");
+    expect(answerAt(result, 99)).toBe("unknown");
+    // Chunk 2 and chunk 3 stay at their exact input offsets.
+    expect(answerAt(result, 100)).toBe("unspent");
+    expect(answerAt(result, 199)).toBe("unspent");
+    expect(answerAt(result, 200)).toBe("spent");
+    expect(answerAt(result, 219)).toBe("spent");
+    const spent = spentSecrets(inputs, result);
+    expect(spent.has("p-1")).toBe(true);
+    expect(spent.has("p-2")).toBe(false);
+    expect(spent.has("p-99")).toBe(false);
+    expect(spent.has("p-100")).toBe(false);
+    expect(spent.has("p-200")).toBe(true);
+  });
+
+  it("fails the whole check when any chunk fails", async () => {
+    const inputs = Array.from({ length: 250 }, (_, index) =>
+      proof(`p-${index}`),
+    );
+    const { wallet } = walletAnswering((secrets) =>
+      secrets[0] === "p-100"
+        ? Promise.reject(new TypeError("chunk 2 failed"))
+        : Promise.resolve(secrets.map(() => "SPENT" as const)),
+    );
+
+    const failure = await Effect.runPromise(
+      Effect.flip(checkProofStates(wallet, mint, inputs)),
     );
 
     expect(failure).toMatchObject({ _tag: "MintUnreachable", mint });
