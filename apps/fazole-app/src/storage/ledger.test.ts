@@ -244,7 +244,7 @@ describe("records", () => {
 });
 
 describe("inflows owned here", () => {
-  it("are the payments this device created and the receipts and direct transfers it recorded, kept across restarts", async () => {
+  it("are the payments this device created and the direct transfers it recorded, kept across restarts", async () => {
     const { repositories } = setup();
     const kv = memoryKv();
     const ledger = makeLedger(repositories.transactions, kv);
@@ -264,11 +264,7 @@ describe("inflows owned here", () => {
       note: null,
     });
     expect(makeLedger(repositories.transactions, kv).ownedHere()).toEqual(
-      new Set([
-        created.id,
-        receiptIdFor("receive-1"),
-        receiptIdFor("receive-2"),
-      ]),
+      new Set([created.id, receiptIdFor("receive-2")]),
     );
     const otherDevice = makeLedger(repositories.transactions, memoryKv());
     await otherDevice.completePayment(created, "lightning");

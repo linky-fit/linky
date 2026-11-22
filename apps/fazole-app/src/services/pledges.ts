@@ -27,11 +27,19 @@ import type { Withdrawals } from "./withdrawals";
 
 const PLEDGE_REF = "fazole.pledge:";
 
-/** A payment, and a receipt that paid one again, belong to the terminal that created the payment, whichever terminal took the sats in. */
-const ownerKeyOf = (inflow: WalletActivity): string =>
+/**
+ * A payment, and a receipt that paid one again, go with the terminal that
+ * created the payment, whichever terminal took the sats in; a receipt naming
+ * no payment (a quote minted before its payment synced) goes with none.
+ */
+const isOwnedHere = (
+  inflow: WalletActivity,
+  ownedHere: ReadonlySet<string>,
+): boolean =>
   inflow.kind === "receipt"
-    ? (inflow.receipt.paymentId ?? inflow.id)
-    : inflow.id;
+    ? inflow.receipt.paymentId !== null &&
+      ownedHere.has(inflow.receipt.paymentId)
+    : ownedHere.has(inflow.id);
 
 /**
  * Cash taken from a Linky user against the bitcoin the shop will receive:
@@ -121,7 +129,7 @@ export const createPledges = ({
     const ownedHere = ledger.ownedHere();
     // One terminal forwards each inflow, so terminals sharing the shop never send it twice.
     const inflows = unforwardedInflows(pledge, records, nowSeconds()).filter(
-      (inflow) => ownedHere.has(ownerKeyOf(inflow)),
+      (inflow) => isOwnedHere(inflow, ownedHere),
     );
     if (inflows.length === 0) return;
     const rate = await czkPerBtc();

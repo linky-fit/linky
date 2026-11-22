@@ -54,8 +54,8 @@ export type PaidBy =
 export interface Ledger {
   readonly records: () => Promise<FazoleRecords>;
   /**
-   * The payments this device created and the receipts and direct transfers
-   * it recorded: every device sharing the account sees them, one owns each.
+   * The payments this device created and the direct transfers it recorded:
+   * every device sharing the account sees them, one owns each.
    */
   readonly ownedHere: () => ReadonlySet<string>;
   readonly payment: (id: string) => Promise<Payment | null>;
@@ -228,12 +228,10 @@ export const makeLedger = (
       );
     },
     recordReceipt: async (receipt) => {
-      const id = receiptIdFor(receipt.operationId);
-      addOwnedInflow(kv, id);
       await run(
         insertReceipt(transactions, {
           ...receipt,
-          id,
+          id: receiptIdFor(receipt.operationId),
           receivedAtSec: nowSeconds(),
         }),
       );
