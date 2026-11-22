@@ -11,6 +11,7 @@ import {
   Stack,
   Text,
   TextField,
+  TopBar,
   type IconName,
 } from "@linky-fit/ui";
 import { DemoBody, DemoTabBar, DemoTopBar } from "./chrome";
@@ -25,39 +26,59 @@ const title = "Send to on-chain wallet";
 
 /** The Wallet tab, its balance below the 202,000 sat a 200,000 sat send would cost, so 100,000 sat is the largest it pays. */
 function WalletScene({ tapSend }: { tapSend: boolean }) {
-  const action = (icon: "ArrowDownRight" | "ArrowUpRight", label: string) => (
-    <Button
-      variant="secondary"
-      icon={icon}
-      flexDirection="column"
-      width="$column"
-      paddingVertical="$xl"
-      onPress={noop}
-    >
-      {label}
-    </Button>
-  );
   return (
     <>
-      <DemoTopBar title="Wallet" trailing="ScanLine" />
-      <DemoBody paddingBottom="$lg">
-        <Stack
-          flex={1}
-          justifyContent="center"
-          alignItems="center"
-          gap="$xxl"
-          paddingBottom="$huge"
-        >
-          <Amount value="158,420" unit="sat" size="lg" />
-          <Row marginTop="$md">
-            {action("ArrowDownRight", "Receive")}
-            <Tap on={tapSend}>{action("ArrowUpRight", "Send")}</Tap>
+      <TopBar
+        large
+        title="Wallet"
+        trailing={
+          <IconButton
+            icon="ScanLine"
+            size="sm"
+            variant="ghost"
+            accessibilityLabel="ScanLine"
+            onPress={noop}
+          />
+        }
+      />
+      <Stack
+        flex={1}
+        paddingHorizontal="$xl"
+        paddingTop="$md"
+        paddingBottom="$huge"
+        overflow="hidden"
+      >
+        <Stack flexGrow={1} gap="$xxl" justifyContent="space-between">
+          <Stack alignItems="center" gap="$xs" paddingTop="$xxl">
+            <Amount value="158,420" unit="sat" size="xl" />
+            <Button variant="ghost" size="sm" icon="History" onPress={noop}>
+              History
+            </Button>
+          </Stack>
+          <Row gap="$sm">
+            <Button
+              flex={1}
+              icon="ArrowDownRight"
+              minHeight="$controlLg"
+              borderRadius="$pill"
+              onPress={noop}
+            >
+              Receive
+            </Button>
+            <Tap on={tapSend} flex={1}>
+              <Button
+                flex={1}
+                icon="ArrowUpRight"
+                minHeight="$controlLg"
+                borderRadius="$pill"
+                onPress={noop}
+              >
+                Send
+              </Button>
+            </Tap>
           </Row>
-          <Button variant="ghost" size="sm" onPress={noop}>
-            Show transactions
-          </Button>
         </Stack>
-      </DemoBody>
+      </Stack>
       <DemoTabBar active="wallet" />
     </>
   );
