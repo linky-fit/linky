@@ -38,6 +38,7 @@ export const dejv: Author = {
   bio: {
     en: "First developer at Linky. Dev lead at Vexl.",
     cs: "První vývojář Linky. Vede vývoj ve Vexlu.",
+    sk: "Prvý vývojár Linky. Vedie vývoj vo Vexle.",
   },
   linky: "dejv",
   x: "Kaladivo",
