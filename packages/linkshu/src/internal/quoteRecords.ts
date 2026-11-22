@@ -82,12 +82,12 @@ export const quoteRecordStore = <R extends QuoteRecord>(
       ? codec.fromOperation(operation)
       : null;
 
-  const findOperation = (
-    record: R,
-  ): Effect.Effect<StoredOperation | undefined> =>
-    Effect.map(ctx.operationStore.loadAll, (operations) =>
-      operations.find((operation) => operation.id === record.id),
-    );
+  // Every record is the decoded `pending` operation of its id.
+  const operationOf = (record: R) => ({
+    id: record.id,
+    kind: codec.kind,
+    status: "pending" as const,
+  });
 
   const create = (draft: Omit<R, "id">): Effect.Effect<R> =>
     Effect.flatMap(
@@ -115,23 +115,16 @@ export const quoteRecordStore = <R extends QuoteRecord>(
     kind: codec.kind,
     create,
     withCounter: (record, counter) =>
-      Effect.gen(function* () {
-        const operation = yield* findOperation(record);
-        if (operation !== undefined) {
-          yield* patchOperation(ctx, operation, { counter }, "attempt");
-        }
-        return { ...record, counter };
-      }),
+      Effect.as(
+        patchOperation(ctx, operationOf(record), { counter }, "attempt"),
+        { ...record, counter },
+      ),
     settle: (record, status, error) =>
-      Effect.flatMap(findOperation(record), (operation) =>
-        operation === undefined
-          ? Effect.void
-          : patchOperation(
-              ctx,
-              operation,
-              { status, error: error ?? null },
-              `${codec.kind}-${status}`,
-            ),
+      patchOperation(
+        ctx,
+        operationOf(record),
+        { status, error: error ?? null },
+        `${codec.kind}-${status}`,
       ),
     read: (mint, quoteId) =>
       Effect.map(ctx.operationStore.loadAll, (operations) => {
