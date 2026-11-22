@@ -16,7 +16,6 @@ COPY apps/linky-site/package.json apps/linky-site/package.json
 COPY apps/ui-book/package.json apps/ui-book/package.json
 COPY apps/linky-app/package.json apps/linky-app/package.json
 COPY packages/identity/package.json packages/identity/package.json
-COPY packages/keryx/package.json packages/keryx/package.json
 COPY packages/linkauth/package.json packages/linkauth/package.json
 COPY packages/linkshu/package.json packages/linkshu/package.json
 COPY packages/linksync/package.json packages/linksync/package.json
@@ -44,13 +43,13 @@ COPY packages/onchain-transfer packages/onchain-transfer
 
 RUN bun run --filter @linky-fit/onchain-operator daemon:build
 
-FROM oven/bun:1.4.4-alpine AS runtime
+FROM node:24-alpine AS runtime
 
 WORKDIR /app
 
-RUN mkdir -p /data && chown bun:bun /data
+RUN mkdir -p /data && chown node:node /data
 
-COPY --from=build /app/apps/onchain-operator/dist/daemon/index.js /app/index.js
+COPY --from=build /app/apps/onchain-operator/dist/daemon /app
 
 ARG GIT_COMMIT_SHA=unknown
 
@@ -58,8 +57,8 @@ ENV NODE_ENV=production
 ENV OPERATOR_DATA_DIR=/data
 ENV BUILD_COMMIT_SHA=${GIT_COMMIT_SHA}
 
-USER bun
+USER node
 
 VOLUME ["/data"]
 
-CMD ["bun", "/app/index.js"]
+CMD ["node", "/app/bin/index.js"]

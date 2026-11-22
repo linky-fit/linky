@@ -35,7 +35,7 @@ Build from the repository root (works on `linux/amd64` and `linux/arm64`):
 docker build -f apps/onchain-operator/Dockerfile -t linky-onchain-operator .
 ```
 
-Store the operator's recovery seed in a restricted file (`chmod 400`, readable by UID `1000` / `bun` inside the container) and run with a persistent `/data` volume (for Evolu SQLite, Nostr inbox cursor/outbox, Cashu counters, and early ecash):
+Store the operator's recovery seed in a restricted file (`chmod 400`, readable by UID `1000` / `node` inside the container) and run with a persistent `/data` volume (for Evolu SQLite, Nostr inbox cursor/outbox, Cashu counters, and early ecash):
 
 ```bash
 docker run -d --restart unless-stopped \

@@ -56,13 +56,11 @@ const logEvoluEvent = (logger: DaemonLogger) => (event: LinkyEvoluEvent) => {
       break;
     case "OwnerSyncFailed":
       logger.warn(
-        `Evolu sync error for owner ${event.failure.ownerId}: ${event.failure.error}`,
+        `Evolu sync error for owner ${event.ownerId}: ${event.error}`,
       );
       break;
-    case "WriteUnconfirmed":
-      logger.warn(
-        `Evolu write unconfirmed after timeout (${event.write.table})`,
-      );
+    case "WriteFailed":
+      logger.warn("Evolu could not store a write", event.write);
       break;
     case "ShardPointerRepairFailed":
       logger.warn("Evolu shard pointer repair failed", event.error);
@@ -88,7 +86,7 @@ export const startOperatorDaemon = async (
   const storage = openDaemonStorage(
     options.inMemory ? ":memory:" : path.join(config.dataDir, "state.sqlite"),
   );
-  let storeClose: (() => void) | null = null;
+  let storeClose: (() => Promise<void>) | null = null;
   try {
     const previousNpub = storage.kv.getItem(DAEMON_NPUB_KEY);
     if (previousNpub !== account.npub) {
@@ -115,9 +113,8 @@ export const startOperatorDaemon = async (
     const opened = await openDaemonStore({
       account,
       config: config.appConfig,
-      dataDir: config.dataDir,
       kv: storage.kv,
-      inMemory: options.inMemory,
+      memoryOnly: options.inMemory ?? false,
       onEvent: logEvoluEvent(logger),
     });
     storeClose = opened.close;
@@ -178,12 +175,12 @@ export const startOperatorDaemon = async (
         if (stopped) return;
         stopped = true;
         await services.dispose();
-        storeClose?.();
+        await storeClose?.();
         storage.close();
       },
     };
   } catch (error) {
-    storeClose?.();
+    await storeClose?.();
     storage.close();
     throw error;
   }

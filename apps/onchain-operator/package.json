@@ -8,8 +8,8 @@
     "dev": "vite",
     "dev:prod": "vite --mode prod-services",
     "build": "tsc -b && vite build",
-    "daemon:build": "bun build ./src/daemon/index.ts --outdir ./dist/daemon --target bun",
-    "daemon:start": "bun run src/daemon/index.ts",
+    "daemon:build": "bun build ./src/daemon/index.ts --outdir ./dist/daemon/bin --target node && cp -R node_modules/@evolu/nodejs/dist/native ./dist/daemon/native",
+    "daemon:start": "bun run daemon:build && node ./dist/daemon/bin/index.js",
     "eslint": "eslint --fix .",
     "prettier": "prettier --write .",
     "typecheck": "tsc -b",
@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@evolu/common": "8.29.0",
+    "@evolu/nodejs": "4.6.0",
     "@evolu/web": "3.9.0",
     "@linky-fit/domain": "workspace:*",
     "@linky-fit/identity": "workspace:*",

@@ -70,6 +70,7 @@ export default defineConfig([
       "src/platform/**",
       "src/**/*.web.{ts,tsx}",
       "src/main.tsx",
+      "src/daemon/**",
     ],
     plugins: { "platform-seam": platformSeamPlugin },
     rules: platformSeamRules(

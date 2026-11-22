@@ -1,9 +1,15 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { loadDaemonConfig } from "./config";
 import { startOperatorDaemon } from "./run";
 
 const main = async () => {
   const config = loadDaemonConfig(process.env);
-  const daemon = await startOperatorDaemon(config);
+  const dataDir = path.resolve(config.dataDir);
+  fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
+  // Evolu's Node.js SQLite driver stores its database in the working directory.
+  process.chdir(dataDir);
+  const daemon = await startOperatorDaemon({ ...config, dataDir });
 
   let shuttingDown = false;
   const shutdown = (signal: string) => {
