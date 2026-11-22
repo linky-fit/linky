@@ -24,9 +24,11 @@ x-build-args: &build-args
 x-app: &app
   image: ${LINKY_JOURNEY_IMAGE}:head
   pull_policy: never
-  # A failed upload falls back to /api/blossom-upload, which must not reach Primal from here.
+  # The browsers' block list cannot see requests a preview server makes: the upload relay to Primal, and
+  # the MONETA proxy of a Fazole release from before MONETA_API_ORIGIN.
   extra_hosts:
     - blossom.primal.net:127.0.0.1
+    - api.moneta.cz:127.0.0.1
   healthcheck:
     test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null || exit 1"]
     interval: 2s
