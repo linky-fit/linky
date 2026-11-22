@@ -13,6 +13,7 @@ import {
   PaymentPending,
   QuoteExpired,
 } from "../domain/errors";
+import type { CounterLockTimeout } from "../domain/errors";
 import { Amount, NonNegativeAmount, UnixSeconds } from "../domain/primitives";
 import type {
   Bolt11Invoice,
@@ -514,58 +515,74 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
       });
 
     /**
-     * Melts under the counter lock. Each attempt persists its blank slot in
-     * the record and burns the full blank range before reaching the mint:
-     * the mint keeps every blank it saw — signed or not — so later
-     * derivations must never revisit those slots, and a restore after the
-     * melt reproduces exactly this accounting.
+     * Burns `blanks` slots from the counter `start` yields, under the
+     * counter lock, and returns the first: the mint keeps every blank it
+     * saw — signed or not — so later derivations must never revisit them.
      */
-    const executeMelt = (
-      started: MeltExecution,
-    ): Effect.Effect<MeltReceipt, MeltError> => {
-      const scope = counterScopeOf(started.pending);
-      return withCounterLock(
+    const reserveBlanks = (
+      scope: CounterScope,
+      blanks: number,
+      start: Effect.Effect<number>,
+    ): Effect.Effect<number, CounterLockTimeout> =>
+      withCounterLock(
         kv,
         scope,
       )(
-        Effect.gen(function* () {
-          let exec = started;
-          const blanks = blankOutputCount(
-            exec.pending.inputsTotal - exec.pending.amount,
-          );
-          let lastCollision: unknown = null;
-          for (let attempt = 0; attempt < MAX_MELT_ATTEMPTS; attempt += 1) {
-            const counter = yield* readCounter(kv, scope);
+        Effect.tap(start, (counter) =>
+          advanceCounterTo(kv, inspector, scope, counter + blanks, "used"),
+        ),
+      );
+
+    /**
+     * Each attempt's blank slot is in the record and its full blank range
+     * burnt before the request reaches the mint, so a restore after the
+     * melt reproduces exactly this accounting. `createRecord` reserved the
+     * first attempt's range; a collision retry reserves past it.
+     */
+    const executeMelt = (
+      started: MeltExecution,
+    ): Effect.Effect<MeltReceipt, MeltError> =>
+      Effect.gen(function* () {
+        const scope = counterScopeOf(started.pending);
+        const blanks = blankOutputCount(
+          started.pending.inputsTotal - started.pending.amount,
+        );
+        let exec = started;
+        let lastCollision: unknown = null;
+        for (let attempt = 0; attempt < MAX_MELT_ATTEMPTS; attempt += 1) {
+          const counter =
+            attempt === 0 && exec.pending.counter !== null
+              ? exec.pending.counter
+              : yield* reserveBlanks(scope, blanks, readCounter(kv, scope));
+          if (counter !== exec.pending.counter) {
             exec = {
               ...exec,
               pending: yield* records.withCounter(exec.pending, counter),
             };
-            yield* advanceCounterTo(
+          }
+          const outcome = yield* Effect.result(
+            Effect.tryPromise({
+              try: () =>
+                exec.wallet.meltProofsBolt11(
+                  exec.raw,
+                  [...exec.inputs],
+                  undefined,
+                  { type: "deterministic", counter },
+                ),
+              catch: (error): unknown => error,
+            }),
+          );
+          if (Result.isSuccess(outcome)) {
+            return yield* settleMeltResponse(exec, outcome.success);
+          }
+          const raw = outcome.failure;
+          if (isRecoverableOutputCollision(raw)) {
+            lastCollision = raw;
+            yield* withCounterLock(
               kv,
-              inspector,
               scope,
-              counter + blanks,
-              "used",
-            );
-            const outcome = yield* Effect.result(
-              Effect.tryPromise({
-                try: () =>
-                  exec.wallet.meltProofsBolt11(
-                    exec.raw,
-                    [...exec.inputs],
-                    undefined,
-                    { type: "deterministic", counter },
-                  ),
-                catch: (error): unknown => error,
-              }),
-            );
-            if (Result.isSuccess(outcome)) {
-              return yield* settleMeltResponse(exec, outcome.success);
-            }
-            const raw = outcome.failure;
-            if (isRecoverableOutputCollision(raw)) {
-              lastCollision = raw;
-              yield* recoverFromCollision(
+            )(
+              recoverFromCollision(
                 {
                   kv,
                   inspector,
@@ -575,23 +592,15 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
                 },
                 counter,
                 raw,
-              );
-              continue;
-            }
-            const failure = classifyMintError(scope.mint, raw);
-            if (failure._tag === "MintUnreachable") {
-              return yield* resolveLostMeltResponse(exec);
-            }
-            // A definitive rejection means the mint never executed the melt.
-            yield* releaseInputs(
-              exec.pending,
-              "failed",
-              "melt-rejected",
-              encodeMeltError(failure),
+              ),
             );
-            return yield* Effect.fail(failure);
+            continue;
           }
-          const failure = classifyMintError(scope.mint, lastCollision);
+          const failure = classifyMintError(scope.mint, raw);
+          if (failure._tag === "MintUnreachable") {
+            return yield* resolveLostMeltResponse(exec);
+          }
+          // A definitive rejection means the mint never executed the melt.
           yield* releaseInputs(
             exec.pending,
             "failed",
@@ -599,9 +608,16 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
             encodeMeltError(failure),
           );
           return yield* Effect.fail(failure);
-        }),
-      );
-    };
+        }
+        const failure = classifyMintError(scope.mint, lastCollision);
+        yield* releaseInputs(
+          exec.pending,
+          "failed",
+          "melt-rejected",
+          encodeMeltError(failure),
+        );
+        return yield* Effect.fail(failure);
+      });
 
     /** Price the payment without touching any stored proof. */
     const quote = (draft: MeltDraft): Effect.Effect<MeltQuote, MeltError> =>
@@ -778,6 +794,7 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
         );
       });
 
+    /** The record names the first attempt's blank range, reserved before it lands. */
     const createRecord = (
       scope: CounterScope,
       target: MeltTarget,
@@ -785,8 +802,18 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
       inputs: ReadonlyArray<Proof>,
       envelope: TokenText | null,
     ) =>
-      Effect.flatMap(nowSeconds, (now) =>
-        records.create({
+      Effect.gen(function* () {
+        const inputsTotal = totalAmount(inputs);
+        const counter = yield* reserveBlanks(
+          scope,
+          blankOutputCount(inputsTotal - quote.amount),
+          readCounter(kv, scope),
+        ).pipe(
+          // The funded inputs are not booked yet, so a busy lock must not
+          // fail here: `executeMelt` reserves once the record holds them.
+          Effect.catchTag("CounterLockTimeout", () => Effect.succeed(null)),
+        );
+        return yield* records.create({
           quoteId: quote.quoteId,
           mint: scope.mint,
           unit: sat,
@@ -794,13 +821,13 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
           invoice: target.invoice,
           amount: quote.amount,
           feeReserve: quote.feeReserve,
-          inputsTotal: Amount.make(totalAmount(inputs)),
+          inputsTotal: Amount.make(inputsTotal),
           expiresAt: quote.expiresAt,
-          createdAt: UnixSeconds.make(now),
-          counter: null,
+          createdAt: UnixSeconds.make(yield* nowSeconds),
+          counter,
           envelope,
-        }),
-      );
+        });
+      });
 
     const scopeAt = (wallet: LoadedWallet, mint: MintUrl) =>
       Effect.map(

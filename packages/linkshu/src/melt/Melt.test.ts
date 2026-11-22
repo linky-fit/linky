@@ -23,8 +23,12 @@ import { WalletInstances } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import { CashuSeed } from "../ports/CashuSeed";
 import { KeyValueStore } from "../ports/KeyValueStore";
+import type { KeyValueStoreService } from "../ports/KeyValueStore";
 import { OperationStore } from "../ports/OperationStore";
-import type { StoredOperation } from "../ports/OperationStore";
+import type {
+  OperationStoreService,
+  StoredOperation,
+} from "../ports/OperationStore";
 import { ProofStore } from "../ports/ProofStore";
 import type { StoredProof } from "../ports/ProofStore";
 import { runOnTestClock } from "../testing/clock";
@@ -321,6 +325,31 @@ const interruptMelt = async (storage: Storage) => {
   return exit.value;
 };
 
+/** Storage whose operation store logs every call, for tests to interleave mint requests. */
+const loggedStorage = () => {
+  const storage = freshStorage();
+  const log: string[] = [];
+  const logged = (entry: string) => Effect.sync(() => log.push(entry));
+  const operations: OperationStoreService = {
+    insert: (operation) =>
+      Effect.tap(storage.operations.insert(operation), () =>
+        logged(`insert counter=${operation.counter}`),
+      ),
+    update: (id, patch) =>
+      Effect.tap(storage.operations.update(id, patch), () =>
+        logged(`update ${JSON.stringify(patch)}`),
+      ),
+    loadAll: Effect.tap(storage.operations.loadAll, () => logged("loadAll")),
+  };
+  return { storage: { ...storage, operations }, log };
+};
+
+const meltOnly = (seeds: ReadonlyArray<ReadonlyArray<CashuProof>>) =>
+  Effect.gen(function* () {
+    yield* Effect.forEach(seeds, (proofs) => seedProofs(mint, proofs));
+    return yield* (yield* Melt).melt(draft);
+  });
+
 describe("Melt.quote", () => {
   it("prices the payment without touching stored proofs", async () => {
     const { wallet, sendCalls } = makeWallet({});
@@ -465,11 +494,11 @@ describe("Melt.melt", () => {
     expect(events.map((event) => event._tag)).toEqual([
       "QuoteStateChanged",
       "CounterAdvanced",
+      "CounterAdvanced",
       "OperationChanged",
       "ProofsChanged",
       "ProofsChanged",
       "ProofsChanged",
-      "CounterAdvanced",
       "QuoteStateChanged",
       "ProofsChanged",
       "ProofsChanged",
@@ -478,26 +507,27 @@ describe("Melt.melt", () => {
     ]);
     expect(events[0]).toMatchObject({ flow: "melt", state: "UNPAID" });
     expect(events[1]).toMatchObject({ from: 1, to: 66, reason: "used" });
-    expect(events[2]).toMatchObject({
+    // The blank range is burnt before the record naming it lands.
+    expect(events[2]).toMatchObject({ from: 66, to: 68, reason: "used" });
+    expect(events[3]).toMatchObject({
       kind: "melt",
       from: null,
       to: "pending",
       operationId: operation.id,
     });
-    expect(events[3]).toMatchObject({
+    expect(events[4]).toMatchObject({
       to: "held",
       amount: 13,
       operationId: operation.id,
       reason: "melt",
     });
-    expect(events[4]).toMatchObject({ to: "available", reason: "melt-keep" });
-    expect(events[5]).toMatchObject({
+    expect(events[5]).toMatchObject({ to: "available", reason: "melt-keep" });
+    expect(events[6]).toMatchObject({
       from: "available",
       to: "spent",
       amount: 14,
       reason: "melt-keep",
     });
-    expect(events[6]).toMatchObject({ from: 66, to: 68, reason: "used" });
     expect(events[7]).toMatchObject({ flow: "melt", state: "PAID" });
     expect(events[8]).toMatchObject({ to: "available", reason: "melt-change" });
     expect(events[9]).toMatchObject({
@@ -598,6 +628,92 @@ describe("Melt.melt", () => {
       exit.value.proofs.every((proof) => proof.state === "available"),
     ).toBe(true);
     expect(exit.value.operations).toEqual([]);
+  });
+
+  it("records the reserved blank slot up front and reads no operations while paying", async () => {
+    const { storage, log } = loggedStorage();
+    const { wallet } = makeWallet({
+      send: () => Promise.resolve(swappedThirteen()),
+      melt: (call) => {
+        log.push(`melt counter=${call.counter}`);
+        return Promise.resolve(meltResponse("PAID", [proof(1, "chg")]));
+      },
+    });
+
+    const exit = await makeHarness(wallet, storage).run(
+      meltOnly([proofsA, proofsB]),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(log).toEqual([
+      "insert counter=66",
+      "melt counter=66",
+      'update {"status":"paid","error":null}',
+    ]);
+  });
+
+  it("persists a collision retry's blank slot before the retry reaches the mint", async () => {
+    const { storage, log } = loggedStorage();
+    const { wallet } = makeWallet({
+      send: () => Promise.resolve(swappedThirteen()),
+      melt: (call) => {
+        log.push(`melt counter=${call.counter}`);
+        return call.counter < 100
+          ? Promise.reject(outputsAlreadySigned())
+          : Promise.resolve(meltResponse("PAID", [proof(1, "chg")]));
+      },
+      restore: () =>
+        Promise.resolve({ proofs: [], lastCounterWithSignature: 99 }),
+    });
+
+    const exit = await makeHarness(wallet, storage).run(
+      meltOnly([proofsA, proofsB]),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(log).toEqual([
+      "insert counter=66",
+      "melt counter=66",
+      'update {"counter":100}',
+      "melt counter=100",
+      'update {"status":"paid","error":null}',
+    ]);
+    expect(await Effect.runPromise(storage.kv.get(counterKey))).toBe("102");
+  });
+
+  it("books the swapped inputs under the record when the counter lock stays busy after the swap", async () => {
+    const storage = freshStorage();
+    let lockBusy = false;
+    const kv: KeyValueStoreService = {
+      ...storage.kv,
+      tryAcquireLease: (key, ttlMs) =>
+        lockBusy
+          ? Effect.succeed(null)
+          : storage.kv.tryAcquireLease(key, ttlMs),
+    };
+    const { wallet, meltCalls } = makeWallet({
+      send: () => {
+        lockBusy = true;
+        return Promise.resolve(swappedThirteen());
+      },
+    });
+
+    const exit = await makeHarness(wallet, { ...storage, kv }).run(
+      Effect.gen(function* () {
+        // Timestamps are positive unix seconds; the TestClock starts at 0.
+        yield* TestClock.adjust("1000 seconds");
+        return yield* runOnTestClock(
+          meltAndInspect([proofsA, proofsB]),
+          "1 second",
+        );
+      }).pipe(Effect.provide(TestClock.layer())),
+    );
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure._tag).toBe("CounterLockTimeout");
+    expect(meltCalls).toEqual([]);
+    const operation = onlyMelt(exit.value.operations);
+    expect(operation).toMatchObject({ status: "pending", counter: null });
+    expect(amountIn(exit.value.proofs, "held")).toBe(13);
+    expect(availableAmounts(exit.value.proofs)).toEqual([1]);
   });
 
   it("recovers a blank-output counter collision via NUT-09 and retries", async () => {

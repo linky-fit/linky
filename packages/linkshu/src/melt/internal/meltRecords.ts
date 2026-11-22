@@ -46,8 +46,8 @@ export class PendingMelt extends Schema.Class<PendingMelt>("PendingMelt")({
   expiresAt: Schema.NullOr(UnixSeconds),
   createdAt: UnixSeconds,
   /**
-   * First deterministic slot of the NUT-08 blank outputs the latest melt
-   * attempt sent, or null before any attempt reached the mint.
+   * First deterministic slot of the NUT-08 blank outputs reserved for the
+   * latest melt attempt, or null before one was reserved.
    */
   counter: Schema.NullOr(Schema.Int),
   /**
