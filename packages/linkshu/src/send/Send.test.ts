@@ -37,6 +37,7 @@ import {
   KEYSET_HEX,
   proof,
 } from "../testing/fakeWallet";
+import type { SwapPlan } from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
 import {
   allProofs,
@@ -84,6 +85,7 @@ interface FakeWalletArgs {
   /** The mint's keysets as the wallet knows them; none (fee-free) by default. */
   keysets?: Keyset[];
   send?: (call: SendCall) => Promise<SendResponse>;
+  swapPlan?: SwapPlan;
   /** NUT-07 state per proof secret; defaults to UNSPENT. */
   stateOf?: (secret: string) => "UNSPENT" | "PENDING" | "SPENT";
   checkStatesError?: unknown;
@@ -107,6 +109,7 @@ const makeWallet = (args: FakeWalletArgs) => {
   const wallet = fakeWallet({
     keysetId: KEYSET_HEX,
     keyChain: fakeKeyChain(args.keysets),
+    ...(args.swapPlan === undefined ? {} : { swapPlan: args.swapPlan }),
     checkProofsStates: (proofs) =>
       args.checkStatesError !== undefined
         ? Promise.reject(args.checkStatesError)
@@ -659,6 +662,64 @@ describe("Send.send", () => {
     expect(allAvailable(exit.value.proofs)).toBe(true);
     expect(exit.value.operations).toEqual([]);
     expect(events.map((event) => event._tag)).toEqual(["OperationFailed"]);
+  });
+
+  it("returns what a swap with a lost response took to the balance, so the retry pays from it", async () => {
+    let swapRan = false;
+    const { wallet, sendCalls, restoreCalls } = makeWallet({
+      send: () => {
+        if (swapRan) {
+          return Promise.resolve({ keep: [], send: [proof(4, "s1")] });
+        }
+        swapRan = true;
+        return Promise.reject(new TypeError("fetch failed"));
+      },
+      swapPlan: { send: [4], keep: [] },
+      stateOf: (secret) =>
+        swapRan && secret === "src-a1" ? "SPENT" : "UNSPENT",
+      restore: () =>
+        Promise.resolve({
+          proofs: [proof(4, "lost-send")],
+          lastCounterWithSignature: 1,
+        }),
+    });
+    const { run, events } = makeHarness(wallet);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        const lost = yield* sendAndInspect(draft(4), [
+          { mint, proofs: [proof(4, "src-a1")] },
+        ]);
+        const retry = yield* Effect.result((yield* Send).send(draft(4)));
+        return { lost, retry, proofs: yield* allProofs };
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    const { lost, retry, proofs } = exit.value;
+    assert(lost.receipt._tag === "Failure");
+    expect(lost.receipt.failure._tag).toBe("MintUnreachable");
+    expect(retry._tag).toBe("Success");
+    expect(restoreCalls).toEqual([{ start: 1, count: 1 }]);
+    expect(
+      sendCalls.map(({ secrets, sendCounter }) => ({ secrets, sendCounter })),
+    ).toEqual([
+      { secrets: ["src-a1"], sendCounter: 1 },
+      { secrets: ["lost-send"], sendCounter: 2 },
+    ]);
+    expect(secretsOf(proofsIn(proofs, "spent"))).toEqual([
+      "lost-send",
+      "src-a1",
+    ]);
+    expect(secretsOf(proofsIn(proofs, "handedOut"))).toEqual(["s1"]);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        _tag: "ProofsChanged",
+        to: "available",
+        amount: 4,
+        reason: "swap-reclaim",
+      }),
+    );
   });
 
   it("classifies a NUT-07 check failure as MintUnreachable", async () => {

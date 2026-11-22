@@ -835,6 +835,7 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
       wallet: LoadedWallet,
       mint: MintUrl,
     ): SpendContext => ({
+      kv,
       proofStore,
       inspector,
       wallet,
@@ -871,7 +872,7 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
             ? spendable
             : yield* offerWithin(wallet, spendable, amount, limit, scope.mint);
         const swapped = yield* swapProofsForAmount(
-          { kv, inspector, wallet, scope },
+          { kv, proofStore, inspector, wallet, scope },
           {
             amount: Amount.make(amount),
             proofs: offered.map(toDomainProof),

@@ -165,6 +165,7 @@ export class Envelope extends Context.Service<Envelope>()("linkshu/Envelope", {
           });
         }
         const spendContext = {
+          kv,
           proofStore,
           inspector,
           wallet,
@@ -184,6 +185,7 @@ export class Envelope extends Context.Service<Envelope>()("linkshu/Envelope", {
         const swapped = yield* swapProofsForAmount(
           {
             kv,
+            proofStore,
             inspector,
             wallet,
             scope: { mint: draft.mint, unit: sat, keysetId },

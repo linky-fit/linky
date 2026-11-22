@@ -1,9 +1,28 @@
+import type {
+  Proof as CashuProof,
+  OutputType,
+  SendResponse,
+  SwapPreview,
+} from "@cashu/cashu-ts";
+import {
+  Amount as CashuAmount,
+  HttpResponseError,
+  MintOperationError,
+} from "@cashu/cashu-ts";
 import { Effect, Exit } from "effect";
-import { CurrencyUnit, MintUrl } from "../domain/primitives";
+import { Amount, CurrencyUnit, KeysetId, MintUrl } from "../domain/primitives";
+import type { LoadedWallet } from "../mint/internal/WalletInstances";
+import { makeInMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
 import { ProofStore } from "../ports/ProofStore";
 import type { ProofWrite } from "../ports/ProofStore";
 import { inMemoryProofStore } from "../ports/inMemoryProofStore";
-import { fakeWallet, KEYSET_HEX, proof } from "../testing/fakeWallet";
+import {
+  answerProofStates,
+  fakeWallet,
+  KEYSET_HEX,
+  plannedOutput,
+  proof,
+} from "../testing/fakeWallet";
 import type { ProofStateName } from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
 import {
@@ -12,9 +31,15 @@ import {
   secretsOf,
   seedProofs,
 } from "../testing/inventory";
+import { toDomainProofs } from "../token/internal/cashuProofs";
+import { LOST_SWAP_KEY_PREFIX } from "./lostSwap";
 import { toNewProofs } from "./proofs";
-import { selectSpendableProofs, settleSwap } from "./spend";
-import type { SpendContext } from "./spend";
+import {
+  selectSpendableProofs,
+  settleSwap,
+  swapProofsForAmount,
+} from "./spend";
+import type { SpendContext, SpendSelection } from "./spend";
 
 const mint = MintUrl.make("https://mint.example");
 const otherMint = "https://other.example";
@@ -50,6 +75,7 @@ const makeHarness = (args: HarnessArgs = {}) => {
     Effect.runPromiseExit(
       Effect.flatMap(ProofStore, (proofStore) =>
         program({
+          kv: makeInMemoryKeyValueStore(),
           proofStore,
           inspector: inspector.service,
           wallet,
@@ -300,4 +326,356 @@ describe("settleSwap", () => {
     expect(secretsOf(proofsIn(exit.value.proofs, "available"))).toEqual(["a1"]);
     expect(secretsOf(proofsIn(exit.value.proofs, "handedOut"))).toEqual(["s1"]);
   });
+});
+
+describe("lost spend swaps", () => {
+  const scope = { mint, unit: sat, keysetId: KeysetId.make(KEYSET_HEX) };
+  const lostAnswer = () => new TypeError("fetch failed");
+
+  type Answer =
+    | "answer"
+    | "lose"
+    | "drop"
+    | Error
+    | { readonly ranThen: Error };
+
+  /**
+   * A mint that signs each swap's planned send (4) and keep (2) slots and
+   * spends its inputs. `answer` runs and answers it, `lose` runs it and drops
+   * the answer, `drop` never runs it, an error rejects it.
+   */
+  const swapMint = () => {
+    const spent = new Set<string>();
+    const pending = new Set<string>();
+    const silent = new Set<string>();
+    const signed = new Map<number, CashuProof>();
+    const restores: Array<[number, number]> = [];
+    const previews = new WeakMap<
+      SwapPreview,
+      { send: number; keep: number; inputs: string[] }
+    >();
+    const mint: {
+      answer: Answer;
+      readonly spent: Set<string>;
+      readonly pending: Set<string>;
+      readonly silent: Set<string>;
+      readonly signed: Map<number, CashuProof>;
+      readonly restores: Array<[number, number]>;
+    } = { answer: "answer", spent, pending, silent, signed, restores };
+    const wallet = fakeWallet({
+      prepareSwapToSend: (_amount, proofs, _config, outputConfig) => {
+        const preview: SwapPreview = {
+          amount: CashuAmount.from(4),
+          fees: CashuAmount.from(0),
+          keysetId: KEYSET_HEX,
+          inputs: proofs.map((input) => ({
+            ...input,
+            amount: CashuAmount.from(input.amount),
+          })),
+          sendOutputs: [plannedOutput(4)],
+          keepOutputs: [plannedOutput(2)],
+        };
+        const counterOf = (type: OutputType | undefined) =>
+          type?.type === "deterministic" ? type.counter : -1;
+        previews.set(preview, {
+          send: counterOf(outputConfig?.send),
+          keep: counterOf(outputConfig?.keep),
+          inputs: proofs.map((input) => input.secret),
+        });
+        return Promise.resolve(preview);
+      },
+      completeSwap: (preview) => {
+        const swap = previews.get(preview);
+        const { answer } = mint;
+        if (swap === undefined) return Promise.reject(new Error("unknown"));
+        if (answer instanceof Error) return Promise.reject(answer);
+        if (answer === "drop") return Promise.reject(lostAnswer());
+        if (signed.has(swap.send) || signed.has(swap.keep)) {
+          return Promise.reject(
+            new MintOperationError(11005, "outputs have already been signed"),
+          );
+        }
+        const send = proof(4, `send@${swap.send}`);
+        const keep = proof(2, `keep@${swap.keep}`);
+        swap.inputs.forEach((secret) => spent.add(secret));
+        signed.set(swap.send, send).set(swap.keep, keep);
+        if (typeof answer === "object") return Promise.reject(answer.ranThen);
+        return answer === "lose"
+          ? Promise.reject(lostAnswer())
+          : Promise.resolve({ keep: [keep], send: [send] });
+      },
+      restore: (start, count) => {
+        restores.push([start, count]);
+        const slots = [...signed.keys()].filter(
+          (slot) => slot >= start && slot < start + count,
+        );
+        return Promise.resolve({
+          proofs: slots.flatMap((slot) => signed.get(slot) ?? []),
+          ...(slots.length === 0
+            ? {}
+            : { lastCounterWithSignature: Math.max(...slots) }),
+        });
+      },
+      checkProofsStates: (proofs) =>
+        proofs.some((entry) => silent.has(entry.secret))
+          ? Promise.resolve([])
+          : answerProofStates((secret) =>
+              pending.has(secret)
+                ? "PENDING"
+                : spent.has(secret)
+                  ? "SPENT"
+                  : "UNSPENT",
+            )(proofs),
+    });
+    return { mint, wallet };
+  };
+
+  /**
+   * Runs `program` over shared fresh stores with `wallet`; `writes` records
+   * every proof-store write batch.
+   */
+  const runSpends = <A, E>(
+    wallet: LoadedWallet,
+    program: (spends: {
+      readonly swap: (secret: string) => Effect.Effect<SendResponse, unknown>;
+      readonly select: Effect.Effect<SpendSelection, unknown>;
+      readonly attempt: Effect.Effect<string | null>;
+      readonly writes: ProofWrite[];
+    }) => Effect.Effect<A, E, ProofStore>,
+  ) => {
+    const inspector = recordingInspector();
+    const kv = makeInMemoryKeyValueStore();
+    const writes: ProofWrite[] = [];
+    return Effect.runPromiseExit(
+      Effect.flatMap(ProofStore, (store) => {
+        const proofStore = {
+          ...store,
+          write: (batch: ProofWrite) => {
+            writes.push(batch);
+            return store.write(batch);
+          },
+        };
+        const context = {
+          kv,
+          proofStore,
+          inspector: inspector.service,
+          wallet,
+        };
+        return program({
+          swap: (secret) =>
+            swapProofsForAmount(
+              { ...context, scope },
+              {
+                amount: Amount.make(4),
+                proofs: toDomainProofs([proof(6, secret)]) ?? [],
+                available: 6,
+              },
+            ),
+          select: selectSpendableProofs({
+            ...context,
+            mint,
+            unit: sat,
+            reason: "test",
+          }),
+          attempt: Effect.map(
+            kv.listKeys(LOST_SWAP_KEY_PREFIX),
+            (keys) => keys[0] ?? null,
+          ).pipe(
+            Effect.flatMap((key) =>
+              key === null ? Effect.succeed(null) : kv.get(key),
+            ),
+          ),
+          writes,
+        });
+      }).pipe(Effect.provide(inMemoryProofStore)),
+    ).then((exit) => ({ exit, events: inspector.events }));
+  };
+
+  it("returns a lost swap's outputs and spends its inputs in one write", async () => {
+    const { mint: fake, wallet } = swapMint();
+    const { exit, events } = await runSpends(wallet, (spends) =>
+      Effect.gen(function* () {
+        yield* seedProofs(mint, [proof(6, "in-1")]);
+        fake.answer = "lose";
+        const lost = yield* Effect.exit(spends.swap("in-1"));
+        const recorded = yield* spends.attempt;
+        spends.writes.length = 0;
+        const { spendable } = yield* spends.select;
+        return {
+          lost,
+          recorded,
+          spendable,
+          writes: [...spends.writes],
+          proofs: yield* allProofs,
+        };
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    const { lost, recorded, spendable, writes, proofs } = exit.value;
+    expect(Exit.isFailure(lost)).toBe(true);
+    expect(recorded).toContain("in-1");
+    expect(fake.restores).toEqual([
+      [1, 1],
+      [65, 1],
+    ]);
+    expect(secretsOf(spendable)).toEqual(["keep@65", "send@1"]);
+    expect(secretsOf(proofsIn(proofs, "spent"))).toEqual(["in-1"]);
+    const [reclaim] = writes;
+    expect(writes).toHaveLength(1);
+    expect(reclaim?.insert?.map((row) => row.secret)).toEqual([
+      "send@1",
+      "keep@65",
+    ]);
+    expect(reclaim?.update).toHaveLength(1);
+    expect(events).toContainEqual(
+      expect.objectContaining({ _tag: "CounterAdvanced", to: 66 }),
+    );
+  });
+
+  it("imports nothing another device signed in the slots of a swap that never ran", async () => {
+    const { mint: fake, wallet } = swapMint();
+    const { exit } = await runSpends(wallet, (spends) =>
+      Effect.gen(function* () {
+        yield* seedProofs(mint, [proof(6, "in-1")]);
+        fake.answer = "drop";
+        yield* Effect.exit(spends.swap("in-1"));
+        // Another device on the seed spent the same synced proof and sent a
+        // token from the slots this device had planned.
+        fake.spent.add("in-1");
+        fake.signed
+          .set(1, proof(1, "other-token"))
+          .set(65, proof(1, "other-keep"))
+          .set(66, proof(4, "other-keep-2"));
+        yield* spends.select;
+        return { attempt: yield* spends.attempt, proofs: yield* allProofs };
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    const { attempt, proofs } = exit.value;
+    expect(secretsOf(proofs)).toEqual(["in-1"]);
+    expect(secretsOf(proofsIn(proofs, "spent"))).toEqual(["in-1"]);
+    expect(attempt).toBeNull();
+  });
+
+  it.each([
+    ["a rejection", new MintOperationError(11001, "Token already spent")],
+    [
+      "a collision on every attempt",
+      new MintOperationError(11005, "outputs have already been signed"),
+    ],
+  ])(
+    "drops the record of a swap the mint answered with %s",
+    async (_, error) => {
+      const { mint: fake, wallet } = swapMint();
+      const { exit } = await runSpends(wallet, (spends) =>
+        Effect.gen(function* () {
+          fake.answer = error;
+          const failed = yield* Effect.exit(spends.swap("in-1"));
+          return { failed, attempt: yield* spends.attempt };
+        }),
+      );
+
+      assert(Exit.isSuccess(exit));
+      expect(Exit.isFailure(exit.value.failed)).toBe(true);
+      expect(exit.value.attempt).toBeNull();
+    },
+  );
+
+  it("reclaims at once a swap the mint ran but a retry answered as spent", async () => {
+    const { mint: fake, wallet } = swapMint();
+    const { exit } = await runSpends(wallet, (spends) =>
+      Effect.gen(function* () {
+        yield* seedProofs(mint, [proof(6, "in-1")]);
+        fake.answer = {
+          ranThen: new MintOperationError(11001, "Token already spent"),
+        };
+        const failed = yield* Effect.exit(spends.swap("in-1"));
+        return {
+          failed,
+          attempt: yield* spends.attempt,
+          proofs: yield* allProofs,
+        };
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    const { failed, attempt, proofs } = exit.value;
+    expect(Exit.isFailure(failed)).toBe(true);
+    expect(attempt).toBeNull();
+    expect(secretsOf(proofsIn(proofs, "available"))).toEqual([
+      "keep@65",
+      "send@1",
+    ]);
+    expect(secretsOf(proofsIn(proofs, "spent"))).toEqual(["in-1"]);
+  });
+
+  it.each([
+    ["a truncated 200 body", new HttpResponseError("bad json", 200)],
+    ["a 4xx without a cashu error", new HttpResponseError("bad request", 400)],
+    ["an unblinding error", new Error("unblinding failed")],
+  ])(
+    "leaves a swap answered with %s to the next spend, which reclaims it once it ran",
+    async (_, error) => {
+      const { mint: fake, wallet } = swapMint();
+      const { exit } = await runSpends(wallet, (spends) =>
+        Effect.gen(function* () {
+          yield* seedProofs(mint, [proof(6, "in-1")]);
+          fake.answer = { ranThen: error };
+          yield* Effect.exit(spends.swap("in-1"));
+          const kept = yield* spends.attempt;
+          yield* spends.select;
+          return {
+            kept,
+            attempt: yield* spends.attempt,
+            proofs: yield* allProofs,
+          };
+        }),
+      );
+
+      assert(Exit.isSuccess(exit));
+      const { kept, attempt, proofs } = exit.value;
+      expect(kept).toContain("in-1");
+      expect(attempt).toBeNull();
+      expect(secretsOf(proofsIn(proofs, "available"))).toEqual([
+        "keep@65",
+        "send@1",
+      ]);
+    },
+  );
+
+  it.each(["pending", "unanswered"] as const)(
+    "keeps the record while an input is %s, without blocking other swaps",
+    async (state) => {
+      const { mint: fake, wallet } = swapMint();
+      const unresolved = state === "pending" ? fake.pending : fake.silent;
+      const { exit } = await runSpends(wallet, (spends) =>
+        Effect.gen(function* () {
+          yield* seedProofs(mint, [proof(6, "in-1")]);
+          fake.answer = "lose";
+          yield* Effect.exit(spends.swap("in-1"));
+          unresolved.add("in-1");
+          fake.answer = "answer";
+          const other = yield* spends.swap("in-2");
+          const kept = yield* spends.attempt;
+          const before = yield* allProofs;
+          unresolved.delete("in-1");
+          yield* spends.select;
+          return { other, kept, before, after: yield* allProofs };
+        }),
+      );
+
+      assert(Exit.isSuccess(exit));
+      const { other, kept, before, after } = exit.value;
+      expect(secretsOf(other.send)).toEqual(["send@66"]);
+      expect(kept).toContain("in-1");
+      expect(secretsOf(proofsIn(before, "available"))).toEqual(["in-1"]);
+      expect(secretsOf(proofsIn(after, "available"))).toEqual([
+        "keep@65",
+        "send@1",
+      ]);
+      expect(secretsOf(proofsIn(after, "spent"))).toEqual(["in-1"]);
+    },
+  );
 });

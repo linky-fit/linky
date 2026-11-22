@@ -269,6 +269,7 @@ export class Autoswap extends Context.Service<Autoswap>()("linkshu/Autoswap", {
         const target = yield* instances.get(draft.targetMint, sat);
         const keysetId = yield* boundKeysetId(draft.targetMint, target);
         const { spendable, available } = yield* selectSpendableProofs({
+          kv,
           proofStore,
           inspector,
           wallet: source,

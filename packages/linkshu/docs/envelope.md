@@ -46,7 +46,7 @@ Every call that finds the envelope stored here first stores the proof rows its o
 1. Look locally. An envelope this device already stores is returned as `adopted`, without asking the mint.
 2. Probe the mint (NUT-09 over the key's slots). Whatever it signed is stored `held` under a new `envelope` operation and returned as `adopted`, with the amount its creator chose; the requested `amount` is ignored.
 3. Fund. `amount` has to exceed the input fee whoever spends the envelope pays (else `AmountConsumedByFee`). Confirmed-unspent `available` proofs at `mint` are swapped into the envelope's outputs, change on the deterministic counter; a confirmed total below `amount` fails with `InsufficientFunds` before any mint write. The `envelope` operation and its `held` proofs are stored first, then the change `available`, then the consumed inputs `spent`. The result is `created`.
-4. If the swap fails, the mint is probed once more: another device that funded the key meanwhile makes this swap fail on the envelope's outputs or on synced inputs, and its envelope is adopted. Otherwise the swap's error is returned. After `MintUnreachable` the mint may have signed the swap whose answer was lost; the next `open` (or `state`) finds that envelope at step 2 and adopts it.
+4. If the swap fails, the mint is probed once more: another device that funded the key meanwhile makes this swap fail on the envelope's outputs or on synced inputs, and its envelope is adopted. Otherwise the swap's error is returned. After `MintUnreachable` the mint may have signed the swap whose answer was lost; the next `open` (or `state`) finds that envelope at step 2 and adopts it, and the next spend from that mint returns the swap's change.
 
 ### `state`
 

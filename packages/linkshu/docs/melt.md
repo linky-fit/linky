@@ -125,7 +125,7 @@ The envelope's proofs move `held` under the `melt` operation with the other inpu
 | `PaymentFailed`  | definitive | mint reported `UNPAID`, or the quote was not `UNPAID` when melting started | inputs back in balance; pay again with a new quote                               |
 | `PaymentPending` | pending    | the melt was sent and the mint has not settled it                          | inputs `held` under the `pending` melt `operationId`; `resumePending` settles it |
 
-`InsufficientFunds` (`required` carries `amount + feeReserve`), `MintRejected`, `MintUnreachable`, and `CounterLockTimeout` are in [errors.md](./errors.md). A `MintUnreachable` from `melt` means the request never left: no melt operation exists and the balance is intact.
+`InsufficientFunds` (`required` carries `amount + feeReserve`), `MintRejected`, `MintUnreachable`, and `CounterLockTimeout` are in [errors.md](./errors.md). A `MintUnreachable` from `melt` means the melt request never left: no melt operation exists. When the funding swap's answer was the one lost, the next spend from that mint returns what it took to the balance.
 
 ## Related
 
