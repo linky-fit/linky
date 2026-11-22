@@ -17,7 +17,7 @@ import { Relay } from "nostr-tools/relay";
 
 const USAGE = `usage: bun run journey wallet <name> <command>
   balance | topup <sat> | send <sat> | receive <token> | melt <bolt11>   the linkshu CLI; --mint <url> picks another mint
-  pay-request <creqA…> [sat]    pay a NUT-18 request over its nostr transport
+  pay-request <creqA…> [sat]    pay a NUT-18 request over its nostr transport; [sat] replaces its amount
   request <sat> [description]   print a NUT-18 request, wait for its payment and receive it
   whoami                        this wallet's npub and nprofile`;
 
@@ -81,7 +81,7 @@ const payRequest = async (encoded: string, amountArg: string | undefined) => {
   if (!transport) throw new Error("the request has no nostr transport");
   const recipient = nip19.decode(transport.target);
   if (recipient.type !== "nprofile") throw new Error("not an nprofile target");
-  const amount = request.amount ?? Number(amountArg);
+  const amount = Number(amountArg ?? request.amount);
   if (!amount) throw new Error("the request names no amount; pass one");
   const mint = request.mints[0] ?? mainMint;
 
