@@ -3,6 +3,7 @@
 x-build-args: &build-args
   BUN_VERSION: ${LINKY_JOURNEY_BUN_VERSION}
   APPS: apps/linky-app apps/fazole-app apps/onchain-operator tools/nostr-error-tracker
+  HOOKED_APPS: apps/linky-app
   GIT_COMMIT_SHA: ${LINKY_JOURNEY_HEAD_SHA}
   VITE_ALLOW_INSECURE_LOCALHOST_RELAYS: "1"
   VITE_NOSTR_RELAYS: ws://localhost:${LINKY_E2E_NOSTR_PORT}
@@ -43,6 +44,14 @@ services:
     ports:
       - "${LINKY_JOURNEY_LINKY_PORT}:80"
 
+  # The head with the Playwright hooks, for `bun run journey bench`; testers use `linky`.
+  linky-hooked:
+    <<: *app
+    working_dir: /app/apps/linky-app
+    command: ["./node_modules/.bin/vite", "preview", "--outDir", "dist-hooked", "--host", "0.0.0.0", "--port", "80", "--strictPort"]
+    ports:
+      - "${LINKY_JOURNEY_HOOKED_PORT}:80"
+
   fazole:
     <<: *app
     working_dir: /app/apps/fazole-app
@@ -74,6 +83,7 @@ services:
         <<: *build-args
         BUN_VERSION: ${LINKY_JOURNEY_LINKY_RELEASE_BUN_VERSION}
         APPS: apps/linky-app
+        HOOKED_APPS: ""
         GIT_COMMIT_SHA: ${LINKY_JOURNEY_LINKY_RELEASE_SHA}
         # Releases up to linky-v26.11.4 accept a localhost mint only as an E2E build.
         VITE_E2E: "1"
@@ -91,6 +101,7 @@ services:
         <<: *build-args
         BUN_VERSION: ${LINKY_JOURNEY_FAZOLE_RELEASE_BUN_VERSION}
         APPS: apps/fazole-app
+        HOOKED_APPS: ""
         GIT_COMMIT_SHA: ${LINKY_JOURNEY_FAZOLE_RELEASE_SHA}
     working_dir: /app/apps/fazole-app
     environment:
@@ -142,8 +153,19 @@ services:
 
   cashu-mint:
     environment:
+      # Nutshell's default of 3 s each would sit in every measured payment and topup.
+      FAKEWALLET_DELAY_OUTGOING_PAYMENT: "0"
+      FAKEWALLET_DELAY_INCOMING_PAYMENT: "0"
       # "false" under `bun run journey mint hold`: invoices then stay unpaid until a wallet at this mint pays them.
       FAKEWALLET_BRR: "${LINKY_JOURNEY_MINT_SELF_PAYS}"
+      # PENDING under `bun run journey mint pending`, for both the payment and every later check of it.
+      FAKEWALLET_PAY_INVOICE_STATE: ${LINKY_JOURNEY_MINT_PAYS_OUT}
+      FAKEWALLET_PAYMENT_STATE: ${LINKY_JOURNEY_MINT_PAYS_OUT}
+
+  cashu-mint-target:
+    environment:
+      FAKEWALLET_DELAY_OUTGOING_PAYMENT: "0"
+      FAKEWALLET_DELAY_INCOMING_PAYMENT: "0"
 
 volumes:
   push-data:

@@ -14,7 +14,10 @@
 #   bun run journey ln invoice <sat>                  an invoice for an app to pay
 #   bun run journey ln quote <id>                     whether that invoice was paid
 #   bun run journey ln address <npub> <sat>           an invoice from a Lightning address of the stack
-#   bun run journey mint hold|auto                    whether the main mint's invoices pay themselves
+#   bun run journey mint auto|hold|pending            hold: the main mint's invoices stay unpaid; pending: its payments out stay pending
+#   bun run journey latency <device> <ms>             delay every mint request of that browser
+#   bun run journey time <device> <tap> <until>       tap one locator, wait for another, print the time and the mint requests
+#   bun run journey bench [release] [playwright args] the payment benchmark of apps/linky-app/bench, on the head or the last release
 #   bun run journey bank pay <czk> <variable symbol>  book a transfer at the fake MONETA
 #   bun run journey bitcoin <command>                 scripts/bitcoin-regtest.sh against this stack
 set -euo pipefail
@@ -42,7 +45,13 @@ export LINKY_JOURNEY_LINKY_RELEASE_SHA=$(git -C "$root" rev-parse "$LINKY_JOURNE
 export LINKY_JOURNEY_FAZOLE_RELEASE_SHA=$(git -C "$root" rev-parse "$LINKY_JOURNEY_FAZOLE_RELEASE^{commit}")
 export LINKY_JOURNEY_LINKY_RELEASE_BUN_VERSION=$(bun_version "$LINKY_JOURNEY_LINKY_RELEASE")
 export LINKY_JOURNEY_FAZOLE_RELEASE_BUN_VERSION=$(bun_version "$LINKY_JOURNEY_FAZOLE_RELEASE")
-export LINKY_JOURNEY_MINT_SELF_PAYS=$([ -e "$home/mint-hold" ] && echo false || echo true)
+# auto: FakeWallet settles everything. hold: its invoices stay unpaid. pending: its payments out stay pending.
+mint_mode() {
+  export LINKY_JOURNEY_MINT_MODE=$1
+  export LINKY_JOURNEY_MINT_SELF_PAYS=$([ "$1" = hold ] && echo false || echo true)
+  export LINKY_JOURNEY_MINT_PAYS_OUT=$([ "$1" = pending ] && echo PENDING || echo SETTLED)
+}
+mint_mode "$(cat "$home/mint-mode" 2>/dev/null || echo auto)"
 
 export LINKY_JOURNEY_LINKY_PORT=$port
 export LINKY_JOURNEY_LINKY_RELEASE_PORT=$((port + 1))
@@ -61,9 +70,10 @@ export LINKY_E2E_BITCOIND_PORT=$((port + 13))
 export LINKY_E2E_ESPLORA_PORT=$((port + 14))
 export LINKY_E2E_EXPLORER_PORT=$((port + 15))
 export LINKY_JOURNEY_BLOSSOM_PORT=$((port + 16))
+export LINKY_JOURNEY_HOOKED_PORT=$((port + 17))
 export LINKY_JOURNEY_NOSTR_RELAY_URL="ws://localhost:$LINKY_E2E_NOSTR_PORT"
 export LINKSHU_MINT_URL="http://localhost:$LINKY_E2E_MINT_PORT"
-target_mint="http://localhost:$LINKY_E2E_TARGET_MINT_PORT"
+export LINKSHU_TARGET_MINT_URL="http://localhost:$LINKY_E2E_TARGET_MINT_PORT"
 
 compose=(docker compose -f "$root/docker-compose.dev.yml" -f "$root/docker/journey/compose.yml"
   --profile integration --profile bitcoin)
@@ -72,14 +82,15 @@ urls() {
   printf '%-34s %s\n' \
     "Linky" "http://localhost:$LINKY_JOURNEY_LINKY_PORT" \
     "Linky $LINKY_JOURNEY_LINKY_RELEASE" "http://localhost:$LINKY_JOURNEY_LINKY_RELEASE_PORT" \
+    "Linky with test hooks" "http://localhost:$LINKY_JOURNEY_HOOKED_PORT" \
     "Fazole" "http://localhost:$LINKY_JOURNEY_FAZOLE_PORT" \
     "Fazole $LINKY_JOURNEY_FAZOLE_RELEASE" "http://localhost:$LINKY_JOURNEY_FAZOLE_RELEASE_PORT" \
     "On-chain operator console" "http://localhost:$LINKY_JOURNEY_OPERATOR_PORT" \
     "Error tracker" "http://localhost:$LINKY_JOURNEY_ERRORS_PORT" \
     "Nostr relay" "$LINKY_JOURNEY_NOSTR_RELAY_URL" \
     "Evolu relay" "ws://localhost:$LINKY_E2E_EVOLU_PORT" \
-    "Main mint (self-pays: $LINKY_JOURNEY_MINT_SELF_PAYS)" "$LINKSHU_MINT_URL" \
-    "Second mint" "$target_mint" \
+    "Main mint ($LINKY_JOURNEY_MINT_MODE)" "$LINKSHU_MINT_URL" \
+    "Second mint" "$LINKSHU_TARGET_MINT_URL" \
     "Lightning addresses" "<npub>@localhost:$LINKY_E2E_NPUBCASH_PORT" \
     "Push service" "http://localhost:$LINKY_JOURNEY_PUSH_PORT" \
     "Fake MONETA" "http://localhost:$LINKY_JOURNEY_BANK_PORT" \
@@ -105,14 +116,16 @@ browser() {
       echo "$engine" >"$profile.engine"
       # Production hosts the apps would otherwise reach from localhost fail instead.
       # The stack's blossom server has a self-signed certificate. Chromium needs the flag as well,
-      # because ignoreHTTPSErrors leaves out the service worker, which fetches the images.
+      # because ignoreHTTPSErrors leaves out the service worker, which fetches the images. Only Chromium can
+      # grant the clipboard, which the apps' Copy and Paste buttons use.
       jq -n --arg engine "$engine" --arg profile "$profile" --argjson headless "$([ -n "${HEADED-}" ] && echo false || echo true)" \
         --argjson blocked "$(jq -R . "$root/scripts/journey/blocked-origins.txt" | jq -s .)" '{
           browser: {
             browserName: $engine,
             userDataDir: $profile,
             launchOptions: { headless: $headless, args: (if $engine == "chromium" then ["--ignore-certificate-errors"] else [] end) },
-            contextOptions: { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, ignoreHTTPSErrors: true }
+            contextOptions: ({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, ignoreHTTPSErrors: true }
+              + (if $engine == "chromium" then { permissions: ["clipboard-read", "clipboard-write"] } else {} end))
           },
           network: { blockedOrigins: $blocked }
         }' >"$profile.json"
@@ -128,6 +141,15 @@ browser() {
       ;;
     *) echo "unknown browser action: $action" >&2 && exit 1 ;;
   esac
+}
+
+# Runs scripts/journey/timing.js in the device's browser with the given options.
+timing() {
+  local out
+  out=$(pw "$1" --raw run-code "async (page) => ($(cat "$root/scripts/journey/timing.js"))(page, {
+    mints: ['$LINKSHU_MINT_URL', '$LINKSHU_TARGET_MINT_URL'], $2 })")
+  # Anything but JSON is playwright-cli reporting an error.
+  jq . <<<"$out" 2>/dev/null || { echo "$out" >&2 && exit 1; }
 }
 
 command=${1:-}
@@ -148,7 +170,7 @@ case $command in
     "${compose[@]}" down --volumes
     # Accounts and ecash of the dropped backends would mislead the next run.
     pkill -9 -f -- "$home/profiles/" || true
-    rm -rf "$home/profiles" "$home/wallets" "$home/work" "$home/mint-hold"
+    rm -rf "$home/profiles" "$home/wallets" "$home/work" "$home/mint-mode"
     ;;
   logs) "${compose[@]}" logs "$@" ;;
   browser) browser "$@" ;;
@@ -159,10 +181,10 @@ case $command in
     case ${1:-} in
       # A quote at the second mint, so an app holding funds at the main mint pays it over Lightning.
       invoice)
-        curl -sf -X POST "$target_mint/v1/mint/quote/bolt11" -H 'content-type: application/json' \
+        curl -sf -X POST "$LINKSHU_TARGET_MINT_URL/v1/mint/quote/bolt11" -H 'content-type: application/json' \
           -d "{\"amount\":${2:?sat},\"unit\":\"sat\"}" | jq -r '"quote \(.quote)\n\(.request)"'
         ;;
-      quote) curl -sf "$target_mint/v1/mint/quote/bolt11/${2:?quote id}" | jq -r .state ;;
+      quote) curl -sf "$LINKSHU_TARGET_MINT_URL/v1/mint/quote/bolt11/${2:?quote id}" | jq -r .state ;;
       address)
         callback=$(curl -sf "http://localhost:$LINKY_E2E_NPUBCASH_PORT/.well-known/lnurlp/${2:?npub}" | jq -r .callback)
         curl -sf "$callback?amount=$((${3:?sat} * 1000))" | jq -r .pr
@@ -172,16 +194,27 @@ case $command in
     ;;
   mint)
     case ${1:-} in
-      hold) mkdir -p "$home" && touch "$home/mint-hold" && export LINKY_JOURNEY_MINT_SELF_PAYS=false ;;
-      auto) rm -f "$home/mint-hold" && export LINKY_JOURNEY_MINT_SELF_PAYS=true ;;
-      *) echo "usage: bun run journey mint hold|auto" >&2 && exit 1 ;;
+      auto | hold | pending) mkdir -p "$home" && echo "$1" >"$home/mint-mode" && mint_mode "$1" ;;
+      *) echo "usage: bun run journey mint auto|hold|pending" >&2 && exit 1 ;;
     esac
     "${compose[@]}" up -d --wait cashu-mint
+    ;;
+  latency) timing "${1:?device}" "delayMs: ${2:?ms}" ;;
+  time) timing "${1:?device}" "tap: page.${2:?locator to tap}, until: page.${3:?locator to wait for}" ;;
+  # The last release is built with the Playwright hooks too, so it can be measured beside the head.
+  bench)
+    [ "$LINKY_JOURNEY_MINT_MODE" = auto ] || { echo "the benchmark needs: bun run journey mint auto" >&2 && exit 1; }
+    target=head target_port=$LINKY_JOURNEY_HOOKED_PORT
+    [ "${1:-}" = release ] && shift && target=release target_port=$LINKY_JOURNEY_LINKY_RELEASE_PORT
+    cd "$root/apps/linky-app"
+    BENCH_LABEL=${BENCH_LABEL:-$target} BENCH_BASE_URL="http://localhost:$target_port" \
+      bunx playwright test -c bench/playwright.config.ts payments.bench.ts "$@"
     ;;
   bank)
     [ "${1:-}" = pay ] || { echo "usage: bun run journey bank pay <czk> <variable symbol>" >&2 && exit 1; }
     curl -sf -X POST "http://localhost:$LINKY_JOURNEY_BANK_PORT/transfers" -H 'content-type: application/json' \
       -d "{\"amountCzk\":${2:?czk},\"vs\":\"${3:?variable symbol}\"}"
+    echo
     ;;
   bitcoin) bash "$root/scripts/bitcoin-regtest.sh" "$@" ;;
   *) sed -n '2,/^set -euo/p' "$0" | sed '$d; s/^# \{0,1\}//' ;;

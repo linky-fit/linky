@@ -26,6 +26,9 @@ ARG VITE_ESPLORA_URL
 ARG VITE_EXPLORER_URL
 ARG VITE_E2E
 RUN for app in $APPS; do (cd "$app" && ./node_modules/.bin/vite build) || exit 1; done
+# The benchmark seeds wallets through the Playwright hooks, which the builds under test leave out.
+ARG HOOKED_APPS
+RUN for app in $HOOKED_APPS; do (cd "$app" && VITE_E2E=1 ./node_modules/.bin/vite build --outDir dist-hooked) || exit 1; done
 
 EXPOSE 80
 CMD ["./node_modules/.bin/vite", "preview", "--host", "0.0.0.0", "--port", "80", "--strictPort"]
