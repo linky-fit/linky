@@ -8,7 +8,7 @@ const KEPT_INFLOWS = 1_000;
 
 const InflowIds = Schema.fromJsonString(Schema.Array(Schema.String));
 
-/** The ids of the payments this device created and the inflows it recorded, oldest first; device-local, never synced. */
+/** The ids of the payments this device created, oldest first; device-local, never synced. */
 export const readOwnedInflows = (
   kv: KeyValueStorage,
 ): readonly TransactionId[] =>

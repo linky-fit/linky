@@ -63,11 +63,6 @@ interface CashuReceive {
   readonly sats: number;
 }
 
-interface UnrecordedReceive extends CashuReceive {
-  /** `false` for a replay, which another terminal sharing the shop may have taken in and recorded too. */
-  readonly takenInHere: boolean;
-}
-
 export const createBitcoinPayments = ({
   ledger,
   nostr,
@@ -249,13 +244,12 @@ export const createBitcoinPayments = ({
   const unrecordedReceiveOf = async (
     text: string,
     incoming: IncomingCashu,
-  ): Promise<UnrecordedReceive | null> => {
+  ): Promise<CashuReceive | null> => {
     const received = await wallet.receive(text);
     if (Result.isSuccess(received)) {
       return {
         operationId: received.success.operationId,
         sats: received.success.amount,
-        takenInHere: true,
       };
     }
     // Unacknowledged, so the next session receives it again.
@@ -266,7 +260,7 @@ export const createBitcoinPayments = ({
     return operationId !== null &&
       !(await ledger.hasReceipt(operationId)) &&
       (await wallet.isReceived(operationId))
-      ? { operationId, sats: incoming.amount, takenInHere: false }
+      ? { operationId, sats: incoming.amount }
       : null;
   };
 
@@ -289,9 +283,8 @@ export const createBitcoinPayments = ({
     const incoming = text === null ? null : readIncomingCashu(text);
     if (text === null || incoming === null) return;
     await whenHydrated();
-    const unrecorded = await unrecordedReceiveOf(text, incoming);
-    if (unrecorded === null) return;
-    const { takenInHere, ...received } = unrecorded;
+    const received = await unrecordedReceiveOf(text, incoming);
+    if (received === null) return;
     await settling(async () => {
       const { payments } = await ledger.records();
       const paidBefore = payments.find(
@@ -325,8 +318,6 @@ export const createBitcoinPayments = ({
         mintUrl: incoming.mint,
         payerPubkey: event.from,
         note: paymentNote(incoming.memo),
-        // A payload naming a request belongs to the terminal that created its payment, which may not have synced here yet.
-        ownedHere: takenInHere && incoming.requestId === null,
       });
     });
   };

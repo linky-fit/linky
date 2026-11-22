@@ -25,11 +25,10 @@ import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { Effect, Layer, ManagedRuntime, Result, Schema } from "effect";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildCashuRequest, CzkAmount, Sats } from "../domain";
-import { makeLedger, receiptIdFor, type Ledger } from "../storage/ledger";
+import type { Ledger } from "../storage/ledger";
 import { createBitcoinPayments } from "./bitcoinPayments";
 import {
   fakeNostr,
-  memoryKv,
   scriptedReceive,
   setup,
   testMint as mint,
@@ -371,49 +370,6 @@ describe("tokens sent to the account", () => {
     expect((await ledger.records()).directTransfers).toMatchObject([
       { operationId: "receive-1", sats: 300, note: "Za kávu" },
     ]);
-  });
-
-  it("leaves a direct transfer to the terminal that took its token in, though the other terminal recorded its replay first", async () => {
-    const { ledger, wallet, repositories } = setup();
-    const otherLedger = makeLedger(repositories.transactions, memoryKv());
-    const inboxOf = (
-      terminalLedger: Ledger,
-      answer: Parameters<typeof scriptedReceive>[1],
-      overrides: Partial<Wallet> = {},
-    ) => {
-      const scripted = scriptedReceive(wallet, answer, overrides);
-      const [handler] = paymentsOf(
-        terminalLedger,
-        scripted.wallet,
-        async () => 2_500_000,
-      ).fake.inbox;
-      if (!handler) throw new Error("no inbox handler");
-      return handler;
-    };
-    // The other terminal sees the receive synced before the transfer row.
-    await inboxOf(
-      otherLedger,
-      () => Result.fail(new TokenAlreadyKnown({ operationId: receiveId })),
-      { isReceived: async () => true },
-    )(directPayment(300, "Za kávu"), "live");
-    await inboxOf(ledger, () => Result.succeed(receipt(300)))(
-      directPayment(300, "Za kávu"),
-      "live",
-    );
-    expect((await ledger.records()).directTransfers).toHaveLength(1);
-    expect(ledger.ownedHere().has(receiptIdFor("receive-1"))).toBe(true);
-    expect(otherLedger.ownedHere()).toEqual(new Set());
-  });
-
-  it("leaves a payload naming a payment that has not synced here to the terminal that created it", async () => {
-    const { ledger, handler } = await withHandler(() =>
-      Result.succeed(receipt(100)),
-    );
-    await handler(nut18Payload("payment-on-another-terminal"), "live");
-    expect((await ledger.records()).directTransfers).toMatchObject([
-      { sats: 100 },
-    ]);
-    expect(ledger.ownedHere().has(receiptIdFor("receive-1"))).toBe(false);
   });
 
   it("keeps a direct transfer in sats while the rate is unavailable", async () => {
