@@ -54,8 +54,8 @@ The receipt carries `paidAmount`, `feeReserve`, `feePaid` (what the melt inputs 
 
 1. Price and select sources concurrently. Fetch or re-check the quote (it must be `UNPAID`, else `PaymentFailed`, and not past `expiresAt`, else `QuoteExpired`) while NUT-07 filtering `available` proofs at `mint` (spent ones are marked `spent`, which sticks even if pricing fails). The confirmed unspent total must cover `amount + feeReserve`, else `InsufficientFunds`.
 2. Swap fee-inclusive. Exactly `amount + feeReserve` plus the swap's own input fee is swapped out under the counter lock.
-3. Persist before melting. A `pending` `melt` operation (quote, invoice, amounts, `inputsTotal`) is inserted; then one write stores the melt inputs `held` under it and the remainder `available`, and marks the consumed sources `spent`. From here on the payment is reconstructible from the stores alone.
-4. Melt and settle. Each attempt writes its blank-output slot to the operation's `counter` and advances the deterministic counter past the full NUT-08 blank range before the request leaves.
+3. Persist before melting. The deterministic counter advances past the full NUT-08 blank range of the first attempt, and a `pending` `melt` operation (quote, invoice, amounts, `inputsTotal`, and that range's first slot as `counter`) is inserted; then one write stores the melt inputs `held` under it and the remainder `available`, and marks the consumed sources `spent`. From here on the payment is reconstructible from the stores alone.
+4. Melt and settle. The first attempt sends the blanks of the slot the operation names. A retry after a counter collision writes its new slot to the operation's `counter` and advances the counter past its blank range before the request leaves.
 
 | Mint answer             | Result                                                                                                                                      |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
