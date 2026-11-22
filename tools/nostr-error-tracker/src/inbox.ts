@@ -12,7 +12,7 @@ import { parseReport, type ErrorReport } from "./reports";
 const configuredRelays = (import.meta.env.VITE_NOSTR_RELAYS ?? "")
   .split(",")
   .map((url) => url.trim())
-  .filter((url) => url.startsWith("ws://") || url.startsWith("wss://"));
+  .filter(Boolean);
 
 export const DEFAULT_RELAYS = configuredRelays.length
   ? configuredRelays
