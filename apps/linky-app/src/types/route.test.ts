@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { encodeNpub, Pubkey } from "@linky-fit/linkstr";
-import { createId, keryxSubscriptionIdFor } from "@linky-fit/linksync";
+import { createId } from "@linky-fit/linksync";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseRouteFromHash } from "./route";
 import { parseNativeDeepLinkUrl } from "../utils/deepLinks";
@@ -32,28 +32,6 @@ describe("parseRouteFromHash", () => {
       spdPayload: payload,
       editing: true,
     });
-  });
-
-  it("parses the Keryx companies, company, announcement and add company routes", () => {
-    const id = keryxSubscriptionIdFor("https://acme.example");
-    replaceHash("#settings/keryx");
-    expect(parseRouteFromHash()).toEqual({ kind: "keryxCompanies" });
-
-    replaceHash("#settings/keryx/new");
-    expect(parseRouteFromHash()).toEqual({ kind: "keryxCompanyNew" });
-
-    replaceHash(`#settings/keryx/${id}`);
-    expect(parseRouteFromHash()).toEqual({ kind: "keryxCompany", id });
-
-    replaceHash(`#settings/keryx/${id}/${encodeURIComponent("news/launch")}`);
-    expect(parseRouteFromHash()).toEqual({
-      kind: "keryxAnnouncement",
-      id,
-      key: "news/launch",
-    });
-
-    replaceHash("#settings/keryx/not-an-id");
-    expect(parseRouteFromHash()).toEqual({ kind: "wallet" });
   });
 
   it("parses the wallet history route", () => {

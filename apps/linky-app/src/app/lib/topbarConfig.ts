@@ -80,7 +80,6 @@ export const resolveBackAction = (
     case "settingsReceiveMethod":
     case "settingsMasterKeys":
     case "settingsNostrIdentity":
-    case "keryxCompanies":
     case "advancedAutoPayLimit":
     case "advancedInspector":
     case "mints":
@@ -121,15 +120,6 @@ export const resolveBackAction = (
 
     case "profileEdit":
       return () => navigateTo({ route: "profile" });
-
-    case "keryxCompanyNew":
-    case "keryxCompany":
-      return () => navigateTo({ route: "keryxCompanies" });
-
-    case "keryxAnnouncement": {
-      const companyId = route.id;
-      return () => navigateTo({ route: "keryxCompany", id: companyId });
-    }
 
     case "bankPayment":
       // Leaving the edit form discards the draft; the page itself has no
@@ -330,10 +320,6 @@ const SHOWS_MENU_BUTTON: Record<
   evoluHistoryData: false,
   evoluServer: true,
   evoluServerNew: true,
-  keryxAnnouncement: false,
-  keryxCompanies: false,
-  keryxCompany: false,
-  keryxCompanyNew: false,
   lnAddressPay: true,
   lnInvoicePay: false,
   manualPay: false,
@@ -506,10 +492,6 @@ const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
   evoluServer: "evoluServer",
   evoluServerNew: "evoluAddServerLabel",
   evoluServers: "evoluServers",
-  keryxAnnouncement: "keryxAnnouncement",
-  keryxCompanies: "keryxNewslettersTitle",
-  keryxCompany: "keryxCompany",
-  keryxCompanyNew: "keryxAddCompany",
   lnAddressPay: "pay",
   lnInvoicePay: "pay",
   manualPay: "manualPayTitle",

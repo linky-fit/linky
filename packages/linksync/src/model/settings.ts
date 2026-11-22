@@ -17,8 +17,6 @@ const settingSchemas = {
   defaultMint: Schema.NonEmptyString,
   /** Whether test mints are visible; absent means the app's build default. */
   allowTestMints: Flag,
-  /** Whether experimental features are shown; absent means off. */
-  experimentalFeatures: Flag,
   /** The display currencies the user enabled; the app drops ones it does not know. */
   displayCurrencies: Schema.fromJsonString(Schema.Array(Schema.String)),
   /** Whether the user passes the contacts' network listings on to their own contacts; absent means on. */

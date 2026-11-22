@@ -1,8 +1,0 @@
-{
-  "extends": "@linky-fit/config/tsconfig/node",
-  "compilerOptions": {
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo",
-    "types": ["node", "vitest/globals"]
-  },
-  "include": ["src", "scripts"]
-}

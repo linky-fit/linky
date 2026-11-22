@@ -13,8 +13,6 @@ export const sk = {
   settingsNetwork: "Sieť",
   settingsSecurity: "Zabezpečenie",
   settingsDebug: "Debug",
-  settingsExperimental: "Experimentálne",
-  experimentalFeatures: "Experimentálne funkcie",
   nostrInspector: "Inspector",
   nostrInspectorLogs: "Ukladať logy inspectora",
   nostrInspectorLogsStats:
@@ -1483,52 +1481,6 @@ export const sk = {
   evoluWipeStorageFailed:
     "Chýba uložený mnemonic (nie je možné vyčistiť Evolu storage).",
 
-  // Keryx
-  keryxNewsletters: "Newslettery (Keryx)",
-  keryxNewslettersTitle: "Newslettery",
-  keryxAddCompany: "Pridať firmu",
-  keryxEmptyTitle: "Zatiaľ žiadne spravodaje",
-  keryxEmptyBody: "Sleduj firmu a jej overené oznámenia sa objavia tu.",
-  keryxCompany: "Firma",
-  keryxAnnouncement: "Oznámenie",
-  keryxJoinUrlLabel: "Odkaz na pripojenie k firme",
-  keryxScanQr: "Naskenovať QR kód",
-  keryxJoinUrlInvalid: "Toto nie je odkaz na pripojenie k firme.",
-  keryxJoinVersionUnsupported:
-    "Tento kód vyžaduje novšiu verziu Linky. Aktualizujte Linky a naskenujte ho znova.",
-  keryxConfirmOriginTitle: "Je toto webová adresa firmy?",
-  keryxConfirmOriginHint:
-    "Pokračujte, len ak túto presnú adresu poznáte. Všetko, čo vám firma pošle, sa bude overovať podľa nej.",
-  keryxPairing: "Overujem firmu…",
-  keryxPairFailed: "Firmu sa nepodarilo overiť. Skúste to neskôr.",
-  keryxLiteModeUnsupported:
-    "Táto firma publikuje vo formáte, ktorý Linky zatiaľ nepodporuje.",
-  keryxChannels: "Kanály",
-  keryxPrivateFeeds: "Súkromné kanály",
-  keryxPrivateFeedAutoSubscribed: "Odoberané automaticky, len pre vás",
-  keryxSubscribe: "Odoberať",
-  keryxConsentHint: "Vyberte, čo chcete od tejto firmy dostávať.",
-  keryxNoAnnouncements: "Zatiaľ žiadne oznámenia",
-  keryxAnnouncements: "Oznámenia",
-  keryxRemoveCompany: "Odobrať firmu",
-  keryxRemoveArmedHint: "Ťuknite ešte raz a firma bude odobratá.",
-  keryxSuspendedTitle: "Identita tejto firmy sa zmenila",
-  keryxSuspendedBody:
-    "Môže to znamenať, že web alebo podpisové kľúče firmy boli napadnuté. Správy sa nezobrazujú.",
-  keryxRebrandedTitle: "Firma zmenila názov",
-  keryxRebrandedBody:
-    "Teraz sa volá „{name}“. Jej správy zostanú skryté, kým nenaskenujete nový QR kód od firmy a nepripojíte ju znova.",
-  keryxRepair: "Naskenovať nový QR kód",
-  keryxLogoChanged: "Firma zmenila logo.",
-  keryxLogoAcknowledge: "Prijať nové logo",
-  keryxRefresh: "Obnoviť",
-  keryxRefreshFailed: "Obnovenie sa nepodarilo. Zobrazujem uložené oznámenia.",
-  keryxFooter: "Tento kanál od vás nikdy nebude chcieť heslo, seed ani kód.",
-  keryxPrivate: "Súkromné",
-  keryxAttachments: "Prílohy",
-  keryxMediaUnavailable:
-    "Súbor nezodpovedá tomu, čo firma podpísala, preto nebol otvorený.",
-  keryxNotFound: "Nenájdené",
   // On-chain transfers
   onchainSendTitle: "Odoslať do on-chain peňaženky",
   onchainReceiveTitle: "Prijať z on-chain peňaženky",

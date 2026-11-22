@@ -16,7 +16,6 @@ A scope is one kind of data with one storage policy. `meta` lives in the Evolu `
 | `unknownSenders` | `ShardOwner` `["unknownSenders", n]` | `unknownSenderMessage`                                                     | 256 KiB or 160 mutations | keep newest 2 |
 | `cashu`          | `ShardOwner` `["cashu", n]`          | `cashuProof`, `cashuOperation`                                             | 256 KiB or 170 mutations | never         |
 | `transactions`   | `ShardOwner` `["transactions", n]`   | `transaction`                                                              | 256 KiB or 220 mutations | keep newest 4 |
-| `keryx`          | `ShardOwner` `["keryx", n]`          | `keryxSubscription`                                                        | 256 KiB or 220 mutations | never         |
 | `onchain`        | `ShardOwner` `["onchain", n]`        | `onchainTransfer`, `onchainTransferMessage`                                | 256 KiB or 220 mutations | never         |
 
 A shard rotates once its Evolu history holds `SHARD_MAX_BYTES` (256 KiB) of column values or the scope's mutation count, whichever comes first, with `SHARD_ROTATION_COOLDOWN_MS` (60 s) between rotations of one scope. The byte threshold is a quarter of the official Evolu relay's 1 MB per-owner quota, leaving room for encryption and per-row overhead. Rotation moves a pointer; nothing is copied.
@@ -62,7 +61,6 @@ Copy-on-write identity is the row `id`. These ids are deterministic, so every de
 | `directConversationIdFor`     | the contact id                                  | every device derives one conversation per contact                                                    |
 | `nostrMessageIdFor`           | the message's rumor id                          | a message fetched again stays one row, in either message table                                       |
 | `nostrReactionIdFor`          | the reaction's rumor id and reactor             | a reaction fetched again stays one row; a removal stored first applies only to its author's reaction |
-| `keryxSubscriptionIdFor`      | the company's join origin                       | pairing a company on two devices lands on one row                                                    |
 | `hiddenListingIdFor`          | the author pubkey and listing id                | hiding a listing on two devices lands on one row                                                     |
 | `pinnedListingIdFor`          | the author pubkey and listing id                | pinning a listing on two devices lands on one row                                                    |
 | `peerListingsIdFor`           | the reader and the author pubkeys               | one author's document as one identity reads it is one row on every device                            |

@@ -42,40 +42,38 @@ describe("domainTableRepository", () => {
 
   it("omits undefined optional fields on insert while preserving explicit null", () => {
     const { store } = linkyStore();
-    const subscriptions = domainTableRepository(
-      store,
-      "keryx",
-      "keryxSubscription",
-    );
-    const id = createId<"KeryxSubscription">();
+    const listings = domainTableRepository(store, "contacts", "listing");
+    const id = createId<"Listing">();
 
     runNow(
-      subscriptions.insert({
+      listings.insert({
         id,
-        origin: "https://example.com",
-        trustJson: "{}",
-        identityJson: "{}",
-        channelsJson: "[]",
-        pairedAtSec: 1_000,
-        privateFeedsJson: '["https://example.com/feed"]',
+        createdAtSec: 1_000,
+        side: "offer",
+        title: "Eggs",
+        amount: "100",
+        currency: "CZK",
+        unit: "dozen",
+        description: "Fresh from the garden",
       }),
     );
-    expect(runNow(subscriptions.byId(id))?.privateFeedsJson).toBe(
-      '["https://example.com/feed"]',
+    expect(runNow(listings.byId(id))?.description).toBe(
+      "Fresh from the garden",
     );
 
     runNow(
-      subscriptions.insert({
+      listings.insert({
         id,
-        origin: "https://example.com",
-        trustJson: "{}",
-        identityJson: "{}",
-        channelsJson: "[]",
-        pairedAtSec: 2_000,
-        privateFeedsJson: null,
+        createdAtSec: 2_000,
+        side: "offer",
+        title: "Eggs",
+        amount: "100",
+        currency: "CZK",
+        unit: "dozen",
+        description: null,
       }),
     );
-    expect(runNow(subscriptions.byId(id))?.privateFeedsJson).toBeNull();
+    expect(runNow(listings.byId(id))?.description).toBeNull();
   });
 
   it("fails with ShardDbError on invalid column values", () => {

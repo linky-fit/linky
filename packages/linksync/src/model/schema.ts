@@ -12,7 +12,6 @@ import {
   ContactId,
   ConversationId,
   HiddenListingId,
-  KeryxSubscriptionId,
   ListingId,
   MessageId,
   NostrIdentityId,
@@ -320,22 +319,6 @@ export const LinkySchema = {
     error: nullOr(NonEmptyString1000),
     pendingLabel: nullOr(NonEmptyString100),
   },
-  /** Keryx scope: the user's pairing with one company, shared by every device. */
-  keryxSubscription: {
-    // `keryxSubscriptionIdFor(origin)`, so pairing on two devices lands on one row.
-    id: KeryxSubscriptionId,
-    // The join origin: ASCII scheme + host[:port], no trailing slash.
-    origin: NonEmptyString1000,
-    // Keryx `CompanyTrust` JSON: the pinned root and the metadata versions seen.
-    trustJson: NonEmptyString,
-    // Keryx `CompanyIdentity` JSON the user acknowledged; an inline logo can be long.
-    identityJson: NonEmptyString,
-    // JSON array of the subscribed public channel names; may be `[]`.
-    channelsJson: NonEmptyString1000,
-    // JSON array of private feed capability URLs, which are secrets; per-feed sync state stays on each device.
-    privateFeedsJson: nullOr(NonEmptyString),
-    pairedAtSec: PositiveInt,
-  },
   /** Onchain scope: one on-chain transfer, on the user's or the operator's account. */
   onchainTransfer: {
     id: OnchainTransferId,
@@ -418,7 +401,6 @@ export type ListingRow = Row<LinkyDbSchema["listing"]>;
 export type HiddenListingRow = Row<LinkyDbSchema["hiddenListing"]>;
 export type PinnedListingRow = Row<LinkyDbSchema["pinnedListing"]>;
 export type PeerListingsRow = Row<LinkyDbSchema["peerListings"]>;
-export type KeryxSubscriptionRow = Row<LinkyDbSchema["keryxSubscription"]>;
 export type OnchainTransferRow = Row<LinkyDbSchema["onchainTransfer"]>;
 export type OnchainTransferMessageRow = Row<
   LinkyDbSchema["onchainTransferMessage"]
@@ -447,7 +429,6 @@ export const linkyTableColumns: TableColumns<LinkyDbSchema> = {
   hiddenListing: columnNames(LinkySchema.hiddenListing),
   pinnedListing: columnNames(LinkySchema.pinnedListing),
   peerListings: columnNames(LinkySchema.peerListings),
-  keryxSubscription: columnNames(LinkySchema.keryxSubscription),
   onchainTransfer: columnNames(LinkySchema.onchainTransfer),
   onchainTransferMessage: columnNames(LinkySchema.onchainTransferMessage),
 };

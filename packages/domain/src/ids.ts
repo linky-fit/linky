@@ -43,9 +43,6 @@ export type PinnedListingId = typeof PinnedListingId.Output;
 export const PeerListingsId = id("PeerListings");
 export type PeerListingsId = typeof PeerListingsId.Output;
 
-export const KeryxSubscriptionId = id("KeryxSubscription");
-export type KeryxSubscriptionId = typeof KeryxSubscriptionId.Output;
-
 export const OnchainTransferId = id("OnchainTransfer");
 export type OnchainTransferId = typeof OnchainTransferId.Output;
 

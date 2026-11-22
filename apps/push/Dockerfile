@@ -16,7 +16,6 @@ COPY apps/linky-site/package.json apps/linky-site/package.json
 COPY apps/ui-book/package.json apps/ui-book/package.json
 COPY apps/linky-app/package.json apps/linky-app/package.json
 COPY packages/identity/package.json packages/identity/package.json
-COPY packages/keryx/package.json packages/keryx/package.json
 COPY packages/linkauth/package.json packages/linkauth/package.json
 COPY packages/linkshu/package.json packages/linkshu/package.json
 COPY packages/linksync/package.json packages/linksync/package.json

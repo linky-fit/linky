@@ -64,11 +64,6 @@ export const linkyScopes = {
     rotation: rotation(220),
     forget: { keepNewest: 4 },
   }),
-  keryx: shardScope({
-    tables: ["keryxSubscription"],
-    rotation: rotation(220),
-    forget: "never",
-  }),
   onchain: shardScope({
     tables: ["onchainTransfer", "onchainTransferMessage"],
     rotation: rotation(220),

@@ -196,8 +196,6 @@ export type {
   MediaFrameProps,
 } from "./media";
 export { CameraPreview } from "./camera-preview";
-export { SandboxedHtml } from "./sandboxed-html";
 export { VideoEmbed } from "./video-embed";
 export type { VideoEmbedProps } from "./video-embed";
-export type { SandboxedHtmlProps } from "./sandboxed-html";
 export type { CameraPreviewProps } from "./camera-preview";

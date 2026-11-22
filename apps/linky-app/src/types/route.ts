@@ -2,7 +2,6 @@ import { Listing, parsePubkey, type Pubkey } from "@linky-fit/linkstr";
 import {
   CashuOperationId,
   ContactId,
-  KeryxSubscriptionId,
   ListingId,
   MessageId,
   OnchainTransferId,
@@ -67,10 +66,6 @@ export type Route =
   | { kind: "settingsReceiveMethod" }
   | { kind: "settingsMasterKeys" }
   | { kind: "settingsNostrIdentity" }
-  | { kind: "keryxCompanies" }
-  | { kind: "keryxCompanyNew" }
-  | { kind: "keryxCompany"; id: KeryxSubscriptionId }
-  | { kind: "keryxAnnouncement"; id: KeryxSubscriptionId; key: string }
   | { kind: "collaboration" }
   | { kind: "proxyPayments" }
   | { kind: "cash" }
@@ -159,19 +154,6 @@ export const parseRouteFromHash = (): Route => {
   if (hash === "#settings/master-keys") return { kind: "settingsMasterKeys" };
   if (hash === "#settings/nostr-identity") {
     return { kind: "settingsNostrIdentity" };
-  }
-  if (hash === "#settings/keryx") return { kind: "keryxCompanies" };
-  if (hash === "#settings/keryx/new") return { kind: "keryxCompanyNew" };
-  const keryxPrefix = "#settings/keryx/";
-  if (hash.startsWith(keryxPrefix)) {
-    const [rawId, rawKey] = hash.slice(keryxPrefix.length).split("/");
-    const id = KeryxSubscriptionId.fromUnknown(decodeSegment(rawId ?? ""));
-    const key = decodeSegment(rawKey ?? "");
-    if (id.ok) {
-      return key
-        ? { kind: "keryxAnnouncement", id: id.value, key }
-        : { kind: "keryxCompany", id: id.value };
-    }
   }
   // The old settings hash stays parseable for links already shared.
   if (hash === "#proxy" || hash === "#settings/proxy-payments") {

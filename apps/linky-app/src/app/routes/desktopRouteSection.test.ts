@@ -29,20 +29,6 @@ describe("desktopRouteSection", () => {
     expect(getDesktopRouteSection({ kind: "cashuTokenEmit" })).toBe("settings");
   });
 
-  it("keeps Keryx companies in settings", () => {
-    const id = createIdFromString<"KeryxSubscription">("company-1");
-    expect(getDesktopRouteSection({ kind: "keryxCompanyNew" })).toBe(
-      "settings",
-    );
-    expect(isDesktopSectionEntryRoute({ kind: "keryxCompanies" })).toBe(true);
-    expect(isDesktopSectionEntryRoute({ kind: "keryxCompany", id })).toBe(
-      false,
-    );
-    expect(
-      isDesktopSectionEntryRoute({ kind: "keryxAnnouncement", id, key: "a" }),
-    ).toBe(false);
-  });
-
   it("keeps on-chain transfers in the wallet, entered from it by the send", () => {
     const id = createIdFromString<"OnchainTransfer">("transfer-1");
     expect(getDesktopRouteSection({ kind: "onchainTransfer", id })).toBe(

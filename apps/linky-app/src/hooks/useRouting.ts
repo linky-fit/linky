@@ -1,10 +1,6 @@
 import { useEffect, useState } from "react";
 import { encodeNpub, type Pubkey } from "@linky-fit/linkstr";
-import type {
-  KeryxSubscriptionId,
-  MessageId,
-  OnchainTransferId,
-} from "@linky-fit/linksync";
+import type { MessageId, OnchainTransferId } from "@linky-fit/linksync";
 import type { CashuOperationId, ContactId } from "../evolu";
 import {
   safeSessionStorageGet,
@@ -120,10 +116,6 @@ type NavigationAction =
   | { route: "settingsAppearance" }
   | { route: "settingsMasterKeys" }
   | { route: "settingsNostrIdentity" }
-  | { route: "keryxCompanies" }
-  | { route: "keryxCompanyNew" }
-  | { route: "keryxCompany"; id: KeryxSubscriptionId }
-  | { route: "keryxAnnouncement"; id: KeryxSubscriptionId; key: string }
   | { route: "proxyPayments" }
   | { route: "collaboration" }
   | { route: "cash" }
@@ -211,20 +203,6 @@ export const navigateTo = (
       break;
     case "settingsNostrIdentity":
       go("#settings/nostr-identity");
-      break;
-    case "keryxCompanies":
-      go("#settings/keryx");
-      break;
-    case "keryxCompanyNew":
-      go("#settings/keryx/new");
-      break;
-    case "keryxCompany":
-      go(`#settings/keryx/${encodeURIComponent(action.id)}`);
-      break;
-    case "keryxAnnouncement":
-      go(
-        `#settings/keryx/${encodeURIComponent(action.id)}/${encodeURIComponent(action.key)}`,
-      );
       break;
     case "proxyPayments":
       go("#proxy");
