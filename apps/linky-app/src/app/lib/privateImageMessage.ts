@@ -322,8 +322,10 @@ const uploadToBlossom = async (
           },
           body: uploadBody,
         });
-      } catch {
-        response = await fetch(getBlossomUploadProxyUrl(), {
+      } catch (error) {
+        const proxyUrl = getBlossomUploadProxyUrl();
+        if (proxyUrl === null) throw error;
+        response = await fetch(proxyUrl, {
           method: "PUT",
           headers: {
             Authorization: authHeader,

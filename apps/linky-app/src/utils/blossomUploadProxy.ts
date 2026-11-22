@@ -1,10 +1,16 @@
 import { envBlossomServerUrl } from "../platform/buildEnv";
 import { isNativePlatform } from "../platform/runtime";
 
-/** Where photos and image messages are uploaded. */
-export const BLOSSOM_SERVER_URL =
-  envBlossomServerUrl?.trim() || "https://blossom.primal.net";
+const PRIMAL_URL = "https://blossom.primal.net";
 
-/** The app's own `/api/blossom-upload`; a native shell has no such route and uses the hosted app's. */
-export const getBlossomUploadProxyUrl = (): string =>
-  `${isNativePlatform() ? "https://app.linky.fit" : ""}/api/blossom-upload`;
+/** Where photos and image messages are uploaded. */
+export const BLOSSOM_SERVER_URL = envBlossomServerUrl?.trim() || PRIMAL_URL;
+
+/**
+ * The app's own `/api/blossom-upload`, which relays an upload to Primal when the browser cannot reach it;
+ * a native shell has no such route and uses the hosted app's. Null for a build with another server.
+ */
+export const getBlossomUploadProxyUrl = (): string | null =>
+  BLOSSOM_SERVER_URL === PRIMAL_URL
+    ? `${isNativePlatform() ? "https://app.linky.fit" : ""}/api/blossom-upload`
+    : null;

@@ -55,7 +55,7 @@ A finding is done when every line is filled. End your work with a report: each s
 - **Outside wallet.** `bun run journey wallet <name>` plays the other party; without a command it prints its usage. Linky shows a payment request to copy under chat › Request › message actions, and only in a chat that exists, so start one by paying a request of the wallet's. `pay-request` sends exactly the requested amount unless you pass one, and the mint's input fee then leaves the request a sat short of paid.
 - **Clipboard.** Chromium devices may read and write it, so Copy and Paste buttons work. WebKit and Firefox devices cannot.
 - **Production.** The browser blocks Linky's and Fazole's production hosts and the production mints. A journey that needs one fails here. Record it as not run.
-- **Last release.** Its origins run the released builds, which predate parts of this stack. Until a release contains them, the released Linky exposes the `window.__linkyE2E` test hooks, which you leave alone, the released Fazole asks the real MONETA, and uploads fail on both because they target Primal, which the browser blocks.
+- **Last release.** Its origins run the released builds, which predate parts of this stack. Until a release contains them, the released Linky exposes the `window.__linkyE2E` test hooks, which you leave alone, the released Fazole cannot reach a bank, because it only knows the real MONETA, which the stack blocks, and uploads fail on both because they target Primal, which the browser blocks.
 
 Nothing here covers push delivery to a device, proxy payments, Nearby, the native shells or Safari on an iPhone.
 

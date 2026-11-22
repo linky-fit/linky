@@ -64,11 +64,13 @@ export const prepareProfilePicture = async (
     let response: Response;
     try {
       response = await fetch(UPLOAD_URL, request);
-    } catch {
+    } catch (error) {
+      const proxyUrl = getBlossomUploadProxyUrl();
+      if (proxyUrl === null) throw error;
       const headers = new Headers(request.headers);
       headers.set("Content-Type", "application/octet-stream");
       headers.set("X-Blob-Type", match[1]!);
-      response = await fetch(getBlossomUploadProxyUrl(), {
+      response = await fetch(proxyUrl, {
         ...request,
         headers,
       });

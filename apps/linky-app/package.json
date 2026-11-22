@@ -14,7 +14,7 @@
     "test": "vitest run",
     "preview": "vite preview",
     "prev": "vite preview",
-    "bench:send": "playwright test -c bench/playwright.config.ts"
+    "bench:send": "playwright test -c bench/playwright.config.ts contactSend.bench.ts"
   },
   "dependencies": {
     "@capacitor/clipboard": "^7.0.0",

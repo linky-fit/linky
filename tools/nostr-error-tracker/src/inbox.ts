@@ -9,11 +9,14 @@ import { Relay } from "nostr-tools/relay";
 import type { TrackerSession } from "./auth";
 import { parseReport, type ErrorReport } from "./reports";
 
-export const DEFAULT_RELAYS = [
-  "wss://relay.damus.io",
-  "wss://nos.lol",
-  "wss://relay.0xchat.com",
-];
+const configuredRelays = (import.meta.env.VITE_NOSTR_RELAYS ?? "")
+  .split(",")
+  .map((url) => url.trim())
+  .filter((url) => url.startsWith("ws://") || url.startsWith("wss://"));
+
+export const DEFAULT_RELAYS = configuredRelays.length
+  ? configuredRelays
+  : ["wss://relay.damus.io", "wss://nos.lol", "wss://relay.0xchat.com"];
 
 export interface RelayResult {
   url: string;
