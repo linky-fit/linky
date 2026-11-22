@@ -95,7 +95,7 @@ Do not pay the invoice again while a melt is pending: `melt` with the same `quot
 
 ## Paying from an envelope
 
-`meltEnvelope(draft)` pays an invoice with an open envelope's proofs ([envelope.md](./envelope.md)). The invoice must ask for exactly the envelope's amount, else `PaymentFailed` before anything moves. `available` proofs at the same mint cover only the fee reserve and the input fees: that much is swapped out fee-inclusive as for `melt`, nothing when both are zero.
+`meltEnvelope(draft)` pays an invoice with an open envelope's proofs ([envelope.md](./envelope.md)). The invoice must ask for exactly the envelope's amount, else `PaymentFailed` before anything moves. `available` proofs at the same mint cover only the fee reserve and the input fees: that much is swapped out fee-inclusive as for `melt`, nothing when both are zero. As in `melt`, those proofs are NUT-07 filtered while the quote is priced, so spent ones are marked `spent` even when the melt then needs none of them. A failed check fails the melt only when it needs them.
 
 ```ts
 import { Effect } from "effect";

@@ -1050,7 +1050,15 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
 
           const wallet = yield* instances.get(draft.mint, sat);
           const scope = yield* scopeAt(wallet, draft.mint);
-          const { raw, quote } = yield* payableQuote(wallet, draft);
+          const [{ raw, quote }, selection] = yield* Effect.all(
+            [
+              payableQuote(wallet, draft),
+              Effect.result(
+                selectSpendableProofs(spendContextAt(wallet, scope.mint)),
+              ),
+            ],
+            { concurrency: 2 },
+          );
           if (quote.amount !== envelope.operation.amount) {
             return yield* new PaymentFailed({
               mint: draft.mint,
@@ -1062,7 +1070,15 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
             const extra =
               quote.feeReserve + inputFeeForProofs(wallet, envelope.proofs);
             const funded =
-              extra > 0 ? yield* fundInputs(wallet, scope, extra) : null;
+              extra > 0
+                ? yield* fundInputs(
+                    wallet,
+                    scope,
+                    extra,
+                    undefined,
+                    yield* Effect.fromResult(selection),
+                  )
+                : null;
             const inputs = [...envelope.proofs, ...(funded?.inputs ?? [])];
             const pending = yield* createRecord(
               scope,
