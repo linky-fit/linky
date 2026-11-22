@@ -129,6 +129,7 @@ const pledgesOver = (
       mintUrl: testMint,
       payerPubkey: makeIdentity().pubkey,
       note: null,
+      ownedHere: true,
     });
   return { repositories, ledger, pledges, texts, quotes, inflow };
 };
