@@ -1,5 +1,5 @@
 import { ClientId, encodeNpub, MessageText } from "@linky-fit/linkstr";
-import { createId } from "@linky-fit/linksync";
+import { createId, type TransactionId } from "@linky-fit/linksync";
 import type { LiveSource } from "@linky-fit/linksync/react";
 import { Effect, Result } from "effect";
 import {
@@ -30,16 +30,21 @@ const PLEDGE_REF = "fazole.pledge:";
 /**
  * A payment, and a receipt that paid one again, go with the terminal that
  * created the payment, whichever terminal took the sats in; a receipt naming
- * no payment (a quote minted before its payment synced) goes with none.
+ * no payment (a quote minted before its payment synced) goes with none; a
+ * direct transfer goes with the terminal that took its token in.
  */
-const isOwnedHere = (
-  inflow: WalletActivity,
-  ownedHere: ReadonlySet<string>,
-): boolean =>
-  inflow.kind === "receipt"
-    ? inflow.receipt.paymentId !== null &&
-      ownedHere.has(inflow.receipt.paymentId)
-    : ownedHere.has(inflow.id);
+const owningId = (inflow: WalletActivity): TransactionId | null => {
+  switch (inflow.kind) {
+    case "payment":
+      return inflow.payment.id;
+    case "receipt":
+      return inflow.receipt.paymentId;
+    case "direct":
+      return inflow.transfer.id;
+    case "withdrawal":
+      return null;
+  }
+};
 
 /**
  * Cash taken from a Linky user against the bitcoin the shop will receive:
@@ -127,9 +132,11 @@ export const createPledges = ({
   const forward = async (pledge: Pledge, remainingCzk: CzkAmount) => {
     const records = await ledger.records();
     const ownedHere = ledger.ownedHere();
-    // One terminal forwards each inflow, so terminals sharing the shop never send it twice.
     const inflows = unforwardedInflows(pledge, records, nowSeconds()).filter(
-      (inflow) => isOwnedHere(inflow, ownedHere),
+      (inflow) => {
+        const id = owningId(inflow);
+        return id !== null && ownedHere.has(id);
+      },
     );
     if (inflows.length === 0) return;
     const rate = await czkPerBtc();

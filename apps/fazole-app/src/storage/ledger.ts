@@ -54,10 +54,10 @@ export type PaidBy =
 export interface Ledger {
   readonly records: () => Promise<FazoleRecords>;
   /**
-   * The payments this device created and the direct transfers it recorded:
+   * The payments this device created and the direct transfers it took in:
    * every device sharing the account sees them, one owns each.
    */
-  readonly ownedHere: () => ReadonlySet<string>;
+  readonly ownedHere: () => ReadonlySet<TransactionId>;
   readonly payment: (id: string) => Promise<Payment | null>;
   /**
    * A new pending payment of `amountCzk`, the tip included; its method is
@@ -89,7 +89,10 @@ export interface Ledger {
   ) => Promise<void>;
   /** Records sats that paid no payment, once per receive. */
   readonly recordDirectTransfer: (
-    transfer: Omit<DirectTransfer, "id" | "receivedAtSec" | "hiddenAtSec">,
+    transfer: Omit<DirectTransfer, "id" | "receivedAtSec" | "hiddenAtSec"> & {
+      /** Whether this device forwards it, as the one device that took its token in. */
+      readonly ownedHere: boolean;
+    },
   ) => Promise<void>;
   readonly createWithdrawal: (withdrawal: {
     readonly kind: WithdrawalKind;
@@ -236,9 +239,9 @@ export const makeLedger = (
         }),
       );
     },
-    recordDirectTransfer: async (transfer) => {
+    recordDirectTransfer: async ({ ownedHere, ...transfer }) => {
       const id = receiptIdFor(transfer.operationId);
-      addOwnedInflow(kv, id);
+      if (ownedHere) addOwnedInflow(kv, id);
       await run(
         insertDirectTransfer(transactions, {
           ...transfer,
