@@ -278,6 +278,20 @@ describe("repaying a pledge", () => {
     expect((await terminal.ledger.records()).withdrawals).toHaveLength(1);
   });
 
+  it("forwards no receipt naming no payment: the other terminal minted the quote before the payment synced there", async () => {
+    const terminal = pledgesOver();
+    const otherTerminal = pledgesOver({ sharing: terminal.repositories });
+    await terminal.pledges.open(contact, czk(10_000));
+    await otherTerminal.ledger.recordReceipt({
+      operationId: "topup-1",
+      method: "lightning",
+      sats: 1_000,
+      paymentId: null,
+    });
+    await otherTerminal.pledges.reconcile();
+    expect((await terminal.ledger.records()).withdrawals).toEqual([]);
+  });
+
   it("does nothing without a pledge", async () => {
     const { ledger, pledges, quotes, inflow } = pledgesOver();
     await inflow(1_000);
