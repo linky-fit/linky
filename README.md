@@ -77,7 +77,7 @@ We also publish npm packages, to make it easier for other developers to work wit
 - [`packages/identity`](./packages/identity/): key derivation (SLIP-39, Nostr, LNURL auth)
 - [`packages/config`](./packages/config/): shared ESLint, Prettier, tsconfig and npm packaging
 
-Tools: [`apps/linkshu-cli`](./apps/linkshu-cli/README.md) (terminal Cashu wallet), [`tools/nostr-error-tracker`](./tools/nostr-error-tracker/README.md) (error dashboard), [`docker/evolu-relay`](./docker/evolu-relay/README.md) (relay image and per-owner quota).
+Tools: [`apps/linkshu-cli`](./apps/linkshu-cli/README.md) (terminal Cashu wallet), [`tools/nostr-error-tracker`](./tools/nostr-error-tracker/README.md) (error dashboard).
 
 ## Development
 
