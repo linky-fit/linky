@@ -21,6 +21,10 @@ The desktop shell loads `app.linky.fit`, so it follows the Linky app release.
 
 Release workflows run no tests. They ship a commit only after `.github/actions/require-ci` confirms that all six checks succeeded on it, so a release always ships code its CI run tested. It waits up to 45 minutes for checks that are still running or not yet started, and fails as soon as one fails.
 
+## Journey tests
+
+No workflow clicks through the apps the way a user does. Before a Linky or Fazole release, run the journey tests by hand: `bun run journey up` starts a local stack with this checkout's apps, the last releases beside them and every backend, and agents test on it by the `journey-testing` skill. Nothing in CI or a release workflow waits for them.
+
 ## Linky app
 
 One release ships the web app to `app.linky.fit`, the Android app to Google Play (internal and beta tracks) and GitHub Releases, the macOS DMG and Zapstore. Versions are CalVer `YY.M.MICRO`; MICRO restarts at 1 each month.

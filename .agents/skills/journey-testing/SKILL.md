@@ -1,0 +1,31 @@
+---
+name: journey-testing
+description: Journey tests, where agents click through Linky and Fazole in real browsers on a local stack. Use when asked to run user journeys or to rehearse a release.
+---
+
+A journey test is a tester using the apps as a user would, in a real browser, against a local copy of every backend. Dave runs it by hand before a release. CI never runs it, so leave it out of workflows.
+
+You orchestrate. Each tester is a delegate that drives browsers and reports findings.
+
+## Steps
+
+1. Run `bun run journey up`. It builds this checkout's apps and the last Linky and Fazole releases as production builds, starts every backend and prints the URLs. It needs `docker`, `jq` and `playwright-cli` on the PATH. `bun run journey` lists the other commands.
+2. Pick the lanes from the table below that the change under test reaches. Before a release, run all of them.
+3. Start one tester per lane. Give each its lane, its scenarios and [TESTER.md](TESTER.md), which holds the rules, the stack's limits and the finding format. Run about six testers at a time. Memory is the limit, and a swapping host produces timeouts that testers report as app bugs.
+4. Merge the testers' findings into `.journey/evidence/FINDINGS.md` as they report. Send back any finding without its "On last release" line: that line decides whether the change under test caused it.
+5. Report to Dave what passed, what failed and which scenarios nobody ran. Then run `bun run journey down`, which also deletes the browser profiles and wallets. The evidence stays in `.journey/`, which git ignores.
+
+## Lanes
+
+| Lane      | Covers                                                                                                                                                       |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| core      | One account with data in every feature and a counterpart: profile, contacts, chat, payments in chat, listings, settings, then a seed restore on a new device |
+| wallet    | Topups, tokens in and out, Lightning invoices, payment requests both ways, a recurring payment, both mints, moving funds, a payment interrupted by a kill    |
+| sessions  | No recovery seed, logout, restore, clearing local data, offline use, two tabs of one account                                                                 |
+| devices   | One account on two devices, both writing and both spending                                                                                                   |
+| fazole    | A shop on several terminals, every checkout method, a withdrawal, a pledge, a bank QR payment, the same account in Linky                                     |
+| browsers  | The core journeys in WebKit and Firefox                                                                                                                      |
+| long tail | On-chain transfers with the operator console, the error tracker                                                                                              |
+| fresh     | A new user's first hour, in Linky and in Fazole                                                                                                              |
+
+A lane that touches wallets needs the outside world: `bun run journey wallet`, `ln`, `bank` and `bitcoin` play the other party.
