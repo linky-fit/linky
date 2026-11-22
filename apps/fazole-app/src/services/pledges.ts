@@ -29,18 +29,17 @@ const PLEDGE_REF = "fazole.pledge:";
 
 /**
  * A payment, and a receipt that paid one again, go with the terminal that
- * created the payment, whichever terminal took the sats in; a receipt naming
- * no payment (a quote minted before its payment synced) goes with none; a
- * direct transfer goes with the terminal that took its token in.
+ * created the payment, whichever terminal took the sats in. Nothing else has
+ * one owner: a receipt naming no payment (a quote minted before its payment
+ * synced) or a direct transfer, which several terminals can each receive.
  */
-const owningId = (inflow: WalletActivity): TransactionId | null => {
+const owningPaymentId = (inflow: WalletActivity): TransactionId | null => {
   switch (inflow.kind) {
     case "payment":
       return inflow.payment.id;
     case "receipt":
       return inflow.receipt.paymentId;
     case "direct":
-      return inflow.transfer.id;
     case "withdrawal":
       return null;
   }
@@ -134,7 +133,7 @@ export const createPledges = ({
     const ownedHere = ledger.ownedHere();
     const inflows = unforwardedInflows(pledge, records, nowSeconds()).filter(
       (inflow) => {
-        const id = owningId(inflow);
+        const id = owningPaymentId(inflow);
         return id !== null && ownedHere.has(id);
       },
     );

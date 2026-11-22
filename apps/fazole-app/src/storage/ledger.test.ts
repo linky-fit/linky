@@ -5,7 +5,7 @@ import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { describe, expect, it } from "vitest";
 import { CzkAmount, Sats } from "../domain";
 import { memoryKv, setup, testMint } from "../services/testing/fakes";
-import { makeLedger, receiptIdFor } from "./ledger";
+import { makeLedger } from "./ledger";
 
 const leg = {
   sats: Sats.make(1_000),
@@ -187,12 +187,8 @@ describe("records", () => {
       payerPubkey,
       note: "Za kávu",
     };
-    await ledger.recordDirectTransfer({ ...transfer, ownedHere: true });
-    await ledger.recordDirectTransfer({
-      ...transfer,
-      sats: 50,
-      ownedHere: true,
-    });
+    await ledger.recordDirectTransfer(transfer);
+    await ledger.recordDirectTransfer({ ...transfer, sats: 50 });
     expect(await ledger.hasReceipt("receive-1")).toBe(true);
     const [row, ...others] = await Effect.runPromise(
       repositories.transactions.all,
@@ -228,7 +224,6 @@ describe("records", () => {
       mintUrl: testMint,
       payerPubkey: makeIdentity().pubkey,
       note: "Za kávu",
-      ownedHere: true,
     });
     const [transfer] = (await ledger.records()).directTransfers;
     if (!transfer) throw new Error("no transfer");
@@ -249,7 +244,7 @@ describe("records", () => {
 });
 
 describe("inflows owned here", () => {
-  it("are the payments this device created and the direct transfers it owns, kept across restarts", async () => {
+  it("are the payments this device created, kept across restarts", async () => {
     const { repositories } = setup();
     const kv = memoryKv();
     const ledger = makeLedger(repositories.transactions, kv);
@@ -260,25 +255,16 @@ describe("inflows owned here", () => {
       sats: 10,
       paymentId: null,
     });
-    const transfer = {
+    await ledger.recordDirectTransfer({
+      operationId: "receive-2",
       sats: 20,
       czkPerBtc: null,
       mintUrl: testMint,
       payerPubkey: makeIdentity().pubkey,
       note: null,
-    };
-    await ledger.recordDirectTransfer({
-      ...transfer,
-      operationId: "receive-2",
-      ownedHere: true,
-    });
-    await ledger.recordDirectTransfer({
-      ...transfer,
-      operationId: "receive-3",
-      ownedHere: false,
     });
     expect(makeLedger(repositories.transactions, kv).ownedHere()).toEqual(
-      new Set([created.id, receiptIdFor("receive-2")]),
+      new Set([created.id]),
     );
     const otherDevice = makeLedger(repositories.transactions, memoryKv());
     await otherDevice.completePayment(created, "lightning");

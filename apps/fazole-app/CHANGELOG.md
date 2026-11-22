@@ -13,10 +13,12 @@ Každá vydaná verze musí obsahovat nejprve `en-US` a potom `cs-CZ`.
 ### en-US
 
 - With several terminals open on one shop, a payment under a pledge is forwarded to the pledger once, by the terminal that created the payment, instead of by every terminal.
+- A direct payment no longer repays a pledge, because several terminals could each forward it; the shop's payments repay it.
 
 ### cs-CZ
 
 - Když je na jednom obchodě otevřeno víc terminálů, platbu během zástavy přepošle zastaviteli jen jednou terminál, na kterém byla zadaná, a ne každý terminál.
+- Přímá platba už zástavu nesplácí, protože by ji mohlo přeposlat víc terminálů; zástavu splácejí platby obchodu.
 
 ## [26.11.1] - 2026-11-22
 

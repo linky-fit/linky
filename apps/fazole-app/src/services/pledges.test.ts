@@ -121,16 +121,22 @@ const pledgesOver = (
       options.czkPerBtc === undefined ? rate : options.czkPerBtc,
     whenHydrated: () => Promise.resolve(),
   });
-  const inflow = (sats: number, operationId = `receive-${sats}`) =>
-    ledger.recordDirectTransfer({
-      operationId,
-      sats,
-      czkPerBtc: rate,
-      mintUrl: testMint,
-      payerPubkey: makeIdentity().pubkey,
-      note: null,
-      ownedHere: true,
-    });
+  /** A Lightning payment of `sats` this terminal created, paid. */
+  const inflow = async (sats: number) => {
+    const payment = await ledger.attachBitcoinLeg(
+      await ledger.createPayment(czk(2_500)),
+      {
+        sats: Sats.make(sats),
+        czkPerBtc: rate,
+        mintUrl: testMint,
+        paymentRequest: "creqAtest",
+        quoteId: `quote-${sats}`,
+        invoice: "lnbc1test",
+      },
+    );
+    await ledger.completePayment(payment, "lightning");
+    return payment.id;
+  };
   return { repositories, ledger, pledges, texts, quotes, inflow };
 };
 
@@ -158,17 +164,17 @@ describe("repaying a pledge", () => {
   it("forwards an inflow to the pledger, tells them what is left, and does it once", async () => {
     const { ledger, pledges, texts, inflow } = pledgesOver();
     await pledges.open(contact, czk(10_000));
-    await inflow(1_000);
+    const paid = await inflow(1_000);
     await pledges.reconcile();
     await pledges.reconcile();
-    const { withdrawals, directTransfers } = await ledger.records();
+    const { withdrawals } = await ledger.records();
     expect(withdrawals).toHaveLength(1);
     expect(withdrawals[0]).toMatchObject({
       kind: "cashu_chat",
       target: encodeNpub(pledger),
       amountSats: 1_000,
       status: "pending",
-      pledge: { czk: 2_500, sources: [directTransfers[0]?.id] },
+      pledge: { czk: 2_500, sources: [paid] },
     });
     expect(texts.map(({ text }) => text)).toEqual([
       "Přijato do zástavy 100 Kč.",
@@ -243,7 +249,7 @@ describe("repaying a pledge", () => {
     unreachable.pledges.stop();
   });
 
-  it("leaves an inflow to the terminal that recorded it, so two terminals forward it once", async () => {
+  it("leaves a payment to the terminal that created it, so two terminals forward it once", async () => {
     const terminal = pledgesOver();
     const otherTerminal = pledgesOver({ sharing: terminal.repositories });
     await terminal.pledges.open(contact, czk(10_000));
@@ -252,6 +258,21 @@ describe("repaying a pledge", () => {
     expect((await terminal.ledger.records()).withdrawals).toEqual([]);
     await otherTerminal.pledges.reconcile();
     expect((await terminal.ledger.records()).withdrawals).toHaveLength(1);
+  });
+
+  it("forwards no direct transfer, which two terminals can each take in", async () => {
+    const { ledger, pledges } = pledgesOver();
+    await pledges.open(contact, czk(10_000));
+    await ledger.recordDirectTransfer({
+      operationId: "receive-1",
+      sats: 1_000,
+      czkPerBtc: rate,
+      mintUrl: testMint,
+      payerPubkey: makeIdentity().pubkey,
+      note: null,
+    });
+    await pledges.reconcile();
+    expect((await ledger.records()).withdrawals).toEqual([]);
   });
 
   it("leaves a payment to the terminal that created it, even when both terminals minted its quote", async () => {
