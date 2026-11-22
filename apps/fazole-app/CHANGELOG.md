@@ -10,6 +10,8 @@ Každá vydaná verze musí obsahovat nejprve `en-US` a potom `cs-CZ`.
 
 ## [Unreleased]
 
+## [26.11.1] - 2026-11-22
+
 ### en-US
 
 - The tab bar on a phone shows only icons, like the side bar on a computer.
