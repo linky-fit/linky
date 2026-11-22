@@ -1,10 +1,13 @@
 import { createIdFromString } from "@linky-fit/domain";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { describe, expect, it } from "vitest";
+import type { WalletActivity } from "./activity";
 import { CzkAmount, Sats } from "./money";
 import {
   exchangeRequestMessage,
   FORWARD_RETRY_SEC,
+  inflowMint,
+  inflowRate,
   isPledgeSettled,
   planForward,
   pledgeOpenedMessage,
@@ -112,6 +115,21 @@ describe("what a pledge still owes", () => {
     expect(pledgeRepaidCzk(pledge, withdrawals)).toBe(5_000);
     expect(pledgeRemainingCzk(pledge, withdrawals)).toBe(5_000);
     expect(isPledgeSettled(pledge, withdrawals)).toBe(false);
+  });
+
+  it("ignores a late-stamped withdrawal whose envelope key belongs to an earlier pledge", () => {
+    const lateOldPledge = withdrawal("late-old", {
+      status: "done",
+      createdAtSec: 1_500,
+      pledge: {
+        czk: czk(10_000),
+        sources: [],
+        envelopeKey: "fazole:pledge:500:old-op",
+      },
+    });
+    expect(pledgeRepaidCzk(pledge, [lateOldPledge])).toBe(0);
+    expect(pledgeRemainingCzk(pledge, [lateOldPledge])).toBe(10_000);
+    expect(isPledgeSettled(pledge, [lateOldPledge])).toBe(false);
   });
 
   it("is settled once it is repaid and every repayment reached the relay", () => {
@@ -232,5 +250,52 @@ describe("the pledger's messages", () => {
     ).toBe(
       "Ze zástavy posláno 4\u00a0000 sat (≈ 100 Kč). Zástava 100 Kč je splacená.",
     );
+  });
+});
+
+describe("inflow mint and rate", () => {
+  it("reads the mint and stored rate from the inflow or a receipt's linked payment", () => {
+    const paid = payment("paid", {});
+    const paymentItem: WalletActivity = {
+      kind: "payment",
+      id: paid.id,
+      atSec: 1_300,
+      sats: 100,
+      feeSats: 0,
+      payment: paid,
+    };
+    expect(inflowMint(paymentItem, [paid])).toBe("http://localhost:3338");
+    expect(inflowRate(paymentItem, [paid])).toBe(rate);
+
+    const transfer = direct("direct", {});
+    const directItem: WalletActivity = {
+      kind: "direct",
+      id: transfer.id,
+      atSec: 1_200,
+      sats: 1_000,
+      feeSats: 0,
+      transfer,
+    };
+    expect(inflowMint(directItem, [paid])).toBe("http://localhost:3338");
+    expect(inflowRate(directItem, [paid])).toBe(rate);
+
+    const receiptItem: WalletActivity = {
+      kind: "receipt",
+      id: id("r1"),
+      atSec: 1_400,
+      sats: 100,
+      feeSats: 0,
+      receipt: {
+        id: id("r1"),
+        method: "cashu",
+        sats: 100,
+        receivedAtSec: 1_400,
+        operationId: "op-r1",
+        mintUrl: null,
+        paymentId: paid.id,
+      },
+    };
+    expect(inflowMint(receiptItem, [paid])).toBe("http://localhost:3338");
+    expect(inflowRate(receiptItem, [paid])).toBe(rate);
   });
 });

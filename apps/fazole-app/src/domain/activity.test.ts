@@ -59,6 +59,7 @@ const receipt = (name: string, overrides: Partial<Receipt>): Receipt => ({
   sats: 99,
   receivedAtSec: 1_000,
   operationId: `receive-${name}`,
+  mintUrl: "http://localhost:3338",
   paymentId: null,
   ...overrides,
 });

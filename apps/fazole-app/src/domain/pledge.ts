@@ -21,15 +21,24 @@ export interface PledgeRepayment {
   readonly czk: CzkAmount;
   /** The wallet activity ids of the inflows the withdrawal forwarded. */
   readonly sources: readonly string[];
+  /** Deterministic linkshu envelope key holding this repayment's proofs; absent on legacy sends. */
+  readonly envelopeKey?: string | undefined;
+  /** What remained of the pledge after this repayment, so retries send the same chat text. */
+  readonly remainingCzk?: CzkAmount | undefined;
 }
+
+/** Whether `withdrawal` belongs to `pledge`: by envelope key when present, else by time for legacy sends. */
+const belongsToPledge = (pledge: Pledge, withdrawal: Withdrawal): boolean =>
+  withdrawal.pledge !== null &&
+  (withdrawal.pledge.envelopeKey !== undefined
+    ? isEnvelopeForPledge(pledge, withdrawal.pledge.envelopeKey)
+    : withdrawal.createdAtSec >= pledge.createdAtSec);
 
 /** The withdrawals that repay the pledge, failed ones excluded: their sats came back. */
 const repayments = (pledge: Pledge, withdrawals: readonly Withdrawal[]) =>
   withdrawals.filter(
     (withdrawal) =>
-      withdrawal.pledge !== null &&
-      withdrawal.status !== "failed" &&
-      withdrawal.createdAtSec >= pledge.createdAtSec,
+      withdrawal.status !== "failed" && belongsToPledge(pledge, withdrawal),
   );
 
 /** What the pledge's withdrawals repaid, the pending ones included. */
@@ -82,25 +91,115 @@ export const unforwardedInflows = (
   },
   nowSec: number,
 ): WalletActivity[] => {
-  const held = new Set(
-    records.withdrawals.flatMap((withdrawal) =>
-      withdrawal.pledge !== null &&
-      withdrawal.createdAtSec >= pledge.createdAtSec &&
-      (withdrawal.status !== "failed" ||
-        withdrawal.createdAtSec > nowSec - FORWARD_RETRY_SEC)
-        ? withdrawal.pledge.sources
-        : [],
-    ),
-  );
+  const heldSources = new Set<string>();
+  const heldKeys = new Set<string>();
+  for (const withdrawal of records.withdrawals) {
+    if (
+      !belongsToPledge(pledge, withdrawal) ||
+      withdrawal.pledge === null ||
+      (withdrawal.status === "failed" &&
+        withdrawal.createdAtSec <= nowSec - FORWARD_RETRY_SEC)
+    ) {
+      continue;
+    }
+    for (const source of withdrawal.pledge.sources) heldSources.add(source);
+    if (withdrawal.pledge.envelopeKey !== undefined) {
+      heldKeys.add(withdrawal.pledge.envelopeKey);
+    }
+  }
   return walletActivity(records, Number.POSITIVE_INFINITY)
     .filter(
       (item) =>
         item.kind !== "withdrawal" &&
         item.sats > 0 &&
         item.atSec >= pledge.createdAtSec &&
-        !held.has(item.id),
+        !heldSources.has(item.id) &&
+        !heldKeys.has(pledgeEnvelopeKey(pledge, item)),
     )
     .reverse();
+};
+
+/**
+ * Stable identity for an inflow across terminals, even if one terminal
+ * classified a NUT-18 token as a paid `payment` and another recorded the same
+ * receive as a `direct` transfer or `receipt` before the payment row synced.
+ */
+export const inflowEnvelopeSource = (inflow: WalletActivity): string => {
+  switch (inflow.kind) {
+    case "payment":
+      return inflow.payment.cashuReceive?.operationId ?? inflow.payment.id;
+    case "receipt":
+      return inflow.receipt.operationId;
+    case "direct":
+      return inflow.transfer.operationId;
+    case "withdrawal":
+      return inflow.id;
+  }
+};
+
+const pledgeEnvelopePrefix = (pledge: Pledge): string =>
+  `fazole:pledge:${pledge.createdAtSec}:`;
+
+/**
+ * Deterministic linkshu envelope key for forwarding `inflow` under `pledge`.
+ * Tied 1-to-1 to the inflow's underlying receive/payment so every terminal
+ * derives the same key at the inflow's mint regardless of sync order or
+ * receive classification.
+ */
+export const pledgeEnvelopeKey = (
+  pledge: Pledge,
+  inflow: WalletActivity,
+): string => `${pledgeEnvelopePrefix(pledge)}${inflowEnvelopeSource(inflow)}`;
+
+/** Whether `envelopeKey` belongs to `pledge` (and not an earlier pledge to the same person). */
+export const isEnvelopeForPledge = (
+  pledge: Pledge,
+  envelopeKey: string | undefined,
+): boolean =>
+  envelopeKey !== undefined &&
+  envelopeKey.startsWith(pledgeEnvelopePrefix(pledge));
+
+/** The mint an inflow arrived at, so every terminal opens its envelope at the same mint. */
+export const inflowMint = (
+  inflow: WalletActivity,
+  payments: readonly Payment[],
+): string | null => {
+  switch (inflow.kind) {
+    case "payment":
+      return inflow.payment.bitcoin?.mintUrl ?? null;
+    case "direct":
+      return inflow.transfer.mintUrl;
+    case "receipt":
+      return (
+        inflow.receipt.mintUrl ??
+        (inflow.receipt.paymentId === null
+          ? null
+          : (payments.find((payment) => payment.id === inflow.receipt.paymentId)
+              ?.bitcoin?.mintUrl ?? null))
+      );
+    case "withdrawal":
+      return null;
+  }
+};
+
+/** The CZK/BTC rate stored on the inflow itself, when one was captured on arrival. */
+export const inflowRate = (
+  inflow: WalletActivity,
+  payments: readonly Payment[],
+): number | null => {
+  switch (inflow.kind) {
+    case "payment":
+      return inflow.payment.bitcoin?.czkPerBtc ?? null;
+    case "direct":
+      return inflow.transfer.czkPerBtc;
+    case "receipt":
+      return inflow.receipt.paymentId === null
+        ? null
+        : (payments.find((payment) => payment.id === inflow.receipt.paymentId)
+            ?.bitcoin?.czkPerBtc ?? null);
+    case "withdrawal":
+      return null;
+  }
 };
 
 /** One repayment: the sats to forward and what they repay. */

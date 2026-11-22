@@ -35,9 +35,20 @@ import {
   Sats,
   walletActivity,
 } from "../domain";
+import { makeLedger } from "../storage/ledger";
+import { savePledge } from "../storage/pledgeSetting";
+import { makeRepositories } from "../storage/repositories";
 import { createBitcoinPayments } from "./bitcoinPayments";
-import { fakeNostr, setup, testMint } from "./testing/fakes";
-import type { Wallet } from "./wallet";
+import { createPledges } from "./pledges";
+import { makeLinkshuRuntime } from "./runtimes";
+import {
+  fakeNostr,
+  setup,
+  testAccount,
+  testMint,
+  testStore,
+} from "./testing/fakes";
+import { createWallet, type Wallet } from "./wallet";
 import { createWithdrawals } from "./withdrawals";
 
 const mint = MintUrl.make(testMint);
@@ -246,6 +257,148 @@ describe.runIf(mintAnswers)("the terminal at the local mint", () => {
         0,
       );
       await payments.stop();
+    },
+  );
+
+  it(
+    "forwards an incoming pledge payment once when two terminals race against fragmented proofs",
+    { timeout: 120_000 },
+    async () => {
+      // Rate where 20 CZK = 1,473 sat, matching the multi-terminal journey failure.
+      const pledgeRate = 1_357_773;
+      const account = testAccount();
+      const pledger = makeIdentity().pubkey;
+
+      const makeTerminal = () => {
+        const store = testStore();
+        const repositories = makeRepositories(store);
+        const ledger = makeLedger(repositories.transactions);
+        const wallet = createWallet(
+          makeLinkshuRuntime({
+            cashuSeed: account.cashuSeed,
+            wallet: repositories.wallet,
+          }),
+          account.secretKey,
+        );
+        const sentTokens: {
+          token: string;
+          ref: string;
+          clientId: ClientId | undefined;
+        }[] = [];
+        const sentTexts: { text: string; clientId: ClientId }[] = [];
+        const fake = fakeNostr({
+          sendToken: async (_to, token, ref, clientId) => {
+            sentTokens.push({ token, ref, clientId });
+            return new EnqueueReceipt({
+              jobId: OutboxJobId.make(ref),
+              ref: OutboxRef.make(ref),
+              rumorId: RumorId.make("ef".repeat(32)),
+              clientId: clientId ?? ClientId.make(ref),
+              sentAt: UnixSeconds.make(1_700_000_000),
+            });
+          },
+          sendText: async (_to, text, clientId, ref) => {
+            sentTexts.push({ text, clientId });
+            return new EnqueueReceipt({
+              jobId: OutboxJobId.make(ref),
+              ref: OutboxRef.make(ref),
+              rumorId: RumorId.make("ef".repeat(32)),
+              clientId,
+              sentAt: UnixSeconds.make(1_700_000_000),
+            });
+          },
+        });
+        const pledges = createPledges({
+          ledger,
+          settings: repositories.settings,
+          nostr: fake.nostr,
+          wallet,
+          czkPerBtc: async () => pledgeRate,
+          whenHydrated: async () => {},
+        });
+        return {
+          repositories,
+          ledger,
+          wallet,
+          pledges,
+          sentTokens,
+          sentTexts,
+        };
+      };
+
+      const pos1 = makeTerminal();
+      const pos2 = makeTerminal();
+
+      // Accumulate 1,923 sat pre-existing balance on pos2 and receive the 1,473 sat payment on pos1
+      // (disjoint proof sets before wallet shards sync, so two non-envelope swaps both succeed).
+      const topup = (wallet: Wallet, amount: number) =>
+        wallet.run(
+          Effect.scoped(
+            Effect.flatMap(
+              Effect.flatMap(Topup, (topups) =>
+                topups.start(
+                  new TopupDraft({ mint, amount: Amount.make(amount) }),
+                ),
+              ),
+              (handle) => handle.result,
+            ),
+          ),
+        );
+      for (const amount of [300, 400, 500, 350, 373]) {
+        succeed(await topup(pos2.wallet, amount));
+      }
+      succeed(await topup(pos1.wallet, 1_473));
+
+      const opened = await pos1.pledges.open(
+        { pubkey: pledger, address: null },
+        CzkAmount.make(5_000),
+      );
+      await Effect.runPromise(savePledge(pos2.repositories.settings, opened));
+
+      const inflow = {
+        operationId: "inflow-20czk",
+        sats: 1_473,
+        czkPerBtc: pledgeRate,
+        mintUrl: mint,
+        payerPubkey: makeIdentity().pubkey,
+        note: null,
+      };
+      await pos1.ledger.recordDirectTransfer(inflow);
+      await pos2.ledger.recordDirectTransfer(inflow);
+
+      await Promise.all([pos1.pledges.reconcile(), pos2.pledges.reconcile()]);
+
+      // Redeem every forwarded token into a customer wallet: only one 1,473 sat payment may settle.
+      const customer = setup().wallet;
+      const allTokens = [
+        ...pos1.sentTokens.map((entry) => entry.token),
+        ...pos2.sentTokens.map((entry) => entry.token),
+      ];
+      expect(allTokens).toHaveLength(1);
+      for (const token of allTokens) {
+        await customer.receive(token);
+      }
+      expect(await balanceOf(customer)).toBeLessThanOrEqual(1_473);
+      expect(await balanceOf(customer)).toBeGreaterThan(1_450);
+
+      // Only the winning terminal writes the withdrawal and sends the single repayment message.
+      const w1 = (await pos1.ledger.records()).withdrawals;
+      const w2 = (await pos2.ledger.records()).withdrawals;
+      expect(w1.length + w2.length).toBe(1);
+      const repaymentTexts = [...pos1.sentTexts.slice(1), ...pos2.sentTexts];
+      expect(repaymentTexts).toHaveLength(1);
+      expect(repaymentTexts[0]?.text).toMatch(
+        /Zbývá doplatit 30(?:,0\d)? Kč\./u,
+      );
+
+      // Combined unspent balance across both terminals preserves the 1,923 sat pre-existing funds (minus swap fee).
+      const remainingBalance =
+        (await balanceOf(pos1.wallet)) + (await balanceOf(pos2.wallet));
+      expect(remainingBalance).toBeGreaterThanOrEqual(1_915);
+      expect(remainingBalance).toBeLessThanOrEqual(1_923);
+
+      pos1.pledges.stop();
+      pos2.pledges.stop();
     },
   );
 });

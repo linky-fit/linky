@@ -166,6 +166,7 @@ describe("records", () => {
       operationId: "receive-1",
       method: "cashu" as const,
       sats: 99,
+      mintUrl: testMint,
       paymentId: null,
     };
     await ledger.recordReceipt(receipt);
@@ -275,5 +276,29 @@ describe("withdrawals", () => {
         error: null,
       },
     ]);
+  });
+
+  it("derives a single deterministic row for an operation-backed withdrawal without overwriting done", async () => {
+    const { ledger } = setup();
+    const first = await ledger.createWithdrawal({
+      kind: "cashu_chat",
+      target: "npub1test",
+      amountSats: 1_473,
+      feeSats: null,
+      mintUrl: testMint,
+      operationId: "envelope-op-1",
+    });
+    await ledger.finishWithdrawal(first.id, { status: "done" });
+    const replay = await ledger.createWithdrawal({
+      kind: "cashu_chat",
+      target: "npub1test",
+      amountSats: 1_473,
+      feeSats: null,
+      mintUrl: testMint,
+      operationId: "envelope-op-1",
+    });
+    expect(replay.id).toBe(first.id);
+    expect(replay.status).toBe("done");
+    expect((await ledger.records()).withdrawals).toHaveLength(1);
   });
 });

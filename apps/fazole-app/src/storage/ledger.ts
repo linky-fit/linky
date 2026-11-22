@@ -28,6 +28,7 @@ import {
   insertPayment,
   insertReceipt,
   insertWithdrawal,
+  insertWithdrawalIfAbsent,
   readFazoleRecords,
   updateDirectTransfer,
   updatePayment,
@@ -92,6 +93,10 @@ export interface Ledger {
     readonly mintUrl: string;
     readonly quoteId?: string | undefined;
     readonly invoice?: string | undefined;
+    /** Deterministic linkshu operation holding the funds (e.g. an envelope); derives the row id. */
+    readonly operationId?: string | undefined;
+    /** Initial row status; `"done"` when adopting an envelope already spent at the mint. */
+    readonly status?: "pending" | "done" | undefined;
     /** What it repays of a pledge, when it forwards inflows to the pledger. */
     readonly pledge?: PledgeRepayment | undefined;
   }) => Promise<Withdrawal>;
@@ -233,23 +238,37 @@ export const makeLedger = (transactions: TransactionsRepository): Ledger => {
         }),
       );
     },
-    createWithdrawal: async ({ quoteId, invoice, pledge, ...fields }) => {
+    createWithdrawal: async ({
+      quoteId,
+      invoice,
+      operationId,
+      status = "pending",
+      pledge,
+      ...fields
+    }) => {
       const mint = MintUrl.make(fields.mintUrl);
       const created: Withdrawal = {
         ...fields,
-        // A melt's row is the one Linky derives from its quote, so a resume on any device lands on it.
+        // A melt derives its row from its quote, an envelope from its operation,
+        // so retries and concurrent terminals land on one row.
         id:
-          quoteId === undefined
-            ? createId<"Transaction">()
-            : transactionIdForQuote("melt", mint, QuoteId.make(quoteId)),
-        status: "pending",
+          operationId !== undefined
+            ? transactionIdForOperation(OperationId.make(operationId))
+            : quoteId === undefined
+              ? createId<"Transaction">()
+              : transactionIdForQuote("melt", mint, QuoteId.make(quoteId)),
+        status,
         createdAtSec: nowSeconds(),
         quoteId: quoteId ?? null,
         invoice: invoice ?? null,
-        operationId: null,
+        operationId: operationId ?? null,
         error: null,
         pledge: pledge ?? null,
       };
+      if (operationId !== undefined) {
+        await run(insertWithdrawalIfAbsent(transactions, created));
+        return (await withdrawal(created.id)) ?? created;
+      }
       await run(insertWithdrawal(transactions, created));
       return created;
     },

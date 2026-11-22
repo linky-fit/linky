@@ -94,6 +94,12 @@ export const paymentNamedBy = (
             normalizeMint(incoming.mint),
       ) ?? null);
 
+/** NUT-02: a swap over `proofs` inputs costs `ceil(ppk * proofs / 1000)`. */
+export const swapFeeFor = (
+  inputFeePpk: number | null,
+  proofs: number,
+): number => Math.ceil(((inputFeePpk ?? 0) * proofs) / 1000);
+
 /** Below it, the mint's input fee takes too large a share of a Cashu payment. */
 const MIN_BITCOIN_SATS = 10;
 

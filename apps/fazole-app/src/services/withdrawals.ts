@@ -14,7 +14,7 @@ import {
 } from "@linky-fit/linkshu";
 import { decodeNpub, type Pubkey } from "@linky-fit/linkstr";
 import { Effect, Result } from "effect";
-import type { PledgeRepayment, Withdrawal, WithdrawTarget } from "../domain";
+import { swapFeeFor, type Withdrawal, type WithdrawTarget } from "../domain";
 import type { Ledger } from "../storage/ledger";
 import { nowSeconds } from "../utils/time";
 import type { Nostr } from "./nostr";
@@ -74,10 +74,6 @@ export interface Withdrawals {
   /** Runs a confirmed quote and records it as an `out` transaction with its fee. */
   readonly execute: (
     quote: WithdrawalQuote,
-    options?: {
-      /** Marks the withdrawal as repaying a pledge. */
-      readonly pledge?: PledgeRepayment | undefined;
-    },
   ) => Promise<Result.Result<WithdrawalOutcome, WithdrawFailure>>;
   /** Settles withdrawals a reload interrupted; call when the store is hydrated. */
   readonly resume: () => Promise<void>;
@@ -99,10 +95,6 @@ const failureOf = (error: MeltError | SendError): WithdrawFailure => {
 
 /** Every fee a paid melt took from the balance beyond the invoice. */
 const meltFee = (receipt: MeltReceipt) => receipt.feePaid + receipt.swapFee;
-
-/** NUT-02: a swap over `proofs` inputs costs `ceil(ppk * proofs / 1000)`. */
-const swapFeeFor = (inputFeePpk: number | null, proofs: number) =>
-  Math.ceil(((inputFeePpk ?? 0) * proofs) / 1000);
 
 // A Lightning address prices each amount anew; a few rounds settle the fee reserve.
 const MAX_SIZING_ROUNDS = 6;
@@ -254,7 +246,6 @@ export const createWithdrawals = ({
   const executeMelt = async (
     quote: WithdrawalQuote,
     plan: Extract<WithdrawalQuote["plan"], { kind: "melt" }>,
-    pledge: PledgeRepayment | undefined,
   ) => {
     const { cost, invoice } = plan;
     const withdrawal = await ledger.createWithdrawal({
@@ -268,7 +259,6 @@ export const createWithdrawals = ({
       mintUrl: cost.quote.mint,
       quoteId: cost.quote.quoteId,
       invoice,
-      pledge,
     });
     const paid = await wallet.run(
       Effect.flatMap(Melt, (melt) =>
@@ -314,11 +304,7 @@ export const createWithdrawals = ({
     return sent;
   };
 
-  const executeSend = (
-    quote: WithdrawalQuote,
-    to: Pubkey,
-    pledge: PledgeRepayment | undefined,
-  ) =>
+  const executeSend = (quote: WithdrawalQuote, to: Pubkey) =>
     serially(
       async (): Promise<Result.Result<WithdrawalOutcome, WithdrawFailure>> => {
         // Stored first, so a reload at any later step leaves a row `resume` settles.
@@ -328,7 +314,6 @@ export const createWithdrawals = ({
           amountSats: quote.amountSats,
           feeSats: null,
           mintUrl: quote.mint,
-          pledge,
         });
         const sent = await sendSized(quote);
         if (Result.isFailure(sent)) {
@@ -463,10 +448,10 @@ export const createWithdrawals = ({
           return quoteSend(target, source, requested);
       }
     },
-    execute: (quote, options) =>
+    execute: (quote) =>
       quote.plan.kind === "melt"
-        ? executeMelt(quote, quote.plan, options?.pledge)
-        : executeSend(quote, quote.plan.to, options?.pledge),
+        ? executeMelt(quote, quote.plan)
+        : executeSend(quote, quote.plan.to),
     resume: async () => {
       await Promise.all([resumeSends(), resumeMelts()]);
     },

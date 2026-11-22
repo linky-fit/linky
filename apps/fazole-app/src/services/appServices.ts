@@ -232,7 +232,7 @@ export const createAppServices = ({
     ledger,
     settings: repositories.settings,
     nostr,
-    withdrawals,
+    wallet,
     czkPerBtc: rates.czkPerBtc,
     whenHydrated: hydrated,
   });

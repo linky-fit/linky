@@ -64,6 +64,8 @@ export interface Receipt {
   readonly sats: number;
   readonly receivedAtSec: number;
   readonly operationId: string;
+  /** The mint the sats arrived at; `null` on rows written before this field existed. */
+  readonly mintUrl: string | null;
   /** The payment the sats paid again; `null` when they matched none. */
   readonly paymentId: TransactionId | null;
 }

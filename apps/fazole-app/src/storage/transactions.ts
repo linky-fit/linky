@@ -82,7 +82,12 @@ const WithdrawalDetails = Schema.Struct({
   invoice: Schema.optionalKey(Schema.String),
   operationId: Schema.optionalKey(Schema.String),
   pledge: Schema.optionalKey(
-    Schema.Struct({ czk: CzkAmount, sources: Schema.Array(Schema.String) }),
+    Schema.Struct({
+      czk: CzkAmount,
+      sources: Schema.Array(Schema.String),
+      envelopeKey: Schema.optionalKey(Schema.String),
+      remainingCzk: Schema.optionalKey(CzkAmount),
+    }),
   ),
 });
 
@@ -176,6 +181,7 @@ export const toFazoleRecords = (
             sats: row.amount,
             receivedAtSec: row.createdAtSec,
             operationId: value.operationId,
+            mintUrl: row.mint,
             paymentId:
               value.paymentId !== undefined && TransactionId.is(value.paymentId)
                 ? value.paymentId
@@ -266,6 +272,7 @@ const receiptColumns = (receipt: Receipt) => ({
   status: "ok",
   method: receipt.method,
   amount: receipt.sats,
+  mint: receipt.mintUrl,
   unit: "sat",
   detailsJson: encodeDetails({
     app: "fazole",
@@ -315,7 +322,20 @@ const withdrawalColumns = (withdrawal: Withdrawal) => ({
     ...(withdrawal.operationId === null
       ? {}
       : { operationId: withdrawal.operationId }),
-    ...(withdrawal.pledge === null ? {} : { pledge: withdrawal.pledge }),
+    ...(withdrawal.pledge === null
+      ? {}
+      : {
+          pledge: {
+            czk: withdrawal.pledge.czk,
+            sources: withdrawal.pledge.sources,
+            ...(withdrawal.pledge.envelopeKey === undefined
+              ? {}
+              : { envelopeKey: withdrawal.pledge.envelopeKey }),
+            ...(withdrawal.pledge.remainingCzk === undefined
+              ? {}
+              : { remainingCzk: withdrawal.pledge.remainingCzk }),
+          },
+        }),
   }),
 });
 
@@ -383,6 +403,15 @@ export const insertWithdrawal = (
   withdrawal: Withdrawal,
 ) =>
   transactions.insert(insertRow(withdrawal.id, withdrawalColumns(withdrawal)));
+
+/** Records a withdrawal once: its id derives from its operation, so concurrent terminals land on one row. */
+export const insertWithdrawalIfAbsent = (
+  transactions: TransactionsRepository,
+  withdrawal: Withdrawal,
+) =>
+  transactions.insertIfAbsent(
+    insertRow(withdrawal.id, withdrawalColumns(withdrawal)),
+  );
 
 export const updateWithdrawal = (
   transactions: TransactionsRepository,

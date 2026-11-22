@@ -106,6 +106,7 @@ export const createBitcoinPayments = ({
       operationId: minted.operationId,
       method: "lightning",
       sats: minted.amount,
+      mintUrl: minted.mint,
       paymentId: payment?.id ?? null,
     });
   };
@@ -307,6 +308,7 @@ export const createBitcoinPayments = ({
           operationId: received.operationId,
           method: "cashu",
           sats: received.sats,
+          mintUrl: incoming.mint,
           paymentId: named.id,
         });
         return;

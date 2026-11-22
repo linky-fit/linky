@@ -64,6 +64,7 @@ export interface Nostr {
     to: Pubkey,
     token: string,
     ref: string,
+    clientId?: ClientId,
   ) => Promise<EnqueueReceipt>;
   /** Queues a NIP-17 text message, the way Linky sends chat text. */
   readonly sendText: (
@@ -179,7 +180,7 @@ export const createNostr = ({
   return {
     pubkey,
     nprofile: encodeNprofile(pubkey, relays),
-    sendToken: (to, token, ref) =>
+    sendToken: (to, token, ref, clientId) =>
       runtime.runPromise(
         Effect.flatMap(Outbox, (outbox) =>
           outbox.enqueue(
@@ -188,6 +189,7 @@ export const createNostr = ({
               draft: new TokenMessageDraft({
                 to,
                 token: CashuTokenText.make(token),
+                ...(clientId === undefined ? {} : { clientId }),
               }),
             },
             OutboxRef.make(ref),

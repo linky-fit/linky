@@ -1,6 +1,7 @@
 import {
   Mints,
   OperationId,
+  OperationStore,
   P2pkUnlockingKey,
   ProofStore,
   QuoteLockingKey,
@@ -52,6 +53,8 @@ export interface Wallet {
   readonly inputFeePpk: (mint: MintUrl) => Promise<number | null>;
   /** How many proofs make up the mint's balance, which sets the fee of spending all of it. */
   readonly availableProofCount: (mint: MintUrl) => Promise<number>;
+  /** The mint a stored linkshu operation ran against; `null` when unknown here. */
+  readonly operationMint: (operationId: string) => Promise<MintUrl | null>;
 }
 
 /** Failures worth replaying the message for: the token may still be received later. */
@@ -140,5 +143,11 @@ export const createWallet = (
           proof.unit === "sat" &&
           proof.state === "available",
       ).length,
+    operationMint: async (operationId) =>
+      (
+        await runtime.runPromise(
+          Effect.flatMap(OperationStore, (store) => store.loadAll),
+        )
+      ).find((operation) => operation.id === operationId)?.mint ?? null,
   };
 };
