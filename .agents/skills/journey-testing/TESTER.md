@@ -57,7 +57,7 @@ A finding is done when every line is filled. End your work with a report: each s
 - **Production.** The browser blocks Linky's and Fazole's production hosts and the production mints. A journey that needs one fails here. Record it as not run.
 - **Last release.** Its origins run the released builds, which predate parts of this stack. Until a release contains them, the released Linky exposes the `window.__linkyE2E` test hooks, which you leave alone, the released Fazole asks the real MONETA, and uploads fail on both because they target Primal, which the browser blocks.
 
-Nothing here covers push delivery to a device, Keryx newsletters, proxy payments, Nearby, the native shells or Safari on an iPhone.
+Nothing here covers push delivery to a device, proxy payments, Nearby, the native shells or Safari on an iPhone.
 
 ## Not bugs
 
