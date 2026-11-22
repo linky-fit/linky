@@ -43,6 +43,7 @@ import {
 } from "../internal/counters";
 import type { CounterScope } from "../internal/counters";
 import type { KeyLeaseOptions } from "../internal/lease";
+import { LeaseLockTimeout, withKeyLease } from "../internal/lease";
 import { inspectOperation } from "../internal/operations";
 import { isRecoverableOutputCollision } from "../internal/outputCollisions";
 import {
@@ -101,6 +102,15 @@ const MELT_COLLISION_FALLBACK_BUMP = 64;
 /** Bounded wait for a PENDING Lightning payment before handing off to resume. */
 const PENDING_POLL_ATTEMPTS = 6;
 const PENDING_POLL_INTERVAL = Duration.millis(500);
+/** One unresponsive mint must not hold up the melts after it in a resume pass. */
+const MINT_READ_TIMEOUT = Duration.seconds(30);
+/**
+ * The mint answers UNPAID until the melt request reaches it, and the record
+ * syncs to other devices before that, so a resume releases the inputs on
+ * UNPAID only once the record is older than this.
+ */
+const UNPAID_GRACE_SECONDS = 120;
+const MELT_LOCK_KEY_PREFIX = "linkshu.meltLock.";
 
 const decodeAmount = Schema.decodeUnknownOption(Amount);
 const decodeReserve = Schema.decodeUnknownOption(NonNegativeAmount);
@@ -156,11 +166,41 @@ const quoteStateOf = (raw: MeltQuoteBolt11Response): QuoteState => {
   return decoded._tag === "Some" ? decoded.value : null;
 };
 
+/** Held while this context pays or resumes the quote, so no other does it at once. */
+const meltLockKey = (quote: {
+  readonly mint: MintUrl;
+  readonly quoteId: QuoteId;
+}): string =>
+  MELT_LOCK_KEY_PREFIX +
+  [quote.mint, quote.quoteId].map(encodeURIComponent).join(".");
+
 const counterScopeOf = (pending: PendingMelt): CounterScope => ({
   mint: pending.mint,
   unit: pending.unit,
   keysetId: pending.keysetId,
 });
+
+/** Another device can sync a pending record before the attempt naming its blank slot. */
+const changeSlotKnown = (pending: PendingMelt): boolean =>
+  pending.counter !== null ||
+  blankOutputCount(pending.inputsTotal - pending.amount) === 0;
+
+/** Bounds a read-only mint call, so interrupting it never cuts a local write short. */
+const boundedRead =
+  (mint: MintUrl) =>
+  <A, E, R>(
+    read: Effect.Effect<A, E, R>,
+  ): Effect.Effect<A, E | MintUnreachable, R> =>
+    Effect.timeoutOrElse(read, {
+      duration: MINT_READ_TIMEOUT,
+      orElse: () =>
+        Effect.fail(
+          new MintUnreachable({
+            mint,
+            detail: "the mint did not answer in time",
+          }),
+        ),
+    });
 
 const paymentPendingOf = (pending: PendingMelt): PaymentPending =>
   new PaymentPending({
@@ -427,6 +467,9 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
       state: QuoteState,
     ): Effect.Effect<MeltReceipt, MeltError> =>
       Effect.gen(function* () {
+        if (state === "PAID" && !changeSlotKnown(pending)) {
+          return yield* Effect.fail(paymentPendingOf(pending));
+        }
         if (state === "PAID") {
           const change = yield* reclaimBlankChange(wallet, pending);
           return yield* finishPaid(pending, change);
@@ -440,6 +483,24 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
           });
         }
         return yield* Effect.fail(paymentPendingOf(pending));
+      });
+
+    /**
+     * A quote check with no melt answer behind it: the mint answers UNPAID
+     * until the melt request reaches it, so a young UNPAID keeps the inputs held.
+     */
+    const settleCheckedState = (
+      wallet: LoadedWallet,
+      pending: PendingMelt,
+      state: QuoteState,
+    ): Effect.Effect<MeltReceipt, MeltError> =>
+      Effect.gen(function* () {
+        const young =
+          (yield* nowSeconds) - pending.createdAt < UNPAID_GRACE_SECONDS;
+        if (state === "UNPAID" && young) {
+          return yield* Effect.fail(paymentPendingOf(pending));
+        }
+        return yield* settleQuoteState(wallet, pending, state);
       });
 
     /** Bounded wait on a PENDING payment; the record outlives the wait. */
@@ -500,8 +561,8 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
 
     /**
      * The melt response was lost in transit; the payment may have happened.
-     * The quote is asked once: a settled answer decides, no answer leaves
-     * the inputs `held` under the record.
+     * The quote is asked once: PAID or an aged UNPAID decides, anything else
+     * leaves the inputs `held` under the record.
      */
     const resolveLostMeltResponse = (
       exec: MeltExecution,
@@ -515,7 +576,7 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
           : null;
         if (state !== null)
           emitQuoteState(inspector, "melt", exec.pending, state);
-        return yield* settleQuoteState(exec.wallet, exec.pending, state);
+        return yield* settleCheckedState(exec.wallet, exec.pending, state);
       });
 
     /**
@@ -632,6 +693,56 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
         );
         return yield* Effect.fail(failure);
       });
+
+    /** A melt this store sent for the quote, which paying again would overwrite. */
+    const sentBefore = (quote: MeltQuote): Effect.Effect<boolean> =>
+      Effect.gen(function* () {
+        if (yield* records.hasLegacy(quote.mint, quote.quoteId)) return true;
+        return (yield* operationStore.loadAll).some(
+          (operation) =>
+            operation.kind === "melt" &&
+            operation.mint === quote.mint &&
+            operation.quoteId === quote.quoteId &&
+            (operation.status === "pending" || operation.status === "paid"),
+        );
+      });
+
+    /**
+     * Pays `quote` holding its lease from before the record exists until
+     * the melt settles or is handed over, so a resume pass in this context,
+     * woken by the new record, leaves it alone. A quote the caller supplied
+     * may already have a melt here that still reads UNPAID at the mint; only
+     * a fresh quote is sure to have none.
+     */
+    const withQuoteLease =
+      (target: MeltTarget, quote: MeltQuote) =>
+      <A, E, R>(
+        pay: Effect.Effect<A, E, R>,
+      ): Effect.Effect<A, E | PaymentFailed, R> => {
+        const notSent = (detail: string) =>
+          new PaymentFailed({
+            mint: quote.mint,
+            quoteId: quote.quoteId,
+            detail,
+          });
+        return Effect.gen(function* () {
+          if (target.quoteId !== undefined && (yield* sentBefore(quote))) {
+            return yield* notSent(
+              "the melt quote was already sent; nothing was sent",
+            );
+          }
+          return yield* pay;
+        }).pipe(
+          withKeyLease(kv, meltLockKey(quote)),
+          Effect.catchIf(
+            (error) => error instanceof LeaseLockTimeout,
+            () =>
+              Effect.fail(
+                notSent("the melt quote is being settled; nothing was sent"),
+              ),
+          ),
+        );
+      };
 
     /** Price the payment without touching any stored proof. */
     const quote = (draft: MeltDraft): Effect.Effect<MeltQuote, MeltError> =>
@@ -860,36 +971,38 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
           ],
           { concurrency: 2 },
         );
-        const funded = yield* fundInputs(
-          wallet,
-          scope,
-          quote.amount + quote.feeReserve,
-          draft.maxTotal === undefined
-            ? undefined
-            : { maxTotal: draft.maxTotal, quoteId: quote.quoteId },
-          selection,
-        );
-        // The record, its held inputs, and the remainder all land before
-        // the consumed sources are marked spent, so the funds are never
-        // outside the store and a crash from here on is resumable.
-        const pending = yield* createRecord(
-          scope,
-          draft,
-          quote,
-          funded.inputs,
-          null,
-        );
-        const swapFee = yield* holdFunded(funded, pending);
-        const receipt = yield* executeMelt({
-          wallet,
-          raw,
-          inputs: funded.inputs,
-          pending,
-        });
-        return new MeltReceipt({
-          ...receipt,
-          swapFee: NonNegativeAmount.make(swapFee),
-        });
+        return yield* Effect.gen(function* () {
+          const funded = yield* fundInputs(
+            wallet,
+            scope,
+            quote.amount + quote.feeReserve,
+            draft.maxTotal === undefined
+              ? undefined
+              : { maxTotal: draft.maxTotal, quoteId: quote.quoteId },
+            selection,
+          );
+          // The record, its held inputs, and the remainder all land before
+          // the consumed sources are marked spent, so the funds are never
+          // outside the store and a crash from here on is resumable.
+          const pending = yield* createRecord(
+            scope,
+            draft,
+            quote,
+            funded.inputs,
+            null,
+          );
+          const swapFee = yield* holdFunded(funded, pending);
+          const receipt = yield* executeMelt({
+            wallet,
+            raw,
+            inputs: funded.inputs,
+            pending,
+          });
+          return new MeltReceipt({
+            ...receipt,
+            swapFee: NonNegativeAmount.make(swapFee),
+          });
+        }).pipe(withQuoteLease(draft, quote));
       }).pipe(
         // The invoice never reaches the inspector; the receipt holds no secrets.
         inspectOperation(inspector, "melt.melt", { mint: draft.mint }),
@@ -936,26 +1049,33 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
               detail: "the invoice does not ask for the envelope's amount",
             });
           }
-          const extra =
-            quote.feeReserve + inputFeeForProofs(wallet, envelope.proofs);
-          const funded =
-            extra > 0 ? yield* fundInputs(wallet, scope, extra) : null;
-          const inputs = [...envelope.proofs, ...(funded?.inputs ?? [])];
-          const pending = yield* createRecord(
-            scope,
-            draft,
-            quote,
-            inputs,
-            envelope.tokenText,
-          );
-          yield* setProofState(ctx, held, "held", "melt", pending.id);
-          const swapFee =
-            funded === null ? 0 : yield* holdFunded(funded, pending);
-          const receipt = yield* executeMelt({ wallet, raw, inputs, pending });
-          return new MeltReceipt({
-            ...receipt,
-            swapFee: NonNegativeAmount.make(swapFee),
-          });
+          return yield* Effect.gen(function* () {
+            const extra =
+              quote.feeReserve + inputFeeForProofs(wallet, envelope.proofs);
+            const funded =
+              extra > 0 ? yield* fundInputs(wallet, scope, extra) : null;
+            const inputs = [...envelope.proofs, ...(funded?.inputs ?? [])];
+            const pending = yield* createRecord(
+              scope,
+              draft,
+              quote,
+              inputs,
+              envelope.tokenText,
+            );
+            yield* setProofState(ctx, held, "held", "melt", pending.id);
+            const swapFee =
+              funded === null ? 0 : yield* holdFunded(funded, pending);
+            const receipt = yield* executeMelt({
+              wallet,
+              raw,
+              inputs,
+              pending,
+            });
+            return new MeltReceipt({
+              ...receipt,
+              swapFee: NonNegativeAmount.make(swapFee),
+            });
+          }).pipe(withQuoteLease(draft, quote));
         }),
       ).pipe(
         inspectOperation(inspector, "melt.meltEnvelope", {
@@ -1014,17 +1134,31 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
 
     /**
      * One persisted record. Only the mint's own answer moves it: PAID
-     * finishes the melt, UNPAID returns the inputs, PENDING keeps both. A
-     * mint that will not load or answer says nothing about the payment, so
-     * the record is kept — quote expiry is not an unlock deadline.
+     * finishes the melt, UNPAID past the grace window returns the inputs,
+     * PENDING keeps both. A mint that will not load or answer says nothing
+     * about the payment, so the record is kept — quote expiry is not an
+     * unlock deadline. A quote another context holds is skipped as pending,
+     * and a record it closed meanwhile yields no result.
      */
-    const resumeOne = (pending: PendingMelt): Effect.Effect<MeltResumeResult> =>
+    const resumeOne = (
+      listed: PendingMelt,
+    ): Effect.Effect<MeltResumeResult | null> =>
       Effect.gen(function* () {
+        const pending = yield* records.read(listed.mint, listed.quoteId);
+        if (pending === null) return null;
         const wallet = yield* instances.get(pending.mint, pending.unit);
-        const state = quoteStateOf(yield* checkQuote(wallet, pending));
+        const state = quoteStateOf(
+          yield* checkQuote(wallet, pending).pipe(boundedRead(pending.mint)),
+        );
         if (state !== null) emitQuoteState(inspector, "melt", pending, state);
+        if (state === "PAID" && changeSlotKnown(pending)) {
+          const change = yield* reclaimBlankChange(wallet, pending).pipe(
+            boundedRead(pending.mint),
+          );
+          return resultOf(pending, "paid", yield* finishPaid(pending, change));
+        }
         const settled = yield* Effect.result(
-          settleQuoteState(wallet, pending, state),
+          settleCheckedState(wallet, pending, state),
         );
         if (Result.isSuccess(settled)) {
           return resultOf(pending, "paid", settled.success);
@@ -1039,20 +1173,25 @@ export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
         }
       }).pipe(
         inspectOperation(inspector, "melt.resume", {
-          mint: pending.mint,
-          quoteId: pending.quoteId,
-          operationId: pending.id,
+          mint: listed.mint,
+          quoteId: listed.quoteId,
+          operationId: listed.id,
         }),
         Effect.catch(() =>
-          Effect.succeed(resultOf(pending, "unresolved", null)),
+          Effect.succeed(resultOf(listed, "unresolved", null)),
+        ),
+        withKeyLease(kv, meltLockKey(listed), { acquireTimeoutMs: 0 }),
+        Effect.catchTag("LeaseLockTimeout", () =>
+          Effect.succeed(resultOf(listed, "pending", null)),
         ),
       );
 
     const resumePending: Effect.Effect<ReadonlyArray<MeltResumeResult>> =
       Effect.gen(function* () {
         const results: MeltResumeResult[] = [];
-        for (const pending of yield* records.readAll) {
-          results.push(yield* resumeOne(pending));
+        for (const listed of yield* records.readAll) {
+          const result = yield* resumeOne(listed);
+          if (result !== null) results.push(result);
         }
         for (const [melt, inputs] of yield* lateInputs) {
           // An envelope text that does not decode leaves its inputs held.

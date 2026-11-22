@@ -215,6 +215,7 @@ export const useCashuWalletComposition = ({
     walletTransfers,
   });
   useWalletResumes({
+    operations: walletOperations,
     pushToast,
     receiveCashuToken,
     resumePendingCashuAutoswapClaims,

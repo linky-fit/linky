@@ -60,6 +60,11 @@ export interface QuoteRecordStore<R extends QuoteRecord> {
     error?: string,
   ) => Effect.Effect<void>;
   readonly read: (mint: MintUrl, quoteId: QuoteId) => Effect.Effect<R | null>;
+  /** Whether a legacy key-value record for the quote awaits carry-over; writes nothing. */
+  readonly hasLegacy: (
+    mint: MintUrl,
+    quoteId: QuoteId,
+  ) => Effect.Effect<boolean>;
   /** Every pending record, after carrying over legacy key-value records. */
   readonly readAll: Effect.Effect<ReadonlyArray<R>>;
   /** The mint-stated expiry, else `createdAt` plus the store's ttl. */
@@ -139,6 +144,14 @@ export const quoteRecordStore = <R extends QuoteRecord>(
         }
         return null;
       }),
+    hasLegacy: (mint, quoteId) =>
+      Effect.map(
+        ctx.kv.get(
+          codec.legacy.prefix +
+            [mint, quoteId].map(encodeURIComponent).join("."),
+        ),
+        (raw) => raw !== null && codec.legacy.decode(raw) !== null,
+      ),
     readAll: Effect.gen(function* () {
       yield* carryOverLegacy;
       return (yield* ctx.operationStore.loadAll).flatMap((operation) => {

@@ -24,7 +24,7 @@ import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import { CashuSeed } from "../ports/CashuSeed";
 import { KeyValueStore } from "../ports/KeyValueStore";
 import type { KeyValueStoreService } from "../ports/KeyValueStore";
-import { OperationStore } from "../ports/OperationStore";
+import { NewOperation, OperationStore } from "../ports/OperationStore";
 import type {
   OperationStoreService,
   StoredOperation,
@@ -49,14 +49,16 @@ import {
 import { freshStorage } from "../testing/storage";
 import type { Storage } from "../testing/storage";
 import { MeltDraft, MeltQuote } from "./domain";
+import type { MeltResumeResult } from "./domain";
 import { Melt } from "./Melt";
 
 const mint = MintUrl.make("https://mint.example");
-const counterKey = deterministicCounterKey({
+const counterScope = {
   mint,
   unit: CurrencyUnit.make("sat"),
   keysetId: KeysetId.make(KEYSET_HEX),
-});
+};
+const counterKey = deterministicCounterKey(counterScope);
 const invoice = Bolt11Invoice.make("lnbc1fakeinvoice");
 const draft = new MeltDraft({ mint, invoice });
 
@@ -303,6 +305,38 @@ const resumeAndInspect = Effect.gen(function* () {
     operations: yield* (yield* OperationStore).loadAll,
   };
 });
+
+/** Runs `program` on a TestClock set `seconds` past the real now the records were created at. */
+const secondsLater = <A, E, R>(
+  seconds: number,
+  program: Effect.Effect<A, E, R>,
+) =>
+  Effect.gen(function* () {
+    yield* TestClock.setTime(Date.now() + seconds * 1000);
+    return yield* program;
+  }).pipe(Effect.provide(TestClock.layer()));
+
+/** A pending melt as releases before the operation inventory stored it. */
+const writeLegacyMelt = (storage: Storage) =>
+  Effect.runPromise(
+    storage.kv.set(
+      LEGACY_PENDING_MELT_KEY_PREFIX +
+        [mint, "quote-1"].map(encodeURIComponent).join("."),
+      JSON.stringify({
+        quoteId: "quote-1",
+        mint,
+        unit: "sat",
+        keysetId: KEYSET_HEX,
+        invoice,
+        amount: 10,
+        feeReserve: 2,
+        inputsTotal: 13,
+        expiresAt: null,
+        createdAt: Math.floor(Date.now() / 1000) - 60,
+        blankCounter: 66,
+      }),
+    ),
+  );
 
 /**
  * A melt whose request left but whose outcome the process never learned:
@@ -908,6 +942,45 @@ describe("Melt.melt", () => {
     expect(onlyMelt(operations).status).toBe("paid");
   });
 
+  it("keeps resume passes off a PENDING payment it is still polling", async () => {
+    const storage = freshStorage();
+    let reachPoll = () => {};
+    const polling = new Promise<void>((resolve) => {
+      reachPoll = resolve;
+    });
+    let answerPoll: (quote: MeltQuoteBolt11Response) => void = () => {};
+    const answer = new Promise<MeltQuoteBolt11Response>((resolve) => {
+      answerPoll = resolve;
+    });
+    const paying = makeWallet({
+      send: () => Promise.resolve(swappedThirteen()),
+      melt: () => Promise.resolve(meltResponse("PENDING", [])),
+      checkQuote: () => {
+        reachPoll();
+        return answer;
+      },
+      restore: () => Promise.resolve({ proofs: [proof(1, "chg")] }),
+    });
+    const payment = makeHarness(paying.wallet, storage).run(
+      meltAndInspect([proofsA, proofsB]),
+    );
+    await polling;
+
+    const resuming = makeWallet({});
+    const resumed = await makeHarness(resuming.wallet, storage).run(
+      resumeAndInspect,
+    );
+    assert(Exit.isSuccess(resumed));
+    expect(resumed.value.results).toMatchObject([{ status: "pending" }]);
+    expect(resuming.checkQuoteCalls).toEqual([]);
+
+    answerPoll(quoteResponse({ state: "PAID" }));
+    const exit = await payment;
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Success");
+    expect(onlyMelt(exit.value.operations).status).toBe("paid");
+  });
+
   it("hands a payment that stays pending to resume, inputs held under the operation", async () => {
     const storage = freshStorage();
     const { wallet } = makeWallet({
@@ -973,7 +1046,7 @@ describe("Melt.melt", () => {
     expect(await pendingMelts(storage)).toHaveLength(1);
   });
 
-  it("releases the inputs when the quote check after a lost response says UNPAID", async () => {
+  it("keeps the inputs held when the quote check after a lost response says UNPAID: the request may still land", async () => {
     const storage = freshStorage();
     const { wallet } = makeWallet({
       send: () => Promise.resolve(swappedThirteen()),
@@ -985,10 +1058,148 @@ describe("Melt.melt", () => {
     );
     assert(Exit.isSuccess(exit));
     assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure._tag).toBe("PaymentPending");
+    expect(amountIn(exit.value.proofs, "held")).toBe(13);
+    expect(onlyMelt(exit.value.operations).status).toBe("pending");
+  });
+
+  it("releases the inputs when the quote check after a lost response says UNPAID past the grace window", async () => {
+    const storage = freshStorage();
+    let reachMelt = () => {};
+    const melting = new Promise<void>((resolve) => {
+      reachMelt = resolve;
+    });
+    let dropResponse = () => {};
+    const response = new Promise<never>((_, reject) => {
+      dropResponse = () => reject(new TypeError("fetch failed"));
+    });
+    const { wallet } = makeWallet({
+      send: () => Promise.resolve(swappedThirteen()),
+      melt: () => {
+        reachMelt();
+        return response;
+      },
+      checkQuote: () => Promise.resolve(quoteResponse({ state: "UNPAID" })),
+    });
+    const exit = await makeHarness(wallet, storage).run(
+      Effect.gen(function* () {
+        // Timestamps are positive unix seconds; the TestClock starts at 0.
+        yield* TestClock.adjust("1000 seconds");
+        const payment = yield* Effect.forkChild(
+          meltAndInspect([proofsA, proofsB]),
+        );
+        yield* Effect.promise(() => melting);
+        yield* TestClock.adjust("121 seconds");
+        dropResponse();
+        return yield* Fiber.join(payment);
+      }).pipe(Effect.provide(TestClock.layer())),
+    );
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Failure");
     expect(exit.value.receipt.failure._tag).toBe("PaymentFailed");
     expect(amountIn(exit.value.proofs, "available")).toBe(14);
     expect(await pendingMelts(storage)).toEqual([]);
     expect(onlyMelt(exit.value.operations).status).toBe("unpaid");
+  });
+
+  it("sends nothing when the caller's quote already has a melt here that the mint still reads UNPAID", async () => {
+    const storage = freshStorage();
+    const first = makeWallet({
+      send: () => Promise.resolve(swappedThirteen()),
+      melt: () => Promise.reject(new TypeError("fetch failed")),
+      checkQuote: () => Promise.resolve(quoteResponse({ state: "UNPAID" })),
+    });
+    const lost = await makeHarness(first.wallet, storage).run(
+      meltAndInspect([proofsA, proofsB]),
+    );
+    assert(Exit.isSuccess(lost));
+    assert(lost.value.receipt._tag === "Failure");
+    expect(lost.value.receipt.failure._tag).toBe("PaymentPending");
+
+    const retry = makeWallet({
+      send: () => Promise.resolve(swappedThirteen()),
+      melt: () => Promise.resolve(meltResponse("PAID", [])),
+      checkQuote: () => Promise.resolve(quoteResponse({ state: "UNPAID" })),
+    });
+    const exit = await makeHarness(retry.wallet, storage).run(
+      Effect.gen(function* () {
+        yield* seedProofs(mint, [proof(16, "src-c1")]);
+        return yield* Effect.flip(
+          (yield* Melt).melt(
+            new MeltDraft({ ...draft, quoteId: QuoteId.make("quote-1") }),
+          ),
+        );
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value._tag).toBe("PaymentFailed");
+    expect(retry.sendCalls).toEqual([]);
+    expect(retry.meltCalls).toEqual([]);
+    expect(await pendingMelts(storage)).toMatchObject([{ counter: 66 }]);
+  });
+
+  it("sends nothing for a caller's quote a legacy key-value record still holds", async () => {
+    const storage = freshStorage();
+    await writeLegacyMelt(storage);
+    const { wallet, sendCalls, meltCalls } = makeWallet({
+      send: () => Promise.resolve(swappedThirteen()),
+      melt: () => Promise.resolve(meltResponse("PAID", [])),
+      checkQuote: () => Promise.resolve(quoteResponse({ state: "UNPAID" })),
+    });
+    const exit = await makeHarness(wallet, storage).run(
+      Effect.gen(function* () {
+        yield* seedProofs(mint, proofsA);
+        yield* seedProofs(mint, proofsB);
+        return yield* Effect.flip(
+          (yield* Melt).melt(
+            new MeltDraft({ ...draft, quoteId: QuoteId.make("quote-1") }),
+          ),
+        );
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value._tag).toBe("PaymentFailed");
+    expect(sendCalls).toEqual([]);
+    expect(meltCalls).toEqual([]);
+    // Left for `resumePending` to carry over.
+    expect(await meltOperations(storage)).toEqual([]);
+  });
+
+  it("holds the quote lease before the record lands, so a resume woken by it stays off the mint", async () => {
+    const storage = freshStorage();
+    const resuming = makeWallet({
+      checkQuote: () => Promise.resolve(quoteResponse({ state: "UNPAID" })),
+    });
+    const resumer = makeHarness(resuming.wallet, storage);
+    const resumed: MeltResumeResult[] = [];
+    // Runs a resume pass the moment the record lands, before the melt request.
+    const operations: OperationStoreService = {
+      ...storage.operations,
+      insert: (operation) =>
+        Effect.tap(storage.operations.insert(operation), () =>
+          Effect.promise(() =>
+            resumer.run(resumeAndInspect).then((exit) => {
+              assert(Exit.isSuccess(exit));
+              resumed.push(...exit.value.results);
+            }),
+          ),
+        ),
+    };
+    const paying = makeWallet({
+      send: () => Promise.resolve(swappedThirteen()),
+      melt: () => Promise.resolve(meltResponse("PAID", [proof(1, "chg")])),
+    });
+
+    const exit = await makeHarness(paying.wallet, {
+      ...storage,
+      operations,
+    }).run(meltAndInspect([proofsA, proofsB]));
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Success");
+    expect(resumed).toMatchObject([{ status: "pending" }]);
+    expect(resuming.checkQuoteCalls).toEqual([]);
+    expect(paying.meltCalls).toHaveLength(1);
+    expect(onlyMelt(exit.value.operations).status).toBe("paid");
   });
 
   it("excludes NUT-07 spent proofs and marks them before melting", async () => {
@@ -1163,7 +1374,7 @@ describe("Melt.melt with a maximum total", () => {
 });
 
 describe("Melt.resumePending", () => {
-  it("finishes a paid melt on a fresh runtime, reclaiming change from the recorded blank slots", async () => {
+  it("finishes a paid melt at once on a fresh runtime, reclaiming change from the recorded blank slots", async () => {
     const storage = freshStorage();
     await interruptMelt(storage);
 
@@ -1212,7 +1423,7 @@ describe("Melt.resumePending", () => {
     expect(serialized).not.toContain("lnbc");
   });
 
-  it("returns the inputs to balance when the mint reports UNPAID", async () => {
+  it("keeps a young melt the mint reports UNPAID: its request may not have landed yet", async () => {
     const storage = freshStorage();
     await interruptMelt(storage);
 
@@ -1220,7 +1431,23 @@ describe("Melt.resumePending", () => {
       checkQuote: () => Promise.resolve(quoteResponse({ state: "UNPAID" })),
     });
     const exit = await makeHarness(resuming.wallet, storage).run(
-      resumeAndInspect,
+      secondsLater(119, resumeAndInspect),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.results[0]).toMatchObject({ status: "pending" });
+    expect(proofsIn(exit.value.proofs, "held")).toHaveLength(3);
+    expect(onlyMelt(exit.value.operations).status).toBe("pending");
+  });
+
+  it("returns the inputs to balance when the mint reports UNPAID past the grace window", async () => {
+    const storage = freshStorage();
+    await interruptMelt(storage);
+
+    const resuming = makeWallet({
+      checkQuote: () => Promise.resolve(quoteResponse({ state: "UNPAID" })),
+    });
+    const exit = await makeHarness(resuming.wallet, storage).run(
+      secondsLater(121, resumeAndInspect),
     );
     assert(Exit.isSuccess(exit));
     expect(exit.value.results[0]).toMatchObject({
@@ -1236,6 +1463,61 @@ describe("Melt.resumePending", () => {
     ]);
     expect(proofsIn(exit.value.proofs, "held")).toHaveLength(0);
     expect(onlyMelt(exit.value.operations).status).toBe("unpaid");
+  });
+
+  it("keeps a PAID melt open while the blank slot of its attempt has not synced", async () => {
+    const storage = freshStorage();
+    await interruptMelt(storage);
+    const [pending] = await pendingMelts(storage);
+    assert(pending !== undefined);
+    await Effect.runPromise(
+      storage.operations.insert(
+        new NewOperation({ ...pending, counter: null }),
+      ),
+    );
+
+    const resuming = makeWallet({
+      checkQuote: () => Promise.resolve(quoteResponse({ state: "PAID" })),
+      restore: () => Promise.resolve({ proofs: [proof(1, "chg")] }),
+    });
+    const exit = await makeHarness(resuming.wallet, storage).run(
+      resumeAndInspect,
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.results).toMatchObject([{ status: "pending" }]);
+    expect(resuming.restoreCalls).toEqual([]);
+    expect(proofsIn(exit.value.proofs, "held")).toHaveLength(3);
+    expect(onlyMelt(exit.value.operations).status).toBe("pending");
+  });
+
+  it("skips a melt the payer closed after the pass listed it, reporting nothing", async () => {
+    const storage = freshStorage();
+    await interruptMelt(storage);
+    const [pending] = await pendingMelts(storage);
+    assert(pending !== undefined);
+    // The payer settles and frees the quote lease just before this pass takes it.
+    const kv = {
+      ...storage.kv,
+      tryAcquireLease: (key: string, ttlMs: number) =>
+        Effect.andThen(
+          storage.operations.update(pending.id, { status: "paid" }),
+          storage.kv.tryAcquireLease(key, ttlMs),
+        ),
+    };
+    const resuming = makeWallet({
+      checkQuote: () => Promise.resolve(quoteResponse({ state: "PAID" })),
+      restore: () => Promise.resolve({ proofs: [proof(1, "chg")] }),
+    });
+    const exit = await makeHarness(resuming.wallet, { ...storage, kv }).run(
+      resumeAndInspect,
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.results).toEqual([]);
+    expect(resuming.checkQuoteCalls).toEqual([]);
+    expect(resuming.restoreCalls).toEqual([]);
+    expect(
+      proofsIn(exit.value.proofs, "available").map((p) => p.secret),
+    ).toEqual(["k1"]);
   });
 
   it("leaves a PENDING payment and its held inputs untouched", async () => {
@@ -1281,6 +1563,36 @@ describe("Melt.resumePending", () => {
     );
   });
 
+  it.each<{ stalled: string; answers: FakeWalletArgs }>([
+    {
+      stalled: "quote check",
+      answers: { checkQuote: () => new Promise<never>(() => {}) },
+    },
+    {
+      stalled: "change reclaim",
+      answers: {
+        checkQuote: () => Promise.resolve(quoteResponse({ state: "PAID" })),
+        restore: () => new Promise<never>(() => {}),
+      },
+    },
+  ])(
+    "gives up on a mint whose $stalled does not answer, so later melts in the pass still run",
+    async ({ answers }) => {
+      const storage = freshStorage();
+      await interruptMelt(storage);
+
+      const resuming = makeWallet(answers);
+      const exit = await makeHarness(resuming.wallet, storage).run(
+        runOnTestClock(resumeAndInspect, "10 seconds").pipe(
+          Effect.provide(TestClock.layer()),
+        ),
+      );
+      assert(Exit.isSuccess(exit));
+      expect(exit.value.results).toMatchObject([{ status: "unresolved" }]);
+      expect(proofsIn(exit.value.proofs, "held")).toHaveLength(3);
+    },
+  );
+
   it("does not import change twice when the change landed before the operation closed", async () => {
     const storage = freshStorage();
     await interruptMelt(storage);
@@ -1309,29 +1621,36 @@ describe("Melt.resumePending", () => {
     expect(onlyMelt(exit.value.operations).status).toBe("paid");
   });
 
+  it("settles a paid melt a second time without importing its change twice", async () => {
+    const storage = freshStorage();
+    await interruptMelt(storage);
+    const resuming = makeWallet({
+      checkQuote: () => Promise.resolve(quoteResponse({ state: "PAID" })),
+      restore: () => Promise.resolve({ proofs: [proof(1, "chg")] }),
+    });
+    const harness = makeHarness(resuming.wallet, storage);
+    assert(Exit.isSuccess(await harness.run(resumeAndInspect)));
+    // Another device settling the same melt before the close synced here.
+    const [paid] = await meltOperations(storage);
+    assert(paid !== undefined);
+    await Effect.runPromise(
+      storage.operations.update(paid.id, { status: "pending" }),
+    );
+
+    const exit = await harness.run(resumeAndInspect);
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.results[0]).toMatchObject({ status: "paid" });
+    expect(secretsOf(proofsIn(exit.value.proofs, "available"))).toEqual([
+      "chg",
+      "k1",
+    ]);
+    expect(proofsIn(exit.value.proofs, "held")).toHaveLength(0);
+    expect(onlyMelt(exit.value.operations).status).toBe("paid");
+  });
+
   it("carries a legacy key-value record over into a melt operation", async () => {
     const storage = freshStorage();
-    const legacyKey =
-      LEGACY_PENDING_MELT_KEY_PREFIX +
-      [mint, "quote-1"].map(encodeURIComponent).join(".");
-    await Effect.runPromise(
-      storage.kv.set(
-        legacyKey,
-        JSON.stringify({
-          quoteId: "quote-1",
-          mint,
-          unit: "sat",
-          keysetId: KEYSET_HEX,
-          invoice,
-          amount: 10,
-          feeReserve: 2,
-          inputsTotal: 13,
-          expiresAt: null,
-          createdAt: Math.floor(Date.now() / 1000) - 60,
-          blankCounter: 66,
-        }),
-      ),
-    );
+    await writeLegacyMelt(storage);
 
     const resuming = makeWallet({
       checkQuote: () => Promise.resolve(quoteResponse({ state: "PAID" })),

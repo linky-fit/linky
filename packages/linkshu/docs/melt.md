@@ -53,28 +53,29 @@ The receipt carries `paidAmount`, `feeReserve`, `feePaid` (what the melt inputs 
 `quote` costs nothing and touches no proof. `melt` runs in this order:
 
 1. Price and select sources concurrently. Fetch or re-check the quote (it must be `UNPAID`, else `PaymentFailed`, and not past `expiresAt`, else `QuoteExpired`) while NUT-07 filtering `available` proofs at `mint` (spent ones are marked `spent`, which sticks even if pricing fails). The confirmed unspent total must cover `amount + feeReserve`, else `InsufficientFunds`.
+   Then the quote's lease is taken and held until `melt` returns, so `resumePending` in the same browser, woken by the new record, leaves the melt alone. A lease it cannot get within 15 s fails with `PaymentFailed`, nothing sent.
 2. Swap fee-inclusive. Exactly `amount + feeReserve` plus the swap's own input fee is swapped out under the counter lock.
-3. Persist before melting. The deterministic counter advances past the full NUT-08 blank range of the first attempt, and a `pending` `melt` operation (quote, invoice, amounts, `inputsTotal`, and that range's first slot as `counter`) is inserted; then one write stores the melt inputs `held` under it and the remainder `available`, and marks the consumed sources `spent`. From here on the payment is reconstructible from the stores alone.
-4. Melt and settle. The first attempt sends the blanks of the slot the operation names. A retry after a counter collision writes its new slot to the operation's `counter` and advances the counter past its blank range before the request leaves.
+3. Persist before melting. When the counter lock is free, the deterministic counter advances past the full NUT-08 blank range of the first attempt. A `pending` `melt` operation (quote, invoice, amounts, `inputsTotal`, and that range's first slot as `counter`, or null when the lock was busy) is inserted; then one write stores the melt inputs `held` under it and the remainder `available`, and marks the consumed sources `spent`. From here on the payment is reconstructible from the stores alone.
+4. Melt and settle. The first attempt sends the blanks of the slot the operation names, reserving and recording one first if it names none. A retry after a counter collision writes its new slot to the operation's `counter` and advances the counter past its blank range before the request leaves.
 
-| Mint answer             | Result                                                                                                                                      |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PAID`                  | change stored `available`, held inputs `spent`, melt `paid`; receipt resolves                                                               |
-| `UNPAID`                | held inputs back to `available`, melt `unpaid`; `PaymentFailed`                                                                             |
-| `PENDING`               | polled briefly; then `PAID`/`UNPAID` as above, or `PaymentPending` with the inputs still `held` under the `pending` melt                    |
-| response lost (network) | the quote is checked once; `PAID`/`UNPAID` as above, no answer → `PaymentPending`, inputs still `held`. Never surfaces as `MintUnreachable` |
-| definitive rejection    | held inputs back to `available`, melt `failed` with the serialized `MintRejected`; `MintRejected`                                           |
+| Mint answer             | Result                                                                                                                                                                                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `PAID`                  | change stored `available`, held inputs `spent`, melt `paid`; receipt resolves                                                                                                                                      |
+| `UNPAID`                | held inputs back to `available`, melt `unpaid`; `PaymentFailed`                                                                                                                                                    |
+| `PENDING`               | polled briefly; then `PAID`/`UNPAID` as above, or `PaymentPending` with the inputs still `held` under the `pending` melt                                                                                           |
+| response lost (network) | the quote is checked once; `PAID` as above, `UNPAID` as above only for a melt created 120 s or more ago, else `PaymentPending` with the inputs still `held`, as for no answer. Never surfaces as `MintUnreachable` |
+| definitive rejection    | held inputs back to `available`, melt `failed` with the serialized `MintRejected`; `MintRejected`                                                                                                                  |
 
 ### `resumePending`
 
-A `PaymentPending` failure, or a crash after step 3, leaves a `pending` melt with `held` inputs. `resumePending` asks the mint about each one and returns a `MeltResumeResult` per melt. The shared rules (when to run it, why only the mint's answer retires a record) are in [concepts.md](./concepts.md#resuming-interrupted-operations).
+A `PaymentPending` failure, or a crash after step 3, leaves a `pending` melt with `held` inputs. `resumePending` asks the mint about each one and returns a `MeltResumeResult` per melt still pending when its turn comes. It can run on any device while another one pays: the mint answers `UNPAID` until the melt request reaches it, so an `UNPAID` for a melt younger than 120 s (the record's `createdAt` against this device's clock) keeps the inputs held, and a `PAID` melt settled twice imports its change once. A device clock off by more than that window, or an older linkshu without it, can still release the inputs of a melt another device is paying. The shared rules (when to run it, why only the mint's answer retires a record) are in [concepts.md](./concepts.md#resuming-interrupted-operations).
 
-| Mint answer      | `status`     | What happened                                                                                                     |
-| ---------------- | ------------ | ----------------------------------------------------------------------------------------------------------------- |
-| `PAID`           | `paid`       | change reclaimed via NUT-09 over the recorded blank slot and stored `available`; inputs `spent`; `receipt` is set |
-| `UNPAID`         | `unpaid`     | inputs back to `available`; melt `unpaid`                                                                         |
-| `PENDING`        | `pending`    | inputs and melt untouched                                                                                         |
-| no usable answer | `unresolved` | inputs and melt untouched; the mint could not be loaded, did not answer, or rejected the change reclaim           |
+| Mint answer      | `status`     | What happened                                                                                                                                                                              |
+| ---------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `PAID`           | `paid`       | change reclaimed via NUT-09 over the recorded blank slot and stored `available`; inputs `spent`; `receipt` is set. `pending` while the record has not synced the blank slot of its attempt |
+| `UNPAID`         | `unpaid`     | inputs back to `available`; melt `unpaid`. Only for a melt created 120 s or more ago, else `pending`                                                                                       |
+| `PENDING`        | `pending`    | inputs and melt untouched; also a melt `melt` is still paying in this browser, which the mint is not asked about                                                                           |
+| no usable answer | `unresolved` | inputs and melt untouched; the mint could not be loaded, did not answer within 30 s, or rejected the change reclaim                                                                        |
 
 ```ts
 import { Effect } from "effect";
@@ -90,7 +91,7 @@ const settleInterruptedMelts = Effect.gen(function* () {
 
 An input can sync in from another device after its melt closed here (a melt operation synced ahead of its proof rows). Each `resumePending` also settles such inputs by the melt's outcome, with reason `melt-late-input`: `spent` under a `paid` melt, else back to the melt's envelope or to the balance.
 
-Do not pay the invoice again while a melt is pending: `melt` with the same `quoteId` fails with `PaymentFailed` while the quote is not `UNPAID`. `held` inputs are not a transfer; `Tokens.returnToWallet` cannot release them, only the mint's answer through `resumePending` does.
+Do not pay the invoice again while a melt is pending: `melt` with the same `quoteId` fails with `PaymentFailed`, nothing sent, while this store holds a `pending` or `paid` melt for it or the quote is not `UNPAID`. `held` inputs are not a transfer; `Tokens.returnToWallet` cannot release them, only the mint's answer through `resumePending` does.
 
 ## Paying from an envelope
 

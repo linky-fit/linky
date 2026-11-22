@@ -23,6 +23,7 @@ import {
   Bolt11Invoice,
   EnvelopeKey,
   MintUrl,
+  UnixSeconds,
 } from "../domain/primitives";
 import { Melt } from "../melt/Melt";
 import { WalletInstances } from "../mint/internal/WalletInstances";
@@ -335,6 +336,13 @@ const syncInto = (
 
 const asNew = (operation: StoredOperation) =>
   new NewOperation(Struct.omit(operation, ["id"]));
+
+/** A melt old enough that a resume trusts the mint's UNPAID. */
+const asAgedNew = (operation: StoredOperation) =>
+  new NewOperation({
+    ...asNew(operation),
+    createdAt: UnixSeconds.make(operation.createdAt - 600),
+  });
 
 const stateOfSecret = (
   proofs: ReadonlyArray<{ secret: string; state: ProofState }>,
@@ -924,7 +932,7 @@ describe("Melt.meltEnvelope", () => {
     );
     const second = makeDevice(fakeMint, { name: "b" });
     await syncInto(second, {
-      operations: [asNew(melt)],
+      operations: [asAgedNew(melt)],
       proofs: proofs.filter((entry) => entry.operationId === melt.id),
     });
     fakeMint.quote.state = "UNPAID";
@@ -955,7 +963,7 @@ describe("Melt.meltEnvelope", () => {
     const melt = operations.find((operation) => operation.kind === "melt");
     assert(melt !== undefined);
     const second = makeDevice(fakeMint, { name: "b" });
-    await syncInto(second, { operations: [asNew(melt)] });
+    await syncInto(second, { operations: [asAgedNew(melt)] });
     fakeMint.quote.state = "UNPAID";
     expect((await resumeOn(second)).map((result) => result.status)).toEqual([
       "unpaid",
