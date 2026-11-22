@@ -22,7 +22,7 @@
     },
     "apps/fazole-app": {
       "name": "@linky-fit/fazole-app",
-      "version": "26.10.4",
+      "version": "26.11.1",
       "dependencies": {
         "@evolu/common": "8.29.0",
         "@evolu/web": "3.9.0",
@@ -116,7 +116,7 @@
     },
     "apps/linky-app": {
       "name": "@linky-fit/linky-app",
-      "version": "26.11.4",
+      "version": "26.11.5",
       "dependencies": {
         "@capacitor/clipboard": "^7.0.0",
         "@capacitor/core": "^7.4.3",

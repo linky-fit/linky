@@ -12,6 +12,8 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ## [Unreleased]
 
+## [26.11.5] - 2026-11-22
+
 ### en-US
 
 - An on-chain send shows its payout address with a link to the explorer; opening it marks the send done once the payout is on chain.
