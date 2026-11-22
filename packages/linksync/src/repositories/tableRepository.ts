@@ -44,9 +44,10 @@ export interface TableRepository<C extends Columns> {
     id: C["id"],
   ) => Effect.Effect<void, ShardDbError | RowNotFound>;
   /**
-   * The rotation check every write ends with; a batch of raw store writes
-   * runs it once. A failed pointer write is logged, never raised: the row
-   * is stored either way and the next write repeats the check.
+   * Starts the rotation check every write ends with, without waiting for
+   * its usage read; a batch of raw store writes runs it once. A failed
+   * pointer write is logged, never raised: the row is stored either way
+   * and the next write repeats the check.
    */
   readonly maybeRotate: Effect.Effect<void>;
   /** Fires after any change to the scope's tables, local or synced. */
@@ -68,6 +69,8 @@ export const tableRepository = <
     Effect.catchTag("ShardDbError", (error) =>
       Effect.logWarning(`shard rotation of ${scope} failed`, error),
     ),
+    // Runs inline until its first async read: an in-memory port rotates before the write returns.
+    Effect.forkDetach({ startImmediately: true }),
     Effect.asVoid,
   );
   const rotateAfter = <E>(write: Effect.Effect<void, E>) =>
