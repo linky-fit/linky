@@ -47,7 +47,7 @@ const owningPaymentId = (inflow: WalletActivity): TransactionId | null => {
 
 /**
  * Cash taken from a Linky user against the bitcoin the shop will receive:
- * while a pledge is open, every inflow is forwarded to them as a Linky
+ * while a pledge is open, each payment is forwarded to them as a Linky
  * withdrawal until the CZK amount is repaid, and they get a chat message
  * at each step. The merchant owes one person at a time.
  */
