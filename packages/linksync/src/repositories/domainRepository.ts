@@ -96,9 +96,10 @@ export interface DomainTableRepository<C extends Columns> {
     id: C["id"],
   ) => Effect.Effect<void, ShardDbError | RowNotFound>;
   /**
-   * The rotation check every write ends with; a batch of raw store writes
-   * runs it once. A failed pointer write is logged, never raised: the row
-   * is stored either way and the next write repeats the check.
+   * Starts the rotation check every write ends with, without waiting for
+   * its usage read; a batch of raw store writes runs it once. A failed
+   * pointer write is logged, never raised: the row is stored either way
+   * and the next write repeats the check.
    */
   readonly maybeRotate: Effect.Effect<void>;
   /** Fires after any change to the scope's tables, local or synced. */

@@ -1,4 +1,4 @@
-import { Effect, References } from "effect";
+import { Deferred, Effect, References } from "effect";
 import {
   makeInMemoryShardDb,
   ShardDbError,
@@ -49,6 +49,35 @@ describe("tableRepository", () => {
       );
     expect(runNow(contacts.all)).toHaveLength(230);
     expect(runNow(store.activeIndex("contacts"))).toBe(0);
+  });
+
+  it("returns from a write before its rotation check reads the shard's usage", async () => {
+    const db = makeInMemoryShardDb<LinkyDbSchema>(linkyTableColumns);
+    const usageRead = Deferred.makeUnsafe<void>();
+    const store = createLinkyStore(
+      {
+        ...db,
+        ownerUsage: () =>
+          Effect.as(Deferred.await(usageRead), { mutations: 1000, bytes: 0 }),
+      },
+      testAppOwner(),
+    );
+    const contacts = tableRepository(store, "contacts", "contact");
+    const contact = {
+      id: createId<"Contact">(),
+      name: NonEmptyString1000.orThrow("Alice"),
+    };
+
+    await Effect.runPromise(contacts.insert(contact));
+    expect(runNow(contacts.byId(contact.id))).toMatchObject(contact);
+    expect(runNow(store.activeIndex("contacts"))).toBe(0);
+
+    const rotated = new Promise<void>((resolve) =>
+      store.subscribePointers(resolve),
+    );
+    runNow(Deferred.succeed(usageRead, undefined));
+    await rotated;
+    expect(runNow(store.activeIndex("contacts"))).toBe(1);
   });
 
   it("revives a removed row on insert", () => {
