@@ -51,6 +51,7 @@
     "typecheck": "bun run --workspaces --if-present typecheck",
     "test": "bun run --workspaces --if-present test",
     "e2e": "bash scripts/e2e.sh",
+    "journey": "bash scripts/journey.sh",
     "check-code": "bun run typecheck && bun run eslint && bun run prettier",
     "check-changed": "bash scripts/changed.sh typecheck eslint prettier",
     "test-changed": "bash scripts/changed.sh test",

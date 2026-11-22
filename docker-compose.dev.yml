@@ -185,7 +185,7 @@ services:
       # Leaves initial block download right away despite the 2011 genesis.
       - -maxtipage=2000000000
     ports:
-      - "18443:18443"
+      - "${LINKY_E2E_BITCOIND_PORT:-18443}:18443"
     volumes:
       - bitcoind-data:/data/.bitcoin
     healthcheck:
@@ -219,7 +219,7 @@ services:
       bitcoind:
         condition: service_healthy
     ports:
-      - "3002:3002"
+      - "${LINKY_E2E_ESPLORA_PORT:-3002}:3002"
     volumes:
       - electrs-data:/data
     healthcheck:
@@ -239,12 +239,12 @@ services:
     profiles: ["bitcoin"]
     image: ghcr.io/vulpemventures/esplora:beb2cff88d63bea6991a5a9a0b11b2a45d13ee6b
     environment:
-      API_URL: http://localhost:3002
+      API_URL: http://localhost:${LINKY_E2E_ESPLORA_PORT:-3002}
     depends_on:
       electrs:
         condition: service_healthy
     ports:
-      - "3003:5000"
+      - "${LINKY_E2E_EXPLORER_PORT:-3003}:5000"
     healthcheck:
       test:
         [

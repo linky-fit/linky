@@ -77,14 +77,14 @@ mine() {
 
 # electrs polls bitcoind every few seconds; wait so callers see the blocks.
 wait_for_esplora() {
-  local height=$1
+  local height=$1 port=${LINKY_E2E_ESPLORA_PORT:-3002}
   for _ in $(seq 60); do
-    if [ "$(curl -s http://localhost:3002/blocks/tip/height)" = "$height" ]; then
+    if [ "$(curl -s "http://localhost:$port/blocks/tip/height")" = "$height" ]; then
       return
     fi
     sleep 0.5
   done
-  echo "electrs on :3002 did not reach height $height" >&2
+  echo "electrs on :$port did not reach height $height" >&2
   exit 1
 }
 

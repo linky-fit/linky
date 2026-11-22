@@ -1,0 +1,132 @@
+# The journey-test services, merged over docker-compose.dev.yml by scripts/journey.sh, which sets every variable.
+# Paths are relative to the repo root.
+x-build-args: &build-args
+  BUN_VERSION: ${LINKY_JOURNEY_BUN_VERSION}
+  APPS: apps/linky-app apps/fazole-app apps/onchain-operator tools/nostr-error-tracker
+  GIT_COMMIT_SHA: ${LINKY_JOURNEY_HEAD_SHA}
+  VITE_ALLOW_INSECURE_LOCALHOST_RELAYS: "1"
+  VITE_NOSTR_RELAYS: ws://localhost:${LINKY_E2E_NOSTR_PORT}
+  VITE_NOSTR_SEARCH_RELAYS: ws://localhost:${LINKY_E2E_NOSTR_PORT}
+  VITE_EVOLU_SERVER_URLS: ws://localhost:${LINKY_E2E_EVOLU_PORT}
+  VITE_MAIN_MINT_URL: http://localhost:${LINKY_E2E_MINT_PORT}
+  VITE_NPUB_CASH_SERVER_URL: http://localhost:${LINKY_E2E_NPUBCASH_PORT}
+  VITE_NPUB_CASH_UPSTREAM_URL: ""
+  VITE_PUSH_SERVER_URL: http://localhost:${LINKY_JOURNEY_PUSH_PORT}
+  # The dev operator of apps/onchain-operator/README.md.
+  VITE_ONCHAIN_OPERATOR_NPUB: npub1j3ntgmxzkw4rrxeh5ksrkca4tq994exjxxz2xr8dwp6xzgtjqq3s490wfg
+  VITE_BITCOIN_NETWORK: regtest
+  VITE_ESPLORA_URL: http://localhost:${LINKY_E2E_ESPLORA_PORT}
+  VITE_EXPLORER_URL: http://localhost:${LINKY_E2E_EXPLORER_PORT}
+
+# One image holds this checkout's four apps; `linky` builds it and the others run it.
+x-app: &app
+  image: ${LINKY_JOURNEY_IMAGE}:head
+  pull_policy: never
+  healthcheck:
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null || exit 1"]
+    interval: 2s
+    timeout: 2s
+    retries: 30
+
+services:
+  linky:
+    <<: *app
+    build:
+      context: .
+      dockerfile: docker/journey/Dockerfile
+      args: *build-args
+    working_dir: /app/apps/linky-app
+    ports:
+      - "${LINKY_JOURNEY_LINKY_PORT}:80"
+
+  fazole:
+    <<: *app
+    working_dir: /app/apps/fazole-app
+    environment:
+      MONETA_API_ORIGIN: http://bank
+    ports:
+      - "${LINKY_JOURNEY_FAZOLE_PORT}:80"
+
+  operator:
+    <<: *app
+    working_dir: /app/apps/onchain-operator
+    ports:
+      - "${LINKY_JOURNEY_OPERATOR_PORT}:80"
+
+  errors:
+    <<: *app
+    working_dir: /app/tools/nostr-error-tracker
+    ports:
+      - "${LINKY_JOURNEY_ERRORS_PORT}:80"
+
+  # The last releases, so a finding can be tried on what users run today.
+  linky-release:
+    <<: *app
+    image: ${LINKY_JOURNEY_IMAGE}:${LINKY_JOURNEY_LINKY_RELEASE}
+    build:
+      context: ${LINKY_JOURNEY_HOME}/src/${LINKY_JOURNEY_LINKY_RELEASE}
+      dockerfile: ${LINKY_JOURNEY_ROOT}/docker/journey/Dockerfile
+      args:
+        <<: *build-args
+        BUN_VERSION: ${LINKY_JOURNEY_LINKY_RELEASE_BUN_VERSION}
+        APPS: apps/linky-app
+        GIT_COMMIT_SHA: ${LINKY_JOURNEY_LINKY_RELEASE_SHA}
+        # Releases up to linky-v26.11.4 accept a localhost mint only as an E2E build.
+        VITE_E2E: "1"
+    working_dir: /app/apps/linky-app
+    ports:
+      - "${LINKY_JOURNEY_LINKY_RELEASE_PORT}:80"
+
+  fazole-release:
+    <<: *app
+    image: ${LINKY_JOURNEY_IMAGE}:${LINKY_JOURNEY_FAZOLE_RELEASE}
+    build:
+      context: ${LINKY_JOURNEY_HOME}/src/${LINKY_JOURNEY_FAZOLE_RELEASE}
+      dockerfile: ${LINKY_JOURNEY_ROOT}/docker/journey/Dockerfile
+      args:
+        <<: *build-args
+        BUN_VERSION: ${LINKY_JOURNEY_FAZOLE_RELEASE_BUN_VERSION}
+        APPS: apps/fazole-app
+        GIT_COMMIT_SHA: ${LINKY_JOURNEY_FAZOLE_RELEASE_SHA}
+    working_dir: /app/apps/fazole-app
+    environment:
+      MONETA_API_ORIGIN: http://bank
+    ports:
+      - "${LINKY_JOURNEY_FAZOLE_RELEASE_PORT}:80"
+
+  push:
+    image: ${LINKY_JOURNEY_IMAGE}:push
+    build:
+      context: .
+      dockerfile: apps/push/Dockerfile
+    env_file: apps/push/.env.development
+    environment:
+      PUSH_STORAGE_PATH: /data/linky-push.sqlite
+      PUSH_DEFAULT_RELAYS: ws://localhost:${LINKY_E2E_NOSTR_PORT}
+    ports:
+      - "${LINKY_JOURNEY_PUSH_PORT}:8787"
+    volumes:
+      - push-data:/data
+
+  # Users' relay lists name the relay by its browser URL; this makes that URL reach it from inside push.
+  push-relay-port:
+    image: docker.io/alpine/socat:1.8.0.3
+    network_mode: service:push
+    command: TCP-LISTEN:${LINKY_E2E_NOSTR_PORT},fork,reuseaddr TCP:nostr-relay:8080
+
+  # Stands in for MONETA's business API behind Fazole's /api/moneta; `bun run journey bank pay` books a transfer.
+  bank:
+    image: oven/bun:1.4.4-alpine
+    command: ["bun", "/fake-bank.ts"]
+    volumes:
+      - ./docker/journey/fake-bank.ts:/fake-bank.ts:ro
+    ports:
+      - "${LINKY_JOURNEY_BANK_PORT}:80"
+
+  cashu-mint:
+    environment:
+      # "false" under `bun run journey mint hold`: invoices then stay unpaid until a wallet at this mint pays them.
+      FAKEWALLET_BRR: "${LINKY_JOURNEY_MINT_SELF_PAYS}"
+
+volumes:
+  push-data:
