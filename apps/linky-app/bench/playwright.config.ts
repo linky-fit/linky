@@ -1,6 +1,6 @@
 import { defineConfig } from "@playwright/test";
 
-// Runs against `bun run dev` (vite + the dev docker stack), which also records the inspector events the bench reads.
+// contactSend runs against `bun run dev`, which records the inspector events it reads; payments runs through `bun run journey bench`.
 export default defineConfig({
   testDir: ".",
   testMatch: "**/*.bench.ts",
