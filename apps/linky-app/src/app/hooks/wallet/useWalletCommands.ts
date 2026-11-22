@@ -6,6 +6,7 @@ import {
   type OnchainTransferPaymentOptions,
 } from "../../state/wallet/walletCommands";
 import type { LocalNostrMessage } from "../../types/appTypes";
+import type { LnurlPayPreview } from "../../../lnurlPay";
 
 /** The wallet composition's payments, token recovery and payment confirmations. */
 export const useWalletCommands = () => {
@@ -41,10 +42,11 @@ export const useWalletCommands = () => {
         lnAddress: string,
         amountSat: number,
         comment: string | null,
+        preview: LnurlPayPreview | null,
       ) =>
         commands
           ?.read()
-          .payLightningAddressWithCashu(lnAddress, amountSat, comment),
+          .payLightningAddressWithCashu(lnAddress, amountSat, comment, preview),
       payLightningInvoiceWithCashu: async (
         invoice: string,
         amountSat?: number,

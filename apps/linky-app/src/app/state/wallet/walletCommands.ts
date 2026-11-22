@@ -1,5 +1,6 @@
 import type { CashuPaymentRequestMessageInfo } from "../../lib/paymentRequestMessage";
 import type { LocalNostrMessage } from "../../types/appTypes";
+import type { LnurlPayPreview } from "../../../lnurlPay";
 import { ownerCommandsAtom } from "../shell/ownerCommands";
 
 /** What paying a transfer's request shows for review, checks while it runs and does once it is paid. */
@@ -21,6 +22,8 @@ export interface WalletCommands {
     lnAddress: string,
     amountSat: number,
     comment: string | null,
+    /** The pay request the user confirmed; skips refetching it. */
+    preview: LnurlPayPreview | null,
   ) => Promise<void>;
   /** Pays the contact the pay screen shows, the amount its draft holds. */
   readonly paySelectedContact: (options: {

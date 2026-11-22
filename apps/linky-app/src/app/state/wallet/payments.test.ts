@@ -40,7 +40,7 @@ import { LinkstrNotConfigured } from "@linky-fit/linkstr-react";
 import { Exit, Result, Schema } from "effect";
 import { getPublicKey, nip19 } from "nostr-tools";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
-import type { LnurlPayInvoiceResult } from "../../../lnurlPay";
+import type { LnurlPayInvoiceResult, LnurlPayPreview } from "../../../lnurlPay";
 import { buildCashuToken } from "../../../testUtils/cashuToken";
 import { makeLightningInvoice } from "../../../testUtils/lightningInvoice";
 import { createSecretKey } from "../../../testUtils/nostrKeys";
@@ -63,6 +63,7 @@ const { fetchLnurlInvoiceForTarget } = vi.hoisted(() => ({
         target: string,
         amountSat: number,
         comment?: string,
+        preview?: LnurlPayPreview | null,
       ) => Promise<LnurlPayInvoiceResult>
     >(),
 }));
@@ -725,15 +726,28 @@ describe("payLightningAddress", () => {
     );
   });
 
-  it("sends the note as the LNURL comment and types a contact's address as a contact payment", async () => {
+  it("sends the note as the LNURL comment with the confirmed pay request and types a contact's address as a contact payment", async () => {
     fetchLnurlInvoiceForTarget.mockResolvedValue(invoiceFor(40));
     const { commands, logPaymentEvent } = setup();
+    const preview: LnurlPayPreview = {
+      callback: "https://example.com/callback",
+      commentAllowed: 100,
+      description: null,
+      lightningAddress: "alice@example.com",
+      maxSendableMsat: 100_000,
+      maxSendableSat: 100,
+      metadataRaw: '[["text/plain","alice"]]',
+      minSendableMsat: 1000,
+      minSendableSat: 1,
+      target: "alice@example.com",
+    };
 
     const outcome = await commands.payLightningAddress({
       lnAddress: "alice@example.com",
       amountSat: 40,
       contact: { id: "contact-1", lnAddress: "alice@example.com" },
       comment: " thanks! ",
+      preview,
     });
 
     expect(outcome).toEqual({
@@ -746,6 +760,7 @@ describe("payLightningAddress", () => {
       "alice@example.com",
       40,
       "thanks!",
+      preview,
     );
     expect(logPaymentEvent).toHaveBeenCalledWith(
       expect.objectContaining({
