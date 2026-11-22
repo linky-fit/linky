@@ -17,14 +17,14 @@ Každá vydaná verze musí obsahovat nejprve `en-US` a potom `cs-CZ`.
 - The tab bar on a phone shows only icons, like the side bar on a computer.
 - The cashu.21m.lol mint is no longer offered; it stays listed for shops that picked it or hold sats there.
 - A withdrawal to a pasted Lightning invoice goes through instead of failing to verify a contact.
-- With several terminals open on one shop, a payment under a pledge is forwarded to the pledger once, by the terminal that received it, instead of by every terminal.
+- With several terminals open on one shop, a payment under a pledge is forwarded to the pledger once, by the terminal that took the payment, instead of by every terminal.
 
 ### cs-CZ
 
 - Spodní lišta na telefonu ukazuje jen ikony, stejně jako boční lišta na počítači.
 - Mint cashu.21m.lol už není v nabídce; zůstane jen obchodům, které ho zvolily nebo u něj drží saty.
 - Výběr na vloženou Lightning fakturu projde, místo aby selhal na ověření kontaktu.
-- Když je na jednom obchodě otevřeno víc terminálů, platbu během zástavy přepošle zastaviteli jen jednou terminál, který ji přijal, a ne každý terminál.
+- Když je na jednom obchodě otevřeno víc terminálů, platbu během zástavy přepošle zastaviteli jen jednou terminál, na kterém byla zadaná, a ne každý terminál.
 
 ## [26.10.4] - 2026-10-30
 

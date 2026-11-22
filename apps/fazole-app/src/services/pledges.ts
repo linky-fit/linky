@@ -13,6 +13,7 @@ import {
   unforwardedInflows,
   type CzkAmount,
   type Pledge,
+  type WalletActivity,
   type WithdrawTarget,
 } from "../domain";
 import type { Ledger } from "../storage/ledger";
@@ -25,6 +26,12 @@ import { exclusive } from "./serial";
 import type { Withdrawals } from "./withdrawals";
 
 const PLEDGE_REF = "fazole.pledge:";
+
+/** A payment, and a receipt that paid one again, belong to the terminal that created the payment, whichever terminal took the sats in. */
+const ownerKeyOf = (inflow: WalletActivity): string =>
+  inflow.kind === "receipt"
+    ? (inflow.receipt.paymentId ?? inflow.id)
+    : inflow.id;
 
 /**
  * Cash taken from a Linky user against the bitcoin the shop will receive:
@@ -111,10 +118,10 @@ export const createPledges = ({
 
   const forward = async (pledge: Pledge, remainingCzk: CzkAmount) => {
     const records = await ledger.records();
-    const recordedHere = ledger.recordedHere();
-    // Only the device that recorded an inflow forwards it, so terminals sharing the shop never send it twice.
+    const ownedHere = ledger.ownedHere();
+    // One terminal forwards each inflow, so terminals sharing the shop never send it twice.
     const inflows = unforwardedInflows(pledge, records, nowSeconds()).filter(
-      (inflow) => recordedHere.has(inflow.id),
+      (inflow) => ownedHere.has(ownerKeyOf(inflow)),
     );
     if (inflows.length === 0) return;
     const rate = await czkPerBtc();

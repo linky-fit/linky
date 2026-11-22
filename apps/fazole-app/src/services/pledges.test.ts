@@ -12,7 +12,7 @@ import {
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
-import { CzkAmount } from "../domain";
+import { CzkAmount, Sats } from "../domain";
 import { makeLedger, type Ledger } from "../storage/ledger";
 import type { Repositories } from "../storage/repositories";
 import { createPledges } from "./pledges";
@@ -250,6 +250,31 @@ describe("repaying a pledge", () => {
     await terminal.pledges.reconcile();
     expect((await terminal.ledger.records()).withdrawals).toEqual([]);
     await otherTerminal.pledges.reconcile();
+    expect((await terminal.ledger.records()).withdrawals).toHaveLength(1);
+  });
+
+  it("leaves a payment to the terminal that created it, even when both terminals minted its quote", async () => {
+    const terminal = pledgesOver();
+    const otherTerminal = pledgesOver({ sharing: terminal.repositories });
+    await terminal.pledges.open(contact, czk(10_000));
+    const pending = await terminal.ledger.attachBitcoinLeg(
+      await terminal.ledger.createPayment(czk(2_500)),
+      {
+        sats: Sats.make(1_000),
+        czkPerBtc: rate,
+        mintUrl: testMint,
+        paymentRequest: "creqAtest",
+        quoteId: "quote-1",
+        invoice: "lnbc1test",
+      },
+    );
+    // Each terminal reclaimed the minted quote before the other's paid row synced.
+    await otherTerminal.ledger.completePayment(pending, "lightning");
+    await terminal.ledger.completePayment(pending, "lightning");
+    await Promise.all([
+      terminal.pledges.reconcile(),
+      otherTerminal.pledges.reconcile(),
+    ]);
     expect((await terminal.ledger.records()).withdrawals).toHaveLength(1);
   });
 

@@ -24,7 +24,7 @@ import {
   type WithdrawalKind,
 } from "../domain";
 import { nowSeconds } from "../utils/time";
-import { addRecordedInflow, readRecordedInflows } from "./recordedInflows";
+import { addOwnedInflow, readOwnedInflows } from "./ownedInflows";
 import {
   insertDirectTransfer,
   insertPayment,
@@ -53,8 +53,11 @@ export type PaidBy =
 /** Payments, receipts, direct transfers and withdrawals over the transactions repository, as promises. */
 export interface Ledger {
   readonly records: () => Promise<FazoleRecords>;
-  /** The ids of the inflows this device recorded: every device sharing the account sees an inflow, one recorded it. */
-  readonly recordedHere: () => ReadonlySet<string>;
+  /**
+   * The payments this device created and the receipts and direct transfers
+   * it recorded: every device sharing the account sees them, one owns each.
+   */
+  readonly ownedHere: () => ReadonlySet<string>;
   readonly payment: (id: string) => Promise<Payment | null>;
   /**
    * A new pending payment of `amountCzk`, the tip included; its method is
@@ -144,7 +147,7 @@ export const makeLedger = (
 
   return {
     records,
-    recordedHere: () => new Set(readRecordedInflows(kv)),
+    ownedHere: () => new Set(readOwnedInflows(kv)),
     payment,
     createPayment: async (amountCzk, tipCzk = null) => {
       const created: Payment = {
@@ -161,6 +164,7 @@ export const makeLedger = (
         payerPubkey: null,
         hiddenAtSec: null,
       };
+      addOwnedInflow(kv, created.id);
       await run(insertPayment(transactions, created));
       return created;
     },
@@ -175,7 +179,6 @@ export const makeLedger = (
     },
     completePayment: async (current, paidBy) => {
       if (!canChangePaymentStatus(current.status, "paid")) return false;
-      if (paidBy !== "bank") addRecordedInflow(kv, current.id);
       await savePayment({
         ...current,
         status: "paid",
@@ -226,7 +229,7 @@ export const makeLedger = (
     },
     recordReceipt: async (receipt) => {
       const id = receiptIdFor(receipt.operationId);
-      addRecordedInflow(kv, id);
+      addOwnedInflow(kv, id);
       await run(
         insertReceipt(transactions, {
           ...receipt,
@@ -237,7 +240,7 @@ export const makeLedger = (
     },
     recordDirectTransfer: async (transfer) => {
       const id = receiptIdFor(transfer.operationId);
-      addRecordedInflow(kv, id);
+      addOwnedInflow(kv, id);
       await run(
         insertDirectTransfer(transactions, {
           ...transfer,

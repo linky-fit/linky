@@ -243,15 +243,12 @@ describe("records", () => {
   });
 });
 
-describe("inflows recorded here", () => {
-  it("are the Bitcoin payments, receipts and direct transfers this device recorded, kept across restarts", async () => {
+describe("inflows owned here", () => {
+  it("are the payments this device created and the receipts and direct transfers it recorded, kept across restarts", async () => {
     const { repositories } = setup();
     const kv = memoryKv();
     const ledger = makeLedger(repositories.transactions, kv);
-    const minted = await ledger.createPayment(CzkAmount.make(25_000));
-    await ledger.completePayment(minted, "lightning");
-    const banked = await ledger.createPayment(CzkAmount.make(25_000));
-    await ledger.completePayment(banked, "bank");
+    const created = await ledger.createPayment(CzkAmount.make(25_000));
     await ledger.recordReceipt({
       operationId: "receive-1",
       method: "cashu",
@@ -266,16 +263,16 @@ describe("inflows recorded here", () => {
       payerPubkey: makeIdentity().pubkey,
       note: null,
     });
-    expect(makeLedger(repositories.transactions, kv).recordedHere()).toEqual(
+    expect(makeLedger(repositories.transactions, kv).ownedHere()).toEqual(
       new Set([
-        minted.id,
+        created.id,
         receiptIdFor("receive-1"),
         receiptIdFor("receive-2"),
       ]),
     );
-    expect(
-      makeLedger(repositories.transactions, memoryKv()).recordedHere(),
-    ).toEqual(new Set());
+    const otherDevice = makeLedger(repositories.transactions, memoryKv());
+    await otherDevice.completePayment(created, "lightning");
+    expect(otherDevice.ownedHere()).toEqual(new Set());
   });
 });
 
