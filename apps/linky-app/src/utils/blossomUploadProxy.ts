@@ -1,18 +1,5 @@
-const LINKY_WEB_APP_ORIGIN = "https://app.linky.fit";
+import { isNativePlatform } from "../platform/runtime";
 
-export const getBlossomUploadProxyUrl = (): string => {
-  if (typeof window === "undefined") {
-    return `${LINKY_WEB_APP_ORIGIN}/api/blossom-upload`;
-  }
-
-  const { hostname, origin, protocol } = window.location;
-  const isLocalDevelopment =
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "[::1]";
-  if ((protocol === "https:" || protocol === "http:") && !isLocalDevelopment) {
-    return `${origin}/api/blossom-upload`;
-  }
-
-  return `${LINKY_WEB_APP_ORIGIN}/api/blossom-upload`;
-};
+/** The app's own `/api/blossom-upload`; a native shell has no such route and uses the hosted app's. */
+export const getBlossomUploadProxyUrl = (): string =>
+  `${isNativePlatform() ? "https://app.linky.fit" : ""}/api/blossom-upload`;
