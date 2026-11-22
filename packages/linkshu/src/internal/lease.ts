@@ -22,16 +22,20 @@ const acquireLease = (
   ttlMs: number,
   acquireTimeoutMs: number,
   pollMs: number,
-): Effect.Effect<LeaseId, LeaseLockTimeout> =>
-  Effect.flatMap(kv.tryAcquireLease(key, ttlMs), (lease) =>
+): Effect.Effect<LeaseId, LeaseLockTimeout> => {
+  const attempt = Effect.flatMap(kv.tryAcquireLease(key, ttlMs), (lease) =>
     lease === null ? new LeaseLockTimeout({ key }) : Effect.succeed(lease),
-  ).pipe(
-    Effect.retry(
-      Schedule.spaced(pollMs).pipe(
-        Schedule.upTo({ duration: acquireTimeoutMs }),
-      ),
-    ),
   );
+  return acquireTimeoutMs <= 0
+    ? attempt
+    : attempt.pipe(
+        Effect.retry(
+          Schedule.spaced(pollMs).pipe(
+            Schedule.upTo({ duration: acquireTimeoutMs }),
+          ),
+        ),
+      );
+};
 
 const keepRenewed = (
   kv: KeyValueStoreService,

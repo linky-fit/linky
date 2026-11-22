@@ -78,6 +78,33 @@ describe("withKeyLease", () => {
     );
   });
 
+  it("fails immediately without retrying when acquireTimeoutMs is 0", async () => {
+    let attempts = 0;
+    const exit = await Effect.runPromiseExit(
+      withStore((kv) =>
+        Effect.gen(function* () {
+          expect(yield* kv.tryAcquireLease("k", 60_000)).not.toBeNull();
+          const countedKv: KeyValueStoreService = {
+            ...kv,
+            tryAcquireLease: (key, ttlMs) => {
+              attempts += 1;
+              return kv.tryAcquireLease(key, ttlMs);
+            },
+          };
+          return yield* Effect.void.pipe(
+            withKeyLease(countedKv, "k", { acquireTimeoutMs: 0 }),
+          );
+        }),
+      ),
+    );
+    expect(attempts).toBe(1);
+    expect(exit).toEqual(
+      Exit.fail(
+        expect.objectContaining({ _tag: "LeaseLockTimeout", key: "k" }),
+      ),
+    );
+  });
+
   it("releases the lease when the wrapped effect fails", async () => {
     const reclaimed = await Effect.runPromise(
       withStore((kv) =>
