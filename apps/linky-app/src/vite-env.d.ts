@@ -14,6 +14,8 @@ interface ImportMetaEnv {
   /** The npub.cash host swept beside it; production's when unset, none when empty. */
   readonly VITE_NPUB_CASH_UPSTREAM_URL?: string;
   readonly VITE_PUSH_SERVER_URL?: string;
+  /** The Blossom server photos and image messages are uploaded to; Primal's when unset. */
+  readonly VITE_BLOSSOM_SERVER_URL?: string;
   readonly VITE_NOTIFICATION_SERVER_URL?: string;
   /** The on-chain operator's npub; unset hides on-chain transfers. */
   readonly VITE_ONCHAIN_OPERATOR_NPUB?: string;

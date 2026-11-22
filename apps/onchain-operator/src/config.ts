@@ -28,6 +28,8 @@ export interface AppConfig {
   /** The mint every transfer's ecash is at. */
   readonly mintUrl: string;
   readonly allowInsecureLocalhostRelays: boolean;
+  /** The Blossom server pictures are uploaded to. */
+  readonly blossomServerUrl: string;
   readonly network: BitcoinNetwork;
   /** An Esplora HTTP API root, e.g. `https://mempool.space/api`. */
   readonly esploraUrl: string;
@@ -45,6 +47,8 @@ export const appConfig: AppConfig = {
   mintUrl: env.VITE_MAIN_MINT_URL?.trim() || "https://cashu.cz",
   allowInsecureLocalhostRelays:
     env.VITE_ALLOW_INSECURE_LOCALHOST_RELAYS === "1",
+  blossomServerUrl:
+    env.VITE_BLOSSOM_SERVER_URL?.trim() || "https://blossom.primal.net",
   network: Schema.decodeUnknownSync(BitcoinNetwork)(
     env.VITE_BITCOIN_NETWORK?.trim() || "mainnet",
   ),

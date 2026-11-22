@@ -34,11 +34,11 @@ A finding is done when every line is filled. End your work with a report: each s
 
 - **Mints.** Both mints pay their own invoices after about 3 seconds and charge an input fee, so a receiver nets slightly less than the sender paid. A checkout that offers Lightning and Cashu together therefore gets paid twice. For an invoice that must stay unpaid, fund an outside wallet first (`bun run journey wallet <name> topup <sat>`), run `bun run journey mint hold`, and pay with `bun run journey wallet <name> melt <invoice>`. While the main mint holds, a payment from the second mint to one of its invoices never arrives. `bun run journey mint auto` pays every invoice still open.
 - **Lightning addresses.** An address of the stack has a port, which the apps reject as a recipient. Pay one from outside with `bun run journey ln address <npub> <sat>`.
-- **Uploads.** Photos and image messages go to `blossom.primal.net`, a public server. Upload only throwaway images.
+- **Uploads.** Photos and image messages go to the stack's own Blossom server. Its certificate is self-signed, which the journey browsers ignore.
 - **Bank.** A fake MONETA stands behind Fazole. Set the shop's account to `2000145399/0600` with any token of eight or more characters, then book a customer's transfer with `bun run journey bank pay <czk> <variable symbol>`.
 - **On-chain.** `apps/onchain-operator/README.md` has the dev operator's seed and keys. `bun run journey bitcoin` pays and mines.
 - **Production.** The browser blocks Linky's and Fazole's production hosts and the production mints. A journey that needs one fails here. Record it as not run.
-- **Last release.** Its origins run the released builds, which predate parts of this stack. Until a release contains them, the released Linky exposes the `window.__linkyE2E` test hooks, which you leave alone, and the released Fazole asks the real MONETA.
+- **Last release.** Its origins run the released builds, which predate parts of this stack. Until a release contains them, the released Linky exposes the `window.__linkyE2E` test hooks, which you leave alone, the released Fazole asks the real MONETA, and uploads fail on both because they target Primal, which the browser blocks.
 
 Nothing here covers push delivery to a device, Keryx newsletters, proxy payments, Nearby, the native shells or Safari on an iPhone.
 

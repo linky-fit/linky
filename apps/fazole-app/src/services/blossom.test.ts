@@ -4,6 +4,7 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 import { describe, expect, it } from "vitest";
 import { uploadToBlossom } from "./blossom";
 
+const SERVER = "https://blossom.example";
 const image = { bytes: new Uint8Array([1, 2, 3]), type: "image/webp" };
 const hash = bytesToHex(sha256(image.bytes));
 
@@ -22,10 +23,12 @@ describe("a Blossom upload", () => {
       await uploadToBlossom(
         image,
         makeIdentity().secretKey,
+        SERVER,
         answering({ sha256: hash, url }, requests),
       ),
     ).toBe(url);
     const [request] = requests;
+    expect(request?.url).toBe(`${SERVER}/upload`);
     expect(request?.method).toBe("PUT");
     expect(request?.headers.get("X-SHA-256")).toBe(hash);
     expect(request?.headers.get("Authorization")).toMatch(/^Nostr /u);
@@ -37,6 +40,7 @@ describe("a Blossom upload", () => {
       uploadToBlossom(
         image,
         secretKey,
+        SERVER,
         answering({ sha256: "00", url: "https://blossom.primal.net/00" }),
       ),
     ).rejects.toThrow();
@@ -44,6 +48,7 @@ describe("a Blossom upload", () => {
       uploadToBlossom(
         image,
         secretKey,
+        SERVER,
         answering({ sha256: hash, url: `http://blossom.primal.net/${hash}` }),
       ),
     ).rejects.toThrow();

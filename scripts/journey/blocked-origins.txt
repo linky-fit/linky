@@ -14,3 +14,4 @@ mempool.space
 free.evoluhq.com
 *.freedomrelay.dev
 api.moneta.cz
+blossom.primal.net
