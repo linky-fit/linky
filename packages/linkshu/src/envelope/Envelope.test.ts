@@ -116,14 +116,18 @@ interface DeviceArgs {
   /** `lost`: the melt request never comes back, as if the network failed. */
   readonly meltState?: MeltQuoteState | "lost";
   readonly quoteAmount?: number;
+  readonly feeReserve?: number;
   /** The mint signs the first swap, then the network fails until `reconnect`. */
   readonly loseSwapResponse?: boolean;
+  /** Awaited before a melt quote or NUT-07 check answers. */
+  readonly beforeQuoteOrCheck?: (call: "quote" | "check") => Promise<void>;
 }
 
 const quoteResponse = (
   amount: number,
   state: MeltQuoteState,
   request: string = invoice,
+  feeReserve = 2,
 ): MeltQuoteBolt11Response => ({
   quote: `quote-${request}`,
   amount: CashuAmount.from(amount),
@@ -131,7 +135,7 @@ const quoteResponse = (
   state,
   expiry: Math.floor(Date.now() / 1000) + 600,
   request,
-  fee_reserve: CashuAmount.from(2),
+  fee_reserve: CashuAmount.from(feeReserve),
   payment_preimage: null,
 });
 
@@ -141,19 +145,23 @@ const deviceWallet = (fakeMint: FakeMint, args: DeviceArgs) => {
   const calls = { swaps: 0, restores: 0 };
   const network = { online: true };
   let blindProbe = args.blindProbe === true;
+  const beforeQuoteOrCheck = (call: "quote" | "check") =>
+    args.beforeQuoteOrCheck?.(call) ?? Promise.resolve();
+  const answerStates = answerProofStates((secret) =>
+    fakeMint.spent.has(secret)
+      ? "SPENT"
+      : fakeMint.pending.has(secret)
+        ? "PENDING"
+        : "UNSPENT",
+  );
   const wallet: LoadedWallet = fakeWallet({
     keysetId: mintKeys.keysetId,
     keyChain: {
       getKeysets: () => [],
       ensureKeysetKeys: () => Promise.resolve(keyset),
     },
-    checkProofsStates: answerProofStates((secret) =>
-      fakeMint.spent.has(secret)
-        ? "SPENT"
-        : fakeMint.pending.has(secret)
-          ? "PENDING"
-          : "UNSPENT",
-    ),
+    checkProofsStates: (proofs) =>
+      beforeQuoteOrCheck("check").then(() => answerStates(proofs)),
     send: (amount, proofs, _config, outputConfig) =>
       Promise.resolve().then(() => {
         calls.swaps += 1;
@@ -211,7 +219,14 @@ const deviceWallet = (fakeMint: FakeMint, args: DeviceArgs) => {
       1,
     ),
     createMeltQuoteBolt11: (request) =>
-      Promise.resolve(quoteResponse(args.quoteAmount ?? 8, "UNPAID", request)),
+      beforeQuoteOrCheck("quote").then(() =>
+        quoteResponse(
+          args.quoteAmount ?? 8,
+          "UNPAID",
+          request,
+          args.feeReserve,
+        ),
+      ),
     checkMeltQuoteBolt11: () =>
       Promise.resolve(
         quoteResponse(args.quoteAmount ?? 8, fakeMint.quote.state),
@@ -877,6 +892,56 @@ describe("Melt.meltEnvelope", () => {
     expect(amountIn(proofs, "available")).toBe(32 - 8 - 2);
     expect(amountIn(proofs, "held")).toBe(0);
     expect(envelopeOperation(operations)?.status).toBe("done");
+  });
+
+  it("checks the balance's proof states while the melt quote is priced", async () => {
+    // Both calls wait on a two-party barrier, which never opens if the melt
+    // awaits the quote before it starts the NUT-07 check.
+    let armed = false;
+    let arrived = 0;
+    let release = () => {};
+    const bothStarted = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const device = makeDevice(makeFakeMint(), {
+      name: "a",
+      beforeQuoteOrCheck: async () => {
+        if (!armed) return;
+        arrived += 1;
+        if (arrived === 2) release();
+        await bothStarted;
+      },
+    });
+    await device.fund(32);
+    await device.open(8);
+    armed = true;
+
+    const paid = await meltOf(device);
+
+    assert(paid._tag === "Success");
+    expect(arrived).toBe(2);
+  });
+
+  it("pays from the envelope alone when the balance's proof state check fails and no fee needs it", async () => {
+    let checksFail = false;
+    const device = makeDevice(makeFakeMint(), {
+      name: "a",
+      feeReserve: 0,
+      beforeQuoteOrCheck: (call) =>
+        checksFail && call === "check"
+          ? Promise.reject(networkDown())
+          : Promise.resolve(),
+    });
+    await device.fund(32);
+    await device.open(8);
+    checksFail = true;
+    const swaps = device.calls.swaps;
+
+    const paid = await meltOf(device);
+
+    assert(paid._tag === "Success");
+    expect(paid.success).toMatchObject({ paidAmount: 8, feePaid: 0 });
+    expect(device.calls.swaps).toBe(swaps);
   });
 
   it("leaves the envelope's proofs in the envelope when the payment fails", async () => {
