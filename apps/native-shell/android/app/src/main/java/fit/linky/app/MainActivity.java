@@ -91,13 +91,13 @@ public class MainActivity extends BridgeActivity {
 	private final OnBackPressedCallback appNavigationBackCallback = new OnBackPressedCallback(true) {
 		@Override
 		public void handleOnBackPressed() {
-			dispatchAppBackButton(MainActivity.this::runDefaultBackAction);
+			dispatchAppBackButton();
 		}
 	};
 	private final OnBackPressedCallback nativeQrScannerBackCallback = new OnBackPressedCallback(false) {
 		@Override
 		public void handleOnBackPressed() {
-			dispatchAppBackButton(() -> stopNativeQrScanner(true));
+			stopNativeQrScanner(true);
 		}
 	};
 	private final BarcodeCallback nativeQrBarcodeCallback = new BarcodeCallback() {
@@ -229,10 +229,10 @@ public class MainActivity extends BridgeActivity {
 		});
 	}
 
-	private void dispatchAppBackButton(Runnable fallback) {
+	private void dispatchAppBackButton() {
 		WebView webView = getBridgeWebView();
 		if (webView == null) {
-			fallback.run();
+			runDefaultBackAction();
 			return;
 		}
 
@@ -244,7 +244,7 @@ public class MainActivity extends BridgeActivity {
 			"})()";
 		webView.evaluateJavascript(javascript, result -> {
 			if (!"true".equals(result)) {
-				fallback.run();
+				runDefaultBackAction();
 			}
 		});
 	}

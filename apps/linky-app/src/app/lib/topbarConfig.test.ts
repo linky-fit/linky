@@ -108,7 +108,9 @@ describe("resolveBackAction", () => {
     expect(backHashFor({ kind: "advancedInspectorTimeline" })).toBe(
       "#advanced/inspector",
     );
-    expect(backHashFor({ kind: "advancedPushDebug" })).toBe("#advanced");
+    expect(backHashFor({ kind: "advancedPushDebug" })).toBe(
+      "#advanced/inspector",
+    );
     expect(backHashFor({ kind: "mints" })).toBe("#settings");
     expect(backHashFor({ kind: "mintNew" })).toBe("#advanced/mints");
     expect(backHashFor({ kind: "nostrRelays" })).toBe("#settings");

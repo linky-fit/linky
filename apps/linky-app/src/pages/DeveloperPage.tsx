@@ -69,11 +69,6 @@ export function DeveloperPage(): React.ReactElement {
             navigateTo({ route: "evoluCurrentData" });
           }}
         />
-        <ListRow
-          icon="FlaskConical"
-          title={t("pushDebug")}
-          onPress={() => navigateTo({ route: "advancedPushDebug" })}
-        />
       </Section>
     </Stack>
   );

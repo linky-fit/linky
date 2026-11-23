@@ -15,7 +15,6 @@ import {
   ListRow,
   LoadingState,
   Notice,
-  Row,
   Section,
   Stack,
   Text,
@@ -319,40 +318,35 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
           </Button>
         ) : null}
 
-        <Row gap="$sm">
-          {isOpenSend && shareMessage ? (
-            <Button
-              variant={isIssued && canSendToContact ? "secondary" : "primary"}
-              icon="Share2"
-              flex={1}
-              onPress={() => void shareTokenText(routeId, shareMessage)}
-            >
-              {t("share")}
-            </Button>
-          ) : (
-            <Button
-              variant="secondary"
-              icon="Copy"
-              flex={1}
-              onPress={() => void copyText(tokenText)}
-              disabled={!tokenText.trim()}
-            >
-              {t("copy")}
-            </Button>
-          )}
+        {isOpenSend && shareMessage ? (
+          <Button
+            variant={isIssued && canSendToContact ? "secondary" : "primary"}
+            icon="Share2"
+            onPress={() => void shareTokenText(routeId, shareMessage)}
+          >
+            {t("share")}
+          </Button>
+        ) : (
+          <Button
+            variant="secondary"
+            icon="Copy"
+            onPress={() => void copyText(tokenText)}
+            disabled={!tokenText.trim()}
+          >
+            {t("copy")}
+          </Button>
+        )}
 
-          {isOpenSend && canWriteToNfc ? (
-            <Button
-              variant="secondary"
-              icon="Radio"
-              flex={1}
-              onPress={() => void writeToNfc(routeId, tokenText)}
-              disabled={!tokenText.trim()}
-            >
-              {t("uploadToNfc")}
-            </Button>
-          ) : null}
-        </Row>
+        {isOpenSend && canWriteToNfc ? (
+          <Button
+            variant="secondary"
+            icon="Radio"
+            onPress={() => void writeToNfc(routeId, tokenText)}
+            disabled={!tokenText.trim()}
+          >
+            {t("uploadToNfc")}
+          </Button>
+        ) : null}
       </Stack>
 
       {isOpenSend ||
