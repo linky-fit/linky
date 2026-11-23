@@ -204,7 +204,9 @@ const deriveEverything = async ({
     cashuMnemonic: await Effect.runPromise(
       deriveCashuMnemonicFromMasterSecret(masterSecret),
     ),
-    cashuWalletSeed: bytesToHex(identity.cashuWalletSeed),
+    cashuWalletSeed: bytesToHex(
+      await Effect.runPromise(identity.cashuWalletSeed),
+    ),
     ownerMnemonics: {
       identity: identityOwner,
       errorTracker,

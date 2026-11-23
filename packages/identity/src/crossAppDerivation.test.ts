@@ -2,7 +2,11 @@ import { hmac } from "@noble/hashes/hmac.js";
 import { sha512 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { HDKey } from "@scure/bip32";
-import { entropyToMnemonic, mnemonicToSeedSync } from "@scure/bip39";
+import {
+  entropyToMnemonic,
+  mnemonicToEntropy,
+  mnemonicToSeedSync,
+} from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { Effect, Layer, Schema } from "effect";
 import { Slip39 } from "slip39-ts";
@@ -231,33 +235,12 @@ describe("@linky-fit/identity API matches the cross-app vectors", () => {
     const vector = BIP85_VECTORS.sharedCashuWallet;
     expect(vector?.mnemonic).toBeDefined();
     if (!vector?.mnemonic) return;
-    expect(hex(identity.cashuWalletSeed)).toBe(
+    expect(hex(await Effect.runPromise(identity.cashuWalletSeed))).toBe(
       bytesToHex(mnemonicToSeedSync(vector.mnemonic)),
     );
   });
 
-  test("derives every owner lane key from its pinned vector", async () => {
-    const { identity } = await loadIdentity();
-    const ownerKeys: Record<string, Uint8Array> = {
-      linkyMetaOwner: identity.storageMetaOwnerKey,
-      linkyIdentityOwner: identity.storageIdentityOwnerKey,
-      linkyContactsOwner0: identity.storageContactsOwnerKey(lane(0)),
-      linkyContactsOwner1: identity.storageContactsOwnerKey(lane(1)),
-      linkyCashuOwner0: identity.storageCashuOwnerKey(lane(0)),
-      linkyCashuOwner1: identity.storageCashuOwnerKey(lane(1)),
-      linkyMessagesOwner0: identity.storageMessagesOwnerKey(lane(0)),
-      linkyMessagesOwner1: identity.storageMessagesOwnerKey(lane(1)),
-      linkyTransactionsOwner0: identity.storageTransactionsOwnerKey(lane(0)),
-      linkyTransactionsOwner1: identity.storageTransactionsOwnerKey(lane(1)),
-    };
-    for (const [name, ownerKey] of Object.entries(ownerKeys)) {
-      expect(`${name}:${hex(ownerKey)}`).toBe(
-        `${name}:${BIP85_VECTORS[name]?.entropyHex}`,
-      );
-    }
-  });
-
-  test("derives every owner lane mnemonic from its pinned vector", async () => {
+  test("derives every owner lane key and mnemonic from its pinned vector", async () => {
     const { masterSecret } = await loadIdentity();
     const roleLanes: ReadonlyArray<
       readonly [string, OwnerRole, OwnerLaneIndex]
@@ -280,6 +263,9 @@ describe("@linky-fit/identity API matches the cross-app vectors", () => {
       expect(`${name}:${mnemonic}`).toBe(
         `${name}:${BIP85_VECTORS[name]?.mnemonic}`,
       );
+      expect(
+        `${name}:${hex(mnemonicToEntropy(mnemonic ?? "", wordlist))}`,
+      ).toBe(`${name}:${BIP85_VECTORS[name]?.entropyHex}`);
     }
   });
 });

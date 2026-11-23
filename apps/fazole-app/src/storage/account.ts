@@ -78,13 +78,14 @@ export const deriveAccount = (
     );
     if (appMnemonic === undefined || appOwnerFromMnemonic(appMnemonic) === null)
       return yield* new InvalidRecoverySeed();
+    const cashuWalletSeed = yield* identity.cashuWalletSeed;
     return {
       recoverySeed: share,
       secretKey: identity.nostrSigningKey,
       pubkey: identity.nostrPublicKey,
       npub: encodeNpub(identity.nostrPublicKey),
       appMnemonic,
-      cashuSeed: Bip39Seed.make(identity.cashuWalletSeed),
+      cashuSeed: Bip39Seed.make(cashuWalletSeed),
     };
   }).pipe(
     Effect.catchTags({

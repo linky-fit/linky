@@ -32,7 +32,7 @@ describe("key derivation", () => {
 
     await Effect.runPromise(
       Effect.provide(
-        IdentityProvider,
+        Effect.flatMap(IdentityProvider, (id) => id.cashuWalletSeed),
         Layer.provideMerge(
           IdentityProvider.layer,
           MasterSecretProvider.fromSlip39Share(share),
