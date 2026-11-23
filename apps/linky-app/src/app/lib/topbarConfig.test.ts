@@ -173,7 +173,7 @@ describe("resolveBackAction", () => {
     );
   });
 
-  it("returns Tokens and Data to Developer when opened from Developer", () => {
+  it("returns Tokens and Data to Advanced when opened from Advanced", () => {
     const clearTokens = vi.fn();
     const clearEvoluData = vi.fn();
     expect(

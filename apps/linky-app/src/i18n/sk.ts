@@ -13,7 +13,7 @@ export const sk = {
   settingsNetwork: "Sieť",
   settingsSecurity: "Zabezpečenie",
   settingsDebug: "Debug",
-  settingsDeveloper: "Vývojár",
+  settingsAdvanced: "Pokročilé",
   nostrInspector: "Inspector",
   nostrInspectorLogs: "Ukladať logy inspectora",
   nostrInspectorLogsStats:

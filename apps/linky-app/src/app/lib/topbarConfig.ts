@@ -400,7 +400,7 @@ export const buildTopbarRight = ({
 };
 
 const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
-  advanced: "settingsDeveloper",
+  advanced: "settingsAdvanced",
   advancedAutoPayLimit: "lightningInvoiceAutoPayLimit",
   advancedInspector: "nostrInspector",
   advancedInspectorTimeline: "nostrInspector",

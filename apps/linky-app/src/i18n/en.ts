@@ -13,7 +13,7 @@ export const en = {
   settingsNetwork: "Network",
   settingsSecurity: "Security",
   settingsDebug: "Debug",
-  settingsDeveloper: "Developer",
+  settingsAdvanced: "Advanced",
   nostrInspector: "Inspector",
   nostrInspectorLogs: "Collect inspector logs",
   nostrInspectorLogsStats: "{count} rows · {size} · oldest row {age} old",

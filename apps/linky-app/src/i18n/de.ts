@@ -12,7 +12,7 @@ export const de = {
   settingsNetwork: "Netzwerk",
   settingsSecurity: "Sicherheit",
   settingsDebug: "Debug",
-  settingsDeveloper: "Entwickler",
+  settingsAdvanced: "Erweitert",
   nostrInspector: "Inspektor",
   nostrInspectorLogs: "Inspektorprotokolle sammeln",
   nostrInspectorLogsStats: "{count} Zeilen · {size} · älteste Zeile {age} alt",

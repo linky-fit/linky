@@ -14,7 +14,7 @@ export const pt = {
   settingsNetwork: "Rede",
   settingsSecurity: "Segurança",
   settingsDebug: "Depuração",
-  settingsDeveloper: "Desenvolvedor",
+  settingsAdvanced: "Avançado",
   nostrInspector: "Inspetor",
   nostrInspectorLogs: "Coletar registros do inspetor",
   nostrInspectorLogsStats:
