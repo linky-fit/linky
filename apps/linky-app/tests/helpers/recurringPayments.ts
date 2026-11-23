@@ -34,6 +34,7 @@ interface BootOptions {
   identity?: SeedIdentity;
   hidden?: boolean;
   fiat?: boolean;
+  inspector?: boolean;
 }
 type BootAccount = (label: string, options?: BootOptions) => Promise<Account>;
 
@@ -58,7 +59,7 @@ export const test = base.extend<{ bootAccount: BootAccount }>({
         await setBaseStorage(page);
         await setSeedLoginStorage(page, identity);
         await page.addInitScript(
-          ({ hidden, fiat }) => {
+          ({ hidden, fiat, inspector }) => {
             Object.defineProperty(document, "visibilityState", {
               configurable: true,
               get: () => (hidden ? "hidden" : "visible"),
@@ -67,15 +68,24 @@ export const test = base.extend<{ bootAccount: BootAccount }>({
               configurable: true,
               get: () => hidden,
             });
-            if (fiat)
-              localStorage.setItem(
-                "linky.display_allowed_currencies.v1",
-                JSON.stringify(["sat", "czk"]),
-              );
+            try {
+              if (fiat)
+                localStorage.setItem(
+                  "linky.display_allowed_currencies.v1",
+                  JSON.stringify(["sat", "czk"]),
+                );
+              if (inspector) {
+                localStorage.setItem("linky.inspector_enabled", "true");
+                localStorage.setItem("linky.inspector_logs_enabled", "true");
+              }
+            } catch {
+              // about:blank in relaunchApp denies localStorage access.
+            }
           },
           {
             hidden: options.hidden ?? false,
             fiat: options.fiat ?? false,
+            inspector: options.inspector ?? false,
           },
         );
         await stubFiatRates(page);

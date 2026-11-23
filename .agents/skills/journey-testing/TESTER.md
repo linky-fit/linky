@@ -42,6 +42,16 @@ A finding is done when every line is filled. End your work with a report: each s
 
 `bun run journey ln invoice <sat>` makes the invoices. Take three samples per case and report the median with the number of mint requests. Run each case at 0, 50 and 150 ms on this checkout's origin and on the last release's, alternating between the two so both see the same load. A difference under 100 ms is noise.
 
+## Heavy multi-shard account
+
+To test Linky with a mature Evolu database (~80 subscribed shards across `cashu`, `contacts`, `messages` and `transactions`, thousands of rows):
+
+1. Open a browser on `Linky with test hooks` (or `Linky <release>` to compare), create an account, write down its recovery seed, and fund it with a topup.
+2. Run `bun run journey seed <device>`. It populates rotated shards across `contacts`, `messages`, `transactions` and `cashu`, reloads for a cold boot over all shards, and prints the shard and row counts. Pass `--help` to see sizing flags.
+3. Turn on **Settings › Advanced › Inspector › Collect inspector logs** (and **Inspector** to view the live timeline in-app).
+4. Exercise the account as a user: open several seeded chats and scroll history, send chat messages to a counterpart, send Cashu in chat, pay a Lightning invoice (`bun run journey ln invoice <sat>`), and open Wallet history. Also restore the same recovery seed on a second device on the unhooked `Linky` origin to check multi-shard cold restore and responsiveness on the production build.
+5. Check for slow Evolu writes via **Settings › Advanced › Inspector › Open inspector** or `bun run journey inspector <device> WriteSlow`. Any `evolu.sync WriteSlow` row (a write taking 250 ms or more) during normal interaction is a regression signal; record its table, row count and duration, and repeat the flow on `Linky <release>`.
+
 ## What the stack does differently
 
 - **Mints.** Both mints pay their own invoices at once and charge an input fee, so a receiver nets slightly less than the sender paid. A checkout that offers Lightning and Cashu together therefore gets paid twice. `bun run journey mint` switches the main mint between three modes:

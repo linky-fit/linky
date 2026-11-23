@@ -10,6 +10,8 @@
 #   bun run journey browser close|kill|delete <device>
 #   bun run journey pw <device> <playwright-cli command...>
 #   bun run journey inventory <device>    what the page's origin stores
+#   bun run journey seed <device> [options]           populate the device's Evolu DB with heavy multi-shard data
+#   bun run journey inspector <device> [tag|channel]  read inspector log rows from the device (e.g. WriteSlow)
 #   bun run journey wallet <name> <command>           a Cashu wallet outside the apps; no command prints its usage
 #   bun run journey ln invoice <sat>                  an invoice for an app to pay
 #   bun run journey ln quote <id>                     whether that invoice was paid
@@ -176,6 +178,25 @@ case $command in
   browser) browser "$@" ;;
   pw) pw "$@" ;;
   inventory) pw "${1:?device}" --raw run-code --filename="$root/scripts/journey/inventory.js" | jq 'fromjson? // .' ;;
+  seed)
+    if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+      bun "$root/apps/linky-app/tests/journey/seed.ts" --help
+      exit 0
+    fi
+    device=${1:?device}
+    shift
+    payload=$(bun "$root/apps/linky-app/tests/journey/seed.ts" "$@")
+    [ -n "$payload" ] || exit 0
+    out=$(pw "$device" --raw run-code "async (page) => ($(cat "$root/scripts/journey/seed.js"))(page, $payload)")
+    jq . <<<"$out" 2>/dev/null || { echo "$out" >&2 && exit 1; }
+    ;;
+  inspector)
+    device=${1:?device}
+    tag=${2:-}
+    arg=$(jq -n --arg tag "$tag" '{ tag: (if $tag == "" then null else $tag end) }')
+    out=$(pw "$device" --raw run-code "async (page) => ($(cat "$root/scripts/journey/inspector.js"))(page, $arg)")
+    jq . <<<"$out" 2>/dev/null || { echo "$out" >&2 && exit 1; }
+    ;;
   wallet) bun "$root/apps/linky-app/tests/journey/wallet.ts" "$@" ;;
   ln)
     case ${1:-} in

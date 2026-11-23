@@ -29,6 +29,13 @@ import {
   setMessagesRotation,
 } from "../../app/state/session/store";
 import { makeLocalStorageKeyValueStore } from "../../platform/linkshu/localStorageKeyValueStore";
+import { clientInspectorStore } from "../inspector/clientInspectorStore";
+import type { CollectedInspectorRow } from "../inspector/inspectorRows";
+import {
+  seedAccountHistory,
+  type AccountHistory,
+  type SeededAccountSummary,
+} from "./seedAccountHistory";
 import { seedCashuHistory, type CashuHistory } from "./seedCashuHistory";
 
 /**
@@ -77,6 +84,15 @@ export interface LinkyE2eHooks {
   readonly makeRecurringDue: (id: string, atSec: number) => Promise<void>;
   /** Fills the cashu shards with a long-lived wallet's spent history; resolves to the active shard index. */
   readonly seedCashuHistory: (history: CashuHistory) => Promise<number>;
+  /** Populates contacts, messages, transactions and cashu across rotated shards. */
+  readonly seedAccountHistory: (
+    history: AccountHistory,
+  ) => Promise<SeededAccountSummary>;
+  /** Live in-memory inspector rows collected in this tab, optionally filtered by channel and tag. */
+  readonly inspectorRows: (filter?: {
+    readonly channel?: string;
+    readonly tag?: string;
+  }) => ReadonlyArray<CollectedInspectorRow>;
 }
 
 declare global {
@@ -208,5 +224,13 @@ export const installLinkyE2eHooks = (
     },
     seedCashuHistory: async (history) =>
       seedCashuHistory(await getLinkyStore(), db().mutate, history),
+    seedAccountHistory: async (history) =>
+      seedAccountHistory(await getLinkyStore(), db().mutate, history),
+    inspectorRows: ({ channel, tag } = {}) => {
+      const { rows } = clientInspectorStore.query(
+        channel === undefined ? {} : { channel },
+      );
+      return tag === undefined ? rows : rows.filter((row) => row.tag === tag);
+    },
   };
 };
