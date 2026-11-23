@@ -1431,7 +1431,9 @@ const useChatViewport = (
         Number.isFinite(nativeKeyboardInset) ? nativeKeyboardInset : 0,
       );
       const viewportHeight = Math.round(layoutHeight - keyboardInset);
-      const viewportHeightChanged = appliedViewportHeight !== viewportHeight;
+      const viewportHeightChanged =
+        appliedViewportHeight !== null &&
+        appliedViewportHeight !== viewportHeight;
 
       if (viewportHeightChanged) {
         pendingViewportAnchor ??= captureChatViewportAnchor(

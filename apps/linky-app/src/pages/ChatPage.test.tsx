@@ -629,4 +629,27 @@ describe("ChatPage message rows", () => {
     expect(button()).toBeNull();
     await unmount();
   });
+
+  it("keeps the opening scroll to the latest message when the chat first sizes itself", async () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: false }));
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (frame: FrameRequestCallback) =>
+      frames.push(frame),
+    );
+    const clientHeight = vi
+      .spyOn(HTMLElement.prototype, "clientHeight", "get")
+      .mockReturnValue(500);
+    const { unmount } = await renderIntoDocument(
+      <ChatPage {...pageProps([message("only", 100)], new Map(), false)} />,
+    );
+    const list = chatMessagesRef.current;
+    if (!list) throw new Error("chat list not rendered");
+
+    list.scrollTop = 1500;
+    for (const frame of frames.splice(0)) frame(0);
+
+    expect(list.scrollTop).toBe(1500);
+    clientHeight.mockRestore();
+    await unmount();
+  });
 });
