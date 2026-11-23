@@ -625,7 +625,7 @@ describe("ChatPage message rows", () => {
     await act(async () => button()?.click());
     expect(scrollTo).toHaveBeenCalledWith({ top: 2000, behavior: "smooth" });
 
-    await scrollToTop(1500);
+    await scrollToTop(1400);
     expect(button()).toBeNull();
     await unmount();
   });

@@ -510,6 +510,8 @@ const ScrollToLatestButton = ({
         variant="secondary"
         accessibilityLabel={label}
         boxShadow={shadow.raised}
+        // Keeps the composer focused so closing the keyboard does not cut the scroll short.
+        onPointerDown={(event) => event.preventDefault()}
         onPress={() => {
           const messages = chatMessagesRef.current;
           messages?.scrollTo({
