@@ -356,8 +356,16 @@ export function ListingFormPage({
         maxLength={LISTING_DESCRIPTION_MAX_LENGTH}
         testID="listing-description"
       />
-      <Row gap="$sm" alignItems="flex-start">
-        <Stack flex={1} minWidth={0}>
+      <Row
+        gap="$sm"
+        alignItems="flex-start"
+        $compact={{ flexDirection: "column", alignItems: "stretch" }}
+      >
+        <Stack
+          flex={1}
+          minWidth={0}
+          $compact={{ flexGrow: 0, flexShrink: 0, flexBasis: "auto" }}
+        >
           <TextField
             label={t("listingPrice")}
             placeholder={t("listingPriceByAgreement")}
@@ -385,7 +393,11 @@ export function ListingFormPage({
             testID="listing-amount"
           />
         </Stack>
-        <Stack flex={1} minWidth={0}>
+        <Stack
+          flex={1}
+          minWidth={0}
+          $compact={{ flexGrow: 0, flexShrink: 0, flexBasis: "auto" }}
+        >
           <TextField
             label={t("listingUnit")}
             placeholder={t("listingUnitPlaceholder")}

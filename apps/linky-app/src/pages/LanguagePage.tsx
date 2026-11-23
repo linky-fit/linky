@@ -2,10 +2,18 @@ import { ListRow, Section } from "@linky-fit/ui";
 import React from "react";
 import { useTranslation } from "../app/hooks/shell";
 import { useSetLang } from "../app/hooks/settings/useDeviceSettings";
-import type { Lang } from "../i18n";
+import type { I18nKey, Lang } from "../i18n";
+
+export const LANGUAGE_LABEL_KEYS = {
+  cs: "czech",
+  de: "german",
+  en: "english",
+  pt: "portuguese",
+  sk: "slovak",
+} as const satisfies Record<Lang, I18nKey>;
 
 const LANGUAGES: ReadonlyArray<{
-  key: "czech" | "german" | "english" | "portuguese" | "slovak";
+  key: (typeof LANGUAGE_LABEL_KEYS)[Lang];
   value: Lang;
 }> = [
   { key: "czech", value: "cs" },

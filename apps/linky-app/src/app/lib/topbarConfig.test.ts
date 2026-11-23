@@ -102,14 +102,13 @@ describe("resolveBackAction", () => {
         { ...baseContext, ownPubkey },
       ),
     ).toBe(`#collaboration/listings/${encodeNpub(ownPubkey)}/${listingId}`);
+    expect(backHashFor({ kind: "advanced" })).toBe("#settings");
     expect(backHashFor({ kind: "advancedAutoPayLimit" })).toBe("#settings");
-    expect(backHashFor({ kind: "advancedInspector" })).toBe("#settings");
+    expect(backHashFor({ kind: "advancedInspector" })).toBe("#advanced");
     expect(backHashFor({ kind: "advancedInspectorTimeline" })).toBe(
       "#advanced/inspector",
     );
-    expect(backHashFor({ kind: "advancedPushDebug" })).toBe(
-      "#advanced/inspector",
-    );
+    expect(backHashFor({ kind: "advancedPushDebug" })).toBe("#advanced");
     expect(backHashFor({ kind: "mints" })).toBe("#settings");
     expect(backHashFor({ kind: "mintNew" })).toBe("#advanced/mints");
     expect(backHashFor({ kind: "nostrRelays" })).toBe("#settings");
@@ -145,10 +144,9 @@ describe("resolveBackAction", () => {
 
   it("returns to the main screen the user came from", () => {
     resolveBackAction({ kind: "settings" }, baseContext)?.();
-    resolveBackAction({ kind: "advanced" }, baseContext)?.();
     resolveBackAction({ kind: "profile" }, baseContext)?.();
 
-    expect(navigateToMainReturn).toHaveBeenCalledTimes(3);
+    expect(navigateToMainReturn).toHaveBeenCalledTimes(2);
   });
 
   it("closes the contact detail rather than navigating by hash", () => {
@@ -173,6 +171,34 @@ describe("resolveBackAction", () => {
     expect(backHashFor({ kind: "contactPay", id: contactId })).toBe(
       `#contact/${contactId}`,
     );
+  });
+
+  it("returns Tokens and Data to Developer when opened from Developer", () => {
+    const clearTokens = vi.fn();
+    const clearEvoluData = vi.fn();
+    expect(
+      backHashFor(
+        { kind: "cashuTokens" },
+        {
+          ...baseContext,
+          cashuTokensBackTo: "advanced",
+          clearCashuTokensBackTo: clearTokens,
+        },
+      ),
+    ).toBe("#advanced");
+    expect(clearTokens).toHaveBeenCalledOnce();
+
+    expect(
+      backHashFor(
+        { kind: "evoluCurrentData" },
+        {
+          ...baseContext,
+          evoluDataBackTo: "advanced",
+          clearEvoluDataBackTo: clearEvoluData,
+        },
+      ),
+    ).toBe("#advanced");
+    expect(clearEvoluData).toHaveBeenCalledOnce();
   });
 
   it("sends a bank payment offer back to its chat", () => {
@@ -308,48 +334,36 @@ describe("buildTopbarRight", () => {
   const rightArgs = {
     chatEditContactId: null,
     deleteEditedContact: vi.fn(),
-    isProfileEditing: false,
     openContactScan: vi.fn(),
-    openReceiveScan: vi.fn(),
     openWalletScan: vi.fn(),
     t,
-    openMenu: vi.fn(),
   };
 
-  it("opens the contact scanner from the profile and the contacts", () => {
+  it("opens the contact scanner from contacts and omits it from profile", () => {
     const openContactScan = vi.fn();
     const openWalletScan = vi.fn();
-    for (const kind of ["profile", "contacts"] as const) {
-      const button = buildTopbarRight({
-        ...rightArgs,
-        openContactScan,
-        openWalletScan,
-        route: { kind },
-      });
-      button?.onClick();
-      expect(button).toMatchObject({ icon: "ScanLine", label: "scan" });
-    }
-
-    expect(openContactScan).toHaveBeenCalledTimes(2);
+    const button = buildTopbarRight({
+      ...rightArgs,
+      openContactScan,
+      openWalletScan,
+      route: { kind: "contacts" },
+    });
+    button?.onClick();
+    expect(button).toMatchObject({ icon: "ScanLine", label: "scan" });
+    expect(openContactScan).toHaveBeenCalledOnce();
     expect(openWalletScan).not.toHaveBeenCalled();
     expect(
       buildTopbarRight({
         ...rightArgs,
-        isProfileEditing: true,
         route: { kind: "profile" },
       }),
     ).toBeNull();
   });
 
-  it("opens the payment scanner from the wallet, proxy and settings", () => {
+  it("opens the payment scanner from wallet and collaboration only", () => {
     const openContactScan = vi.fn();
     const openWalletScan = vi.fn();
-    for (const kind of [
-      "wallet",
-      "collaboration",
-      "proxyPayments",
-      "settings",
-    ] as const) {
+    for (const kind of ["wallet", "collaboration"] as const) {
       const button = buildTopbarRight({
         ...rightArgs,
         openContactScan,
@@ -360,8 +374,31 @@ describe("buildTopbarRight", () => {
       expect(button).toMatchObject({ icon: "ScanLine", label: "scan" });
     }
 
-    expect(openWalletScan).toHaveBeenCalledTimes(4);
+    expect(openWalletScan).toHaveBeenCalledTimes(2);
     expect(openContactScan).not.toHaveBeenCalled();
+
+    for (const kind of ["proxyPayments", "settings", "topup"] as const) {
+      expect(
+        buildTopbarRight({
+          ...rightArgs,
+          route: { kind },
+        }),
+      ).toBeNull();
+    }
+  });
+
+  it("omits orphaned settings gears on detail and payment routes", () => {
+    for (const route of [
+      { kind: "contactPay", id: contactId },
+      { kind: "mint", mintUrl: "https://cashu.cz" },
+      { kind: "evoluServer", id: "wss://evolu.example" },
+      { kind: "evoluServerNew" },
+      { kind: "nostrRelay", id: "wss://relay.example" },
+      { kind: "nostrRelayNew" },
+      { kind: "lnAddressPay", lnAddress: "alice@example.com" },
+    ] as const satisfies readonly Route[]) {
+      expect(buildTopbarRight({ ...rightArgs, route })).toBeNull();
+    }
   });
 
   it("offers the pencil on the bank payment page and hides it while editing", () => {
@@ -414,20 +451,6 @@ describe("buildTopbarRight", () => {
     expect(button?.icon).toBe("Trash2");
     expect(button?.label).toBe("deleteContact");
     expect(deleteEditedContact).toHaveBeenCalledTimes(1);
-  });
-
-  it("opens the receive scanner from the top-up page", () => {
-    const openReceiveScan = vi.fn();
-    const button = buildTopbarRight({
-      ...rightArgs,
-      openReceiveScan,
-      route: { kind: "topup" },
-    });
-
-    button?.onClick();
-
-    expect(button?.icon).toBe("ScanLine");
-    expect(openReceiveScan).toHaveBeenCalledOnce();
   });
 });
 

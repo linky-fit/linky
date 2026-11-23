@@ -120,7 +120,6 @@ export type Route =
   | { kind: "evoluServers" }
   | { kind: "evoluServer"; id: string }
   | { kind: "evoluServerNew" }
-  | { kind: "evoluData" }
   | { kind: "evoluCurrentData" }
   | { kind: "evoluHistoryData" }
   | { kind: "contactNew" }
@@ -276,8 +275,9 @@ export const parseRouteFromHash = (): Route => {
 
   if (hash === "#advanced/chat-storage") return { kind: "chatStorage" };
   if (hash === "#evolu-servers") return { kind: "evoluServers" };
-  if (hash === "#evolu-data") return { kind: "evoluData" };
-  if (hash === "#evolu-current-data") return { kind: "evoluCurrentData" };
+  if (hash === "#evolu-current-data" || hash === "#evolu-data") {
+    return { kind: "evoluCurrentData" };
+  }
   if (hash === "#evolu-history-data") return { kind: "evoluHistoryData" };
 
   if (hash === "#evolu-server/new") return { kind: "evoluServerNew" };

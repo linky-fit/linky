@@ -1,4 +1,4 @@
-import { useAtomValue } from "@linky-fit/linkstr-react";
+import { useAtomSet, useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
 import { navigateTo, useRouting } from "../../../hooks/useRouting";
 import {
@@ -7,6 +7,7 @@ import {
   scanDiagnosticsAtom,
   scanEntryPointAtom,
   scanIsOpenAtom,
+  scanPausedAtom,
   scanVideoRefAtom,
   type ScanEntryPoint,
 } from "../../state/shell/scan";
@@ -33,6 +34,8 @@ export const useScanCommands = () => {
 };
 
 export const useScanIsOpen = () => useAtomValue(scanIsOpenAtom);
+
+export const useSetScanPaused = () => useAtomSet(scanPausedAtom);
 
 /** What the open scanner shows: where it was opened from, the camera and its reads. */
 export const useScanView = () => {

@@ -1,9 +1,11 @@
 import {
   Avatar,
   Button,
+  Disclosure,
   Notice,
   OptionTile,
   Row,
+  Section,
   SelectField,
   Stack,
   StatusDot,
@@ -175,6 +177,19 @@ const getSpdAmountSat = (
   const amountSat = Math.round((amount / rate) * SATS_PER_BTC);
   return Number.isFinite(amountSat) && amountSat > 0 ? amountSat : null;
 };
+
+const ACCOUNT_FIELD_KEYS = new Set<BankPaymentFieldKey>([
+  "ACC",
+  "BIC",
+  "RN",
+  "CITY",
+]);
+
+const CZECH_SYMBOL_FIELD_KEYS = new Set<BankPaymentFieldKey>([
+  "X-VS",
+  "X-SS",
+  "X-KS",
+]);
 
 const FIELD_LABEL_KEYS: Record<BankPaymentFieldKey, I18nKey> = {
   ACC: "spdPaymentAccount",
@@ -496,59 +511,118 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
     }
   };
 
+  const rawAmountText = getSpdField(activePayment ?? payment, "AM");
+  const originalFiatText =
+    displayCurrency !== "hidden" &&
+    amount !== null &&
+    rawAmountText &&
+    currencyCode &&
+    currency !== "sat" &&
+    currency !== "sats" &&
+    currency !== displayCurrency
+      ? `${rawAmountText} ${currencyCode}`
+      : null;
+
   const summary = (
-    <DisplayAmount
-      amount={amountText || t("spdPaymentAmountUnknown")}
-      cycles={Boolean(amountText)}
-      testID="bank-payment-amount"
-    />
+    <Stack alignItems="center" gap="$xs">
+      <DisplayAmount
+        amount={amountText || t("spdPaymentAmountUnknown")}
+        cycles={Boolean(amountText)}
+        testID="bank-payment-amount"
+      />
+      {originalFiatText ? (
+        <Text
+          variant="label"
+          fontWeight="$regular"
+          color="$colorMuted"
+          testID="bank-payment-fiat-amount"
+        >
+          {originalFiatText}
+        </Text>
+      ) : null}
+    </Stack>
   );
 
   if (draftFields) {
+    const accountKeys = editableKeys.filter((key) =>
+      ACCOUNT_FIELD_KEYS.has(key),
+    );
+    const czechSymbolKeys = editableKeys.filter((key) =>
+      CZECH_SYMBOL_FIELD_KEYS.has(key),
+    );
+    const paymentKeys = editableKeys.filter(
+      (key) =>
+        !ACCOUNT_FIELD_KEYS.has(key) && !CZECH_SYMBOL_FIELD_KEYS.has(key),
+    );
+    const hasCzechSymbolValueOrError = czechSymbolKeys.some(
+      (key) =>
+        (draftFields[key] ?? "").trim().length > 0 || editError?.field === key,
+    );
+    const renderField = (key: "AM" | BankPaymentFieldKey) => {
+      const isDate = key === "DT";
+      const fieldError = editError?.field === key ? editError : null;
+      return (
+        <TextField
+          key={key}
+          id={`bank-payment-field-${key}`}
+          label={t(getFieldLabelKey(payment.format, key))}
+          {...(fieldError ? { error: t(fieldError.key) } : {})}
+          inputMode={key === "AM" ? "decimal" : undefined}
+          type={isDate ? "date" : undefined}
+          value={
+            isDate
+              ? toDateInputValue(draftFields[key] ?? "")
+              : (draftFields[key] ?? "")
+          }
+          onChangeText={(value) =>
+            updateDraftField(key, isDate ? fromDateInputValue(value) : value)
+          }
+          trailing={key === "AM" ? currencyCode : undefined}
+          // A scanned code without an amount opens here to get one.
+          autoFocus={key === "AM" && !draftFields[key]}
+        />
+      );
+    };
+
     return (
       <BankPaymentScreen>
         {amountText ? summary : null}
 
-        <Stack gap="$md">
-          {isManualEntry ? (
-            <SelectField
-              label={t("spdPaymentCurrency")}
-              value={currencyCode}
-              options={BANK_PAYMENT_OFFER_CURRENCIES.map((code) => ({
-                label: code,
-                value: code,
-              }))}
-              onValueChange={changeManualCurrency}
-            />
+        <Stack gap="$lg">
+          <Section title={t("spdPaymentSectionPayment")}>
+            <Stack gap="$md">
+              {isManualEntry ? (
+                <SelectField
+                  label={t("spdPaymentCurrency")}
+                  value={currencyCode}
+                  options={BANK_PAYMENT_OFFER_CURRENCIES.map((code) => ({
+                    label: code,
+                    value: code,
+                  }))}
+                  onValueChange={changeManualCurrency}
+                />
+              ) : null}
+              {renderField("AM")}
+              {paymentKeys.map(renderField)}
+            </Stack>
+          </Section>
+
+          {accountKeys.length > 0 ? (
+            <Section title={t("spdPaymentSectionAccount")}>
+              <Stack gap="$md">{accountKeys.map(renderField)}</Stack>
+            </Section>
           ) : null}
-          {["AM" as const, ...editableKeys].map((key) => {
-            const isDate = key === "DT";
-            const fieldError = editError?.field === key ? editError : null;
-            return (
-              <TextField
-                key={key}
-                id={`bank-payment-field-${key}`}
-                label={t(getFieldLabelKey(payment.format, key))}
-                {...(fieldError ? { error: t(fieldError.key) } : {})}
-                inputMode={key === "AM" ? "decimal" : undefined}
-                type={isDate ? "date" : undefined}
-                value={
-                  isDate
-                    ? toDateInputValue(draftFields[key] ?? "")
-                    : (draftFields[key] ?? "")
-                }
-                onChangeText={(value) =>
-                  updateDraftField(
-                    key,
-                    isDate ? fromDateInputValue(value) : value,
-                  )
-                }
-                trailing={key === "AM" ? currencyCode : undefined}
-                // A scanned code without an amount opens here to get one.
-                autoFocus={key === "AM" && !draftFields[key]}
-              />
-            );
-          })}
+
+          {czechSymbolKeys.length > 0 ? (
+            <Disclosure
+              key={payment.format}
+              title={t("spdPaymentSectionCzechSymbols")}
+              defaultOpen={hasCzechSymbolValueOrError}
+            >
+              <Stack gap="$md">{czechSymbolKeys.map(renderField)}</Stack>
+            </Disclosure>
+          ) : null}
+
           {editError && editError.field === null ? (
             <Notice tone="danger" title={t(editError.key)} />
           ) : null}
@@ -575,6 +649,49 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
           />
         ))}
       </Stack>
+
+      {offerContacts.length > 0 ? (
+        <Row gap="$xs" flexWrap="wrap" alignItems="stretch">
+          {offerContacts.map((contact) => {
+            const key = getOfferContactKey(contact);
+            const orderIndex = selectedOfferContactKeys.indexOf(key);
+            return (
+              <OfferContactTile
+                contact={contact}
+                key={key}
+                order={orderIndex === -1 ? null : orderIndex + 1}
+                t={t}
+                onToggle={() => {
+                  setHasEditedOfferContacts(true);
+                  setSelectedOfferContactKeys((current) =>
+                    // A re-added contact joins the end of the queue.
+                    current.includes(key)
+                      ? current.filter((candidate) => candidate !== key)
+                      : [...current, key],
+                  );
+                }}
+              />
+            );
+          })}
+        </Row>
+      ) : null}
+
+      <Row gap="$sm">
+        <Text variant="caption" flex={1}>
+          {t("bankPaymentOfferStaggerDelay")}
+        </Text>
+        <Stepper
+          accessibilityLabel={t("bankPaymentOfferStaggerDelay")}
+          decreaseLabel={t("bankPaymentOfferStaggerDelayDecrease")}
+          increaseLabel={t("bankPaymentOfferStaggerDelayIncrease")}
+          max={BANK_PAYMENT_OFFER_MAX_STAGGER_DELAY_SEC}
+          min={BANK_PAYMENT_OFFER_MIN_STAGGER_DELAY_SEC}
+          onValueChange={(value) => setOfferDelaySec(clampOfferDelaySec(value))}
+          step={BANK_PAYMENT_OFFER_STAGGER_DELAY_STEP_SEC}
+          value={offerDelaySec}
+          valueText={`${offerDelaySec} s`}
+        />
+      </Row>
 
       {amount === null ? (
         // Bank QR codes may leave the amount to the payer; without it there is nothing to offer.
@@ -618,49 +735,6 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
           {requestReimbursementLabel}
         </Button>
       )}
-
-      <Row gap="$sm">
-        <Text variant="caption" flex={1}>
-          {t("bankPaymentOfferStaggerDelay")}
-        </Text>
-        <Stepper
-          accessibilityLabel={t("bankPaymentOfferStaggerDelay")}
-          decreaseLabel={t("bankPaymentOfferStaggerDelayDecrease")}
-          increaseLabel={t("bankPaymentOfferStaggerDelayIncrease")}
-          max={BANK_PAYMENT_OFFER_MAX_STAGGER_DELAY_SEC}
-          min={BANK_PAYMENT_OFFER_MIN_STAGGER_DELAY_SEC}
-          onValueChange={(value) => setOfferDelaySec(clampOfferDelaySec(value))}
-          step={BANK_PAYMENT_OFFER_STAGGER_DELAY_STEP_SEC}
-          value={offerDelaySec}
-          valueText={`${offerDelaySec} s`}
-        />
-      </Row>
-
-      {offerContacts.length > 0 ? (
-        <Row gap="$xs" flexWrap="wrap" alignItems="stretch">
-          {offerContacts.map((contact) => {
-            const key = getOfferContactKey(contact);
-            const orderIndex = selectedOfferContactKeys.indexOf(key);
-            return (
-              <OfferContactTile
-                contact={contact}
-                key={key}
-                order={orderIndex === -1 ? null : orderIndex + 1}
-                t={t}
-                onToggle={() => {
-                  setHasEditedOfferContacts(true);
-                  setSelectedOfferContactKeys((current) =>
-                    // A re-added contact joins the end of the queue.
-                    current.includes(key)
-                      ? current.filter((candidate) => candidate !== key)
-                      : [...current, key],
-                  );
-                }}
-              />
-            );
-          })}
-        </Row>
-      ) : null}
 
       {offerStatus ? <Notice tone="danger" title={offerStatus} /> : null}
     </BankPaymentScreen>

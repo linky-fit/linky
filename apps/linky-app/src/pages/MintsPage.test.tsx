@@ -91,7 +91,8 @@ describe("MintsPage", () => {
 
     const selectedButton = findButton(container, "cashu.cz");
     expect(selectedButton.textContent).toContain("recommendedMintBadge");
-    expect(selectedButton.getAttribute("aria-selected")).toBe("true");
+    expect(selectedButton.getAttribute("aria-pressed")).toBe("true");
+    expect(selectedButton.hasAttribute("aria-selected")).toBe(false);
     const selectedItem = selectedButton.closest('[data-testid="mint-choice"]');
     expect(
       selectedItem?.querySelector('[data-testid="mint-fees"]'),

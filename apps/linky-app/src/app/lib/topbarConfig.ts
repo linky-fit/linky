@@ -10,8 +10,12 @@ import type { I18nKey, Translate } from "../../i18n";
 
 export interface BackActionContext {
   backFromContactNew: () => void;
+  cashuTokensBackTo?: "advanced" | null;
+  clearCashuTokensBackTo?: () => void;
+  clearEvoluDataBackTo?: () => void;
   closeContactDetail: () => void;
   contactPayBackToChatId: ContactId | null;
+  evoluDataBackTo?: "advanced" | null;
   navigateToMainReturn: () => void;
   ownPubkey: Pubkey | null;
   /** The chat holding the message a listing detail shows its copy from. */
@@ -34,15 +38,12 @@ interface BuildTopbarLeadingArgs {
 interface BuildTopbarRightArgs {
   chatEditContactId: ContactId | null;
   deleteEditedContact: () => void;
-  isProfileEditing: boolean;
   /** Opens the scanner for a contact's code. */
   openContactScan: () => void;
-  openReceiveScan: () => void;
   /** Opens the scanner for payments, which reads contact codes too. */
   openWalletScan: () => void;
   route: Route;
   t: Translate;
-  openMenu: () => void;
 }
 
 /**
@@ -57,8 +58,12 @@ export const resolveBackAction = (
   route: Route,
   {
     backFromContactNew,
+    cashuTokensBackTo = null,
+    clearCashuTokensBackTo,
+    clearEvoluDataBackTo,
     closeContactDetail,
     contactPayBackToChatId,
+    evoluDataBackTo = null,
     navigateToMainReturn,
     ownPubkey,
     sharedListingChatId,
@@ -66,10 +71,10 @@ export const resolveBackAction = (
 ): (() => void) | null => {
   switch (route.kind) {
     case "settings":
-    case "advanced":
     case "profile":
       return navigateToMainReturn;
 
+    case "advanced":
     case "settingsLanguage":
     case "settingsAppearance":
     case "settingsUnits":
@@ -81,11 +86,14 @@ export const resolveBackAction = (
     case "settingsMasterKeys":
     case "settingsNostrIdentity":
     case "advancedAutoPayLimit":
-    case "advancedInspector":
     case "mints":
     case "nostrRelays":
     case "evoluServers":
       return () => navigateTo({ route: "settings" });
+
+    case "advancedInspector":
+    case "advancedPushDebug":
+      return () => navigateTo({ route: "advanced" });
 
     case "bankPaymentNew":
       return () => navigateTo({ route: "proxyPayments" });
@@ -111,7 +119,6 @@ export const resolveBackAction = (
     }
 
     case "advancedInspectorTimeline":
-    case "advancedPushDebug":
       return () => navigateTo({ route: "advancedInspector" });
 
     case "mint":
@@ -129,9 +136,16 @@ export const resolveBackAction = (
             navigateTo({ route: "bankPayment", spdPayload: route.spdPayload })
         : () => navigateTo({ route: "wallet" });
 
+    case "cashuTokens":
+      return () => {
+        clearCashuTokensBackTo?.();
+        navigateTo({
+          route: cashuTokensBackTo === "advanced" ? "advanced" : "wallet",
+        });
+      };
+
     case "manualPay":
     case "lnInvoicePay":
-    case "cashuTokens":
     case "cashuTokenEmit":
     case "topup":
     case "onchainSend":
@@ -165,9 +179,6 @@ export const resolveBackAction = (
     case "cashuToken":
       return () => navigateTo({ route: "cashuTokens" });
 
-    case "evoluData":
-      return () => navigateTo({ route: "advanced" });
-
     case "lnAddressPay":
     case "chat":
       return () => navigateTo({ route: "contacts" });
@@ -176,10 +187,17 @@ export const resolveBackAction = (
     case "nostrRelayNew":
       return () => navigateTo({ route: "nostrRelays" });
 
+    case "evoluCurrentData":
+      return () => {
+        clearEvoluDataBackTo?.();
+        navigateTo({
+          route: evoluDataBackTo === "advanced" ? "advanced" : "evoluServers",
+        });
+      };
+
     case "evoluServer":
     case "evoluServerNew":
     case "chatStorage":
-    case "evoluCurrentData":
     case "evoluHistoryData":
       return () => navigateTo({ route: "evoluServers" });
 
@@ -274,107 +292,19 @@ export const buildTopbarLeading = ({
   return null;
 };
 
-// Routes whose right button is decided above are narrowed away before the
-// lookup, so adding a route kind forces a decision here.
-const SHOWS_MENU_BUTTON: Record<
-  Exclude<
-    Route["kind"],
-    | "chat"
-    | "contact"
-    | "contactEdit"
-    | "contacts"
-    | "evoluServers"
-    | "nostrRelays"
-    | "collaboration"
-    | "profile"
-    | "proxyPayments"
-    | "settings"
-    | "topup"
-    | "wallet"
-  >,
-  boolean
-> = {
-  advanced: false,
-  advancedAutoPayLimit: false,
-  advancedInspector: false,
-  advancedInspectorTimeline: false,
-  advancedPushDebug: false,
-  bankPayment: false,
-  bankPaymentNew: false,
-  bankPaymentOffer: false,
-  cashuToken: false,
-  cashuTokenEmit: false,
-  cashuTokenNew: false,
-  cashuTokens: false,
-  cashuProofs: false,
-  cash: false,
-  listings: false,
-  listingNew: false,
-  listingEdit: false,
-  listing: false,
-  contactNew: false,
-  contactPay: true,
-  chatStorage: false,
-  evoluCurrentData: false,
-  evoluData: false,
-  evoluHistoryData: false,
-  evoluServer: true,
-  evoluServerNew: true,
-  lnAddressPay: true,
-  lnInvoicePay: false,
-  manualPay: false,
-  onchainReceive: false,
-  onchainSend: false,
-  onchainTransfer: false,
-  mint: true,
-  mintNew: false,
-  mints: false,
-  nostrRelay: true,
-  nostrRelayNew: true,
-  profileEdit: false,
-  settingsLanguage: false,
-  settingsAppearance: false,
-  settingsMasterKeys: false,
-  settingsNostrIdentity: false,
-  settingsReceiveMethod: false,
-  settingsTutorial: false,
-  settingsSupport: false,
-  settingsWhatsNew: false,
-  settingsBlocked: false,
-  settingsUnits: false,
-  topupInvoice: false,
-  topupNoAmount: false,
-  transaction: false,
-  walletHistory: false,
-  recurringPaymentNew: false,
-  recurringPayment: false,
-  recurringPaymentEdit: false,
-};
-
 export const buildTopbarRight = ({
   chatEditContactId,
   deleteEditedContact,
-  isProfileEditing,
   openContactScan,
-  openReceiveScan,
   openWalletScan,
   route,
   t,
-  openMenu,
 }: BuildTopbarRightArgs): TopbarButton | null => {
-  // Every root screen opens the scanner on the right. The profile and the
-  // contacts read a contact's code; the others read payments as well.
-  if (route.kind === "contacts" || route.kind === "profile") {
-    if (isProfileEditing && route.kind === "profile") return null;
+  if (route.kind === "contacts") {
     return { icon: "ScanLine", label: t("scan"), onClick: openContactScan };
   }
 
-  if (
-    route.kind === "wallet" ||
-    route.kind === "collaboration" ||
-    route.kind === "proxyPayments" ||
-    route.kind === "settings"
-  ) {
+  if (route.kind === "wallet" || route.kind === "collaboration") {
     return { icon: "ScanLine", label: t("scan"), onClick: openWalletScan };
   }
 
@@ -446,21 +376,11 @@ export const buildTopbarRight = ({
     };
   }
 
-  if (route.kind === "topup") {
-    return {
-      icon: "ScanLine",
-      label: t("scan"),
-      onClick: openReceiveScan,
-    };
-  }
-
-  return SHOWS_MENU_BUTTON[route.kind]
-    ? { icon: "Settings", label: t("menu"), onClick: openMenu }
-    : null;
+  return null;
 };
 
 const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
-  advanced: "settings",
+  advanced: "settingsDeveloper",
   advancedAutoPayLimit: "lightningInvoiceAutoPayLimit",
   advancedInspector: "nostrInspector",
   advancedInspectorTimeline: "nostrInspector",
@@ -487,7 +407,6 @@ const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
   contacts: "contactsTitle",
   chatStorage: "chatStorage",
   evoluCurrentData: "evoluData",
-  evoluData: "evoluStorage",
   evoluHistoryData: "evoluHistory",
   evoluServer: "evoluServer",
   evoluServerNew: "evoluAddServerLabel",

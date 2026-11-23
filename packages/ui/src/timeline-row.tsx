@@ -1,6 +1,6 @@
 import { View } from "tamagui";
 import { Pressable } from "./controls";
-import { Text } from "./layout";
+import { Row, Text } from "./layout";
 import { border } from "./tokens";
 import type { Tone } from "./tokens";
 import { toneColors } from "./styles";
@@ -19,7 +19,7 @@ export interface TimelineRowProps {
   testID?: string | undefined;
 }
 
-/** A compact diagnostic row with fixed columns, suitable for long timelines. */
+/** A compact diagnostic row with fixed columns on wide screens and a wrapped layout on phones. */
 export function TimelineRow({
   time,
   channel,
@@ -44,6 +44,14 @@ export function TimelineRow({
       gap="$sm"
       paddingHorizontal="$sm"
       paddingVertical="$xs"
+      $compact={{
+        minWidth: 0,
+        width: "100%",
+        flexDirection: "column",
+        alignItems: "stretch",
+        gap: "$xs",
+        paddingVertical: "$sm",
+      }}
       backgroundColor={
         selected ? "$infoSoft" : related ? "$warningSoft" : "$transparent"
       }
@@ -52,56 +60,89 @@ export function TimelineRow({
       <View
         width={border.emphasis}
         alignSelf="stretch"
+        $compact={{ display: "none" }}
         backgroundColor={
           selected ? "$infoText" : related ? "$warningText" : "$transparent"
         }
       />
-      <Text
-        mono
-        variant="caption"
-        color="$colorMuted"
-        width="$hero"
-        flexShrink={0}
-      >
-        {time}
-      </Text>
-      {clientLabel ? (
+      <Row gap="$sm" flexShrink={0} $compact={{ flexWrap: "wrap", gap: "$xs" }}>
         <Text
           mono
           variant="caption"
           color="$colorMuted"
-          width="$row"
+          width="$hero"
+          $compact={{ width: "auto" }}
           flexShrink={0}
         >
-          {clientLabel}
+          {time}
         </Text>
-      ) : null}
-      <Text
-        mono
-        variant="caption"
-        bold
-        color={colors.color}
-        backgroundColor={colors.background}
-        borderRadius="$sm"
-        paddingHorizontal="$xs"
-        width="$hero"
-        flexShrink={0}
-        numberOfLines={1}
+        {clientLabel ? (
+          <Text
+            mono
+            variant="caption"
+            color="$colorMuted"
+            width="$row"
+            $compact={{ width: "auto" }}
+            flexShrink={0}
+          >
+            {clientLabel}
+          </Text>
+        ) : null}
+        <Text
+          mono
+          variant="caption"
+          bold
+          color={colors.color}
+          backgroundColor={colors.background}
+          borderRadius="$sm"
+          paddingHorizontal="$xs"
+          width="$hero"
+          $compact={{ width: "auto" }}
+          flexShrink={0}
+          numberOfLines={1}
+        >
+          {channel}
+        </Text>
+      </Row>
+      <Row
+        gap="$sm"
+        flex={1}
+        minWidth={0}
+        $compact={{
+          flexGrow: 0,
+          flexShrink: 0,
+          flexBasis: "auto",
+          width: "100%",
+          flexDirection: "column",
+          alignItems: "flex-start",
+          gap: "$xxs",
+        }}
       >
-        {channel}
-      </Text>
-      <Text
-        mono
-        variant="caption"
-        width="$column"
-        flexShrink={0}
-        numberOfLines={1}
-      >
-        {tag}
-      </Text>
-      <Text variant="caption" color="$colorMuted" flex={1} numberOfLines={1}>
-        {summary}
-      </Text>
+        <Text
+          mono
+          variant="caption"
+          width="$column"
+          $compact={{ width: "100%" }}
+          flexShrink={0}
+          numberOfLines={1}
+        >
+          {tag}
+        </Text>
+        <Text
+          variant="caption"
+          color="$colorMuted"
+          flex={1}
+          $compact={{
+            flexGrow: 0,
+            flexShrink: 0,
+            flexBasis: "auto",
+            width: "100%",
+          }}
+          numberOfLines={2}
+        >
+          {summary}
+        </Text>
+      </Row>
     </Pressable>
   );
 }

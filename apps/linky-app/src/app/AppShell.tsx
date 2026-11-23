@@ -28,17 +28,13 @@ const AppFrame = ({ children }: { children: React.ReactNode }) => (
   </Stack>
 );
 
-/** Pins app-wide banners over the top edge as full-width strips, stacked when several show at once. */
+/** Places app-wide banners above the shell in normal flow so they never overlap headers or avatars. */
 const TopBanners = ({ children }: { children: React.ReactNode }) => (
   <Stack
-    position="fixed"
-    top="$none"
-    left="$none"
-    right="$none"
-    zIndex="$overlay"
+    flexShrink={0}
+    zIndex="$sticky"
     gap="$none"
-    pointerEvents="box-none"
-    data-safe-area="top"
+    data-safe-area="top-when-present"
   >
     {children}
   </Stack>
@@ -138,6 +134,8 @@ const UnauthenticatedAppShell = () => {
         alignSelf="center"
         overflowY="auto"
         paddingHorizontal="$xl"
+        // Keeps focused fields in tall forms (e.g. the 20-word recovery seed) clear of the sticky bottom action bar.
+        $platform-web={{ scrollPaddingBottom: 96 }}
       >
         <UnauthenticatedLayout
           confirmPendingOnboardingProfile={confirmPendingOnboardingProfile}

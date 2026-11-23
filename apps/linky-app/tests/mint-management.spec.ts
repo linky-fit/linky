@@ -98,7 +98,7 @@ test("test mints can be hidden and funds move between mints", async ({
     await page.goto("/#advanced/mints");
     await expect(
       page.getByRole("button", { name: new RegExp(`^${SOURCE_HOST}\\b`) }),
-    ).toHaveAttribute("aria-selected", "true");
+    ).toHaveAttribute("aria-pressed", "true");
   });
 
   let targetBefore = 0;
@@ -117,6 +117,7 @@ test("test mints can be hidden and funds move between mints", async ({
 
   await test.step("estimate and move an explicit amount to the target mint", async () => {
     await page.goto(`/#advanced/mint/${encodeURIComponent(SOURCE_MINT_URL)}`);
+    await page.getByTestId("mint-move-open").click();
     const moveForm = page.getByTestId("mint-move-form");
     await expect(moveForm.getByTestId("amount-display")).toHaveText(
       new RegExp(`^${FUNDING_SAT}\\s*sat$`, "i"),
@@ -126,7 +127,7 @@ test("test mints can be hidden and funds move between mints", async ({
       .getByLabel("To mint")
       .getByRole("button", { name: TARGET_HOST });
     await targetMint.click();
-    await expect(targetMint).toHaveAttribute("aria-selected", "true");
+    await expect(targetMint).toHaveAttribute("aria-pressed", "true");
     await page.getByRole("button", { name: "Clear form", exact: true }).click();
     for (const digit of String(MOVE_SAT)) {
       await page.getByRole("button", { exact: true, name: digit }).click();
@@ -170,7 +171,7 @@ test("test mints can be hidden and funds move between mints", async ({
     await page.goto("/#advanced/mints");
     await expect(
       page.getByRole("button", { name: new RegExp(`^${TARGET_HOST}\\b`) }),
-    ).toHaveAttribute("aria-selected", "true");
+    ).toHaveAttribute("aria-pressed", "true");
   });
 
   errors.assertClean();

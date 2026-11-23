@@ -104,7 +104,8 @@ body {
 }
 
 /* nativeBridge.ts writes native insets to these variables, which Tamagui props cannot read. */
-[data-safe-area="top"] {
+[data-safe-area="top"],
+[data-safe-area="top-when-present"]:not(:empty) {
   padding-top: var(--safe-area-top);
 }
 

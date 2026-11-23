@@ -110,13 +110,20 @@ const StepHeading = ({ title, hint }: { title: string; hint?: string }) => (
   </Stack>
 );
 
-/** Centers a step's content in the space above its actions. */
-const StepBody = ({ children }: { children: React.ReactNode }) => (
+/** Centers a step's content in the space above its actions, or starts from the top for tall forms. */
+const StepBody = ({
+  children,
+  alignStart = false,
+}: {
+  children: React.ReactNode;
+  alignStart?: boolean;
+}) => (
   <Stack
     flexGrow={1}
-    justifyContent="center"
+    justifyContent={alignStart ? "flex-start" : "center"}
     gap="$xl"
-    paddingVertical="$xxl"
+    paddingTop="$xxl"
+    paddingBottom={alignStart ? "$huge" : "$xxl"}
     width="100%"
     maxWidth="$sheetWidth"
     alignSelf="center"
@@ -296,7 +303,7 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
         />
 
         <Form onSubmit={() => void submitReturningSlip39()} flexGrow={1}>
-          <StepBody>
+          <StepBody alignStart>
             <StepHeading
               title={t("onboardingReturnTitle")}
               hint={t("onboardingReturnIntro")}
@@ -645,20 +652,18 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
         onOpenChange={setPickerMenuIsOpen}
         title={t("language")}
       >
-        <Stack>
-          {Object.entries(LANGUAGE_LABEL_KEYS).map(([option, labelKey]) => (
-            <ListRow
-              key={option}
-              title={t(labelKey)}
-              selected={lang === option}
-              chevron={false}
-              onPress={() => {
-                if (isLang(option)) setLang(option);
-                setPickerMenuIsOpen(false);
-              }}
-            />
-          ))}
-        </Stack>
+        {Object.entries(LANGUAGE_LABEL_KEYS).map(([option, labelKey]) => (
+          <ListRow
+            key={option}
+            title={t(labelKey)}
+            selected={lang === option}
+            chevron={false}
+            onPress={() => {
+              if (isLang(option)) setLang(option);
+              setPickerMenuIsOpen(false);
+            }}
+          />
+        ))}
       </Sheet>
     </Stack>
   );

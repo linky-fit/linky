@@ -43,7 +43,7 @@ import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey, Translate } from "../i18n";
 
 const Price = ({ children }: { children: string }) => (
-  <Text variant="label" bold>
+  <Text variant="label" bold numberOfLines={1} flexShrink={1} textAlign="right">
     {children}
   </Text>
 );
@@ -61,7 +61,7 @@ function ListingByline({
   testID: string;
 }): React.ReactElement {
   return (
-    <Row gap="$xs" alignItems="center" testID={testID}>
+    <Row gap="$xs" alignItems="center" minWidth={0} testID={testID}>
       {prefix ? (
         <Text variant="caption" color="$colorMuted" flexShrink={0}>
           {prefix}
@@ -72,7 +72,13 @@ function ListingByline({
       ) : (
         <AvatarGroup people={people} size="xs" max={4} />
       )}
-      <Text variant="caption" color="$colorMuted" numberOfLines={1} flex={1}>
+      <Text
+        variant="caption"
+        color="$colorMuted"
+        numberOfLines={1}
+        flex={1}
+        minWidth={0}
+      >
         {unit}
       </Text>
     </Row>

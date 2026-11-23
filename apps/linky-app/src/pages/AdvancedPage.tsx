@@ -3,7 +3,6 @@ import {
   ListRow,
   Row,
   Section,
-  Spinner,
   Stack,
   StatusDot,
   Switch,
@@ -12,7 +11,6 @@ import {
 import type { IconName } from "@linky-fit/ui";
 import React, { useCallback } from "react";
 import { useAtom, useAtomValue } from "@linky-fit/linkstr-react";
-import { useDedupeContacts } from "../app/hooks/contacts/useDedupeContacts";
 import { useEvoluStatusSummary } from "../app/hooks/settings/useEvoluSettings";
 import { useIdentitySettings } from "../app/hooks/settings/useIdentitySettings";
 import {
@@ -20,7 +18,6 @@ import {
   usePushToast,
   useTranslation,
 } from "../app/hooks/shell";
-import { useAppDataActions } from "../app/hooks/useAppDataTransfer";
 import { useDefaultMintDisplay } from "../app/hooks/wallet/useDefaultMint";
 import { nostrRelayUrlsAtom } from "../app/state/messages/relays";
 import {
@@ -45,24 +42,24 @@ import { usePassOnListings } from "../app/hooks/usePassOnListings";
 import { usePushNotificationsSetting } from "../app/hooks/usePushNotificationsSetting";
 import { useColorModePreference } from "../hooks/useColorMode";
 import { navigateTo, useRouting } from "../hooks/useRouting";
+import { supportsDeviceMotion } from "../platform/deviceMotion";
 import type { Route } from "../types/route";
 import {
   connectionStatus,
   type ConnectionState,
 } from "../utils/connectionStatus";
+import { getDisplayUnitLabel } from "../utils/displayAmounts";
 import { isDesktopShell, isNightlyOrigin } from "../platform/runtime";
 import { COLOR_MODE_PREFERENCE_LABEL_KEYS } from "../utils/colorMode";
-import { pickFile } from "../utils/pickFile";
 import { RECEIVE_METHOD_LABEL_KEYS } from "../utils/receiveMethod";
+import { LANGUAGE_LABEL_KEYS } from "./LanguagePage";
 
 export function AdvancedPage(): React.ReactElement {
   const route = useRouting();
   const { requestLogout, seedMnemonic } = useIdentitySettings();
-  const { dedupeContacts, dedupeContactsIsBusy } = useDedupeContacts();
   const defaultMintDisplay = useDefaultMintDisplay();
   const { evoluConnectedServerCount, evoluOverallStatus, evoluServerUrls } =
     useEvoluStatusSummary();
-  const { exportAppData, handleImportAppDataFilePicked } = useAppDataActions();
   const lightningInvoiceAutoPayLimit = useAtomValue(
     lightningInvoiceAutoPayLimitAtom,
   );
@@ -79,8 +76,8 @@ export function AdvancedPage(): React.ReactElement {
   const nostrRelayOverallStatus = overallRelayStatus(relayUrls, relayHealth);
 
   const currentNsec = useAtomValue(currentNsecAtom);
-  const { formatDisplayedAmountParts } = useDisplayAmounts();
-  const { t } = useTranslation();
+  const { displayCurrency, formatDisplayedAmountParts } = useDisplayAmounts();
+  const { lang, t } = useTranslation();
   const { sendReadReceiptsEnabled, toggleSendReadReceipts } =
     useSeenReceiptsSetting();
   const { showProfileQrOnTiltEnabled, toggleShowProfileQrOnTilt } =
@@ -88,8 +85,13 @@ export function AdvancedPage(): React.ReactElement {
   const openFeedbackContact = useOpenFeedbackContact();
   const notifications = usePushNotificationsSetting();
   const colorModePreference = useColorModePreference();
+  const showTiltSetting = supportsDeviceMotion();
   const hasSeedMnemonic = (seedMnemonic ?? "").trim().length > 0;
   const hasCurrentNsec = (currentNsec ?? "").trim().length > 0;
+  const currentUnitLabel =
+    displayCurrency === "hidden"
+      ? t("unitHidden")
+      : getDisplayUnitLabel(displayCurrency, lang);
   const appVersionLabel = [
     __APP_VERSION__,
     isNightlyOrigin() ? "nightly" : "",
@@ -106,36 +108,25 @@ export function AdvancedPage(): React.ReactElement {
     [formatDisplayedAmountParts],
   );
 
-  const handleReloadApp = useCallback(async () => {
-    if ("serviceWorker" in navigator) {
-      try {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        await Promise.allSettled(
-          registrations.map((registration) => registration.update()),
-        );
-      } catch {
-        // Reload anyway even if the service worker update check fails.
-      }
-    }
-
-    window.location.reload();
-  }, []);
-
   /** Whether the detail pane beside the desktop list shows one of these routes. */
   const isOpen = (...kinds: Route["kind"][]) => kinds.includes(route.kind);
   const linkRow = (
     icon: IconName,
     title: string,
     onPress: () => void,
-    trailing?: React.ReactNode,
-    active = false,
+    options?: {
+      active?: boolean | undefined;
+      trailing?: React.ReactNode;
+      value?: string | undefined;
+    },
   ) => (
     <ListRow
       icon={icon}
       title={title}
       onPress={onPress}
-      trailing={trailing}
-      active={active}
+      value={options?.value}
+      trailing={options?.trailing}
+      active={options?.active}
     />
   );
   const toggleRow = (
@@ -158,18 +149,20 @@ export function AdvancedPage(): React.ReactElement {
       }
     />
   );
-  const valueText = (text: string) => (
-    <Text variant="label" color="$colorMuted" numberOfLines={1}>
-      {text}
-    </Text>
-  );
   const connectionState = (
     connected: number,
     total: number,
     state: ConnectionState,
   ) => (
     <Row gap="$sm">
-      {valueText(`${connected}/${total}`)}
+      <Text
+        variant="label"
+        fontWeight="$regular"
+        color="$colorMuted"
+        numberOfLines={1}
+      >
+        {`${connected}/${total}`}
+      </Text>
       <StatusDot
         tone={connectionStatus[state].tone}
         accessibilityLabel={t(connectionStatus[state].labelKey)}
@@ -184,22 +177,28 @@ export function AdvancedPage(): React.ReactElement {
           "Languages",
           t("language"),
           () => navigateTo({ route: "settingsLanguage" }),
-          undefined,
-          isOpen("settingsLanguage"),
+          {
+            active: isOpen("settingsLanguage"),
+            value: t(LANGUAGE_LABEL_KEYS[lang]),
+          },
         )}
         {linkRow(
           "Palette",
           t("appearance"),
           () => navigateTo({ route: "settingsAppearance" }),
-          valueText(t(COLOR_MODE_PREFERENCE_LABEL_KEYS[colorModePreference])),
-          isOpen("settingsAppearance"),
+          {
+            active: isOpen("settingsAppearance"),
+            value: t(COLOR_MODE_PREFERENCE_LABEL_KEYS[colorModePreference]),
+          },
         )}
         {linkRow(
           "Bitcoin",
           t("unit"),
           () => navigateTo({ route: "settingsUnits" }),
-          undefined,
-          isOpen("settingsUnits"),
+          {
+            active: isOpen("settingsUnits"),
+            value: currentUnitLabel,
+          },
         )}
         {/* Electron has no Web Push service; the running desktop app notifies. */}
         {isDesktopShell()
@@ -230,15 +229,16 @@ export function AdvancedPage(): React.ReactElement {
           "Ban",
           t("blocked"),
           () => navigateTo({ route: "settingsBlocked" }),
-          undefined,
-          isOpen("settingsBlocked"),
+          { active: isOpen("settingsBlocked") },
         )}
-        {toggleRow(
-          "Smartphone",
-          t("showProfileQrOnTilt"),
-          showProfileQrOnTiltEnabled,
-          toggleShowProfileQrOnTilt,
-        )}
+        {showTiltSetting
+          ? toggleRow(
+              "Smartphone",
+              t("showProfileQrOnTilt"),
+              showProfileQrOnTiltEnabled,
+              toggleShowProfileQrOnTilt,
+            )
+          : null}
       </Section>
 
       <Section grouped title={t("settingsAbout")}>
@@ -246,8 +246,7 @@ export function AdvancedPage(): React.ReactElement {
           "Compass",
           t("tutorial"),
           () => navigateTo({ route: "settingsTutorial" }),
-          undefined,
-          isOpen("settingsTutorial"),
+          { active: isOpen("settingsTutorial") },
         )}
         {linkRow("MessageCircle", t("feedback"), openFeedbackContact)}
         <ListRow
@@ -265,8 +264,7 @@ export function AdvancedPage(): React.ReactElement {
           "Newspaper",
           t("whatsNew"),
           () => navigateTo({ route: "settingsWhatsNew" }),
-          valueText(__APP_VERSION__),
-          isOpen("settingsWhatsNew"),
+          { active: isOpen("settingsWhatsNew"), value: __APP_VERSION__ },
         )}
       </Section>
 
@@ -275,8 +273,10 @@ export function AdvancedPage(): React.ReactElement {
           "QrCode",
           t("receiveMethod"),
           () => navigateTo({ route: "settingsReceiveMethod" }),
-          valueText(t(RECEIVE_METHOD_LABEL_KEYS[receiveMethod])),
-          isOpen("settingsReceiveMethod"),
+          {
+            active: isOpen("settingsReceiveMethod"),
+            value: t(RECEIVE_METHOD_LABEL_KEYS[receiveMethod]),
+          },
         )}
         {toggleRow(
           "Bean",
@@ -288,8 +288,10 @@ export function AdvancedPage(): React.ReactElement {
           "Zap",
           t("lightningInvoiceAutoPayLimit"),
           () => navigateTo({ route: "advancedAutoPayLimit" }),
-          valueText(getAutoPayLimitLabel(lightningInvoiceAutoPayLimit)),
-          isOpen("advancedAutoPayLimit"),
+          {
+            active: isOpen("advancedAutoPayLimit"),
+            value: getAutoPayLimitLabel(lightningInvoiceAutoPayLimit),
+          },
         )}
       </Section>
 
@@ -298,39 +300,39 @@ export function AdvancedPage(): React.ReactElement {
           "RadioTower",
           "Nostr",
           () => navigateTo({ route: "nostrRelays" }),
-          connectionState(
-            connectedRelayCount,
-            relayUrls.length,
-            nostrRelayOverallStatus,
-          ),
-          isOpen("nostrRelays", "nostrRelay", "nostrRelayNew"),
+          {
+            active: isOpen("nostrRelays", "nostrRelay", "nostrRelayNew"),
+            trailing: connectionState(
+              connectedRelayCount,
+              relayUrls.length,
+              nostrRelayOverallStatus,
+            ),
+          },
         )}
         {linkRow(
           "Cloud",
           "Evolu",
           () => navigateTo({ route: "evoluServers" }),
-          connectionState(
-            evoluConnectedServerCount,
-            evoluServerUrls.length,
-            evoluOverallStatus,
-          ),
-          isOpen(
-            "evoluServers",
-            "evoluServer",
-            "evoluServerNew",
-            "evoluData",
-            "evoluCurrentData",
-            "evoluHistoryData",
-            "chatStorage",
-          ),
+          {
+            active: isOpen(
+              "evoluServers",
+              "evoluServer",
+              "evoluServerNew",
+              "evoluCurrentData",
+              "evoluHistoryData",
+              "chatStorage",
+            ),
+            trailing: connectionState(
+              evoluConnectedServerCount,
+              evoluServerUrls.length,
+              evoluOverallStatus,
+            ),
+          },
         )}
-        {linkRow(
-          "Landmark",
-          "Mint",
-          () => navigateTo({ route: "mints" }),
-          defaultMintDisplay ? valueText(defaultMintDisplay) : null,
-          isOpen("mints", "mint", "mintNew"),
-        )}
+        {linkRow("Landmark", "Mint", () => navigateTo({ route: "mints" }), {
+          active: isOpen("mints", "mint", "mintNew"),
+          value: defaultMintDisplay || undefined,
+        })}
         {toggleRow(
           "FlaskConical",
           t("allowTestMints"),
@@ -339,43 +341,6 @@ export function AdvancedPage(): React.ReactElement {
             void setAllowTestMints(checked).then((outcome) => {
               if (!outcome.ok) pushToast(outcome.error);
             }),
-        )}
-      </Section>
-
-      <Section grouped title={t("settingsDebug")}>
-        {linkRow(
-          "Coins",
-          t("tokens"),
-          () => navigateTo({ route: "cashuTokens" }),
-          undefined,
-          isOpen(
-            "cashuTokens",
-            "cashuToken",
-            "cashuTokenNew",
-            "cashuTokenEmit",
-            "cashuProofs",
-          ),
-        )}
-        {linkRow("Upload", t("exportData"), exportAppData)}
-        {linkRow("Download", t("importData"), () => {
-          void pickFile(".txt,.json,application/json,text/plain").then(
-            handleImportAppDataFilePicked,
-          );
-        })}
-        <ListRow
-          icon="BrushCleaning"
-          title={t("dedupeContacts")}
-          onPress={() => void dedupeContacts()}
-          trailing={dedupeContactsIsBusy ? <Spinner /> : null}
-          disabled={dedupeContactsIsBusy}
-        />
-        {linkRow("RotateCw", t("reloadApp"), () => void handleReloadApp())}
-        {linkRow(
-          "Bug",
-          t("nostrInspector"),
-          () => navigateTo({ route: "advancedInspector" }),
-          undefined,
-          isOpen("advancedInspector", "advancedInspectorTimeline"),
         )}
       </Section>
 
@@ -410,6 +375,27 @@ export function AdvancedPage(): React.ReactElement {
           }
           t={t}
         />
+      </Section>
+
+      <Section grouped>
+        {linkRow(
+          "Bug",
+          t("settingsDeveloper"),
+          () => navigateTo({ route: "advanced" }),
+          {
+            active: isOpen(
+              "advanced",
+              "advancedInspector",
+              "advancedInspectorTimeline",
+              "advancedPushDebug",
+              "cashuTokens",
+              "cashuToken",
+              "cashuTokenNew",
+              "cashuTokenEmit",
+              "cashuProofs",
+            ),
+          },
+        )}
       </Section>
 
       <Text

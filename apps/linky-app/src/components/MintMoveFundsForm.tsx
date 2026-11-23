@@ -24,6 +24,7 @@ interface MintMoveFundsFormProps {
   estimateMintMove: (move: MintMove) => Promise<AutoswapEstimate | null>;
   getMintIconUrl: (mint: string | null | undefined) => MintIconSource;
   moveMintFunds: (move: MintMove) => Promise<boolean>;
+  onMoved?: () => void;
   sourceMint: string;
   /** Candidate target mints, the preferred one first. */
   targets: readonly string[];
@@ -64,6 +65,7 @@ export function MintMoveFundsForm({
   estimateMintMove,
   getMintIconUrl,
   moveMintFunds,
+  onMoved,
   sourceMint,
   targets,
 }: MintMoveFundsFormProps) {
@@ -123,6 +125,7 @@ export function MintMoveFundsForm({
     if (await moveMintFunds(priced)) {
       setEditedAmount(null);
       setEstimated(null);
+      onMoved?.();
     }
   };
 

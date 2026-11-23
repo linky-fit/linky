@@ -27,7 +27,7 @@ import {
   useRouteContact,
 } from "../contacts/useDisplayContacts";
 import { useTranslation } from "../shell";
-import { useNavIntent } from "../shell/navIntents";
+import { useNavIntent, useSetNavIntent } from "../shell/navIntents";
 import { useScanCommands } from "../shell/scan";
 import { useOnchainTransfers } from "../useOnchainTransfers";
 import { useChatIdOfMessage } from "../useSharedListing";
@@ -46,12 +46,16 @@ export const useTopbar = () => {
   const backFromContactNew = useBackFromContactNew();
   const deleteContact = useDeleteContact();
   const contactPayBackToChatId = useNavIntent("contactPayBackToChat");
+  const cashuTokensBackTo = useNavIntent("cashuTokensBackTo");
+  const evoluDataBackTo = useNavIntent("evoluDataBackTo");
+  const setCashuTokensBackTo = useSetNavIntent("cashuTokensBackTo");
+  const setEvoluDataBackTo = useSetNavIntent("evoluDataBackTo");
   const ownPubkey = useAtomValue(currentPubkeyAtom);
   const sharedListingChatId = useChatIdOfMessage(
     route.kind === "listing" ? route.messageId : null,
   );
-  const { navigateToMainReturn, openMenu } = useMainMenu();
-  const { openReceiveScan, openScan, openWalletScan } = useScanCommands();
+  const { navigateToMainReturn } = useMainMenu();
+  const { openScan, openWalletScan } = useScanCommands();
   const toggleContactsFilter = useToggleContactsFilter();
   const selectedChatContact = useChatContact(route);
   const selectedContact = useRouteContact(route);
@@ -70,8 +74,12 @@ export const useTopbar = () => {
 
   const topbar = buildTopbar({
     backFromContactNew,
+    cashuTokensBackTo,
+    clearCashuTokensBackTo: () => setCashuTokensBackTo(null),
+    clearEvoluDataBackTo: () => setEvoluDataBackTo(null),
     closeContactDetail,
     contactPayBackToChatId,
+    evoluDataBackTo,
     navigateToMainReturn,
     ownPubkey,
     route,
@@ -96,13 +104,10 @@ export const useTopbar = () => {
     deleteEditedContact: () => {
       if (route.kind === "contactEdit") void deleteContact(route.id);
     },
-    isProfileEditing,
     openContactScan: openScan,
-    openReceiveScan,
     openWalletScan,
     route,
     t,
-    openMenu,
   });
 
   const chatTopbarContact =

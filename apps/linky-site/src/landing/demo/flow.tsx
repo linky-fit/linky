@@ -1,5 +1,14 @@
-import { Keypad, Row, Stack, SuccessOverlay } from "@linky-fit/ui";
-import { shadow } from "@linky-fit/ui/tokens";
+import {
+  Amount,
+  Avatar,
+  Icon,
+  Keypad,
+  Row,
+  Spinner,
+  Stack,
+  Text,
+} from "@linky-fit/ui";
+import { enterScale, shadow, space } from "@linky-fit/ui/tokens";
 import type { ComponentProps, ReactNode } from "react";
 import "./flow.css";
 import { fill } from "./fill";
@@ -135,15 +144,102 @@ export function PaymentOverlay({
       zIndex="$overlay"
       {...fill}
     >
-      <SuccessOverlay
-        contained
-        title={title}
-        amount={amount}
-        unit="sat"
-        avatar={{ name: person, uri: avatarUri(person) }}
-        direction={direction}
-        pending={pending}
-      />
+      <Stack
+        position="absolute"
+        inset={0}
+        zIndex="$overlay"
+        justifyContent="center"
+        alignItems="center"
+        padding="$lg"
+        backgroundColor="$scrim"
+        role="status"
+        aria-live="assertive"
+      >
+        <Stack
+          alignItems="center"
+          gap="$md"
+          width="100%"
+          maxWidth="$sheetWidth"
+          padding="$xxl"
+          borderRadius="$card"
+          backgroundColor="$surface"
+          boxShadow={shadow.floating}
+          transition="slow"
+          enterStyle={{ opacity: 0, scale: enterScale.pop }}
+        >
+          <Stack position="relative" gap="$none">
+            <Avatar name={person} uri={avatarUri(person)} size="lg" raised />
+            {pending ? (
+              <Stack
+                key="pending"
+                position="absolute"
+                right={0}
+                bottom={0}
+                width="$controlSm"
+                height="$controlSm"
+                borderRadius="$pill"
+                backgroundColor="$surface"
+                alignItems="center"
+                justifyContent="center"
+              >
+                <Spinner />
+              </Stack>
+            ) : (
+              <Stack
+                key={direction}
+                position="absolute"
+                right={0}
+                bottom={0}
+                transition="slow"
+                enterStyle={{
+                  opacity: 0,
+                  scale: enterScale.pop,
+                  y: direction === "out" ? space.lg : -space.xxxl,
+                }}
+              >
+                <Stack
+                  width="$controlSm"
+                  height="$controlSm"
+                  borderRadius="$pill"
+                  backgroundColor="$surface"
+                  alignItems="center"
+                  justifyContent="center"
+                >
+                  <Stack
+                    width="$iconLg"
+                    height="$iconLg"
+                    borderRadius="$pill"
+                    backgroundColor={
+                      direction === "out" ? "$warning" : "$accent"
+                    }
+                    alignItems="center"
+                    justifyContent="center"
+                  >
+                    <Icon
+                      name={direction === "out" ? "ArrowUp" : "ArrowDown"}
+                      size="sm"
+                      color={direction === "out" ? "$onOnchain" : "$onAccent"}
+                    />
+                  </Stack>
+                </Stack>
+              </Stack>
+            )}
+          </Stack>
+          <Text
+            variant="label"
+            fontWeight="$regular"
+            color="$colorMuted"
+            textAlign="center"
+            numberOfLines={1}
+          >
+            {person}
+          </Text>
+          <Text variant="heading" textAlign="center">
+            {title}
+          </Text>
+          <Amount value={amount} unit="sat" size="md" />
+        </Stack>
+      </Stack>
     </Stack>
   );
 }

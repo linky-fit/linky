@@ -3,7 +3,11 @@ import { MOBILE_VIEWPORT, setBaseStorage } from "./helpers/appState";
 import { setRandomIdentityStorage } from "./helpers/identity";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
 
-test.use({ serviceWorkers: "block", viewport: MOBILE_VIEWPORT });
+test.use({
+  hasTouch: true,
+  serviceWorkers: "block",
+  viewport: MOBILE_VIEWPORT,
+});
 
 test.beforeEach(async ({ page }) => {
   await setBaseStorage(page);

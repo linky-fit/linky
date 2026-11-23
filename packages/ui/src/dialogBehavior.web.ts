@@ -10,7 +10,11 @@ const focusOutsideDialogs = () => {
     : null;
 };
 
-export const useDialogBehavior: DialogBehaviorHook = (open) => {
+export const useDialogBehavior: DialogBehaviorHook = (
+  open,
+  _onOpenChange,
+  returnFocusTo,
+) => {
   const [opener, setOpener] = useState(() =>
     open ? focusOutsideDialogs() : null,
   );
@@ -31,6 +35,11 @@ export const useDialogBehavior: DialogBehaviorHook = (open) => {
     },
     onCloseAutoFocus: (event) => {
       event.preventDefault();
+      const target = returnFocusTo?.current;
+      if (target && target.isConnected !== false) {
+        target.focus?.();
+        return;
+      }
       opener?.focus();
     },
   };

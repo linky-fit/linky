@@ -5,6 +5,7 @@ import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { TopupPage } from "./TopupPage";
 
 const mocks = vi.hoisted(() => ({
+  openReceiveScan: vi.fn<() => void>(),
   pasteFromClipboard: vi.fn<() => Promise<boolean>>(),
   pasteScanValue: vi.fn<(entryPoint?: string) => Promise<void>>(),
 }));
@@ -14,6 +15,7 @@ vi.mock("../app/hooks/shell", async () =>
 );
 vi.mock("../app/hooks/shell/scan", () => ({
   useScanCommands: () => ({
+    openReceiveScan: mocks.openReceiveScan,
     pasteScanValue: mocks.pasteScanValue,
   }),
 }));
@@ -50,6 +52,7 @@ const button = (container: HTMLElement, label: string) =>
   );
 
 afterEach(() => {
+  mocks.openReceiveScan.mockReset();
   mocks.pasteFromClipboard.mockReset();
   mocks.pasteScanValue.mockReset();
   document.body.innerHTML = "";
@@ -88,5 +91,19 @@ describe("TopupPage", () => {
 
     expect(mocks.pasteFromClipboard).toHaveBeenCalledOnce();
     expect(mocks.pasteScanValue).not.toHaveBeenCalled();
+  });
+
+  it("opens receive mode scanning from the body scan action", async () => {
+    const { container } = await renderIntoDocument(
+      <RegistryContext.Provider value={AtomRegistry.make()}>
+        <TopupPage />
+      </RegistryContext.Provider>,
+    );
+
+    await act(async () => {
+      button(container, "scan")?.click();
+    });
+
+    expect(mocks.openReceiveScan).toHaveBeenCalledOnce();
   });
 });

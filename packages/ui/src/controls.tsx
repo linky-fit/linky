@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ComponentRef, ReactNode, Ref } from "react";
 import { Slider, Button as TamaguiButton, View } from "tamagui";
 import type { ColorTokens, GetProps } from "tamagui";
 import { Icon } from "./icons";
@@ -10,6 +10,7 @@ import type { Tone } from "./tokens";
 import { border, opacity, shadow, size as sizes } from "./tokens";
 
 export type PressableProps = GetProps<typeof TamaguiButton> & {
+  ref?: Ref<ComponentRef<typeof TamaguiButton>> | undefined;
   /** A browser tooltip on the web; ignored on native. */
   tooltip?: string | undefined;
 };
@@ -376,67 +377,6 @@ export function OptionTile({
         {label}
       </Text>
       {children}
-    </Pressable>
-  );
-}
-
-export interface ActionTileProps extends Omit<
-  PressableProps,
-  "children" | "icon"
-> {
-  label: string;
-  /** A large icon above the label, on a soft badge of the tile's tone. */
-  icon: IconName;
-  /** Tells neighbouring tiles apart; defaults to accent. */
-  tone?: Tone | undefined;
-  /** A muted line under the label, e.g. a count. */
-  caption?: string | undefined;
-}
-
-/** A navigation tile for a hub screen: an icon badge, a short label and an optional caption, laid out in a grid of tiles. */
-export function ActionTile({
-  label,
-  icon,
-  tone = "accent",
-  caption,
-  ...props
-}: ActionTileProps) {
-  const colors = toneColors[tone];
-  return (
-    <Pressable
-      flexDirection="column"
-      justifyContent="center"
-      gap="$xs"
-      paddingTop="$xl"
-      paddingBottom="$lg"
-      paddingHorizontal="$md"
-      borderRadius="$card"
-      backgroundColor="$surface"
-      hoverStyle={{ backgroundColor: "$surfaceRaised" }}
-      pressStyle={{ backgroundColor: "$backgroundPress" }}
-      {...props}
-    >
-      <View
-        marginBottom="$sm"
-        padding="$md"
-        borderRadius="$card"
-        backgroundColor={colors.background}
-      >
-        <Icon name={icon} size="lg" color={colors.color} />
-      </View>
-      <Text bold textAlign="center" numberOfLines={2}>
-        {label}
-      </Text>
-      {caption ? (
-        <Text
-          variant="caption"
-          color="$colorMuted"
-          textAlign="center"
-          numberOfLines={1}
-        >
-          {caption}
-        </Text>
-      ) : null}
     </Pressable>
   );
 }

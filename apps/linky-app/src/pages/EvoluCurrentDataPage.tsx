@@ -59,8 +59,10 @@ export function EvoluCurrentDataPage(): React.ReactElement {
       <Section title={t("evoluShards")}>
         {evoluShards.map((shard) => (
           <Card key={shard.scope} gap="$xs">
-            <Row justifyContent="space-between">
-              <Text variant="label">{shard.scope}</Text>
+            <Row justifyContent="space-between" flexWrap="wrap" gap="$sm">
+              <Text variant="label" flexShrink={1}>
+                {shard.scope}
+              </Text>
               {shard.rotates ? (
                 <Button
                   size="sm"

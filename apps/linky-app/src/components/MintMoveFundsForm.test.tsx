@@ -160,7 +160,7 @@ describe("MintMoveFundsForm", () => {
     expect(
       targetButtons.map((button) => [
         button.textContent,
-        button.getAttribute("aria-selected"),
+        button.getAttribute("aria-pressed"),
       ]),
     ).toEqual([
       ["Kkashu.me", "true"],
@@ -170,7 +170,7 @@ describe("MintMoveFundsForm", () => {
     await act(async () => {
       targetButtons[1]?.click();
     });
-    expect(targetButtons[1]?.getAttribute("aria-selected")).toBe("true");
+    expect(targetButtons[1]?.getAttribute("aria-pressed")).toBe("true");
     await press(container, ["mintMoveEstimate"]);
     expect(estimateMintMove.mock.calls[0]?.[0].targetMint).toBe(
       OTHER_TARGET_MINT,

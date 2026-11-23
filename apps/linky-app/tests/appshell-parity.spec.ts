@@ -337,17 +337,14 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
     await tabs.getByRole("tab", { name: "Einstellungen", exact: true }).click();
     await expect(page).toHaveURL(/#settings$/);
     await expect(title).toHaveAccessibleName("Einstellungen");
-    for (const name of [
-      "Allgemein",
-      "Zahlungen",
-      "Netzwerk",
-      "Sicherheit",
-      "Debug",
-    ]) {
+    for (const name of ["Allgemein", "Zahlungen", "Netzwerk", "Sicherheit"]) {
       await expect(
         page.getByRole("heading", { name, exact: true }),
       ).toBeVisible();
     }
+    await expect(
+      page.getByRole("button", { name: "Entwickler", exact: true }),
+    ).toBeVisible();
     await page.getByRole("button", { name: /^Mint\b/ }).click();
     await expect(page).toHaveURL(/#advanced\/mints$/);
     await expect(title).toHaveAccessibleName("Mints");
@@ -355,7 +352,7 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
       page.getByRole("button", {
         name: new RegExp(`^${new URL(mintUrl).host}\\b`),
       }),
-    ).toHaveAttribute("aria-selected", "true");
+    ).toHaveAttribute("aria-pressed", "true");
     await back.click();
     await expect(page).toHaveURL(/#settings$/);
   });
@@ -443,9 +440,6 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
     }
     await back.click();
     await expect(page).toHaveURL(/#evolu-servers$/);
-    await page.goto("/#evolu-data");
-    await expect(title).toHaveAccessibleName("Speicher");
-    await expect(page.getByText(/^\d+\.\d % des 1-MiB-Limits$/)).toBeVisible();
   });
 
   await test.step("open and cancel profile editing through the topbar", async () => {

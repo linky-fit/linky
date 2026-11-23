@@ -72,9 +72,8 @@ export function TopBar({
         {content ??
           (title ? (
             <Text
-              variant="label"
-              bold
-              color="$colorSubtle"
+              variant="title"
+              color="$colorStrong"
               role="heading"
               aria-label={title}
               numberOfLines={1}

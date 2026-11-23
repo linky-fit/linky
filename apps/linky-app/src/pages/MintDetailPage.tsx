@@ -5,16 +5,19 @@ import {
   EmptyState,
   Row,
   Section,
+  Sheet,
   Stack,
   Text,
   ListRow,
 } from "@linky-fit/ui";
+import React from "react";
 import { useArmedAction } from "../hooks/useArmedAction";
 import {
   useDisplayAmounts,
   useSetStatus,
   useTranslation,
 } from "../app/hooks/shell";
+import { useRegisterTopModalDismiss } from "../app/hooks/shell/overlays";
 import { useMoveMintFunds } from "../app/hooks/mint/useMoveMintFunds";
 import {
   useDeleteMint,
@@ -81,11 +84,20 @@ export function MintDetailPage({ mintUrl }: MintDetailPageProps) {
   const { lang, t } = useTranslation();
   const { formatDisplayedAmountText } = useDisplayAmounts();
   const deleteAction = useArmedAction(() => setStatus(t("deleteArmedHint")));
+  const [moveSheetOpen, setMoveSheetOpen] = React.useState(false);
+  const closeMoveSheet = React.useCallback(() => setMoveSheetOpen(false), []);
 
   const cleaned = normalizeMintUrl(mintUrl);
+  React.useEffect(() => {
+    setMoveSheetOpen(false);
+  }, [cleaned]);
   const row = mintInfoByUrl.get(cleaned) ?? null;
   const holdings = mintHoldings(cashuProofs);
   const holding = holdingOf(holdings, cleaned);
+  useRegisterTopModalDismiss(
+    holding.balance > 0 && moveSheetOpen,
+    closeMoveSheet,
+  );
   const defaultMint = normalizeMintUrl(defaultMintUrl ?? MAIN_MINT_URL);
   const isDefault = cleaned === defaultMint;
 
@@ -147,31 +159,44 @@ export function MintDetailPage({ mintUrl }: MintDetailPageProps) {
           title={t("mintBalance")}
           value={formatDisplayedAmountText(holding.balance)}
         />
+        {holding.balance > 0 ? (
+          <Button
+            variant="secondary"
+            icon="ArrowRight"
+            testID="mint-move-open"
+            disabled={cashuIsBusy}
+            onPress={() => setMoveSheetOpen(true)}
+          >
+            {t("mintMoveTitle")}
+          </Button>
+        ) : null}
       </Section>
 
       <MintDeferredReceives mint={cleaned} />
 
       {holding.balance > 0 ? (
-        <>
-          <Divider />
-          <Section title={t("mintMoveTitle")}>
-            <MintMoveFundsForm
-              key={cleaned}
-              available={holding.balance}
-              busy={cashuIsBusy}
-              estimateMintMove={estimateMintMove}
-              getMintIconUrl={getMintIconUrl}
-              moveMintFunds={moveMintFunds}
-              sourceMint={cleaned}
-              targets={moveTargets(
-                cleaned,
-                defaultMint,
-                fundedMints,
-                allowTestMints,
-              )}
-            />
-          </Section>
-        </>
+        <Sheet
+          open={moveSheetOpen}
+          onOpenChange={setMoveSheetOpen}
+          title={t("mintMoveTitle")}
+        >
+          <MintMoveFundsForm
+            key={cleaned}
+            available={holding.balance}
+            busy={cashuIsBusy}
+            estimateMintMove={estimateMintMove}
+            getMintIconUrl={getMintIconUrl}
+            moveMintFunds={moveMintFunds}
+            onMoved={() => setMoveSheetOpen(false)}
+            sourceMint={cleaned}
+            targets={moveTargets(
+              cleaned,
+              defaultMint,
+              fundedMints,
+              allowTestMints,
+            )}
+          />
+        </Sheet>
       ) : null}
 
       <Divider />

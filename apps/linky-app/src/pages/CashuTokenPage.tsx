@@ -10,7 +10,16 @@ import {
   type StoredProof,
   type TokenTransfer,
 } from "@linky-fit/linkshu";
-import { Button, LoadingState, Notice, Stack, Text } from "@linky-fit/ui";
+import {
+  Button,
+  ListRow,
+  LoadingState,
+  Notice,
+  Row,
+  Section,
+  Stack,
+  Text,
+} from "@linky-fit/ui";
 import type { FC } from "react";
 import { useArmedAction } from "../hooks/useArmedAction";
 import React from "react";
@@ -300,81 +309,93 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
 
       <CashuTokenQr key={routeId} tokenText={tokenText} copyText={copyText} />
 
-      {isOpenSend || isFailedReceive ? (
-        <Button
-          variant="secondary"
-          size="sm"
-          alignSelf="flex-start"
-          onPress={() => void checkAndRefreshCashuToken(routeId)}
-          disabled={cashuIsBusy}
-        >
-          {t("cashuCheckToken")}
-        </Button>
-      ) : null}
+      <Stack gap="$sm">
+        {isIssued && canSendToContact ? (
+          <Button
+            onPress={() => void startSendCashuTokenToContact(routeId)}
+            disabled={!tokenText.trim()}
+          >
+            {t("cashuSendToContact")}
+          </Button>
+        ) : null}
 
-      {isIssued && canSendToContact ? (
-        <Button
-          onPress={() => void startSendCashuTokenToContact(routeId)}
-          disabled={!tokenText.trim()}
-        >
-          {t("cashuSendToContact")}
-        </Button>
-      ) : null}
+        <Row gap="$sm">
+          {isOpenSend && shareMessage ? (
+            <Button
+              variant={isIssued && canSendToContact ? "secondary" : "primary"}
+              icon="Share2"
+              flex={1}
+              onPress={() => void shareTokenText(routeId, shareMessage)}
+            >
+              {t("share")}
+            </Button>
+          ) : (
+            <Button
+              variant="secondary"
+              icon="Copy"
+              flex={1}
+              onPress={() => void copyText(tokenText)}
+              disabled={!tokenText.trim()}
+            >
+              {t("copy")}
+            </Button>
+          )}
 
-      <Button
-        variant="secondary"
-        icon="Copy"
-        onPress={() => void copyText(tokenText)}
-        disabled={!tokenText.trim()}
-      >
-        {t("copy")}
-      </Button>
+          {isOpenSend && canWriteToNfc ? (
+            <Button
+              variant="secondary"
+              icon="Radio"
+              flex={1}
+              onPress={() => void writeToNfc(routeId, tokenText)}
+              disabled={!tokenText.trim()}
+            >
+              {t("uploadToNfc")}
+            </Button>
+          ) : null}
+        </Row>
+      </Stack>
 
-      {isOpenSend ? (
-        <Button
-          variant="secondary"
-          icon="Share2"
-          onPress={() => void shareTokenText(routeId, shareMessage)}
-          disabled={!shareMessage}
-        >
-          {t("share")}
-        </Button>
-      ) : null}
+      {isOpenSend ||
+      isFailedReceive ||
+      canReturnToWallet ||
+      (!isClosed && allProofsSpent) ? (
+        <Section grouped>
+          {isOpenSend || isFailedReceive ? (
+            <ListRow
+              icon="RefreshCcw"
+              title={t("cashuCheckToken")}
+              chevron={false}
+              onPress={() => void checkAndRefreshCashuToken(routeId)}
+              disabled={cashuIsBusy}
+            />
+          ) : null}
 
-      {isOpenSend && canWriteToNfc ? (
-        <Button
-          variant="secondary"
-          icon="Radio"
-          onPress={() => void writeToNfc(routeId, tokenText)}
-          disabled={!tokenText.trim()}
-        >
-          {t("uploadToNfc")}
-        </Button>
-      ) : null}
+          {canReturnToWallet ? (
+            <ListRow
+              icon="Wallet"
+              title={t("cashuReturnToWallet")}
+              chevron={false}
+              onPress={() =>
+                void (reclaimFromInventory
+                  ? reclaimCashuTransfer(routeId)
+                  : returnCashuTokenToWallet(routeId))
+              }
+              disabled={cashuIsBusy}
+            />
+          ) : null}
 
-      {canReturnToWallet ? (
-        <Button
-          variant="secondary"
-          onPress={() =>
-            void (reclaimFromInventory
-              ? reclaimCashuTransfer(routeId)
-              : returnCashuTokenToWallet(routeId))
-          }
-          disabled={cashuIsBusy}
-        >
-          {t("cashuReturnToWallet")}
-        </Button>
-      ) : null}
-
-      {!isClosed && allProofsSpent ? (
-        <Button
-          variant={deleteAction.armed ? "danger" : "secondary"}
-          onPress={() =>
-            deleteAction.confirm(() => void deleteCashuToken(routeId))
-          }
-        >
-          {t("delete")}
-        </Button>
+          {!isClosed && allProofsSpent ? (
+            <ListRow
+              icon="Trash2"
+              title={t("delete")}
+              chevron={false}
+              destructive={deleteAction.armed}
+              onPress={() =>
+                deleteAction.confirm(() => void deleteCashuToken(routeId))
+              }
+            />
+          ) : null}
+        </Section>
       ) : null}
     </Stack>
   );

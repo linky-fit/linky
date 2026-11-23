@@ -11,6 +11,8 @@ export const cs = {
   settingsNetwork: "Síť",
   settingsSecurity: "Zabezpečení",
   settingsDebug: "Debug",
+  settingsDeveloper: "Vývojář",
+  scanMoreOptions: "Další",
   nostrInspector: "Inspector",
   nostrInspectorLogs: "Ukládat logy inspectoru",
   nostrInspectorLogsStats:
@@ -211,7 +213,7 @@ export const cs = {
   logoutConfirmBackUpFirst: "Nejdřív zálohovat klíče",
 
   nostrIdentity: "Nostr identita",
-  masterKeys: "Hlavní klíče",
+  masterKeys: "Obnovovací seed",
   masterKeysShow: "Zobrazit",
   masterKeysHide: "Skrýt",
   pasteCustomNostrKeys: "Vložit vlastní Nostr identitu",
@@ -678,10 +680,11 @@ export const cs = {
     "Napište zprávu a klepněte na Odeslat. Tlačítkem s obrázkem přiložíte obrázek nebo PDF.",
   guideBackupKeysStep1Title: "Nastavení",
   guideBackupKeysStep1Body: "Otevřete nastavení v dolní liště.",
-  guideBackupKeysStep2Title: "Hlavní klíče",
-  guideBackupKeysStep2Body: "V sekci Zabezpečení klepněte na Hlavní klíče.",
+  guideBackupKeysStep2Title: "Obnovovací seed",
+  guideBackupKeysStep2Body: "V sekci Zabezpečení klepněte na Obnovovací seed.",
   guideBackupKeysStep3Title: "Záloha klíče",
-  guideBackupKeysStep3Body: "Zkopírujte své hlavní klíče a bezpečně je uložte.",
+  guideBackupKeysStep3Body:
+    "Zkopírujte svůj obnovovací seed a bezpečně jej uložte.",
   contactsOnboardingTaskAddContact: "Přidat kontakt",
   contactsOnboardingTaskBackupKeys: "Zálohovat klíče",
   contactsOnboardingTaskTopup: "Přijmout bitcoin",
@@ -876,6 +879,9 @@ export const cs = {
   manualPaySuggestions: "Shodné kontakty",
   manualPayLinkyAliasHint: "Zkusím {address}",
   spdPaymentTitle: "Bankovní platba",
+  spdPaymentSectionAccount: "Účet",
+  spdPaymentSectionPayment: "Platba",
+  spdPaymentSectionCzechSymbols: "Platební symboly (VS / SS / KS)",
   spdPaymentCurrency: "Měna",
   spdPaymentRequestReimbursementCountOne: "Poptat proplacení u 1 kontaktu",
   spdPaymentRequestReimbursementCountOther:
@@ -1031,7 +1037,7 @@ export const cs = {
     "Kliknutím na balanci v peněžence nebo při zadávání částky přepínáte mezi povolenými měnami.",
   decimalInput: "Desetinná místa",
   showProfileQrOnTilt: "Naklopením zobrazit profil",
-  sendReadReceipts: "Odesílat potvrzení o přečtení",
+  sendReadReceipts: "Potvrzení o zobrazení",
   passOnListings: "Předávat nabídky kontaktů dál",
   decimalPoint: ",",
 

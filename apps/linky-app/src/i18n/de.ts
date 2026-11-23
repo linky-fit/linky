@@ -12,6 +12,8 @@ export const de = {
   settingsNetwork: "Netzwerk",
   settingsSecurity: "Sicherheit",
   settingsDebug: "Debug",
+  settingsDeveloper: "Entwickler",
+  scanMoreOptions: "Mehr",
   nostrInspector: "Inspektor",
   nostrInspectorLogs: "Inspektorprotokolle sammeln",
   nostrInspectorLogsStats: "{count} Zeilen · {size} · älteste Zeile {age} alt",
@@ -217,7 +219,7 @@ export const de = {
   logoutConfirmBackUpFirst: "Zuerst Schlüssel sichern",
 
   nostrIdentity: "Nostr-Identität",
-  masterKeys: "Hauptschlüssel",
+  masterKeys: "Wiederherstellungs-Seed",
   masterKeysShow: "Anzeigen",
   masterKeysHide: "Ausblenden",
   pasteCustomNostrKeys: "Eigene Nostr-Identität einfügen",
@@ -686,11 +688,12 @@ export const de = {
   guideBackupKeysStep1Title: "Einstellungen",
   guideBackupKeysStep1Body:
     "Öffnen Sie die Einstellungen in der unteren Leiste.",
-  guideBackupKeysStep2Title: "Hauptschlüssel",
-  guideBackupKeysStep2Body: "Tippe unter Sicherheit auf Hauptschlüssel.",
+  guideBackupKeysStep2Title: "Wiederherstellungs-Seed",
+  guideBackupKeysStep2Body:
+    "Tippe unter Sicherheit auf Wiederherstellungs-Seed.",
   guideBackupKeysStep3Title: "Schlüssel sichern",
   guideBackupKeysStep3Body:
-    "Kopiere deine Hauptschlüssel und bewahre sie sicher auf.",
+    "Kopiere deinen Wiederherstellungs-Seed und bewahre ihn sicher auf.",
   contactsOnboardingTaskAddContact: "Kontakt hinzufügen",
   contactsOnboardingTaskBackupKeys: "Schlüssel sichern",
   contactsOnboardingTaskTopup: "Bitcoin empfangen",
@@ -881,6 +884,9 @@ export const de = {
   manualPaySuggestions: "Passende Kontakte",
   manualPayLinkyAliasHint: "{address} wird versucht",
   spdPaymentTitle: "Bankzahlung",
+  spdPaymentSectionAccount: "Konto",
+  spdPaymentSectionPayment: "Zahlung",
+  spdPaymentSectionCzechSymbols: "Zahlungssymbole (VS / SS / KS)",
   spdPaymentCurrency: "Währung",
   spdPaymentRequestReimbursementCountOne: "1 Kontakt um Zahlung bitten",
   spdPaymentRequestReimbursementCountOther:
@@ -1042,7 +1048,7 @@ export const de = {
     "Wähle die Einheiten, zwischen denen du durch Tippen auf Beträge wechselst.",
   decimalInput: "Dezimalstellen",
   showProfileQrOnTilt: "Profil durch Kippen anzeigen",
-  sendReadReceipts: "Lesebestätigungen senden",
+  sendReadReceipts: "Gesehen-Bestätigungen",
   passOnListings: "Angebote von Kontakten weitergeben",
   decimalPoint: ",",
 
