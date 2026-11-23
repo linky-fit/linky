@@ -67,6 +67,30 @@ describe("redactInspectorSecrets", () => {
     });
   });
 
+  it("redacts a NUT-18 JSON proof payload, including escaped keys", () => {
+    const plain = JSON.stringify({
+      mint: "https://mint.test",
+      unit: "sat",
+      proofs: [{ id: "00", amount: 1, secret: "secret-plain", C: "02" }],
+    });
+    const escaped =
+      '{"mint":"https://mint.test","unit":"sat","\\u0070roofs":[{"id":"00","amount":1,"secret":"secret-escaped","C":"02"}]}';
+
+    const redacted = redactInspectorSecrets({
+      params: { token: escaped },
+      raw: plain,
+      error: { detail: escaped },
+    });
+
+    expect(JSON.stringify(redacted)).not.toContain("secret-plain");
+    expect(JSON.stringify(redacted)).not.toContain("secret-escaped");
+    expect(redacted).toEqual({
+      params: { token: "[redacted cashu token]" },
+      raw: "[redacted cashu token]",
+      error: { detail: "[redacted cashu token]" },
+    });
+  });
+
   it("redacts a shared listing marker inside any text and keeps the rest", () => {
     const text =
       "fresh today\n\nEggs · 90 CZK per 10\nnostr:npub1x\nlinky:listing:v1:eyJrZXkiOiIwMSJ9_-";

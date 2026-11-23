@@ -5,10 +5,7 @@ import {
   bankOfferContentFromSnapshot,
   decodeBankPaymentOffer,
 } from "./content";
-import {
-  bankPaymentOfferResponseDurationSec,
-  isBankPaymentOfferExpired,
-} from "./offer";
+import { isBankPaymentOfferExpired } from "./offer";
 
 const decode = (event: ReturnType<typeof snapshot>) => {
   const info = decodeBankPaymentOffer(bankOfferContentFromSnapshot(event));
@@ -49,7 +46,6 @@ describe("decodeBankPaymentOffer", () => {
     );
     expect(info.initiatedAtSec).toBe(START);
     expect(info.bankPaidAtSec).toBe(START + 125);
-    expect(bankPaymentOfferResponseDurationSec(info, 0)).toBe(125);
   });
 
   it.each([

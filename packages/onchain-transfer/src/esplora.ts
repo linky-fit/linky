@@ -171,18 +171,22 @@ export const depositStatus = (args: {
   readonly transactions: ReadonlyArray<EsploraTransaction>;
   readonly tipHeight: number;
 }): DepositStatus => {
-  const paying = args.transactions.filter(
-    (tx) => paysAddress(tx, args.address) > 0,
-  );
+  let receivedSat = 0;
+  let confirmations = Number.POSITIVE_INFINITY;
+  const txids: string[] = [];
+  for (const tx of args.transactions) {
+    const amount = paysAddress(tx, args.address);
+    if (amount <= 0) continue;
+    receivedSat += amount;
+    confirmations = Math.min(
+      confirmations,
+      confirmationsOf(tx, args.tipHeight),
+    );
+    txids.push(tx.txid);
+  }
   return {
-    receivedSat: paying.reduce(
-      (sum, tx) => sum + paysAddress(tx, args.address),
-      0,
-    ),
-    confirmations:
-      paying.length === 0
-        ? 0
-        : Math.min(...paying.map((tx) => confirmationsOf(tx, args.tipHeight))),
-    txids: paying.map((tx) => tx.txid),
+    receivedSat,
+    confirmations: txids.length === 0 ? 0 : confirmations,
+    txids,
   };
 };

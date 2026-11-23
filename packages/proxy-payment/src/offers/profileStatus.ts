@@ -44,22 +44,26 @@ const parseCurrencyStatusCodes = (
   return uniqueParts;
 };
 
+const VALID_PROFILE_STATUS_CURRENCIES = new Set<string>([
+  ...PROFILE_STATUS_CURRENCIES,
+  ...LEGACY_PROFILE_STATUS_CURRENCIES,
+]);
+const SUPPORTED_PROFILE_STATUS_CURRENCIES = new Set<string>(
+  PROFILE_STATUS_CURRENCIES,
+);
+
 const parseLinkyProfileExchangeStatus = (
   status: string | null | undefined,
 ): ProfileStatusCurrency[] | null => {
   const parts = parseCurrencyStatusCodes(status);
   if (!parts) return null;
-  if (parts.length === 0) return null;
 
-  const validCurrencies = new Set<string>([
-    ...PROFILE_STATUS_CURRENCIES,
-    ...LEGACY_PROFILE_STATUS_CURRENCIES,
-  ]);
-  if (!parts.every((part) => validCurrencies.has(part))) return null;
+  if (!parts.every((part) => VALID_PROFILE_STATUS_CURRENCIES.has(part))) {
+    return null;
+  }
 
-  const supportedCurrencies = new Set<string>(PROFILE_STATUS_CURRENCIES);
   return parts.filter((part): part is ProfileStatusCurrency =>
-    supportedCurrencies.has(part),
+    SUPPORTED_PROFILE_STATUS_CURRENCIES.has(part),
   );
 };
 
@@ -75,14 +79,12 @@ export const parseProfileGeneralStatus = (
   }
 
   const lines = normalizedStatus.split(/\r?\n/);
-  for (let index = lines.length - 1; index >= 0; index -= 1) {
-    const maybeCurrencies = parseLinkyProfileExchangeStatus(lines[index]);
-    if (!maybeCurrencies) continue;
-
-    const text = nonEmpty(lines.slice(0, index).join("\n"));
+  const lastIndex = lines.length - 1;
+  const maybeCurrencies = parseLinkyProfileExchangeStatus(lines[lastIndex]);
+  if (maybeCurrencies) {
     return {
       currencies: maybeCurrencies,
-      text,
+      text: nonEmpty(lines.slice(0, lastIndex).join("\n")),
     };
   }
 

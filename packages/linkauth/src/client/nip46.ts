@@ -245,6 +245,7 @@ export const connectNip46 = (options: Nip46LoginOptions): Nip46Login => {
         hasValidSignature(event) &&
         sameTemplate(event, template)
       ) {
+        markReady();
         end(() => resolve(event));
       } else {
         fail("refused", "the signer returned a different event");

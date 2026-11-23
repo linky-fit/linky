@@ -45,9 +45,6 @@ export interface ConversationsRepository extends DomainTableRepository<
   readonly messagesIn: (
     conversationId: ConversationId,
   ) => Effect.Effect<ReadonlyArray<MessageRecord>>;
-  readonly reactionsIn: (
-    conversationId: ConversationId,
-  ) => Effect.Effect<ReadonlyArray<ReactionRecord>>;
   /**
    * When the oldest messages shard this device reads began (its earliest
    * row), or null when the device reads the scope from its first shard. Read
@@ -148,15 +145,19 @@ export const makeConversationsRepository = (
       Effect.map(messages.all, (rows) =>
         rows.filter((row) => row.conversationId === conversationId),
       ),
-    reactionsIn: (conversationId) =>
-      Effect.map(reactions.all, (rows) =>
-        rows.filter((row) => row.conversationId === conversationId),
-      ),
     visibleSinceSec,
-    removedReactions: Effect.map(store.copies("messages", "reaction"), (rows) =>
-      rows
-        .filter((row) => row.isDeleted === 1)
-        .map((row) => toDomainRow("reaction", row)),
+    removedReactions: Effect.map(
+      store.copies("messages", "reaction"),
+      (rows) => {
+        const seen = new Set<string>();
+        const removed = [];
+        for (const row of rows) {
+          if (seen.has(row.id)) continue;
+          seen.add(row.id);
+          if (row.isDeleted === 1) removed.push(toDomainRow("reaction", row));
+        }
+        return removed;
+      },
     ),
     markSeen: (conversationId, atSec) =>
       !PositiveInt.is(atSec)

@@ -7,7 +7,6 @@ import {
   bankPaymentOfferGroupResponses,
   bankPaymentOfferResponderSteps,
   hasPendingBankPaymentOfferResponderWork,
-  lastBankPaymentOfferResponseSecByPeer,
   ownBankPaymentOfferExpiries,
   recentBankPaymentOfferOutcomesByPeer,
 } from "./selectors";
@@ -258,51 +257,6 @@ describe("bankPaymentOfferGroupResponses", () => {
         "settled",
       ),
     ).toMatchObject({ alreadyDone: true });
-  });
-});
-
-describe("lastBankPaymentOfferResponseSecByPeer", () => {
-  it("finds the most recent completed response for each peer of my offers", () => {
-    const paid = (
-      offerId: string,
-      peer: typeof payer,
-      initiated: number,
-      paidAt: number,
-    ) => [
-      snapshot("offered", true, {
-        offerId: BankOfferId.make(offerId),
-        from: peer,
-        initiatedAtSec: at(initiated),
-        sentAt: at(initiated),
-      }),
-      snapshot("accepted", false, {
-        offerId: BankOfferId.make(offerId),
-        from: peer,
-        initiatedAtSec: at(initiated),
-        sentAt: at(initiated + 1),
-      }),
-      snapshot("bank_details_sent", true, {
-        offerId: BankOfferId.make(offerId),
-        from: peer,
-        initiatedAtSec: at(initiated),
-        sentAt: at(initiated + 2),
-      }),
-      snapshot("bank_paid", false, {
-        offerId: BankOfferId.make(offerId),
-        from: peer,
-        initiatedAtSec: at(initiated),
-        sentAt: at(paidAt),
-      }),
-    ];
-    const offers = book(
-      ...paid("offer-a", payer, 0, 45),
-      ...paid("offer-b", payer, 100, 225),
-      ...paid("offer-c", other, 300, 330),
-    );
-    const durations = lastBankPaymentOfferResponseSecByPeer(offers, me);
-    expect(durations.get(payer)).toBe(125);
-    expect(durations.get(other)).toBe(30);
-    expect(lastBankPaymentOfferResponseSecByPeer(offers, payer).size).toBe(0);
   });
 });
 

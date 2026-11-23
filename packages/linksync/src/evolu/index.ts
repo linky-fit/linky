@@ -26,5 +26,5 @@ export type {
   LinkyEvolu,
   LinkyEvoluEvent,
 } from "./linkyEvolu";
-export { LinkyEvoluSchema, linkyIndexes } from "./linkyEvoluSchema";
+export { LinkyEvoluSchema } from "./linkyEvoluSchema";
 export type { CashuTokenId } from "./linkyEvoluSchema";

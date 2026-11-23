@@ -88,11 +88,11 @@ describe("readRecurringPaymentOrder", () => {
 
 describe("recurringOrderState", () => {
   it("is paused only while pausedAtSec is set", () => {
-    expect(recurringOrderState(recurringOrderFixture(), DUE)).toBe("active");
+    expect(recurringOrderState(recurringOrderFixture())).toBe("active");
     const paused = recurringOrderFixture({
       schedule: { ...recurringOrderFixture().schedule, pausedAtSec: DUE },
     });
-    expect(recurringOrderState(paused, DUE + HOUR)).toBe("paused");
+    expect(recurringOrderState(paused)).toBe("paused");
   });
 });
 

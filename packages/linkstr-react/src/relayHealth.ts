@@ -10,12 +10,10 @@ import { linkstrRuntimeAtom } from "./runtime";
  */
 export const relayHealthAtom = linkstrRuntimeAtom.atom(() =>
   Stream.unwrap(
-    Effect.map(RelayHealth, (health) =>
-      Stream.map(
+    Effect.map(
+      RelayHealth,
+      (health): Stream.Stream<ReadonlyMap<string, RelayHealthState>> =>
         health.changes,
-        (snapshot): ReadonlyMap<string, RelayHealthState> =>
-          new Map<string, RelayHealthState>(snapshot),
-      ),
     ),
   ),
 );

@@ -2,7 +2,6 @@ import type { BankOfferId, BankOfferStatus, Pubkey } from "@linky-fit/linkstr";
 import {
   bankPaymentOfferBankPaidAtSec,
   bankPaymentOfferExpiresAtSec,
-  bankPaymentOfferResponseDurationSec,
   isBankPaymentOfferExpired,
   offerUpdatedAtSec,
   type BankPaymentOffer,
@@ -331,30 +330,4 @@ export const recentBankPaymentOfferOutcomesByPeer = (
     if (recent.length > 0) outcomes.set(peer, recent);
   }
   return outcomes;
-};
-
-/** Seconds each peer needed to pay my most recent offer they completed. */
-export const lastBankPaymentOfferResponseSecByPeer = (
-  offers: readonly BankPaymentOffer[],
-  me: Pubkey,
-): ReadonlyMap<Pubkey, number> => {
-  const latest = new Map<
-    Pubkey,
-    { bankPaidAtSec: number; durationSec: number }
-  >();
-  for (const offer of ownOffers(offers, me)) {
-    const bankPaidAtSec = bankPaymentOfferBankPaidAtSec(offer);
-    const durationSec = bankPaymentOfferResponseDurationSec(
-      offer,
-      offer.createdAtSec,
-    );
-    if (bankPaidAtSec === null || durationSec === null) continue;
-    const current = latest.get(offer.peer);
-    if (!current || bankPaidAtSec > current.bankPaidAtSec) {
-      latest.set(offer.peer, { bankPaidAtSec, durationSec });
-    }
-  }
-  return new Map(
-    Array.from(latest, ([peer, value]) => [peer, value.durationSec]),
-  );
 };

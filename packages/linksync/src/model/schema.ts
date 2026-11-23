@@ -383,28 +383,8 @@ export type InferDbSchema<ES extends EvoluSchema> = {
 export type LinkyDbSchema = InferDbSchema<typeof LinkySchema>;
 export type LinkyTable = keyof LinkyDbSchema;
 
-export type ShardPointerRow = Row<LinkyDbSchema["shardPointer"]>;
-export type SettingRow = Row<LinkyDbSchema["setting"]>;
-export type NostrIdentityRow = Row<LinkyDbSchema["nostrIdentity"]>;
-export type ContactRow = Row<LinkyDbSchema["contact"]>;
-export type ConversationRow = Row<LinkyDbSchema["conversation"]>;
-export type MessageRow = Row<LinkyDbSchema["message"]>;
-export type ReactionRow = Row<LinkyDbSchema["reaction"]>;
-export type UnknownSenderMessageRow = Row<
-  LinkyDbSchema["unknownSenderMessage"]
->;
 export type CashuProofRow = Row<LinkyDbSchema["cashuProof"]>;
 export type CashuOperationRow = Row<LinkyDbSchema["cashuOperation"]>;
-export type TransactionRow = Row<LinkyDbSchema["transaction"]>;
-export type RecurringPaymentRow = Row<LinkyDbSchema["recurringPayment"]>;
-export type ListingRow = Row<LinkyDbSchema["listing"]>;
-export type HiddenListingRow = Row<LinkyDbSchema["hiddenListing"]>;
-export type PinnedListingRow = Row<LinkyDbSchema["pinnedListing"]>;
-export type PeerListingsRow = Row<LinkyDbSchema["peerListings"]>;
-export type OnchainTransferRow = Row<LinkyDbSchema["onchainTransfer"]>;
-export type OnchainTransferMessageRow = Row<
-  LinkyDbSchema["onchainTransferMessage"]
->;
 
 const columnNames = <Table extends Record<string, unknown>>(
   table: Table,

@@ -230,16 +230,20 @@ export class Validation extends Context.Service<Validation>()(
           const operation = operations.find(
             (candidate) => candidate.id === operationId,
           );
-          if (operation === undefined || operation.tokenText === null) {
+          if (
+            operation === undefined ||
+            operation.tokenText === null ||
+            (operation.kind !== "send" && operation.kind !== "receive")
+          ) {
             return yield* new OperationNotFound({ operationId });
           }
           const unavailable = new TransferCheckResult({
             operationId,
             status: "unavailable",
           });
-          const proofs = yield* proofStore.findByOperation(operationId);
-          const handedOut = handedOutOf(proofs, operation);
           if (operation.kind === "send") {
+            const proofs = yield* proofStore.findByOperation(operationId);
+            const handedOut = handedOutOf(proofs, operation);
             if (handedOut.length === 0) {
               return new TransferCheckResult({
                 operationId,
@@ -255,7 +259,7 @@ export class Validation extends Context.Service<Validation>()(
             if (states === null) return unavailable;
             const spent = yield* applyAnswer(group, states, "check");
             if (spent.length === handedOut.length) {
-              yield* closeClaimed(operations, proofs, spent);
+              yield* closeClaimed([operation], proofs, spent);
               return new TransferCheckResult({ operationId, status: "spent" });
             }
             return group.proofs.every(
@@ -264,23 +268,15 @@ export class Validation extends Context.Service<Validation>()(
               ? new TransferCheckResult({ operationId, status: "live" })
               : unavailable;
           }
-          const decoded = yield* Effect.map(
-            Effect.option(instances.get(operation.mint, operation.unit)),
-            (wallet) =>
-              wallet._tag === "None"
-                ? null
-                : decodeWithKeysets(
-                    operation.tokenText ?? "",
-                    wallet.value.keyChain
-                      .getKeysets()
-                      .map((keyset) => keyset.id),
-                  ),
-          );
-          if (decoded === null) return unavailable;
           const wallet = yield* Effect.option(
             instances.get(operation.mint, operation.unit),
           );
           if (wallet._tag === "None") return unavailable;
+          const decoded = decodeWithKeysets(
+            operation.tokenText,
+            wallet.value.keyChain.getKeysets().map((keyset) => keyset.id),
+          );
+          if (decoded === null) return unavailable;
           const states = yield* Effect.option(
             checkProofStates(wallet.value, operation.mint, decoded.proofs),
           );

@@ -2,8 +2,8 @@ import { RecurringPaymentId, type ContactId } from "@linky-fit/domain";
 import { Option, Schema } from "effect";
 import { isRecurringAmountUnit, type RecurringAmount } from "./amount";
 import {
-  decideRecurringRun,
   isRecurringIntervalUnit,
+  isValidRecurringInterval,
   type RecurringScheduleState,
 } from "./schedule";
 
@@ -91,7 +91,16 @@ export const readRecurringPaymentOrder = (
   if (progress === null) return null;
   if (!isRecurringRail(columns.rail)) return null;
   if (!isRecurringIntervalUnit(columns.intervalUnit)) return null;
+  if (
+    !isValidRecurringInterval({
+      unit: columns.intervalUnit,
+      count: columns.intervalCount,
+    })
+  ) {
+    return null;
+  }
   if (!isRecurringAmountUnit(columns.unit)) return null;
+  if (!Number.isFinite(columns.amount) || columns.amount <= 0) return null;
   return {
     id: columns.id,
     createdAtSec: columns.createdAtSec,
@@ -118,11 +127,8 @@ export type RecurringOrderState = "active" | "paused";
 
 export const recurringOrderState = (
   order: RecurringPaymentOrder,
-  nowSec: number,
 ): RecurringOrderState =>
-  decideRecurringRun(order.schedule, nowSec).kind === "paused"
-    ? "paused"
-    : "active";
+  order.schedule.pausedAtSec !== null ? "paused" : "active";
 
 /**
  * The key linkshu derives a run's envelope from. It names the payment number,

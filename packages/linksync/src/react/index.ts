@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import { useEffect, useMemo, useState } from "react";
-import type { CoreSchema, ScopeRegistry, Shard, ShardStore } from "../core";
+import type { CoreSchema, ScopeRegistry, ShardStore } from "../core";
 
 /**
  * React bindings for the store: a value read whole and re-read after every
@@ -39,24 +39,6 @@ const NO_ROWS: ReadonlyArray<never> = [];
 export const useRepositoryRows = <Row>(
   repository: LiveSource<ReadonlyArray<Row>>,
 ): ReadonlyArray<Row> => useLiveValue(repository, NO_ROWS);
-
-/** The shards a device reads and syncs for the scope, kept current across rotations here or elsewhere. */
-export const useVisibleShards = <
-  S extends CoreSchema,
-  R extends ScopeRegistry<keyof S & string>,
->(
-  store: ShardStore<S, R>,
-  scope: keyof R & string,
-): ReadonlyArray<Shard> => {
-  const source = useMemo(
-    () => ({
-      all: store.visibleShards(scope),
-      subscribe: store.subscribePointers,
-    }),
-    [store, scope],
-  );
-  return useLiveValue(source, NO_ROWS);
-};
 
 /** Whether the store is hydrated; `false` until the first read answers. */
 export const useHydrated = <

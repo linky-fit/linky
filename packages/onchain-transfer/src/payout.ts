@@ -21,10 +21,10 @@ export const findPayout = (args: {
         (tx.status.block_time ?? 0) >= args.notBeforeSec) &&
       paysAddress(tx, args.payoutAddress) >= args.amount,
   );
-  const oldestFirst = [...candidates].sort(
+  candidates.sort(
     (a, b) =>
       (a.status.block_time ?? Number.MAX_SAFE_INTEGER) -
       (b.status.block_time ?? Number.MAX_SAFE_INTEGER),
   );
-  return oldestFirst[0]?.txid ?? null;
+  return candidates[0]?.txid ?? null;
 };

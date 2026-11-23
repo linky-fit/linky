@@ -18,7 +18,6 @@
   "dependencies": {
     "@linky-fit/domain": "workspace:*",
     "@linky-fit/linkstr": "workspace:*",
-    "@scure/base": "^2.0.0",
     "@scure/bip32": "^2.0.1",
     "@scure/btc-signer": "~2.2.0",
     "effect": "^4.0.0"

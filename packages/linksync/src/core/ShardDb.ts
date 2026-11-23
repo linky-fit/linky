@@ -91,7 +91,7 @@ const sortKey = (value: unknown): string =>
   value === null || value === undefined ? "" : String(value);
 
 /** `YYYY-MM-DDTHH:MM:SS`: rows created within one second tie and fall to `thenBy`. */
-export const createdSecond = (row: Pick<SystemColumns, "createdAt">): string =>
+const createdSecond = (row: Pick<SystemColumns, "createdAt">): string =>
   row.createdAt.slice(0, 19);
 
 /** `readOldest` over rows already read and filtered by owner. */
