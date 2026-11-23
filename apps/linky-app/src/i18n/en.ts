@@ -538,6 +538,7 @@ export const en = {
   chatQueued: "Queued for delivery.",
   chatPendingShort: "pending",
   chatSeenShort: "seen",
+  chatScrollToLatest: "Scroll to latest message",
   chatImageAttach: "Add image or PDF",
   chatMenuAttach: "Attach",
   chatMoreActions: "More actions",
