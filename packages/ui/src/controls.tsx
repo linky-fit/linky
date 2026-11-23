@@ -587,7 +587,7 @@ export function SliderField({
   disabled = false,
 }: SliderFieldProps) {
   return (
-    <Stack gap="$sm">
+    <Stack gap="$sm" opacity={disabled ? opacity.disabled : undefined}>
       <Text variant="label" color="$colorSubtle">
         {label}
       </Text>

@@ -6,7 +6,6 @@ const palette = {
   mist100: "#f2f4f7",
   mist200: "#e7ecf1",
   mist300: "#d5dde6",
-  slate100: "#f1f5f9",
   slate200: "#e2e8f0",
   slate300: "#cbd5e1",
   slate400: "#94a3b8",
@@ -15,7 +14,6 @@ const palette = {
   slate700: "#334155",
   slate800: "#1e293b",
   slate900: "#0f172a",
-  slate925: "#0b1222",
   slate950: "#020617",
   // Linky's dark planes: page, panel, control and pressed control, each a step lighter.
   night950: "#070b14",
@@ -121,8 +119,6 @@ export const size = {
   controlSm: 32,
   control: 44,
   avatar: 48,
-  // A single-line text field: a body line, $md padding and a hairline border on each side.
-  field: 50,
   controlLg: 56,
   row: 64,
   hero: 112,

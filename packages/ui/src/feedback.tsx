@@ -72,6 +72,7 @@ export function Notice({
       {dismiss ? (
         <IconButton
           icon="X"
+          variant={solid ? "secondary" : "ghost"}
           accessibilityLabel={dismiss.label}
           size="sm"
           onPress={dismiss.onPress}
