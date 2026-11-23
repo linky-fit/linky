@@ -2,7 +2,7 @@ import type {
   OnchainTransferDirection,
   OnchainTransferPhase,
 } from "@linky-fit/onchain-transfer";
-import type { IconName, Tone } from "@linky-fit/ui";
+import type { Tone } from "@linky-fit/ui";
 import type { I18nKey } from "../../i18n";
 import { normalizeLocale } from "../../utils/formatting";
 import type { OnchainTransferView } from "./onchainTransfers";
@@ -50,14 +50,6 @@ export const onchainTransferHistoryAmount = (
         ? null
         : transfer.amount;
   }
-};
-
-export const ONCHAIN_TRANSFER_DIRECTION_ICONS: Record<
-  OnchainTransferDirection,
-  IconName
-> = {
-  send: "ArrowUpRight",
-  receive: "ArrowDownRight",
 };
 
 export const ONCHAIN_TRANSFER_PHASE_LABEL_KEYS: Record<

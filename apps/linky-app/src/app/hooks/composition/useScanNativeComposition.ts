@@ -50,10 +50,7 @@ import {
   readNotificationOpenRoute,
   readNotificationOpenTarget,
 } from "../../lib/notificationOpenTarget";
-import {
-  extractCashuTokenFromText,
-  extractCashuTokenFromText as extractCashuTokenFromTextFromUrl,
-} from "../../lib/tokenText";
+import { extractCashuTokenFromText } from "../../lib/tokenText";
 import {
   pendingLightningInvoiceAtom,
   pendingLnurlWithdrawAtom,
@@ -515,7 +512,7 @@ export const useScanNativeComposition = ({
     }
 
     const rawHash = window.location.hash;
-    const token = extractCashuTokenFromTextFromUrl(rawHash);
+    const token = extractCashuTokenFromText(rawHash);
     if (!token) {
       return;
     }
@@ -542,7 +539,7 @@ export const useScanNativeComposition = ({
 
     updatePendingDeepLinkText(null);
     void handleScannedText(pendingDeepLinkText).catch(() => {
-      updatePendingDeepLinkText(pendingDeepLinkText);
+      // Drop a failing deep link instead of re-enqueueing it into an infinite effect loop.
     });
   }, [
     currentNsec,

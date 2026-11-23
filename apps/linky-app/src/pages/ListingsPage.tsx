@@ -277,7 +277,6 @@ function PeerSection({
   );
 }
 
-/** The listings the user hid, folded under one row until the user opens it. */
 /** A section kept out of the way: a row with the count that unfolds the listings. */
 function CollapsedSection({
   icon,

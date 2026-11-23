@@ -449,6 +449,9 @@ export const useContactsMessagingComposition = ({
 
   const { fetchProfiles: fetchProfilesOneShot } = useLinkstrCommands();
 
+  const unknownNamesRef = React.useRef(unknownNames);
+  unknownNamesRef.current = unknownNames;
+
   // Unknown senders and mentioned npubs are not watched; a cached read or one
   // batched profile fetch feeds both their display name and avatar.
   React.useEffect(() => {
@@ -470,8 +473,9 @@ export const useContactsMessagingComposition = ({
 
     const run = async () => {
       const uncached: string[] = [];
+      const known = unknownNamesRef.current;
       for (const npub of prefetchedMessageNpubs) {
-        if (unknownNames[npub] !== undefined) continue;
+        if (known[npub] !== undefined) continue;
 
         const cached = loadCachedProfile(npub);
         if (cached) {
@@ -508,7 +512,6 @@ export const useContactsMessagingComposition = ({
     prefetchedMessageNpubs,
     setNostrPictureByNpub,
     setUnknownNames,
-    unknownNames,
   ]);
 
   const selectedChatContact = useChatContact(route);

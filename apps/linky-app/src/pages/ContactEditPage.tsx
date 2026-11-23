@@ -69,10 +69,12 @@ export const ContactEditPage: FC<ContactEditPageProps> = ({
     />
   );
 
+  if (!selectedContact) {
+    return <EmptyState title={t("contactNotFound")} />;
+  }
+
   return (
     <PageCard gap="$lg">
-      {!selectedContact && <EmptyState title={t("contactNotFound")} />}
-
       <ContactFields
         form={form}
         groupNames={groupNames}

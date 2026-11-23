@@ -35,7 +35,6 @@ export const cs = {
   recurringPaymentTitle: "Pravidelná platba",
   recurringPaymentNewTitle: "Nová pravidelná platba",
   recurringPaymentEditTitle: "Upravit pravidelnou platbu",
-  recurringHistorySection: "Historie",
   recurringInsufficientFundsHint: "nízký zůstatek",
   recurringSentBody: "{amount} {unit} pro {name} odesláno.",
   recurringFailedBody:
@@ -105,7 +104,6 @@ export const cs = {
   recurringOnlyWhileOpen:
     "Platbu odešle kterékoli vaše zařízení, na kterém běží Linky, i na pozadí. Pokud ji žádné neodešle do minuty po splatnosti, dostanete připomínku, abyste Linky otevřeli; při otevřené aplikaci uvidíte, jak platba odchází.",
   recurringRepeatAction: "Opakovat pravidelně",
-  showTransactions: "Ukázat transakce",
   feedback: "Zpětná vazba",
   settingsAbout: "O aplikaci",
   supportLinky: "Podpořit Linky",
@@ -144,7 +142,6 @@ export const cs = {
   importFailed: "Import se nepovedl.",
   importInvalid: "Neplatný import soubor.",
   importNothing: "Není co importovat.",
-  keys: "Klíče",
   paste: "Vložit",
   enable: "Povolit",
   notifications: "Notifikace",
@@ -228,7 +225,6 @@ export const cs = {
     "Vložte nsec, pokud chcete vystupovat pod Nostr identitou, kterou už máte.",
   sensitiveActionArmedHint:
     "Citlivá akce. Klikněte ještě jednou pro potvrzení.",
-  derive: "Derivovat",
   nostrKeysCopied: "Nostr klíče zkopírovány do schránky.",
   seed: "Hlavní klíče",
   seedCopied: "Hlavní klíče zkopírovány do schránky.",
@@ -818,7 +814,6 @@ export const cs = {
   contactUsesLinky: "Používá Linky",
   contactUsesNostr: "Profil na Nostru",
   contactsSearchNotSaved: "Mimo vaše kontakty",
-  saving: "Ukládání...",
   clearForm: "Vyčistit formulář",
 
   fillAtLeastOne: "Vyplňte alespoň jedno pole.",
@@ -1118,7 +1113,6 @@ export const cs = {
     "Vyhrazeno pro pravidelnou platbu, dokud neodejde, nebo vstupy Lightning platby, kterou mincovna ještě nevyřídila.",
   cashuHeldUnknownHint:
     "Zadržené operací, která se do tohoto zařízení ještě nesynchronizovala.",
-  cashuTransfers: "Převody",
   cashuTransfersEmpty: "Žádné otevřené převody.",
   cashuTransferIssued: "Emitováno, čeká na vyzvednutí.",
   cashuTransferReturned: "Vráceno do peněženky.",
@@ -1346,8 +1340,6 @@ export const cs = {
   beaconStatusBluetoothOff: "Bluetooth je vypnutý",
   beaconStatusNotBroadcasting: "Nevysílá",
   beaconStatusPermissionNeeded: "Chybí oprávnění",
-  beaconTrade: "Obchod",
-  beaconTradeNone: "Žádný",
   beaconTradeBuy: "Koupí BTC",
   beaconTradeSell: "Prodá BTC",
   beaconMutualOnly: "V okolí vás uvidí jen kontakty, které si uložily i vás.",

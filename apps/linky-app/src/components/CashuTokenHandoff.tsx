@@ -45,7 +45,7 @@ export const CashuTokenHandoff = ({
       ) : (
         chats.map((message) => (
           <Button
-            key={message.contactId}
+            key={message.id}
             variant="ghost"
             size="sm"
             icon="MessageCircle"

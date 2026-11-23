@@ -14,7 +14,6 @@ import {
   type OnchainTransferRecord,
   type OnchainTransfersRepository,
   type NostrIdentityRecord,
-  type ReactionRecord,
   type SettingKey,
   type RecurringPaymentRecord,
   type RecurringPaymentsRepository,
@@ -81,9 +80,6 @@ export const useUnknownSendersRepository = (): UnknownSendersRepository =>
 
 export const useMessageRows = (): ReadonlyArray<MessageRecord> =>
   useRepositoryRows(useConversationsRepository().messages);
-
-export const useReactionRows = (): ReadonlyArray<ReactionRecord> =>
-  useRepositoryRows(useConversationsRepository().reactions);
 
 export const useIdentityRepository = (): IdentityRepository =>
   useAtomSuspense(identityRepositoryAtom).value;

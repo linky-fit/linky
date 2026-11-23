@@ -166,7 +166,7 @@ export const writeStoredSecret = async (
 
 export const removeStoredSecret = async (key: string): Promise<void> => {
   if (isNativePlatform()) {
-    const removedFromAndroidBridge = await removeAndroidStoredSecret(key);
+    await removeAndroidStoredSecret(key);
 
     if (supportsIosNativeSecretStorage()) {
       try {
@@ -183,11 +183,6 @@ export const removeStoredSecret = async (key: string): Promise<void> => {
       } catch {
         // ignore
       }
-    }
-
-    if (removedFromAndroidBridge) {
-      safeLocalStorageRemove(key);
-      return;
     }
   }
 

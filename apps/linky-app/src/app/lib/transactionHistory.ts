@@ -220,12 +220,13 @@ const makeOperationLookup = (operations: readonly StoredOperation[]) => {
 const toTransactionItem = (
   record: TransactionRecord,
   operation: StoredOperation | null,
+  details: JsonValue | null,
 ): TransactionItem => ({
   amount: record.amount,
   category: record.category,
   contactId: record.contactId,
   createdAtSec: record.createdAtSec,
-  details: parseJsonValue(record.detailsJson),
+  details,
   direction: record.direction,
   error: asNonEmptyString(record.error),
   fee: record.fee,
@@ -300,13 +301,14 @@ export const buildTransactionHistory = (
   const operationFor = makeOperationLookup(operations);
   const eventKeyById = new Map<string, string>();
   const items = records.map((record) => {
+    const details = parseJsonValue(record.detailsJson);
     const operation = operationFor(
       record.id,
       record.direction,
       record.mint,
-      parseJsonValue(record.detailsJson),
+      details,
     );
-    const item = toTransactionItem(record, operation);
+    const item = toTransactionItem(record, operation, details);
     const gainedTokenId = readStringArrayFromJson(
       readJsonRecord(item.details)?.gainedTokenIds,
     )[0];

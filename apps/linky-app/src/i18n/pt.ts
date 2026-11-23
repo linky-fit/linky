@@ -38,7 +38,6 @@ export const pt = {
   recurringPaymentTitle: "Pagamento recorrente",
   recurringPaymentNewTitle: "Novo pagamento recorrente",
   recurringPaymentEditTitle: "Editar pagamento recorrente",
-  recurringHistorySection: "Histórico",
   recurringInsufficientFundsHint: "saldo baixo",
   recurringSentBody: "{amount} {unit} enviados a {name}.",
   recurringFailedBody:
@@ -110,7 +109,6 @@ export const pt = {
   recurringOnlyWhileOpen:
     "Qualquer aparelho seu com o Linky em execução envia o pagamento, também em segundo plano. Se nenhum o enviar até um minuto após o vencimento, você recebe um lembrete para abrir o Linky; com o aplicativo aberto, vê o pagamento sair.",
   recurringRepeatAction: "Repetir regularmente",
-  showTransactions: "Mostrar transações",
   feedback: "Feedback",
   settingsAbout: "Sobre o Linky",
   supportLinky: "Apoiar o Linky",
@@ -149,7 +147,6 @@ export const pt = {
   importFailed: "A importação falhou.",
   importInvalid: "Arquivo de importação inválido.",
   importNothing: "Nada para importar.",
-  keys: "Chaves",
   paste: "Colar",
   enable: "Ativar",
   notifications: "Notificações",
@@ -233,7 +230,6 @@ export const pt = {
   nostrIdentityCustomHint:
     "Cole um nsec para aparecer aos outros com uma identidade Nostr que você já tem.",
   sensitiveActionArmedHint: "Ação sensível. Toque mais uma vez para confirmar.",
-  derive: "Derivar",
   nostrKeysCopied: "Chaves nostr copiadas para a área de transferência.",
   seed: "Chaves",
   seedCopied: "Chaves copiadas para a área de transferência.",
@@ -829,7 +825,6 @@ export const pt = {
   contactUsesLinky: "Usa o Linky",
   contactUsesNostr: "Perfil Nostr",
   contactsSearchNotSaved: "Fora dos seus contatos",
-  saving: "Salvando...",
   clearForm: "Limpar formulário",
 
   fillAtLeastOne: "Preencha pelo menos um campo.",
@@ -1128,7 +1123,6 @@ export const pt = {
     "Reservadas para um pagamento recorrente até ele sair, ou entradas de um pagamento Lightning que o mint ainda não liquidou.",
   cashuHeldUnknownHint:
     "Retidas por uma operação que ainda não foi sincronizada com este aparelho.",
-  cashuTransfers: "Transferências",
   cashuTransfersEmpty: "Nenhuma transferência em aberto.",
   cashuTransferIssued: "Emitido, aguardando resgate.",
   cashuTransferReturned: "Devolvido à carteira.",
@@ -1358,8 +1352,6 @@ export const pt = {
   beaconStatusBluetoothOff: "Bluetooth desligado",
   beaconStatusNotBroadcasting: "Não está transmitindo",
   beaconStatusPermissionNeeded: "Permissão necessária",
-  beaconTrade: "Negociação",
-  beaconTradeNone: "Nenhuma",
   beaconTradeBuy: "Compra BTC",
   beaconTradeSell: "Vende BTC",
   beaconMutualOnly:

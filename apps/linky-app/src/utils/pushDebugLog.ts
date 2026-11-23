@@ -154,8 +154,10 @@ export function appendPushDebugLog(
 }
 
 /** Resolves once every entry appended so far has been written. */
-export function flushPushDebugLog(): Promise<void> {
-  return pushDebugLogFlushPromise ?? Promise.resolve();
+export async function flushPushDebugLog(): Promise<void> {
+  while (pushDebugLogFlushPromise || pendingPushDebugEntries.length > 0) {
+    await (pushDebugLogFlushPromise ?? schedulePushDebugLogFlush());
+  }
 }
 
 export async function readPushDebugLog(): Promise<PushDebugLogEntry[]> {

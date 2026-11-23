@@ -34,7 +34,7 @@ export const AdvancedAutoPayLimitPage: FC = () => {
           onPress={() => {
             if (invalid) return;
             setLightningInvoiceAutoPayLimit(amountSat);
-            navigateTo({ route: "advanced" });
+            navigateTo({ route: "settings" });
           }}
           disabled={invalid}
         >

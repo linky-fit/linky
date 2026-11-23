@@ -15,15 +15,14 @@ export type {
   LnurlWithdrawPreview,
   LnurlPayPreview,
 } from "@linky-fit/linkshu";
+// Throws only when the proxy itself cannot be reached; linkshu reads the
+// proxied status and body so an upstream error keeps its reason.
 const fallback: lnurl.LnurlFallback = async (url) => {
   if (typeof window === "undefined") throw new Error("LNURL request failed");
   const origin = isNativePlatform() ? "https://app.linky.fit" : "";
-  const response = await fetch(
-    `${origin}/api/lnurlp?url=${encodeURIComponent(url)}`,
-    { headers: { Accept: "application/json" } },
-  );
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response;
+  return fetch(`${origin}/api/lnurlp?url=${encodeURIComponent(url)}`, {
+    headers: { Accept: "application/json" },
+  });
 };
 export const fetchLnurlPayPreview = (target: string) =>
   lnurl.fetchLnurlPayPreview(target, fallback);

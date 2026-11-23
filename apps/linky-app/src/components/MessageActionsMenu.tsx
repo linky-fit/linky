@@ -52,6 +52,7 @@ interface MessageActionsMenuProps {
 }
 
 interface MenuAction {
+  destructive?: boolean;
   icon: IconName;
   label: string;
   run: () => void;
@@ -105,7 +106,12 @@ export const MessageActionsMenu: FC<MessageActionsMenuProps> = ({
     });
   if (canCopy) actions.push({ icon: "Copy", label: labels.copy, run: onCopy });
   if (canDelete)
-    actions.push({ icon: "Trash2", label: labels.delete, run: onDelete });
+    actions.push({
+      destructive: true,
+      icon: "Trash2",
+      label: labels.delete,
+      run: onDelete,
+    });
   const close = () => {
     setEmojisExpanded(false);
     onClose();
@@ -152,11 +158,12 @@ export const MessageActionsMenu: FC<MessageActionsMenuProps> = ({
           />
         )
       ) : null}
-      <Divider />
+      {canReplyOrReact && actions.length > 0 ? <Divider /> : null}
       {actions.map((action) => (
         <ListRow
           key={action.label}
           testID="message-action"
+          destructive={action.destructive}
           icon={action.icon}
           title={action.label}
           chevron={false}

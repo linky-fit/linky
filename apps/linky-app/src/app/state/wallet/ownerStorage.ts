@@ -41,6 +41,7 @@ export const makeOwnerStorage = (
       const cleaned = normalizeMintUrl(mintUrl);
       if (!cleaned) return;
       const seen = new Set(readSeenMints());
+      if (seen.has(cleaned)) return;
       seen.add(cleaned);
       writeKvJson(
         kv,

@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   describeTaggedCashuError,
   formatStoredCashuError,
-  isStoredCashuErrorTokenSpent,
 } from "./cashuStoredError";
 
 describe("describeTaggedCashuError", () => {
@@ -133,22 +132,5 @@ describe("formatStoredCashuError", () => {
     expect(formatStoredCashuError("  ")).toBeNull();
     expect(formatStoredCashuError(null)).toBeNull();
     expect(formatStoredCashuError(undefined)).toBeNull();
-  });
-});
-
-describe("isStoredCashuErrorTokenSpent", () => {
-  it("recognizes only the tagged already-spent failure", () => {
-    expect(
-      isStoredCashuErrorTokenSpent(
-        JSON.stringify({ _tag: "TokenAlreadySpent", mint: "m" }),
-      ),
-    ).toBe(true);
-    expect(
-      isStoredCashuErrorTokenSpent(
-        JSON.stringify({ _tag: "MintUnreachable", mint: "m", detail: null }),
-      ),
-    ).toBe(false);
-    expect(isStoredCashuErrorTokenSpent("Token already spent")).toBe(false);
-    expect(isStoredCashuErrorTokenSpent(null)).toBe(false);
   });
 });
