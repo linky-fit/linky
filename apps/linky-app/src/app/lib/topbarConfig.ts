@@ -94,7 +94,6 @@ export const resolveBackAction = (
       return () => navigateTo({ route: "settings" });
 
     case "advancedInspector":
-    case "advancedPushDebug":
       return () => navigateTo({ route: "advanced" });
 
     case "bankPaymentNew":
@@ -121,6 +120,7 @@ export const resolveBackAction = (
     }
 
     case "advancedInspectorTimeline":
+    case "advancedPushDebug":
       return () => navigateTo({ route: "advancedInspector" });
 
     case "mint":
