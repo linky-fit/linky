@@ -441,7 +441,6 @@ interface ChatMessageListProps {
   peerSeenUpToSec: number;
   reactionsByMessageId: ReadonlyMap<string, LocalNostrReaction[]>;
   receivedSatByRequestId: ReceivedSatByRequestId;
-  selectedContactId: string;
   t: Translate;
 }
 
@@ -515,7 +514,6 @@ const ChatMessageList = memo(function ChatMessageList({
   peerSeenUpToSec,
   reactionsByMessageId,
   receivedSatByRequestId,
-  selectedContactId,
   t,
 }: ChatMessageListProps) {
   const actionLabels = useMemo(
@@ -689,7 +687,6 @@ const ChatMessageList = memo(function ChatMessageList({
     peerSeenUpToSec,
     reactionsByMessageId,
     receivedSatByRequestId,
-    selectedContactId,
     t,
   ]);
 
@@ -1691,7 +1688,6 @@ export const ChatPage: FC<ChatPageProps> = ({
         peerSeenUpToSec={selectedContact.chatPeerSeenAtSec ?? 0}
         reactionsByMessageId={reactionsByMessageId}
         receivedSatByRequestId={receivedSatByRequestId}
-        selectedContactId={selectedContact.id}
         t={t}
       />
 

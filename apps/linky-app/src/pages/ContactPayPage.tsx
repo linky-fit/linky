@@ -46,7 +46,6 @@ interface ContactPayPageProps {
   cashuIsBusy: boolean;
   contactPaymentIntent: "pay" | "request";
   contactPayMethod: "lightning" | "cashu" | null;
-  displayUnit: string;
   nostrPictureByNpub: Record<string, string | null>;
   payAmount: string;
   paySelectedContact: (options: { note: string | null }) => Promise<void>;
@@ -158,11 +157,13 @@ export const ContactPayPage: FC<ContactPayPageProps> = ({
             uri={url ?? undefined}
             size="md"
           />
-          {selectedContact.name && (
+          {(selectedContact.name || showToggle) && (
             <Row gap="$xs">
-              <Text variant="title" numberOfLines={1} flexShrink={1}>
-                {selectedContact.name}
-              </Text>
+              {selectedContact.name ? (
+                <Text variant="title" numberOfLines={1} flexShrink={1}>
+                  {selectedContact.name}
+                </Text>
+              ) : null}
               <IconButton
                 icon={methodIcon}
                 accessibilityLabel={methodLabel}
@@ -254,7 +255,6 @@ export const ContactPayRoute: FC<{ route: Route }> = ({ route }) => {
   const nostrPictureByNpub = useNostrPictureByNpub();
   const { cashuBalance, cashuBalanceAfterMelt, cashuIsBusy } =
     useWalletBalance();
-  const { displayUnit } = useDisplayAmounts();
   const payWithCashuEnabled = useAtomValue(payWithCashuEnabledAtom);
   const contactPaymentIntent = useAtomValue(contactPaymentIntentAtom);
   const [contactPayMethod, setContactPayMethod] = useAtom(contactPayMethodAtom);
@@ -266,7 +266,6 @@ export const ContactPayRoute: FC<{ route: Route }> = ({ route }) => {
       cashuIsBusy={cashuIsBusy}
       contactPaymentIntent={contactPaymentIntent}
       contactPayMethod={contactPayMethod}
-      displayUnit={displayUnit}
       nostrPictureByNpub={nostrPictureByNpub}
       payAmount={payAmount}
       paySelectedContact={paySelectedContact}

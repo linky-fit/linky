@@ -209,23 +209,20 @@ const runWithTimeout = async <T>(
 };
 
 const collectStorageDiagnostics = async (): Promise<BootStorageDiagnostics> => {
-  const estimate = navigator.storage?.estimate
-    ? await runWithTimeout(() => navigator.storage.estimate(), {})
-    : {};
-  const persisted = navigator.storage?.persisted
-    ? await runWithTimeout(() => navigator.storage.persisted(), null)
-    : null;
-  const cacheNames =
+  const [estimate, persisted, cacheNames, registrations] = await Promise.all([
+    navigator.storage?.estimate
+      ? runWithTimeout<StorageEstimate>(() => navigator.storage.estimate(), {})
+      : Promise.resolve<StorageEstimate>({}),
+    navigator.storage?.persisted
+      ? runWithTimeout(() => navigator.storage.persisted(), null)
+      : Promise.resolve(null),
     typeof caches === "undefined"
-      ? null
-      : await runWithTimeout(() => caches.keys(), null);
-  const registrations =
+      ? Promise.resolve(null)
+      : runWithTimeout(() => caches.keys(), null),
     "serviceWorker" in navigator
-      ? await runWithTimeout(
-          () => navigator.serviceWorker.getRegistrations(),
-          null,
-        )
-      : null;
+      ? runWithTimeout(() => navigator.serviceWorker.getRegistrations(), null)
+      : Promise.resolve(null),
+  ]);
 
   return {
     cacheNames: cacheNames?.map(redactDiagnosticText) ?? null,

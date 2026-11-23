@@ -282,13 +282,13 @@ export const useNpubCash = ({
   React.useEffect(() => {
     // Poll faster while the topup invoice shows, to see it paid quickly.
     if (!networkEnabled || routeKind !== "topupInvoice") return;
-    void claimNpubCashOnce();
+    void claimLatestRef.current();
     const intervalId = setInterval(
-      () => void claimNpubCashOnce(),
+      () => void claimLatestRef.current(),
       TOPUP_CLAIM_POLL_MS,
     );
     return () => clearInterval(intervalId);
-  }, [claimNpubCashOnce, networkEnabled, routeKind]);
+  }, [claimLatestRef, networkEnabled, routeKind]);
 };
 
 /** Makes `mintUrl` the default mint, at npub.cash first; moves no funds. */

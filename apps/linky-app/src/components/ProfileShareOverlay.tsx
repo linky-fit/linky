@@ -43,7 +43,9 @@ export function ProfileShareOverlay({
   return (
     <Dialog
       open
-      onOpenChange={onClose}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
       title={t("myNpubQr")}
       hideTitle
       fullScreen

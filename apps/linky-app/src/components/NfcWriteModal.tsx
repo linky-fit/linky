@@ -50,7 +50,9 @@ export function NfcWriteModal({
   return (
     <Dialog
       open
-      onOpenChange={onCancel}
+      onOpenChange={(open) => {
+        if (!open) onCancel();
+      }}
       title={t("nfcWriteReadyTitle")}
       description={t("nfcWriteReadySubtitle")}
       actions={

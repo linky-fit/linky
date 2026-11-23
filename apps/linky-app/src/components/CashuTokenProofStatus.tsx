@@ -7,7 +7,6 @@ import {
   Text,
   ListRow,
 } from "@linky-fit/ui";
-import { useMemo } from "react";
 import type { InspectCashuProofStates } from "../app/hooks/composition/useLinkshuComposition";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import { useTokenProofStates } from "../hooks/useTokenProofStates";
@@ -45,9 +44,8 @@ export const CashuTokenProofStatus = ({
 }: CashuTokenProofStatusProps) => {
   const { t, lang } = useTranslation();
   const { formatDisplayedAmountText } = useDisplayAmounts();
-  const tokens = useMemo(() => proofs, [proofs]);
   const { reports, loading, refresh, checkedAt } = useTokenProofStates(
-    tokens,
+    proofs,
     inspect,
   );
   const sums = sumProofsByMintState(proofs, reports);

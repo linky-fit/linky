@@ -8,18 +8,19 @@ import {
   Text,
 } from "@linky-fit/ui";
 import React from "react";
+import type { ContactsGuideKey } from "../app/types/appTypes";
 import type { Translate } from "../i18n";
 
 interface OnboardingTask {
   done: boolean;
-  key: string;
+  key: ContactsGuideKey;
   label: string;
 }
 
 interface ContactsChecklistProps {
   contactsOnboardingCelebrating: boolean;
   dismissContactsOnboarding: () => void;
-  onShowHow: (taskKey: string) => void;
+  onShowHow: (taskKey: ContactsGuideKey) => void;
   progressPercent: number;
   t: Translate;
   tasks: readonly OnboardingTask[];

@@ -19,9 +19,9 @@ describe("ContactsChecklist", () => {
         progressPercent={20}
         t={(key) => key}
         tasks={[
-          { done: true, key: "done", label: "Completed task" },
-          { done: false, key: "next", label: "Next task" },
-          { done: false, key: "later", label: "Later task" },
+          { done: true, key: "add_contact", label: "Completed task" },
+          { done: false, key: "topup", label: "Next task" },
+          { done: false, key: "pay", label: "Later task" },
         ]}
         tasksCompleted={1}
         tasksTotal={3}
@@ -38,7 +38,7 @@ describe("ContactsChecklist", () => {
     await act(async () => {
       showHow?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
-    expect(onShowHow).toHaveBeenCalledWith("next");
+    expect(onShowHow).toHaveBeenCalledWith("topup");
 
     await act(async () => root.unmount());
   });

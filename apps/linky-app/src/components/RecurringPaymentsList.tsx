@@ -13,7 +13,6 @@ import { formatRecurringAmountText } from "../app/lib/recurringAmount";
 import { describeRecurringInterval } from "../app/lib/recurringPaymentDisplay";
 import { navigateTo } from "../hooks/useRouting";
 import { formatChatDayLabel, formatClockTime } from "../utils/formatting";
-import { nowSeconds } from "../utils/time";
 import { ContactSummaryAvatar } from "./ContactSummaryAvatar";
 
 /** Rows of recurring payments with their interval pill, amount, and next due date. */
@@ -32,12 +31,10 @@ export const RecurringPaymentsList: FC<{
       "{date}",
       `${formatChatDayLabel(atSec * 1000, lang, t)} ${formatClockTime(atSec, lang)}`,
     );
-  const nowSec = nowSeconds();
-
   return (
     <>
       {orders.map((order) => {
-        const state = recurringOrderState(order, nowSec);
+        const state = recurringOrderState(order);
         const amountSat = recurringAmountSat(order.amount, fiatRates);
         const underfunded =
           state === "active" &&

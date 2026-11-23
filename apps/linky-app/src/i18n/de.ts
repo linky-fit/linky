@@ -36,7 +36,6 @@ export const de = {
   recurringPaymentTitle: "Wiederkehrende Zahlung",
   recurringPaymentNewTitle: "Neue wiederkehrende Zahlung",
   recurringPaymentEditTitle: "Wiederkehrende Zahlung bearbeiten",
-  recurringHistorySection: "Verlauf",
   recurringInsufficientFundsHint: "geringes Guthaben",
   recurringSentBody: "{amount} {unit} an {name} gesendet.",
   recurringFailedBody:
@@ -110,7 +109,6 @@ export const de = {
   recurringOnlyWhileOpen:
     "Jedes deiner Geräte, auf dem Linky läuft, sendet die Zahlung, auch im Hintergrund. Hat es eine Minute nach Fälligkeit keines gesendet, erinnern wir dich, Linky zu öffnen; bei geöffneter App siehst du, wie die Zahlung rausgeht.",
   recurringRepeatAction: "Regelmäßig wiederholen",
-  showTransactions: "Transaktionen anzeigen",
   feedback: "Feedback",
   settingsAbout: "Über Linky",
   supportLinky: "Linky unterstützen",
@@ -149,7 +147,6 @@ export const de = {
   importFailed: "Import fehlgeschlagen.",
   importInvalid: "Ungültige Importdatei.",
   importNothing: "Nichts zu importieren.",
-  keys: "Schlüssel",
   paste: "Einfügen",
   enable: "Aktivieren",
   notifications: "Benachrichtigungen",
@@ -234,7 +231,6 @@ export const de = {
     "Füge einen nsec ein, um unter einer Nostr-Identität aufzutreten, die du schon hast.",
   sensitiveActionArmedHint:
     "Sensible Aktion. Klicke zum Bestätigen noch einmal.",
-  derive: "Ableiten",
   nostrKeysCopied: "Nostr-Schlüssel in die Zwischenablage kopiert.",
   seed: "Schlüssel",
   seedCopied: "Schlüssel in die Zwischenablage kopiert.",
@@ -827,7 +823,6 @@ export const de = {
   contactUsesLinky: "Nutzt Linky",
   contactUsesNostr: "Nostr-Profil",
   contactsSearchNotSaved: "Nicht in deinen Kontakten",
-  saving: "Wird gespeichert…",
   clearForm: "Formular leeren",
   fillAtLeastOne: "Fülle mindestens ein Feld aus.",
   contactSaved: "Kontakt gespeichert.",
@@ -1127,7 +1122,6 @@ export const de = {
     "Für eine wiederkehrende Zahlung zurückgelegt, bis sie rausgeht, oder Eingaben einer Lightning-Zahlung, die die Mint noch nicht abgeschlossen hat.",
   cashuHeldUnknownHint:
     "Von einem Vorgang gehalten, der noch nicht auf dieses Gerät synchronisiert wurde.",
-  cashuTransfers: "Übertragungen",
   cashuTransfersEmpty: "Keine offenen Übertragungen.",
   cashuTransferIssued: "Ausgestellt, wartet auf Einlösung.",
   cashuTransferReturned: "In die Wallet zurückgeholt.",
@@ -1354,8 +1348,6 @@ export const de = {
   beaconStatusBluetoothOff: "Bluetooth ist aus",
   beaconStatusNotBroadcasting: "Sendet nicht",
   beaconStatusPermissionNeeded: "Berechtigung fehlt",
-  beaconTrade: "Handel",
-  beaconTradeNone: "Keiner",
   beaconTradeBuy: "Kauft BTC",
   beaconTradeSell: "Verkauft BTC",
   beaconMutualOnly:

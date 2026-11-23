@@ -15,7 +15,6 @@ import {
   LIGHTNING_INVOICE_AUTO_PAY_LIMIT_STORAGE_KEY,
   NOSTR_IDENTITY_SOURCE_STORAGE_KEY,
   NOSTR_IDENTITY_SWITCHED_AT_SEC_STORAGE_KEY,
-  NOSTR_NSEC_STORAGE_KEY,
   PAY_WITH_CASHU_STORAGE_KEY,
   RECEIVE_METHOD_STORAGE_KEY,
   SEEN_RECEIPTS_ENABLED_AT_SEC_STORAGE_KEY,
@@ -32,7 +31,7 @@ import {
   parseReceiveMethod,
   type ReceiveMethod,
 } from "./receiveMethod";
-import { asNonEmptyString, trimString } from "./validation";
+import { trimString } from "./validation";
 
 import { nowSeconds, sleep } from "./time";
 
@@ -402,9 +401,6 @@ export const getInitialBankPaymentOfferStaggerDelaySec = (
   );
   return stored !== null && stored >= 0 ? stored : fallback;
 };
-
-export const getInitialNostrNsec = (): string | null =>
-  asNonEmptyString(safeLocalStorageGet(NOSTR_NSEC_STORAGE_KEY));
 
 export const getInitialNostrIdentitySource = (): "custom" | "derived" =>
   trimString(safeLocalStorageGet(NOSTR_IDENTITY_SOURCE_STORAGE_KEY)) ===

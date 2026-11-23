@@ -25,6 +25,7 @@ import {
 } from "../app/lib/privateImageMessage";
 
 import type { Translate } from "../i18n";
+import { formatBytes } from "../utils/formatting";
 import { AttachmentViewer } from "./AttachmentViewer";
 
 interface PrivateFileBubbleProps {
@@ -36,12 +37,6 @@ interface PrivateFileBubbleProps {
 
 const PREVIEW_WIDTH_PX = 260;
 const VIEWER_WIDTH_PX = 920;
-
-const formatFileSize = (bytes: number): string => {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} kB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-};
 
 export function PrivateFileBubble({
   onBlobChange,
@@ -227,11 +222,11 @@ export function PrivateFileBubble({
           name={fileName}
           meta={
             fileBlob
-              ? `${t("chatPdfMessage")} · ${formatFileSize(fileBlob.size)}`
+              ? `${t("chatPdfMessage")} · ${formatBytes(fileBlob.size)}`
               : t("chatPdfDecrypting")
           }
           loading={!fileBlob}
-          onPress={openViewer}
+          onPress={fileBlob ? openViewer : undefined}
         />
       )}
 

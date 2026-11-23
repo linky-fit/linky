@@ -35,7 +35,6 @@ export const en = {
   recurringPaymentTitle: "Recurring payment",
   recurringPaymentNewTitle: "New recurring payment",
   recurringPaymentEditTitle: "Edit recurring payment",
-  recurringHistorySection: "History",
   recurringInsufficientFundsHint: "low balance",
   recurringSentBody: "Sent {amount} {unit} to {name}.",
   recurringFailedBody:
@@ -106,7 +105,6 @@ export const en = {
   recurringOnlyWhileOpen:
     "Any of your devices running Linky sends the payment, also in the background. If none has sent it a minute after it is due, you get a reminder to open Linky; with the app open you see the payment go out.",
   recurringRepeatAction: "Repeat regularly",
-  showTransactions: "Show transactions",
   feedback: "Feedback",
   settingsAbout: "About Linky",
   supportLinky: "Support Linky",
@@ -145,7 +143,6 @@ export const en = {
   importFailed: "Import failed.",
   importInvalid: "Invalid import file.",
   importNothing: "Nothing to import.",
-  keys: "Keys",
   paste: "Paste",
   enable: "Enable",
   notifications: "Notifications",
@@ -227,7 +224,6 @@ export const en = {
   nostrIdentityCustomHint:
     "Paste an nsec to appear to others under a Nostr identity you already have.",
   sensitiveActionArmedHint: "Sensitive action. Click once more to confirm.",
-  derive: "Derive",
   nostrKeysCopied: "Nostr keys copied to clipboard.",
   seed: "Keys",
   seedCopied: "Keys copied to clipboard.",
@@ -814,7 +810,6 @@ export const en = {
   contactUsesLinky: "Uses Linky",
   contactUsesNostr: "Nostr profile",
   contactsSearchNotSaved: "Not in your contacts",
-  saving: "Saving...",
   clearForm: "Clear form",
 
   fillAtLeastOne: "Fill in at least one field.",
@@ -1108,7 +1103,6 @@ export const en = {
     "Set aside for a recurring payment until it goes out, or inputs of a Lightning payment the mint has not settled yet.",
   cashuHeldUnknownHint:
     "Held by an operation that has not synced to this device yet.",
-  cashuTransfers: "Transfers",
   cashuTransfersEmpty: "No open transfers.",
   cashuTransferIssued: "Issued, waiting to be claimed.",
   cashuTransferReturned: "Returned to the wallet.",
@@ -1337,8 +1331,6 @@ export const en = {
   beaconStatusBluetoothOff: "Bluetooth is off",
   beaconStatusNotBroadcasting: "Not broadcasting",
   beaconStatusPermissionNeeded: "Permission needed",
-  beaconTrade: "Trade",
-  beaconTradeNone: "None",
   beaconTradeBuy: "Buys BTC",
   beaconTradeSell: "Sells BTC",
   beaconMutualOnly: "Only contacts who also saved you can see you nearby.",

@@ -1,6 +1,6 @@
 import { useAtom, useAtomValue } from "@linky-fit/linkstr-react";
 import { Button, Stack, TextField } from "@linky-fit/ui";
-import { useRef, type ComponentRef, type FC } from "react";
+import { type FC } from "react";
 import { useTranslation } from "../app/hooks/shell";
 import { extractCashuTokenFromText } from "../app/lib/tokenText";
 import { walletOpRunningAtom } from "../app/state/wallet/opQueue";
@@ -12,7 +12,6 @@ export const CashuTokenNewPage: FC = () => {
   const { t } = useTranslation();
   const cashuIsBusy = useAtomValue(walletOpRunningAtom);
   const [cashuDraft, setCashuDraft] = useAtom(receiveTokenDraftAtom);
-  const cashuDraftRef = useRef<ComponentRef<typeof TextField>>(null);
   const saveToken = (tokenRaw: string) =>
     void saveCashuFromText(tokenRaw, { navigateToTokens: true });
 
@@ -31,7 +30,6 @@ export const CashuTokenNewPage: FC = () => {
     <Stack gap="$lg">
       <TextField
         multiline
-        ref={cashuDraftRef}
         label={t("cashuToken")}
         value={cashuDraft}
         onChangeText={handleDraftChange}

@@ -5,16 +5,6 @@ import { nowSeconds } from "./time";
 export const firstName = (name: string): string =>
   name.trim().split(/\s+/)[0] ?? name;
 
-export const getInitials = (name: string): string => {
-  const normalized = name.trim();
-  if (!normalized) return "?";
-  const parts = normalized.split(/\s+/).filter(Boolean);
-  const letters = parts
-    .slice(0, 2)
-    .map((part) => part.slice(0, 1).toUpperCase());
-  return letters.join("") || "?";
-};
-
 export const formatBytes = (bytes: number): string => {
   if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
   const units = ["B", "KiB", "MiB", "GiB"];
@@ -119,7 +109,7 @@ const dateTimeFormatters = new Map<string, Intl.DateTimeFormat>();
 
 const getDateTimeFormatter = (
   locale: string,
-  format: "clock" | "dayMonth" | "time" | "weekday",
+  format: "clock" | "dateTime" | "dayMonth" | "time" | "weekday",
 ): Intl.DateTimeFormat => {
   const key = `${locale}:${format}`;
   let formatter = dateTimeFormatters.get(key);
@@ -130,9 +120,11 @@ const getDateTimeFormatter = (
       ? { hour: "2-digit", minute: "2-digit" }
       : format === "clock"
         ? { hour: "numeric", minute: "2-digit" }
-        : format === "dayMonth"
-          ? { day: "2-digit", month: "2-digit" }
-          : { weekday: "short" };
+        : format === "dateTime"
+          ? { dateStyle: "medium", timeStyle: "short" }
+          : format === "dayMonth"
+            ? { day: "2-digit", month: "2-digit" }
+            : { weekday: "short" };
   formatter = new Intl.DateTimeFormat(locale, options);
   dateTimeFormatters.set(key, formatter);
   return formatter;
@@ -146,10 +138,7 @@ export const formatClockTime = (unixSeconds: number, lang?: string): string =>
 
 /** A full date with the time, e.g. for a transaction's detail. */
 export const formatDateTime = (ms: number, lang?: string): string =>
-  new Intl.DateTimeFormat(normalizeLocale(lang), {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(ms);
+  getDateTimeFormatter(normalizeLocale(lang), "dateTime").format(ms);
 
 export const formatInteger = (value: number, lang?: string): string => {
   const locale = normalizeLocale(lang);

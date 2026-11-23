@@ -275,9 +275,9 @@ export const useMintInfoWatchers = ({
         continue;
 
       const existing = mintInfoByUrl.get(cleaned);
-      touchMintInfo(cleaned, nowSec);
-      if (
-        existing &&
+      if (!existing) {
+        touchMintInfo(cleaned, nowSec);
+      } else if (
         canRunNetworkWork &&
         isStale(cleaned, existing.lastCheckedAtSec ?? 0, nowSec)
       ) {

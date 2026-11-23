@@ -27,7 +27,6 @@ import { UnitCyclePressable } from "../components/UnitCyclePressable";
 import { navigateTo } from "../hooks/useRouting";
 import { formatTimeAgo, normalizeLocale } from "../utils/formatting";
 import { formatMintHost } from "../utils/mint";
-import { nowSeconds } from "../utils/time";
 
 interface RecurringPaymentPageProps {
   id: string;
@@ -65,7 +64,7 @@ export function RecurringPaymentPage({
     );
   }
 
-  const state = recurringOrderState(order, nowSeconds());
+  const state = recurringOrderState(order);
   const formatDate = (epochSec: number): string =>
     dateFormatter.format(new Date(epochSec * 1000));
   const lastRun = recurringLastRunLabel(order, t);

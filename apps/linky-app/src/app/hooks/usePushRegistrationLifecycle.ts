@@ -176,6 +176,8 @@ export const usePushRegistrationLifecycle = ({
           return;
         }
 
+        if (!("Notification" in window)) return;
+
         if (Notification.permission === "granted") {
           const result = await registerPushNotifications(currentNsec);
           if (!result.success) {
@@ -183,6 +185,8 @@ export const usePushRegistrationLifecycle = ({
               "Push notification registration failed:",
               result.error ?? "unknown error",
             );
+          } else {
+            lastPushRevalidationMsRef.current = Date.now();
           }
           return;
         }
@@ -196,6 +200,8 @@ export const usePushRegistrationLifecycle = ({
                 "Push notification registration failed:",
                 result.error ?? "unknown error",
               );
+            } else {
+              lastPushRevalidationMsRef.current = Date.now();
             }
           }
         }

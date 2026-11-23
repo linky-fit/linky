@@ -1,5 +1,5 @@
 import type { ProfileMetadata } from "@linky-fit/linkstr";
-import { useAtomSet, useAtomValue } from "@linky-fit/linkstr-react";
+import { useAtomSet } from "@linky-fit/linkstr-react";
 import React from "react";
 import type { useRouting } from "../../../hooks/useRouting";
 import { getBestNostrName } from "../../../utils/formatting";
@@ -39,10 +39,6 @@ export const useProfileComposition = ({
   const updateMyProfile = useUpdateMyProfile();
   const setMyProfileMetadata = useAtomSet(myProfileMetadataAtom);
   const setOwned = useAtomSet(ownedLightningAddressesAtom);
-  const ownedProfileLightningAddresses = useAtomValue(
-    ownedLightningAddressesAtom,
-    (owned) => owned.addresses,
-  );
   const { isProfileEditing, setIsProfileEditing, toggleProfileEditing } =
     useProfileEditing();
 
@@ -121,7 +117,6 @@ export const useProfileComposition = ({
     npubCashInfoInFlightRef,
     npubCashInfoLoadedAtMsRef,
     npubCashInfoLoadedForNpubRef,
-    ownedProfileLightningAddresses,
     setIsProfileEditing,
     setOwnedProfileLightningAddresses,
     setOwnedProfileLightningAddressesLoading,

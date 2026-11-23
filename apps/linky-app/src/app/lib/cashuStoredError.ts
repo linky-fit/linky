@@ -119,10 +119,6 @@ const storedErrorTag = (stored: unknown): unknown => {
   return tagged === null ? null : Reflect.get(tagged, "_tag");
 };
 
-/** True when a stored error is linkshu's definitive already-spent failure. */
-export const isStoredCashuErrorTokenSpent = (stored: unknown): boolean =>
-  storedErrorTag(stored) === "TokenAlreadySpent";
-
 /** True for an error tag saying the mint was not reached or the wallet was busy, so trying again may succeed. */
 export const isTransientCashuErrorTag = (tag: unknown): boolean =>
   tag === "MintUnreachable" || tag === "CounterLockTimeout";

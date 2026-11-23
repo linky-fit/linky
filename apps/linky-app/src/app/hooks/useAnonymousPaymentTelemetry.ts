@@ -89,6 +89,8 @@ export const useAnonymousPaymentTelemetry = ({
     const storageKey = makeLocalStorageKey(
       LOCAL_PENDING_PAYMENT_TELEMETRY_STORAGE_KEY_PREFIX,
     );
+    if (readQueue(storageKey).length === 0) return;
+
     const lockKey = makeLocalStorageKey(
       LOCAL_PENDING_PAYMENT_TELEMETRY_LOCK_STORAGE_KEY_PREFIX,
     );
@@ -122,9 +124,13 @@ export const useAnonymousPaymentTelemetry = ({
 
         writeQueue(storageKey, Array.from(remainingById.values()));
       },
-    }).finally(() => {
-      flushRef.current = null;
-    });
+    })
+      .catch(() => {
+        // Lease lock timed out or failed; retry on the next interval or online event.
+      })
+      .finally(() => {
+        flushRef.current = null;
+      });
 
     flushRef.current = run;
     await run;

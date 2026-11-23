@@ -18,9 +18,9 @@ import { readRepeatablePayment } from "../app/lib/transactionHistory";
 import { TransactionAvatar } from "../components/TransactionRow";
 import { UnitCyclePressable } from "../components/UnitCyclePressable";
 import { formatDateTime } from "../utils/formatting";
+import { navigateTo } from "../hooks/useRouting";
 
 const withoutScheme = (value: string) => value.replace(/^https?:\/\//u, "");
-import { navigateTo } from "../hooks/useRouting";
 
 /** One transaction of the payment history: its row, then what is known about it. */
 export function TransactionPage({ id }: { id: string }): React.ReactElement {

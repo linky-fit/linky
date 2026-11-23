@@ -258,6 +258,12 @@ describe("usePushRegistrationLifecycle", () => {
     await flushLifecycle();
     pushMocks.registerPushNotifications.mockClear();
 
+    window.dispatchEvent(new Event("focus"));
+    await flushLifecycle();
+    expect(pushMocks.registerPushNotifications).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(12 * 60 * 60 * 1000);
+
     setVisibility("hidden");
     window.dispatchEvent(new Event("focus"));
     await flushLifecycle();
@@ -285,6 +291,7 @@ describe("usePushRegistrationLifecycle", () => {
     await renderLifecycle();
     await flushLifecycle();
     pushMocks.registerPushNotifications.mockClear();
+    await vi.advanceTimersByTimeAsync(12 * 60 * 60 * 1000);
     pushMocks.registerPushNotifications.mockResolvedValueOnce({
       success: false,
       error: "offline",
@@ -311,6 +318,7 @@ describe("usePushRegistrationLifecycle", () => {
     await renderLifecycle();
     await flushLifecycle();
     pushMocks.registerPushNotifications.mockClear();
+    await vi.advanceTimersByTimeAsync(12 * 60 * 60 * 1000);
 
     serviceWorkerTarget.dispatchEvent(
       new MessageEvent("message", { data: { type: "push-received" } }),

@@ -192,9 +192,10 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
 
   const menuButton = (disabled = false) => (
     <IconButton
-      icon="Settings"
+      icon="Languages"
       size="sm"
-      accessibilityLabel={t("menu")}
+      accessibilityLabel={t("language")}
+      tooltip={t("language")}
       onPress={() => setPickerMenuIsOpen((current) => !current)}
       disabled={disabled}
     />

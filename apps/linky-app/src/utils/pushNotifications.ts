@@ -403,40 +403,49 @@ async function ensureNativePushListeners(): Promise<void> {
     return nativePushListenersPromise;
   }
 
+  const handles: Array<{ remove: () => Promise<void> }> = [];
   nativePushListenersPromise = (async () => {
-    await PushNotifications.addListener("registration", (token: Token) => {
-      const normalized = token.value.trim();
-      appendPushDebugLog("client", "native push token event", {
-        tokenHash: hashStoredIdentifier(normalized),
-      });
+    const registrationHandle = await PushNotifications.addListener(
+      "registration",
+      (token: Token) => {
+        const normalized = token.value.trim();
+        appendPushDebugLog("client", "native push token event", {
+          tokenHash: hashStoredIdentifier(normalized),
+        });
 
-      if (!normalized) {
-        const error = new Error("Native push token is empty");
+        if (!normalized) {
+          const error = new Error("Native push token is empty");
+          for (const waiter of pendingNativePushTokenWaiters) {
+            waiter.reject(error);
+          }
+          pendingNativePushTokenWaiters.clear();
+          return;
+        }
+
         for (const waiter of pendingNativePushTokenWaiters) {
-          waiter.reject(error);
+          waiter.resolve(normalized);
         }
         pendingNativePushTokenWaiters.clear();
-        return;
-      }
+      },
+    );
+    handles.push(registrationHandle);
 
-      for (const waiter of pendingNativePushTokenWaiters) {
-        waiter.resolve(normalized);
-      }
-      pendingNativePushTokenWaiters.clear();
-    });
+    const registrationErrorHandle = await PushNotifications.addListener(
+      "registrationError",
+      (error) => {
+        const wrappedError = new Error(error.error);
+        appendPushDebugLog("client", "native push token error", {
+          error,
+        });
+        for (const waiter of pendingNativePushTokenWaiters) {
+          waiter.reject(wrappedError);
+        }
+        pendingNativePushTokenWaiters.clear();
+      },
+    );
+    handles.push(registrationErrorHandle);
 
-    await PushNotifications.addListener("registrationError", (error) => {
-      const wrappedError = new Error(error.error);
-      appendPushDebugLog("client", "native push token error", {
-        error,
-      });
-      for (const waiter of pendingNativePushTokenWaiters) {
-        waiter.reject(wrappedError);
-      }
-      pendingNativePushTokenWaiters.clear();
-    });
-
-    await PushNotifications.addListener(
+    const receivedHandle = await PushNotifications.addListener(
       "pushNotificationReceived",
       (notification: PushNotificationSchema) => {
         appendPushDebugLog(
@@ -451,8 +460,9 @@ async function ensureNativePushListeners(): Promise<void> {
         );
       },
     );
+    handles.push(receivedHandle);
 
-    await PushNotifications.addListener(
+    const actionHandle = await PushNotifications.addListener(
       "pushNotificationActionPerformed",
       (notification: PushNotificationActionPerformed) => {
         appendPushDebugLog(
@@ -467,31 +477,61 @@ async function ensureNativePushListeners(): Promise<void> {
         );
       },
     );
-  })();
+    handles.push(actionHandle);
+  })().catch(async (error) => {
+    await Promise.allSettled(handles.map((handle) => handle.remove()));
+    nativePushListenersPromise = null;
+    throw error;
+  });
 
   return nativePushListenersPromise;
 }
 
-function waitForNativePushToken(): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    const waiter = { reject, resolve };
+function waitForNativePushToken(): {
+  cancel: () => void;
+  promise: Promise<string>;
+} {
+  let waiter: {
+    reject: (error: Error) => void;
+    resolve: (token: string) => void;
+  } | null = null;
+  let timeoutId: number | null = null;
+  const promise = new Promise<string>((resolve, reject) => {
+    waiter = { reject, resolve };
     pendingNativePushTokenWaiters.add(waiter);
 
-    window.setTimeout(() => {
-      if (!pendingNativePushTokenWaiters.has(waiter)) {
+    timeoutId = window.setTimeout(() => {
+      if (!waiter || !pendingNativePushTokenWaiters.has(waiter)) {
         return;
       }
       pendingNativePushTokenWaiters.delete(waiter);
       reject(new Error("Timed out while waiting for native push token"));
     }, 15000);
   });
+
+  const cancel = () => {
+    if (timeoutId !== null) {
+      window.clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+    if (waiter) {
+      pendingNativePushTokenWaiters.delete(waiter);
+    }
+  };
+
+  return { cancel, promise };
 }
 
 async function requestNativePushToken(): Promise<string> {
   await ensureNativePushListeners();
-  const tokenPromise = waitForNativePushToken();
-  await PushNotifications.register();
-  return tokenPromise;
+  const tokenWait = waitForNativePushToken();
+  try {
+    await PushNotifications.register();
+  } catch (error) {
+    tokenWait.cancel();
+    throw error;
+  }
+  return tokenWait.promise;
 }
 
 type PushRegistrationResult =

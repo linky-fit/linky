@@ -53,7 +53,7 @@ import {
   unreadByContactIdAtom,
 } from "../state/contacts/contactsList";
 import { lastVisibleMessageByContactIdAtom } from "../state/contacts/displayContacts";
-import type { ContactRowLike, ContactsGuideKey } from "../types/appTypes";
+import type { ContactRowLike } from "../types/appTypes";
 import { getDesktopActiveContactId } from "./desktopRouteSection";
 import { contactPictureUrl } from "../../derivedProfile";
 
@@ -61,13 +61,6 @@ type ActiveBankPaymentOfferContacts = (nowSec: number) => {
   contactIds: ReadonlySet<string>;
   nextExpiryAtSec: number | null;
 };
-
-const isContactsGuideKey = (value: string): value is ContactsGuideKey =>
-  value === "add_contact" ||
-  value === "topup" ||
-  value === "pay" ||
-  value === "message" ||
-  value === "backup_keys";
 
 interface VisibleContactSections {
   conversations: ContactRowLike[];
@@ -231,7 +224,6 @@ export const ContactsOnboardingCard = (): React.ReactElement | null => {
       contactsOnboardingCelebrating={contactsOnboardingCelebrating}
       dismissContactsOnboarding={dismissContactsOnboarding}
       onShowHow={(key) => {
-        if (!isContactsGuideKey(key)) return;
         startContactsGuide(
           key,
           contactsOnboardingTasks.tasks.some(

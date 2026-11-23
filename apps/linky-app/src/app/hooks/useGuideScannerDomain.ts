@@ -374,9 +374,17 @@ export const useGuideScannerDomain = ({
 
         const nativeScan = startNativeQrScan();
         if (nativeScan) {
-          void nativeScan.then((result) => {
-            void handleNativeScanResult(requestId, result);
-          });
+          void nativeScan
+            .then((result) => {
+              void handleNativeScanResult(requestId, result);
+            })
+            .catch((error) => {
+              void handleNativeScanResult(requestId, {
+                cancelled: false,
+                message: error instanceof Error ? error.message : "",
+                value: null,
+              });
+            });
           return true;
         }
 

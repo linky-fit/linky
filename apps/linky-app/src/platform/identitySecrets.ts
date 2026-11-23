@@ -131,10 +131,6 @@ interface PersistSyncedActiveNostrIdentityParams {
   switchedAtSec: number | null;
 }
 
-export const readStoredNostrNsec = async (): Promise<string | null> => {
-  return readStoredSecret(NOSTR_NSEC_STORAGE_KEY);
-};
-
 export const readStoredAttachedNsec = async (): Promise<string | null> => {
   return readStoredSecret(NOSTR_ATTACHED_NSEC_STORAGE_KEY);
 };
