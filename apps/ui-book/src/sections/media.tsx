@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as UI from "@linky-fit/ui";
 import type { Section } from "../section";
 import { sampleImage } from "../sample-image";
@@ -58,6 +58,12 @@ export const media: Section = {
     CameraPreview: () => {
       const [camera, setCamera] = useState<MediaStream | null>(null);
       const video = useRef<HTMLVideoElement>(null);
+      useEffect(
+        () => () => {
+          camera?.getTracks().forEach((track) => track.stop());
+        },
+        [camera],
+      );
       const toggleCamera = async () => {
         if (camera) {
           camera.getTracks().forEach((track) => track.stop());
@@ -67,7 +73,11 @@ export const media: Section = {
         const stream = await navigator.mediaDevices?.getUserMedia({
           video: true,
         });
-        if (!stream || !video.current) return;
+        if (!stream) return;
+        if (!video.current) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
         video.current.srcObject = stream;
         setCamera(stream);
       };

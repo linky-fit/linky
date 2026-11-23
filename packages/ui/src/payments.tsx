@@ -206,7 +206,7 @@ function DirectionBadge({
         <Icon
           name={direction === "out" ? "ArrowUp" : "ArrowDown"}
           size="sm"
-          color="$colorStrong"
+          color={direction === "out" ? "$onOnchain" : "$onAccent"}
         />
       </View>
     </View>

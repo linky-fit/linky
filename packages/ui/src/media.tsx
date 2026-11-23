@@ -110,6 +110,7 @@ export function ImageCropPreview({
   }, []);
   const moveDrag = useCallback(
     (_event: GestureResponderEvent, gesture: PanResponderGestureState) => {
+      if (scale <= 0) return;
       const half = Math.min(imageWidth, imageHeight) / zoom / 2;
       const clamp = (value: number, extent: number) =>
         Math.min(extent - half, Math.max(half, value));
@@ -144,7 +145,10 @@ export function ImageCropPreview({
       overflow="hidden"
       borderRadius="$card"
       backgroundColor="$neutralSoft"
-      onLayout={(event) => setViewport(event.nativeEvent.layout.width)}
+      onLayout={(event) => {
+        const width = event.nativeEvent.layout.width;
+        if (width > 0) setViewport(width);
+      }}
     >
       <Image
         src={uri}

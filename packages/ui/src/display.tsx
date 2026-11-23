@@ -340,16 +340,16 @@ const scaledText = (variant: TextVariant, scale: number) => ({
 });
 
 /** The factor that shrinks a one-line web text to its width; native text fits itself with `adjustsFontSizeToFit`. */
-const useFitScale = (text: string) => {
+const useFitScale = (variant: TextVariant, text: string) => {
   const ref = useRef<TamaguiElement>(null);
   const { width } = useWindowDimensions();
-  const key = `${text}@${width}`;
+  const key = `${variant}:${text}@${width}`;
   const [fit, setFit] = useState({ key, scale: 1 });
   const scale = fit.key === key ? fit.scale : 1;
   const shrinkToFit = useCallback(() => {
     const node = ref.current;
     if (!isWeb || !(node instanceof HTMLElement)) return;
-    if (node.scrollWidth > node.clientWidth) {
+    if (node.clientWidth > 0 && node.scrollWidth > node.clientWidth) {
       setFit({ key, scale: (scale * node.clientWidth) / node.scrollWidth });
     }
   }, [key, scale]);
@@ -359,7 +359,10 @@ const useFitScale = (text: string) => {
 
 export function Amount({ value, unit, caption, size = "lg" }: AmountProps) {
   const variant = amountVariant[size];
-  const { ref, scale, shrinkToFit } = useFitScale(`${value} ${unit ?? ""}`);
+  const { ref, scale, shrinkToFit } = useFitScale(
+    variant,
+    `${value} ${unit ?? ""}`,
+  );
   return (
     <Stack gap="$xs" alignItems="center" maxWidth="100%">
       <Text
