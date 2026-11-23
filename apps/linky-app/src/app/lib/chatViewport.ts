@@ -31,17 +31,18 @@ export const restoreChatViewportAnchor = (
 /** How close to the newest message still counts as reading it. */
 export const CHAT_NEAR_BOTTOM_PX = 120;
 
+export const isChatNearBottom = (messages: HTMLElement): boolean =>
+  messages.scrollHeight - messages.scrollTop - messages.clientHeight <
+  CHAT_NEAR_BOTTOM_PX;
+
 /** Keeps a list that sits at its newest message there while the list or its content resizes, e.g. a pill or image finishing layout or the composer growing. */
 export const pinChatToBottom = (
   messages: HTMLElement,
   content: HTMLElement,
 ): (() => void) => {
-  const nearBottom = () =>
-    messages.scrollHeight - messages.scrollTop - messages.clientHeight <
-    CHAT_NEAR_BOTTOM_PX;
-  let pinned = nearBottom();
+  let pinned = isChatNearBottom(messages);
   const updatePinned = () => {
-    pinned = nearBottom();
+    pinned = isChatNearBottom(messages);
   };
   const observer = new ResizeObserver(() => {
     if (pinned) messages.scrollTop = messages.scrollHeight;

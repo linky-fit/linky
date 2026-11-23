@@ -544,6 +544,7 @@ export const sk = {
   chatQueued: "Správa zaradená do frontu.",
   chatPendingShort: "čaká",
   chatSeenShort: "prečítané",
+  chatScrollToLatest: "Prejsť na najnovšiu správu",
   chatImageAttach: "Pridať obrázok alebo PDF",
   chatMenuAttach: "Príloha",
   chatMoreActions: "Ďalšie akcie",

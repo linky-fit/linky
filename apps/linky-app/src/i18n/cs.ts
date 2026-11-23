@@ -542,6 +542,7 @@ export const cs = {
   chatQueued: "Zpráva zařazena do fronty.",
   chatPendingShort: "čeká",
   chatSeenShort: "přečteno",
+  chatScrollToLatest: "Přejít na nejnovější zprávu",
   chatImageAttach: "Přidat obrázek nebo PDF",
   chatMenuAttach: "Příloha",
   chatMoreActions: "Další akce",

@@ -597,4 +597,36 @@ describe("ChatPage message rows", () => {
     expect(rows.rendered).toEqual(["npub"]);
     await unmount();
   });
+
+  it("offers a jump to the latest message only while scrolled up", async () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: false }));
+    const { container, unmount } = await renderIntoDocument(
+      <ChatPage {...pageProps([message("only", 100)], new Map(), false)} />,
+    );
+    const list = chatMessagesRef.current;
+    if (!list) throw new Error("chat list not rendered");
+    Object.defineProperty(list, "scrollHeight", { value: 2000 });
+    Object.defineProperty(list, "clientHeight", { value: 500 });
+    const scrollTo = vi.fn();
+    list.scrollTo = scrollTo;
+    const button = () =>
+      container.querySelector<HTMLElement>(
+        'button[aria-label="chatScrollToLatest"]',
+      );
+    const scrollToTop = async (top: number) => {
+      list.scrollTop = top;
+      await act(async () => {
+        list.dispatchEvent(new Event("scroll"));
+      });
+    };
+
+    expect(button()).toBeNull();
+    await scrollToTop(200);
+    await act(async () => button()?.click());
+    expect(scrollTo).toHaveBeenCalledWith({ top: 2000, behavior: "smooth" });
+
+    await scrollToTop(1500);
+    expect(button()).toBeNull();
+    await unmount();
+  });
 });

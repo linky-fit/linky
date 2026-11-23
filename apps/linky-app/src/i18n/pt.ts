@@ -552,6 +552,7 @@ export const pt = {
   chatQueued: "Na fila para entrega.",
   chatPendingShort: "pendente",
   chatSeenShort: "visto",
+  chatScrollToLatest: "Ir para a mensagem mais recente",
   chatImageAttach: "Adicionar imagem ou PDF",
   chatMenuAttach: "Anexo",
   chatMoreActions: "Mais ações",

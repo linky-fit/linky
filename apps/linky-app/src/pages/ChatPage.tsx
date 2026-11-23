@@ -14,6 +14,7 @@ import {
   Notice,
   ReplyPreview,
   Row,
+  shadow,
   Stack,
   Text,
 } from "@linky-fit/ui";
@@ -87,6 +88,7 @@ import {
 import { useEmojiSearchIndex } from "../app/hooks/messages/useEmojiSearchIndex";
 import {
   captureChatViewportAnchor,
+  isChatNearBottom,
   pinChatToBottom,
   restoreChatViewportAnchor,
   type ChatViewportAnchor,
@@ -484,6 +486,42 @@ const useStableRowActions = (actions: MessageRowActions): MessageRowActions => {
   );
 };
 
+const ScrollToLatestButton = ({
+  chatMessagesRef,
+  label,
+}: {
+  chatMessagesRef: React.RefObject<HTMLDivElement | null>;
+  label: string;
+}) => {
+  const [scrolledUp, setScrolledUp] = useState(false);
+  useEffect(() => {
+    const messages = chatMessagesRef.current;
+    if (!messages) return;
+    const update = () => setScrolledUp(!isChatNearBottom(messages));
+    messages.addEventListener("scroll", update, { passive: true });
+    return () => messages.removeEventListener("scroll", update);
+  }, [chatMessagesRef]);
+
+  if (!scrolledUp) return null;
+  return (
+    <Stack position="absolute" right="$lg" bottom="$md" zIndex="$sticky">
+      <IconButton
+        icon="ChevronDown"
+        variant="secondary"
+        accessibilityLabel={label}
+        boxShadow={shadow.raised}
+        onPress={() => {
+          const messages = chatMessagesRef.current;
+          messages?.scrollTo({
+            top: messages.scrollHeight,
+            behavior: "smooth",
+          });
+        }}
+      />
+    </Stack>
+  );
+};
+
 const ChatMessageList = memo(function ChatMessageList({
   bankPaymentOfferMessages,
   canOpenBankPaymentOfferDetails,
@@ -691,92 +729,102 @@ const ChatMessageList = memo(function ChatMessageList({
   ]);
 
   return (
-    <Stack
-      ref={messagesNodeRef}
-      role="log"
-      aria-live="polite"
-      flex={1}
-      minHeight={0}
-      overflowY="auto"
-      paddingHorizontal="$lg"
-    >
+    <Stack flex={1} minHeight={0} position="relative">
       <Stack
-        ref={contentNodeRef}
-        // A short conversation sits just above the composer.
-        flexGrow={1}
-        justifyContent="flex-end"
-        width="100%"
-        maxWidth="$contentWidth"
-        alignSelf="center"
-        gap="$xxs"
-        paddingTop="$lg"
-        paddingBottom="$md"
+        ref={messagesNodeRef}
+        role="log"
+        aria-live="polite"
+        flex={1}
+        minHeight={0}
+        overflowY="auto"
+        paddingHorizontal="$lg"
       >
-        {viewModels.length === 0 ? (
-          <EmptyState title={t("chatEmpty")} />
-        ) : (
-          viewModels.map((viewModel) => (
-            <ChatMessage
-              key={viewModel.message.id}
-              message={viewModel.message}
-              previousMessage={viewModel.previousMessage}
-              nextMessage={viewModel.nextMessage}
-              locale={locale}
-              formatChatDayLabel={formatChatDayLabelForLang}
-              getCashuTokenMessageInfo={
-                viewModel.hasCashuText ? getCashuTokenMessageInfo : noTokenInfo
-              }
-              getMintIconUrl={
-                viewModel.hasCashuText ? getMintIconUrl : noMintIcon
-              }
-              getNpubMessageContactInfo={
-                viewModel.hasNpubText ? getNpubMessageContactInfo : noNpubInfo
-              }
-              onMintIconError={markMintIconFailed}
-              actionLabels={actionLabels}
-              canDelete={viewModel.canDelete}
-              canEdit={viewModel.canEdit}
-              canReplyOrReact={viewModel.canReplyOrReact}
-              reactions={viewModel.reactions}
-              paymentRequestInfo={viewModel.paymentRequestInfo}
-              paymentRequestStatus={viewModel.paymentRequestStatus}
-              declineInfo={viewModel.declineInfo}
-              bankPaymentOfferInfo={viewModel.bankPaymentOfferInfo}
-              bankPaymentOfferPeerNotice={viewModel.bankPaymentOfferPeerNotice}
-              canOpenBankPaymentOfferDetails={canOpenBankPaymentOfferDetails}
-              canSettleBankPaymentOffer={viewModel.canSettleBankPaymentOffer}
-              onOpenBankPaymentOfferDetails={openBankPaymentOfferDetails}
-              onOpenSharedListing={openSharedListing}
-              ownPubkey={chatOwnPubkeyHex}
-              sharedListing={viewModel.sharedListing}
-              onDeclinePaymentRequest={onDeclinePaymentRequest}
-              onPayPaymentRequest={onPayPaymentRequest}
-              onSettleBankPaymentOffer={onSettleBankPaymentOffer}
-              canActOnPaymentRequest={viewModel.canActOnPaymentRequest}
-              payPaymentRequestDisabled={viewModel.payPaymentRequestDisabled}
-              payPaymentRequestBusy={
-                viewModel.paymentRequestInfo ? cashuIsBusy : false
-              }
-              replyQuoteText={viewModel.replyQuoteText}
-              settleBankPaymentOfferBusy={
-                viewModel.bankPaymentOfferInfo ? cashuIsBusy : false
-              }
-              onCopy={onCopy}
-              onDelete={onDelete}
-              onAddNpubContacts={onAddNpubContacts}
-              contactsGroupAssignment={contactsGroupAssignment}
-              onEdit={onEdit}
-              onOpenNpubContact={onOpenNpubContact}
-              onReact={onReact}
-              onReply={onReply}
-              chatPendingLabel={chatPendingLabel}
-              chatSeenLabel={chatSeenLabel}
-              isSeen={viewModel.isSeen}
-              messageElRef={messageElRef}
-            />
-          ))
-        )}
+        <Stack
+          ref={contentNodeRef}
+          // A short conversation sits just above the composer.
+          flexGrow={1}
+          justifyContent="flex-end"
+          width="100%"
+          maxWidth="$contentWidth"
+          alignSelf="center"
+          gap="$xxs"
+          paddingTop="$lg"
+          paddingBottom="$md"
+        >
+          {viewModels.length === 0 ? (
+            <EmptyState title={t("chatEmpty")} />
+          ) : (
+            viewModels.map((viewModel) => (
+              <ChatMessage
+                key={viewModel.message.id}
+                message={viewModel.message}
+                previousMessage={viewModel.previousMessage}
+                nextMessage={viewModel.nextMessage}
+                locale={locale}
+                formatChatDayLabel={formatChatDayLabelForLang}
+                getCashuTokenMessageInfo={
+                  viewModel.hasCashuText
+                    ? getCashuTokenMessageInfo
+                    : noTokenInfo
+                }
+                getMintIconUrl={
+                  viewModel.hasCashuText ? getMintIconUrl : noMintIcon
+                }
+                getNpubMessageContactInfo={
+                  viewModel.hasNpubText ? getNpubMessageContactInfo : noNpubInfo
+                }
+                onMintIconError={markMintIconFailed}
+                actionLabels={actionLabels}
+                canDelete={viewModel.canDelete}
+                canEdit={viewModel.canEdit}
+                canReplyOrReact={viewModel.canReplyOrReact}
+                reactions={viewModel.reactions}
+                paymentRequestInfo={viewModel.paymentRequestInfo}
+                paymentRequestStatus={viewModel.paymentRequestStatus}
+                declineInfo={viewModel.declineInfo}
+                bankPaymentOfferInfo={viewModel.bankPaymentOfferInfo}
+                bankPaymentOfferPeerNotice={
+                  viewModel.bankPaymentOfferPeerNotice
+                }
+                canOpenBankPaymentOfferDetails={canOpenBankPaymentOfferDetails}
+                canSettleBankPaymentOffer={viewModel.canSettleBankPaymentOffer}
+                onOpenBankPaymentOfferDetails={openBankPaymentOfferDetails}
+                onOpenSharedListing={openSharedListing}
+                ownPubkey={chatOwnPubkeyHex}
+                sharedListing={viewModel.sharedListing}
+                onDeclinePaymentRequest={onDeclinePaymentRequest}
+                onPayPaymentRequest={onPayPaymentRequest}
+                onSettleBankPaymentOffer={onSettleBankPaymentOffer}
+                canActOnPaymentRequest={viewModel.canActOnPaymentRequest}
+                payPaymentRequestDisabled={viewModel.payPaymentRequestDisabled}
+                payPaymentRequestBusy={
+                  viewModel.paymentRequestInfo ? cashuIsBusy : false
+                }
+                replyQuoteText={viewModel.replyQuoteText}
+                settleBankPaymentOfferBusy={
+                  viewModel.bankPaymentOfferInfo ? cashuIsBusy : false
+                }
+                onCopy={onCopy}
+                onDelete={onDelete}
+                onAddNpubContacts={onAddNpubContacts}
+                contactsGroupAssignment={contactsGroupAssignment}
+                onEdit={onEdit}
+                onOpenNpubContact={onOpenNpubContact}
+                onReact={onReact}
+                onReply={onReply}
+                chatPendingLabel={chatPendingLabel}
+                chatSeenLabel={chatSeenLabel}
+                isSeen={viewModel.isSeen}
+                messageElRef={messageElRef}
+              />
+            ))
+          )}
+        </Stack>
       </Stack>
+      <ScrollToLatestButton
+        chatMessagesRef={chatMessagesRef}
+        label={t("chatScrollToLatest")}
+      />
     </Stack>
   );
 });

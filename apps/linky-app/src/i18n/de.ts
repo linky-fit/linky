@@ -554,6 +554,7 @@ export const de = {
   chatQueued: "Zum Senden vorgemerkt.",
   chatPendingShort: "ausstehend",
   chatSeenShort: "gelesen",
+  chatScrollToLatest: "Zur neuesten Nachricht",
   chatImageAttach: "Bild oder PDF hinzufügen",
   chatMenuAttach: "Anhang",
   chatMoreActions: "Weitere Aktionen",
