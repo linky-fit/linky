@@ -195,6 +195,44 @@ describe("OutboxStore.fromStringStorage", () => {
     run(store.insert(makeJob("job-1")));
     expect(run(store.loadAll)).toHaveLength(1);
   });
+
+  it("skips corrupt entries instead of dropping valid queued jobs", () => {
+    const storage = stubStorage();
+    const writer = buildStore(
+      OutboxStore.fromStringStorage(storage, storageKey),
+    );
+    run(writer.insert(makeJob("job-1")));
+    run(writer.insert(makeJob("job-2")));
+
+    const persisted = Schema.decodeUnknownSync(Schema.Array(Schema.Unknown))(
+      JSON.parse(storage.map.get(storageKey) ?? "[]"),
+    );
+    storage.map.set(
+      storageKey,
+      JSON.stringify([
+        persisted[0],
+        { jobId: "broken", operation: { _tag: "unknown" } },
+        null,
+        persisted[1],
+      ]),
+    );
+
+    const rebuilt = buildStore(
+      OutboxStore.fromStringStorage(storage, storageKey),
+    );
+    const loaded = run(rebuilt.loadAll);
+    expect(loaded.map((job) => job.jobId)).toEqual(["job-1", "job-2"]);
+  });
+
+  it("treats a non-array JSON value as empty", () => {
+    const storage = stubStorage();
+    storage.map.set(storageKey, JSON.stringify({ not: "an array" }));
+
+    const store = buildStore(
+      OutboxStore.fromStringStorage(storage, storageKey),
+    );
+    expect(run(store.loadAll)).toEqual([]);
+  });
 });
 
 describe("OutboxStore.inMemory", () => {
