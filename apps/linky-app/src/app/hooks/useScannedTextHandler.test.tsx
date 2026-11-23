@@ -74,6 +74,9 @@ const setup = async ({
     .fn<(invoice: string) => Promise<boolean>>()
     .mockResolvedValue(true);
   const requestLightningInvoiceConfirmation = vi.fn();
+  const saveCashuFromText = vi
+    .fn<ScanParams["saveCashuFromText"]>()
+    .mockResolvedValue(undefined);
   const insertContact = vi.fn<ScanParams["contactsRepository"]["insert"]>(
     () => Effect.void,
   );
@@ -87,7 +90,8 @@ const setup = async ({
       contacts,
       contactsRepository: { insert: insertContact },
       currentNpub,
-      extractCashuTokenFromText: () => null,
+      extractCashuTokenFromText: (text) =>
+        text.startsWith("cashu") ? text : null,
       lightningInvoiceAutoPayLimit: autoPayLimit,
       onchainSendEnabled,
       onContactIdentifierScanned: null,
@@ -99,7 +103,7 @@ const setup = async ({
       requestLnurlWithdrawConfirmation,
       requestLinkauthLogin,
       requestSiteLoginConfirmation,
-      saveCashuFromText: async () => undefined,
+      saveCashuFromText,
       scanAcceptsBankPayment: false,
       scanEntryPoint,
       setStatus,
@@ -120,12 +124,16 @@ const setup = async ({
   unmounts.push(rendered.unmount);
 
   return {
-    handle: async (text: string) => {
+    handle: async (
+      text: string,
+      entryPoint?: Parameters<ScannedTextHandler>[1],
+    ) => {
       const handle = handlerRef.current;
       if (!handle) throw new Error("scan handler did not mount");
-      await act(async () => handle(text));
+      await act(async () => handle(text, entryPoint));
     },
     insertContact,
+    saveCashuFromText,
     setStatus,
     canPayCashuRequest,
     payCashuPaymentRequest,
@@ -334,6 +342,38 @@ describe("scanned Cashu requests", () => {
 
     expect(scan.payCashuPaymentRequest).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({ amount: 500 }),
+    );
+  });
+
+  it.each([
+    ["a Cashu payment request", cashuRequest(50)],
+    ["a BIP-321 Cashu request", `bitcoin:?creq=${cashuRequest(50)}`],
+    ["a Lightning invoice", lightningInvoice(50)],
+    ["a Lightning address", "alice@linky.fit"],
+  ])(
+    "rejects %s when called with a receive entry-point override",
+    async (_, payload) => {
+      const scan = await setup({ autoPayLimit: 1000, scanEntryPoint: null });
+      await scan.handle(payload, "receive");
+
+      expect(scan.setStatus).toHaveBeenCalledWith(
+        "scanReceiveUnsupportedPayment",
+      );
+      expect(scan.payCashuPaymentRequest).not.toHaveBeenCalled();
+      expect(scan.payLightningInvoiceWithCashu).not.toHaveBeenCalled();
+    },
+  );
+
+  it("still receives a Cashu token when called with a receive entry-point override", async () => {
+    const scan = await setup({ scanEntryPoint: null });
+    await scan.handle("cashuBo2FtdQ", "receive");
+
+    expect(scan.saveCashuFromText).toHaveBeenCalledExactlyOnceWith(
+      "cashuBo2FtdQ",
+      { navigateToWallet: true },
+    );
+    expect(scan.setStatus).not.toHaveBeenCalledWith(
+      "scanReceiveUnsupportedPayment",
     );
   });
 });

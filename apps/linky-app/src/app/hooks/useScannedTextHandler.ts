@@ -36,6 +36,7 @@ import {
 } from "../lib/paymentRequestMessage";
 import { onchainPayoutTarget } from "../lib/onchainTransfers";
 import { runWrite } from "../lib/storeWrite";
+import type { ScanEntryPoint } from "../state/shell/scan";
 import type { ContactRowLike } from "../types/appTypes";
 import type { Translate } from "../../i18n";
 import type { SiteLoginRequest } from "../../siteLogin";
@@ -74,7 +75,7 @@ interface UseScannedTextHandlerParams<TContact extends ContactRowLike> {
     options?: { navigateToTokens?: boolean; navigateToWallet?: boolean },
   ) => Promise<void>;
   scanAcceptsBankPayment: boolean;
-  scanEntryPoint: "contacts" | "receive" | "send" | null;
+  scanEntryPoint: ScanEntryPoint | null;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   t: Translate;
 }
@@ -104,15 +105,16 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
   t,
 }: UseScannedTextHandlerParams<TContact>) => {
   return React.useCallback(
-    async (rawValue: string) => {
+    async (rawValue: string, entryPoint?: ScanEntryPoint) => {
       const raw = rawValue.trim();
       if (!raw) return;
+      const activeEntryPoint = entryPoint ?? scanEntryPoint;
 
       /** Opens the on-chain send for a bitcoin address; false when `text` names none. */
       const openOnchainSend = (text: string): boolean => {
         const target = onchainSendEnabled ? onchainPayoutTarget(text) : null;
         if (target === null) return false;
-        if (scanEntryPoint === "receive") {
+        if (activeEntryPoint === "receive") {
           setStatus(t("scanReceiveUnsupportedPayment"));
         } else {
           navigateTo({
@@ -169,7 +171,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
       }
 
       if (isBankPaymentPayload(scanText)) {
-        if (scanEntryPoint === "receive") {
+        if (activeEntryPoint === "receive") {
           setStatus(t("scanReceiveUnsupportedPayment"));
           closeScan();
           return;
@@ -211,7 +213,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
         parseCashuPaymentRequestMessage(scanText) ??
         parseCashuPaymentRequestMessage(raw);
       if (cashuPaymentRequest) {
-        if (scanEntryPoint === "receive") {
+        if (activeEntryPoint === "receive") {
           setStatus(t("scanReceiveUnsupportedPayment"));
           closeScan();
           return;
@@ -262,7 +264,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
             return;
           }
 
-          if (scanEntryPoint === "contacts" && onContactIdentifierScanned) {
+          if (activeEntryPoint === "contacts" && onContactIdentifierScanned) {
             await onContactIdentifierScanned(npub);
             closeScan();
             return;
@@ -290,7 +292,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
       const maybeLnAddress = normalized.trim();
       const isLnAddress = isLightningAddress(maybeLnAddress);
       if (isLnAddress) {
-        if (scanEntryPoint === "receive") {
+        if (activeEntryPoint === "receive") {
           setStatus(t("scanReceiveUnsupportedPayment"));
           closeScan();
           return;
@@ -329,7 +331,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
       }
 
       if (isLnurlPayTarget(maybeLnAddress)) {
-        if (scanEntryPoint === "receive") {
+        if (activeEntryPoint === "receive") {
           setStatus(t("scanReceiveUnsupportedPayment"));
           closeScan();
           return;
@@ -341,7 +343,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
       }
 
       if (/^(lnbc|lntb|lnbcrt)/i.test(normalized)) {
-        if (scanEntryPoint === "receive") {
+        if (activeEntryPoint === "receive") {
           setStatus(t("scanReceiveUnsupportedPayment"));
           closeScan();
           return;

@@ -36,7 +36,7 @@ export const TopupPage: FC = () => {
   });
   const pasteAmountOrScanValue = async () => {
     if (await amountInput.pasteFromClipboard()) return;
-    await pasteScanValue();
+    await pasteScanValue("receive");
   };
 
   return (

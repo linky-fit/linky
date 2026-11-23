@@ -62,7 +62,7 @@ export interface ScanCommands {
   readonly cycleScanCamera: () => void;
   readonly onPickScanImage: () => void;
   /** Handles clipboard text as if it had been scanned. */
-  readonly pasteScanValue: () => Promise<void>;
+  readonly pasteScanValue: (entryPoint?: ScanEntryPoint) => Promise<void>;
   /** Handles typed text as if it had been scanned. */
   readonly handleScannedText: (text: string) => Promise<void>;
 }

@@ -8,6 +8,7 @@ import {
   scanEntryPointAtom,
   scanIsOpenAtom,
   scanVideoRefAtom,
+  type ScanEntryPoint,
 } from "../../state/shell/scan";
 import { useOpenNewContactPage } from "../contacts/useContactActions";
 
@@ -24,7 +25,8 @@ export const useScanCommands = () => {
       openReceiveScan: () => commands?.read().openReceiveScan(),
       openScan: () => commands?.read().openScan(),
       openWalletScan: () => commands?.read().openWalletScan(),
-      pasteScanValue: async () => commands?.read().pasteScanValue(),
+      pasteScanValue: async (entryPoint?: ScanEntryPoint) =>
+        commands?.read().pasteScanValue(entryPoint),
     }),
     [commands],
   );
