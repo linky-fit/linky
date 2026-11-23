@@ -334,37 +334,46 @@ describe("buildTopbarRight", () => {
   const rightArgs = {
     chatEditContactId: null,
     deleteEditedContact: vi.fn(),
+    isProfileEditing: false,
     openContactScan: vi.fn(),
     openReceiveScan: vi.fn(),
     openWalletScan: vi.fn(),
     t,
   };
 
-  it("opens the contact scanner from contacts and omits it from profile", () => {
+  it("opens the contact scanner from contacts and profile (hidden while editing)", () => {
     const openContactScan = vi.fn();
     const openWalletScan = vi.fn();
-    const button = buildTopbarRight({
-      ...rightArgs,
-      openContactScan,
-      openWalletScan,
-      route: { kind: "contacts" },
-    });
-    button?.onClick();
-    expect(button).toMatchObject({ icon: "ScanLine", label: "scan" });
-    expect(openContactScan).toHaveBeenCalledOnce();
+    for (const kind of ["contacts", "profile"] as const) {
+      const button = buildTopbarRight({
+        ...rightArgs,
+        openContactScan,
+        openWalletScan,
+        route: { kind },
+      });
+      button?.onClick();
+      expect(button).toMatchObject({ icon: "ScanLine", label: "scan" });
+    }
+    expect(openContactScan).toHaveBeenCalledTimes(2);
     expect(openWalletScan).not.toHaveBeenCalled();
     expect(
       buildTopbarRight({
         ...rightArgs,
+        isProfileEditing: true,
         route: { kind: "profile" },
       }),
     ).toBeNull();
   });
 
-  it("opens the payment scanner from wallet and collaboration only", () => {
+  it("opens the payment scanner from wallet, collaboration, proxyPayments, settings, and topup", () => {
     const openContactScan = vi.fn();
     const openWalletScan = vi.fn();
-    for (const kind of ["wallet", "collaboration"] as const) {
+    for (const kind of [
+      "wallet",
+      "collaboration",
+      "proxyPayments",
+      "settings",
+    ] as const) {
       const button = buildTopbarRight({
         ...rightArgs,
         openContactScan,
@@ -375,17 +384,8 @@ describe("buildTopbarRight", () => {
       expect(button).toMatchObject({ icon: "ScanLine", label: "scan" });
     }
 
-    expect(openWalletScan).toHaveBeenCalledTimes(2);
+    expect(openWalletScan).toHaveBeenCalledTimes(4);
     expect(openContactScan).not.toHaveBeenCalled();
-
-    for (const kind of ["proxyPayments", "settings"] as const) {
-      expect(
-        buildTopbarRight({
-          ...rightArgs,
-          route: { kind },
-        }),
-      ).toBeNull();
-    }
 
     const openReceiveScan = vi.fn();
     const topupButton = buildTopbarRight({

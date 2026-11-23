@@ -104,6 +104,7 @@ export const useTopbar = () => {
     deleteEditedContact: () => {
       if (route.kind === "contactEdit") void deleteContact(route.id);
     },
+    isProfileEditing,
     openContactScan: openScan,
     openReceiveScan,
     openWalletScan,

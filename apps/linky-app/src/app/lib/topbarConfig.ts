@@ -38,6 +38,7 @@ interface BuildTopbarLeadingArgs {
 interface BuildTopbarRightArgs {
   chatEditContactId: ContactId | null;
   deleteEditedContact: () => void;
+  isProfileEditing: boolean;
   /** Opens the scanner for a contact's code. */
   openContactScan: () => void;
   openReceiveScan: () => void;
@@ -296,17 +297,26 @@ export const buildTopbarLeading = ({
 export const buildTopbarRight = ({
   chatEditContactId,
   deleteEditedContact,
+  isProfileEditing,
   openContactScan,
   openReceiveScan,
   openWalletScan,
   route,
   t,
 }: BuildTopbarRightArgs): TopbarButton | null => {
-  if (route.kind === "contacts") {
+  // Every root screen opens the scanner on the right. The profile and the
+  // contacts read a contact's code; the others read payments as well.
+  if (route.kind === "contacts" || route.kind === "profile") {
+    if (isProfileEditing && route.kind === "profile") return null;
     return { icon: "ScanLine", label: t("scan"), onClick: openContactScan };
   }
 
-  if (route.kind === "wallet" || route.kind === "collaboration") {
+  if (
+    route.kind === "wallet" ||
+    route.kind === "collaboration" ||
+    route.kind === "proxyPayments" ||
+    route.kind === "settings"
+  ) {
     return { icon: "ScanLine", label: t("scan"), onClick: openWalletScan };
   }
 
