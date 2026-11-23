@@ -27,12 +27,6 @@ export const formatDateTime = (sec: number): string =>
     timeStyle: "short",
   }).format(sec * 1000);
 
-export const formatTime = (sec: number): string =>
-  new Intl.DateTimeFormat(LOCALE, {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(sec * 1000);
-
 /** A user's key, e.g. "npub1abcd…wxyz". */
 export const shortNpub = (pubkey: Pubkey): string => {
   const npub = encodeNpub(pubkey);

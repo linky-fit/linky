@@ -99,7 +99,7 @@ export const useIssueResolutions = (store: TrackerStore) => {
     readonly store: TrackerStore;
     readonly evolu: TrackerEvolu;
   } | null>(null);
-  const [loadFailed, setLoadFailed] = useState(false);
+  const [failedStore, setFailedStore] = useState<TrackerStore | null>(null);
   useEffect(() => {
     let active = true;
     void store.evolu
@@ -108,13 +108,14 @@ export const useIssueResolutions = (store: TrackerStore) => {
         if (active) setLoaded({ store, evolu });
       })
       .catch(() => {
-        if (active) setLoadFailed(true);
+        if (active) setFailedStore(store);
       });
     return () => {
       active = false;
     };
   }, [store]);
-  const evolu = loaded?.evolu ?? null;
+  const evolu = loaded?.store === store ? loaded.evolu : null;
+  const loadFailed = failedStore === store;
   const rows = useSyncExternalStore(
     useMemo(
       () => (evolu ? evolu.subscribeQuery(query) : () => () => {}),

@@ -24,15 +24,13 @@ export const createWatcherAlerts =
     if (watchers.includes(user)) return;
     const text = MessageText.make(watcherAlertText(alert, encodeNpub(user)));
     await Promise.all(
-      watchers
-        .filter((watcher) => watcher !== user)
-        .map(async (watcher) => {
-          const clientId = ClientId.make(createId());
-          await nostr
-            .sendText(watcher, text, clientId, `${WATCHER_REF}${clientId}`)
-            .catch((error: unknown) => {
-              console.warn("[onchain-operator] watcher not alerted", error);
-            });
-        }),
+      watchers.map(async (watcher) => {
+        const clientId = ClientId.make(createId());
+        await nostr
+          .sendText(watcher, text, clientId, `${WATCHER_REF}${clientId}`)
+          .catch((error: unknown) => {
+            console.warn("[onchain-operator] watcher not alerted", error);
+          });
+      }),
     );
   };

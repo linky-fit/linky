@@ -71,7 +71,7 @@ jobs:
           else
             # Linky's release stays the repository's latest.
             gh release create "$RELEASE_TAG" \
-              --title "Fazole $RELEASE_TAG" \
+              --title "Fazole ${RELEASE_TAG#fazole-}" \
               --notes-file "$RUNNER_TEMP/release-notes.md" \
               --target "$RELEASE_SHA" \
               --latest=false

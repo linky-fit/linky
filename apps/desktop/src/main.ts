@@ -49,8 +49,17 @@ const hideWindow = () => {
   app.dock?.hide();
 };
 
+const parseUrl = (url: string): URL | null => {
+  try {
+    return new URL(url);
+  } catch {
+    return null;
+  }
+};
+
 const openExternally = (url: string) => {
-  if (externalProtocols.has(new URL(url).protocol)) {
+  const parsed = parseUrl(url);
+  if (parsed && externalProtocols.has(parsed.protocol)) {
     void shell.openExternal(url);
   }
 };
@@ -87,7 +96,7 @@ const createWindow = () => {
     return { action: "deny" };
   });
   window.webContents.on("will-navigate", (event, url) => {
-    if (new URL(url).origin === appUrl.origin) return;
+    if (parseUrl(url)?.origin === appUrl.origin) return;
     event.preventDefault();
     openExternally(url);
   });
@@ -185,7 +194,7 @@ const start = () => {
 
   session.defaultSession.setPermissionRequestHandler(
     (_webContents, _permission, callback, { requestingUrl }) => {
-      callback(new URL(requestingUrl).origin === appUrl.origin);
+      callback(parseUrl(requestingUrl)?.origin === appUrl.origin);
     },
   );
 

@@ -13,6 +13,7 @@ import {
   SEEN_EVENT_RETENTION_MARGIN_MS,
   WRAP_LOOKBACK_SECONDS,
 } from "./config";
+import { hashSecret } from "./hashSecret";
 import { PushStorage } from "./storage";
 import type {
   PushNotificationData,
@@ -32,6 +33,7 @@ interface PushDelivery {
 }
 
 interface RelayWatcherOptions {
+  allowInsecureLocalhost?: boolean;
   relayUrls: string[];
   storage: PushStorage;
   pushDelivery: PushDelivery;
@@ -40,6 +42,7 @@ interface RelayWatcherOptions {
 const RECIPIENT_SYNC_INTERVAL_MS = 10_000;
 
 export class RelayWatcher {
+  private readonly allowInsecureLocalhost: boolean;
   private readonly relayUrls: ReadonlyArray<RelayUrl>;
   private readonly storage: PushStorage;
   private readonly pushDelivery: PushDelivery;
@@ -48,6 +51,7 @@ export class RelayWatcher {
   private recipientsKey = "";
 
   constructor(options: RelayWatcherOptions) {
+    this.allowInsecureLocalhost = options.allowInsecureLocalhost ?? false;
     this.relayUrls = options.relayUrls.map((url) => RelayUrl.make(url));
     this.storage = options.storage;
     this.pushDelivery = options.pushDelivery;
@@ -62,8 +66,7 @@ export class RelayWatcher {
       {
         readRelays: this.relayUrls,
         recipients: [],
-        allowInsecureLocalhost:
-          process.env.PUSH_ALLOW_INSECURE_LOCALHOST_RELAYS === "1",
+        allowInsecureLocalhost: this.allowInsecureLocalhost,
         lookbackSeconds: WRAP_LOOKBACK_SECONDS,
         onInvalidWrap: (failure) =>
           console.warn(`[push] invalid push wrap failure=${failure}`),
@@ -118,6 +121,7 @@ export class RelayWatcher {
 
   async handleDelivered({ delivery, wrap }: DeliveredPushWrap): Promise<void> {
     const recipient = wrap.recipient;
+    const recipientHash = hashSecret(recipient);
     const subscriptions =
       this.storage.getSubscriptionsForPubkeys([recipient]).get(recipient) ?? [];
     const nativeSubscriptions =
@@ -126,14 +130,14 @@ export class RelayWatcher {
         .get(recipient) ?? [];
     if (subscriptions.length === 0 && nativeSubscriptions.length === 0) {
       console.debug(
-        `[push] skipped event without matching subscriptions id=${wrap.wrapId} recipient=${recipient}`,
+        `[push] skipped event without matching subscriptions id=${wrap.wrapId} recipient=${recipientHash}`,
       );
       return;
     }
 
     if (delivery === "backfill") {
       console.debug(
-        `[push] suppressed historical gift wrap id=${wrap.wrapId} recipient=${recipient}`,
+        `[push] suppressed historical gift wrap id=${wrap.wrapId} recipient=${recipientHash}`,
       );
       return;
     }
@@ -145,10 +149,10 @@ export class RelayWatcher {
     }
 
     console.debug(
-      `[push] observed gift wrap id=${wrap.wrapId} recipient=${recipient} createdAt=${wrap.createdAt}`,
+      `[push] observed gift wrap id=${wrap.wrapId} recipient=${recipientHash} createdAt=${wrap.createdAt}`,
     );
     console.debug(
-      `[push] delivering gift wrap id=${wrap.wrapId} recipient=${recipient} webSubscriptions=${subscriptions.length} nativeSubscriptions=${nativeSubscriptions.length}`,
+      `[push] delivering gift wrap id=${wrap.wrapId} recipient=${recipientHash} webSubscriptions=${subscriptions.length} nativeSubscriptions=${nativeSubscriptions.length}`,
     );
     const payloadData: PushNotificationData = {
       type: "nostr_inbox",
@@ -165,7 +169,7 @@ export class RelayWatcher {
           .deliverWeb(subscription, payloadData)
           .catch((error) => {
             console.warn(
-              `[push] failed to deliver ${wrap.wrapId} to ${recipient}`,
+              `[push] failed to deliver ${wrap.wrapId} to ${recipientHash}`,
               error instanceof Error ? error.message : "Unknown delivery error",
             );
           }),
@@ -177,8 +181,8 @@ export class RelayWatcher {
           .deliverNative(subscription, payloadData)
           .catch((error) => {
             console.warn(
-              `[push] failed to deliver native ${wrap.wrapId} to ${recipient}`,
-              error,
+              `[push] failed to deliver native ${wrap.wrapId} to ${recipientHash}`,
+              error instanceof Error ? error.message : "Unknown delivery error",
             );
           }),
       );

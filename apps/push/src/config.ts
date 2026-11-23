@@ -16,6 +16,7 @@ export interface PushServiceConfig {
   vapidPrivateKey: string;
   firebaseServiceAccountJson: string | null;
   defaultRelays: string[];
+  allowInsecureLocalhostRelays: boolean;
   corsOrigins: string[];
   trustedProxyIps: string[];
   challengeTtlMs: number;
@@ -177,6 +178,8 @@ export function loadConfig(
       "PUSH_FIREBASE_SERVICE_ACCOUNT_JSON",
     ),
     defaultRelays: readRelayList(env),
+    allowInsecureLocalhostRelays:
+      env.PUSH_ALLOW_INSECURE_LOCALHOST_RELAYS === "1",
     corsOrigins: readCorsOrigins(env),
     trustedProxyIps: (env.PUSH_TRUSTED_PROXY_IPS ?? "")
       .split(",")

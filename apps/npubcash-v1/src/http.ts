@@ -37,11 +37,15 @@ const routes: Record<string, Handler> = {
   },
   "PUT /api/v1/info/mint": async ({ db }, pubkey, request) => {
     const body = await readBody(request, decodeMintRequest);
-    if (!body?.mintUrl || !URL.canParse(body.mintUrl)) {
+    const parsed = body?.mintUrl ? URL.parse(body.mintUrl) : null;
+    if (
+      !parsed ||
+      (parsed.protocol !== "http:" && parsed.protocol !== "https:")
+    ) {
       return failure(400, "Invalid URL");
     }
     // Old apps refuse to change the default mint when this fails.
-    await db.setMint(pubkey, new URL(body.mintUrl).toString());
+    await db.setMint(pubkey, parsed.toString());
     return new Response(null, {
       status: 204,
       headers: { "Access-Control-Allow-Origin": "*" },
