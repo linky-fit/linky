@@ -62,7 +62,7 @@ describe("appOwnerFromMnemonic", () => {
 });
 
 describe("linkyIndexes", () => {
-  it("adds only the proof query indexes and leaves id indexes to Evolu 8", () => {
+  it("adds only the targeted query indexes and leaves id indexes to Evolu 8", () => {
     expect(
       evoluSchemaToSqliteSchema(LinkyEvoluSchema, linkyIndexes).indexes.map(
         (index) => index.sql,
@@ -71,6 +71,7 @@ describe("linkyIndexes", () => {
       'create index "cashuProofState" on "cashuProof" ("state")',
       'create index "cashuProofOperationId" on "cashuProof" ("operationId")',
       'create index "cashuProofKeysetCreatedSecond" on "cashuProof" ("keysetId", substr("createdAt", 1, 19), "mint")',
+      'create index "historyTable" on "evolu_history" ("table")',
     ]);
   });
 });

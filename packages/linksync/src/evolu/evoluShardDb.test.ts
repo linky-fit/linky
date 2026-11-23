@@ -1,31 +1,70 @@
 import {
+  AppName,
+  createEvolu,
   createIdFromString,
+  createRun,
   createStore,
   createUnknownError,
+  createWorker,
+  createXChaCha20Poly1305,
   deriveShardOwner,
   err,
+  FiniteNumber,
   Millis,
   Name,
   ok,
   ownerIdToOwnerIdBytes,
   PositiveInt,
   sqliteQueryStringToSqliteQuery,
+  testCreateBroadcastChannel,
   testCreateDeps,
+  testCreateMessageChannel,
+  testCreateMessagePort,
+  testCreateTime,
+  waitForAbort,
+  WebSocketUrlFromString,
+  type CreateWebSocket,
   type DeleteOwnerError,
+  type LockManagerDep,
+  type MessagePort,
   type MutationOptions,
   type OwnerId,
   type Result,
   type Row,
   type ShardOwner,
+  type SharedWorker,
+  type SharedWorkerSelf,
+  type SqliteDriver,
+  type SqliteQuery,
+  type SqliteQueryParameters,
+  type SqliteRow,
+  type SqliteValue,
 } from "@evolu/common";
 import {
+  Counter,
+  createEvoluDeps,
   createInitialTimestamp,
+  createProtocolBroadcastMessagesFromCrdtMessages,
+  createTimestamp,
+  DbChange,
   evoluSchemaToSqliteSchema,
+  initSharedWorker,
+  startDbWorker,
+  type DbWorkerInit,
+  type SharedWorkerInput,
+  type SharedWorkerOutput,
   type SyncRoute,
   type SyncState,
 } from "@evolu/common/local-first";
+import { installPolyfills } from "@evolu/common/polyfills";
 import { Effect } from "effect";
-import { DatabaseSync } from "node:sqlite";
+import {
+  DatabaseSync,
+  type SQLInputValue,
+  type StatementSync,
+} from "node:sqlite";
+
+installPolyfills();
 import { testAppOwner } from "../testing/toy";
 import {
   createEvoluShardDb,
@@ -747,5 +786,852 @@ describe("evolu shard db filtered reads over SQLite", () => {
     );
 
     expect(rows.map((row) => row.mint)).toEqual(["https://a.example"]);
+  });
+});
+
+const createInMemoryLockManager = (): LockManagerDep["lockManager"] => {
+  const held = new Map<string, Promise<void>>();
+  const request: LockManagerDep["lockManager"]["request"] = async <T>(
+    lockName: string,
+    optionsOrCallback: LockOptions | ((lock: Lock | null) => Promise<T> | T),
+    maybeCallback?: (lock: Lock | null) => Promise<T> | T,
+  ): Promise<T> => {
+    const options =
+      typeof optionsOrCallback === "function" ? {} : optionsOrCallback;
+    const callback =
+      typeof optionsOrCallback === "function"
+        ? optionsOrCallback
+        : maybeCallback;
+    if (!callback) throw new Error("Missing lock callback");
+    if (options.ifAvailable && held.has(lockName)) return callback(null);
+    while (held.has(lockName)) {
+      const waiting = held.get(lockName);
+      if (!waiting) break;
+      if (options.signal?.aborted)
+        throw options.signal.reason ?? new Error("Lock request aborted");
+      await new Promise<void>((resolve, reject) => {
+        const signal = options.signal;
+        const onAbort = () =>
+          reject(signal?.reason ?? new Error("Lock request aborted"));
+        signal?.addEventListener("abort", onAbort, { once: true });
+        void waiting.then(() => {
+          signal?.removeEventListener("abort", onAbort);
+          resolve();
+        });
+      });
+    }
+    if (options.signal?.aborted)
+      throw options.signal.reason ?? new Error("Lock request aborted");
+    let release!: () => void;
+    const promise = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    held.set(lockName, promise);
+    try {
+      return await callback({
+        name: lockName,
+        mode: options.mode ?? "exclusive",
+      });
+    } finally {
+      held.delete(lockName);
+      release();
+    }
+  };
+  return {
+    request,
+    query: () =>
+      Promise.resolve({
+        held: [...held.keys()].map((heldName) => ({
+          name: heldName,
+          mode: "exclusive" as const,
+        })),
+        pending: [],
+      }),
+  };
+};
+
+const toSqliteInput = (value: SqliteValue): SQLInputValue => value;
+
+const toSqliteRow = (record: Record<string, unknown>): SqliteRow => {
+  const row: Record<string, SqliteValue> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (
+      value === null ||
+      typeof value === "string" ||
+      value instanceof Uint8Array
+    ) {
+      row[key] = value;
+    } else if (typeof value === "number") {
+      row[key] = FiniteNumber.orThrow(value);
+    } else if (typeof value === "bigint") {
+      row[key] = FiniteNumber.orThrow(Number(value));
+    }
+  }
+  return row;
+};
+
+const runStatement = (
+  statement: StatementSync,
+  parameters: SqliteQueryParameters,
+) => {
+  const bound = parameters.map(toSqliteInput);
+  if (statement.columns().length > 0) {
+    return {
+      rows: statement.all(...bound).map(toSqliteRow),
+      changes: 0,
+    };
+  }
+  const info = statement.run(...bound);
+  return { rows: [], changes: Number(info.changes) };
+};
+
+/**
+ * Minimal in-memory WebSocket relay that accepts injected binary Evolu protocol
+ * frames so tests can deliver real encrypted sync messages (including
+ * older-timestamp changes) through Evolu's `ApplySyncMessage` pipeline.
+ */
+const createInMemoryRelay = (): {
+  readonly createWebSocket: CreateWebSocket;
+  readonly deliver: (frame: Uint8Array) => void;
+} => {
+  const listeners = new Set<(data: ArrayBuffer) => void>();
+  return {
+    createWebSocket: (_url, options) => () => {
+      const receive = (data: ArrayBuffer) => {
+        options?.onMessage?.(data);
+      };
+      listeners.add(receive);
+      queueMicrotask(() => options?.onOpen?.());
+      return Promise.resolve(
+        ok({
+          send: () => ok(),
+          getReadyState: () => "open" as const,
+          isOpen: () => true,
+          reconnect: () => {},
+          [Symbol.dispose]: () => {
+            listeners.delete(receive);
+          },
+          [Symbol.asyncDispose]: () => {
+            listeners.delete(receive);
+            return Promise.resolve();
+          },
+        }),
+      );
+    },
+    deliver: (frame) => {
+      const buffer = new ArrayBuffer(frame.byteLength);
+      new Uint8Array(buffer).set(frame);
+      for (const listener of listeners) queueMicrotask(() => listener(buffer));
+    },
+  };
+};
+
+interface RealEvoluHarness {
+  readonly openInstance: (options: {
+    readonly appOwner: ReturnType<typeof testAppOwner>;
+    readonly withRelay?: boolean;
+  }) => Promise<{
+    readonly evolu: Parameters<typeof createEvoluShardDb>[0];
+    readonly db: ReturnType<typeof createEvoluShardDb>;
+    readonly rawSqlite: () => DatabaseSync;
+    readonly dispose: () => Promise<void>;
+  }>;
+  readonly dispose: () => Promise<void>;
+}
+
+/**
+ * Runs the real Evolu SharedWorker + DbWorker + `node:sqlite` stack in-process
+ * so subscription invalidation, query plans, sync messages, and `deleteOwner`
+ * execute against Evolu's actual runtime.
+ */
+const createRealEvoluHarness = (
+  options: {
+    readonly nowMs?: number;
+    readonly createWebSocket?: CreateWebSocket;
+  } = {},
+): RealEvoluHarness => {
+  const lockManager = createInMemoryLockManager();
+  const dbs = new Map<string, DatabaseSync>();
+  const runs: Array<AsyncDisposable> = [];
+  const createSqliteDriver = (dbName: Name) => () => {
+    let sqlite = dbs.get(dbName);
+    if (!sqlite) {
+      sqlite = new DatabaseSync(":memory:");
+      const db = sqlite;
+      db.function(
+        "evolu_skiplist_insert",
+        (ownerId: SQLInputValue, ts: SQLInputValue, level: SQLInputValue) => {
+          const result = db
+            .prepare(
+              `insert or ignore into "evolu_timestamp" ("ownerId", "t", "l") values (?, ?, ?)`,
+            )
+            .run(ownerId, ts, level);
+          return Number(result.changes > 0 ? 1 : 0);
+        },
+      );
+      db.function("evolu_skiplist_size", (ownerId: SQLInputValue) => {
+        const row = db
+          .prepare(
+            `select count(*) as size from "evolu_timestamp" where "ownerId" = ?`,
+          )
+          .get(ownerId);
+        return Number(row?.size ?? 0);
+      });
+      db.function(
+        "evolu_skiplist_timestamp_at",
+        (ownerId: SQLInputValue, index: SQLInputValue) => {
+          const row = db
+            .prepare(
+              `select "t" from "evolu_timestamp" where "ownerId" = ? order by "t" limit 1 offset ?`,
+            )
+            .get(ownerId, index);
+          const t = row?.t;
+          return t instanceof Uint8Array ? t : null;
+        },
+      );
+      dbs.set(dbName, sqlite);
+    }
+    const db = sqlite;
+    const driver: SqliteDriver = {
+      exec: (query: SqliteQuery) =>
+        runStatement(db.prepare(query.sql), query.parameters),
+      prepare: (sqlText) => {
+        const statement = db.prepare(sqlText);
+        return {
+          exec: (parameters) => runStatement(statement, parameters),
+          [Symbol.dispose]: () => {},
+        };
+      },
+      iterate: (query, onRow) => {
+        const statement = db.prepare(query.sql);
+        for (const row of statement.iterate(
+          ...query.parameters.map(toSqliteInput),
+        )) {
+          if (!onRow(toSqliteRow(row))) break;
+        }
+      },
+      deleteDatabase: () => {
+        dbs.delete(dbName);
+      },
+      export: () => new Uint8Array(),
+      [Symbol.dispose]: () => {},
+    };
+    return Promise.resolve(ok(driver));
+  };
+
+  const baseDeps = {
+    ...testCreateDeps(),
+    ...(options.nowMs === undefined
+      ? {}
+      : { time: testCreateTime({ startAt: Millis.orThrow(options.nowMs) }) }),
+    consoleStoreOutputEntry: createStore(null),
+  };
+  const relaySocket =
+    options.createWebSocket ?? createInMemoryRelay().createWebSocket;
+  type SwPort = MessagePort<SharedWorkerOutput, SharedWorkerInput>;
+  let swStarted = false;
+  let onConnectHandler: ((port: SwPort) => void) | null = null;
+  const pendingPorts: SwPort[] = [];
+  const swSelf: SharedWorkerSelf<SharedWorkerInput, SharedWorkerOutput> = {
+    get onConnect() {
+      return onConnectHandler;
+    },
+    set onConnect(fn) {
+      onConnectHandler = fn;
+      if (fn) for (const port of pendingPorts.splice(0)) fn(port);
+    },
+    [Symbol.dispose]: () => {
+      onConnectHandler = null;
+      pendingPorts.length = 0;
+    },
+  };
+  const connectSharedWorker = (): SharedWorker<
+    SharedWorkerInput,
+    SharedWorkerOutput
+  > => {
+    if (!swStarted) {
+      swStarted = true;
+      const swRun = createRun({
+        ...baseDeps,
+        createMessageChannel: testCreateMessageChannel,
+        createMessagePort: testCreateMessagePort,
+        createBroadcastChannel: testCreateBroadcastChannel,
+        createWebSocket: relaySocket,
+        lockManager,
+      });
+      runs.push(swRun);
+      void swRun(async (r) => {
+        await r.ok(initSharedWorker(swSelf));
+        return r(waitForAbort);
+      });
+    }
+    const channel = testCreateMessageChannel<
+      SharedWorkerInput,
+      SharedWorkerOutput
+    >();
+    if (onConnectHandler) onConnectHandler(channel.port2);
+    else pendingPorts.push(channel.port2);
+    return {
+      port: channel.port1,
+      [Symbol.dispose]: () => {
+        channel[Symbol.dispose]();
+      },
+    };
+  };
+
+  const createDbWorker = () =>
+    createWorker<DbWorkerInit>((self) => {
+      const dbRun = createRun({
+        ...baseDeps,
+        createSqliteDriver,
+        deleteDatabaseFiles: () => () => Promise.resolve(ok()),
+        createMessagePort: testCreateMessagePort,
+        createBroadcastChannel: testCreateBroadcastChannel,
+        lockManager,
+      });
+      runs.push(dbRun);
+      void dbRun(startDbWorker(self));
+    });
+
+  return {
+    openInstance: async ({ appOwner, withRelay = false }) => {
+      const deps = createEvoluDeps({
+        ...baseDeps,
+        createDbWorker,
+        createStoredWorker: connectSharedWorker,
+        createBroadcastChannel: testCreateBroadcastChannel,
+        createMessageChannel: testCreateMessageChannel,
+        getDevicePersistence: () => Promise.resolve("Persisted"),
+        lockManager,
+        reloadApp: () => {},
+      });
+      const instanceRun = createRun({ ...baseDeps, ...deps });
+      runs.push(instanceRun);
+      const transports = withRelay
+        ? [
+            {
+              type: "WebSocket" as const,
+              url: WebSocketUrlFromString.orThrow("wss://relay.example"),
+            },
+          ]
+        : [];
+      const evolu = await instanceRun.ok(
+        createEvolu(LinkyEvoluSchema, {
+          appName: AppName.orThrow("linky"),
+          appOwner,
+          indexes: linkyIndexes,
+          transports,
+        }),
+      );
+      const db = createEvoluShardDb(evolu, {
+        syncState: deps.syncState,
+        hasEvoluRelay: withRelay,
+      });
+      await Effect.runPromise(db.readTable("shardPointer"));
+      return {
+        evolu,
+        db,
+        rawSqlite: () => {
+          const sqlite = dbs.get(evolu.name);
+          if (!sqlite) throw new Error(`Missing sqlite db ${evolu.name}`);
+          return sqlite;
+        },
+        dispose: async () => {
+          await evolu[Symbol.asyncDispose]();
+          deps[Symbol.dispose]();
+        },
+      };
+    },
+    dispose: async () => {
+      await Promise.all(runs.map((r) => r[Symbol.asyncDispose]()));
+      for (const db of dbs.values()) db.close();
+      dbs.clear();
+    },
+  };
+};
+
+const waitFor = async (
+  predicate: () => boolean,
+  timeoutMs = 2000,
+): Promise<void> => {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate()) {
+    if (Date.now() > deadline)
+      throw new Error("Timed out waiting for condition");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+};
+
+describe("evolu shard db subscriptions over real Evolu SQLite", () => {
+  it("uses historyTable and table id indexes for the table-change digest", async () => {
+    const harness = createRealEvoluHarness();
+    try {
+      const appOwner = testAppOwner(11);
+      const instance = await harness.openInstance({ appOwner });
+      const subscribedSql: Array<{
+        readonly sql: string;
+        readonly parameters: SqliteQueryParameters;
+      }> = [];
+      const inspectingDb = createEvoluShardDb(
+        {
+          ...instance.evolu,
+          subscribeQuery: (query) => {
+            const parsed = sqliteQueryStringToSqliteQuery(query);
+            subscribedSql.push({
+              sql: parsed.sql,
+              parameters: parsed.parameters,
+            });
+            return instance.evolu.subscribeQuery(query);
+          },
+        },
+        { syncState: syncStore(), hasEvoluRelay: false },
+      );
+
+      const stop = inspectingDb.subscribe("message", () => {});
+      stop();
+
+      expect(subscribedSql).toHaveLength(1);
+      const [{ sql, parameters }] = subscribedSql;
+      expect(sql).not.toContain(`select * from "message"`);
+      const plan = instance
+        .rawSqlite()
+        .prepare(`explain query plan ${sql}`)
+        .all(...parameters.map(toSqliteInput))
+        .map((step) => String(step.detail));
+      expect(plan).toContainEqual(
+        expect.stringContaining("USING INDEX historyTable"),
+      );
+      expect(plan).toContainEqual(
+        expect.stringContaining("USING COVERING INDEX evolu_message_id"),
+      );
+      await instance.dispose();
+    } finally {
+      await harness.dispose();
+    }
+  });
+
+  it("notifies on insert, update, copy-forward, soft delete, and revive without firing unrelated tables or serving stale reads", async () => {
+    const harness = createRealEvoluHarness();
+    try {
+      const appOwner = testAppOwner(12);
+      const shard0 = deriveShardOwner(appOwner, ["contacts", 0]);
+      const shard1 = deriveShardOwner(appOwner, ["contacts", 1]);
+      const instance = await harness.openInstance({ appOwner });
+
+      let contactEvents = 0;
+      let messageEvents = 0;
+      const stopContact = instance.db.subscribe("contact", () => {
+        contactEvents += 1;
+      });
+      const stopMessage = instance.db.subscribe("message", () => {
+        messageEvents += 1;
+      });
+      await waitFor(() => contactEvents >= 1 && messageEvents >= 1);
+      contactEvents = 0;
+      messageEvents = 0;
+
+      const id = createIdFromString("contact/alice");
+      // Local insert
+      await Effect.runPromise(
+        instance.db.mutate([
+          {
+            kind: "upsert",
+            table: "contact",
+            owner: shard0,
+            row: { id, name: "Alice" },
+          },
+        ]),
+      );
+      expect(contactEvents).toBe(1);
+      expect(messageEvents).toBe(0);
+      expect(
+        (await Effect.runPromise(instance.db.readTable("contact"))).map(
+          (row) => [row.ownerId, row.name, row.isDeleted],
+        ),
+      ).toEqual([[shard0.id, "Alice", null]]);
+
+      // Local in-place update
+      await Effect.runPromise(
+        instance.db.mutate([
+          {
+            kind: "update",
+            table: "contact",
+            owner: shard0,
+            row: { id, name: "Alice 2" },
+          },
+        ]),
+      );
+      expect(contactEvents).toBe(2);
+      expect(messageEvents).toBe(0);
+      expect(
+        (await Effect.runPromise(instance.db.readTable("contact"))).map(
+          (row) => row.name,
+        ),
+      ).toEqual(["Alice 2"]);
+
+      // Copy-forward into shard 1 + tombstone in shard 0
+      await Effect.runPromise(
+        instance.db.mutate([
+          {
+            kind: "upsert",
+            table: "contact",
+            owner: shard1,
+            row: { id, name: "Alice 3" },
+          },
+          {
+            kind: "update",
+            table: "contact",
+            owner: shard0,
+            row: { id, isDeleted: true },
+          },
+        ]),
+      );
+      expect(contactEvents).toBe(3);
+      expect(messageEvents).toBe(0);
+      expect(
+        await Effect.runPromise(instance.db.readTable("contact")),
+      ).toHaveLength(2);
+
+      // Soft delete on shard 1
+      await Effect.runPromise(
+        instance.db.mutate([
+          {
+            kind: "update",
+            table: "contact",
+            owner: shard1,
+            row: { id, isDeleted: true },
+          },
+        ]),
+      );
+      expect(contactEvents).toBe(4);
+      expect(
+        (await Effect.runPromise(instance.db.readTable("contact"))).find(
+          (row) => row.ownerId === shard1.id,
+        )?.isDeleted,
+      ).toBe(1);
+
+      // Revive on shard 1
+      await Effect.runPromise(
+        instance.db.mutate([
+          {
+            kind: "upsert",
+            table: "contact",
+            owner: shard1,
+            row: { id, name: "Alice revived", isDeleted: false },
+          },
+        ]),
+      );
+      expect(contactEvents).toBe(5);
+      expect(messageEvents).toBe(0);
+      const revived = (
+        await Effect.runPromise(instance.db.readTable("contact"))
+      ).find((row) => row.ownerId === shard1.id);
+      expect(revived?.isDeleted).toBe(0);
+      expect(revived?.name).toBe("Alice revived");
+
+      stopContact();
+      stopMessage();
+      await instance.dispose();
+    } finally {
+      await harness.dispose();
+    }
+  });
+
+  it("notifies and refreshes reads when a synced change arrives with an older timestamp", async () => {
+    const relay = createInMemoryRelay();
+    const baseTime = 1_700_000_050_000;
+    const harness = createRealEvoluHarness({
+      nowMs: baseTime,
+      createWebSocket: relay.createWebSocket,
+    });
+    try {
+      const appOwner = testAppOwner(21);
+      const sharedShard = deriveShardOwner(appOwner, ["contacts", 0]);
+      const device = await harness.openInstance({
+        appOwner,
+        withRelay: true,
+      });
+      const unuse = device.db.useOwner(sharedShard);
+
+      const newerId = createIdFromString("contact/newer");
+      const olderId = createIdFromString("contact/older");
+      await Effect.runPromise(
+        device.db.mutate([
+          {
+            kind: "upsert",
+            table: "contact",
+            owner: sharedShard,
+            row: { id: newerId, name: "Newer" },
+          },
+        ]),
+      );
+      const [newerRow] = await Effect.runPromise(
+        device.db.readTable("contact"),
+      );
+      expect(newerRow?.name).toBe("Newer");
+
+      let contactEvents = 0;
+      const stop = device.db.subscribe("contact", () => {
+        contactEvents += 1;
+      });
+      await waitFor(() => contactEvents >= 1);
+      contactEvents = 0;
+
+      const protocolDeps = {
+        ...testCreateDeps(),
+        xChaCha20Poly1305: createXChaCha20Poly1305(),
+      };
+      // 1) Synced insert with a timestamp 30 seconds older than `newerRow`.
+      const olderInsertFrames = createProtocolBroadcastMessagesFromCrdtMessages(
+        protocolDeps,
+      )(sharedShard, [
+        {
+          timestamp: createTimestamp({
+            millis: Millis.orThrow(baseTime - 30_000),
+            counter: Counter.orThrow(0),
+          }),
+          change: DbChange.orThrow({
+            table: "contact",
+            id: olderId,
+            values: { name: "Older from sync" },
+            isInsert: true,
+            isDelete: false,
+          }),
+        },
+      ]);
+      for (const frame of olderInsertFrames) relay.deliver(frame);
+
+      await waitFor(() => contactEvents >= 1);
+      const afterInsert = await Effect.runPromise(
+        device.db.readTable("contact"),
+      );
+      const syncedOlder = afterInsert.find((row) => row.id === olderId);
+      expect(syncedOlder?.name).toBe("Older from sync");
+      expect(syncedOlder !== undefined && newerRow !== undefined).toBe(true);
+      if (syncedOlder && newerRow) {
+        expect(syncedOlder.createdAt < newerRow.createdAt).toBe(true);
+      }
+
+      // 2) Give `newerId` a non-null `updatedAt`, then deliver a synced update
+      // to `olderId` at a timestamp between `olderId.createdAt` and `newerRow`:
+      // row count, max(createdAt), and max(updatedAt) all stay fixed, yet the
+      // digest still fires.
+      await Effect.runPromise(
+        device.db.mutate([
+          {
+            kind: "update",
+            table: "contact",
+            owner: sharedShard,
+            row: { id: newerId, name: "Newer edited" },
+          },
+        ]),
+      );
+      await waitFor(() => contactEvents >= 2);
+      const readRawBounds = () =>
+        device
+          .rawSqlite()
+          .prepare(
+            `select count(*) as count, max("createdAt") as maxCreated, max("updatedAt") as maxUpdated from "contact"`,
+          )
+          .get();
+      const boundsBefore = readRawBounds();
+      expect(boundsBefore?.maxUpdated).not.toBeNull();
+
+      contactEvents = 0;
+      const olderUpdateFrames = createProtocolBroadcastMessagesFromCrdtMessages(
+        protocolDeps,
+      )(sharedShard, [
+        {
+          timestamp: createTimestamp({
+            millis: Millis.orThrow(baseTime - 20_000),
+            counter: Counter.orThrow(0),
+          }),
+          change: DbChange.orThrow({
+            table: "contact",
+            id: olderId,
+            values: { lnAddress: "older@example.com" },
+            isInsert: false,
+            isDelete: null,
+          }),
+        },
+      ]);
+      for (const frame of olderUpdateFrames) relay.deliver(frame);
+
+      await waitFor(() => contactEvents >= 1);
+      expect(readRawBounds()).toEqual(boundsBefore);
+      const afterUpdate = await Effect.runPromise(
+        device.db.readTable("contact"),
+      );
+      expect(afterUpdate.find((row) => row.id === olderId)?.lnAddress).toBe(
+        "older@example.com",
+      );
+
+      stop();
+      unuse();
+      await device.dispose();
+    } finally {
+      await harness.dispose();
+    }
+  });
+
+  it("notifies and drops cached rows on deleteOwner of an older shard and detects rowid reuse", async () => {
+    const harness = createRealEvoluHarness();
+    try {
+      const appOwner = testAppOwner(31);
+      const shard0 = deriveShardOwner(appOwner, ["messages", 0]);
+      const shard1 = deriveShardOwner(appOwner, ["messages", 1]);
+      const instance = await harness.openInstance({ appOwner });
+
+      const convId = createIdFromString("conv/1");
+      await Effect.runPromise(
+        instance.db.mutate([
+          {
+            kind: "upsert",
+            table: "message",
+            owner: shard0,
+            row: {
+              id: createIdFromString("msg/old"),
+              conversationId: convId,
+              direction: "in",
+              content: "old shard",
+              wrapId: "wrap-old",
+              createdAtSec: 1700000001,
+            },
+          },
+        ]),
+      );
+      await Effect.runPromise(
+        instance.db.mutate([
+          {
+            kind: "upsert",
+            table: "message",
+            owner: shard1,
+            row: {
+              id: createIdFromString("msg/new"),
+              conversationId: convId,
+              direction: "in",
+              content: "new shard",
+              wrapId: "wrap-new",
+              createdAtSec: 1700000002,
+            },
+          },
+          {
+            kind: "upsert",
+            table: "contact",
+            owner: shard1,
+            row: { id: createIdFromString("contact/keep"), name: "Keep" },
+          },
+        ]),
+      );
+      // Warm readTable cache before deleting shard0.
+      expect(
+        await Effect.runPromise(instance.db.readTable("message")),
+      ).toHaveLength(2);
+
+      let messageEvents = 0;
+      let contactEvents = 0;
+      const stopMessage = instance.db.subscribe("message", () => {
+        messageEvents += 1;
+      });
+      const stopContact = instance.db.subscribe("contact", () => {
+        contactEvents += 1;
+      });
+      await waitFor(() => messageEvents >= 1 && contactEvents >= 1);
+      messageEvents = 0;
+      contactEvents = 0;
+
+      // Deleting shard0 leaves shard1's higher rowid/timestamp intact; count drops 2 -> 1.
+      await Effect.runPromise(instance.db.deleteOwner(shard0));
+      await waitFor(() => messageEvents >= 1);
+      expect(contactEvents).toBe(0);
+      expect(
+        (await Effect.runPromise(instance.db.readTable("message"))).map(
+          (row) => row.content,
+        ),
+      ).toEqual(["new shard"]);
+
+      stopMessage();
+      stopContact();
+
+      // Test rowid reuse directly between two observed digests with the same count:
+      // clear the remaining owner so SQLite restarts evolu_history rowids at 1,
+      // write one message, snapshot the digest, delete and rewrite an equal-shape
+      // message, then compare digests without observing the empty intermediate state.
+      const capturedQueries: Array<{
+        readonly sql: string;
+        readonly parameters: SqliteQueryParameters;
+      }> = [];
+      const capturingDb = createEvoluShardDb(
+        {
+          ...instance.evolu,
+          subscribeQuery: (query) => {
+            const parsed = sqliteQueryStringToSqliteQuery(query);
+            capturedQueries.push({
+              sql: parsed.sql,
+              parameters: parsed.parameters,
+            });
+            return () => () => {};
+          },
+        },
+        { syncState: syncStore(), hasEvoluRelay: false },
+      );
+      capturingDb.subscribe("message", () => {})();
+      const [digestQuery] = capturedQueries;
+      if (!digestQuery) throw new Error("Expected subscribed digest query");
+      const { sql, parameters } = digestQuery;
+      const readDigest = () =>
+        instance
+          .rawSqlite()
+          .prepare(sql)
+          .get(...parameters.map(toSqliteInput));
+
+      await Effect.runPromise(instance.db.deleteOwner(shard1));
+      await Effect.runPromise(
+        instance.db.mutate([
+          {
+            kind: "upsert",
+            table: "message",
+            owner: shard1,
+            row: {
+              id: createIdFromString("msg/before-reuse"),
+              conversationId: convId,
+              direction: "in",
+              content: "before reuse",
+              wrapId: "wrap-before",
+              createdAtSec: 1700000003,
+            },
+          },
+        ]),
+      );
+      const beforeReuse = readDigest();
+
+      await Effect.runPromise(instance.db.deleteOwner(shard1));
+      await Effect.runPromise(
+        instance.db.mutate([
+          {
+            kind: "upsert",
+            table: "message",
+            owner: shard1,
+            row: {
+              id: createIdFromString("msg/after-reuse"),
+              conversationId: convId,
+              direction: "in",
+              content: "after reuse",
+              wrapId: "wrap-after",
+              createdAtSec: 1700000004,
+            },
+          },
+        ]),
+      );
+      const afterReuse = readDigest();
+
+      expect(afterReuse?.count).toBe(beforeReuse?.count);
+      expect(afterReuse?.rev).toBe(beforeReuse?.rev);
+      expect(afterReuse?.ts).not.toEqual(beforeReuse?.ts);
+
+      await instance.dispose();
+    } finally {
+      await harness.dispose();
+    }
   });
 });

@@ -242,6 +242,37 @@ export const createEvoluShardDb = (
     return query;
   };
 
+  // One-row digest so writes do not rescan and diff every live table; `rev` +
+  // `ts` catch every write (including older-timestamp syncs and rowid reuse)
+  // and `count` catches `deleteOwner` dropping an older shard.
+  const tableChangeQueries = new Map<string, UntypedQuery>();
+  const tableChangeQuery = (table: LinkyTable): UntypedQuery => {
+    const cached = tableChangeQueries.get(table);
+    if (cached !== undefined) return cached;
+    const query = rawQuery(
+      kyselySql<{
+        readonly rev: number | null;
+        readonly ts: Uint8Array | null;
+        readonly count: number;
+      }>`(select
+        h.rowid as "rev",
+        h."timestamp" as "ts",
+        (select count(*) from ${kyselySql.table(table)}) as "count"
+      from (select 1) as "_"
+      left join (
+        select rowid, "timestamp"
+        from "evolu_history"
+        where "table" = ${table}
+        order by rowid desc
+        limit 1
+      ) as "h" on 1 = 1)`,
+      "tableChange",
+      { prepare: true },
+    );
+    tableChangeQueries.set(table, query);
+    return query;
+  };
+
   // Evolu returns the same result array until the query's rows change.
   const rowsByResult = new WeakMap<object, ReadonlyArray<Row<Columns>>>();
   const loadRows = (
@@ -502,7 +533,14 @@ export const createEvoluShardDb = (
     readCopiesWhere,
     readOldest,
     mutate,
-    subscribe: (table, listener) => subscribeQuery(tableQuery(table), listener),
+    subscribe: (table, listener) => {
+      if (!isTable(table)) return () => {};
+      const query = tableChangeQuery(table);
+      const unsubscribe = subscribeQuery(query, listener);
+      // Prime the digest so the first unrelated write does not fire every table.
+      void evolu.loadQuery(query).catch(() => {});
+      return unsubscribe;
+    },
     subscribeWhere: (table, column, values, listener, options) => {
       if (!isColumnOf(table, column) || values.length === 0) return () => {};
       return subscribeQuery(
