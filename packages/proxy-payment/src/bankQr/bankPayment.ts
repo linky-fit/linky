@@ -83,6 +83,7 @@ const createBankPayment = (args: {
 };
 
 const IBAN_PATTERN = /^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/;
+const UTF8_ENCODER = new TextEncoder();
 
 const parseEpcPayment = (input: string): BankPayment => {
   const payload = input.trim();
@@ -272,7 +273,7 @@ const serializeEmvTags = (tags: readonly EmvTag[]): string =>
 // bytes, as the EMV specification defines it.
 const crc16Ccitt = (text: string): string => {
   let crc = 0xffff;
-  for (const byte of new TextEncoder().encode(text)) {
+  for (const byte of UTF8_ENCODER.encode(text)) {
     crc ^= byte << 8;
     for (let bit = 0; bit < 8; bit += 1) {
       crc = ((crc & 0x8000 ? (crc << 1) ^ 0x1021 : crc << 1) & 0xffff) >>> 0;
@@ -640,7 +641,7 @@ const encodeSpdValue = (value: string): string => {
       encoded += char;
       continue;
     }
-    for (const byte of new TextEncoder().encode(char)) {
+    for (const byte of UTF8_ENCODER.encode(char)) {
       encoded += `%${byte.toString(16).toUpperCase().padStart(2, "0")}`;
     }
   }

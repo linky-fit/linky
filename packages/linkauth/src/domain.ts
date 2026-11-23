@@ -81,7 +81,8 @@ const isRelay = (origin: string, value: unknown): value is string => {
       (secure || localDev) &&
       url.username === "" &&
       url.password === "" &&
-      url.hash === ""
+      url.hash === "" &&
+      !value.includes("#")
     );
   } catch {
     return false;

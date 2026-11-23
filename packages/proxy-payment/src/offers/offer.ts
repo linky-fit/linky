@@ -87,27 +87,6 @@ export const showsBankPaymentOfferBankDetails = (
   info.status === "bank_paid" ||
   info.bankPaidAtSec !== null;
 
-/** Seconds from the offer's initiation to the payer's bank payment. */
-export const bankPaymentOfferResponseDurationSec = (
-  offer: Pick<
-    BankPaymentOfferInfo,
-    "bankPaidAtSec" | "initiatedAtSec" | "status" | "statusUpdatedAtSec"
-  >,
-  createdAtSec: number,
-): number | null => {
-  const initiatedAtSec = offer.initiatedAtSec ?? Math.trunc(createdAtSec);
-  const bankPaidAtSec = bankPaymentOfferBankPaidAtSec(offer);
-  if (
-    !Number.isFinite(initiatedAtSec) ||
-    initiatedAtSec <= 0 ||
-    bankPaidAtSec === null ||
-    bankPaidAtSec < initiatedAtSec
-  ) {
-    return null;
-  }
-  return bankPaidAtSec - initiatedAtSec;
-};
-
 export const offerUpdatedAtSec = (offer: BankPaymentOffer): number =>
   offer.statusUpdatedAtSec ?? offer.createdAtSec;
 

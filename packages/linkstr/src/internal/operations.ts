@@ -47,7 +47,11 @@ export const inspectOperation =
           inspector.emit(
             () =>
               new OperationFailed(
-                { name, params: redactInspectorSecrets(params), error },
+                {
+                  name,
+                  params: redactInspectorSecrets(params),
+                  error: redactInspectorSecrets(error),
+                },
                 { disableChecks: true },
               ),
           ),

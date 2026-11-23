@@ -144,7 +144,7 @@ const toProofColumns = (proof: NewProof, id: CashuProofId): ProofColumns => ({
 });
 
 /** One row per id: the highest shard's copy as the core merges, unless any copy is spent. */
-export const mergeProofCopies = (
+const mergeProofCopies = (
   copies: ReadonlyArray<Row<LinkyDbSchema["cashuProof"]>>,
 ): ReadonlyArray<Row<LinkyDbSchema["cashuProof"]>> => {
   const byId = new Map<string, Row<LinkyDbSchema["cashuProof"]>>();

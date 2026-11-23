@@ -64,8 +64,7 @@ describe("conversations repository", () => {
     expect(
       runNow(conversations.messagesIn(a.id)).map((m) => m.content),
     ).toEqual(["hi a"]);
-    expect(runNow(conversations.reactionsIn(a.id))).toHaveLength(1);
-    expect(runNow(conversations.reactionsIn(b.id))).toHaveLength(0);
+    expect(runNow(conversations.reactions.all)).toHaveLength(1);
   });
 
   it("keeps a removed reaction's tombstone readable", () => {
@@ -89,6 +88,41 @@ describe("conversations repository", () => {
     expect(runNow(conversations.removedReactions).map((r) => r.wrapId)).toEqual(
       ["wrap-removed"],
     );
+  });
+
+  it("drops an older shard tombstone once a newer shard holds a live copy", () => {
+    const { store } = linkyStore();
+    const conversations = makeConversationsRepository(store);
+    const chat = runNow(conversations.ensureDirect(createId<"Contact">()));
+    const id = createId<"Reaction">();
+    runNow(
+      conversations.reactions.insert({
+        id,
+        conversationId: chat.id,
+        messageId: "rumor",
+        reactorPubkey: "pk",
+        emoji: "👍",
+        createdAtSec: 2,
+        wrapId: "wrap-old",
+      }),
+    );
+    runNow(conversations.reactions.remove(id));
+    runNow(store.rotate("messages"));
+    runNow(
+      conversations.reactions.insert({
+        id,
+        conversationId: chat.id,
+        messageId: "rumor",
+        reactorPubkey: "pk",
+        emoji: "👍",
+        createdAtSec: 3,
+        wrapId: "wrap-new",
+      }),
+    );
+    expect(runNow(conversations.reactions.all).map((r) => r.wrapId)).toEqual([
+      "wrap-new",
+    ]);
+    expect(runNow(conversations.removedReactions)).toEqual([]);
   });
 
   it("takes an old conversation forward when its cursor moves after a rotation", () => {

@@ -15,6 +15,12 @@ export type LinkauthCallback =
  */
 export const readCallback = (urlOrHash: string): LinkauthCallback | null => {
   const hashStart = urlOrHash.indexOf("#");
+  if (
+    hashStart === -1 &&
+    (urlOrHash.includes("://") || urlOrHash.includes("?"))
+  ) {
+    return null;
+  }
   const params = new URLSearchParams(
     hashStart === -1 ? urlOrHash : urlOrHash.slice(hashStart + 1),
   );

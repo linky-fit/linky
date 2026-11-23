@@ -84,7 +84,14 @@ export const deriveOwnerMnemonicsFromMasterSecret = (
   masterSecret: MasterSecret,
   requests: ReadonlyArray<OwnerMnemonicRequest>,
 ): Effect.Effect<ReadonlyArray<Bip39Mnemonic12>, IdentityDerivationError> =>
-  Effect.sync(() => HDKey.fromMasterSeed(masterSecret)).pipe(
+  Effect.try({
+    try: () => HDKey.fromMasterSeed(masterSecret),
+    catch: (cause) =>
+      new IdentityDerivationError({
+        message: "Failed to derive owner root key from master secret",
+        cause,
+      }),
+  }).pipe(
     Effect.flatMap((root) =>
       Effect.all(
         requests.map((request) =>

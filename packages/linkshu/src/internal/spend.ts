@@ -274,7 +274,7 @@ export const swapProofsForAmount = (
           !isRecoverableOutputCollision(raw) ||
           (fixedSend !== undefined && (yield* fixedSend.alreadySigned))
         ) {
-          return yield* Effect.fail(classifyMintError(ctx.scope.mint, raw));
+          return yield* Effect.fail(failure);
         }
         lastCollision = raw;
         counter = yield* recoverFromCollision(

@@ -20,7 +20,6 @@ export type {
 } from "./domain";
 export {
   deriveLnurlAuthPublicKeyHex,
-  normalizeLnurlAuthDomain,
   signLnurlAuthChallenge,
   type LnurlAuthSignature,
 } from "./lnurlAuth";

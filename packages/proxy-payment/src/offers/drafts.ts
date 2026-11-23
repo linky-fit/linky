@@ -3,8 +3,9 @@ import {
   BankOfferId,
   ClientId,
   Pubkey,
-  UnixSeconds,
+  isUnixSeconds,
   type BankOfferStatus,
+  type UnixSeconds,
 } from "@linky-fit/linkstr";
 import { Schema } from "effect";
 import type { BankPaymentOfferCurrency } from "../bankQr/bankPayment";
@@ -22,7 +23,6 @@ const isNonEmptyTrimmedString = Schema.is(
   Schema.Trimmed.check(Schema.isNonEmpty()),
 );
 const isPositiveInt = Schema.is(Schema.Int.check(Schema.isGreaterThan(0)));
-const isUnixSeconds = Schema.is(UnixSeconds);
 
 const positiveInt = (value: unknown): number | undefined => {
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
@@ -51,7 +51,14 @@ export const bankPaymentOfferedDraft = (args: {
 }): BankOfferDraft | null => {
   const amountText = args.amountText.trim();
   const text = bankPaymentOfferMessageText(amountText, "offered");
-  if (!isNonEmptyTrimmedString(amountText) || !isNonEmptyTrimmedString(text)) {
+  if (
+    !isPubkey(args.to) ||
+    !isPubkey(args.offerer) ||
+    args.to === args.offerer ||
+    !isBankOfferId(args.offerId) ||
+    !isNonEmptyTrimmedString(amountText) ||
+    !isNonEmptyTrimmedString(text)
+  ) {
     return null;
   }
   const amountSat = positiveInt(args.amountSat);

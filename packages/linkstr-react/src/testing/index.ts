@@ -69,7 +69,8 @@ export const fakeTransport = (
       return Effect.never.pipe(
         Effect.ensuring(
           Effect.sync(() => {
-            subscriptions.splice(subscriptions.indexOf(subscription), 1);
+            const index = subscriptions.indexOf(subscription);
+            if (index >= 0) subscriptions.splice(index, 1);
           }),
         ),
       );

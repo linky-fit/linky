@@ -106,7 +106,7 @@ it("routes a wrap into a typed fact", async () => {
 });
 ```
 
-The `asBob` layer is also the shape of a plain send test: run the operation against it and assert on `published` (`published.map(recipientOf)` holds both copies of a two-copy send). To test the failure path, pass an `accept` function: `stubWrapTransport(published, (wrap) => recipientOf(wrap) === alice.pubkey)` accepts only the self copy, so `react` fails with `RecipientNotReached`.
+The `asBob` layer is also the shape of a plain send test: run the operation against it and assert on `published` (`published.map(recipientOf)` holds both copies of a two-copy send). To test the failure path, pass an `accept` function: `stubWrapTransport(published, (wrap) => recipientOf(wrap) === bob.pubkey)` accepts only the self copy, so `react` fails with `RecipientNotReached`.
 
 `fake.emit` before `fake.eose()` yields `delivery: "backfill"`; after it, `"live"`. `eose()` also starts the inbox's backfill walk, whose pages go through `transport.fetch`; to serve stored wraps, spread `makeRelayPoolTransport(...)` and replace its `fetch` with one that answers each page's filter. `fake.closeFromRelay("reason")` ends the subscription so you can watch the resubscribe loop; set `fake.down = true` to make `ensureRelay` reject.
 

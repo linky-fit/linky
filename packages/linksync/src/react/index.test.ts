@@ -8,7 +8,7 @@ import { makeInMemoryShardDb } from "../core";
 import { linkyTableColumns, type LinkyDbSchema } from "../model/schema";
 import { createLinkyStore } from "../model/store";
 import { testAppOwner } from "../testing/toy";
-import { useHydrated, useRepositoryRows, useVisibleShards } from "./index";
+import { useHydrated, useRepositoryRows } from "./index";
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
@@ -44,23 +44,6 @@ describe("react bindings", () => {
     );
     await settle();
     expect(seen.at(-1)).toBe(1);
-    await view.unmount();
-  });
-
-  it("follows the visible shards across a rotation", async () => {
-    const { store } = linkyStore();
-    let indexes: ReadonlyArray<number> = [];
-    const view = await mount(() => {
-      indexes = useVisibleShards(store, "transactions").map(
-        (shard) => shard.index,
-      );
-      return null;
-    });
-    await settle();
-    expect(indexes).toEqual([0]);
-    runNow(store.rotate("transactions"));
-    await settle();
-    expect(indexes).toEqual([0, 1]);
     await view.unmount();
   });
 

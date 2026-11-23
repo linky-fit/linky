@@ -3,21 +3,9 @@ export { LinkySchema, linkyTableColumns } from "./schema";
 export type {
   CashuOperationRow,
   CashuProofRow,
-  ContactRow,
-  ConversationRow,
   InferDbSchema,
   LinkyDbSchema,
   LinkyTable,
-  MessageRow,
-  NostrIdentityRow,
-  OnchainTransferMessageRow,
-  OnchainTransferRow,
-  PeerListingsRow,
-  ReactionRow,
-  RecurringPaymentRow,
-  SettingRow,
-  ShardPointerRow,
-  TransactionRow,
 } from "./schema";
 export {
   linkyScopes,

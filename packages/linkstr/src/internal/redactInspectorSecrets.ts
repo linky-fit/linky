@@ -6,12 +6,27 @@ const isAttachment = (value: Record<string, unknown>): boolean =>
   typeof value["key"] === "string" &&
   typeof value["nonce"] === "string";
 
-// A cashu token is a bearer instrument: its proofs carry the mint secrets that
-// let anyone holding the text spend the funds. It must never sit in a log, so a
-// `token` field holding an encoded token (`cashuA`/`cashuB`) is dropped like an
-// attachment key.
+// A cashu token (cashuA/cashuB) or NUT-18 JSON payment payload carries spendable
+// proof secrets and must never sit in inspector logs.
+const isNut18ProofPayload = (value: string): boolean => {
+  const trimmed = value.trimStart();
+  if (!trimmed.startsWith("{")) return false;
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    return (
+      Predicate.isObject(parsed) &&
+      "proofs" in parsed &&
+      Array.isArray(parsed["proofs"])
+    );
+  } catch {
+    return false;
+  }
+};
+
 const isCashuTokenField = (field: string, value: unknown): boolean =>
-  field === "token" && typeof value === "string" && value.startsWith("cashu");
+  field === "token" &&
+  typeof value === "string" &&
+  (value.startsWith("cashu") || isNut18ProofPayload(value));
 
 // App message content is the app's own payload and may carry a token or keys.
 const isAppMessage = (value: Record<string, unknown>): boolean =>
@@ -23,11 +38,13 @@ const sharedListingMarker = new RegExp(
   "g",
 );
 
-const redactString = (value: string): string =>
-  value.replace(
+const redactString = (value: string): string => {
+  if (isNut18ProofPayload(value)) return "[redacted cashu token]";
+  return value.replace(
     sharedListingMarker,
     `${SHARED_LISTING_MARKER_PREFIX}[redacted listing]`,
   );
+};
 
 const redactRecord = (value: Record<string, unknown>): unknown => {
   if (isAttachment(value)) return Struct.omit(value, ["key", "nonce"]);

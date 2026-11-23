@@ -133,12 +133,17 @@ const epochFromWallClock = (clock: WallClock, timeZone: string): number => {
     wallClockAsUtcSeconds(wallClockAt(epochSec, timeZone)) - epochSec;
   const first = asUtc - offsetAt(asUtc);
   const second = asUtc - offsetAt(first);
-  if (first === second) return first;
-  const candidates = [first, second].filter(
+  const probes = new Set([
+    first,
+    second,
+    asUtc - offsetAt(asUtc - 86_400),
+    asUtc - offsetAt(asUtc + 86_400),
+  ]);
+  const candidates = [...probes].filter(
     (epochSec) =>
       wallClockAsUtcSeconds(wallClockAt(epochSec, timeZone)) === asUtc,
   );
-  if (candidates.length > 0) return Math.min(...candidates);
+  if (candidates.length > 0) return Math.max(...candidates);
   return Math.max(first, second);
 };
 

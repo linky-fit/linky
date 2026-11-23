@@ -781,7 +781,10 @@ export const createShardStore = <
       const fresh = incoming.filter((row) => {
         if (!isLive(row)) return false;
         const existing = known.get(row.id);
-        return existing === undefined || existing.updatedAt < row.updatedAt;
+        return (
+          existing === undefined ||
+          (isLive(existing) && existing.updatedAt < row.updatedAt)
+        );
       });
       if (fresh.length === 0) return { ingested: 0 };
       yield* retainBeforeWrite(scope);

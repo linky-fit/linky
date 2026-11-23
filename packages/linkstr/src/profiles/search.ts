@@ -4,7 +4,7 @@ import type { EventId, RelayUrl } from "../domain/primitives";
 import { Pubkey, UnixSeconds } from "../domain/primitives";
 import type { SignedPlainEvent } from "../internal/nostrEvent";
 import { decodeVerifiedPlainEvent } from "../internal/plainEvent";
-import { decodeProfileEvent } from "./codec";
+import { decodeProfileEvent, PROFILE_KIND } from "./codec";
 import { ProfileMetadata } from "./domain";
 
 export class ProfileSearchHit extends Schema.Class<ProfileSearchHit>(
@@ -171,6 +171,7 @@ export const createProfileSearchCollector = (
       const decoded = decodeVerifiedPlainEvent(raw);
       if (Result.isFailure(decoded)) continue;
       const event = decoded.success;
+      if (event.kind !== PROFILE_KIND) continue;
       const position =
         positionByAuthor.get(event.pubkey) ?? positionByAuthor.size;
       positionByAuthor.set(event.pubkey, position);
