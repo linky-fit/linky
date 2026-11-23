@@ -143,14 +143,20 @@ export const normalizeEvoluServerUrl = normalizeEvoluRelayUrl;
 const probeWebSocketConnection = (
   url: string,
   timeoutMs = 2500,
+  signal?: AbortSignal,
 ): Promise<boolean> => {
+  if (signal?.aborted) return Promise.resolve(false);
+
   return new Promise<boolean>((resolve) => {
     let ws: WebSocket | null = null;
     let done = false;
+    let timer = 0;
 
     const finish = (ok: boolean) => {
       if (done) return;
       done = true;
+      window.clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
       try {
         ws?.close();
       } catch {
@@ -159,6 +165,9 @@ const probeWebSocketConnection = (
       resolve(ok);
     };
 
+    const onAbort = () => finish(false);
+    signal?.addEventListener("abort", onAbort, { once: true });
+
     try {
       ws = new WebSocket(url);
     } catch {
@@ -166,22 +175,11 @@ const probeWebSocketConnection = (
       return;
     }
 
-    const timer = window.setTimeout(() => finish(false), timeoutMs);
+    timer = window.setTimeout(() => finish(false), timeoutMs);
 
-    ws.addEventListener("open", () => {
-      window.clearTimeout(timer);
-      finish(true);
-    });
-
-    ws.addEventListener("error", () => {
-      window.clearTimeout(timer);
-      finish(false);
-    });
-
-    ws.addEventListener("close", () => {
-      window.clearTimeout(timer);
-      finish(false);
-    });
+    ws.addEventListener("open", () => finish(true));
+    ws.addEventListener("error", () => finish(false));
+    ws.addEventListener("close", () => finish(false));
   });
 };
 
@@ -759,11 +757,13 @@ export const useEvoluServers = () => {
   } as const;
 };
 
-/** Probes the active Evolu relays every 15 s; mounted once by the shell. */
+/** Probes the active Evolu relays every 15 s while `enabled` is true. */
 export const useEvoluServerProbes = (opts?: {
+  enabled?: boolean;
   probeIntervalMs?: number;
   probeTimeoutMs?: number;
 }): void => {
+  const enabled = opts?.enabled ?? true;
   const probeIntervalMs = opts?.probeIntervalMs ?? 15000;
   const probeTimeoutMs = opts?.probeTimeoutMs ?? 3500;
   const canRunNetworkWork = useDeferredOnlineReady();
@@ -776,10 +776,11 @@ export const useEvoluServerProbes = (opts?: {
   }, [canRunNetworkWork, setProbesReady]);
 
   useEffect(() => {
+    if (!enabled) return;
     if (activeUrls.length === 0) return;
     if (!canRunNetworkWork) return;
 
-    let cancelled = false;
+    const controller = new AbortController();
     const setStatusByUrl = (
       update: (
         prev: Readonly<Record<string, EvoluServerStatus>>,
@@ -792,26 +793,35 @@ export const useEvoluServerProbes = (opts?: {
           : { ...current, statusByUrl };
       });
 
+    let firstProbe = true;
     const run = async () => {
-      // Only urls with no known status get a visible "checking" state; known
-      // urls keep their last status during background re-probes so steady-state
-      // polls don't re-render the app when nothing changed.
+      const markAllChecking = firstProbe;
+      firstProbe = false;
+      // Show "checking" on the first probe after enabling so reopening settings
+      // never displays a stale status from earlier; steady-state polls keep the
+      // last status so unchanged relays don't re-render.
       setStatusByUrl((prev) => {
-        const missing = activeUrls.filter((url) => prev[url] === undefined);
-        if (missing.length === 0) return prev;
+        const toMark = markAllChecking
+          ? activeUrls.filter((url) => prev[url] !== "checking")
+          : activeUrls.filter((url) => prev[url] === undefined);
+        if (toMark.length === 0) return prev;
         const next = { ...prev };
-        for (const url of missing) next[url] = "checking";
+        for (const url of toMark) next[url] = "checking";
         return next;
       });
 
       const results = await Promise.all(
         activeUrls.map(async (url) => {
-          const ok = await probeWebSocketConnection(url, probeTimeoutMs);
+          const ok = await probeWebSocketConnection(
+            url,
+            probeTimeoutMs,
+            controller.signal,
+          );
           return [url, ok] as const;
         }),
       );
 
-      if (cancelled) return;
+      if (controller.signal.aborted) return;
       setStatusByUrl((prev) => {
         const changed = results.filter(
           ([url, ok]) => prev[url] !== (ok ? "connected" : "disconnected"),
@@ -827,12 +837,13 @@ export const useEvoluServerProbes = (opts?: {
     void run();
     const intervalId = window.setInterval(run, probeIntervalMs);
     return () => {
-      cancelled = true;
+      controller.abort();
       window.clearInterval(intervalId);
     };
   }, [
     activeUrls,
     canRunNetworkWork,
+    enabled,
     probeIntervalMs,
     probeTimeoutMs,
     setServers,

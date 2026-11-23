@@ -18,7 +18,7 @@ import { OnchainTransfersSync } from "./OnchainTransfersSync";
 import { useLaneToShardMigration } from "./migrations/useLaneToShardMigration";
 import { AppRouteContent } from "./routes/AppRouteContent";
 import { sessionAtom } from "./state/session/session";
-import { useAppShellComposition } from "./useAppShellComposition";
+import { AppShellWatchers } from "./useAppShellComposition";
 import { useUnauthenticatedAppShellComposition } from "./useUnauthenticatedAppShellComposition";
 
 /** Fills the viewport; index.css shrinks it above the keyboard while a chat is open. */
@@ -69,18 +69,22 @@ const ContactSendBanner = () => {
   );
 };
 
-const AuthenticatedAppShell = ({ currentNsec }: AuthenticatedAppShellProps) => {
-  useAppShellComposition({ currentNsec });
-  const { t } = useTranslation();
+const AppToastHost = () => {
   const { dismissToast, toasts } = useToasts();
+  return <ToastNotifications toasts={toasts} dismissToast={dismissToast} />;
+};
+
+const AuthenticatedAppShell = ({ currentNsec }: AuthenticatedAppShellProps) => {
+  const { t } = useTranslation();
 
   return (
     <AppFrame>
+      <AppShellWatchers currentNsec={currentNsec} />
       <TopBanners>
         <PwaUpdateBanner t={t} />
         <ContactSendBanner />
       </TopBanners>
-      <ToastNotifications toasts={toasts} dismissToast={dismissToast} />
+      <AppToastHost />
       <InstallPwaBanner t={t} />
       <BeaconController currentNsec={currentNsec} />
       <ListingsController />

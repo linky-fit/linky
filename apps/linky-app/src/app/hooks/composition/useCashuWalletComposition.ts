@@ -33,7 +33,6 @@ import { useTransferCleanup } from "../wallet/useTransferCleanup";
 import { useWalletOps } from "../wallet/useWalletOps";
 import { useWalletPayments } from "../wallet/useWalletPayments";
 import { useWalletResumes } from "../wallet/useWalletResumes";
-import { useWalletBalance } from "../wallet/useWalletInventory";
 import {
   useIssuedTokenClaimWatch,
   useTokenRecovery,
@@ -224,7 +223,7 @@ export const useCashuWalletComposition = ({
     transactions,
   });
 
-  const { cashuBalance } = useWalletBalance();
+  const cashuBalance = walletBalances.spendable;
   const requestMintUrls = useRequestMintUrls();
   const receivedSatByRequestId = useReceivedSatByRequestId();
 
