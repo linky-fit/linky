@@ -6,7 +6,7 @@
 
 Two things decide whether the queue is actually durable:
 
-- **The store.** The job list lives behind the `OutboxStore` port. The default, `OutboxStore.inMemory`, is lost on restart; pass `OutboxStore.fromStringStorage(storage, key)` (one JSON array under `key`, `storage` is any `{ getItem, setItem }`) through `linkstrServices({ outboxStore })`, `runLinkstr` or `LinkstrConfig.outboxStore`. An unreadable stored value decodes as an empty list.
+- **The store.** The job list lives behind the `OutboxStore` port. The default, `OutboxStore.inMemory`, is lost on restart; pass `OutboxStore.fromStringStorage(storage, key)` (one JSON array under `key`, `storage` is any `{ getItem, setItem }`) through `linkstrServices({ outboxStore })`, `runLinkstr` or `LinkstrConfig.outboxStore`. An unreadable stored value decodes as an empty list; individual corrupt entries in a stored array are skipped.
 - **The runtime.** The delivery worker is scoped to the `Outbox` service. When the runtime that built it closes, the worker stops; queued jobs stay in the store and resume when the next runtime builds the service. A `runLinkstr` call that enqueues and returns therefore delivers nothing by itself.
 
 ## Enqueue, deliver, observe

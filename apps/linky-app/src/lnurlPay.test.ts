@@ -90,7 +90,7 @@ describe("LNURL-pay lightning address metadata", () => {
       ),
     );
     fetchMock.mockResolvedValueOnce(
-      new Response(JSON.stringify({ pr: "lnbc1testinvoice" }), {
+      new Response(JSON.stringify({ pr: "lnbc50n1testinvoice" }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       }),
@@ -175,10 +175,13 @@ describe("fetchLnurlInvoiceForTarget fixed-amount re-quotes", () => {
       ),
     );
     fetchMock.mockResolvedValueOnce(
-      new Response(JSON.stringify({ pr: "lnbc1testinvoice" }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
+      new Response(
+        JSON.stringify({ pr: `lnbc${fixedMsat * 10}p1testinvoice` }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
     );
     return fetchMock;
   };
@@ -188,7 +191,7 @@ describe("fetchLnurlInvoiceForTarget fixed-amount re-quotes", () => {
 
     await expect(
       fetchLnurlInvoiceForTarget("fixed@lnbits.cz", 4352),
-    ).resolves.toMatchObject({ pr: "lnbc1testinvoice" });
+    ).resolves.toMatchObject({ pr: "lnbc43605000p1testinvoice" });
 
     const invoiceUrl = new URL(String(fetchMock.mock.calls[1]?.[0]));
     expect(invoiceUrl.searchParams.get("amount")).toBe("4360500");

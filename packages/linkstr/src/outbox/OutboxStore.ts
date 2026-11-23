@@ -12,9 +12,23 @@ export interface OutboxStoreService {
   readonly loadAll: Effect.Effect<ReadonlyArray<StoredOutboxJob>>;
 }
 
-const StoredJobsJson = Schema.fromJsonString(Schema.Array(PersistedOutboxJob));
-const decodeJobs = Schema.decodeUnknownResult(StoredJobsJson);
-const encodeJobs = Schema.encodeSync(StoredJobsJson);
+const StoredRawJobsJson = Schema.fromJsonString(Schema.Array(Schema.Unknown));
+const decodeRawJobs = Schema.decodeUnknownResult(StoredRawJobsJson);
+const decodeJob = Schema.decodeUnknownResult(PersistedOutboxJob);
+const encodeJobs = Schema.encodeSync(
+  Schema.fromJsonString(Schema.Array(PersistedOutboxJob)),
+);
+
+const decodeJobs = (raw: string): ReadonlyArray<StoredOutboxJob> => {
+  const rawItems = decodeRawJobs(raw);
+  if (Result.isFailure(rawItems)) return [];
+  const jobs: StoredOutboxJob[] = [];
+  for (const item of rawItems.success) {
+    const decoded = decodeJob(item);
+    if (Result.isSuccess(decoded)) jobs.push(decoded.success);
+  }
+  return jobs;
+};
 
 const makeInMemory = (): OutboxStoreService => {
   const jobs = new Map<string, StoredOutboxJob>();
@@ -38,7 +52,7 @@ const makeStringStorage = (
   key: string,
 ): OutboxStoreService => {
   const slot = stringStorageSlot<ReadonlyArray<StoredOutboxJob>>(storage, key, {
-    decode: (raw) => Result.getOrElse(decodeJobs(raw), () => []),
+    decode: decodeJobs,
     encode: encodeJobs,
   });
   const load = (): ReadonlyArray<StoredOutboxJob> => slot.read() ?? [];
@@ -72,8 +86,8 @@ export class OutboxStore extends Context.Service<
 
   /**
    * One storage key holding the JSON-encoded job array; an unreadable stored
-   * value decodes as an empty list. Platform code supplies the storage
-   * (web: `localStorage`).
+   * value decodes as an empty list, and corrupt entries in a stored array are
+   * skipped. Platform code supplies the storage (web: `localStorage`).
    */
   static fromStringStorage(
     storage: StringStorage,

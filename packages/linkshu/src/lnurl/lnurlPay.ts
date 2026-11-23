@@ -483,7 +483,10 @@ const requestLnurlInvoice = async (
     }
   }
   const invoiceMsat = parseBolt11AmountMsat(pr);
-  if (invoiceMsat !== null && invoiceMsat !== amountMsat) {
+  if (invoiceMsat === null) {
+    throw new Error("LNURL invoice missing amount");
+  }
+  if (invoiceMsat !== amountMsat) {
     throw new Error(
       `LNURL invoice amount mismatch (expected ${amountMsat} msat, got ${invoiceMsat})`,
     );

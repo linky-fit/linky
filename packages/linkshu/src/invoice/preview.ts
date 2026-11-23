@@ -1,7 +1,7 @@
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { bech32 } from "@scure/base";
 
-const BOLT11_PREFIX_RE = /^(lnbc|lntb|lnbcrt)/i;
+const BOLT11_PREFIX_RE = /^(lnbcrt|lnbc|lntb)/i;
 const BOLT11_WORD_LIMIT = 5_000;
 const BOLT11_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 const BOLT11_TIMESTAMP_WORDS = 7;
@@ -25,11 +25,20 @@ const parseBolt11AmountSat = (invoice: string): number | null => {
   return Math.ceil(msat / 1000);
 };
 
+const UNIT_MULTIPLIER_MSAT: Readonly<Record<string, bigint>> = {
+  "": 100_000_000_000n,
+  m: 100_000_000n,
+  u: 100_000n,
+  n: 100n,
+};
+const MAX_SAFE_MSAT = BigInt(Number.MAX_SAFE_INTEGER);
+
 export const parseBolt11AmountMsat = (invoice: string): number | null => {
   const separatorIndex = invoice.lastIndexOf("1");
   if (separatorIndex <= 0) return null;
 
   const hrp = invoice.slice(0, separatorIndex).toLowerCase();
+  if (!BOLT11_PREFIX_RE.test(hrp)) return null;
   const amountPart = hrp.replace(BOLT11_PREFIX_RE, "");
   if (!amountPart) return null;
 
@@ -38,23 +47,20 @@ export const parseBolt11AmountMsat = (invoice: string): number | null => {
   const digits = hasUnit ? amountPart.slice(0, -1) : amountPart;
   if (!/^\d+$/.test(digits)) return null;
 
-  const value = Number(digits);
-  if (!Number.isFinite(value) || value <= 0) return null;
-
-  const msatAmount = (() => {
-    if (!hasUnit) return value * 100_000_000_000;
-    if (unitSuffix === "m") return value * 100_000_000;
-    if (unitSuffix === "u") return value * 100_000;
-    if (unitSuffix === "n") return value * 100;
-    if (unitSuffix === "p") return value / 10;
-    return null;
-  })();
-
-  if (!Number.isFinite(msatAmount) || msatAmount === null || msatAmount <= 0) {
-    return null;
+  let msat: bigint;
+  if (unitSuffix === "p") {
+    if (!digits.endsWith("0")) return null;
+    const wholeMsatDigits = digits.slice(0, -1);
+    if (!wholeMsatDigits) return null;
+    msat = BigInt(wholeMsatDigits);
+  } else {
+    const multiplier = UNIT_MULTIPLIER_MSAT[hasUnit ? unitSuffix : ""];
+    if (multiplier === undefined) return null;
+    msat = BigInt(digits) * multiplier;
   }
 
-  return Math.ceil(msatAmount);
+  if (msat <= 0n || msat > MAX_SAFE_MSAT) return null;
+  return Number(msat);
 };
 
 const parseWordNumber = (words: readonly number[]): number | null => {

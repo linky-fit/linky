@@ -227,7 +227,7 @@ describe("LNURL HTTPS policy", () => {
 });
 
 describe("LNURL-pay comments (LUD-12)", () => {
-  const invoiceResponse = () => Response.json({ pr: "lnbc1testinvoice" });
+  const invoiceResponse = () => Response.json({ pr: "lnbc10n1testinvoice" });
   const callback = "https://example.com/callback";
   const invoiceUrl = (fetchSpy: ReturnType<typeof vi.spyOn>, call: number) =>
     new URL(String(fetchSpy.mock.calls[call]?.[0]));
@@ -242,7 +242,7 @@ describe("LNURL-pay comments (LUD-12)", () => {
 
     await expect(
       fetchLnurlInvoiceForTarget("alice@example.com", 1, "coffee money"),
-    ).resolves.toMatchObject({ pr: "lnbc1testinvoice" });
+    ).resolves.toMatchObject({ pr: "lnbc10n1testinvoice" });
 
     expect(fetchSpy).toHaveBeenCalledTimes(2);
     expect(invoiceUrl(fetchSpy, 1).searchParams.get("comment")).toBe("coffe");
@@ -271,7 +271,7 @@ describe("LNURL-pay comments (LUD-12)", () => {
 
     await expect(
       fetchLnurlInvoiceForTarget("alice@example.com", 1, "coffee"),
-    ).resolves.toMatchObject({ pr: "lnbc1testinvoice" });
+    ).resolves.toMatchObject({ pr: "lnbc10n1testinvoice" });
 
     expect(fetchSpy).toHaveBeenCalledTimes(3);
     expect(invoiceUrl(fetchSpy, 1).searchParams.get("comment")).toBe("coffee");
@@ -292,9 +292,73 @@ describe("LNURL-pay comments (LUD-12)", () => {
   });
 });
 
+describe("LNURL-pay BOLT11 amount verification (LUD-06)", () => {
+  const callback = "https://example.com/callback";
+
+  it("rejects an amountless BOLT11 invoice from the callback", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json(payRequest(callback)))
+      .mockResolvedValueOnce(Response.json({ pr: "lnbc1testinvoice" }));
+
+    await expect(
+      fetchLnurlInvoiceForTarget("alice@example.com", 1),
+    ).rejects.toThrow("LNURL invoice missing amount");
+  });
+
+  it("rejects a non-BOLT11 invoice string from the callback", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json(payRequest(callback)))
+      .mockResolvedValueOnce(Response.json({ pr: "10n1notbolt11" }));
+
+    await expect(
+      fetchLnurlInvoiceForTarget("alice@example.com", 1),
+    ).rejects.toThrow("LNURL invoice missing amount");
+  });
+
+  it("rejects a BOLT11 invoice whose amount does not match the requested amount", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json(payRequest(callback)))
+      .mockResolvedValueOnce(Response.json({ pr: "lnbc20n1testinvoice" }));
+
+    await expect(
+      fetchLnurlInvoiceForTarget("alice@example.com", 1),
+    ).rejects.toThrow("LNURL invoice amount mismatch");
+  });
+
+  it("rejects a BOLT11 invoice with a sub-millisatoshi fractional amount", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json(payRequest(callback)))
+      .mockResolvedValueOnce(Response.json({ pr: "lnbc9999p1testinvoice" }));
+
+    await expect(
+      fetchLnurlInvoiceForTarget("alice@example.com", 1),
+    ).rejects.toThrow("LNURL invoice missing amount");
+  });
+
+  it("accepts a BOLT11 invoice whose explicit amount matches the request", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json(payRequest(callback)))
+      .mockResolvedValueOnce(Response.json({ pr: "lnbc10n1testinvoice" }));
+
+    await expect(
+      fetchLnurlInvoiceForTarget("alice@example.com", 1),
+    ).resolves.toMatchObject({ pr: "lnbc10n1testinvoice" });
+  });
+
+  it("accepts a matching regtest lnbcrt invoice from the callback", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json(payRequest(callback)))
+      .mockResolvedValueOnce(Response.json({ pr: "lnbcrt10n1testinvoice" }));
+
+    await expect(
+      fetchLnurlInvoiceForTarget("alice@example.com", 1),
+    ).resolves.toMatchObject({ pr: "lnbcrt10n1testinvoice" });
+  });
+});
+
 describe("LNURL-pay with a confirmed preview", () => {
   const callback = "https://example.com/callback";
-  const invoiceResponse = () => Response.json({ pr: "lnbc1testinvoice" });
+  const invoiceResponse = () => Response.json({ pr: "lnbc10n1testinvoice" });
   const requestedPaths = () =>
     vi
       .mocked(fetch)
@@ -321,7 +385,7 @@ describe("LNURL-pay with a confirmed preview", () => {
         undefined,
         preview,
       ),
-    ).resolves.toMatchObject({ pr: "lnbc1testinvoice" });
+    ).resolves.toMatchObject({ pr: "lnbc10n1testinvoice" });
 
     expect(requestedPaths()).toEqual(["/callback"]);
   });
@@ -343,7 +407,7 @@ describe("LNURL-pay with a confirmed preview", () => {
         undefined,
         preview,
       ),
-    ).resolves.toMatchObject({ pr: "lnbc1testinvoice" });
+    ).resolves.toMatchObject({ pr: "lnbc10n1testinvoice" });
 
     expect(requestedPaths()).toEqual([
       "/callback",

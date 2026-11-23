@@ -1,6 +1,7 @@
 import { bech32 } from "@scure/base";
 import { describe, expect, it } from "vitest";
 import { getLightningInvoicePreview } from "../index";
+import { parseBolt11AmountMsat } from "./preview";
 
 const BOLT11_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 const DESCRIPTION_TAG = BOLT11_CHARSET.indexOf("d");
@@ -87,5 +88,15 @@ describe("getLightningInvoicePreview", () => {
       expiresAtSec: 1_700_003_600,
       invoice,
     });
+  });
+});
+
+describe("parseBolt11AmountMsat", () => {
+  it("handles large pico-BTC amounts without IEEE-754 rounding", () => {
+    expect(parseBolt11AmountMsat("lnbc9999999999999999p1test")).toBeNull();
+    expect(parseBolt11AmountMsat("lnbc20000000000000010p1test")).toBe(
+      2_000_000_000_000_001,
+    );
+    expect(parseBolt11AmountMsat("lnbcrt10n1test")).toBe(1000);
   });
 });
