@@ -58,7 +58,11 @@ import {
   pendingLightningInvoiceAtom,
   pendingLnurlWithdrawAtom,
 } from "../../state/shell/confirmations";
-import { scanCommandsAtom, scanEntryPointAtom } from "../../state/shell/scan";
+import {
+  scanCommandsAtom,
+  scanEntryPointAtom,
+  type ScanEntryPoint,
+} from "../../state/shell/scan";
 import type { useCashuWalletComposition } from "./useCashuWalletComposition";
 import type { useContactsMessagingComposition } from "./useContactsMessagingComposition";
 import type { Translate } from "../../../i18n";
@@ -547,29 +551,32 @@ export const useScanNativeComposition = ({
     updatePendingDeepLinkText,
   ]);
 
-  const pasteScanValue = React.useCallback(async () => {
-    let text = await readClipboardText();
+  const pasteScanValue = React.useCallback(
+    async (entryPoint?: ScanEntryPoint) => {
+      let text = await readClipboardText();
 
-    if (text === null) {
-      if (
-        typeof window !== "undefined" &&
-        typeof window.prompt === "function"
-      ) {
-        text = window.prompt(t("scanPastePrompt")) ?? "";
-      } else {
-        pushToast(t("pasteNotAvailable"));
+      if (text === null) {
+        if (
+          typeof window !== "undefined" &&
+          typeof window.prompt === "function"
+        ) {
+          text = window.prompt(t("scanPastePrompt")) ?? "";
+        } else {
+          pushToast(t("pasteNotAvailable"));
+          return;
+        }
+      }
+
+      const raw = text.trim();
+      if (!raw) {
+        pushToast(t("pasteEmpty"));
         return;
       }
-    }
 
-    const raw = text.trim();
-    if (!raw) {
-      pushToast(t("pasteEmpty"));
-      return;
-    }
-
-    await handleScannedText(raw);
-  }, [handleScannedText, pushToast, t]);
+      await handleScannedText(raw, entryPoint);
+    },
+    [handleScannedText, pushToast, t],
+  );
 
   const scanImageFile = React.useCallback(
     async (file: File) => {
