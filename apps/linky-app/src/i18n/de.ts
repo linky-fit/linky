@@ -13,7 +13,6 @@ export const de = {
   settingsSecurity: "Sicherheit",
   settingsDebug: "Debug",
   settingsDeveloper: "Entwickler",
-  scanMoreOptions: "Mehr",
   nostrInspector: "Inspektor",
   nostrInspectorLogs: "Inspektorprotokolle sammeln",
   nostrInspectorLogsStats: "{count} Zeilen · {size} · älteste Zeile {age} alt",
@@ -884,9 +883,6 @@ export const de = {
   manualPaySuggestions: "Passende Kontakte",
   manualPayLinkyAliasHint: "{address} wird versucht",
   spdPaymentTitle: "Bankzahlung",
-  spdPaymentSectionAccount: "Konto",
-  spdPaymentSectionPayment: "Zahlung",
-  spdPaymentSectionCzechSymbols: "Zahlungssymbole (VS / SS / KS)",
   spdPaymentCurrency: "Währung",
   spdPaymentRequestReimbursementCountOne: "1 Kontakt um Zahlung bitten",
   spdPaymentRequestReimbursementCountOther:

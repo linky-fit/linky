@@ -5,23 +5,22 @@ import {
   IconButton,
   ListRow,
   MediaFrame,
+  OptionTile,
   Progress,
   Row,
-  Sheet,
   Stack,
   Text,
 } from "@linky-fit/ui";
 import type { IconName } from "@linky-fit/ui";
 import React from "react";
 import { useTranslation } from "../app/hooks/shell";
-import { useRegisterTopModalDismiss } from "../app/hooks/shell/overlays";
 import { useOnchainTransfersShown } from "../app/hooks/useOnchainTransfers";
 import {
   useScanCommands,
   useScanShortcuts,
   useScanView,
-  useSetScanPaused,
 } from "../app/hooks/shell/scan";
+import { useInspectorEmissionEnabled } from "../devtools/inspector/inspectorEnabled";
 import { useDesktopSplitView } from "../hooks/useDesktopSplitView";
 import { navigateTo } from "../hooks/useRouting";
 
@@ -29,7 +28,6 @@ interface ScanAction {
   icon: IconName;
   label: string;
   onPress: () => void;
-  ref?: React.RefObject<React.ComponentRef<typeof Button> | null>;
 }
 
 export function ScanModal(): React.ReactElement {
@@ -50,24 +48,9 @@ export function ScanModal(): React.ReactElement {
   const { t } = useTranslation();
   const onchainTransfersShown = useOnchainTransfersShown();
   const isDesktopSplitView = useDesktopSplitView();
-  const setScanPaused = useSetScanPaused();
-  const [moreOpen, setMoreOpen] = React.useState(false);
-  const moreButtonRef = React.useRef<React.ComponentRef<typeof Button> | null>(
-    null,
-  );
-  const setMoreSheetOpen = React.useCallback(
-    (open: boolean) => {
-      setScanPaused(open);
-      setMoreOpen(open);
-    },
-    [setScanPaused],
-  );
-  const closeMoreSheet = React.useCallback(
-    () => setMoreSheetOpen(false),
-    [setMoreSheetOpen],
-  );
-  useRegisterTopModalDismiss(moreOpen, closeMoreSheet);
-  React.useEffect(() => () => setScanPaused(false), [setScanPaused]);
+  // What the camera decodes is developer information; the progress of an
+  // animation is not, so only the detail line waits for the inspector.
+  const showScanDiagnostics = useInspectorEmissionEnabled();
   const animation = scanDiagnostics.animation;
   const animationFraction =
     animation === null || animation.expected === null
@@ -76,9 +59,11 @@ export function ScanModal(): React.ReactElement {
   const isReceiveScan = scanEntryPoint === "receive";
   const isSendScan = scanEntryPoint === "send";
   const handleClose = React.useCallback(() => {
-    setMoreSheetOpen(false);
     closeScan();
-  }, [closeScan, setMoreSheetOpen]);
+    if (isReceiveScan) {
+      navigateTo({ route: "wallet" });
+    }
+  }, [closeScan, isReceiveScan]);
   const title =
     scanEntryPoint === "contacts"
       ? t("contactsScanContactQr")
@@ -116,16 +101,15 @@ export function ScanModal(): React.ReactElement {
       navigateTo({ route: "topup" });
     },
   };
+  const issueToken: ScanAction = {
+    icon: "BadgePlus",
+    label: t("cashuEmit"),
+    onPress: onIssueToken,
+  };
   const gallery: ScanAction = {
     icon: "Images",
     label: t("scanGallery"),
     onPress: onPickScanImage,
-  };
-  const more: ScanAction = {
-    icon: "Ellipsis",
-    label: t("scanMoreOptions"),
-    onPress: () => setMoreSheetOpen(true),
-    ref: moreButtonRef,
   };
   const actions = [
     ...(showTypeAction ? [typeManually] : []),
@@ -133,7 +117,7 @@ export function ScanModal(): React.ReactElement {
     ...(isReceiveScan
       ? [setAmount, gallery]
       : isSendScan
-        ? [gallery, more]
+        ? [issueToken, gallery]
         : showTypeAction
           ? []
           : [gallery]),
@@ -166,114 +150,107 @@ export function ScanModal(): React.ReactElement {
         alignSelf="center"
         data-scan-region="footer"
       >
-        {animationHeadline === null ? null : (
+        {animationHeadline === null && !showScanDiagnostics ? null : (
           <Stack role="status" gap="$xs">
-            <Progress
-              value={animationFraction}
-              accessibilityLabel={animationHeadline}
-            />
-            <Text variant="label" textAlign="center">
-              {animationHeadline}
-            </Text>
+            {animationHeadline === null ? null : (
+              <>
+                <Progress
+                  value={animationFraction}
+                  accessibilityLabel={animationHeadline}
+                />
+                <Text variant="label" textAlign="center">
+                  {animationHeadline}
+                </Text>
+              </>
+            )}
+            {showScanDiagnostics ? (
+              <Text
+                variant="caption"
+                mono
+                color="$colorMuted"
+                textAlign="center"
+              >
+                {t("scanDiagnosticsReads").replace(
+                  "{reads}",
+                  String(scanDiagnostics.reads),
+                )}
+                {scanDiagnostics.lastValue
+                  ? ` · ${scanDiagnostics.lastValue}…`
+                  : ""}
+                {scanDiagnostics.lastRejection
+                  ? ` · ${scanDiagnostics.lastRejection}`
+                  : ""}
+              </Text>
+            ) : null}
           </Stack>
         )}
-        <Row gap="$sm">
+        {isSendScan ? (
+          <ListRow
+            icon="Keyboard"
+            title={t("manualPayOpen")}
+            onPress={onTypePayment}
+          />
+        ) : null}
+        {isSendScan && onchainTransfersShown ? (
+          <ListRow
+            icon="Bitcoin"
+            title={t("onchainSendTitle")}
+            onPress={() => {
+              closeScan();
+              navigateTo({ route: "onchainSend" });
+            }}
+            testID="scan-onchain-send"
+          />
+        ) : null}
+        <Row gap="$sm" alignItems="stretch">
           {actions.map((action) => (
-            <Button
+            <OptionTile
               key={action.label}
-              ref={action.ref}
-              variant="secondary"
+              label={action.label}
               icon={action.icon}
               flex={1}
               onPress={action.onPress}
-            >
-              {action.label}
-            </Button>
+            />
           ))}
         </Row>
       </Stack>
     </>
   );
 
-  // Rendered as a sibling of the full-screen Dialog so the Sheet opens above its top layer.
-  const moreSheet = isSendScan ? (
-    <Sheet
-      open={moreOpen}
-      onOpenChange={setMoreSheetOpen}
-      title={t("scanMoreOptions")}
-      returnFocusTo={moreButtonRef}
-    >
-      <ListRow
-        icon="Keyboard"
-        title={t("manualPayOpen")}
-        onPress={() => {
-          setMoreSheetOpen(false);
-          onTypePayment();
-        }}
-      />
-      <ListRow
-        icon="BadgePlus"
-        title={t("cashuEmit")}
-        onPress={() => {
-          setMoreSheetOpen(false);
-          onIssueToken();
-        }}
-      />
-      {onchainTransfersShown ? (
-        <ListRow
-          icon="Bitcoin"
-          title={t("onchainSendTitle")}
-          onPress={() => {
-            setMoreSheetOpen(false);
-            closeScan();
-            navigateTo({ route: "onchainSend" });
-          }}
-          testID="scan-onchain-send"
-        />
-      ) : null}
-    </Sheet>
-  ) : null;
-
   if (isDesktopSplitView) {
     return (
-      <>
-        <Stack
-          role="dialog"
-          aria-label={title}
-          flex={1}
-          padding="$xl"
-          backgroundColor="$background"
-        >
-          <Row justifyContent="space-between">
-            <Text variant="title">{title}</Text>
-            <IconButton
-              icon="X"
-              size="sm"
-              accessibilityLabel={t("close")}
-              onPress={handleClose}
-            />
-          </Row>
-          {content}
-        </Stack>
-        {moreSheet}
-      </>
+      <Stack
+        role="dialog"
+        aria-label={title}
+        flex={1}
+        padding="$xl"
+        backgroundColor="$background"
+      >
+        <Row justifyContent="space-between">
+          <Text variant="title">{title}</Text>
+          <IconButton
+            icon="X"
+            size="sm"
+            accessibilityLabel={t("close")}
+            onPress={handleClose}
+          />
+        </Row>
+        {content}
+      </Stack>
     );
   }
 
   return (
-    <>
-      <Dialog
-        open
-        onOpenChange={(open) => {
-          if (!open) handleClose();
-        }}
-        title={title}
-        closeLabel={t("close")}
-        fullScreen
-      >
-        {content}
-      </Dialog>
-      {moreSheet}
-    </>
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) handleClose();
+      }}
+      title={title}
+      closeLabel={t("close")}
+      fullScreen
+    >
+      {content}
+    </Dialog>
   );
 }

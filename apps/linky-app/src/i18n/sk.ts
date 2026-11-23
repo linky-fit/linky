@@ -14,7 +14,6 @@ export const sk = {
   settingsSecurity: "Zabezpečenie",
   settingsDebug: "Debug",
   settingsDeveloper: "Vývojár",
-  scanMoreOptions: "Ďalšie",
   nostrInspector: "Inspector",
   nostrInspectorLogs: "Ukladať logy inspectora",
   nostrInspectorLogsStats:
@@ -880,9 +879,6 @@ export const sk = {
   manualPaySuggestions: "Zhodné kontakty",
   manualPayLinkyAliasHint: "Skúsim {address}",
   spdPaymentTitle: "Banková platba",
-  spdPaymentSectionAccount: "Účet",
-  spdPaymentSectionPayment: "Platba",
-  spdPaymentSectionCzechSymbols: "Platobné symboly (VS / SS / KS)",
   spdPaymentCurrency: "Mena",
   spdPaymentRequestReimbursementCountOne: "Žiadať preplatenie od 1 kontaktu",
   spdPaymentRequestReimbursementCountOther:

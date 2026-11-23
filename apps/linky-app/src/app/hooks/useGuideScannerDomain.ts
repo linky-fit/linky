@@ -27,7 +27,6 @@ import {
   scanDiagnosticsAtom,
   scanEntryPointAtom,
   scanIsOpenAtom,
-  scanPausedAtom,
   scanVideoRefAtom,
   type ScanDiagnostics,
   type ScanEntryPoint,
@@ -127,7 +126,6 @@ export const useGuideScannerDomain = ({
   });
 
   const [scanIsOpen, setScanIsOpen] = useAtom(scanIsOpenAtom);
-  const [scanPaused, setScanPaused] = useAtom(scanPausedAtom);
   const [scanEntryPoint, setScanEntryPoint] = useAtom(scanEntryPointAtom);
   const [scanStream, setScanStream] = React.useState<MediaStream | null>(null);
   const [scanCameraDevices, setScanCameraDevices] = useAtom(
@@ -140,8 +138,6 @@ export const useGuideScannerDomain = ({
   const scanVideoRef = useAtomValue(scanVideoRefAtom);
   const scanOpenRequestIdRef = React.useRef(0);
   const scanIsOpenRef = React.useRef(false);
-  const scanPausedRef = React.useRef(scanPaused);
-  scanPausedRef.current = scanPaused;
   const nativeScanHandleRef = React.useRef<NativeScanStreamHandle | null>(null);
   const preferredCameraDeviceIdRef = React.useRef<string | null>(null);
   // Held as a promise so that frames arriving while the reader still loads
@@ -204,9 +200,7 @@ export const useGuideScannerDomain = ({
     animatedQrReaderRef.current = null;
     setScanDiagnostics(SCAN_DIAGNOSTICS_START);
     scanIsOpenRef.current = false;
-    scanPausedRef.current = false;
     setScanIsOpen(false);
-    setScanPaused(false);
     setScanEntryPoint(null);
     setScanCameraDevices([]);
     setScanCameraDeviceId(null);
@@ -216,7 +210,6 @@ export const useGuideScannerDomain = ({
   }, [
     stopScanStream,
     setScanIsOpen,
-    setScanPaused,
     setScanEntryPoint,
     setScanDiagnostics,
     setScanCameraDevices,
@@ -228,10 +221,6 @@ export const useGuideScannerDomain = ({
     animatedQrReaderRef.current = null;
     setScanDiagnostics((current) => ({ ...current, animation: null }));
   }, [setScanDiagnostics]);
-
-  React.useEffect(() => {
-    if (scanPaused) resetAnimatedQr();
-  }, [resetAnimatedQr, scanPaused]);
 
   /**
    * One frame of a NUT-16 animation is not a payload: it is collected until
@@ -252,15 +241,8 @@ export const useGuideScannerDomain = ({
       }));
       if (!isFrame) return value;
 
-      const readerPromise = (animatedQrReaderRef.current ??=
-        createAnimatedQrReader());
-      const reader = await readerPromise;
-      if (
-        animatedQrReaderRef.current !== readerPromise ||
-        scanPausedRef.current
-      ) {
-        return null;
-      }
+      animatedQrReaderRef.current ??= createAnimatedQrReader();
+      const reader = await animatedQrReaderRef.current;
 
       const progress = reader.receive(value);
       if (progress.status === "collecting") {
@@ -291,9 +273,8 @@ export const useGuideScannerDomain = ({
 
   const handleDetectedScanValue = React.useCallback(
     async (value: string) => {
-      if (scanPausedRef.current) return false;
       const payload = await collectScanValue(value);
-      if (payload === null || scanPausedRef.current) return false;
+      if (payload === null) return false;
       await handleScannedTextRef.current(payload);
       return true;
     },
@@ -318,7 +299,6 @@ export const useGuideScannerDomain = ({
 
       const value = (result.value ?? "").trim();
       if (value) {
-        if (scanPausedRef.current) return;
         const nativeScanHandle = nativeScanHandleRef.current;
         // Without a stream handle this came from the one-shot scanner, which
         // has already closed on this frame and can never collect the rest.
@@ -329,14 +309,7 @@ export const useGuideScannerDomain = ({
         }
 
         const payload = await collectScanValue(value);
-        if (
-          payload === null ||
-          scanPausedRef.current ||
-          requestId !== scanOpenRequestIdRef.current ||
-          !scanIsOpenRef.current
-        ) {
-          return;
-        }
+        if (payload === null) return;
 
         // Stop before handing on: the stream would otherwise keep reporting
         // the same code while the payload is being processed.
@@ -380,8 +353,6 @@ export const useGuideScannerDomain = ({
     (entryPoint: ScanEntryPoint) => {
       stopScanStream();
       scanIsOpenRef.current = true;
-      scanPausedRef.current = false;
-      setScanPaused(false);
       setScanEntryPoint(entryPoint);
       setScanIsOpen(true);
 
@@ -591,7 +562,6 @@ export const useGuideScannerDomain = ({
       stopScanStream,
       t,
       setScanIsOpen,
-      setScanPaused,
       setScanEntryPoint,
       setScanCameraDevices,
     ],
@@ -754,21 +724,9 @@ export const useGuideScannerDomain = ({
           if (handled) {
             return;
           }
-          if (scanPausedRef.current) {
-            rafId = window.requestAnimationFrame(() => {
-              void tick();
-            });
-            return;
-          }
 
           if (detector) {
             const codes = await detector.detect(video);
-            if (cancelled || scanPausedRef.current) {
-              rafId = window.requestAnimationFrame(() => {
-                void tick();
-              });
-              return;
-            }
             const value = (codes?.[0]?.rawValue ?? "").trim();
             if (value) {
               const didHandle = await handleDetectedScanValue(value);

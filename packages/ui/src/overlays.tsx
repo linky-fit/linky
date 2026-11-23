@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import { Dialog as TamaguiDialog, useMedia, VisuallyHidden } from "tamagui";
 import { IconButton } from "./controls";
 import { useDialogBehavior } from "./dialogBehavior";
-import type { FocusableTarget } from "./dialogBehavior";
 import { Row, ScrollList, Stack } from "./layout";
 import { textVariant } from "./styles";
 import { enterScale, shadow, space } from "./tokens";
@@ -70,7 +69,6 @@ interface ModalProps {
   onOpenChange: (open: boolean) => void;
   placement: keyof typeof placements;
   described: boolean;
-  returnFocusTo?: FocusableTarget | undefined;
   testID?: string | undefined;
   children: ReactNode;
 }
@@ -81,11 +79,10 @@ function Modal({
   onOpenChange,
   placement,
   described,
-  returnFocusTo,
   testID,
   children,
 }: ModalProps) {
-  const behavior = useDialogBehavior(open, onOpenChange, returnFocusTo);
+  const behavior = useDialogBehavior(open, onOpenChange);
   const styles = placements[placement];
   return (
     <TamaguiDialog modal open={open} onOpenChange={onOpenChange}>
@@ -221,8 +218,6 @@ export interface SheetProps {
   title: string;
   /** Hides the visible title; it still names the sheet for assistive technology. */
   hideTitle?: boolean | undefined;
-  /** Explicit element to restore focus to on close when opened from inside another dialog. */
-  returnFocusTo?: FocusableTarget | undefined;
   children: ReactNode;
 }
 
@@ -232,7 +227,6 @@ export function Sheet({
   onOpenChange,
   title,
   hideTitle = false,
-  returnFocusTo,
   children,
 }: SheetProps) {
   const { wide } = useMedia();
@@ -252,7 +246,6 @@ export function Sheet({
       onOpenChange={onOpenChange}
       placement={wide ? "center" : "bottom"}
       described={false}
-      returnFocusTo={returnFocusTo}
     >
       {hideTitle ? <VisuallyHidden>{titleText}</VisuallyHidden> : titleText}
       <ScrollList flexShrink={1}>

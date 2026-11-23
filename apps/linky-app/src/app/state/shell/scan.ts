@@ -33,9 +33,6 @@ export const SCAN_DIAGNOSTICS_START: ScanDiagnostics = {
 
 export const scanIsOpenAtom = Atom.keepAlive(Atom.make(false));
 
-/** Pauses QR decoding while a sheet sits above the camera so nothing auto-pays behind it. */
-export const scanPausedAtom = Atom.keepAlive(Atom.make(false));
-
 /** Where the open scanner was started from, which decides what it accepts. */
 export const scanEntryPointAtom = Atom.keepAlive(
   Atom.make<ScanEntryPoint | null>(null),
