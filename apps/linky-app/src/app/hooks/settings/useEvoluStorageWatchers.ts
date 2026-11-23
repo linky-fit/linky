@@ -6,7 +6,9 @@ import {
   useEvoluServerProbes,
   useWipeEvoluStorage,
 } from "../../../evolu";
+import { useDesktopSplitView } from "../../../hooks/useDesktopSplitView";
 import type { Route } from "../../../types/route";
+import { getDesktopRouteSection } from "../../routes/desktopRouteSection";
 import {
   evoluStorageCommandsAtom,
   evoluWipeBusyAtom,
@@ -23,17 +25,29 @@ const EVOLU_PAGES: ReadonlySet<Route["kind"]> = new Set([
   "evoluHistoryData",
 ]);
 
+const EVOLU_PROBE_PAGES: ReadonlySet<Route["kind"]> = new Set([
+  "settings",
+  "advanced",
+  "evoluServers",
+  "evoluServer",
+  "evoluServerNew",
+]);
+
 /**
  * Evolu's error watch, relay probes, database info for the Evolu pages, and
  * the user's storage reset. Mounted once by the shell.
  */
 export const useEvoluStorageWatchers = (route: Route): void => {
+  const isDesktopSplitView = useDesktopSplitView();
   const pushToast = usePushToast();
   const { t } = useTranslation();
   const evoluLastError = useEvoluLastError({ logToConsole: true });
   const wipeEvoluStorageImpl = useWipeEvoluStorage();
   const [wipeIsBusy, setWipeIsBusy] = useAtom(evoluWipeBusyAtom);
-  useEvoluServerProbes();
+  const probeEvoluServers =
+    EVOLU_PROBE_PAGES.has(route.kind) ||
+    (isDesktopSplitView && getDesktopRouteSection(route) === "settings");
+  useEvoluServerProbes({ enabled: probeEvoluServers });
   useEvoluDatabaseInfoState({ enabled: EVOLU_PAGES.has(route.kind) });
 
   const wipeEvoluStorage = React.useCallback(async () => {

@@ -1,5 +1,5 @@
 import { RegistryContext } from "@linky-fit/linkstr-react";
-import { act } from "react";
+import { act, useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useEvoluServerProbes, useEvoluServers } from "./evolu";
 import { makeTestAppRegistry } from "./testUtils/appRegistry";
@@ -104,5 +104,80 @@ describe("Evolu relay settings", () => {
     );
     await page.unmount();
     await shell.unmount();
+  });
+
+  it("skips WebSocket probing while disabled and stops when disabled again", async () => {
+    vi.useFakeTimers();
+    let openedCount = 0;
+    let openImmediately = true;
+    class CountingWebSocket extends EventTarget {
+      constructor() {
+        super();
+        openedCount += 1;
+        if (openImmediately) {
+          queueMicrotask(() => this.dispatchEvent(new Event("open")));
+        }
+      }
+      close() {}
+    }
+    vi.stubGlobal("WebSocket", CountingWebSocket);
+    const registry = makeTestAppRegistry();
+
+    let latestStatus: Readonly<Record<string, string>> = {};
+    function Shell({ enabled }: { enabled: boolean }) {
+      useEvoluServerProbes({ enabled, probeIntervalMs: 1000 });
+      const { statusByUrl } = useEvoluServers();
+      useEffect(() => {
+        latestStatus = statusByUrl;
+      });
+      return null;
+    }
+
+    const view = await renderIntoDocument(
+      <RegistryContext.Provider value={registry}>
+        <Shell enabled={false} />
+      </RegistryContext.Provider>,
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(openedCount).toBe(0);
+
+    await view.rerender(
+      <RegistryContext.Provider value={registry}>
+        <Shell enabled />
+      </RegistryContext.Provider>,
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(150);
+    });
+    expect(openedCount).toBe(recommended.length);
+    expect(latestStatus).toEqual(
+      Object.fromEntries(recommended.map((url) => [url, "connected"])),
+    );
+
+    await view.rerender(
+      <RegistryContext.Provider value={registry}>
+        <Shell enabled={false} />
+      </RegistryContext.Provider>,
+    );
+    const countAfterDisable = openedCount;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(openedCount).toBe(countAfterDisable);
+
+    // Re-enabling marks stale statuses as checking while the fresh probe runs.
+    openImmediately = false;
+    await view.rerender(
+      <RegistryContext.Provider value={registry}>
+        <Shell enabled />
+      </RegistryContext.Provider>,
+    );
+    expect(latestStatus).toEqual(
+      Object.fromEntries(recommended.map((url) => [url, "checking"])),
+    );
+
+    await view.unmount();
   });
 });

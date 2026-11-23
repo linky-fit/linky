@@ -139,12 +139,11 @@ const useDismissTopModal = (): (() => void) | null => {
 };
 
 /**
- * The signed-in shell's once-only watchers and the owners of commands that
- * keep their machinery in one place: identity, Evolu, messaging, wallet,
- * scanner and login signers. It also runs the Android back handler with its
- * modal priority, and tilt-to-show; screens read atoms and feature hooks.
+ * The signed-in shell's core watchers and command owners: identity, messaging,
+ * profile, wallet, scanner and login signers. Mounted inside a headless leaf
+ * sibling so message/balance updates never re-render the visible shell tree.
  */
-export const useAppShellComposition = ({
+const useAppShellComposition = ({
   currentNsec,
 }: UseAppShellCompositionParams): void => {
   const route = useRouting();
@@ -162,13 +161,6 @@ export const useAppShellComposition = ({
   const transactions = useTransactionsRepository();
   const setStatus = useSetStatus();
   const copyText = useCopyText();
-  useEvoluStorageWatchers(route);
-  useDisplayCurrencyGuard();
-  useFiatRatesSync();
-  useStoragePersistRequestEffect({ refreshKey: t });
-  useStatusToasts();
-  useAppPreferences();
-  useMainReturnTabWatcher(route);
   const { fiatRates, formatDisplayedAmountParts, formatDisplayedAmountText } =
     useDisplayAmounts();
 
@@ -293,7 +285,28 @@ export const useAppShellComposition = ({
     saveCashuFromText: wallet.saveCashuFromText,
     selectedContact: messaging.selectedChatContact,
   });
+};
 
+const EvoluStorageWatcher = () => {
+  const route = useRouting();
+  useEvoluStorageWatchers(route);
+  return null;
+};
+
+const ShellUtilityWatchers = () => {
+  const route = useRouting();
+  const { t } = useAppLanguage();
+  useDisplayCurrencyGuard();
+  useFiatRatesSync();
+  useStoragePersistRequestEffect({ refreshKey: t });
+  useStatusToasts();
+  useAppPreferences();
+  useMainReturnTabWatcher(route);
+  return null;
+};
+
+const TiltShareWatcher = () => {
+  const route = useRouting();
   const scanIsOpen = useScanIsOpen();
   const tiltEnabled = useAtomValue(showProfileQrOnTiltAtom);
   const setProfileShareOverlayIsOpen = useAtomSet(profileShareOverlayOpenAtom);
@@ -310,7 +323,12 @@ export const useAppShellComposition = ({
       }
     },
   });
+  return null;
+};
 
+const NativeBackWatcher = () => {
+  const route = useRouting();
+  const scanIsOpen = useScanIsOpen();
   const { closeScan } = useScanCommands();
   const { navigateToMainReturn } = useMainMenu();
   const closeContactDetail = useCloseContactDetail();
@@ -334,4 +352,29 @@ export const useAppShellComposition = ({
     }),
     scanIsOpen,
   });
+  return null;
 };
+
+const AppShellCoreWatchers = ({
+  currentNsec,
+}: UseAppShellCompositionParams) => {
+  useAppShellComposition({ currentNsec });
+  return null;
+};
+
+/**
+ * Headless once-only shell watchers split into independent siblings so modal,
+ * Evolu, tilt, messaging and wallet updates stay isolated from each other and
+ * from the visible route tree.
+ */
+export const AppShellWatchers = ({
+  currentNsec,
+}: UseAppShellCompositionParams): React.ReactElement => (
+  <>
+    <EvoluStorageWatcher />
+    <ShellUtilityWatchers />
+    <AppShellCoreWatchers currentNsec={currentNsec} />
+    <TiltShareWatcher />
+    <NativeBackWatcher />
+  </>
+);

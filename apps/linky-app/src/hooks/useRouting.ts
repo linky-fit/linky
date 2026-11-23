@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { encodeNpub, type Pubkey } from "@linky-fit/linkstr";
 import type { MessageId, OnchainTransferId } from "@linky-fit/linksync";
 import type { CashuOperationId, ContactId } from "../evolu";
@@ -56,21 +56,50 @@ export const returnFromBankPaymentOffer = (fallbackChatId: string): void => {
   navigateTo({ route: "chat", id: fallbackChatId });
 };
 
-export const useRouting = () => {
-  const [route, setRoute] = useState<Route>(() => parseRouteFromHash());
+const routeListeners = new Set<() => void>();
+let cachedHash: string | null = null;
+let cachedExplicitEmptyHash: boolean | null = null;
+let cachedRoute: Route | null = null;
 
-  useEffect(() => {
-    const onHashChange = () => setRoute(parseRouteFromHash());
-    window.addEventListener("hashchange", onHashChange);
-    return () => window.removeEventListener("hashchange", onHashChange);
-  }, []);
-
-  // The native back press is handled by `useNativeBackHandler`, which walks the
-  // route hierarchy instead of the browser history. See its doc comment for why
-  // `history.back()` is not usable here.
-
-  return route;
+const readRouteSnapshot = (): Route => {
+  const hash = globalThis.location?.hash ?? "";
+  const explicitEmptyHash = (globalThis.location?.href ?? "").endsWith("#");
+  if (
+    cachedRoute !== null &&
+    cachedHash === hash &&
+    cachedExplicitEmptyHash === explicitEmptyHash
+  ) {
+    return cachedRoute;
+  }
+  cachedHash = hash;
+  cachedExplicitEmptyHash = explicitEmptyHash;
+  cachedRoute = parseRouteFromHash();
+  return cachedRoute;
 };
+
+const notifyRouteListeners = (): void => {
+  readRouteSnapshot();
+  for (const listener of routeListeners) listener();
+};
+
+const subscribeRoute = (listener: () => void): (() => void) => {
+  if (routeListeners.size === 0) {
+    window.addEventListener("hashchange", notifyRouteListeners);
+  }
+  routeListeners.add(listener);
+  return () => {
+    routeListeners.delete(listener);
+    if (routeListeners.size === 0) {
+      window.removeEventListener("hashchange", notifyRouteListeners);
+    }
+  };
+};
+
+// The native back press is handled by `useNativeBackHandler`, which walks the
+// route hierarchy instead of the browser history. See its doc comment for why
+// `history.back()` is not usable here.
+export const useRouting = (): Route =>
+  useSyncExternalStore(subscribeRoute, readRouteSnapshot);
 
 // Navigation types
 type NavigationAction =
