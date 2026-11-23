@@ -17,3 +17,13 @@ export const nfcWritePromptKindAtom = Atom.keepAlive(
 
 /** The user cancelled the pending NFC write, so its cancelled result is not reported. */
 export const nfcWriteCancelledByUserAtom = Atom.keepAlive(Atom.make(false));
+
+export interface LocalOverlayDismissEntry {
+  readonly id: symbol;
+  readonly dismiss: () => void;
+}
+
+/** LIFO stack of route-local sheets/modals so Android Back closes the topmost one first. */
+export const localOverlayDismissStackAtom = Atom.keepAlive(
+  Atom.make<readonly LocalOverlayDismissEntry[]>([]),
+);

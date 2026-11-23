@@ -151,7 +151,6 @@ export const platformSeamRatchet = [
   "src/hooks/useRouting.ts",
   "src/lnurlAuth.ts",
   "src/lnurlPay.ts",
-  "src/pages/AdvancedPage.tsx",
   "src/pages/BankPaymentOfferDetailPage.tsx",
   "src/pages/CashuTokenPage.tsx",
   "src/pages/CashuTokensPage.tsx",

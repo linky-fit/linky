@@ -21,7 +21,7 @@ export interface ListRowProps {
   /** Sets the icon on a tinted badge of this tone, e.g. for a hub's destinations. */
   iconTone?: Tone | undefined;
   leading?: ReactNode;
-  /** Muted text at the end of the row, e.g. a setting's current value; a string title also labels it. */
+  /** Muted text at the end of the row, e.g. a setting's current value; on non-pressable rows, a string title also labels it. */
   value?: string | number | undefined;
   trailing?: ReactNode;
   /** A control beside the row, outside its press target, e.g. a button next to a row that opens something else. */
@@ -78,7 +78,7 @@ function ListRowFrame({
   trailing,
   onPress,
   chevron = onPress !== undefined,
-  selected = false,
+  selected,
   active = false,
   expanded,
   destructive = false,
@@ -106,7 +106,8 @@ function ListRowFrame({
       onPress={onPress}
       disabled={disabled}
       aria-label={accessibilityLabel}
-      aria-selected={selected || active}
+      aria-pressed={onPress && selected !== undefined ? selected : undefined}
+      aria-current={active ? "true" : undefined}
       aria-expanded={expanded}
       gap="$md"
       minHeight="$controlLg"
@@ -160,8 +161,13 @@ function ListRowFrame({
           {value === undefined ? null : (
             <Text
               variant="label"
+              fontWeight="$regular"
               color="$colorMuted"
-              aria-label={typeof title === "string" ? title : undefined}
+              numberOfLines={1}
+              flexShrink={1}
+              aria-label={
+                !onPress && typeof title === "string" ? title : undefined
+              }
             >
               {value}
             </Text>

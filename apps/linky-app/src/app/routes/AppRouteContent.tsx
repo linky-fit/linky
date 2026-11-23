@@ -30,8 +30,8 @@ import {
   ContactRoute,
   ContactPayRoute,
   ChatStoragePage,
+  DeveloperPage,
   EvoluCurrentDataPage,
-  EvoluDataDetailPage,
   EvoluHistoryDataPage,
   EvoluServerNewPage,
   EvoluServerPage,
@@ -76,7 +76,7 @@ import {
 import { useRouting } from "../../hooks/useRouting";
 import type { Route } from "../../types/route";
 import { useTranslation } from "../hooks/shell";
-import { useScanIsOpen } from "../hooks/shell/scan";
+import { useScanCommands, useScanIsOpen } from "../hooks/shell/scan";
 import { ContactsPane, DesktopContactsPane, WalletPane } from "./MainTabPanes";
 import {
   getDesktopRouteSection,
@@ -103,8 +103,9 @@ const RoutePage = (): React.ReactElement => {
     case "walletHistory":
       return <WalletHistoryPage />;
     case "settings":
-    case "advanced":
       return <AdvancedPage />;
+    case "advanced":
+      return <DeveloperPage />;
     case "settingsUnits":
       return <SettingsPage />;
     case "settingsTutorial":
@@ -175,8 +176,6 @@ const RoutePage = (): React.ReactElement => {
       return <EvoluServerPage />;
     case "evoluServerNew":
       return <EvoluServerNewPage />;
-    case "evoluData":
-      return <EvoluDataDetailPage />;
     case "nostrRelays":
       return <NostrRelaysPage />;
     case "nostrRelayNew":
@@ -482,6 +481,16 @@ const DesktopSplitPanes = ({
 export const AppRouteContent = (): React.ReactElement => {
   const route = useRouting();
   const isDesktopSplitView = useDesktopSplitView();
+  const { closeScan } = useScanCommands();
+  const scanIsOpen = useScanIsOpen();
+  const routeKey = JSON.stringify(route);
+  const previousRouteKeyRef = React.useRef(routeKey);
+
+  React.useEffect(() => {
+    if (previousRouteKeyRef.current === routeKey) return;
+    previousRouteKeyRef.current = routeKey;
+    if (scanIsOpen) closeScan();
+  }, [closeScan, routeKey, scanIsOpen]);
 
   if (!isDesktopSplitView) return <PhoneRouteContent />;
 

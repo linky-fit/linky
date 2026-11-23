@@ -13,7 +13,7 @@ export function DataValue({ value, previewLength = 40 }: DataValueProps) {
       <CodeBlock>{value}</CodeBlock>
     </Disclosure>
   ) : (
-    <Text variant="caption" userSelect="text">
+    <Text variant="caption" userSelect="text" numberOfLines={1} flexShrink={1}>
       {value}
     </Text>
   );

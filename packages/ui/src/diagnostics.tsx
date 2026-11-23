@@ -81,21 +81,34 @@ export function DataTable({
       ))}
     </Stack>
   );
-  return fill ? table : <ScrollView horizontal>{table}</ScrollView>;
+  return fill ? (
+    table
+  ) : (
+    <ScrollView horizontal width="100%">
+      {table}
+    </ScrollView>
+  );
 }
 
 export interface DisclosureProps {
   title: string;
   children: ReactNode;
+  defaultOpen?: boolean | undefined;
 }
 
-export function Disclosure({ title, children }: DisclosureProps) {
-  const [open, setOpen] = useState(false);
+export function Disclosure({
+  title,
+  children,
+  defaultOpen = false,
+}: DisclosureProps) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <Stack gap="$sm">
+    <Stack gap="$sm" minWidth={0} maxWidth="100%">
       <Pressable
         gap="$sm"
         minHeight="$control"
+        minWidth={0}
+        maxWidth="100%"
         aria-expanded={open}
         onPress={() => setOpen(!open)}
       >
@@ -104,7 +117,9 @@ export function Disclosure({ title, children }: DisclosureProps) {
           size="sm"
           color="$colorMuted"
         />
-        <Text variant="label">{title}</Text>
+        <Text variant="label" flexShrink={1} numberOfLines={1}>
+          {title}
+        </Text>
       </Pressable>
       {open ? children : null}
     </Stack>

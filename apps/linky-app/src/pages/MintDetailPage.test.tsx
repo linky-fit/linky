@@ -1,5 +1,8 @@
+import { AtomRegistry, RegistryContext } from "@linky-fit/linkstr-react";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { localOverlayDismissStackAtom } from "../app/state/shell/overlays";
+import { createStoredProofFixture } from "../testUtils/cashuInventory";
 import {
   createMintSettings,
   type MintSettings,
@@ -117,6 +120,43 @@ describe("MintDetailPage", () => {
       setDefault.click();
     });
     expect(applyDefaultMintSelection).toHaveBeenCalledWith(mintUrl);
+    await unmount();
+  });
+
+  it("opens the move-funds keypad inside a sheet and dismisses it on Android back", async () => {
+    const registry = AtomRegistry.make();
+    mintSettings = createMintSettings({
+      cashuProofs: [
+        createStoredProofFixture({ mint: "https://cashu.cz", amount: 50 }),
+      ],
+    });
+
+    const { container, unmount } = await renderIntoDocument(
+      <RegistryContext.Provider value={registry}>
+        <MintDetailPage mintUrl="https://cashu.cz" />
+      </RegistryContext.Provider>,
+    );
+    expect(document.querySelector('[data-testid="mint-move-form"]')).toBeNull();
+
+    const openMove = container.querySelector<HTMLButtonElement>(
+      '[data-testid="mint-move-open"]',
+    );
+    if (!openMove) throw new Error("move funds button missing");
+    await act(async () => {
+      openMove.click();
+    });
+    expect(
+      document.querySelector('[role="dialog"] [data-testid="mint-move-form"]'),
+    ).not.toBeNull();
+    const dismiss = registry.get(localOverlayDismissStackAtom).at(-1)?.dismiss;
+    expect(dismiss).toBeDefined();
+
+    await act(async () => {
+      dismiss?.();
+    });
+    expect(registry.get(localOverlayDismissStackAtom)).toHaveLength(0);
+    await act(() => new Promise((resolve) => setTimeout(resolve, 400)));
+    expect(document.querySelector('[data-testid="mint-move-form"]')).toBeNull();
     await unmount();
   });
 });

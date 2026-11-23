@@ -6,17 +6,6 @@ import { options } from "../sample-data";
 export const controls: Section = {
   title: "Controls",
   entries: {
-    ActionTile: () => (
-      <UI.Row>
-        <UI.ActionTile
-          flex={1}
-          icon="HandCoins"
-          label="Bank transfer"
-          caption="5 contacts pay"
-        />
-        <UI.ActionTile flex={1} icon="Banknote" label="Cash" tone="warning" />
-      </UI.Row>
-    ),
     Button: () => (
       <UI.Row flexWrap="wrap">
         <UI.Button icon="Send">Primary</UI.Button>

@@ -14,6 +14,8 @@ export const pt = {
   settingsNetwork: "Rede",
   settingsSecurity: "Segurança",
   settingsDebug: "Depuração",
+  settingsDeveloper: "Desenvolvedor",
+  scanMoreOptions: "Mais",
   nostrInspector: "Inspetor",
   nostrInspectorLogs: "Coletar registros do inspetor",
   nostrInspectorLogsStats:
@@ -217,7 +219,7 @@ export const pt = {
   logoutConfirmBackUpFirst: "Salvar as chaves primeiro",
 
   nostrIdentity: "Identidade Nostr",
-  masterKeys: "Chaves mestras",
+  masterKeys: "Seed de recuperação",
   masterKeysShow: "Mostrar",
   masterKeysHide: "Ocultar",
   pasteCustomNostrKeys: "Colar uma identidade Nostr própria",
@@ -687,11 +689,11 @@ export const pt = {
     "Digite uma mensagem e toque em Enviar. O botão de imagem anexa uma imagem ou um PDF.",
   guideBackupKeysStep1Title: "Configurações",
   guideBackupKeysStep1Body: "Abra Configurações na barra inferior.",
-  guideBackupKeysStep2Title: "Chaves mestras",
-  guideBackupKeysStep2Body: "Em Segurança, toque em Chaves mestras.",
+  guideBackupKeysStep2Title: "Seed de recuperação",
+  guideBackupKeysStep2Body: "Em Segurança, toque em Seed de recuperação.",
   guideBackupKeysStep3Title: "Fazer backup das chaves",
   guideBackupKeysStep3Body:
-    "Copie suas chaves mestras e guarde-as em um lugar seguro.",
+    "Copie sua seed de recuperação e guarde-a em um lugar seguro.",
   contactsOnboardingTaskAddContact: "Adicionar contato",
   contactsOnboardingTaskBackupKeys: "Fazer backup das chaves",
   contactsOnboardingTaskTopup: "Receber bitcoin",
@@ -885,6 +887,9 @@ export const pt = {
   manualPaySuggestions: "Contatos correspondentes",
   manualPayLinkyAliasHint: "Vai tentar {address}",
   spdPaymentTitle: "Pagamento bancário",
+  spdPaymentSectionAccount: "Conta",
+  spdPaymentSectionPayment: "Pagamento",
+  spdPaymentSectionCzechSymbols: "Símbolos de pagamento (VS / SS / KS)",
   spdPaymentCurrency: "Moeda",
   spdPaymentRequestReimbursementCountOne: "Pedir a 1 contato para pagar",
   spdPaymentRequestReimbursementCountOther:
@@ -1041,7 +1046,7 @@ export const pt = {
     "Toque no saldo da carteira ou no valor enquanto digita para alternar entre as moedas permitidas.",
   decimalInput: "Casas decimais",
   showProfileQrOnTilt: "Inclinar para mostrar o perfil",
-  sendReadReceipts: "Enviar confirmações de leitura",
+  sendReadReceipts: "Confirmações de visualização",
   passOnListings: "Repassar anúncios dos contatos",
   decimalPoint: ",",
 

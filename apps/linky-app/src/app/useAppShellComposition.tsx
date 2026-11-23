@@ -30,7 +30,7 @@ import {
   useSetStatus,
 } from "./hooks/shell";
 import { useLoginCommands } from "./hooks/shell/login";
-import { useNavIntent } from "./hooks/shell/navIntents";
+import { useNavIntent, useSetNavIntent } from "./hooks/shell/navIntents";
 import { useCancelNfcWrite } from "./hooks/shell/nfc";
 import { useProvideOwnerCommands } from "./hooks/shell/ownerCommands";
 import { useScanCommands, useScanIsOpen } from "./hooks/shell/scan";
@@ -69,6 +69,7 @@ import {
 import { currentPubkeyAtom } from "./state/session/session";
 import { showProfileQrOnTiltAtom } from "./state/shell/devicePrefs";
 import {
+  localOverlayDismissStackAtom,
   nfcWritePromptKindAtom,
   profileShareOverlayOpenAtom,
 } from "./state/shell/overlays";
@@ -112,6 +113,7 @@ const useDismissTopModal = (): (() => void) | null => {
   const pendingCashuPaymentRequest = useAtomValue(
     pendingCashuPaymentRequestAtom,
   );
+  const localOverlayDismissStack = useAtomValue(localOverlayDismissStackAtom);
 
   if (share.shareOptionsText) return share.closeShareOptions;
   if (profileShareOverlayIsOpen) {
@@ -135,7 +137,7 @@ const useDismissTopModal = (): (() => void) | null => {
   if (pendingIdentitySwitch) {
     return () => void answerPendingIdentitySwitch(null);
   }
-  return null;
+  return localOverlayDismissStack.at(-1)?.dismiss ?? null;
 };
 
 /**
@@ -334,6 +336,10 @@ const NativeBackWatcher = () => {
   const closeContactDetail = useCloseContactDetail();
   const backFromContactNew = useBackFromContactNew();
   const contactPayBackToChatId = useNavIntent("contactPayBackToChat");
+  const cashuTokensBackTo = useNavIntent("cashuTokensBackTo");
+  const evoluDataBackTo = useNavIntent("evoluDataBackTo");
+  const setCashuTokensBackTo = useSetNavIntent("cashuTokensBackTo");
+  const setEvoluDataBackTo = useSetNavIntent("evoluDataBackTo");
   const ownPubkey = useAtomValue(currentPubkeyAtom);
   const sharedListingChatId = useChatIdOfMessage(
     route.kind === "listing" ? route.messageId : null,
@@ -344,8 +350,12 @@ const NativeBackWatcher = () => {
     dismissTopModal,
     navigateBack: resolveBackAction(route, {
       backFromContactNew,
+      cashuTokensBackTo,
+      clearCashuTokensBackTo: () => setCashuTokensBackTo(null),
+      clearEvoluDataBackTo: () => setEvoluDataBackTo(null),
       closeContactDetail,
       contactPayBackToChatId,
+      evoluDataBackTo,
       navigateToMainReturn,
       ownPubkey,
       sharedListingChatId,

@@ -20,7 +20,6 @@ const EVOLU_PAGES: ReadonlySet<Route["kind"]> = new Set([
   "evoluServers",
   "evoluServer",
   "evoluServerNew",
-  "evoluData",
   "evoluCurrentData",
   "evoluHistoryData",
 ]);

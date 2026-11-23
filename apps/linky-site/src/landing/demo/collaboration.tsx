@@ -1,11 +1,12 @@
 import {
-  ActionTile,
   AvatarGroup,
   Avatar,
   Button,
   Divider,
+  Icon,
   IconButton,
   ListRow,
+  Pressable,
   Row,
   SegmentedControl,
   Stack,
@@ -23,6 +24,55 @@ import { useCues, useFlow } from "./playback";
 
 type Hub = "Bank transfer" | "Cash" | "Goods and services";
 
+function DemoActionTile({
+  label,
+  icon,
+  caption,
+  onPress,
+}: {
+  label: string;
+  icon: "QrCode" | "Banknote" | "Package";
+  caption: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      flexDirection="column"
+      justifyContent="center"
+      flexGrow={1}
+      gap="$xs"
+      paddingTop="$xl"
+      paddingBottom="$lg"
+      paddingHorizontal="$md"
+      borderRadius="$card"
+      backgroundColor="$surface"
+      hoverStyle={{ backgroundColor: "$surfaceRaised" }}
+      pressStyle={{ backgroundColor: "$backgroundPress" }}
+      onPress={onPress}
+    >
+      <Stack
+        marginBottom="$sm"
+        padding="$md"
+        borderRadius="$card"
+        backgroundColor="$accentSoft"
+      >
+        <Icon name={icon} size="lg" color="$accentText" />
+      </Stack>
+      <Text bold textAlign="center" numberOfLines={2}>
+        {label}
+      </Text>
+      <Text
+        variant="caption"
+        color="$colorMuted"
+        textAlign="center"
+        numberOfLines={1}
+      >
+        {caption}
+      </Text>
+    </Pressable>
+  );
+}
+
 /** The Collaboration tab with a touch on the tile labelled `tapped`. */
 function CollaborationScene({ tapped }: { tapped?: Hub | undefined }) {
   const tile = (
@@ -32,8 +82,7 @@ function CollaborationScene({ tapped }: { tapped?: Hub | undefined }) {
     inRow = true,
   ) => (
     <Tap on={label === tapped} flex={inRow ? 1 : undefined}>
-      <ActionTile
-        flexGrow={1}
+      <DemoActionTile
         icon={icon}
         label={label}
         caption={caption}

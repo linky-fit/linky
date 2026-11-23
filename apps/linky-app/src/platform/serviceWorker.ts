@@ -60,3 +60,19 @@ export const registerServiceWorker = ({
     workbox.messageSkipWaiting();
   };
 };
+
+/** Checks registered service workers for updates, then reloads the app. */
+export const updateAndReloadApp = async (): Promise<void> => {
+  if ("serviceWorker" in navigator) {
+    try {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.allSettled(
+        registrations.map((registration) => registration.update()),
+      );
+    } catch {
+      // Reload anyway even if the service worker update check fails.
+    }
+  }
+
+  window.location.reload();
+};

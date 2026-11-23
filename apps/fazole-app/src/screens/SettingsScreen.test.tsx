@@ -190,10 +190,10 @@ describe("the mint setting", () => {
     const dialog = byTestId(document.body, "mint-dialog");
     expect(dialog.textContent).toContain("mint.minibits.cash");
     expect(
-      byTestId(dialog, "mint-row-cashu.cz").getAttribute("aria-selected"),
+      byTestId(dialog, "mint-row-cashu.cz").getAttribute("aria-pressed"),
     ).toBe("true");
     expect(
-      byTestId(dialog, "mint-row-kashu.me").getAttribute("aria-selected"),
+      byTestId(dialog, "mint-row-kashu.me").getAttribute("aria-pressed"),
     ).not.toBe("true");
   });
 

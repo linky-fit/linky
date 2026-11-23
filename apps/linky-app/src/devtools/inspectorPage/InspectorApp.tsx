@@ -199,10 +199,10 @@ function DetailPane({
       $compact={{ width: "100%", flex: 1 }}
     >
       <Stack gap="$lg" padding="$lg">
-        <Row justifyContent="space-between">
-          <Stack gap="$xs">
+        <Row justifyContent="space-between" gap="$sm">
+          <Stack gap="$xs" flex={1} minWidth={0}>
             <Text eyebrow>Row #{row.id}</Text>
-            <Text variant="title" role="heading">
+            <Text variant="title" role="heading" numberOfLines={2}>
               {row.tag}
             </Text>
           </Stack>
@@ -710,7 +710,11 @@ export function InspectorApp({
             />
           ))}
         </Row>
-        <Stack flexGrow={1} minWidth="$column">
+        <Stack
+          flexGrow={1}
+          minWidth="$column"
+          $compact={{ minWidth: 0, width: "100%" }}
+        >
           <TextField
             label="Filter rows"
             hideLabel

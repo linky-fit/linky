@@ -48,6 +48,7 @@ describe("desktopRouteSection", () => {
     expect(isDesktopSectionRoot({ kind: "contacts" })).toBe(true);
     expect(isDesktopSectionRoot({ kind: "wallet" })).toBe(true);
     expect(isDesktopSectionRoot({ kind: "settings" })).toBe(true);
+    expect(isDesktopSectionRoot({ kind: "advanced" })).toBe(false);
     expect(isDesktopSectionRoot({ kind: "topup" })).toBe(false);
   });
 
@@ -56,7 +57,11 @@ describe("desktopRouteSection", () => {
       true,
     );
     expect(isDesktopSectionEntryRoute({ kind: "topup" })).toBe(true);
-    expect(isDesktopSectionEntryRoute({ kind: "cashuTokens" })).toBe(true);
+    expect(isDesktopSectionEntryRoute({ kind: "advanced" })).toBe(true);
+    expect(isDesktopSectionEntryRoute({ kind: "advancedInspector" })).toBe(
+      false,
+    );
+    expect(isDesktopSectionEntryRoute({ kind: "cashuTokens" })).toBe(false);
     expect(isDesktopSectionEntryRoute({ kind: "cashuTokenNew" })).toBe(false);
   });
 

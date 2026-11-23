@@ -105,7 +105,7 @@ export function Topbar({
               uri={contactPictureUrl(npub, nostrPictureByNpub) ?? undefined}
               size="sm"
             />
-            <Text variant="label" bold color="$colorSubtle" numberOfLines={1}>
+            <Text variant="title" color="$colorStrong" numberOfLines={1}>
               {name}
             </Text>
           </Pressable>

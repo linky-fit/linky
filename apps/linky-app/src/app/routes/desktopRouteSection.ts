@@ -69,7 +69,6 @@ export const getDesktopRouteSection = (route: Route): DesktopRouteSection => {
     case "evoluServers":
     case "evoluServer":
     case "evoluServerNew":
-    case "evoluData":
     case "evoluCurrentData":
     case "evoluHistoryData":
     case "cashuProofs":
@@ -96,8 +95,7 @@ export const isDesktopSectionRoot = (route: Route): boolean =>
   route.kind === "contacts" ||
   route.kind === "wallet" ||
   route.kind === "collaboration" ||
-  route.kind === "settings" ||
-  route.kind === "advanced";
+  route.kind === "settings";
 
 export const isDesktopSectionEntryRoute = (route: Route): boolean => {
   switch (route.kind) {
@@ -126,14 +124,12 @@ export const isDesktopSectionEntryRoute = (route: Route): boolean => {
     case "settingsReceiveMethod":
     case "settingsMasterKeys":
     case "settingsNostrIdentity":
+    case "advanced":
     case "advancedAutoPayLimit":
-    case "advancedInspector":
     case "mints":
     case "nostrRelays":
     case "chatStorage":
     case "evoluServers":
-    case "evoluData":
-    case "cashuTokens":
       return true;
 
     default:

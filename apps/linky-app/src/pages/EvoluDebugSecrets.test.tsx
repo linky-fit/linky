@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { loadEvoluCurrentData, loadEvoluHistoryData } from "../evolu";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { EvoluCurrentDataPage } from "./EvoluCurrentDataPage";
-import { EvoluDataDetailPage } from "./EvoluDataDetailPage";
 import { EvoluHistoryTable } from "../components/EvoluHistoryTable";
 
 vi.mock("../app/hooks/shell", async () =>
@@ -62,14 +61,6 @@ const expectNoSecrets = (container: HTMLElement) => {
   expect(container.textContent).toContain("[redacted]");
 };
 
-const clickNamedButton = async (container: HTMLElement, name: string) => {
-  const button = [...container.querySelectorAll("button")].find(
-    (button) => button.textContent === name,
-  );
-  expect(button).toBeDefined();
-  await act(async () => button?.click());
-};
-
 beforeEach(() => {
   vi.clearAllMocks();
   const data: Awaited<ReturnType<typeof loadEvoluCurrentData>> = {};
@@ -95,14 +86,6 @@ describe("routine Evolu debug views", () => {
     }
     expectNoSecrets(view.container);
     expect(view.container.textContent).toContain("42");
-    await view.unmount();
-  });
-
-  it("redacts both detail-page data sections", async () => {
-    const view = await renderIntoDocument(<EvoluDataDetailPage />);
-    await clickNamedButton(view.container, "evoluCurrentDataJson");
-    await clickNamedButton(view.container, "evoluHistoryDataJson");
-    expectNoSecrets(view.container);
     await view.unmount();
   });
 

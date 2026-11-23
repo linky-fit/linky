@@ -104,11 +104,21 @@ describe("SpdPaymentPage offer recipients", () => {
     ).toEqual(["true", "true", "false"]);
     const request = requestButton(container);
     const firstContact = contactButtons[0];
+    const stepper = delayStepper(container);
     expect(
       request &&
         firstContact &&
-        Boolean(request.compareDocumentPosition(firstContact) & 4),
+        Boolean(firstContact.compareDocumentPosition(request) & 4),
     ).toBe(true);
+    expect(
+      request &&
+        stepper &&
+        Boolean(stepper.compareDocumentPosition(request) & 4),
+    ).toBe(true);
+    expect(
+      container.querySelector('[data-testid="bank-payment-fiat-amount"]')
+        ?.textContent,
+    ).toBe("480 CZK");
 
     await act(async () => {
       contactButtons[1]?.click();
@@ -528,6 +538,12 @@ describe("SpdPaymentPage manual entry", () => {
     expect(isDisabled(confirm)).toBe(true);
     // An empty form is not an error until the user starts typing.
     expect(container.querySelector('[role="alert"]')).toBeNull();
+    // Czech payment symbols start collapsed until expanded.
+    expect(container.querySelector("#bank-payment-field-X-VS")).toBeNull();
+    await act(async () => {
+      buttonByText(container, "spdPaymentSectionCzechSymbols")?.click();
+    });
+    expect(container.querySelector("#bank-payment-field-X-VS")).not.toBeNull();
 
     const currency = container.querySelector<HTMLSelectElement>(
       'select[aria-label="spdPaymentCurrency"]',

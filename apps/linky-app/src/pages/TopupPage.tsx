@@ -12,7 +12,7 @@ import { navigateTo } from "../hooks/useRouting";
 import { useScanCommands } from "../app/hooks/shell/scan";
 
 export const TopupPage: FC = () => {
-  const { pasteScanValue } = useScanCommands();
+  const { openReceiveScan, pasteScanValue } = useScanCommands();
   const { t } = useTranslation();
   const currentNpub = useAtomValue(currentNpubAtom);
   const onchainTransfersShown = useOnchainTransfersShown();
@@ -89,6 +89,14 @@ export const TopupPage: FC = () => {
           onPress={() => void pasteAmountOrScanValue()}
         >
           {t("paste")}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          icon="ScanLine"
+          onPress={openReceiveScan}
+        >
+          {t("scan")}
         </Button>
         {onchainTransfersShown ? (
           <Button

@@ -29,7 +29,6 @@ export type { BrandMarkProps } from "./brand-mark";
 
 // Controls and fields
 export {
-  ActionTile,
   Button,
   Chip,
   IconButton,
@@ -41,7 +40,6 @@ export {
   Switch,
 } from "./controls";
 export type {
-  ActionTileProps,
   ButtonProps,
   ButtonVariant,
   ChipProps,
@@ -142,13 +140,12 @@ export type {
 } from "./navigation";
 
 // Payments
-export { Keypad, PaymentBanner, QRCode, SuccessOverlay } from "./payments";
+export { Keypad, PaymentBanner, QRCode } from "./payments";
 export type {
   KeypadKey,
   KeypadProps,
   PaymentBannerProps,
   QRCodeProps,
-  SuccessOverlayProps,
 } from "./payments";
 
 // Messaging and media

@@ -1,16 +1,24 @@
+import { AtomRegistry, RegistryContext } from "@linky-fit/linkstr-react";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Translate } from "../i18n";
+import { localOverlayDismissStackAtom } from "../app/state/shell/overlays";
 import type { ScanDiagnostics } from "../app/state/shell/scan";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 
-const { mockNavigate, mockScanView, mockScanCommands, mockScanShortcuts } =
-  vi.hoisted(() => ({
-    mockNavigate: vi.fn(),
-    mockScanView: vi.fn(),
-    mockScanCommands: vi.fn(),
-    mockScanShortcuts: vi.fn(),
-  }));
+const {
+  mockNavigate,
+  mockScanView,
+  mockScanCommands,
+  mockScanShortcuts,
+  mockSetScanPaused,
+} = vi.hoisted(() => ({
+  mockNavigate: vi.fn(),
+  mockScanView: vi.fn(),
+  mockScanCommands: vi.fn(),
+  mockScanShortcuts: vi.fn(),
+  mockSetScanPaused: vi.fn(),
+}));
 
 vi.mock("../hooks/useRouting", () => ({
   navigateTo: mockNavigate,
@@ -18,14 +26,11 @@ vi.mock("../hooks/useRouting", () => ({
 
 import { ScanModal } from "./ScanModal";
 
-vi.mock("../devtools/inspector/inspectorEnabled", () => ({
-  useInspectorEmissionEnabled: () => false,
-}));
-
 vi.mock("../app/hooks/shell/scan", () => ({
   useScanCommands: mockScanCommands,
   useScanShortcuts: mockScanShortcuts,
   useScanView: mockScanView,
+  useSetScanPaused: () => mockSetScanPaused,
 }));
 
 vi.mock("../app/hooks/shell", async () =>
@@ -79,6 +84,8 @@ const translate = (key: string): string => {
       return "Scan";
     case "scanTypeManually":
       return "Type";
+    case "scanMoreOptions":
+      return "More";
     case "manualPayOpen":
       return "Type recipient";
     default:
@@ -102,6 +109,7 @@ const press = async (element: HTMLElement | undefined) => {
 describe("ScanModal", () => {
   afterEach(() => {
     mockNavigate.mockReset();
+    mockSetScanPaused.mockReset();
   });
 
   const baseProps = {
@@ -216,7 +224,7 @@ describe("ScanModal", () => {
     expect(onTypeManually).toHaveBeenCalledTimes(1);
   });
 
-  it("returns receive scan close to wallet", async () => {
+  it("dismisses receive scan without navigating away from the receive page", async () => {
     const closeScan = vi.fn();
 
     await renderIntoDocument(
@@ -230,10 +238,10 @@ describe("ScanModal", () => {
     await press(buttonNamed("Close"));
 
     expect(closeScan).toHaveBeenCalledTimes(1);
-    expect(mockNavigate).toHaveBeenCalledWith({ route: "wallet" });
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it("shows issue action in send flow and calls it", async () => {
+  it("shows issue action under More in send flow and calls it", async () => {
     const onIssueToken = vi.fn();
 
     await renderIntoDocument(
@@ -245,12 +253,14 @@ describe("ScanModal", () => {
       />,
     );
 
+    expect(buttonNamed("Issue")).toBeUndefined();
+    await press(buttonNamed("More"));
     await press(buttonNamed("Issue"));
 
     expect(onIssueToken).toHaveBeenCalledTimes(1);
   });
 
-  it("shows manual recipient action in send flow and calls it", async () => {
+  it("shows manual recipient action under More in send flow and calls it", async () => {
     const onTypePayment = vi.fn();
 
     await renderIntoDocument(
@@ -262,8 +272,44 @@ describe("ScanModal", () => {
       />,
     );
 
+    expect(buttonNamed("Type recipient")).toBeUndefined();
+    await press(buttonNamed("More"));
     await press(buttonNamed("Type recipient"));
 
     expect(onTypePayment).toHaveBeenCalledTimes(1);
+  });
+
+  it("pauses scanning, registers Android back dismiss, and restores focus to More when dismissed", async () => {
+    const registry = AtomRegistry.make();
+    const closeScan = vi.fn();
+
+    await renderIntoDocument(
+      <RegistryContext.Provider value={registry}>
+        <TestScanModal
+          {...baseProps}
+          closeScan={closeScan}
+          scanEntryPoint="send"
+          showWalletActions={true}
+        />
+      </RegistryContext.Provider>,
+    );
+
+    const more = buttonNamed("More");
+    more?.focus();
+    await press(more);
+
+    expect(mockSetScanPaused).toHaveBeenCalledWith(true);
+    const dismiss = registry.get(localOverlayDismissStackAtom).at(-1)?.dismiss;
+    expect(dismiss).toBeDefined();
+
+    await act(async () => {
+      dismiss?.();
+    });
+    await act(() => new Promise((resolve) => setTimeout(resolve, 500)));
+
+    expect(mockSetScanPaused).toHaveBeenLastCalledWith(false);
+    expect(closeScan).not.toHaveBeenCalled();
+    expect(buttonNamed("Issue")).toBeUndefined();
+    expect(document.activeElement).toBe(more);
   });
 });

@@ -1,32 +1,41 @@
 import { RegistryContext, useAtomSet } from "@linky-fit/linkstr-react";
 import React from "react";
-import { navigateTo, useRouting } from "../../../hooks/useRouting";
+import { navigateTo } from "../../../hooks/useRouting";
 import type { Route } from "../../../types/route";
 import { mainReturnTabAtom } from "../../state/shell/topbar";
+import { useSetNavIntent } from "../shell/navIntents";
 
-/** Remembers the main tab the user was last on; mounted once by the shell. */
+const CASHU_TOKEN_ROUTE_KINDS: ReadonlySet<Route["kind"]> = new Set([
+  "cashuTokens",
+  "cashuToken",
+  "cashuTokenNew",
+  "cashuTokenEmit",
+  "cashuProofs",
+]);
+
+/** Remembers the main tab and clears scoped back intents on route change; mounted once by the shell. */
 export const useMainReturnTabWatcher = (route: Route): void => {
   const setMainReturnTab = useAtomSet(mainReturnTabAtom);
+  const setCashuTokensBackTo = useSetNavIntent("cashuTokensBackTo");
+  const setEvoluDataBackTo = useSetNavIntent("evoluDataBackTo");
   React.useEffect(() => {
     if (route.kind === "wallet" || route.kind === "contacts") {
       setMainReturnTab(route.kind);
     }
-  }, [route.kind, setMainReturnTab]);
+    if (!CASHU_TOKEN_ROUTE_KINDS.has(route.kind)) {
+      setCashuTokensBackTo(null);
+    }
+    if (route.kind !== "evoluCurrentData") {
+      setEvoluDataBackTo(null);
+    }
+  }, [route.kind, setCashuTokensBackTo, setEvoluDataBackTo, setMainReturnTab]);
 };
 
-/** Back to the main tab the user came from, and Settings opened from it. */
+/** Back to the main tab the user came from. */
 export const useMainMenu = () => {
   const registry = React.useContext(RegistryContext);
-  const route = useRouting();
   const navigateToMainReturn = React.useCallback(() => {
     navigateTo({ route: registry.get(mainReturnTabAtom) });
   }, [registry]);
-  const openMenu = React.useCallback(() => {
-    registry.set(
-      mainReturnTabAtom,
-      route.kind === "wallet" ? "wallet" : "contacts",
-    );
-    navigateTo({ route: "settings" });
-  }, [registry, route.kind]);
-  return { navigateToMainReturn, openMenu };
+  return { navigateToMainReturn };
 };

@@ -239,6 +239,14 @@ describe("parseRouteFromHash", () => {
 
     expect(parseRouteFromHash()).toEqual({ kind: "manualPay" });
   });
+
+  it("parses the evolu current data route and its legacy #evolu-data alias", () => {
+    replaceHash("#evolu-current-data");
+    expect(parseRouteFromHash()).toEqual({ kind: "evoluCurrentData" });
+
+    replaceHash("#evolu-data");
+    expect(parseRouteFromHash()).toEqual({ kind: "evoluCurrentData" });
+  });
 });
 
 describe("parseNativeDeepLinkUrl", () => {

@@ -2,9 +2,17 @@ import { useEffect } from "react";
 import { BackHandler } from "react-native";
 import type { GetProps, Dialog } from "tamagui";
 
+export interface FocusableTarget {
+  readonly current: {
+    focus?: () => void;
+    isConnected?: boolean;
+  } | null;
+}
+
 export type DialogBehaviorHook = (
   open: boolean,
   onOpenChange: (open: boolean) => void,
+  returnFocusTo?: FocusableTarget | undefined,
 ) => Pick<
   GetProps<typeof Dialog.Content>,
   "tabIndex" | "onOpenAutoFocus" | "onCloseAutoFocus"

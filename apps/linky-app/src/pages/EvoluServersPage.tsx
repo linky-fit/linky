@@ -12,6 +12,7 @@ import { evoluSyncStatus } from "../utils/connectionStatus";
 
 import React from "react";
 import { useTranslation } from "../app/hooks/shell";
+import { useSetNavIntent } from "../app/hooks/shell/navIntents";
 import { useEvoluSettings } from "../app/hooks/settings/useEvoluSettings";
 import { deriveEvoluServerState } from "../app/lib/evoluServerState";
 import { navigateTo } from "../hooks/useRouting";
@@ -35,6 +36,7 @@ export function EvoluServersPage(): React.ReactElement {
     requestClearDatabase,
     syncOwnerId,
   } = useEvoluSettings();
+  const setEvoluDataBackTo = useSetNavIntent("evoluDataBackTo");
   const { t } = useTranslation();
   const counts = Object.values(evoluTableCounts);
   const totalCurrentRows = counts.reduce<number | null>(
@@ -109,7 +111,10 @@ export function EvoluServersPage(): React.ReactElement {
           title={t("evoluData")}
           value={formatEvoluRowCount(t, totalCurrentRows)}
           testID="evoluData"
-          onPress={() => navigateTo({ route: "evoluCurrentData" })}
+          onPress={() => {
+            setEvoluDataBackTo(null);
+            navigateTo({ route: "evoluCurrentData" });
+          }}
         />
 
         <ListRow

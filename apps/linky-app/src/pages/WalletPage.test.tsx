@@ -7,6 +7,7 @@ import { WalletHistoryPage, WalletPage } from "./WalletPage";
 
 const state = vi.hoisted(() => ({
   orders: new Array<{ id: string }>(),
+  entries: new Array<{ kind: "transaction"; item: { id: string } }>(),
 }));
 
 vi.mock("../app/hooks/shell", async () =>
@@ -17,9 +18,22 @@ vi.mock("../app/hooks/payments/useRecurringPaymentOrders", () => ({
 }));
 vi.mock("../app/hooks/payments/useTransactionHistory", () => ({
   useTransactionHistory: () => ({
-    entries: [],
+    entries: state.entries,
     t: (key: string) => key,
   }),
+}));
+vi.mock("../components/TransactionRow", () => ({
+  TransactionRow: ({
+    item,
+    onPress,
+  }: {
+    item: { id: string };
+    onPress: () => void;
+  }) => (
+    <button type="button" data-testid={`tx-${item.id}`} onClick={onPress}>
+      {item.id}
+    </button>
+  ),
 }));
 vi.mock("../app/hooks/useOnchainTransfers", () => ({
   useOnchainTransfers: () => [],
@@ -58,11 +72,13 @@ const button = (container: HTMLElement, label: string) =>
 
 afterEach(() => {
   state.orders = [];
+  state.entries = [];
   vi.mocked(navigateTo).mockClear();
+  closeScan.mockClear();
 });
 
 describe("WalletPage", () => {
-  it("opens the history from its own button instead of listing it", async () => {
+  it("omits the recent transactions section while empty and opens History from its button", async () => {
     const { container } = await renderWallet();
 
     expect(container.textContent).not.toContain("transactionsTitle");
@@ -71,6 +87,30 @@ describe("WalletPage", () => {
       button(container, "walletHistory")?.click();
     });
     expect(navigateTo).toHaveBeenCalledWith({ route: "walletHistory" });
+  });
+
+  it("surfaces up to 4 recent transactions directly on the wallet and closes scan when opening one", async () => {
+    state.entries = ["tx-1", "tx-2", "tx-3", "tx-4", "tx-5"].map((id) => ({
+      kind: "transaction",
+      item: { id },
+    }));
+    const { container } = await renderWallet();
+
+    expect(container.textContent).toContain("transactionsTitle");
+    expect(container.querySelector('[data-testid="tx-tx-1"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="tx-tx-4"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="tx-tx-5"]')).toBeNull();
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[data-testid="tx-tx-2"]')
+        ?.click();
+    });
+    expect(closeScan).toHaveBeenCalledOnce();
+    expect(navigateTo).toHaveBeenCalledWith({
+      route: "transaction",
+      id: "tx-2",
+    });
   });
 
   it("closes the open scanner before it opens History or Receive", async () => {

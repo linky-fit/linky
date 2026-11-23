@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EvoluErrorType } from "../evolu";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
-import { EvoluDataDetailPage } from "./EvoluDataDetailPage";
 import { EvoluServersPage } from "./EvoluServersPage";
 
 const counts = vi.hoisted(() => {
@@ -135,27 +134,13 @@ describe("Evolu row counts", () => {
     await view.unmount();
   });
 
-  it("does not describe pending detail table counts as no data", async () => {
-    const view = await renderIntoDocument(<EvoluDataDetailPage />);
-    expect(view.container.textContent).not.toContain("evoluNoDataYet");
-    expect(view.container.textContent).toContain("unknown");
-    await view.unmount();
-  });
-
-  it("does not present partial counts or their percentages as complete totals", async () => {
+  it("does not present partial counts as complete totals", async () => {
     counts.tables = { contact: 7, cashuToken: null, ownerMeta: 2 };
     counts.history = 870;
     const servers = await renderIntoDocument(<EvoluServersPage />);
     expect(rowValue(servers.container, "evoluData")).toContain("unknown");
     expect(rowValue(servers.container, "evoluHistory")).toContain("870 rows");
     await servers.unmount();
-
-    const detail = await renderIntoDocument(<EvoluDataDetailPage />);
-    expect(rowValue(detail.container, "evoluCurrentDataJson")).toBe("unknown");
-    expect(rowValue(detail.container, "evoluTotalRows")).toBe("unknown");
-    expect(rowValue(detail.container, "cashuToken")).toBe("unknown");
-    expect(rowValue(detail.container, "contact")).toBe("7 rows");
-    await detail.unmount();
   });
 });
 
