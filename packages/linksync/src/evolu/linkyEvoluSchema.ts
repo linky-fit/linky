@@ -130,4 +130,5 @@ export const linkyIndexes: IndexesConfig = (create) => [
     .column("keysetId")
     .expression(kyselySql`substr("createdAt", 1, 19)`)
     .column("mint"),
+  create("historyTable").on("evolu_history").column("table"),
 ];
