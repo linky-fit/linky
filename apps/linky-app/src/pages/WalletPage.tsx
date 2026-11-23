@@ -27,7 +27,6 @@ import { navigateTo } from "../hooks/useRouting";
 import { formatChatDayLabel } from "../utils/formatting";
 
 const TRANSACTION_PAGE_SIZE = 50;
-const RECENT_TRANSACTION_COUNT = 4;
 
 /** Runs of entries from the same calendar day, newest first like the entries. */
 const groupByDay = (entries: readonly HistoryEntry[]) => {
@@ -174,17 +173,15 @@ export const WalletPage: React.FC<WalletPageProps> = React.memo(
   ({ closeScan, openScan, scanIsOpen }) => {
     const { t } = useTranslation();
     const { cashuTotalBalance } = useWalletBalance();
-    const history = useTransactionHistory();
-    const recentEntries = history.entries.slice(0, RECENT_TRANSACTION_COUNT);
     // On a computer the scanner sits beside the wallet and would hide the page opened from it.
     const openInsteadOfScan = (route: "walletHistory" | "topup") => () => {
       closeScan();
       navigateTo({ route });
     };
     return (
-      <Stack flexGrow={1} gap="$xl">
-        <Stack gap="$xl" paddingTop="$xxl">
-          <Stack alignItems="center" gap="$xs">
+      <Stack flexGrow={1} gap="$xxl" justifyContent="space-between">
+        <Stack gap="$xxl">
+          <Stack alignItems="center" gap="$xs" paddingTop="$xxl">
             <DisplayAmount
               amount={cashuTotalBalance}
               accessibilityLabel={t("cashuBalance")}
@@ -200,54 +197,31 @@ export const WalletPage: React.FC<WalletPageProps> = React.memo(
               {t("walletHistory")}
             </Button>
           </Stack>
-          <Row gap="$sm">
-            <Button
-              variant="secondary"
-              flex={1}
-              icon="ArrowDownRight"
-              minHeight="$controlLg"
-              borderRadius="$pill"
-              onPress={openInsteadOfScan("topup")}
-              data-guide="wallet-topup"
-            >
-              {t("walletReceive")}
-            </Button>
-            <Button
-              flex={1}
-              icon="ArrowUpRight"
-              minHeight="$controlLg"
-              borderRadius="$pill"
-              onPress={openScan}
-              disabled={scanIsOpen}
-              data-guide="wallet-send"
-            >
-              {t("walletSend")}
-            </Button>
-          </Row>
+          <PendingOnchainTransfers />
         </Stack>
-        <PendingOnchainTransfers />
-        {recentEntries.length > 0 ? (
-          <Section grouped title={t("transactionsTitle")}>
-            {recentEntries.map((entry) =>
-              entry.kind === "onchainTransfer" ? (
-                <OnchainTransferHistoryRow
-                  key={entry.transfer.id}
-                  transfer={entry.transfer}
-                />
-              ) : (
-                <TransactionRow
-                  key={entry.item.id}
-                  history={history}
-                  item={entry.item}
-                  onPress={() => {
-                    closeScan();
-                    navigateTo({ route: "transaction", id: entry.item.id });
-                  }}
-                />
-              ),
-            )}
-          </Section>
-        ) : null}
+        <Row gap="$sm">
+          <Button
+            flex={1}
+            icon="ArrowDownRight"
+            minHeight="$controlLg"
+            borderRadius="$pill"
+            onPress={openInsteadOfScan("topup")}
+            data-guide="wallet-topup"
+          >
+            {t("walletReceive")}
+          </Button>
+          <Button
+            flex={1}
+            icon="ArrowUpRight"
+            minHeight="$controlLg"
+            borderRadius="$pill"
+            onPress={openScan}
+            disabled={scanIsOpen}
+            data-guide="wallet-send"
+          >
+            {t("walletSend")}
+          </Button>
+        </Row>
       </Stack>
     );
   },
