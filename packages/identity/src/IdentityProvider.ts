@@ -3,19 +3,10 @@ import { HDKey } from "@scure/bip32";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { Context, Effect, Layer, Schema } from "effect";
-import { deriveBip85Entropy, deriveOwnerKeyAtPath } from "./bip85";
+import { deriveBip85Entropy } from "./bip85";
 import { bip39MnemonicToSeed } from "./bip39Seed";
-import {
-  CASHU_SEED_PATH,
-  cashuOwnerPath,
-  contactsOwnerPath,
-  IDENTITY_OWNER_PATH,
-  messagesOwnerPath,
-  META_OWNER_PATH,
-  NOSTR_PATH,
-  transactionsOwnerPath,
-} from "./derivationPaths";
-import { CashuSeed, OwnerKey, OwnerLaneIndex } from "./domain";
+import { CASHU_SEED_PATH, NOSTR_PATH } from "./derivationPaths";
+import { CashuSeed } from "./domain";
 import { MasterSecretProvider } from "./MasterSecretProvider";
 
 export class IdentityProviderError extends Schema.TaggedError<IdentityProviderError>()(
@@ -26,15 +17,8 @@ export class IdentityProviderError extends Schema.TaggedError<IdentityProviderEr
 interface Identities {
   readonly nostrSigningKey: NostrSecretKey;
   readonly nostrPublicKey: Pubkey;
-
-  readonly cashuWalletSeed: CashuSeed;
-
-  readonly storageMetaOwnerKey: OwnerKey;
-  readonly storageIdentityOwnerKey: OwnerKey;
-  readonly storageContactsOwnerKey: (index: OwnerLaneIndex) => OwnerKey;
-  readonly storageCashuOwnerKey: (index: OwnerLaneIndex) => OwnerKey;
-  readonly storageMessagesOwnerKey: (index: OwnerLaneIndex) => OwnerKey;
-  readonly storageTransactionsOwnerKey: (index: OwnerLaneIndex) => OwnerKey;
+  /** Lazily derived and cached so callers that only need Nostr keys skip PBKDF2. */
+  readonly cashuWalletSeed: Effect.Effect<CashuSeed, IdentityProviderError>;
 }
 
 export class IdentityProvider extends Context.Service<
@@ -54,40 +38,38 @@ export class IdentityProvider extends Context.Service<
     const nostrSigningKey = NostrSecretKey.make(nostrNode.privateKey);
     const nostrPublicKey = derivePubkey(nostrSigningKey);
 
-    const cashuEntropy = deriveBip85Entropy(root, CASHU_SEED_PATH, 32);
-    const cashuMnemonic = entropyToMnemonic(cashuEntropy, wordlist);
-    const cashuWalletSeed = CashuSeed.make(
-      yield* bip39MnemonicToSeed(cashuMnemonic).pipe(
-        Effect.mapError(
-          (cause) =>
-            new IdentityProviderError({
-              cause,
-              message: "Cashu wallet seed derivation failed",
-            }),
+    const cashuWalletSeed = yield* Effect.cached(
+      Effect.try({
+        try: () =>
+          entropyToMnemonic(
+            deriveBip85Entropy(root, CASHU_SEED_PATH, 32),
+            wordlist,
+          ),
+        catch: (cause) =>
+          new IdentityProviderError({
+            cause,
+            message: "Cashu wallet seed derivation failed",
+          }),
+      }).pipe(
+        Effect.flatMap((cashuMnemonic) =>
+          bip39MnemonicToSeed(cashuMnemonic).pipe(
+            Effect.map(CashuSeed.make),
+            Effect.mapError(
+              (cause) =>
+                new IdentityProviderError({
+                  cause,
+                  message: "Cashu wallet seed derivation failed",
+                }),
+            ),
+          ),
         ),
       ),
-    );
-
-    const storageMetaOwnerKey = deriveOwnerKeyAtPath(root, META_OWNER_PATH);
-    const storageIdentityOwnerKey = deriveOwnerKeyAtPath(
-      root,
-      IDENTITY_OWNER_PATH,
     );
 
     return {
       nostrSigningKey,
       nostrPublicKey,
       cashuWalletSeed,
-      storageMetaOwnerKey,
-      storageIdentityOwnerKey,
-      storageContactsOwnerKey: (index: OwnerLaneIndex) =>
-        deriveOwnerKeyAtPath(root, contactsOwnerPath(index)),
-      storageCashuOwnerKey: (index: OwnerLaneIndex) =>
-        deriveOwnerKeyAtPath(root, cashuOwnerPath(index)),
-      storageMessagesOwnerKey: (index: OwnerLaneIndex) =>
-        deriveOwnerKeyAtPath(root, messagesOwnerPath(index)),
-      storageTransactionsOwnerKey: (index: OwnerLaneIndex) =>
-        deriveOwnerKeyAtPath(root, transactionsOwnerPath(index)),
     };
   }).pipe(
     Effect.catchDefect(

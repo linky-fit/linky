@@ -87,9 +87,6 @@ export const loginWithSecret = async (
         );
       } finally {
         identities.nostrSigningKey.fill(0);
-        identities.cashuWalletSeed.fill(0);
-        identities.storageMetaOwnerKey.fill(0);
-        identities.storageIdentityOwnerKey.fill(0);
       }
     } finally {
       masterSecret.fill(0);

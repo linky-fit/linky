@@ -90,7 +90,8 @@ describe("SLIP-39", () => {
 
     expect(fromNoisy.nostrPublicKey).toBe(clean.nostrPublicKey);
     expect(fromNoisy.nostrSigningKey).toEqual(clean.nostrSigningKey);
-    expect(fromNoisy.cashuWalletSeed).toEqual(clean.cashuWalletSeed);
-    expect(fromNoisy.storageMetaOwnerKey).toEqual(clean.storageMetaOwnerKey);
+    expect(await Effect.runPromise(fromNoisy.cashuWalletSeed)).toEqual(
+      await Effect.runPromise(clean.cashuWalletSeed),
+    );
   });
 });
