@@ -54,9 +54,6 @@ export type Settlement =
   | { readonly method: "bank" | "lightning" }
   | { readonly method: "cashu"; readonly payer: DemoPayer };
 
-/** The customer who pays the live demo with Cashu from Linky. */
-export const livePayer: DemoPayer = { name: "Tereza Malá" };
-
 const seedPayment = (
   id: string,
   nowMs: number,

@@ -143,7 +143,7 @@ Like the site, the push server ships ahead of the app and must keep working with
 - The `fazole-production` branch has the same ruleset as `linky-production`. The `Fazole production` environment holds the same release app credentials and admits only `main` and `fazole-v*` tags.
 - Tags `linky-v*`, `fazole-v*` and `packages-v*`, and the `v*` tags of releases before the rename, have a ruleset that restricts updates and deletions. Creation stays open, because the releases create their tags with `GITHUB_TOKEN`.
 - The `zapstore` environment admits `main` and `linky-v*` tags, so a release run started from a tag can publish.
-- npm: the trusted publisher of both packages names `release-npm.yml`, with no environment or the `npm` environment.
+- npm: the trusted publisher of all three packages names `release-npm.yml`, with no environment or the `npm` environment.
 - The README's app version badges read `version` from `apps/linky-app/package.json` on `linky-production` and `apps/fazole-app/package.json` on `fazole-production`. The other badges read GitHub deployments: `Production – linky-website` and `Production – fazole-site` (Vercel), `push` (`release-push.yml`) and `npm` (`release-npm.yml`). A job using an environment records a deployment, and GitHub creates the `push` and `npm` environments on their first run.
 
 Pull requests keep their preview deployments.

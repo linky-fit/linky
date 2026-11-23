@@ -23,6 +23,7 @@ const pushDelivery = new PushDeliveryService({
   storage,
 });
 const relayWatcher = new RelayWatcher({
+  allowInsecureLocalhost: config.allowInsecureLocalhostRelays,
   relayUrls: config.defaultRelays,
   storage,
   pushDelivery,

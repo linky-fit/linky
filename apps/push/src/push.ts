@@ -187,6 +187,7 @@ export class PushDeliveryService {
     payloadData: PushNotificationData,
   ): Promise<void> {
     const endpointHash = hashSecret(subscription.endpoint);
+    const recipientHash = hashSecret(payloadData.recipientPubkey);
     const payload: PushNotificationEnvelope = {
       title: buildNotificationTitle(payloadData),
       body: notificationBody(payloadData),
@@ -207,7 +208,7 @@ export class PushDeliveryService {
       );
       this.storage.countDelivery("sent");
       console.info(
-        `[push] sent notification successfully id=${subscription.id} ${describePayload(payloadData)} recipient=${payloadData.recipientPubkey} endpoint=${endpointHash} ttl=${deliveryTtlSeconds(payloadData)}`,
+        `[push] sent notification successfully id=${subscription.id} ${describePayload(payloadData)} recipient=${recipientHash} endpoint=${endpointHash} ttl=${deliveryTtlSeconds(payloadData)}`,
       );
     } catch (error) {
       this.storage.countDelivery("failed");
@@ -224,7 +225,7 @@ export class PushDeliveryService {
         );
       }
       console.warn(
-        `[push] delivery failed ${describePayload(payloadData)} to ${payloadData.recipientPubkey} endpoint=${endpointHash} status=${statusCode ?? "unknown"}`,
+        `[push] delivery failed ${describePayload(payloadData)} to ${recipientHash} endpoint=${endpointHash} status=${statusCode ?? "unknown"}`,
       );
       throw error;
     }
@@ -239,6 +240,7 @@ export class PushDeliveryService {
     }
 
     const tokenHash = hashSecret(subscription.token);
+    const recipientHash = hashSecret(payloadData.recipientPubkey);
     const message: Message = {
       token: subscription.token,
       data: {
@@ -263,7 +265,7 @@ export class PushDeliveryService {
       const messageId = await this.messaging.send(message, false);
       this.storage.countDelivery("sent");
       console.info(
-        `[push] sent native notification successfully id=${subscription.id} ${describePayload(payloadData)} recipient=${payloadData.recipientPubkey} token=${tokenHash} messageId=${messageId}`,
+        `[push] sent native notification successfully id=${subscription.id} ${describePayload(payloadData)} recipient=${recipientHash} token=${tokenHash} messageId=${messageId}`,
       );
     } catch (error) {
       this.storage.countDelivery("failed");
@@ -275,8 +277,7 @@ export class PushDeliveryService {
         );
       }
       console.warn(
-        `[push] native delivery failed ${describePayload(payloadData)} to ${payloadData.recipientPubkey} token=${tokenHash} code=${code ?? "unknown"}`,
-        error,
+        `[push] native delivery failed ${describePayload(payloadData)} to ${recipientHash} token=${tokenHash} code=${code ?? "unknown"}`,
       );
       throw error;
     }

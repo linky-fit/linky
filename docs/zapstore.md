@@ -9,7 +9,7 @@ The job needs the `ZAPSTORE_NSEC` environment secret and fails, without printing
 1. Pick the Nostr identity that publishes Linky releases. `zapstore.yaml` currently uses the public Linky contact key `npub1kkht6jvgr8mt4844saf80j5jjwyy6fdy90sxsuxt4hfv8pel499s96jvz8`; a dedicated store identity is preferable, so replace the `pubkey` before the first publish if you have one.
 2. Have the matching private key in `nsec1...` format.
 3. In the repository's **Settings → Environments**, create the environment `zapstore` with the secret `ZAPSTORE_NSEC` set to the complete `nsec1...` for the `pubkey` in `zapstore.yaml`.
-4. Restrict the environment's deployment branches and tags to the protected `main` branch and release tags (`v*`). Do not add required reviewers if publishing must stay automatic.
+4. Restrict the environment's deployment branches and tags to the protected `main` branch and release tags (`linky-v*`). Do not add required reviewers if publishing must stay automatic.
 5. Prove that the APK signing certificate belongs to the Nostr identity. Zapstore only lists releases whose certificate has an active ownership proof (NIP-C1, kind `30509`) from the signer; without one every publish is silently dropped. The `zsp` wizard creates the proof from the release keystore and the `nsec`, and renews it the same way; the current proof expires on 2028-10-30:
 
    ```bash

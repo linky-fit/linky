@@ -146,7 +146,17 @@ export const loadProfilePicture = async (
 // Link previews render neither data URLs nor SVG, and Linky's generated avatars are DiceBear SVGs.
 const previewImageUrl = (picture: string | null, pageUrl: string): string => {
   if (!picture) return FALLBACK_IMAGE_URL;
-  if (picture.startsWith("data:")) return `${pageUrl}/picture`;
+  if (picture.startsWith("data:")) {
+    try {
+      const url = new URL(pageUrl);
+      url.search = "";
+      url.hash = "";
+      url.pathname = `${url.pathname.replace(/\/$/, "")}/picture`;
+      return url.toString();
+    } catch {
+      return `${pageUrl}/picture`;
+    }
+  }
   return picture.startsWith("https://api.dicebear.com/")
     ? picture.replace(/\/svg(\?|$)/, "/png$1")
     : picture;

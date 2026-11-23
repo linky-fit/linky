@@ -1,6 +1,6 @@
 services:
   push:
-    image: ghcr.io/your-org/linky-push:latest
+    image: ghcr.io/linky-fit/linky-push:latest
     container_name: linky-push
     restart: unless-stopped
     ports:

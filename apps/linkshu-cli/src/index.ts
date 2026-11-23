@@ -37,7 +37,8 @@ options:
   --help              this text
 
 environment:
-  LINKSHU_SEED        64-byte bip39 seed as hex; overrides <data-dir>/seed.hex`;
+  LINKSHU_SEED        64-byte bip39 seed as hex; overrides <data-dir>/seed.hex
+  LINKSHU_MINT_URL    default mint url when --mint is omitted`;
 
 const resolveDataDir = (fromFlag: string | undefined): string => {
   const dataDir = path.resolve(

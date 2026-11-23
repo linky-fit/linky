@@ -22,6 +22,11 @@ else
   done
 fi
 
+if [[ ${#scope[@]} -eq 0 ]]; then
+  echo "Scope: none"
+  exit 0
+fi
+
 echo "Scope: ${scope[*]}"
 for script in "$@"; do
   bun run "${scope[@]}" --if-present "$script"
