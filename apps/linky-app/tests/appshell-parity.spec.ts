@@ -343,7 +343,7 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
       ).toBeVisible();
     }
     await expect(
-      page.getByRole("button", { name: "Entwickler", exact: true }),
+      page.getByRole("button", { name: "Erweitert", exact: true }),
     ).toBeVisible();
     await page.getByRole("button", { name: /^Mint\b/ }).click();
     await expect(page).toHaveURL(/#advanced\/mints$/);

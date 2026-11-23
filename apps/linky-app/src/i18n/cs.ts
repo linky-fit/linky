@@ -11,7 +11,7 @@ export const cs = {
   settingsNetwork: "Síť",
   settingsSecurity: "Zabezpečení",
   settingsDebug: "Debug",
-  settingsDeveloper: "Vývojář",
+  settingsAdvanced: "Pokročilé",
   nostrInspector: "Inspector",
   nostrInspectorLogs: "Ukládat logy inspectoru",
   nostrInspectorLogsStats:

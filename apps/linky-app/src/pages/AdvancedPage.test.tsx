@@ -115,7 +115,7 @@ afterEach(() => {
 });
 
 describe("AdvancedPage", () => {
-  it("shows current Language and Units summaries and collapses developer tools behind Developer", async () => {
+  it("shows current Language and Units summaries and collapses advanced tools behind Advanced", async () => {
     const { container } = await renderSettings();
 
     expect(buttonContaining(container, "language")?.textContent).toContain(
@@ -126,7 +126,7 @@ describe("AdvancedPage", () => {
     expect(container.textContent).not.toContain("reloadApp");
 
     await act(async () => {
-      buttonContaining(container, "settingsDeveloper")?.click();
+      buttonContaining(container, "settingsAdvanced")?.click();
     });
     expect(navigateTo).toHaveBeenCalledWith({ route: "advanced" });
   });

@@ -8,7 +8,7 @@ import { navigateTo } from "../hooks/useRouting";
 import { updateAndReloadApp } from "../platform/serviceWorker";
 import { pickFile } from "../utils/pickFile";
 
-/** Developer and maintenance tools moved off the main Settings screen. */
+/** Advanced and maintenance tools moved off the main Settings screen. */
 export function DeveloperPage(): React.ReactElement {
   const { dedupeContacts, dedupeContactsIsBusy } = useDedupeContacts();
   const { exportAppData, handleImportAppDataFilePicked } = useAppDataActions();

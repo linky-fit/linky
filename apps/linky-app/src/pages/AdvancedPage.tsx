@@ -380,7 +380,7 @@ export function AdvancedPage(): React.ReactElement {
       <Section grouped>
         {linkRow(
           "Bug",
-          t("settingsDeveloper"),
+          t("settingsAdvanced"),
           () => navigateTo({ route: "advanced" }),
           {
             active: isOpen(
