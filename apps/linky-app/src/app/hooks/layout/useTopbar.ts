@@ -55,7 +55,7 @@ export const useTopbar = () => {
     route.kind === "listing" ? route.messageId : null,
   );
   const { navigateToMainReturn } = useMainMenu();
-  const { openScan, openWalletScan } = useScanCommands();
+  const { openReceiveScan, openScan, openWalletScan } = useScanCommands();
   const toggleContactsFilter = useToggleContactsFilter();
   const selectedChatContact = useChatContact(route);
   const selectedContact = useRouteContact(route);
@@ -105,6 +105,7 @@ export const useTopbar = () => {
       if (route.kind === "contactEdit") void deleteContact(route.id);
     },
     openContactScan: openScan,
+    openReceiveScan,
     openWalletScan,
     route,
     t,

@@ -335,6 +335,7 @@ describe("buildTopbarRight", () => {
     chatEditContactId: null,
     deleteEditedContact: vi.fn(),
     openContactScan: vi.fn(),
+    openReceiveScan: vi.fn(),
     openWalletScan: vi.fn(),
     t,
   };
@@ -377,7 +378,7 @@ describe("buildTopbarRight", () => {
     expect(openWalletScan).toHaveBeenCalledTimes(2);
     expect(openContactScan).not.toHaveBeenCalled();
 
-    for (const kind of ["proxyPayments", "settings", "topup"] as const) {
+    for (const kind of ["proxyPayments", "settings"] as const) {
       expect(
         buildTopbarRight({
           ...rightArgs,
@@ -385,6 +386,16 @@ describe("buildTopbarRight", () => {
         }),
       ).toBeNull();
     }
+
+    const openReceiveScan = vi.fn();
+    const topupButton = buildTopbarRight({
+      ...rightArgs,
+      openReceiveScan,
+      route: { kind: "topup" },
+    });
+    topupButton?.onClick();
+    expect(topupButton).toMatchObject({ icon: "ScanLine", label: "scan" });
+    expect(openReceiveScan).toHaveBeenCalledOnce();
   });
 
   it("omits orphaned settings gears on detail and payment routes", () => {

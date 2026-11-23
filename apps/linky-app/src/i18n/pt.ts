@@ -15,7 +15,6 @@ export const pt = {
   settingsSecurity: "Segurança",
   settingsDebug: "Depuração",
   settingsDeveloper: "Desenvolvedor",
-  scanMoreOptions: "Mais",
   nostrInspector: "Inspetor",
   nostrInspectorLogs: "Coletar registros do inspetor",
   nostrInspectorLogsStats:
@@ -887,9 +886,6 @@ export const pt = {
   manualPaySuggestions: "Contatos correspondentes",
   manualPayLinkyAliasHint: "Vai tentar {address}",
   spdPaymentTitle: "Pagamento bancário",
-  spdPaymentSectionAccount: "Conta",
-  spdPaymentSectionPayment: "Pagamento",
-  spdPaymentSectionCzechSymbols: "Símbolos de pagamento (VS / SS / KS)",
   spdPaymentCurrency: "Moeda",
   spdPaymentRequestReimbursementCountOne: "Pedir a 1 contato para pagar",
   spdPaymentRequestReimbursementCountOther:

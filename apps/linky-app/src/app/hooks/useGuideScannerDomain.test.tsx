@@ -6,11 +6,7 @@ import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import type { Translate } from "../../i18n";
 import type { PlatformTarget } from "../../platform/runtime";
 import { createAnimatedQrFrames } from "../../utils/animatedQr";
-import {
-  scanDiagnosticsAtom,
-  scanIsOpenAtom,
-  scanPausedAtom,
-} from "../state/shell/scan";
+import { scanDiagnosticsAtom, scanIsOpenAtom } from "../state/shell/scan";
 import { useGuideScannerDomain } from "./useGuideScannerDomain";
 
 interface NativeScanResult {
@@ -49,20 +45,6 @@ vi.mock("../../platform/runtime", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../platform/runtime")>()),
   getPlatformTarget: () => platform.target,
 }));
-const animatedQrGate = vi.hoisted((): { wait: Promise<void> | null } => ({
-  wait: null,
-}));
-vi.mock("../../utils/animatedQr", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../../utils/animatedQr")>();
-  return {
-    ...actual,
-    createAnimatedQrReader: async () => {
-      if (animatedQrGate.wait) await animatedQrGate.wait;
-      return actual.createAnimatedQrReader();
-    },
-  };
-});
 // The walkthrough reads the beacon, whose store needs the whole native bridge.
 vi.mock("./useBeacon", () => ({
   useBeacon: () => ({ enabled: false }),
@@ -125,7 +107,6 @@ const deliver = async (value: string) => {
 
 describe("native scanner stream", () => {
   afterEach(() => {
-    animatedQrGate.wait = null;
     native.onResult = null;
     native.oneShot = null;
     native.stop.mockReset();
@@ -195,61 +176,4 @@ describe("native scanner stream", () => {
       await rendered.unmount();
     },
   );
-
-  it("discards native detections while paused and resumes when unpaused", async () => {
-    const { onScannedText, registry, rendered } = await setup();
-
-    await act(async () => {
-      registry.set(scanPausedAtom, true);
-    });
-    await deliver("lnbc1ignored");
-
-    expect(onScannedText).not.toHaveBeenCalled();
-    expect(native.stop).not.toHaveBeenCalled();
-    expect(registry.get(scanIsOpenAtom)).toBe(true);
-
-    await act(async () => {
-      registry.set(scanPausedAtom, false);
-    });
-    await deliver("lnbc1accepted");
-
-    expect(native.stop).toHaveBeenCalledTimes(1);
-    expect(onScannedText).toHaveBeenCalledWith("lnbc1accepted");
-    await rendered.unmount();
-  });
-
-  it("drops an in-flight animated QR read when paused and resumed before its decoder loads", async () => {
-    let releaseDecoder: (() => void) | null = null;
-    animatedQrGate.wait = new Promise<void>((resolve) => {
-      releaseDecoder = resolve;
-    });
-
-    const { onScannedText, registry, rendered } = await setup();
-    const frames = await createAnimatedQrFrames(token);
-
-    // Deliver the first frame while the decoder load is still pending.
-    await deliver(frames.next());
-    expect(registry.get(scanDiagnosticsAtom).animation).toEqual({
-      expected: null,
-      received: 0,
-    });
-
-    // Pause (More opens) and resume (More closes) before the decoder resolves.
-    await act(async () => {
-      registry.set(scanPausedAtom, true);
-    });
-    expect(registry.get(scanDiagnosticsAtom).animation).toBeNull();
-    await act(async () => {
-      registry.set(scanPausedAtom, false);
-    });
-
-    await act(async () => {
-      releaseDecoder?.();
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    });
-
-    expect(registry.get(scanDiagnosticsAtom).animation).toBeNull();
-    expect(onScannedText).not.toHaveBeenCalled();
-    await rendered.unmount();
-  });
 });

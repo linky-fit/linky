@@ -40,6 +40,7 @@ interface BuildTopbarRightArgs {
   deleteEditedContact: () => void;
   /** Opens the scanner for a contact's code. */
   openContactScan: () => void;
+  openReceiveScan: () => void;
   /** Opens the scanner for payments, which reads contact codes too. */
   openWalletScan: () => void;
   route: Route;
@@ -296,6 +297,7 @@ export const buildTopbarRight = ({
   chatEditContactId,
   deleteEditedContact,
   openContactScan,
+  openReceiveScan,
   openWalletScan,
   route,
   t,
@@ -373,6 +375,14 @@ export const buildTopbarRight = ({
           spdPayload: route.spdPayload,
           editing: true,
         }),
+    };
+  }
+
+  if (route.kind === "topup") {
+    return {
+      icon: "ScanLine",
+      label: t("scan"),
+      onClick: openReceiveScan,
     };
   }
 
