@@ -28,17 +28,18 @@ You orchestrate. Each tester is a delegate that drives browsers and reports find
 | browsers  | The core journeys in WebKit and Firefox                                                                                                                                 |
 | long tail | On-chain transfers with the operator console, the error tracker                                                                                                         |
 | fresh     | A new user's first hour, in Linky and in Fazole                                                                                                                         |
+| heavy     | A mature multi-shard Evolu account (~80 shards, thousands of messages, transactions and spent proofs): chat sends, Cashu and Lightning payments, opening chats and history, cold restore on Linky, and checking the inspector for `evolu.sync WriteSlow` rows |
 | speed     | Time from tap to "Sent" for a Cashu send and for Lightning invoices below and above the confirmation limit, under added mint latency; a payment the mint leaves pending |
 
 A lane that touches wallets needs the outside world: `bun run journey wallet`, `ln`, `bank` and `bitcoin` play the other party.
 
 ## Benchmark
 
-`bun run journey bench` measures the time from tap to "Sent" for a Cashu send and for Lightning invoices below and above the confirmation limit, on wallets of 5, 128 and 512 proofs, with 0, 50 and 150 ms added to every mint request. It takes about eight minutes and prints a table of medians. `bun run journey bench release` measures the last release the same way.
+`bun run journey bench` measures the time from tap to "Sent" and counts `evolu.sync WriteSlow` inspector rows (writes taking 250 ms or more) for a Cashu send and for Lightning invoices below and above the confirmation limit, across `fresh` wallets of 5, 128 and 512 proofs and a `heavy` multi-shard Evolu account (~80 subscribed shards, thousands of spent proofs, messages and transactions) at 128 proofs, with 0, 50 and 150 ms added to every mint request. It takes about ten minutes and prints a table of medians alongside total slow writes and max slow-write duration. `bun run journey bench release` measures the last release the same way.
 
-Run both once the testers are done and the main mint is in `auto`, because testers load the same mints. Report both tables. A cell varies by 30 to 50 % between runs of one build, so name a difference only when it is larger than that and a second run repeats it.
+Run both once the testers are done and the main mint is in `auto`, because testers load the same mints. Report both tables. A cell varies by 30 to 50 % between runs of one build, so name a latency difference only when it is larger than that and a second run repeats it; report any `WriteSlow` rows on `heavy` that were absent on the other build (or any increase in their count or max duration).
 
-`BENCH_RUNS`, `BENCH_FLOWS`, `BENCH_PROOFS`, `BENCH_LATENCY` and `BENCH_CPU_THROTTLE` narrow or widen a run; `apps/linky-app/bench/payments.bench.ts` has their values.
+`BENCH_RUNS`, `BENCH_FLOWS`, `BENCH_ACCOUNTS`, `BENCH_PROOFS`, `BENCH_HEAVY_PROOFS`, `BENCH_HEAVY_SCALE`, `BENCH_LATENCY` and `BENCH_CPU_THROTTLE` narrow or widen a run; `apps/linky-app/bench/payments.bench.ts` has their values.
 
 ## Report
 
@@ -47,7 +48,7 @@ Write a self-contained HTML report to `.journey/evidence/report.html`. When `htm
 Include four sections:
 
 - **Lanes.** Each lane as passed, partial, or failed, with its passed, failed, and skipped scenario counts.
-- **Benchmark.** This checkout beside the last release across proof counts and added mint latencies, as an interactive chart and a table. Mark deltas larger than the 30 to 50 % run-to-run noise. Skip this section when no benchmark ran.
+- **Benchmark.** This checkout beside the last release across `fresh` and `heavy` accounts, proof counts and added mint latencies, as an interactive chart and a table including `WriteSlow` counts and max write durations. Mark deltas larger than the 30 to 50 % run-to-run noise. Skip this section when no benchmark ran.
 - **Findings.** Every finding from `FINDINGS.md`, grouped by severity and split by `On last release`, with `different` before `same` and `not tried`.
 - **Not run.** Scenarios nobody ran and why.
 

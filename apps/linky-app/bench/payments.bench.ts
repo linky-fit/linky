@@ -9,8 +9,14 @@ import {
   mintUrl,
   targetMintUrl,
 } from "../../../packages/linkshu/tests/integration/helpers";
-import { readBalanceSat } from "../tests/helpers/appState";
+import type { SeededAccountSummary } from "../src/devtools/e2e/seedAccountHistory";
+import { readBalanceSat, relaunchApp } from "../tests/helpers/appState";
 import { addContactByNpub } from "../tests/helpers/contacts";
+import {
+  readSlowWritesSince,
+  seedHeavyAccount,
+  type SlowWriteEvent,
+} from "../tests/helpers/heavyAccount";
 import { createSeedIdentity } from "../tests/helpers/identity";
 import {
   shardIndexes,
@@ -37,6 +43,11 @@ const FLOWS = {
 type Flow = keyof typeof FLOWS;
 const isFlow = (flow: string): flow is Flow => flow in FLOWS;
 
+const ACCOUNT_PROFILES = ["fresh", "heavy"] as const;
+type AccountProfile = (typeof ACCOUNT_PROFILES)[number];
+const isAccountProfile = (value: string): value is AccountProfile =>
+  ACCOUNT_PROFILES.some((profile) => profile === value);
+
 const RUNS = Number(process.env.BENCH_RUNS ?? 5);
 const FLOW_NAMES = listEnv("BENCH_FLOWS", Object.keys(FLOWS).join(",")).map(
   (flow) => {
@@ -44,8 +55,21 @@ const FLOW_NAMES = listEnv("BENCH_FLOWS", Object.keys(FLOWS).join(",")).map(
     return flow;
   },
 );
-/** Available proofs in the wallet before each payment. */
+/** Account shapes to benchmark: fresh single-shard accounts and/or a heavy multi-shard account. */
+const ACCOUNTS = listEnv("BENCH_ACCOUNTS", "fresh,heavy").map((account) => {
+  if (!isAccountProfile(account))
+    throw new Error(`unknown account profile ${account}`);
+  return account;
+});
+/** Available proofs in the wallet before each payment on `fresh` accounts. */
 const PROOF_COUNTS = numbersEnv("BENCH_PROOFS", "5,128,512");
+/** Available proofs on `heavy` multi-shard accounts; follows BENCH_PROOFS when set, else 128. */
+const HEAVY_PROOF_COUNTS = numbersEnv(
+  "BENCH_HEAVY_PROOFS",
+  process.env.BENCH_PROOFS ?? "128",
+);
+/** Multiplier for the heavy account's seeded multi-shard history (1 = full power-user scale). */
+const HEAVY_SCALE = Number(process.env.BENCH_HEAVY_SCALE ?? 1);
 /** Added to every request to a mint's /v1/ API. */
 const LATENCIES_MS = numbersEnv("BENCH_LATENCY", "0,50,150");
 /** Chromium CPU slowdown factor; 4–6 is roughly a mid-range phone. */
@@ -286,6 +310,7 @@ const openFlow = async (
 };
 
 interface Sample {
+  account: AccountProfile;
   flow: Flow;
   proofs: number;
   latencyMs: number;
@@ -293,6 +318,9 @@ interface Sample {
   ms: number;
   mintRequests: number;
   mintMs: number;
+  slowWrites: number;
+  maxWriteMs: number;
+  slowWriteEvents: ReadonlyArray<SlowWriteEvent>;
   paths: string[];
 }
 
@@ -301,110 +329,176 @@ const median = (values: ReadonlyArray<number>): number => {
   return sorted[Math.floor(sorted.length / 2)] ?? NaN;
 };
 
+const proofCountsFor = (account: AccountProfile): ReadonlyArray<number> =>
+  account === "heavy" ? HEAVY_PROOF_COUNTS : PROOF_COUNTS;
+
 const samples: Sample[] = [];
+let heavySummary: SeededAccountSummary | null = null;
 
-for (const proofs of PROOF_COUNTS) {
-  test(`payments from ${proofs} proofs`, async ({ bootAccount }) => {
-    test.setTimeout(30 * 60_000);
-    const { page } = await bootAccount(`payer-${proofs}`);
-    const mints = await routeMints(page);
-    const contactId = await addContactByNpub(
-      page,
-      (await createSeedIdentity()).npub,
-    );
+for (const account of ACCOUNTS) {
+  for (const proofs of proofCountsFor(account)) {
+    test(`payments (${account}) from ${proofs} proofs`, async ({
+      bootAccount,
+    }) => {
+      test.setTimeout(30 * 60_000);
+      const { page } = await bootAccount(`payer-${account}-${proofs}`, {
+        inspector: true,
+      });
 
-    // One spend proof per payment and the warm-up. The wallet may pay from filler instead, up to the spend proof's worth.
-    const payments = LATENCIES_MS.length * RUNS + 1;
-    const spares = FLOW_NAMES.reduce(
-      (sum, flow) =>
-        sum + payments * Math.ceil(FLOWS[flow].spend / FILLER_SAT + 1),
-      0,
-    );
-    const filler = await mintProofs(
-      Array<number>(proofs - 1 + spares).fill(FILLER_SAT),
-    );
-    const spends = new Map<Flow, Fixture[]>();
-    for (const flow of FLOW_NAMES)
-      spends.set(
-        flow,
-        await mintProofs(Array<number>(payments).fill(FLOWS[flow].spend)),
+      if (account === "heavy") {
+        const seeded = await seedHeavyAccount(page, {
+          mintUrl,
+          scale: HEAVY_SCALE,
+        });
+        // Cold boot over the seeded multi-shard history, as the app starts on a phone.
+        await relaunchApp(page, "/#wallet", async () => {});
+        const syncOwners = await page.evaluate(async () =>
+          window.__linkyE2E
+            ? (await window.__linkyE2E.syncOwnerIds()).length
+            : null,
+        );
+        heavySummary = {
+          ...seeded,
+          syncOwners: syncOwners ?? seeded.syncOwners,
+        };
+      }
+
+      const mints = await routeMints(page);
+      const contactId = await addContactByNpub(
+        page,
+        (await createSeedIdentity()).npub,
       );
 
-    const spent = new Set<string>();
-    const pay = async (flow: Flow, latencyMs: number) => {
-      mints.delayMs = 0;
-      for (const { id, state } of await cashuProofs(page))
-        if (state !== "available") spent.add(id);
-      const unspentFiller = filler.filter(({ id }) => !spent.has(id));
-      if (unspentFiller.length < proofs - 1)
-        throw new Error("ran out of filler proofs");
-      const spend = spends.get(flow)?.pop();
-      if (spend === undefined) throw new Error("ran out of spend proofs");
-      await setAvailableProofs(page, [
-        spend,
-        ...unspentFiller.slice(0, proofs - 1),
-      ]);
+      // One spend proof per payment and the warm-up. The wallet may pay from filler instead, up to the spend proof's worth.
+      const payments = LATENCIES_MS.length * RUNS + 1;
+      const spares = FLOW_NAMES.reduce(
+        (sum, flow) =>
+          sum + payments * Math.ceil(FLOWS[flow].spend / FILLER_SAT + 1),
+        0,
+      );
+      const filler = await mintProofs(
+        Array<number>(proofs - 1 + spares).fill(FILLER_SAT),
+      );
+      const spends = new Map<Flow, Fixture[]>();
+      for (const flow of FLOW_NAMES)
+        spends.set(
+          flow,
+          await mintProofs(Array<number>(payments).fill(FLOWS[flow].spend)),
+        );
 
-      mints.delayMs = latencyMs;
-      const button = await openFlow(page, flow, contactId);
-      const { tapAt, sentAt } = await timeTap(page, button);
-      return {
-        flow,
-        proofs,
-        latencyMs,
-        ms: Math.round(sentAt - tapAt),
-        ...mintTraffic(mints.requests, tapAt, sentAt),
+      const spent = new Set<string>();
+      const pay = async (flow: Flow, latencyMs: number) => {
+        mints.delayMs = 0;
+        for (const { id, state } of await cashuProofs(page))
+          if (state !== "available") spent.add(id);
+        const unspentFiller = filler.filter(({ id }) => !spent.has(id));
+        if (unspentFiller.length < proofs - 1)
+          throw new Error("ran out of filler proofs");
+        const spend = spends.get(flow)?.pop();
+        if (spend === undefined) throw new Error("ran out of spend proofs");
+        await setAvailableProofs(page, [
+          spend,
+          ...unspentFiller.slice(0, proofs - 1),
+        ]);
+
+        mints.delayMs = latencyMs;
+        const button = await openFlow(page, flow, contactId);
+        const { tapAt, sentAt } = await timeTap(page, button);
+        const slowWriteEvents = await readSlowWritesSince(
+          page,
+          Math.floor(tapAt),
+        );
+        const maxWriteMs = slowWriteEvents.reduce(
+          (max, event) => Math.max(max, event.durationMs),
+          0,
+        );
+        return {
+          account,
+          flow,
+          proofs,
+          latencyMs,
+          ms: Math.round(sentAt - tapAt),
+          ...mintTraffic(mints.requests, tapAt, sentAt),
+          slowWrites: slowWriteEvents.length,
+          maxWriteMs,
+          slowWriteEvents,
+        };
       };
-    };
 
-    // The session's first payment also loads the mint's info, keysets and keys; every timed one starts warm.
-    await pay(FLOW_NAMES[0] ?? "cashu", 0);
-    if (CPU_THROTTLE > 1) {
-      const cdp = await page.context().newCDPSession(page);
-      await cdp.send("Emulation.setCPUThrottlingRate", { rate: CPU_THROTTLE });
-    }
-    for (let run = 0; run < RUNS; run++)
-      for (const latencyMs of LATENCIES_MS)
-        for (const flow of FLOW_NAMES) {
-          const sample = { ...(await pay(flow, latencyMs)), run };
-          console.log(JSON.stringify(sample));
-          samples.push(sample);
-        }
-  });
+      // The session's first payment also loads the mint's info, keysets and keys; every timed one starts warm.
+      await pay(FLOW_NAMES[0] ?? "cashu", 0);
+      if (CPU_THROTTLE > 1) {
+        const cdp = await page.context().newCDPSession(page);
+        await cdp.send("Emulation.setCPUThrottlingRate", {
+          rate: CPU_THROTTLE,
+        });
+      }
+      for (let run = 0; run < RUNS; run++)
+        for (const latencyMs of LATENCIES_MS)
+          for (const flow of FLOW_NAMES) {
+            const sample = { ...(await pay(flow, latencyMs)), run };
+            console.log(JSON.stringify(sample));
+            samples.push(sample);
+          }
+    });
+  }
 }
 
 test.afterAll(async () => {
   if (samples.length === 0) return;
-  const rows = FLOW_NAMES.flatMap((flow) =>
-    PROOF_COUNTS.flatMap((proofs) =>
-      LATENCIES_MS.flatMap((latencyMs) => {
-        const cell = samples.filter(
-          (sample) =>
-            sample.flow === flow &&
-            sample.proofs === proofs &&
-            sample.latencyMs === latencyMs,
-        );
-        if (cell.length === 0) return [];
-        return {
-          flow,
-          proofs,
-          latencyMs,
-          runs: cell.length,
-          ms: median(cell.map(({ ms }) => ms)),
-          mintRequests: median(cell.map(({ mintRequests }) => mintRequests)),
-          mintMs: median(cell.map(({ mintMs }) => mintMs)),
-        };
-      }),
+  const rows = ACCOUNTS.flatMap((account) =>
+    FLOW_NAMES.flatMap((flow) =>
+      proofCountsFor(account).flatMap((proofs) =>
+        LATENCIES_MS.flatMap((latencyMs) => {
+          const cell = samples.filter(
+            (sample) =>
+              sample.account === account &&
+              sample.flow === flow &&
+              sample.proofs === proofs &&
+              sample.latencyMs === latencyMs,
+          );
+          if (cell.length === 0) return [];
+          return {
+            account,
+            flow,
+            proofs,
+            latencyMs,
+            runs: cell.length,
+            ms: median(cell.map(({ ms }) => ms)),
+            mintRequests: median(cell.map(({ mintRequests }) => mintRequests)),
+            mintMs: median(cell.map(({ mintMs }) => mintMs)),
+            slowWrites: cell.reduce(
+              (sum, { slowWrites }) => sum + slowWrites,
+              0,
+            ),
+            maxWriteMs: cell.reduce(
+              (max, { maxWriteMs }) => Math.max(max, maxWriteMs),
+              0,
+            ),
+          };
+        }),
+      ),
     ),
   );
-  const table = [
+  const headerLines = [
     `${LABEL}: ${process.env.BENCH_BASE_URL ?? "default base URL"}, CPU x${CPU_THROTTLE}, medians`,
+  ];
+  if (heavySummary !== null) {
+    const shards = Object.entries(heavySummary.shards)
+      .map(([scope, count]) => `${scope}: ${count}`)
+      .join(", ");
+    headerLines.push(
+      `heavy account: ${heavySummary.syncOwners} subscribed owners (${shards}; ${heavySummary.rows.contacts} contacts, ${heavySummary.rows.messages} messages, ${heavySummary.rows.transactions} transactions, ${heavySummary.rows.cashuOperations} cashu ops, ${heavySummary.rows.cashuProofs} spent proofs)`,
+    );
+  }
+  const table = [
+    ...headerLines,
     "",
-    "| Flow | Proofs | Added latency (ms) | Runs | Tap to Sent (ms) | Mint requests | Time in mint requests (ms) |",
-    "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+    "| Account | Flow | Proofs | Added latency (ms) | Runs | Tap to Sent (ms) | Mint requests | Time in mint requests (ms) | Slow writes | Max slow write (ms) |",
+    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ...rows.map(
       (row) =>
-        `| ${row.flow} | ${row.proofs} | ${row.latencyMs} | ${row.runs} | ${row.ms} | ${row.mintRequests} | ${row.mintMs} |`,
+        `| ${row.account} | ${row.flow} | ${row.proofs} | ${row.latencyMs} | ${row.runs} | ${row.ms} | ${row.mintRequests} | ${row.mintMs} | ${row.slowWrites} | ${row.maxWriteMs} |`,
     ),
   ].join("\n");
   console.log(`\n${table}\n`);
@@ -418,6 +512,7 @@ test.afterAll(async () => {
         label: LABEL,
         baseUrl: process.env.BENCH_BASE_URL,
         cpuThrottle: CPU_THROTTLE,
+        heavySummary,
         median: rows,
         samples,
       },
