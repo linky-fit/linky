@@ -350,6 +350,50 @@ export const cs = {
       "Obrázek se nepodařilo uložit. Zkontrolujte připojení a zkuste to znovu.",
   },
 
+  devices: {
+    title: "Zařízení",
+    description:
+      "Zařízení, která používají stejnou záložní frázi, ve Fazoli, Linky i Finitu.",
+    thisDevice: "Toto zařízení",
+    add: "Přidat zařízení",
+    name: "Název zařízení",
+    rename: "Přejmenovat",
+    remove: "Vzdáleně vymazat zařízení",
+    removeConfirmTitle: (name: string) => `Vzdáleně vymazat ${name}?`,
+    removeConfirmDescription:
+      "Zařízení se při příštím připojení odhlásí a smaže z něj obchod i všechna data. Zpět ho přidáte záložní frází nebo z tohoto seznamu.",
+    removed: "Zařízení se vymaže, jakmile se připojí.",
+    scanHint:
+      "Na novém zařízení otevřete Fazoli, Linky nebo Finito, zvolte přihlášení z jiného zařízení a naskenujte tento kód.",
+    warning:
+      "Kód nikomu neposílejte ani nefoťte. Kdo opíše kód z nového zařízení, získá vaši záložní frázi.",
+    code: "Kód z nového zařízení",
+    codeHint: "Opište šest číslic, které teď ukazuje nové zařízení.",
+    codeMismatch: (attemptsLeft: number) =>
+      `Kód nesedí. Zbývá pokusů: ${attemptsLeft}.`,
+    confirm: "Potvrdit kód",
+    sending: "Posílám záložní frázi na nové zařízení…",
+    done: "Zařízení přidáno.",
+    expired: "Platnost kódu vypršela.",
+    newCode: "Nový kód",
+    conflict:
+      "Kód naskenovala dvě zařízení. Z bezpečnostních důvodů jsme přidání zrušili.",
+    failed: "Zařízení se nepodařilo přidat. Zkuste to znovu.",
+    removedHereTitle: "Toto zařízení bylo vzdáleně vymazáno",
+    removedHereBy: (device: string) =>
+      `Vymazalo ho zařízení ${device}, a proto se odhlásilo a smazalo svá data.`,
+    removedHereDescription:
+      "Vymazali jste ho z jiného zařízení, a proto se odhlásilo a smazalo svá data.",
+    join: "Přihlásit z jiného zařízení",
+    joinHint:
+      "Na zařízení, kde obchod už máte, otevřete Nastavení → Zařízení → Přidat zařízení a naskenujte zobrazený kód.",
+    scanner: "Čtečka QR kódu",
+    scannerUnavailable: "Kamera není dostupná. Zadejte záložní frázi ručně.",
+    connecting: "Spojuji se s druhým zařízením…",
+    joinCode: "Opište tento kód na druhém zařízení",
+    joinFailed: "Přihlášení z jiného zařízení se nepodařilo. Zkuste to znovu.",
+  },
+
   recoverySeed: {
     description:
       "Záložní fráze je jediná záloha obchodu, jeho historie i peněženky. Uložte si ji do správce hesel, nebo ji zkopírujte na bezpečné místo.",

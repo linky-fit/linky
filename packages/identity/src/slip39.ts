@@ -1,3 +1,5 @@
+import { hmac } from "@noble/hashes/hmac.js";
+import { sha512 } from "@noble/hashes/sha2.js";
 import { Effect, Schema } from "effect";
 import { Slip39 } from "slip39-ts";
 import { MasterSecret, Slip39Passphrase, Slip39Share, toWords } from "./domain";
@@ -121,5 +123,42 @@ export const createSlip39Share = (
       new IdentityDerivationError({
         cause,
         message: "Failed to create SLIP-39 share",
+      }),
+  });
+
+// SLIP-39's identifier is 15 bits over two bytes; slip39-ts masks the high bit the same way.
+const IDENTIFIER_HIGH_BYTE_MASK = 0x7f;
+const identifierKey = new TextEncoder().encode("payky-slip39-identifier");
+
+/**
+ * The share Finito shows for the same master secret: its identifier derives
+ * from the secret instead of being random, so a secret received from another
+ * device turns back into the words that device shows.
+ */
+export const slip39ShareFromMasterSecret = (
+  bytes: Uint8Array,
+): Effect.Effect<Slip39Share, IdentityDerivationError> =>
+  Effect.flatMap(
+    decodeUnknown(MasterSecret, bytes, "Invalid master secret"),
+    (secret) => encodeMasterSecret(secret),
+  );
+
+const encodeMasterSecret = (
+  secret: MasterSecret,
+): Effect.Effect<Slip39Share, IdentityDerivationError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const [first, second] = hmac(sha512, identifierKey, secret);
+      const slip = await Slip39.fromArray(Array.from(secret), {
+        identifier: [(first ?? 0) & IDENTIFIER_HIGH_BYTE_MASK, second ?? 0],
+      });
+      return Schema.decodeUnknownSync(Slip39Share)(
+        normalizeSlip39Share(slip.fromPath("r/0").mnemonics[0] ?? ""),
+      );
+    },
+    catch: (cause) =>
+      new IdentityDerivationError({
+        cause,
+        message: "Failed to encode the master secret as a SLIP-39 share",
       }),
   });

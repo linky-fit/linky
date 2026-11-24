@@ -65,6 +65,7 @@ export type Route =
   | { kind: "settingsBlocked" }
   | { kind: "settingsReceiveMethod" }
   | { kind: "settingsMasterKeys" }
+  | { kind: "settingsDevices" }
   | { kind: "settingsNostrIdentity" }
   | { kind: "collaboration" }
   | { kind: "proxyPayments" }
@@ -151,6 +152,7 @@ export const parseRouteFromHash = (): Route => {
     return { kind: "settingsReceiveMethod" };
   }
   if (hash === "#settings/master-keys") return { kind: "settingsMasterKeys" };
+  if (hash === "#settings/devices") return { kind: "settingsDevices" };
   if (hash === "#settings/nostr-identity") {
     return { kind: "settingsNostrIdentity" };
   }

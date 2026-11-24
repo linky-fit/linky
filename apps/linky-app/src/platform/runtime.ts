@@ -23,6 +23,9 @@ const getNavigator = (): Navigator | null => {
   return typeof navigator === "undefined" ? null : navigator;
 };
 
+/** What the browser says about this device, for the devices list. */
+export const getUserAgent = (): string => getNavigator()?.userAgent ?? "";
+
 const getNavigatorStandalone = (): boolean => {
   const browserNavigator = getNavigator();
   const standalone = Reflect.get(browserNavigator ?? {}, "standalone");

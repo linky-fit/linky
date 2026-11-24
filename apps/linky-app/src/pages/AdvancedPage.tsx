@@ -354,6 +354,13 @@ export function AdvancedPage(): React.ReactElement {
           disabled={!hasSeedMnemonic}
         />
         <ListRow
+          icon="Smartphone"
+          title={t("devices")}
+          testID="open-devices"
+          onPress={() => navigateTo({ route: "settingsDevices" })}
+          active={isOpen("settingsDevices")}
+        />
+        <ListRow
           icon="KeyRound"
           title={t("nostrIdentity")}
           testID="open-nostr-identity"

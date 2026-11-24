@@ -39,6 +39,11 @@ import {
 import { AvatarPhotoInput } from "./AvatarPhotoInput";
 import type { FilePickerHandle } from "../utils/pickFile";
 import { StickyTopBar } from "./StickyTopBar";
+import { PairingJoinDialog } from "./PairingJoinDialog";
+import {
+  forgetRemovedFromDevices,
+  removedFromDevices,
+} from "../platform/logoutWipe";
 import { SelfieCaptureModal } from "./SelfieCaptureModal";
 
 import type { Translate } from "../i18n";
@@ -176,6 +181,9 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
   t,
 }) => {
   const [pickerMenuIsOpen, setPickerMenuIsOpen] = React.useState(false);
+  const [pairingJoinIsOpen, setPairingJoinIsOpen] = React.useState(false);
+  const [removedHere] = React.useState(removedFromDevices);
+  React.useEffect(forgetRemovedFromDevices, []);
   const colorModePreference = useColorModePreference();
   const colorModeLabel = `${t("appearance")}: ${t(
     COLOR_MODE_PREFERENCE_LABEL_KEYS[colorModePreference],
@@ -310,6 +318,15 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
             />
 
             <Stack gap="$sm">
+              <Button
+                variant="secondary"
+                icon="ScanLine"
+                testID="onboarding-pair-join"
+                onPress={() => setPairingJoinIsOpen(true)}
+                disabled={onboardingIsBusy}
+              >
+                {t("pairJoin")}
+              </Button>
               <Button
                 variant="secondary"
                 icon="ClipboardPaste"
@@ -598,6 +615,19 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
         paddingVertical="$huge"
       >
         <BrandHero />
+        {removedHere ? (
+          <Notice
+            tone="info"
+            title={t("devicesRemovedHereTitle")}
+            description={
+              removedHere.removedBy === null
+                ? t("devicesRemovedHereBody")
+                : formatTemplate(t("devicesRemovedHereByBody"), {
+                    device: removedHere.removedBy,
+                  })
+            }
+          />
+        ) : null}
         <Stack gap="$xs">
           <Text variant="display" textAlign="center">
             {t("onboardingTitle")}
@@ -646,6 +676,17 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
         : onboardingStep?.kind === "returning"
           ? renderReturnStep(onboardingStep)
           : renderWelcome(onboardingStep)}
+
+      {pairingJoinIsOpen ? (
+        <PairingJoinDialog
+          t={t}
+          onClose={() => setPairingJoinIsOpen(false)}
+          onShare={async (share) => {
+            setPairingJoinIsOpen(false);
+            await submitReturningSlip39(share);
+          }}
+        />
+      ) : null}
 
       <Sheet
         open={pickerMenuIsOpen}

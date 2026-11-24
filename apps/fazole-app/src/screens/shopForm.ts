@@ -62,6 +62,7 @@ const isShopName = Schema.is(ShopName);
 /** The optional shop name and bank account with live validation; `initial` prefills an edit. */
 export const useShopForm = (initial?: ShopProfile | null) => {
   const [name, setName] = useState(initial?.name ?? "");
+  const [picture, setPicture] = useState(initial?.picture ?? null);
   const [account, setAccount] = useState(
     initial?.iban ? formatCzechIban(initial.iban) : "",
   );
@@ -75,6 +76,8 @@ export const useShopForm = (initial?: ShopProfile | null) => {
   return {
     name,
     setName,
+    picture,
+    setPicture,
     account,
     setAccount,
     touchAccount: () => setAccountTouched(true),
@@ -94,7 +97,7 @@ export const useShopForm = (initial?: ShopProfile | null) => {
       return {
         name: trimmedName === "" ? null : trimmedName,
         iban: accountCheck.kind === "valid" ? accountCheck.iban : null,
-        picture: initial?.picture ?? null,
+        picture,
       };
     },
   };

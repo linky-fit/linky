@@ -1,5 +1,6 @@
 import { Restore, runLinkshu } from "@linky-fit/linkshu";
-import type { LinkyStore } from "@linky-fit/linksync";
+import { decodeNsec, encodeNsec } from "@linky-fit/linkstr";
+import { makeIdentityRepository, type LinkyStore } from "@linky-fit/linksync";
 import {
   classifyEvoluOpenError,
   markAwaitingFirstHydration,
@@ -14,9 +15,11 @@ import {
   deriveAccount,
   loadStoredAccount,
   storeAccount,
+  withNostrKey,
   type Account,
   type InvalidRecoverySeed,
 } from "../storage/account";
+import { whenHydrated } from "../storage/repositories";
 import {
   createAppServices,
   type AppServices,
@@ -88,16 +91,44 @@ export const createDevice = (
     for (const listener of listeners) listener();
   };
 
+  /**
+   * Linky mirrors the identity the user is using, a custom one included, in
+   * the synced identity row; this device follows it, so both apps show and
+   * pay as the same profile. A different key is stored and the app reloads
+   * under it.
+   */
+  const followSyncedIdentity = (account: Account, store: LinkyStore) => {
+    const identity = makeIdentityRepository(store);
+    let switching = false;
+    const check = () =>
+      void Effect.runPromise(identity.current).then((row) => {
+        if (switching || row?.nsec == null) return;
+        const secretKey = decodeNsec(row.nsec);
+        if (secretKey === null) return;
+        if (encodeNsec(secretKey) === encodeNsec(account.secretKey)) return;
+        switching = true;
+        storeAccount(platform.kv, withNostrKey(account, secretKey));
+        platform.reload();
+      });
+    // Before hydration the row may be another device's older one, or none yet.
+    void whenHydrated(store).then(() => {
+      check();
+      identity.subscribe(check);
+    });
+  };
+
   const open = async (account: Account, restored: boolean) => {
     setSession({ _tag: "Opening" });
     try {
+      const store = await platform.openStore(account);
       const services = createAppServices({
         account,
-        store: await platform.openStore(account),
+        store,
         config,
         ports: platform.servicePorts(account),
       });
       services.start();
+      followSyncedIdentity(account, store);
       setSession({ _tag: "SignedIn", services, restored });
       return services;
     } catch (error) {
@@ -159,7 +190,7 @@ export const createDevice = (
       if (Result.isFailure(derived)) return Result.fail(derived.failure);
       const account = derived.success;
       const replaced = loadStoredAccount(platform.kv);
-      if (replaced !== null && replaced.npub !== account.npub) {
+      if (replaced !== null && replaced.appMnemonic !== account.appMnemonic) {
         if (session._tag === "SignedIn") await session.services.dispose();
         await wipeSeedBoundState(account);
       }

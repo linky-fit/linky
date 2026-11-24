@@ -261,6 +261,7 @@ const REQUIRED_COLUMNS: {
     "feeBasisPoints",
   ],
   onchainTransferMessage: ["rumorId", "peerPubkey", "content", "sentAtSec"],
+  linkedDevice: ["app", "name"],
 };
 
 // The overload types the picked row against the package schema; the

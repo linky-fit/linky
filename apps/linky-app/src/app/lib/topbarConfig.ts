@@ -86,6 +86,7 @@ export const resolveBackAction = (
     case "settingsBlocked":
     case "settingsReceiveMethod":
     case "settingsMasterKeys":
+    case "settingsDevices":
     case "settingsNostrIdentity":
     case "advancedAutoPayLimit":
     case "mints":
@@ -449,6 +450,7 @@ const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
   settingsLanguage: "language",
   settingsAppearance: "appearance",
   settingsMasterKeys: "masterKeys",
+  settingsDevices: "devices",
   settingsNostrIdentity: "nostrIdentity",
   proxyPayments: "proxyPayments",
   settingsReceiveMethod: "receiveMethod",

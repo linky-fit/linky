@@ -3,6 +3,7 @@ import {
   Card,
   IconButton,
   Notice,
+  QrScanner,
   Row,
   Sheet,
   Stack,
@@ -23,7 +24,6 @@ import { useAppServices } from "../services/react";
 import { ContactField } from "./ContactField";
 import { useContactLookup, type ContactState } from "./contactState";
 import { DetailRows } from "./DetailRows";
-import { QrScanner } from "./QrScanner";
 import {
   acceptsTarget,
   needsContactLookup,
@@ -146,6 +146,8 @@ export function WithdrawSheet({
           <Stack gap="$lg" testID="withdraw-form">
             {scanning ? (
               <QrScanner
+                accessibilityLabel={copy.withdraw.scanner}
+                unavailableLabel={copy.withdraw.scannerUnavailable}
                 onScan={(text) => {
                   if (!acceptsTarget(text)) return false;
                   setTargetText(text);

@@ -23,7 +23,7 @@ import type {
   RelayUrl,
   WrapInboxEvent,
 } from "@linky-fit/linkstr";
-import { Cause, Duration, Effect, Layer, Stream } from "effect";
+import { Cause, Duration, Effect, Layer, Stream, Struct } from "effect";
 import { nowSeconds } from "../utils/time";
 import type { LinkstrRuntime } from "./runtimes";
 
@@ -76,11 +76,22 @@ export interface Nostr {
   readonly sendPaymentNotice: (to: Pubkey) => Promise<void>;
   /** The refs of outbox jobs still stored, delivered or not. */
   readonly queuedRefs: () => Promise<ReadonlySet<string>>;
-  /** Publishes the shop as the account's kind-0 profile, so wallets show it instead of a stranger. */
+  /**
+   * Publishes the shop's name and picture as the account's kind-0 profile,
+   * which Linky shows as the user's own: the profile's other fields, such as
+   * the lightning address Linky set, are kept.
+   */
   readonly publishProfile: (shop: {
     readonly name: string | null;
     readonly picture: string | null;
   }) => Promise<void>;
+  /**
+   * The account's own name and picture as its kind-0 profile has them;
+   * `{ profile: null }` when it has none, `null` when no relay answered.
+   */
+  readonly fetchOwnProfile: () => Promise<{
+    readonly profile: PayerProfile | null;
+  } | null>;
   /** Someone's kind-0 name and picture; `null` when they have none or no relay answered in time. */
   readonly fetchProfile: (pubkey: Pubkey) => Promise<PayerProfile | null>;
   readonly onInboxEvent: (handler: InboxHandler) => () => void;
@@ -244,17 +255,51 @@ export const createNostr = ({
           },
           () => null,
         ),
-    publishProfile: ({ name, picture }) =>
+    fetchOwnProfile: () =>
       runtime
         .runPromise(
           Effect.flatMap(Profiles, (profiles) =>
-            profiles.publishProfile(
+            profiles.fetchProfile(pubkey),
+          ).pipe(Effect.timeout(PROFILE_TIMEOUT)),
+        )
+        .then(
+          (result) => {
+            const metadata = result.profile?.metadata;
+            return {
+              profile: metadata
+                ? {
+                    name: metadata.displayName || metadata.name || null,
+                    picture: metadata.picture || null,
+                  }
+                : null,
+            };
+          },
+          () => null,
+        ),
+    publishProfile: ({ name, picture }) =>
+      runtime
+        .runPromise(
+          Effect.gen(function* () {
+            const profiles = yield* Profiles;
+            // Unreachable relays leave nothing to keep; the shop's fields go out alone.
+            const existing = yield* profiles.fetchProfile(pubkey).pipe(
+              Effect.timeout(PROFILE_TIMEOUT),
+              Effect.map((result) => result.profile?.metadata ?? null),
+              Effect.orElseSucceed(() => null),
+              Effect.catchDefect(() => Effect.succeed(null)),
+            );
+            const kept =
+              existing === null
+                ? {}
+                : Struct.omit(existing, ["name", "displayName", "picture"]);
+            return yield* profiles.publishProfile(
               new ProfileMetadata({
+                ...kept,
                 ...(name === null ? {} : { name, displayName: name }),
                 ...(picture === null ? {} : { picture }),
               }),
-            ),
-          ),
+            );
+          }),
         )
         .then(
           () => undefined,

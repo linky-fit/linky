@@ -35,6 +35,7 @@ vi.mock("../devtools/inspector/usePersistentInspectorLogStartup", () => ({
   usePersistentInspectorLogStartup: () => {},
 }));
 vi.mock("./BeaconController", () => ({ BeaconController: () => null }));
+vi.mock("./DevicesController", () => ({ DevicesController: () => null }));
 vi.mock("./ListingsController", () => ({ ListingsController: () => null }));
 vi.mock("./OnchainTransfersSync", () => ({ OnchainTransfersSync: () => null }));
 vi.mock("../components/PwaUpdateBanner", () => ({

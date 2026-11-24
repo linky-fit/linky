@@ -17,6 +17,7 @@ A scope is one kind of data with one storage policy. `meta` lives in the Evolu `
 | `cashu`          | `ShardOwner` `["cashu", n]`          | `cashuProof`, `cashuOperation`                                             | 256 KiB or 170 mutations | never         |
 | `transactions`   | `ShardOwner` `["transactions", n]`   | `transaction`                                                              | 256 KiB or 220 mutations | keep newest 4 |
 | `onchain`        | `ShardOwner` `["onchain", n]`        | `onchainTransfer`, `onchainTransferMessage`                                | 256 KiB or 220 mutations | never         |
+| `devices`        | `ShardOwner` `["devices", 0]`        | `linkedDevice`                                                             | no                       | never         |
 
 A shard rotates once its Evolu history holds `SHARD_MAX_BYTES` (256 KiB) of column values or the scope's mutation count, whichever comes first, with `SHARD_ROTATION_COOLDOWN_MS` (60 s) between rotations of one scope. The byte threshold is a quarter of the official Evolu relay's 1 MB per-owner quota, leaving room for encryption and per-row overhead. Rotation moves a pointer; nothing is copied.
 
@@ -33,7 +34,7 @@ Peer listings are a copy of what relays serve, kept so every device shows a cont
 - `insert` writes into the active shard of the scope (the shard the pointer names, or index 0). A repository's `insert` also marks the row live, reviving a removed copy; `insertIfAbsent` and `ingest` write only the columns, so a removal from another device that syncs later still wins.
 - `update` of a row in the active shard patches it in place. Update of a row in an older shard copies the whole row, patch applied, into the active shard and tombstones the copy where it was. Retired shards therefore receive at most tombstones.
 - `write(scope, table, writes)` does what non-reviving `insert` and `update` would for each row of a batch, in order, and issues it all as one `mutate`, so the batch lands whole or not at all. An update of an id with no live copy is skipped instead of failing, and an update may follow the insert of its row in the same batch.
-- `remove` tombstones the row where it lives (or is a no-op if the newest copy is already tombstoned); nothing is copied.
+- `remove` tombstones the row where it lives (or is a no-op if the newest copy is already tombstoned); nothing is copied. Columns passed with it land in the same mutation, so a device that sees the removal sees them too.
 - `ingest` copies rows from outside the shards, such as legacy owners, into the active shard. It fills each shard only up to the scope's rule and rotates past the cooldown, so a history of any size spreads over as many shards as it needs.
 - `insertRemoved` writes a tombstone into the active shard for a row that has not arrived yet, so a later insert of that id can be refused. It carries only the columns given.
 - A read takes every row of the visible shards, keeps one copy per id from the highest shard index, and drops tombstones.

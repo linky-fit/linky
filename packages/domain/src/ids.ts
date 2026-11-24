@@ -49,6 +49,9 @@ export type OnchainTransferId = typeof OnchainTransferId.Output;
 export const OnchainTransferMessageId = id("OnchainTransferMessage");
 export type OnchainTransferMessageId = typeof OnchainTransferMessageId.Output;
 
+export const DeviceId = id("Device");
+export type DeviceId = typeof DeviceId.Output;
+
 export const NostrIdentityId = id("NostrIdentity");
 export type NostrIdentityId = typeof NostrIdentityId.Output;
 

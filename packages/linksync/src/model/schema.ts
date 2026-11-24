@@ -11,6 +11,7 @@ import {
   CashuProofId,
   ContactId,
   ConversationId,
+  DeviceId,
   HiddenListingId,
   ListingId,
   MessageId,
@@ -371,6 +372,25 @@ export const LinkySchema = {
     content: NonEmptyString,
     sentAtSec: PositiveInt,
   },
+  /**
+   * Devices scope: one app on one device holding the recovery seed, which
+   * Linky, Fazole and Finito each write and list. A removal is the row's
+   * tombstone, which signs that app out once it sees it.
+   */
+  linkedDevice: {
+    // Random, kept in the device's own storage until it signs out.
+    id: DeviceId,
+    // "linky" | "fazole" | "finito"; another value is an app this release does not know.
+    app: NonEmptyString100,
+    // Renamable; written by the device itself only while the row has none.
+    name: NonEmptyString1000,
+    // "mobile" | "tablet" | "desktop", as the device reported itself.
+    deviceType: nullOr(NonEmptyString100),
+    browserName: nullOr(NonEmptyString100),
+    osName: nullOr(NonEmptyString100),
+    // The device that removed this one, written with the tombstone, so the removed device can say who.
+    removedBy: nullOr(DeviceId),
+  },
 } satisfies EvoluSchema;
 
 /** The column value types of an Evolu schema, the shape the shard store reads and writes. */
@@ -411,4 +431,5 @@ export const linkyTableColumns: TableColumns<LinkyDbSchema> = {
   peerListings: columnNames(LinkySchema.peerListings),
   onchainTransfer: columnNames(LinkySchema.onchainTransfer),
   onchainTransferMessage: columnNames(LinkySchema.onchainTransferMessage),
+  linkedDevice: columnNames(LinkySchema.linkedDevice),
 };

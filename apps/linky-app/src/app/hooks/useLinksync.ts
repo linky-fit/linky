@@ -4,7 +4,9 @@ import {
   type ContactsRepository,
   type ConversationRecord,
   type ConversationsRepository,
+  type DevicesRepository,
   type IdentityRepository,
+  type LinkedDeviceRecord,
   type InboxCursorsRepository,
   type LinkyScope,
   type LinkyStore,
@@ -38,6 +40,7 @@ import { getUnknownErrorMessage } from "../../utils/unknown";
 import {
   contactsRepositoryAtom,
   conversationsRepositoryAtom,
+  devicesRepositoryAtom,
   identityRepositoryAtom,
   appOwnerIdAtom,
   inboxCursorsRepositoryAtom,
@@ -127,6 +130,12 @@ export const useListingsRepository = (): ListingsRepository =>
 
 export const useListingRecords = (): ReadonlyArray<ListingRecord> =>
   useRepositoryRows(useListingsRepository());
+
+export const useDevicesRepository = (): DevicesRepository =>
+  useAtomSuspense(devicesRepositoryAtom).value;
+
+export const useDeviceRecords = (): ReadonlyArray<LinkedDeviceRecord> =>
+  useRepositoryRows(useDevicesRepository());
 
 export const useOnchainTransfersRepository = (): OnchainTransfersRepository =>
   useAtomSuspense(onchainTransfersRepositoryAtom).value;
