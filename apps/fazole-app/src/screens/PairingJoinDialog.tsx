@@ -39,7 +39,14 @@ export function PairingJoinDialog({
 }) {
   const [view, setView] = useState<JoinView>({ phase: "scanning" });
   const session = useRef<PairingJoin | null>(null);
-  useEffect(() => () => session.current?.cancel(), []);
+  const closed = useRef(false);
+  useEffect(() => {
+    closed.current = false;
+    return () => {
+      closed.current = true;
+      session.current?.cancel();
+    };
+  }, []);
 
   const onState = (state: PairingJoinState) => {
     if (state.phase !== "received") {
@@ -60,6 +67,7 @@ export function PairingJoinDialog({
     setView({ phase: "connecting" });
     void loadDevicePairing().then(
       (pairing) => {
+        if (closed.current) return;
         session.current = pairing.join({ invite, onState });
       },
       () => setView({ phase: "failed", reason: "network" }),

@@ -36,6 +36,11 @@ export interface PayerProfile {
   readonly picture: string | null;
 }
 
+/** The account's own kind-0 name and picture, and when it was published. */
+export interface OwnProfile extends PayerProfile {
+  readonly updatedAt: number;
+}
+
 /** A first session with no stored cursor reads this far back. */
 const LOOKBACK_SECONDS = 3 * 24 * 60 * 60;
 
@@ -86,11 +91,12 @@ export interface Nostr {
     readonly picture: string | null;
   }) => Promise<void>;
   /**
-   * The account's own name and picture as its kind-0 profile has them;
-   * `{ profile: null }` when it has none, `null` when no relay answered.
+   * The account's own name and picture as its kind-0 profile has them, with
+   * when it was published; `{ profile: null }` when it has none, `null` when
+   * no relay answered.
    */
   readonly fetchOwnProfile: () => Promise<{
-    readonly profile: PayerProfile | null;
+    readonly profile: OwnProfile | null;
   } | null>;
   /** Someone's kind-0 name and picture; `null` when they have none or no relay answered in time. */
   readonly fetchProfile: (pubkey: Pubkey) => Promise<PayerProfile | null>;
@@ -264,12 +270,16 @@ export const createNostr = ({
         )
         .then(
           (result) => {
-            const metadata = result.profile?.metadata;
+            const profile = result.profile;
             return {
-              profile: metadata
+              profile: profile
                 ? {
-                    name: metadata.displayName || metadata.name || null,
-                    picture: metadata.picture || null,
+                    name:
+                      profile.metadata.displayName ||
+                      profile.metadata.name ||
+                      null,
+                    picture: profile.metadata.picture || null,
+                    updatedAt: profile.updatedAt,
                   }
                 : null,
             };
@@ -281,12 +291,10 @@ export const createNostr = ({
         .runPromise(
           Effect.gen(function* () {
             const profiles = yield* Profiles;
-            // Unreachable relays leave nothing to keep; the shop's fields go out alone.
+            // Unreachable relays fail the publish, so it cannot drop fields Linky set.
             const existing = yield* profiles.fetchProfile(pubkey).pipe(
               Effect.timeout(PROFILE_TIMEOUT),
               Effect.map((result) => result.profile?.metadata ?? null),
-              Effect.orElseSucceed(() => null),
-              Effect.catchDefect(() => Effect.succeed(null)),
             );
             const kept =
               existing === null

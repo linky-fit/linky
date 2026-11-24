@@ -31,6 +31,11 @@ const removerLabel = (device: LinkedDeviceRecord): string =>
 /** The device reset wipes local storage, so a device signing in again is a new one. */
 const THIS_DEVICE_KEY = "linky.fazole.thisDevice";
 
+// The removal synced in, so a relay answers; this lets the device's own changes reach it first.
+const REMOVED_UPLOAD_WAIT = "30 seconds";
+// The merchant waits on a reset.
+const RESET_UPLOAD_WAIT = "3 seconds";
+
 const StoredDevice = Schema.fromJsonString(
   Schema.Struct({ id: Schema.String, joined: Schema.Boolean }),
 );
@@ -68,6 +73,8 @@ export interface Devices {
   readonly rename: (id: DeviceId, name: string) => Promise<void>;
   /** Signs the device out once it syncs the removal. */
   readonly remove: (id: DeviceId) => Promise<void>;
+  /** Takes this device off the list before a reset wipes it; never fails. */
+  readonly leave: () => Promise<void>;
   /** What a new device receives when this one adds it. */
   readonly pairingPayload: (shop: {
     readonly name: string | null;
@@ -78,10 +85,13 @@ export interface Devices {
 
 export const createDevices = ({
   repository,
+  whenUploaded,
   recoverySeed,
   ports,
 }: {
   readonly repository: DevicesRepository;
+  /** The store's `whenUploaded`: the wipe waits for it, so it erases nothing a relay lacks. */
+  readonly whenUploaded: Effect.Effect<void>;
   readonly recoverySeed: string;
   /** Without them, as in tests, this device neither registers nor signs out. */
   readonly ports: DevicePorts | undefined;
@@ -92,6 +102,9 @@ export const createDevices = ({
     if (signedOut || thisDevice === null) return;
     signedOut = true;
     const removal = await Effect.runPromise(repository.removal(thisDevice.id));
+    await Effect.runPromise(
+      Effect.timeoutOption(whenUploaded, REMOVED_UPLOAD_WAIT),
+    );
     ports?.onRemoved(removal?.by == null ? null : removerLabel(removal.by));
   };
 
@@ -129,6 +142,19 @@ export const createDevices = ({
       Effect.runPromise(repository.rename(id, name.trim().slice(0, 255))),
     remove: (id) =>
       Effect.runPromise(repository.remove(id, thisDevice?.id ?? null)),
+    leave: () =>
+      thisDevice === null
+        ? Promise.resolve()
+        : Effect.runPromise(
+            repository
+              .leave(thisDevice.id)
+              .pipe(
+                Effect.andThen(
+                  Effect.timeoutOption(whenUploaded, RESET_UPLOAD_WAIT),
+                ),
+                Effect.ignore,
+              ),
+          ),
     pairingPayload: async (shop) => {
       const secret = await Effect.runPromise(
         Effect.flatMap(parseSlip39Share(recoverySeed), (share) =>

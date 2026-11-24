@@ -62,7 +62,10 @@ const isShopName = Schema.is(ShopName);
 /** The optional shop name and bank account with live validation; `initial` prefills an edit. */
 export const useShopForm = (initial?: ShopProfile | null) => {
   const [name, setName] = useState(initial?.name ?? "");
-  const [picture, setPicture] = useState(initial?.picture ?? null);
+  // `undefined` until set here, so a picture saved while the form is open still shows.
+  const [pictureSet, setPicture] = useState<string | null | undefined>();
+  const picture =
+    pictureSet === undefined ? (initial?.picture ?? null) : pictureSet;
   const [account, setAccount] = useState(
     initial?.iban ? formatCzechIban(initial.iban) : "",
   );

@@ -363,6 +363,8 @@ export const cs = {
     removeConfirmDescription:
       "Zařízení se při příštím připojení odhlásí a smaže z něj obchod i všechna data. Zpět ho přidáte záložní frází nebo z tohoto seznamu.",
     removed: "Zařízení se vymaže, jakmile se připojí.",
+    renameFailed: "Zařízení se nepodařilo přejmenovat. Zkuste to znovu.",
+    removeFailed: "Zařízení se nepodařilo vymazat. Zkuste to znovu.",
     scanHint:
       "Na novém zařízení otevřete Fazoli, Linky nebo Finito, zvolte přihlášení z jiného zařízení a naskenujte tento kód.",
     warning:

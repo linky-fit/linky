@@ -233,6 +233,10 @@ export const de = {
   devicesRemoveConfirmBody:
     "Das Gerät meldet sich bei der nächsten Verbindung ab und löscht das Konto mit allen Daten. Mit den Hauptschlüsseln oder aus dieser Liste fügen Sie es wieder hinzu.",
   devicesRemoved: "Das Gerät wird gelöscht, sobald es sich verbindet.",
+  devicesRenameFailed:
+    "Das Gerät konnte nicht umbenannt werden. Versuchen Sie es erneut.",
+  devicesRemoveFailed:
+    "Das Gerät konnte nicht gelöscht werden. Versuchen Sie es erneut.",
   devicesAddScanHint:
     "Öffnen Sie auf dem neuen Gerät Linky, Fazole oder Finito, wählen Sie die Anmeldung über ein anderes Gerät und scannen Sie diesen Code.",
   devicesAddWarning:

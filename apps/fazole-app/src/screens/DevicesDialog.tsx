@@ -155,6 +155,18 @@ function AddDevice({
   );
 }
 
+type ListNotice = "added" | "removed" | "renameFailed" | "removeFailed";
+
+const listNotices: Record<
+  ListNotice,
+  { readonly tone: "accent" | "info" | "danger"; readonly title: string }
+> = {
+  added: { tone: "accent", title: copy.devices.done },
+  removed: { tone: "info", title: copy.devices.removed },
+  renameFailed: { tone: "danger", title: copy.devices.renameFailed },
+  removeFailed: { tone: "danger", title: copy.devices.removeFailed },
+};
+
 /** One device: rename it, or remove another one, which signs it out. */
 function DeviceDetail({
   device,
@@ -165,7 +177,7 @@ function DeviceDetail({
   readonly device: LinkedDeviceRecord;
   readonly isThisDevice: boolean;
   readonly onRemove: () => void;
-  readonly onDone: () => void;
+  readonly onDone: (notice?: ListNotice) => void;
 }) {
   const { devices } = useAppServices();
   const [name, setName] = useState<string>(device.name);
@@ -185,8 +197,11 @@ function DeviceDetail({
         testID="rename-device"
         disabled={trimmed === ""}
         onPress={() => {
-          if (trimmed !== device.name) void devices.rename(device.id, trimmed);
-          onDone();
+          if (trimmed === device.name) return onDone();
+          devices.rename(device.id, trimmed).then(
+            () => onDone(),
+            () => onDone("renameFailed"),
+          );
         }}
       >
         {copy.devices.rename}
@@ -216,7 +231,7 @@ export function DevicesDialog({
   const { devices } = useAppServices();
   const records = useLiveValue(devices.live, NO_DEVICES);
   const [view, setView] = useState<View>({ kind: "list" });
-  const [notice, setNotice] = useState<"added" | "removed" | null>(null);
+  const [notice, setNotice] = useState<ListNotice | null>(null);
   const thisId = devices.thisDeviceId;
   const sorted = [...records].sort(
     (a, b) =>
@@ -261,10 +276,8 @@ export function DevicesDialog({
             <Text color="$colorMuted">{copy.devices.description}</Text>
             {notice === null ? null : (
               <Notice
-                tone={notice === "added" ? "accent" : "info"}
-                title={
-                  notice === "added" ? copy.devices.done : copy.devices.removed
-                }
+                tone={listNotices[notice].tone}
+                title={listNotices[notice].title}
               />
             )}
             <Stack gap="$none">
@@ -305,8 +318,10 @@ export function DevicesDialog({
             icon="Trash2"
             testID="remove-device-confirm"
             onPress={() => {
-              void devices.remove(selected.id);
-              setNotice("removed");
+              devices.remove(selected.id).then(
+                () => setNotice("removed"),
+                () => setNotice("removeFailed"),
+              );
               back();
             }}
           >
@@ -321,7 +336,10 @@ export function DevicesDialog({
           device={selected}
           isThisDevice={selected.id === thisId}
           onRemove={() => setView({ kind: "remove", id: selected.id })}
-          onDone={back}
+          onDone={(next) => {
+            setNotice(next ?? null);
+            back();
+          }}
         />
       )}
     </Dialog>

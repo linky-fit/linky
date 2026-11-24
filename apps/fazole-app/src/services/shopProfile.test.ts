@@ -19,8 +19,13 @@ afterEach(async () => {
   for (const services of running.splice(0)) await services.dispose();
 });
 
-/** Services whose relays hold `profile` as the account's kind 0, if given. */
-const startedServices = async (profile?: Record<string, string>) => {
+const PROFILE_AT = 1_700_000_000;
+
+/** Services whose relays hold `profile` as the account's kind 0, if given, over a shop edited at `editedAt`. */
+const startedServices = async (
+  profile?: Record<string, string>,
+  editedAt: number | null = null,
+) => {
   const account = testAccount();
   const published: SignedPlainEvent[] = [];
   const services = createAppServices({
@@ -40,7 +45,7 @@ const startedServices = async (profile?: Record<string, string>) => {
                   finalizeEvent(
                     {
                       kind: 0,
-                      created_at: 1_700_000_000,
+                      created_at: PROFILE_AT,
                       tags: [],
                       content: JSON.stringify(profile),
                     },
@@ -54,11 +59,15 @@ const startedServices = async (profile?: Record<string, string>) => {
   });
   running.push(services);
   await Effect.runPromise(
-    saveShop(services.repositories.settings, {
-      name: "Kavárna",
-      iban: null,
-      picture: null,
-    }),
+    saveShop(
+      services.repositories.settings,
+      {
+        name: "Kavárna",
+        iban: null,
+        picture: null,
+      },
+      editedAt,
+    ),
   );
   services.start();
   return { services, published };
@@ -92,5 +101,22 @@ describe("the shop's name and picture", () => {
           .map((event): unknown => JSON.parse(event.content)),
       ).toEqual([{ name: "Kavárna", display_name: "Kavárna" }]),
     );
+  });
+
+  it("go out as the profile when the merchant edited them after it was published", async () => {
+    const { services, published } = await startedServices(
+      { name: "kokos", lud16: "kokos@linky.fit" },
+      PROFILE_AT + 60,
+    );
+    await vi.waitFor(() =>
+      expect(
+        published
+          .filter((event) => event.kind === 0)
+          .map((event): unknown => JSON.parse(event.content)),
+      ).toEqual([
+        { name: "Kavárna", display_name: "Kavárna", lud16: "kokos@linky.fit" },
+      ]),
+    );
+    expect(await shopOf(services)).toMatchObject({ name: "Kavárna" });
   });
 });

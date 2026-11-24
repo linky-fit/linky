@@ -264,6 +264,8 @@ export interface ShardStore<
   readonly syncOwners: () => Effect.Effect<ReadonlyArray<Owner>>;
   /** Uses the owners in `syncOwners` and unuses the rest. */
   readonly reconcileSync: () => Effect.Effect<void>;
+  /** Completes once a relay holds every change stored here for `syncOwners`; without a relay, never. */
+  readonly whenUploaded: Effect.Effect<void>;
   /**
    * Whether the store is hydrated: the app owner, and after it every shard
    * its pointers make visible, finished a sync round with a relay, so reads
@@ -1242,6 +1244,9 @@ export const createShardStore = <
     maybeRotate,
     syncOwners,
     reconcileSync,
+    whenUploaded: Effect.flatMap(syncOwners(), (owners) =>
+      db.whenUploaded(owners.map((owner) => owner.id)),
+    ),
     hydrated: checkHydration,
     subscribeHydration,
     repairPointers,

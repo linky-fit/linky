@@ -227,6 +227,8 @@ export const en = {
   devicesRemoveConfirmBody:
     "The device signs out and erases the account and all its data the next time it connects. Add it back with the master keys or from this list.",
   devicesRemoved: "The device is wiped once it connects.",
+  devicesRenameFailed: "The device could not be renamed. Try again.",
+  devicesRemoveFailed: "The device could not be wiped. Try again.",
   devicesAddScanHint:
     "On the new device, open Linky, Fazole or Finito, choose to sign in from another device and scan this code.",
   devicesAddWarning:

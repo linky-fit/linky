@@ -39,6 +39,7 @@ import { myProfileAtom } from "../app/state/contacts/profiles";
 import { evoluRelaySettingsAtom } from "../app/state/session/evolu";
 import { reportAppLog } from "../devtools/inspector/appLog";
 import type { Translate } from "../i18n";
+import { getUnknownErrorMessage } from "../utils/unknown";
 
 const describe = (device: LinkedDeviceRecord): string =>
   [deviceAppName(device.app), device.browserName, device.osName]
@@ -277,28 +278,48 @@ const DeviceDialog = ({
 
   const rename = async () => {
     if (trimmed === "" || trimmed === device.name) return onClose();
-    await Effect.runPromise(devices.rename(device.id, trimmed)).catch(() =>
-      pushToast(t("devicesAddFailed")),
-    );
-    reportAppLog({
-      tag: "devices.renamed",
-      summary: "Renamed a device in the devices list",
-      payload: { deviceId: device.id, name: trimmed },
-    });
+    try {
+      await Effect.runPromise(devices.rename(device.id, trimmed));
+      reportAppLog({
+        tag: "devices.renamed",
+        summary: "Renamed a device in the devices list",
+        payload: { deviceId: device.id, name: trimmed },
+      });
+    } catch (error) {
+      reportAppLog({
+        tag: "devices.renameFailed",
+        summary: "Renaming a device in the devices list failed",
+        payload: {
+          deviceId: device.id,
+          error: getUnknownErrorMessage(error, "unknown"),
+        },
+      });
+      pushToast(t("devicesRenameFailed"));
+    }
     onClose();
   };
 
   const remove = async () => {
-    await Effect.runPromise(devices.remove(device.id, thisDeviceId)).catch(() =>
-      pushToast(t("devicesAddFailed")),
-    );
-    reportAppLog({
-      tag: "devices.removed",
-      summary:
-        "Removed a device; it signs out and erases its data once it syncs",
-      payload: { deviceId: device.id, app: device.app },
-    });
-    pushToast(t("devicesRemoved"));
+    try {
+      await Effect.runPromise(devices.remove(device.id, thisDeviceId));
+      reportAppLog({
+        tag: "devices.removed",
+        summary:
+          "Removed a device; it signs out and erases its data once it syncs",
+        payload: { deviceId: device.id, app: device.app },
+      });
+      pushToast(t("devicesRemoved"));
+    } catch (error) {
+      reportAppLog({
+        tag: "devices.removeFailed",
+        summary: "Removing a device from the devices list failed",
+        payload: {
+          deviceId: device.id,
+          error: getUnknownErrorMessage(error, "unknown"),
+        },
+      });
+      pushToast(t("devicesRemoveFailed"));
+    }
     onClose();
   };
 

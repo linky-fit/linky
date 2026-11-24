@@ -78,7 +78,8 @@ const hostOf = (url: string) => {
 
 export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
   const device = useDevice();
-  const { config, saveOfferTips, saveBitcoinQrMode } = useAppServices();
+  const { config, saveOfferTips, saveBitcoinQrMode, devices } =
+    useAppServices();
   const offerTips = useOfferTips() ?? true;
   const bitcoinQrMode = useBitcoinQrMode() ?? "universal";
   const mintUrl = useMintUrl() ?? config.mintUrl;
@@ -273,7 +274,7 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
         description={copy.settings.resetConfirmDescription}
         confirm={copy.settings.resetConfirm}
         destructive
-        onConfirm={device.resetDevice}
+        onConfirm={() => void devices.leave().then(device.resetDevice)}
       />
     </Page>
   );

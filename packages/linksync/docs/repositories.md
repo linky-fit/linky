@@ -122,6 +122,7 @@ Adding a listing is `insert` with every column; editing is `update`; withdrawing
 - Each start calls `register` with the device's own id, kept in its local storage, and what it is. It writes `name` only while the row has none, so a rename from another device stays, and a start that changes nothing writes nothing.
 - Pass `joining: true` until the device has registered once since it got the recovery seed (a new account, a restore, a pairing). A joining device revives its row, so a removal from before it joined cannot sign it out; once joined it never does, so a removal wins.
 - `remove(id, by)` removes another device and names this one as `by`, in the same mutation as the tombstone. `register` then answers `removed` on that device, and `removal` turns from `null` into `{ by }`, the record of the device that removed it, or `by: null` when that device is not in the list. Sign the device out then; `subscribe` fires when the removal syncs in while it runs.
+- `leave(id)` takes this device off the list on a logout, which wipes the device itself: the row is removed with this device as `by`, and `removal` stays `null` for it, so it is not signed out as removed.
 - `rename` writes a name from any device.
 
 ## Identity

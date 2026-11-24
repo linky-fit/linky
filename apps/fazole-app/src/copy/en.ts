@@ -367,6 +367,8 @@ export const en: Copy = {
     removeConfirmDescription:
       "The device signs out and erases the shop and all its data the next time it connects. Add it back with the recovery seed or from this list.",
     removed: "The device is wiped once it connects.",
+    renameFailed: "The device could not be renamed. Try again.",
+    removeFailed: "The device could not be wiped. Try again.",
     scanHint:
       "On the new device, open Fazole, Linky or Finito, choose to sign in from another device and scan this code.",
     warning:

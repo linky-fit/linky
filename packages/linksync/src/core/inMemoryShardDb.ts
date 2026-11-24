@@ -222,6 +222,7 @@ export const makeInMemoryShardDb = <S extends DbSchema>(
         syncListeners.delete(listener);
       };
     },
+    whenUploaded: () => Effect.void,
     usedOwners: () => [...used.keys()],
     finishSync: (ownerId) => {
       synced.add(ownerId);

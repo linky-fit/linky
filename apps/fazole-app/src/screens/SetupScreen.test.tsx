@@ -115,7 +115,11 @@ describe("an account restored without a shop", () => {
 
   it("starts from the name and picture of the account's Nostr profile", async () => {
     const { device, save } = restoredDevice(async () => ({
-      profile: { name: "Hynek", picture: "https://example.com/hynek.webp" },
+      profile: {
+        name: "Hynek",
+        picture: "https://example.com/hynek.webp",
+        updatedAt: 1_700_000_000,
+      },
     }));
     const container = await render(<SetupScreen />, device);
 

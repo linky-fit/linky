@@ -44,13 +44,15 @@ export const PairingJoinDialog = ({
 }) => {
   const [view, setView] = React.useState<JoinView>({ phase: "scanning" });
   const session = React.useRef<PairingJoin | null>(null);
+  const closed = React.useRef(false);
 
-  React.useEffect(
-    () => () => {
+  React.useEffect(() => {
+    closed.current = false;
+    return () => {
+      closed.current = true;
       session.current?.cancel();
-    },
-    [],
-  );
+    };
+  }, []);
 
   const onState = React.useCallback(
     (state: PairingJoinState) => {
@@ -88,6 +90,7 @@ export const PairingJoinDialog = ({
     });
     void loadDevicePairing().then(
       (pairing) => {
+        if (closed.current) return;
         session.current = pairing.join({
           invite,
           deviceId: readThisDevice().id,

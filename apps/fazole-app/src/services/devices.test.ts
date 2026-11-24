@@ -1,5 +1,5 @@
 import { createId, makeDevicesRepository } from "@linky-fit/linksync";
-import { Effect } from "effect";
+import { Deferred, Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
 import { createDevices, readThisDevice } from "./devices";
 import { memoryKv, testStore } from "./testing/fakes";
@@ -10,13 +10,14 @@ const recoverySeed =
 const userAgent =
   "Mozilla/5.0 (Linux; Android 14; SM-A546B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36";
 
-const setupDevices = () => {
+const setupDevices = (whenUploaded: Effect.Effect<void> = Effect.void) => {
   const store = testStore();
   const kv = memoryKv();
   const onRemoved = vi.fn();
   const repository = makeDevicesRepository(store);
   const devices = createDevices({
     repository,
+    whenUploaded,
     recoverySeed,
     ports: {
       kv,
@@ -38,8 +39,11 @@ describe("devices", () => {
     ]);
   });
 
-  it("signs out once another device removes this one, saying which", async () => {
-    const { devices, repository, kv, onRemoved } = setupDevices();
+  it("signs out once another device removes this one and its own changes reached a relay, saying which", async () => {
+    const uploaded = Effect.runSync(Deferred.make<void>());
+    const { devices, repository, kv, onRemoved } = setupDevices(
+      Deferred.await(uploaded),
+    );
     devices.start();
     await vi.waitFor(() => expect(readThisDevice(kv).joined).toBe(true));
     const id = devices.thisDeviceId;
@@ -58,10 +62,25 @@ describe("devices", () => {
     );
 
     await Effect.runPromise(repository.remove(id, phone));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(onRemoved).not.toHaveBeenCalled();
+    Effect.runSync(Deferred.succeed(uploaded, undefined));
 
     await vi.waitFor(() =>
       expect(onRemoved).toHaveBeenCalledExactlyOnceWith("Pixel 8 (Linky)"),
     );
+  });
+
+  it("leaves the list on a reset without signing out as removed", async () => {
+    const { devices, repository, kv, onRemoved } = setupDevices();
+    devices.start();
+    await vi.waitFor(() => expect(readThisDevice(kv).joined).toBe(true));
+
+    await devices.leave();
+
+    expect(Effect.runSync(repository.all)).toEqual([]);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(onRemoved).not.toHaveBeenCalled();
   });
 
   it("sends the seed's master secret, the shop's name and its wss sync servers", async () => {

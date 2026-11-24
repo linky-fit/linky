@@ -233,6 +233,10 @@ export const pt = {
   devicesRemoveConfirmBody:
     "O dispositivo sai da conta e apaga-a com todos os dados na próxima vez que se ligar. Adicione-o de novo com as chaves mestras ou a partir desta lista.",
   devicesRemoved: "O dispositivo é apagado assim que se ligar.",
+  devicesRenameFailed:
+    "Não foi possível mudar o nome do dispositivo. Tente novamente.",
+  devicesRemoveFailed:
+    "Não foi possível apagar o dispositivo. Tente novamente.",
   devicesAddScanHint:
     "No novo dispositivo, abra o Linky, o Fazole ou o Finito, escolha entrar a partir de outro dispositivo e leia este código.",
   devicesAddWarning:

@@ -11,6 +11,7 @@ import {
 import type { IconName } from "@linky-fit/ui";
 import React, { useCallback } from "react";
 import { useAtom, useAtomValue } from "@linky-fit/linkstr-react";
+import { useLeaveDevicesList } from "../app/hooks/useLeaveDevicesList";
 import { useEvoluStatusSummary } from "../app/hooks/settings/useEvoluSettings";
 import { useIdentitySettings } from "../app/hooks/settings/useIdentitySettings";
 import {
@@ -57,6 +58,7 @@ import { LANGUAGE_LABEL_KEYS } from "./LanguagePage";
 export function AdvancedPage(): React.ReactElement {
   const route = useRouting();
   const { requestLogout, seedMnemonic } = useIdentitySettings();
+  const leaveDevicesList = useLeaveDevicesList();
   const defaultMintDisplay = useDefaultMintDisplay();
   const { evoluConnectedServerCount, evoluOverallStatus, evoluServerUrls } =
     useEvoluStatusSummary();
@@ -376,9 +378,11 @@ export function AdvancedPage(): React.ReactElement {
               : undefined
           }
           onConfirm={() =>
-            requestLogout({
-              evoluConnected: evoluOverallStatus === "connected",
-            })
+            void leaveDevicesList().then(() =>
+              requestLogout({
+                evoluConnected: evoluOverallStatus === "connected",
+              }),
+            )
           }
           t={t}
         />

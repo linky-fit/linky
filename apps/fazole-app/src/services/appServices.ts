@@ -30,7 +30,12 @@ import {
   saveMonetaConnection,
   type MonetaConnection,
 } from "../storage/monetaSetting";
-import { readShop, saveShop, shopFieldsFromProfile } from "../storage/shop";
+import {
+  readShop,
+  readShopEditedAt,
+  saveShop,
+  shopFieldsFromProfile,
+} from "../storage/shop";
 import { readOfferTips, saveOfferTips } from "../storage/tipSetting";
 import {
   readBitcoinQrMode,
@@ -58,6 +63,7 @@ import { makeLinkshuRuntime, makeLinkstrRuntime } from "./runtimes";
 import { createDevices, type DevicePorts, type Devices } from "./devices";
 import { createWallet, type Wallet } from "./wallet";
 import { createWithdrawals, type Withdrawals } from "./withdrawals";
+import { nowSeconds } from "../utils/time";
 
 /** The terminal's payments: created by the merchant, settled by the bank leg or the Bitcoin leg. */
 export interface Payments {
@@ -259,21 +265,25 @@ export const createAppServices = ({
   };
 
   const saveShopProfile = async (shop: ShopProfile) => {
-    await Effect.runPromise(saveShop(repositories.settings, shop));
+    await Effect.runPromise(
+      saveShop(repositories.settings, shop, nowSeconds()),
+    );
     void nostr.publishProfile(shop);
   };
 
   const devices = createDevices({
     repository: repositories.devices,
+    whenUploaded: store.whenUploaded,
     recoverySeed: account.recoverySeed,
     ports: ports.devices,
   });
 
   /**
    * The shop's name and picture are the account's Nostr profile, which Linky
-   * edits too: a profile on the relays wins over the stored shop; without
-   * one, the shop goes out as the profile, so the pledger and support see
-   * who sends. An account without a shop is set up from the profile instead.
+   * edits too: the newer of the profile on the relays and the merchant's last
+   * edit wins. Without a profile, the shop goes out as one, so the pledger
+   * and support see who sends. An account without a shop is set up from the
+   * profile instead.
    */
   const syncShopWithProfile = async () => {
     const shop = await loadShop();
@@ -281,7 +291,10 @@ export const createAppServices = ({
     const fetched = await nostr.fetchOwnProfile();
     if (fetched === null) return;
     const { profile } = fetched;
-    if (profile === null) {
+    const editedAt = await Effect.runPromise(
+      readShopEditedAt(repositories.settings),
+    );
+    if (profile === null || (editedAt ?? 0) > profile.updatedAt) {
       if (shop.name !== null || shop.picture !== null)
         await nostr.publishProfile(shop);
       return;
@@ -290,7 +303,7 @@ export const createAppServices = ({
     if (fromProfile.name === shop.name && fromProfile.picture === shop.picture)
       return;
     await Effect.runPromise(
-      saveShop(repositories.settings, { ...shop, ...fromProfile }),
+      saveShop(repositories.settings, { ...shop, ...fromProfile }, null),
     );
   };
 

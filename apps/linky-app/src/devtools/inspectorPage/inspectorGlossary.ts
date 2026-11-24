@@ -53,7 +53,15 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "devices.registerFailed":
     "This device could not write its row in the devices list at start; it tries again on the next start.",
   "devices.removedHere":
-    "Another device removed this one from the devices list. Every open tab reloads and the first one to boot deletes this device's data, as on logout; onboarding then says why.",
+    "Another device removed this one from the devices list. After up to 30 seconds for a relay to take this device's own changes (`uploaded` says whether it did), every open tab reloads and the first one to boot deletes this device's data, as on logout; onboarding then says why.",
+  "devices.left":
+    "On logout, this device took its row off the devices list, then waited up to 3 seconds for a relay to take that and its other changes; `uploaded` says whether it did.",
+  "devices.leaveFailed":
+    "On logout, this device could not take its row off the devices list, so other devices still list it; the logout goes on.",
+  "devices.renameFailed":
+    "Renaming a device in Settings → Devices failed; the old name stays.",
+  "devices.removeFailed":
+    "Removing a device in Settings → Devices failed; that device stays signed in.",
   "devices.renamed": "The user renamed a device in Settings → Devices.",
   "devices.removed":
     "The user removed another device in Settings → Devices. That device signs out and erases its data once it syncs the removal.",

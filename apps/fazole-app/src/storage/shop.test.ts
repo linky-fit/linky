@@ -5,6 +5,7 @@ import { testStore } from "../services/testing/fakes";
 import {
   makeSettingsRepository,
   readShop,
+  readShopEditedAt,
   saveShop,
   SHOP_SETTING_KEY,
 } from "./shop";
@@ -18,9 +19,9 @@ describe("the shop profile", () => {
       iban: CzechIban.make("CZ6508000000192000145399"),
       picture: null,
     };
-    await Effect.runPromise(saveShop(settings, shop));
+    await Effect.runPromise(saveShop(settings, shop, null));
     expect(await Effect.runPromise(readShop(settings))).toEqual(shop);
-    await Effect.runPromise(saveShop(settings, { ...shop, iban: null }));
+    await Effect.runPromise(saveShop(settings, { ...shop, iban: null }, null));
     expect(await Effect.runPromise(readShop(settings))).toEqual({
       ...shop,
       iban: null,
@@ -34,7 +35,7 @@ describe("the shop profile", () => {
       iban: CzechIban.make("CZ6508000000192000145399"),
       picture: null,
     };
-    await Effect.runPromise(saveShop(settings, shop));
+    await Effect.runPromise(saveShop(settings, shop, null));
     expect(await Effect.runPromise(readShop(settings))).toEqual(shop);
   });
 
@@ -45,9 +46,11 @@ describe("the shop profile", () => {
       iban: null,
       picture: "https://blossom.primal.net/ab12.webp",
     };
-    await Effect.runPromise(saveShop(settings, shop));
+    await Effect.runPromise(saveShop(settings, shop, null));
     expect(await Effect.runPromise(readShop(settings))).toEqual(shop);
-    await Effect.runPromise(saveShop(settings, { ...shop, picture: null }));
+    await Effect.runPromise(
+      saveShop(settings, { ...shop, picture: null }, null),
+    );
     expect(await Effect.runPromise(readShop(settings))).toEqual({
       ...shop,
       picture: null,
@@ -64,5 +67,16 @@ describe("the shop profile", () => {
       iban: null,
       picture: null,
     });
+  });
+
+  it("remembers when the merchant last edited the shop", async () => {
+    const settings = makeSettingsRepository(testStore());
+    const shop = { name: "Kavárna", iban: null, picture: null };
+    await Effect.runPromise(saveShop(settings, shop, 1_700_000_060));
+    expect(await Effect.runPromise(readShopEditedAt(settings))).toBe(
+      1_700_000_060,
+    );
+    await Effect.runPromise(saveShop(settings, shop, null));
+    expect(await Effect.runPromise(readShopEditedAt(settings))).toBeNull();
   });
 });

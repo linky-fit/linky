@@ -46,8 +46,8 @@ export interface DevicesRepository {
     device: DeviceRegistration,
   ) => Effect.Effect<"registered" | "removed", ShardDbError>;
   /**
-   * `null` while the device is in the list; once removed, the device that
-   * removed it, or `null` for `by` when that device is unknown here.
+   * `null` while the device is in the list or after it left; once another
+   * device removed it, that device, or `null` for `by` when it is unknown here.
    */
   readonly removal: (
     id: DeviceId,
@@ -60,6 +60,10 @@ export interface DevicesRepository {
   readonly remove: (
     id: DeviceId,
     by: DeviceId | null,
+  ) => Effect.Effect<void, ShardDbError | RowNotFound>;
+  /** Takes this device off the list on a logout, which wipes it without the removal's sign-out. */
+  readonly leave: (
+    id: DeviceId,
   ) => Effect.Effect<void, ShardDbError | RowNotFound>;
   readonly subscribe: (listener: () => void) => () => void;
 }
@@ -74,6 +78,17 @@ export const makeDevicesRepository = (store: LinkyStore): DevicesRepository => {
     Effect.map(
       store.copiesOf("devices", "linkedDevice", id),
       ([newest]) => newest ?? null,
+    );
+
+  const remove = (id: DeviceId, by: DeviceId | null) =>
+    Effect.andThen(
+      store.remove(
+        "devices",
+        "linkedDevice",
+        id,
+        by === null ? {} : { removedBy: by },
+      ),
+      table.maybeRotate,
     );
 
   return {
@@ -119,7 +134,8 @@ export const makeDevicesRepository = (store: LinkyStore): DevicesRepository => {
     removal: (id) =>
       Effect.gen(function* () {
         const existing = yield* newestCopy(id);
-        if (existing?.isDeleted !== sqliteTrue) return null;
+        if (existing?.isDeleted !== sqliteTrue || existing.removedBy === id)
+          return null;
         const by =
           existing.removedBy === null
             ? null
@@ -127,16 +143,8 @@ export const makeDevicesRepository = (store: LinkyStore): DevicesRepository => {
         return { by: by !== null && isComplete(by) ? by : null };
       }),
     rename: (id, name) => table.update(id, { name }),
-    remove: (id, by) =>
-      Effect.andThen(
-        store.remove(
-          "devices",
-          "linkedDevice",
-          id,
-          by === null ? {} : { removedBy: by },
-        ),
-        table.maybeRotate,
-      ),
+    remove,
+    leave: (id) => remove(id, id),
     subscribe: table.subscribe,
   };
 };

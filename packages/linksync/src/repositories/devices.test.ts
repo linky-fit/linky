@@ -84,4 +84,15 @@ describe("devices repository", () => {
     expect(runNow(devices.removal(phone.id))).toBeNull();
     expect(runNow(devices.all)).toMatchObject([{ name: "Work phone" }]);
   });
+
+  it("a device that left on logout is off the list without being told it was removed", () => {
+    const { store } = linkyStore();
+    const devices = makeDevicesRepository(store);
+    runNow(devices.register(phone));
+
+    runNow(devices.leave(phone.id));
+
+    expect(runNow(devices.all)).toEqual([]);
+    expect(runNow(devices.removal(phone.id))).toBeNull();
+  });
 });

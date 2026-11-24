@@ -229,6 +229,8 @@ export const sk = {
   devicesRemoveConfirmBody:
     "Zariadenie sa pri najbližšom pripojení odhlási a zmaže z neho účet aj všetky dáta. Späť ho pridáte hlavnými kľúčmi alebo z tohto zoznamu.",
   devicesRemoved: "Zariadenie sa vymaže, hneď ako sa pripojí.",
+  devicesRenameFailed: "Zariadenie sa nepodarilo premenovať. Skúste to znova.",
+  devicesRemoveFailed: "Zariadenie sa nepodarilo vymazať. Skúste to znova.",
   devicesAddScanHint:
     "Na novom zariadení otvorte Linky, Fazolu alebo Finito, zvoľte prihlásenie z iného zariadenia a naskenujte tento kód.",
   devicesAddWarning:

@@ -1,4 +1,8 @@
-import { describeDevice, type DevicesRepository } from "@linky-fit/linksync";
+import {
+  describeDevice,
+  type DevicesRepository,
+  type LinkyStore,
+} from "@linky-fit/linksync";
 import { useHydrated } from "@linky-fit/linksync/react";
 import { useAtomValue } from "@linky-fit/linkstr-react";
 import { Effect } from "effect";
@@ -14,18 +18,28 @@ import { removerLabel } from "./lib/deviceApps";
 import { markThisDeviceJoined, readThisDevice } from "./lib/thisDevice";
 import { platformAtom } from "./state/platform";
 
+// The removal synced in, so a relay answers; this lets the device's own changes reach it first.
+const REMOVED_UPLOAD_WAIT = "30 seconds";
+
 /** Another device removed this one: wipe it like a logout, and onboarding says who did. */
 const signOutRemovedDevice = async (
+  store: LinkyStore,
   devices: DevicesRepository,
   reload: () => void,
 ): Promise<void> => {
   const removal = await Effect.runPromise(devices.removal(readThisDevice().id));
+  const uploaded = await Effect.runPromise(
+    Effect.timeoutOption(store.whenUploaded, REMOVED_UPLOAD_WAIT),
+  );
   const removedBy = removal?.by == null ? null : removerLabel(removal.by);
   reportAppLog({
     tag: "devices.removedHere",
     summary:
       "Another device removed this one; every tab reloads to erase this device's data",
-    payload: { removedBy: removal?.by?.id ?? null },
+    payload: {
+      removedBy: removal?.by?.id ?? null,
+      uploaded: uploaded._tag === "Some",
+    },
   });
   stopBeaconForIdentityChange();
   await clearIdentitySecrets();
@@ -71,7 +85,8 @@ const register = async (
  */
 export const DevicesController = (): null => {
   const devices = useDevicesRepository();
-  const hydrated = useHydrated(useLinkyStore());
+  const store = useLinkyStore();
+  const hydrated = useHydrated(store);
   const { reload } = useAtomValue(platformAtom).lifecycle;
   const signingOut = React.useRef(false);
 
@@ -81,7 +96,7 @@ export const DevicesController = (): null => {
     const signOut = () => {
       if (signingOut.current) return;
       signingOut.current = true;
-      void signOutRemovedDevice(devices, reload);
+      void signOutRemovedDevice(store, devices, reload);
     };
     void register(devices, signOut).then(
       () => {
@@ -102,7 +117,7 @@ export const DevicesController = (): null => {
         if (removal !== null) signOut();
       });
     });
-  }, [devices, hydrated, reload]);
+  }, [devices, hydrated, reload, store]);
 
   return null;
 };
