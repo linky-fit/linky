@@ -5,7 +5,10 @@ import {
 } from "@linky-fit/linksync/evolu";
 import { Effect, Layer, Result } from "effect";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createRecoverySeed } from "../storage/account";
+import { encodeNpub, encodeNsec } from "@linky-fit/linkstr";
+import { makeIdentity } from "@linky-fit/linkstr/testing";
+import { makeIdentityRepository } from "@linky-fit/linksync";
+import { createRecoverySeed, loadStoredAccount } from "../storage/account";
 import type { Device, DevicePlatform } from "./device";
 import { createDevice } from "./device";
 import {
@@ -87,6 +90,27 @@ describe("a device", () => {
     await vi.waitFor(() =>
       expect(signedIn(restarted).services.account.npub).toBe(npub),
     );
+  });
+
+  it("follows the identity Linky switched to and reloads under it", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { platform, kv, reloads } = fakePlatform();
+    const device = open(platform);
+    await device.createAccount({ name: "Kavárna", iban: null, picture: null });
+    const { store } = signedIn(device).services;
+    const custom = makeIdentity();
+
+    await Effect.runPromise(
+      makeIdentityRepository(store).set({
+        nsec: encodeNsec(custom.secretKey),
+        npub: encodeNpub(custom.pubkey),
+        source: "custom",
+        switchedAtSec: 1_800_000_000,
+      }),
+    );
+
+    await vi.waitFor(() => expect(reloads()).toBe(1));
+    expect(loadStoredAccount(kv)?.pubkey).toBe(custom.pubkey);
   });
 
   it("restores an account and holds its writes until the account's data arrives", async () => {

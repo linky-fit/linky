@@ -31,6 +31,7 @@ import {
 import { BITCOIN_QR_MODES } from "../storage/bitcoinQrSetting";
 import { offeredMints, parseMintUrlInput } from "../storage/mintSetting";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { DevicesDialog } from "./DevicesDialog";
 import { LanguageDialog } from "./LanguageDialog";
 import { MonetaDialog } from "./MonetaDialog";
 import { Page } from "./Page";
@@ -45,6 +46,7 @@ type OpenDialog =
   | "bitcoinQr"
   | "mint"
   | "seed"
+  | "devices"
   | "reset"
   | "language";
 
@@ -76,7 +78,8 @@ const hostOf = (url: string) => {
 
 export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
   const device = useDevice();
-  const { config, saveOfferTips, saveBitcoinQrMode } = useAppServices();
+  const { config, saveOfferTips, saveBitcoinQrMode, devices } =
+    useAppServices();
   const offerTips = useOfferTips() ?? true;
   const bitcoinQrMode = useBitcoinQrMode() ?? "universal";
   const mintUrl = useMintUrl() ?? config.mintUrl;
@@ -181,6 +184,12 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
             onPress={() => setDialog("seed")}
           />
           <ListRow
+            testID="settings-devices"
+            icon="Smartphone"
+            title={copy.devices.title}
+            onPress={() => setDialog("devices")}
+          />
+          <ListRow
             testID="settings-reset"
             icon="Trash2"
             title={copy.settings.reset}
@@ -254,6 +263,9 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
       >
         <RecoverySeed shopName={shop.name} />
       </Dialog>
+      {dialog === "devices" ? (
+        <DevicesDialog shop={shop} onClose={close} />
+      ) : null}
       <LanguageDialog open={dialog === "language"} onClose={close} />
       <ConfirmDialog
         open={dialog === "reset"}
@@ -262,7 +274,7 @@ export function SettingsScreen({ shop }: { readonly shop: ShopProfile }) {
         description={copy.settings.resetConfirmDescription}
         confirm={copy.settings.resetConfirm}
         destructive
-        onConfirm={device.resetDevice}
+        onConfirm={() => void devices.leave().then(device.resetDevice)}
       />
     </Page>
   );

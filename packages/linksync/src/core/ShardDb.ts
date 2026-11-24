@@ -186,6 +186,10 @@ export interface ShardDb<S extends DbSchema> {
   readonly isOwnerSynced: (ownerId: OwnerId) => boolean;
   /** Fires after more owners finished their sync round. */
   readonly subscribeOwnerSync: (listener: () => void) => () => void;
+  /** Completes once a relay holds every change this database stores for the owners. */
+  readonly whenUploaded: (
+    ownerIds: ReadonlyArray<OwnerId>,
+  ) => Effect.Effect<void>;
   readonly ownerUsage: (ownerId: OwnerId) => Effect.Effect<OwnerUsage>;
   /** Deletes the shard owner's local rows and history and stops syncing it. */
   readonly deleteOwner: (

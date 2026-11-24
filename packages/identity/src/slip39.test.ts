@@ -9,7 +9,10 @@ import {
   parseSlip39Share,
   recoverMasterSecretFromSlip39Share,
   recoverMasterSecretFromSlip39Shares,
+  slip39ShareFromMasterSecret,
 } from "./slip39";
+import { MasterSecret } from "./domain";
+import { hexToBytes } from "@noble/hashes/utils.js";
 
 const runIdentity = <E>(
   masterSecretLayer: Layer.Layer<MasterSecretProvider, E>,
@@ -22,6 +25,20 @@ const runIdentity = <E>(
   );
 
 describe("SLIP-39", () => {
+  it("encodes a master secret as the share Finito shows for it", async () => {
+    // Finito's `masterKeyToMnemonic("00112233445566778899aabbccddeeff")`.
+    const secret = MasterSecret.make(
+      hexToBytes("00112233445566778899aabbccddeeff"),
+    );
+    const share = await Effect.runPromise(slip39ShareFromMasterSecret(secret));
+    expect(share).toBe(
+      "academic else academic academic canyon album laden hairy debris ladle beard agree glad twin always dance metric lily strike herd",
+    );
+    expect(
+      await Effect.runPromise(recoverMasterSecretFromSlip39Share(share)),
+    ).toEqual(secret);
+  });
+
   it("generates a share that parses back as one", async () => {
     const share = await Effect.runPromise(createSlip39Share());
     expect(looksLikeSlip39Share(share)).toBe(true);

@@ -502,6 +502,35 @@ describe("evolu shard db", () => {
     expect(db.isOwnerSynced(owner.id)).toBe(true);
   });
 
+  it("counts an owner uploaded only while a route has nothing left to send", async () => {
+    const fake = fakeEvolu();
+    const syncState = syncStore();
+    const db = open(fake.runtime, { syncState });
+    const owner = testAppOwner();
+    // A route that completed before still counts as pending while a write waits to go out.
+    syncState.set(
+      stateWith([owner.id], {
+        type: "Pending",
+        transportId: complete.transportId,
+        failure: null,
+        skippedError: null,
+        completeAt: complete.completeAt,
+        lastSentAt: complete.lastSentAt,
+        lastReceivedAt: null,
+      }),
+    );
+    let uploaded = false;
+    void Effect.runPromise(db.whenUploaded([owner.id])).then(() => {
+      uploaded = true;
+    });
+    await settle();
+    expect(uploaded).toBe(false);
+
+    syncState.set(stateWith([owner.id]));
+    await settle();
+    expect(uploaded).toBe(true);
+  });
+
   it("deletes a shard owner through Evolu and turns refusal errors into ShardDbError", async () => {
     const fake = fakeEvolu();
     const db = open(fake.runtime);

@@ -30,6 +30,7 @@ import { Effect, Layer, Option, Schema } from "effect";
 export interface Account {
   /** The SLIP-39 share the account restores from. */
   readonly recoverySeed: string;
+  /** Derived from the seed, unless the user switched Linky to a custom identity, which this device follows. */
   readonly secretKey: NostrSecretKey;
   readonly pubkey: Pubkey;
   readonly npub: string;
@@ -93,6 +94,18 @@ export const deriveAccount = (
       IdentityProviderError: () => Effect.fail(new InvalidRecoverySeed()),
     }),
   );
+
+/**
+ * The account under another Nostr key, such as the custom identity Linky
+ * switched to; the recovery seed, synced data and wallet stay its own.
+ */
+export const withNostrKey = (
+  account: Account,
+  secretKey: NostrSecretKey,
+): Account => {
+  const pubkey = derivePubkey(secretKey);
+  return { ...account, secretKey, pubkey, npub: encodeNpub(pubkey) };
+};
 
 /** A fresh recovery seed: a 20-word SLIP-39 share, the same kind Linky creates. */
 export const createRecoverySeed: Effect.Effect<string> =

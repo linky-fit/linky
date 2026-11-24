@@ -115,6 +115,16 @@ Adding a listing is `insert` with every column; editing is `update`; withdrawing
 
 `makeOnchainTransferMessagesRepository(store)` over `onchainTransferMessage` in the same scope keeps, on the operator's account, every on-chain transfer message a user sent, with its content exactly as it arrived, so a dispute can be settled against what was sent. Store each with `insertIfAbsent` under `onchainTransferMessageIdFor(rumorId)`, so a replayed inbox or a second device lands on the same row; `transferId` is the transfer the message names, or `null` for one that does not decode.
 
+## Devices
+
+`makeDevicesRepository(store)` over `linkedDevice` in the `devices` scope (one fixed shard, never forgotten): one row per app on a device that holds the recovery seed, written by Linky, Fazole and Finito alike. `app` is one of `deviceApps` or an app this release does not know; `all` returns `LinkedDeviceRecord`s whose app and name have arrived.
+
+- Each start calls `register` with the device's own id, kept in its local storage, and what it is. It writes `name` only while the row has none, so a rename from another device stays, and a start that changes nothing writes nothing.
+- Pass `joining: true` until the device has registered once since it got the recovery seed (a new account, a restore, a pairing). A joining device revives its row, so a removal from before it joined cannot sign it out; once joined it never does, so a removal wins.
+- `remove(id, by)` removes another device and names this one as `by`, in the same mutation as the tombstone. `register` then answers `removed` on that device, and `removal` turns from `null` into `{ by }`, the record of the device that removed it, or `by: null` when that device is not in the list. Sign the device out then; `subscribe` fires when the removal syncs in while it runs.
+- `leave(id)` takes this device off the list on a logout, which wipes the device itself: the row is removed with this device as `by`, and `removal` stays `null` for it, so it is not signed out as removed.
+- `rename` writes a name from any device.
+
 ## Identity
 
 `makeIdentityRepository(store)` mirrors the active Nostr key in the `identity` scope (one fixed shard, never forgotten) so another device can adopt it. `set` upserts the one row `activeNostrIdentityId`; `current` is the newest row by `updatedAt`, or `null`. `switchedAtSec` is the cutoff after which older incoming events are ignored following a custom override. The row carries the `nsec`; keep it out of logs.

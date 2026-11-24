@@ -53,6 +53,7 @@ export const getDesktopRouteSection = (route: Route): DesktopRouteSection => {
     case "settingsBlocked":
     case "settingsReceiveMethod":
     case "settingsMasterKeys":
+    case "settingsDevices":
     case "settingsNostrIdentity":
     case "advanced":
     case "advancedAutoPayLimit":
@@ -123,6 +124,7 @@ export const isDesktopSectionEntryRoute = (route: Route): boolean => {
     case "settingsBlocked":
     case "settingsReceiveMethod":
     case "settingsMasterKeys":
+    case "settingsDevices":
     case "settingsNostrIdentity":
     case "advanced":
     case "advancedAutoPayLimit":

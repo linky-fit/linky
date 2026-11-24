@@ -53,8 +53,8 @@ export type {
   StepperProps,
   SwitchProps,
 } from "./controls";
-export { TextField } from "./fields";
-export type { TextFieldProps } from "./fields";
+export { CodeField, TextField } from "./fields";
+export type { CodeFieldProps, TextFieldProps } from "./fields";
 export { SelectField } from "./select-field";
 export type { SelectFieldProps, SelectOption } from "./select-field";
 export { RichTextInput } from "./rich-text-input";
@@ -193,6 +193,8 @@ export type {
   MediaFrameProps,
 } from "./media";
 export { CameraPreview } from "./camera-preview";
+export { QrScanner } from "./qr-scanner";
 export { VideoEmbed } from "./video-embed";
 export type { VideoEmbedProps } from "./video-embed";
 export type { CameraPreviewProps } from "./camera-preview";
+export type { QrScannerProps } from "./qr-scanner";

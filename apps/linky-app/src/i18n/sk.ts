@@ -217,6 +217,50 @@ export const sk = {
   masterKeys: "Obnovovací seed",
   masterKeysShow: "Zobraziť",
   masterKeysHide: "Skryť",
+  devices: "Zariadenia",
+  devicesIntro:
+    "Zariadenia, ktoré používajú rovnaké hlavné kľúče, v Linky, Fazoli aj Finite.",
+  devicesThisDevice: "Toto zariadenie",
+  devicesAdd: "Pridať zariadenie",
+  devicesNameLabel: "Názov zariadenia",
+  devicesRename: "Premenovať",
+  devicesRemove: "Vzdialene vymazať zariadenie",
+  devicesRemoveConfirmTitle: "Vzdialene vymazať {name}?",
+  devicesRemoveConfirmBody:
+    "Zariadenie sa pri najbližšom pripojení odhlási a zmaže z neho účet aj všetky dáta. Späť ho pridáte hlavnými kľúčmi alebo z tohto zoznamu.",
+  devicesRemoved: "Zariadenie sa vymaže, hneď ako sa pripojí.",
+  devicesRenameFailed: "Zariadenie sa nepodarilo premenovať. Skúste to znova.",
+  devicesRemoveFailed: "Zariadenie sa nepodarilo vymazať. Skúste to znova.",
+  devicesAddScanHint:
+    "Na novom zariadení otvorte Linky, Fazolu alebo Finito, zvoľte prihlásenie z iného zariadenia a naskenujte tento kód.",
+  devicesAddWarning:
+    "Kód nikomu neposielajte ani nefoťte. Kto odpíše kód z nového zariadenia, získa vaše hlavné kľúče.",
+  devicesAddCodeLabel: "Kód z nového zariadenia",
+  devicesAddCodeHint:
+    "Odpíšte šesť číslic, ktoré teraz ukazuje nové zariadenie.",
+  devicesAddCodeMismatch: "Kód nesedí. Zostáva pokusov: {count}.",
+  devicesAddSending: "Posielam kľúče na nové zariadenie…",
+  devicesAddDone: "Zariadenie pridané.",
+  devicesAddExpired: "Platnosť kódu vypršala.",
+  devicesAddRetry: "Nový kód",
+  devicesAddConflict:
+    "Kód naskenovali dve zariadenia. Z bezpečnostných dôvodov sme pridanie zrušili.",
+  devicesAddFailed: "Zariadenie sa nepodarilo pridať. Skúste to znova.",
+  devicesRemovedHereTitle: "Toto zariadenie bolo vzdialene vymazané",
+  devicesRemovedHereBody:
+    "Vymazali ste ho z iného zariadenia, preto sa odhlásilo a zmazalo svoje dáta.",
+  devicesRemovedHereByBody:
+    "Vymazalo ho zariadenie {device}, preto sa odhlásilo a zmazalo svoje dáta.",
+  pairJoin: "Prihlásiť z iného zariadenia",
+  pairJoinHint:
+    "Na zariadení, kde účet už máte, otvorte Nastavenia → Zariadenia → Pridať zariadenie a naskenujte zobrazený kód.",
+  pairJoinScanner: "Čítačka QR kódu",
+  pairJoinCameraUnavailable:
+    "Kamera nie je dostupná. Zadajte hlavné kľúče ručne.",
+  pairJoinConnecting: "Spájam sa s druhým zariadením…",
+  pairJoinCode: "Odpíšte tento kód na druhom zariadení",
+  pairJoinFailed:
+    "Prihlásenie z iného zariadenia sa nepodarilo. Skúste to znova.",
   pasteCustomNostrKeys: "Vložiť vlastnú Nostr identitu",
   switchToDefaultIdentity: "Prepnúť späť na odvodenú identitu",
   copyNsec: "Kopírovať nsec",

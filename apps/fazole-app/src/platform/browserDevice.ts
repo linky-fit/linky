@@ -1,6 +1,6 @@
 import type { AppConfig } from "../config";
 import { createDevice, type Device } from "../services/device";
-import { openBrowserStore } from "../storage/evolu.web";
+import { activeEvoluRelayUrls, openBrowserStore } from "../storage/evolu.web";
 import { reloadApp, resetDevice } from "./deviceWipe";
 import { localStorageKeyValueStore } from "./linkshuKeyValueStore";
 import { linkstrStores } from "./linkstrStores";
@@ -20,9 +20,15 @@ export const createBrowserDevice = (config: AppConfig): Device =>
       keyValueStore: localStorageKeyValueStore,
       onOnline,
       deferUpdateWhile,
+      devices: {
+        kv: localStorageKv,
+        userAgent: navigator.userAgent,
+        onRemoved: (removedBy) => resetDevice({ removedBy }),
+        syncServers: () => activeEvoluRelayUrls(config),
+      },
     }),
     saveRecoverySeed: (account, shopName) =>
       void saveRecoverySeedToPasswordManager(account, shopName),
     reload: reloadApp,
-    resetDevice,
+    resetDevice: () => resetDevice(),
   });

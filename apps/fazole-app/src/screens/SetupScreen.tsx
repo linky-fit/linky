@@ -1,4 +1,5 @@
 import {
+  Avatar,
   Button,
   Form,
   IconButton,
@@ -11,6 +12,7 @@ import {
 import { useEffect, useState } from "react";
 import { copy } from "../copy";
 import { navigateTo } from "../platform/hashRoute";
+import { shopFieldsFromProfile } from "../storage/shop";
 import { useDevice, useSession } from "../services/react";
 import { Page, WithTopBar } from "./Page";
 import { ShopFields } from "./ShopFields";
@@ -29,6 +31,24 @@ export function SetupScreen() {
   const noShop = session._tag === "SignedIn" && !saving;
   const [failed, setFailed] = useState(false);
   useEffect(() => device.prepareAccount(), [device]);
+
+  // An account from Linky starts from the name and picture its Nostr profile shows.
+  const services = session._tag === "SignedIn" ? session.services : null;
+  const { setName, setPicture } = form;
+  useEffect(() => {
+    if (services === null) return;
+    let cancelled = false;
+    void services.nostr.fetchOwnProfile().then((fetched) => {
+      if (cancelled || fetched?.profile == null) return;
+      const { name, picture } = shopFieldsFromProfile(fetched.profile);
+      if (name !== null)
+        setName((current) => (current === "" ? name : current));
+      if (picture !== null) setPicture((current) => current ?? picture);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [services, setName, setPicture]);
 
   const submit = async () => {
     const shop = form.submit();
@@ -72,6 +92,11 @@ export function SetupScreen() {
           </Text>
         </Stack>
         <Form onSubmit={() => void submit()} gap="$xl">
+          {form.picture === null ? null : (
+            <Stack alignItems="center" testID="setup-picture">
+              <Avatar name={form.name} uri={form.picture} size="lg" />
+            </Stack>
+          )}
           <ShopFields form={form} />
           {failed ? <Notice tone="danger" title={copy.setup.failed} /> : null}
           <SubmitButton testID="setup-submit" loading={saving}>

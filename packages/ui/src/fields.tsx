@@ -162,3 +162,111 @@ export function TextField({
     </FieldFrame>
   );
 }
+
+export interface CodeFieldProps {
+  label: string;
+  value: string;
+  /** Receives the digits only, at most `length` of them. */
+  onChangeText: (value: string) => void;
+  /** Digits in the code. */
+  length?: number | undefined;
+  /** Digits per group; a dash separates the groups, e.g. `482–913`. */
+  groupSize?: number | undefined;
+  hint?: string | undefined;
+  error?: string | undefined;
+  autoFocus?: boolean | undefined;
+  disabled?: boolean | undefined;
+  id?: string | undefined;
+  testID?: string | undefined;
+}
+
+/**
+ * A short numeric code typed into one box per digit, so the user sees how
+ * many digits it takes. One invisible input over the boxes holds the focus
+ * and the keyboard; the boxes only draw its value. Autofill is off, since
+ * such codes are often secrets.
+ */
+export function CodeField({
+  label,
+  value,
+  onChangeText,
+  length = 6,
+  groupSize = 3,
+  hint,
+  error,
+  autoFocus,
+  disabled,
+  id,
+  testID,
+}: CodeFieldProps) {
+  const generatedId = useId();
+  const fieldId = id ?? generatedId;
+  const [focused, setFocused] = useState(Boolean(autoFocus));
+  const activeIndex = Math.min(value.length, length - 1);
+  const slots = Array.from({ length }, (_, index) => index);
+  return (
+    <FieldFrame
+      id={fieldId}
+      label={label}
+      hint={hint}
+      error={error}
+      disabled={disabled}
+    >
+      <Stack position="relative" alignSelf="center">
+        <Row gap="$xs" alignItems="center" aria-hidden>
+          {slots.map((index) => (
+            <Row key={index} gap="$xs" alignItems="center">
+              {index > 0 && index % groupSize === 0 ? (
+                <Text variant="heading" color="$colorMuted">
+                  –
+                </Text>
+              ) : null}
+              <Stack
+                width={size.control}
+                height={size.controlLg}
+                borderRadius="$control"
+                alignItems="center"
+                justifyContent="center"
+                backgroundColor={
+                  error
+                    ? "$dangerSoft"
+                    : focused && index === activeIndex
+                      ? "$accentSoft"
+                      : "$neutralSoft"
+                }
+              >
+                <Text variant="heading" mono>
+                  {value[index] ?? ""}
+                </Text>
+              </Stack>
+            </Row>
+          ))}
+        </Row>
+        <Input
+          unstyled
+          {...fieldA11y(fieldId, label, error, hint)}
+          testID={testID}
+          position="absolute"
+          top={0}
+          left={0}
+          right={0}
+          bottom={0}
+          opacity={0}
+          value={value}
+          onChangeText={(text) =>
+            onChangeText(text.replace(/\D/g, "").slice(0, length))
+          }
+          maxLength={length}
+          inputMode="numeric"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
+          autoFocus={autoFocus}
+          disabled={disabled}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+        />
+      </Stack>
+    </FieldFrame>
+  );
+}

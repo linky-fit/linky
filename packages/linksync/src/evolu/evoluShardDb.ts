@@ -177,6 +177,24 @@ const completedOwners = (
   );
 };
 
+/** Whether every owner has a route its relay has reconciled with nothing left to send. */
+const uploadedOwners = (
+  state: SyncState | null,
+  name: string,
+  ownerIds: ReadonlyArray<OwnerId>,
+): boolean => {
+  const tenant = state?.tenants.find((tenant) => tenant.name === name);
+  if (tenant?.type !== "Active") return false;
+  return ownerIds.every((ownerId) =>
+    tenant.owners.some(
+      (owner) =>
+        owner.ownerId === ownerId &&
+        owner.type === "Writable" &&
+        owner.routes.some((route) => route.type === "Complete"),
+    ),
+  );
+};
+
 /** Why Evolu must not store the row, or `null` when every value fits its column. */
 const rejection = ({ kind, table, row }: Mutation): string | null => {
   const columns = schema[table];
@@ -552,6 +570,17 @@ export const createEvoluShardDb = (
     useOwner: (owner: Owner) =>
       hasEvoluRelay ? evolu.useOwner(owner) : () => {},
     isOwnerSynced: (ownerId) => readable.has(ownerId),
+    whenUploaded: (ownerIds) =>
+      Effect.callback<void>((resume) => {
+        const check = () => {
+          if (!uploadedOwners(syncState.get(), evolu.name, ownerIds)) return;
+          stop();
+          resume(Effect.void);
+        };
+        const stop = syncState.subscribe(check);
+        check();
+        return Effect.sync(stop);
+      }),
     subscribeOwnerSync: (listener) => {
       syncListeners.add(listener);
       return () => {

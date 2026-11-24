@@ -23,7 +23,7 @@ import type {
   RelayUrl,
   WrapInboxEvent,
 } from "@linky-fit/linkstr";
-import { Cause, Duration, Effect, Layer, Stream } from "effect";
+import { Cause, Duration, Effect, Layer, Stream, Struct } from "effect";
 import { nowSeconds } from "../utils/time";
 import type { LinkstrRuntime } from "./runtimes";
 
@@ -34,6 +34,11 @@ const PROFILE_TIMEOUT = Duration.seconds(8);
 export interface PayerProfile {
   readonly name: string | null;
   readonly picture: string | null;
+}
+
+/** The account's own kind-0 name and picture, and when it was published. */
+export interface OwnProfile extends PayerProfile {
+  readonly updatedAt: number;
 }
 
 /** A first session with no stored cursor reads this far back. */
@@ -76,11 +81,23 @@ export interface Nostr {
   readonly sendPaymentNotice: (to: Pubkey) => Promise<void>;
   /** The refs of outbox jobs still stored, delivered or not. */
   readonly queuedRefs: () => Promise<ReadonlySet<string>>;
-  /** Publishes the shop as the account's kind-0 profile, so wallets show it instead of a stranger. */
+  /**
+   * Publishes the shop's name and picture as the account's kind-0 profile,
+   * which Linky shows as the user's own: the profile's other fields, such as
+   * the lightning address Linky set, are kept.
+   */
   readonly publishProfile: (shop: {
     readonly name: string | null;
     readonly picture: string | null;
   }) => Promise<void>;
+  /**
+   * The account's own name and picture as its kind-0 profile has them, with
+   * when it was published; `{ profile: null }` when it has none, `null` when
+   * no relay answered.
+   */
+  readonly fetchOwnProfile: () => Promise<{
+    readonly profile: OwnProfile | null;
+  } | null>;
   /** Someone's kind-0 name and picture; `null` when they have none or no relay answered in time. */
   readonly fetchProfile: (pubkey: Pubkey) => Promise<PayerProfile | null>;
   readonly onInboxEvent: (handler: InboxHandler) => () => void;
@@ -244,17 +261,53 @@ export const createNostr = ({
           },
           () => null,
         ),
-    publishProfile: ({ name, picture }) =>
+    fetchOwnProfile: () =>
       runtime
         .runPromise(
           Effect.flatMap(Profiles, (profiles) =>
-            profiles.publishProfile(
+            profiles.fetchProfile(pubkey),
+          ).pipe(Effect.timeout(PROFILE_TIMEOUT)),
+        )
+        .then(
+          (result) => {
+            const profile = result.profile;
+            return {
+              profile: profile
+                ? {
+                    name:
+                      profile.metadata.displayName ||
+                      profile.metadata.name ||
+                      null,
+                    picture: profile.metadata.picture || null,
+                    updatedAt: profile.updatedAt,
+                  }
+                : null,
+            };
+          },
+          () => null,
+        ),
+    publishProfile: ({ name, picture }) =>
+      runtime
+        .runPromise(
+          Effect.gen(function* () {
+            const profiles = yield* Profiles;
+            // Unreachable relays fail the publish, so it cannot drop fields Linky set.
+            const existing = yield* profiles.fetchProfile(pubkey).pipe(
+              Effect.timeout(PROFILE_TIMEOUT),
+              Effect.map((result) => result.profile?.metadata ?? null),
+            );
+            const kept =
+              existing === null
+                ? {}
+                : Struct.omit(existing, ["name", "displayName", "picture"]);
+            return yield* profiles.publishProfile(
               new ProfileMetadata({
+                ...kept,
                 ...(name === null ? {} : { name, displayName: name }),
                 ...(picture === null ? {} : { picture }),
               }),
-            ),
-          ),
+            );
+          }),
         )
         .then(
           () => undefined,

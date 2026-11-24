@@ -44,6 +44,10 @@ The store is hydrated once the app owner has finished a sync round with an Evolu
   - A `memoryOnly` store starts from an empty database: when an Evolu relay is configured (`memoryOnly && hasEvoluRelay`), it holds writes until hydrated without reading or writing retention or removing the marker in `kv`.
   - When no Evolu relay is configured (`hasEvoluRelay: false`), an existing local device (no marker) hydrates immediately; a device with the marker set stays unhydrated so it never hydrates from an empty database.
 
+## Upload
+
+`whenUploaded` completes once a relay holds every change this device stores for `syncOwners`: each owner has a route its relay reconciled with nothing left to send. Await it, bounded by a timeout, before wiping the device, so the wipe erases nothing only this device had. Without a relay it never completes.
+
 ## Rotation
 
 The store does not schedule the check: every `TableRepository` write ends by starting `maybeRotate`, which reads the shard's history usage after the write has returned, a batch writer runs it once, and of concurrent writes only the first passing check rotates while the rest report `cooldown`. A rotation writes the pointer into the app owner and reconciles sync at once, so the new shard uploads. `rotate(scope)` moves the pointer unconditionally.

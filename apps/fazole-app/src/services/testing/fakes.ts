@@ -101,6 +101,7 @@ export const fakeNostr = (overrides: Partial<Nostr> = {}) => {
     queuedRefs: () => Promise.resolve(new Set()),
     publishProfile: () => Promise.resolve(),
     fetchProfile: () => Promise.resolve(null),
+    fetchOwnProfile: () => Promise.resolve({ profile: null }),
     onInboxEvent: (handler) => {
       inbox.push(handler);
       return () => {};

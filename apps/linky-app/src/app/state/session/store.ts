@@ -2,6 +2,7 @@ import {
   linkyScopes,
   makeContactsRepository,
   makeConversationsRepository,
+  makeDevicesRepository,
   makeHiddenListingsRepository,
   makeIdentityRepository,
   makeInboxCursorsRepository,
@@ -79,6 +80,7 @@ export const contactsRepositoryAtom = repositoryAtom(makeContactsRepository);
 export const conversationsRepositoryAtom = repositoryAtom(
   makeConversationsRepository,
 );
+export const devicesRepositoryAtom = repositoryAtom(makeDevicesRepository);
 export const identityRepositoryAtom = repositoryAtom(makeIdentityRepository);
 export const inboxCursorsRepositoryAtom = repositoryAtom(
   makeInboxCursorsRepository,

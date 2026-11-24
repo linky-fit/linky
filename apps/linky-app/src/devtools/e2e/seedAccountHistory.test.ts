@@ -188,8 +188,8 @@ describe("seedAccountHistory", () => {
     expect(new Set(proofs.map((row) => row.ownerId)).size).toBe(3);
 
     expect(summary.syncOwners).toBe(syncOwners.length);
-    // 1 app + 1 identity + 3 contacts + 1 peerListings + 3 messages + 1 unknownSenders + 3 cashu + 3 transactions + 1 onchain = 17
-    expect(summary.syncOwners).toBe(17);
+    // 1 app + 1 identity + 3 contacts + 1 peerListings + 3 messages + 1 unknownSenders + 3 cashu + 3 transactions + 1 onchain + 1 devices = 18
+    expect(summary.syncOwners).toBe(18);
   });
 
   it("writes nothing and leaves shard pointers at 0 when all counts are 0", async () => {

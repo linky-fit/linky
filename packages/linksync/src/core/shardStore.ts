@@ -217,7 +217,10 @@ export interface ShardStore<
     table: T,
     writes: ReadonlyArray<RowWrite<S[T]>>,
   ) => Effect.Effect<void, ShardDbError>;
-  /** Tombstones the row where it lives; nothing is copied forward. */
+  /**
+   * Tombstones the row where it lives; nothing is copied forward. `patch`
+   * lands in the same mutation, so a device that sees the removal sees it too.
+   */
   readonly remove: <
     Scope extends keyof R & string,
     T extends TableOf<R, Scope>,
@@ -225,6 +228,7 @@ export interface ShardStore<
     scope: Scope,
     table: T,
     id: S[T]["id"],
+    patch?: Patch<S[T]>,
   ) => Effect.Effect<void, ShardDbError | RowNotFound>;
   /**
    * Copies rows from outside the scope's shards (a legacy lane, an older
@@ -260,6 +264,8 @@ export interface ShardStore<
   readonly syncOwners: () => Effect.Effect<ReadonlyArray<Owner>>;
   /** Uses the owners in `syncOwners` and unuses the rest. */
   readonly reconcileSync: () => Effect.Effect<void>;
+  /** Completes once a relay holds every change stored here for `syncOwners`; without a relay, never. */
+  readonly whenUploaded: Effect.Effect<void>;
   /**
    * Whether the store is hydrated: the app owner, and after it every shard
    * its pointers make visible, finished a sync round with a relay, so reads
@@ -750,6 +756,7 @@ export const createShardStore = <
     scope: string,
     table: T,
     id: string,
+    patch?: Patch<S[T]>,
   ): Effect.Effect<void, ShardDbError | RowNotFound> =>
     Effect.gen(function* () {
       yield* beforeWrite;
@@ -762,7 +769,7 @@ export const createShardStore = <
           kind: "update",
           table,
           owner: ownerOf(current.ownerId),
-          row: { id, isDeleted: true },
+          row: { ...patch, id, isDeleted: true },
         },
       ]);
     });
@@ -1237,6 +1244,9 @@ export const createShardStore = <
     maybeRotate,
     syncOwners,
     reconcileSync,
+    whenUploaded: Effect.flatMap(syncOwners(), (owners) =>
+      db.whenUploaded(owners.map((owner) => owner.id)),
+    ),
     hydrated: checkHydration,
     subscribeHydration,
     repairPointers,

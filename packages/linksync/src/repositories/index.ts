@@ -38,6 +38,15 @@ export type {
   PinnedListingRecord,
   PinnedListingsRepository,
 } from "./listingMarks";
+export { describeDevice } from "./deviceLabels";
+export type { DeviceLabels } from "./deviceLabels";
+export { deviceApps, makeDevicesRepository } from "./devices";
+export type {
+  DeviceApp,
+  DeviceRegistration,
+  DevicesRepository,
+  LinkedDeviceRecord,
+} from "./devices";
 export { makeIdentityRepository } from "./identity";
 export type {
   IdentityInput,

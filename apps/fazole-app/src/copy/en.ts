@@ -354,6 +354,53 @@ export const en: Copy = {
       "The picture could not be saved. Check your connection and try again.",
   },
 
+  devices: {
+    title: "Devices",
+    description:
+      "Devices using the same recovery seed, in Fazole, Linky and Finito.",
+    thisDevice: "This device",
+    add: "Add device",
+    name: "Device name",
+    rename: "Rename",
+    remove: "Remotely wipe device",
+    removeConfirmTitle: (name: string) => `Remotely wipe ${name}?`,
+    removeConfirmDescription:
+      "The device signs out and erases the shop and all its data the next time it connects. Add it back with the recovery seed or from this list.",
+    removed: "The device is wiped once it connects.",
+    renameFailed: "The device could not be renamed. Try again.",
+    removeFailed: "The device could not be wiped. Try again.",
+    scanHint:
+      "On the new device, open Fazole, Linky or Finito, choose to sign in from another device and scan this code.",
+    warning:
+      "Never send or photograph this code. Whoever types in the new device's code gets your recovery seed.",
+    code: "Code from the new device",
+    codeHint: "Type the six digits the new device shows now.",
+    codeMismatch: (attemptsLeft: number) =>
+      `Wrong code. Attempts left: ${attemptsLeft}.`,
+    confirm: "Confirm code",
+    sending: "Sending the seed to the new device…",
+    done: "Device added.",
+    expired: "The code expired.",
+    newCode: "New code",
+    conflict:
+      "Two devices scanned the code. Adding was cancelled for your safety.",
+    failed: "The device could not be added. Try again.",
+    removedHereTitle: "This device was wiped remotely",
+    removedHereBy: (device: string) =>
+      `${device} wiped it, so it signed out and erased its data.`,
+    removedHereDescription:
+      "You wiped it from another device, so it signed out and erased its data.",
+    join: "Sign in from another device",
+    joinHint:
+      "On a device that has your shop, open Settings → Devices → Add device and scan the code it shows.",
+    scanner: "QR code scanner",
+    scannerUnavailable:
+      "The camera is unavailable. Enter the recovery seed by hand.",
+    connecting: "Connecting to the other device…",
+    joinCode: "Type this code on the other device",
+    joinFailed: "Signing in from another device failed. Try again.",
+  },
+
   recoverySeed: {
     description:
       "The recovery seed is the only backup of the shop, its history and its wallet. Save it in your password manager, or copy it somewhere safe.",

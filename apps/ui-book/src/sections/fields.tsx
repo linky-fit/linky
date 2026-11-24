@@ -6,6 +6,25 @@ import { options } from "../sample-data";
 export const fields: Section = {
   title: "Fields",
   entries: {
+    CodeField: () => {
+      const [code, setCode] = useState("48291");
+      return (
+        <UI.Stack gap="$lg">
+          <UI.CodeField
+            label="Code from the new device"
+            hint="Type the six digits the new device shows."
+            value={code}
+            onChangeText={setCode}
+          />
+          <UI.CodeField
+            label="Wrong code"
+            error="Wrong code. Attempts left: 2."
+            value="000000"
+            onChangeText={() => undefined}
+          />
+        </UI.Stack>
+      );
+    },
     TextField: () => {
       const [name, setName] = useState("Alex Rivers");
       const [note, setNote] = useState("See you on Saturday.");

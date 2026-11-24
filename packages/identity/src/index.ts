@@ -30,4 +30,5 @@ export {
   looksLikeSlip39Share,
   parseSlip39Share,
   recoverMasterSecretFromSlip39Share,
+  slip39ShareFromMasterSecret,
 } from "./slip39";

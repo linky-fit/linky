@@ -215,6 +215,49 @@ export const cs = {
   masterKeys: "Obnovovací seed",
   masterKeysShow: "Zobrazit",
   masterKeysHide: "Skrýt",
+  devices: "Zařízení",
+  devicesIntro:
+    "Zařízení, která používají stejné hlavní klíče, v Linky, Fazoli i Finitu.",
+  devicesThisDevice: "Toto zařízení",
+  devicesAdd: "Přidat zařízení",
+  devicesNameLabel: "Název zařízení",
+  devicesRename: "Přejmenovat",
+  devicesRemove: "Vzdáleně vymazat zařízení",
+  devicesRemoveConfirmTitle: "Vzdáleně vymazat {name}?",
+  devicesRemoveConfirmBody:
+    "Zařízení se při příštím připojení odhlásí a smaže z něj účet i všechna data. Zpět ho přidáte hlavními klíči nebo z tohoto seznamu.",
+  devicesRemoved: "Zařízení se vymaže, jakmile se připojí.",
+  devicesRenameFailed: "Zařízení se nepodařilo přejmenovat. Zkuste to znovu.",
+  devicesRemoveFailed: "Zařízení se nepodařilo vymazat. Zkuste to znovu.",
+  devicesAddScanHint:
+    "Na novém zařízení otevřete Linky, Fazoli nebo Finito, zvolte přihlášení z jiného zařízení a naskenujte tento kód.",
+  devicesAddWarning:
+    "Kód nikomu neposílejte ani nefoťte. Kdo opíše kód z nového zařízení, získá vaše hlavní klíče.",
+  devicesAddCodeLabel: "Kód z nového zařízení",
+  devicesAddCodeHint: "Opište šest číslic, které teď ukazuje nové zařízení.",
+  devicesAddCodeMismatch: "Kód nesedí. Zbývá pokusů: {count}.",
+  devicesAddSending: "Posílám klíče na nové zařízení…",
+  devicesAddDone: "Zařízení přidáno.",
+  devicesAddExpired: "Platnost kódu vypršela.",
+  devicesAddRetry: "Nový kód",
+  devicesAddConflict:
+    "Kód naskenovala dvě zařízení. Z bezpečnostních důvodů jsme přidání zrušili.",
+  devicesAddFailed: "Zařízení se nepodařilo přidat. Zkuste to znovu.",
+  devicesRemovedHereTitle: "Toto zařízení bylo vzdáleně vymazáno",
+  devicesRemovedHereBody:
+    "Vymazali jste ho z jiného zařízení, a proto se odhlásilo a smazalo svá data.",
+  devicesRemovedHereByBody:
+    "Vymazalo ho zařízení {device}, a proto se odhlásilo a smazalo svá data.",
+  pairJoin: "Přihlásit z jiného zařízení",
+  pairJoinHint:
+    "Na zařízení, kde účet už máte, otevřete Nastavení → Zařízení → Přidat zařízení a naskenujte zobrazený kód.",
+  pairJoinScanner: "Čtečka QR kódu",
+  pairJoinCameraUnavailable:
+    "Kamera není dostupná. Zadejte hlavní klíče ručně.",
+  pairJoinConnecting: "Spojuji se s druhým zařízením…",
+  pairJoinCode: "Opište tento kód na druhém zařízení",
+  pairJoinFailed:
+    "Přihlášení z jiného zařízení se nepodařilo. Zkuste to znovu.",
   pasteCustomNostrKeys: "Vložit vlastní Nostr identitu",
   switchToDefaultIdentity: "Přepnout zpět na odvozenou identitu",
   copyNsec: "Kopírovat nsec",

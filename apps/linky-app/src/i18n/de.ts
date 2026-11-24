@@ -221,6 +221,53 @@ export const de = {
   masterKeys: "Wiederherstellungs-Seed",
   masterKeysShow: "Anzeigen",
   masterKeysHide: "Ausblenden",
+  devices: "Geräte",
+  devicesIntro:
+    "Geräte mit denselben Hauptschlüsseln, in Linky, Fazole und Finito.",
+  devicesThisDevice: "Dieses Gerät",
+  devicesAdd: "Gerät hinzufügen",
+  devicesNameLabel: "Gerätename",
+  devicesRename: "Umbenennen",
+  devicesRemove: "Gerät aus der Ferne löschen",
+  devicesRemoveConfirmTitle: "{name} aus der Ferne löschen?",
+  devicesRemoveConfirmBody:
+    "Das Gerät meldet sich bei der nächsten Verbindung ab und löscht das Konto mit allen Daten. Mit den Hauptschlüsseln oder aus dieser Liste fügen Sie es wieder hinzu.",
+  devicesRemoved: "Das Gerät wird gelöscht, sobald es sich verbindet.",
+  devicesRenameFailed:
+    "Das Gerät konnte nicht umbenannt werden. Versuchen Sie es erneut.",
+  devicesRemoveFailed:
+    "Das Gerät konnte nicht gelöscht werden. Versuchen Sie es erneut.",
+  devicesAddScanHint:
+    "Öffnen Sie auf dem neuen Gerät Linky, Fazole oder Finito, wählen Sie die Anmeldung über ein anderes Gerät und scannen Sie diesen Code.",
+  devicesAddWarning:
+    "Senden oder fotografieren Sie diesen Code nie. Wer den Code des neuen Geräts eingibt, erhält Ihre Hauptschlüssel.",
+  devicesAddCodeLabel: "Code vom neuen Gerät",
+  devicesAddCodeHint:
+    "Geben Sie die sechs Ziffern ein, die das neue Gerät jetzt zeigt.",
+  devicesAddCodeMismatch: "Falscher Code. Verbleibende Versuche: {count}.",
+  devicesAddSending: "Schlüssel werden an das neue Gerät gesendet…",
+  devicesAddDone: "Gerät hinzugefügt.",
+  devicesAddExpired: "Der Code ist abgelaufen.",
+  devicesAddRetry: "Neuer Code",
+  devicesAddConflict:
+    "Zwei Geräte haben den Code gescannt. Zu Ihrer Sicherheit wurde das Hinzufügen abgebrochen.",
+  devicesAddFailed:
+    "Das Gerät konnte nicht hinzugefügt werden. Versuchen Sie es erneut.",
+  devicesRemovedHereTitle: "Dieses Gerät wurde aus der Ferne gelöscht",
+  devicesRemovedHereBody:
+    "Sie haben es von einem anderen Gerät aus gelöscht, daher hat es sich abgemeldet und seine Daten gelöscht.",
+  devicesRemovedHereByBody:
+    "{device} hat es gelöscht, daher hat es sich abgemeldet und seine Daten gelöscht.",
+  pairJoin: "Über ein anderes Gerät anmelden",
+  pairJoinHint:
+    "Öffnen Sie auf einem Gerät mit Ihrem Konto Einstellungen → Geräte → Gerät hinzufügen und scannen Sie den angezeigten Code.",
+  pairJoinScanner: "QR-Code-Scanner",
+  pairJoinCameraUnavailable:
+    "Die Kamera ist nicht verfügbar. Geben Sie die Hauptschlüssel von Hand ein.",
+  pairJoinConnecting: "Verbindung zum anderen Gerät…",
+  pairJoinCode: "Geben Sie diesen Code auf dem anderen Gerät ein",
+  pairJoinFailed:
+    "Die Anmeldung über ein anderes Gerät ist fehlgeschlagen. Versuchen Sie es erneut.",
   pasteCustomNostrKeys: "Eigene Nostr-Identität einfügen",
   switchToDefaultIdentity: "Zurück zur abgeleiteten Identität",
   copyNsec: "nsec kopieren",

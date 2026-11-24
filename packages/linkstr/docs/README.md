@@ -25,6 +25,7 @@ Plain (public, signed and published unwrapped):
 - [Plain events](./plain-events.md): profiles and status, relay lists, mute list, NIP-78 app data
 - [Listings](./listings.md): cash intent and listings of goods and services, readable by chosen contacts only
 - [Nostr Connect](./nostr-connect.md): one NIP-46 `nostrconnect://` login as the remote signer, device authorizations, and the client side that asks a signer
+- [Device pairing](./device-pairing.md): moving the recovery seed to a new device by QR code and a typed code, compatible with Finito's `payky:pair`
 
 Never published:
 
@@ -61,6 +62,7 @@ Every event kind the package produces. Wrapped kinds travel inside a kind 1059 g
 | 30078 | app data (NIP-78)                         | no      | n/a                 | [plain-events.md](./plain-events.md#app-data-nip-78)                         |
 | 34133 | listings (content readable by contacts)   | no      | n/a                 | [listings.md](./listings.md#wire-format)                                     |
 | 24133 | NIP-46 Nostr Connect message (ephemeral)  | no      | n/a                 | [nostr-connect.md](./nostr-connect.md#wire-format)                           |
+| 28581 | device pairing message (ephemeral)        | no      | n/a                 | [device-pairing.md](./device-pairing.md#wire-format)                         |
 | 24138 | device authorization (signed, embedded)   | no      | n/a                 | [nostr-connect.md](./nostr-connect.md#device-authorization)                  |
 | 24139 | site login (signed, never published)      | no      | n/a                 | [nostr-connect.md](./nostr-connect.md#the-site-login-event)                  |
 | 24242 | Blossom upload auth (never published)     | no      | n/a                 | [http-auth.md](./http-auth.md#wire-format)                                   |

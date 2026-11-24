@@ -13,6 +13,7 @@ import { useToasts } from "../hooks/useToasts";
 import { useDisplayAmounts, useTranslation } from "./hooks/shell";
 import { useTokenContactSend } from "./hooks/wallet/useWalletTokens";
 import { BeaconController } from "./BeaconController";
+import { DevicesController } from "./DevicesController";
 import { ListingsController } from "./ListingsController";
 import { OnchainTransfersSync } from "./OnchainTransfersSync";
 import { useLaneToShardMigration } from "./migrations/useLaneToShardMigration";
@@ -85,6 +86,7 @@ const AuthenticatedAppShell = ({ currentNsec }: AuthenticatedAppShellProps) => {
       <BeaconController currentNsec={currentNsec} />
       <ListingsController />
       <OnchainTransfersSync />
+      <DevicesController />
 
       <AuthenticatedLayout>
         <AppRouteContent />

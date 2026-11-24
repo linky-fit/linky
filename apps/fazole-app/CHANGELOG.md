@@ -15,12 +15,16 @@ Každá vydaná verze musí obsahovat nejprve `en-US` a potom `cs-CZ`.
 - With several terminals open on one shop, a payment under a pledge is forwarded to the pledger once, by the terminal that created the payment, instead of by every terminal.
 - A direct payment no longer repays a pledge, because several terminals could each forward it; the shop's payments repay it.
 - Money from a payment whose connection dropped mid-way returns to the balance with the next payment from that mint, without a manual restore.
+- Settings → Devices lists every device using the shop's recovery seed in Fazole, Linky and Finito. Rename them, wipe one remotely, or add a new one by scanning a QR code.
+- The shop's name and picture are the account's Nostr profile, the same one Linky shows, and Fazole follows the Nostr identity Linky switched to.
 
 ### cs-CZ
 
 - Když je na jednom obchodě otevřeno víc terminálů, platbu během zástavy přepošle zastaviteli jen jednou terminál, na kterém byla zadaná, a ne každý terminál.
 - Přímá platba už zástavu nesplácí, protože by ji mohlo přeposlat víc terminálů; zástavu splácejí platby obchodu.
 - Peníze z platby, které vypadlo spojení, se vrátí do zůstatku s další platbou z daného mintu, bez ruční obnovy.
+- Nastavení → Zařízení ukazuje všechna zařízení se záložní frází obchodu ve Fazoli, Linky i Finitu. Přejmenujete je, vzdáleně vymažete a nové přidáte naskenováním QR kódu.
+- Jméno a obrázek obchodu jsou Nostr profil účtu, stejný jako v Linky, a Fazole přejde na Nostr identitu, na kterou jste přepnuli v Linky.
 
 ## [26.11.1] - 2026-11-22
 

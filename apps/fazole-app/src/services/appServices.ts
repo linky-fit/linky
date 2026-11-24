@@ -30,7 +30,12 @@ import {
   saveMonetaConnection,
   type MonetaConnection,
 } from "../storage/monetaSetting";
-import { readShop, saveShop } from "../storage/shop";
+import {
+  readShop,
+  readShopEditedAt,
+  saveShop,
+  shopFieldsFromProfile,
+} from "../storage/shop";
 import { readOfferTips, saveOfferTips } from "../storage/tipSetting";
 import {
   readBitcoinQrMode,
@@ -55,8 +60,10 @@ import {
   type SupportChat,
 } from "./supportChat";
 import { makeLinkshuRuntime, makeLinkstrRuntime } from "./runtimes";
+import { createDevices, type DevicePorts, type Devices } from "./devices";
 import { createWallet, type Wallet } from "./wallet";
 import { createWithdrawals, type Withdrawals } from "./withdrawals";
+import { nowSeconds } from "../utils/time";
 
 /** The terminal's payments: created by the merchant, settled by the bank leg or the Bitcoin leg. */
 export interface Payments {
@@ -144,6 +151,8 @@ export interface AppServices {
   readonly pledges: Pledges;
   readonly supportChat: SupportChat;
   readonly cashRequests: CashRequests;
+  /** The devices of the recovery seed in every app. */
+  readonly devices: Devices;
   readonly live: LiveSources;
   /** Opens the inbox and, once the store is hydrated, resumes interrupted payments and withdrawals; once. */
   readonly start: () => void;
@@ -167,6 +176,8 @@ export interface ServicePorts {
   readonly onOnline?: ((listener: () => void) => () => void) | undefined;
   /** Holds a new release's reload back until the wallet operation settles. */
   readonly deferUpdateWhile?: (<A>(work: Promise<A>) => Promise<A>) | undefined;
+  /** This device's place in the devices list; without it the device does not register. */
+  readonly devices?: DevicePorts | undefined;
 }
 
 export const createAppServices = ({
@@ -254,8 +265,46 @@ export const createAppServices = ({
   };
 
   const saveShopProfile = async (shop: ShopProfile) => {
-    await Effect.runPromise(saveShop(repositories.settings, shop));
+    await Effect.runPromise(
+      saveShop(repositories.settings, shop, nowSeconds()),
+    );
     void nostr.publishProfile(shop);
+  };
+
+  const devices = createDevices({
+    repository: repositories.devices,
+    whenUploaded: store.whenUploaded,
+    recoverySeed: account.recoverySeed,
+    ports: ports.devices,
+  });
+
+  /**
+   * The shop's name and picture are the account's Nostr profile, which Linky
+   * edits too: the newer of the profile on the relays and the merchant's last
+   * edit wins. Without a profile, the shop goes out as one, so the pledger
+   * and support see who sends. An account without a shop is set up from the
+   * profile instead.
+   */
+  const syncShopWithProfile = async () => {
+    const shop = await loadShop();
+    if (shop === null) return;
+    const fetched = await nostr.fetchOwnProfile();
+    if (fetched === null) return;
+    const { profile } = fetched;
+    const editedAt = await Effect.runPromise(
+      readShopEditedAt(repositories.settings),
+    );
+    if (profile === null || (editedAt ?? 0) > profile.updatedAt) {
+      if (shop.name !== null || shop.picture !== null)
+        await nostr.publishProfile(shop);
+      return;
+    }
+    const fromProfile = shopFieldsFromProfile(profile);
+    if (fromProfile.name === shop.name && fromProfile.picture === shop.picture)
+      return;
+    await Effect.runPromise(
+      saveShop(repositories.settings, { ...shop, ...fromProfile }, null),
+    );
   };
 
   const payerProfiles = new Map<Pubkey, Promise<PayerProfile | null>>();
@@ -335,6 +384,7 @@ export const createAppServices = ({
         );
       },
     },
+    devices,
     live: {
       shop: {
         all: readShop(repositories.settings),
@@ -371,12 +421,8 @@ export const createAppServices = ({
       started = true;
       nostr.start();
       void hydrated().then(() => {
-        // The shop is what the pledger and support see as the sender: keep it on the relays this launch uses.
-        void loadShop().then((shop) => {
-          if (shop && (shop.name !== null || shop.picture !== null)) {
-            void nostr.publishProfile(shop);
-          }
-        });
+        void syncShopWithProfile();
+        stops.push(devices.start());
         void bitcoinPayments.resume();
         void withdrawals.resume();
         // Inflows, settled withdrawals and a pledge opened on another device all ask for a forward.
@@ -387,6 +433,7 @@ export const createAppServices = ({
           repositories.settings.subscribe(reconcile),
         );
         const online = ports.onOnline?.(() => {
+          void syncShopWithProfile();
           void bitcoinPayments.resume();
           reconcile();
         });
