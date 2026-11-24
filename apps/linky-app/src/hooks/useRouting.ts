@@ -144,6 +144,7 @@ type NavigationAction =
   | { route: "settingsLanguage" }
   | { route: "settingsAppearance" }
   | { route: "settingsMasterKeys" }
+  | { route: "settingsDevices" }
   | { route: "settingsNostrIdentity" }
   | { route: "proxyPayments" }
   | { route: "collaboration" }
@@ -229,6 +230,9 @@ export const navigateTo = (
       break;
     case "settingsMasterKeys":
       go("#settings/master-keys");
+      break;
+    case "settingsDevices":
+      go("#settings/devices");
       break;
     case "settingsNostrIdentity":
       go("#settings/nostr-identity");

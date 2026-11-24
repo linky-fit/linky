@@ -2,25 +2,54 @@ import { sleep } from "../utils/time";
 import {
   safeLocalStorageClear,
   safeLocalStorageGet,
+  safeLocalStorageRemove,
   safeLocalStorageSet,
   safeSessionStorageClear,
 } from "../utils/storage";
 
 const LOGOUT_PENDING_STORAGE_KEY = "linky.logoutPending";
+// Its value: the user logged out here, or removed this device from another one.
+const REMOVED_LOGOUT = "removed";
+/** Names the device that removed this one, across the wipe, so onboarding can say who. */
+const REMOVED_NOTICE_STORAGE_KEY = "linky.removedFromDevices";
 const WIPE_DEADLINE_MS = 10_000;
 const RETRY_DELAY_MS = 250;
 const IDB_DELETE_WAIT_MS = 1_000;
 
 export const isLogoutPending = (): boolean =>
-  safeLocalStorageGet(LOGOUT_PENDING_STORAGE_KEY) === "1";
+  Boolean(safeLocalStorageGet(LOGOUT_PENDING_STORAGE_KEY));
 
 /**
  * Every tab, this one included, has to reload after this: a booting tab sees
  * the pending logout and wipes before it opens Evolu, whose worker would
  * otherwise keep the database files open.
  */
-export const markLogoutPending = (): void =>
-  safeLocalStorageSet(LOGOUT_PENDING_STORAGE_KEY, "1");
+export const markLogoutPending = (
+  removal?: { readonly removedBy: string | null } | undefined,
+): void => {
+  if (removal === undefined) {
+    safeLocalStorageSet(LOGOUT_PENDING_STORAGE_KEY, "1");
+    return;
+  }
+  safeLocalStorageSet(REMOVED_NOTICE_STORAGE_KEY, removal.removedBy ?? "");
+  safeLocalStorageSet(LOGOUT_PENDING_STORAGE_KEY, REMOVED_LOGOUT);
+};
+
+/**
+ * Set on the first start after another device removed this one: the device
+ * that did, or `null` for `removedBy` when it was not known.
+ */
+export const removedFromDevices = (): {
+  readonly removedBy: string | null;
+} | null => {
+  if (isLogoutPending()) return null;
+  const removedBy = safeLocalStorageGet(REMOVED_NOTICE_STORAGE_KEY);
+  return removedBy === null ? null : { removedBy: removedBy || null };
+};
+
+/** The notice shows on the first start after the removal only. */
+export const forgetRemovedFromDevices = (): void =>
+  safeLocalStorageRemove(REMOVED_NOTICE_STORAGE_KEY);
 
 export const onLogoutInAnotherTab = (callback: () => void): void => {
   window.addEventListener("storage", (event) => {
@@ -102,6 +131,13 @@ const wipeSiteData = async (deadline: number): Promise<void> => {
 export const finishPendingLogout = async (): Promise<void> => {
   const deadline = Date.now() + WIPE_DEADLINE_MS;
   await navigator.locks.request("linky.logout", async () => {
-    if (isLogoutPending()) await wipeSiteData(deadline);
+    if (!isLogoutPending()) return;
+    const removedBy =
+      safeLocalStorageGet(LOGOUT_PENDING_STORAGE_KEY) === REMOVED_LOGOUT
+        ? (safeLocalStorageGet(REMOVED_NOTICE_STORAGE_KEY) ?? "")
+        : null;
+    await wipeSiteData(deadline);
+    if (removedBy !== null)
+      safeLocalStorageSet(REMOVED_NOTICE_STORAGE_KEY, removedBy);
   });
 };

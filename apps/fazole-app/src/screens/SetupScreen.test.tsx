@@ -1,5 +1,15 @@
+import { KeyValueStore, makeInMemoryKeyValueStore } from "@linky-fit/linkshu";
+import { Layer } from "effect";
 import { act } from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createAppServices, type AppServices } from "../services/appServices";
+import {
+  memoryKv,
+  sharedOutboxStore,
+  testAccount,
+  testConfig,
+  testStore,
+} from "../services/testing/fakes";
 import { copy } from "../copy";
 import { fakeDevice } from "../testing/fakeDevice";
 import { byTestId, render, typeInto } from "../testing/render";
@@ -66,6 +76,60 @@ describe("the setup screen", () => {
       name: "Stánek",
       iban: null,
       picture: null,
+    });
+  });
+});
+
+describe("an account restored without a shop", () => {
+  const running: AppServices[] = [];
+  afterEach(async () => {
+    for (const services of running.splice(0)) await services.dispose();
+  });
+
+  const restoredDevice = (
+    fetchOwnProfile: AppServices["nostr"]["fetchOwnProfile"],
+  ) => {
+    const created = createAppServices({
+      account: testAccount(),
+      store: testStore(),
+      config: testConfig,
+      ports: {
+        kv: memoryKv(),
+        outboxStore: sharedOutboxStore(),
+        keyValueStore: Layer.succeed(
+          KeyValueStore,
+          makeInMemoryKeyValueStore(),
+        ),
+      },
+    });
+    running.push(created);
+    const save = vi.fn<AppServices["shop"]["save"]>(async () => {});
+    const services: AppServices = {
+      ...created,
+      nostr: { ...created.nostr, fetchOwnProfile },
+      shop: { ...created.shop, save },
+    };
+    const session = { _tag: "SignedIn", services, restored: true } as const;
+    return { device: { ...fakeDevice(), session: () => session }, save };
+  };
+
+  it("starts from the name and picture of the account's Nostr profile", async () => {
+    const { device, save } = restoredDevice(async () => ({
+      profile: { name: "Hynek", picture: "https://example.com/hynek.webp" },
+    }));
+    const container = await render(<SetupScreen />, device);
+
+    await vi.waitFor(() =>
+      expect(byTestId<HTMLInputElement>(container, "shop-name").value).toBe(
+        "Hynek",
+      ),
+    );
+    await submit(container);
+
+    expect(save).toHaveBeenCalledWith({
+      name: "Hynek",
+      iban: null,
+      picture: "https://example.com/hynek.webp",
     });
   });
 });

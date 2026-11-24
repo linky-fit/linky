@@ -43,6 +43,7 @@ import {
   LnAddressPayRoute,
   LnInvoicePayRoute,
   ManualPayRoute,
+  DevicesPage,
   MasterKeysPage,
   NostrIdentityPage,
   MintDetailPage,
@@ -124,6 +125,8 @@ const RoutePage = (): React.ReactElement => {
       return <ReceiveMethodPage />;
     case "settingsMasterKeys":
       return <MasterKeysPage />;
+    case "settingsDevices":
+      return <DevicesPage />;
     case "settingsNostrIdentity":
       return <NostrIdentityPage />;
     case "collaboration":

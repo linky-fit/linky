@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render } from "../test/render";
 import { IconButton } from "./controls";
-import { TextField } from "./fields";
+import { CodeField, TextField } from "./fields";
 
 describe("text inputs on the web", () => {
   it.each([
@@ -64,5 +64,28 @@ describe("TextField trailing", () => {
   it("renders a string as a suffix inside the field", async () => {
     const { frame } = await renderField("CZK");
     expect(frame?.textContent).toBe("CZK");
+  });
+});
+
+describe("CodeField", () => {
+  it("draws one box per digit, split into groups, and keeps only digits", async () => {
+    const onChangeText = vi.fn();
+    const container = await render(
+      <CodeField label="Code" value="482" onChangeText={onChangeText} />,
+    );
+    const input = container.querySelector("input");
+    if (!input) throw new Error("no input");
+    expect(input.getAttribute("aria-label")).toBe("Code");
+    expect(input.getAttribute("autocomplete")).toBe("off");
+    expect(container.textContent).toBe("Code482–");
+
+    const setValue = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )?.set;
+    setValue?.call(input, "48 2-9135");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+
+    expect(onChangeText).toHaveBeenLastCalledWith("482913");
   });
 });

@@ -221,6 +221,49 @@ export const pt = {
   masterKeys: "Seed de recuperação",
   masterKeysShow: "Mostrar",
   masterKeysHide: "Ocultar",
+  devices: "Dispositivos",
+  devicesIntro:
+    "Dispositivos que usam as mesmas chaves mestras, no Linky, no Fazole e no Finito.",
+  devicesThisDevice: "Este dispositivo",
+  devicesAdd: "Adicionar dispositivo",
+  devicesNameLabel: "Nome do dispositivo",
+  devicesRename: "Renomear",
+  devicesRemove: "Apagar dispositivo remotamente",
+  devicesRemoveConfirmTitle: "Apagar {name} remotamente?",
+  devicesRemoveConfirmBody:
+    "O dispositivo sai da conta e apaga-a com todos os dados na próxima vez que se ligar. Adicione-o de novo com as chaves mestras ou a partir desta lista.",
+  devicesRemoved: "O dispositivo é apagado assim que se ligar.",
+  devicesAddScanHint:
+    "No novo dispositivo, abra o Linky, o Fazole ou o Finito, escolha entrar a partir de outro dispositivo e leia este código.",
+  devicesAddWarning:
+    "Nunca envie nem fotografe este código. Quem introduzir o código do novo dispositivo obtém as suas chaves mestras.",
+  devicesAddCodeLabel: "Código do novo dispositivo",
+  devicesAddCodeHint:
+    "Introduza os seis dígitos que o novo dispositivo mostra agora.",
+  devicesAddCodeMismatch: "Código errado. Tentativas restantes: {count}.",
+  devicesAddSending: "A enviar as chaves para o novo dispositivo…",
+  devicesAddDone: "Dispositivo adicionado.",
+  devicesAddExpired: "O código expirou.",
+  devicesAddRetry: "Novo código",
+  devicesAddConflict:
+    "Dois dispositivos leram o código. Para sua segurança, a adição foi cancelada.",
+  devicesAddFailed:
+    "Não foi possível adicionar o dispositivo. Tente novamente.",
+  devicesRemovedHereTitle: "Este dispositivo foi apagado remotamente",
+  devicesRemovedHereBody:
+    "Apagou-o a partir de outro dispositivo, por isso saiu da conta e apagou os seus dados.",
+  devicesRemovedHereByBody:
+    "{device} apagou-o, por isso saiu da conta e apagou os seus dados.",
+  pairJoin: "Entrar a partir de outro dispositivo",
+  pairJoinHint:
+    "Num dispositivo com a sua conta, abra Definições → Dispositivos → Adicionar dispositivo e leia o código apresentado.",
+  pairJoinScanner: "Leitor de códigos QR",
+  pairJoinCameraUnavailable:
+    "A câmara não está disponível. Introduza as chaves mestras manualmente.",
+  pairJoinConnecting: "A ligar ao outro dispositivo…",
+  pairJoinCode: "Introduza este código no outro dispositivo",
+  pairJoinFailed:
+    "Não foi possível entrar a partir de outro dispositivo. Tente novamente.",
   pasteCustomNostrKeys: "Colar uma identidade Nostr própria",
   switchToDefaultIdentity: "Voltar à identidade derivada",
   copyNsec: "Copiar nsec",

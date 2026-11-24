@@ -25,6 +25,25 @@ export const ShopPicture = Schema.String.pipe(
   Schema.check(Schema.isPattern(/^https:\/\/\S+$/u), Schema.isMaxLength(500)),
 );
 
+/**
+ * The shop's name and picture as a Nostr profile has them, cut down to what
+ * the shop stores: a name too long is shortened, a picture that is not a
+ * short https URL is left out.
+ */
+export const shopFieldsFromProfile = (profile: {
+  readonly name: string | null;
+  readonly picture: string | null;
+}): Pick<ShopProfile, "name" | "picture"> => {
+  const name = profile.name?.trim().slice(0, 100).trim() ?? "";
+  return {
+    name: Schema.is(ShopName)(name) ? name : null,
+    picture:
+      profile.picture !== null && Schema.is(ShopPicture)(profile.picture)
+        ? profile.picture
+        : null,
+  };
+};
+
 const ShopJson = Schema.fromJsonString(
   Schema.Struct({
     name: Schema.optionalKey(ShopName),

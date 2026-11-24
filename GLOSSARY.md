@@ -445,8 +445,16 @@ _Avoid_: swap config, swap settings, terms
 ## Sync and devices
 
 **Device**:
-One installation of Linky with its own local copy of the user's data.
+One installation of Linky, Fazole or Finito with its own local copy of the user's data; the devices list in Settings shows every device of the recovery seed, in every app.
 _Avoid_: client, instance
+
+**Remotely wiped device**:
+A device the user wiped from the devices list on another device; once it syncs the wipe it signs out and erases its data, and onboarding names the device that wiped it. In code, its row is removed.
+_Avoid_: removed device, revoked device, kicked device
+
+**Pairing**:
+Adding a device by scanning a QR code on a device that has the recovery seed and typing back the code the new device shows; only then does the seed travel, end-to-end encrypted. It is Finito's `payky:pair`, so the three apps pair with each other.
+_Avoid_: device transfer, linking, QR login
 
 **Session**:
 The identity secrets, Evolu instance and store one page load runs on; switching identity, restoring or logging out starts a new page load.

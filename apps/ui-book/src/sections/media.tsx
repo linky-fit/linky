@@ -92,6 +92,35 @@ export const media: Section = {
         </UI.Stack>
       );
     },
+    QrScanner: () => {
+      const [scanning, setScanning] = useState(false);
+      const [scanned, setScanned] = useState<string | null>(null);
+      return (
+        <UI.Stack>
+          {scanning ? (
+            <UI.QrScanner
+              accessibilityLabel="QR code scanner"
+              unavailableLabel="The camera is unavailable"
+              onScan={(text) => {
+                setScanned(text);
+                setScanning(false);
+                return true;
+              }}
+            />
+          ) : null}
+          <UI.Button
+            variant="secondary"
+            icon="ScanLine"
+            onPress={() => setScanning((current) => !current)}
+          >
+            {scanning ? "Stop scanning" : "Scan a QR code (web)"}
+          </UI.Button>
+          {scanned === null ? null : (
+            <UI.Text variant="caption">{scanned}</UI.Text>
+          )}
+        </UI.Stack>
+      );
+    },
     ImageCropPreview: () => {
       const [center, setCenter] = useState<UI.ImageCropCenter>({
         x: 96,

@@ -69,6 +69,11 @@ export const linkyScopes = {
     rotation: rotation(220),
     forget: "never",
   }),
+  devices: shardScope({
+    tables: ["linkedDevice"],
+    rotation: null,
+    forget: "never",
+  }),
 };
 
 export type LinkyScopes = typeof linkyScopes;

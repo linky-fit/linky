@@ -59,6 +59,18 @@ export * from "./listings/Listings";
 export * from "./listings/sharedListing";
 export * from "./muteList/MuteList";
 export {
+  DEVICE_PAIRING_KIND,
+  encodePairingInvite,
+  formatPairingCode,
+  pairingCode,
+  pairingHelloProof,
+  PairingAbortReason,
+  PairingInvite,
+  PairingPayload,
+  parsePairingInvite,
+} from "./devicePairing/codec";
+export * from "./devicePairing/DevicePairing";
+export {
   DEVICE_AUTHORIZATION_KIND,
   DEVICE_AUTHORIZATION_PERMISSION,
   deviceAuthorizationTemplate,

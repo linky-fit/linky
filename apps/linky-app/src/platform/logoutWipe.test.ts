@@ -2,9 +2,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   finishPendingLogout,
+  forgetRemovedFromDevices,
   isLogoutPending,
   markLogoutPending,
   onLogoutInAnotherTab,
+  removedFromDevices,
 } from "./logoutWipe";
 
 const opfsEntries = new Set<string>();
@@ -72,6 +74,31 @@ describe("finishPendingLogout", () => {
     expect(indexedDbs.size).toBe(0);
     expect(localStorage.length).toBe(0);
     expect(sessionStorage.length).toBe(0);
+  });
+
+  it("remembers past the wipe which device removed this one, until onboarding showed it", async () => {
+    localStorage.setItem("linky.nostr_nsec", "nsec1...");
+    markLogoutPending({ removedBy: "MacBook (Fazole)" });
+
+    await finishPendingLogout();
+
+    expect(localStorage.getItem("linky.nostr_nsec")).toBeNull();
+    expect(isLogoutPending()).toBe(false);
+    expect(removedFromDevices()).toEqual({ removedBy: "MacBook (Fazole)" });
+    forgetRemovedFromDevices();
+    expect(removedFromDevices()).toBeNull();
+  });
+
+  it("still says the device was removed when the remover is unknown", async () => {
+    markLogoutPending({ removedBy: null });
+    await finishPendingLogout();
+    expect(removedFromDevices()).toEqual({ removedBy: null });
+  });
+
+  it("says nothing about a removal after a logout of the user's own", async () => {
+    markLogoutPending();
+    await finishPendingLogout();
+    expect(removedFromDevices()).toBeNull();
   });
 
   it("leaves a fresh session alone once another tab finished the wipe", async () => {

@@ -1,9 +1,11 @@
 import { Effect } from "effect";
 import {
   makeConversationsRepository,
+  makeDevicesRepository,
   makeTransactionsRepository,
   makeWalletRepository,
   type ConversationsRepository,
+  type DevicesRepository,
   type LinkyStore,
   type TransactionsRepository,
   type WalletRepository,
@@ -17,6 +19,7 @@ export interface Repositories {
   readonly settings: SettingsRepository;
   readonly wallet: WalletRepository;
   readonly conversations: ConversationsRepository;
+  readonly devices: DevicesRepository;
 }
 
 export const makeRepositories = (store: LinkyStore): Repositories => ({
@@ -25,6 +28,7 @@ export const makeRepositories = (store: LinkyStore): Repositories => ({
   settings: makeSettingsRepository(store),
   wallet: makeWalletRepository(store),
   conversations: makeConversationsRepository(store),
+  devices: makeDevicesRepository(store),
 });
 
 /** Resolves once the store is hydrated; background writes wait for it, as linksync asks. */

@@ -19,9 +19,9 @@ Read `GLOSSARY.md` before discussing domain concepts. When the user uses a term 
 - Funds move between mints only on an explicit user action; changing the default mint moves nothing, and one payment uses one mint; for a payment request no held mint can pay, the funds first move over Lightning into one of its mints
 - A payment matches a payment request only by the request's NUT-18 id, never by amount; a request the user made counts as paid only once the receives naming its id brought in its amount
 - Quote ids and proofs go straight from the wallet to the mint, never through Linky infrastructure
-- The recovery seed stays out of every HTTP request; secrets stay out of every log
+- The recovery seed stays out of every HTTP request and leaves the device only by pairing, end-to-end encrypted to the device whose code the user typed; secrets stay out of every log
 - Inspector rows hold decrypted plaintext and stay on the device in production
-- Local Evolu data is cleared only by the user; quota errors are recovered by adding relay capacity, and degraded storage asks the user instead of falling back silently
+- Local Evolu data is cleared only by the user, here or by removing this device on another one; quota errors are recovered by adding relay capacity, and degraded storage asks the user instead of falling back silently
 - Env vars set only fresh-origin defaults; relay and Evolu server lists are user settings
 - Nightly (`main`) shares accounts and services with the last release, so whatever it writes to Evolu, Nostr or a mint stays readable by that release
 - Linky and Fazole release separately and share accounts, so whatever either writes to Evolu, Nostr or a mint stays readable by the other's last release

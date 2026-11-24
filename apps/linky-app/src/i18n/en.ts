@@ -215,6 +215,46 @@ export const en = {
   masterKeys: "Recovery seed",
   masterKeysShow: "Show",
   masterKeysHide: "Hide",
+  devices: "Devices",
+  devicesIntro:
+    "Devices using the same master keys, in Linky, Fazole and Finito.",
+  devicesThisDevice: "This device",
+  devicesAdd: "Add device",
+  devicesNameLabel: "Device name",
+  devicesRename: "Rename",
+  devicesRemove: "Remotely wipe device",
+  devicesRemoveConfirmTitle: "Remotely wipe {name}?",
+  devicesRemoveConfirmBody:
+    "The device signs out and erases the account and all its data the next time it connects. Add it back with the master keys or from this list.",
+  devicesRemoved: "The device is wiped once it connects.",
+  devicesAddScanHint:
+    "On the new device, open Linky, Fazole or Finito, choose to sign in from another device and scan this code.",
+  devicesAddWarning:
+    "Never send or photograph this code. Whoever types in the new device's code gets your master keys.",
+  devicesAddCodeLabel: "Code from the new device",
+  devicesAddCodeHint: "Type the six digits the new device shows now.",
+  devicesAddCodeMismatch: "Wrong code. Attempts left: {count}.",
+  devicesAddSending: "Sending the keys to the new device…",
+  devicesAddDone: "Device added.",
+  devicesAddExpired: "The code expired.",
+  devicesAddRetry: "New code",
+  devicesAddConflict:
+    "Two devices scanned the code. Adding was cancelled for your safety.",
+  devicesAddFailed: "The device could not be added. Try again.",
+  devicesRemovedHereTitle: "This device was wiped remotely",
+  devicesRemovedHereBody:
+    "You wiped it from another device, so it signed out and erased its data.",
+  devicesRemovedHereByBody:
+    "{device} wiped it, so it signed out and erased its data.",
+  pairJoin: "Sign in from another device",
+  pairJoinHint:
+    "On a device that has your account, open Settings → Devices → Add device and scan the code it shows.",
+  pairJoinScanner: "QR code scanner",
+  pairJoinCameraUnavailable:
+    "The camera is unavailable. Enter the master keys by hand.",
+  pairJoinConnecting: "Connecting to the other device…",
+  pairJoinCode: "Type this code on the other device",
+  pairJoinFailed: "Signing in from another device failed. Try again.",
   pasteCustomNostrKeys: "Paste a custom Nostr identity",
   switchToDefaultIdentity: "Switch back to the derived identity",
   copyNsec: "Copy nsec",

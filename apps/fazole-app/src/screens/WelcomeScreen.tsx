@@ -2,6 +2,7 @@ import {
   Button,
   IconButton,
   Image,
+  Notice,
   space,
   Stack,
   Text,
@@ -9,6 +10,10 @@ import {
 } from "@linky-fit/ui";
 import { useEffect, useState } from "react";
 import { copy } from "../copy";
+import {
+  forgetRemovedFromDevices,
+  removedFromDevices,
+} from "../platform/deviceWipe";
 import { navigateTo } from "../platform/hashRoute";
 import { useDevice } from "../services/react";
 import { LanguageDialog } from "./LanguageDialog";
@@ -21,6 +26,8 @@ const LOGO_RADIUS = Math.round(LOGO_SIZE * 0.28);
 export function WelcomeScreen() {
   const device = useDevice();
   const [choosingLanguage, setChoosingLanguage] = useState(false);
+  const [removedHere] = useState(removedFromDevices);
+  useEffect(forgetRemovedFromDevices, []);
   // The recovery seed takes a moment to derive; by the time the form is filled it is ready.
   useEffect(() => device.prepareAccount(), [device]);
   return (
@@ -41,6 +48,17 @@ export function WelcomeScreen() {
         />
       </Stack>
       <Stack flexGrow={1} justifyContent="center" gap="$xl">
+        {removedHere ? (
+          <Notice
+            tone="info"
+            title={copy.devices.removedHereTitle}
+            description={
+              removedHere.removedBy === null
+                ? copy.devices.removedHereDescription
+                : copy.devices.removedHereBy(removedHere.removedBy)
+            }
+          />
+        ) : null}
         <Stack alignItems="center" gap="$lg" paddingVertical="$xl">
           <Image
             src="/logo-tile.webp"

@@ -48,6 +48,23 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "The user answered the profile choice of an identity switch (target custom or default). check checking means the user cancelled before the check finished. choice linky publishes the Linky name, picture and about; nostr publishes the identity's own profile; both use the identity's Linky address and keep the fields of its own profile Linky does not model. cancel leaves the current identity and stores nothing.",
   "auth.loggedOut":
     "User confirmed logout. Every open tab reloads and the first one to boot deletes everything the site stored on this device: the Evolu databases, IndexedDB (including this inspector buffer), localStorage, caches and the service worker. The payload says whether Evolu was connected, i.e. whether unsynced data may have been lost.",
+  "devices.joined":
+    "This device wrote its row into the devices list for the first time since it got the recovery seed, which revives a row an earlier removal left behind. The payload names the device id and the name it started with.",
+  "devices.registerFailed":
+    "This device could not write its row in the devices list at start; it tries again on the next start.",
+  "devices.removedHere":
+    "Another device removed this one from the devices list. Every open tab reloads and the first one to boot deletes this device's data, as on logout; onboarding then says why.",
+  "devices.renamed": "The user renamed a device in Settings → Devices.",
+  "devices.removed":
+    "The user removed another device in Settings → Devices. That device signs out and erases its data once it syncs the removal.",
+  "devices.pairingOffered":
+    "Settings → Devices shows a QR code that adds a device to the recovery seed. The payload names the relays the invite carries, never the invite.",
+  "devices.pairingEnded":
+    "Adding a device by QR code ended: `acked` and `deviceId` when the new device received the recovery seed, `reason` (cancelled, conflict, codeMismatch, timeout, network) when it did not.",
+  "devices.pairingJoinStarted":
+    "Onboarding scanned another device's pairing QR code and answers it on the relays in the payload.",
+  "devices.pairingJoinEnded":
+    "Signing in from another device ended: received the recovery seed, or failed with `reason`.",
   "push.nativeRegistered":
     "The Android app registered this identity with the push service, or failed to. `transport` is `fcm` where Google Play Services exist and `unifiedpush` otherwise (e.g. GrapheneOS with a distributor such as ntfy). Fires on enabling notifications and on each revalidation when the app comes to the foreground.",
   "recurring.remindersSynced":

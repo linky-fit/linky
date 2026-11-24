@@ -1,8 +1,26 @@
 import { localStorageKv } from "./storage";
 
 const WIPE_PENDING_KEY = "linky.fazole.wipePending";
+// The pending wipe's value when another device removed this one.
+const REMOVED = "removed";
+/** Names the device that removed this one, across the wipe, so the welcome screen can say who. */
+const REMOVED_NOTICE_KEY = "linky.fazole.removedFromDevices";
 
-/** Reloads the app at its start, e.g. once another account's secrets are stored. */
+/**
+ * Set on the first start after another device removed this one: the device
+ * that did, or `null` for `removedBy` when it was not known.
+ */
+export const removedFromDevices = (): {
+  readonly removedBy: string | null;
+} | null => {
+  const removedBy = localStorageKv.getItem(REMOVED_NOTICE_KEY);
+  return removedBy === null ? null : { removedBy: removedBy || null };
+};
+
+/** The notice shows on the first start after the removal only. */
+export const forgetRemovedFromDevices = (): void =>
+  localStorageKv.removeItem(REMOVED_NOTICE_KEY);
+
 export const reloadApp = (): void => {
   window.location.replace("/");
 };
@@ -41,14 +59,26 @@ const deleteIndexedDbs = async (): Promise<void> => {
  * start, before Evolu opens its database, and the app reloads to the welcome
  * screen. The account itself stays on the relays.
  */
-export const resetDevice = (): void => {
-  localStorageKv.setItem(WIPE_PENDING_KEY, "1");
+export const resetDevice = (
+  removal?: { readonly removedBy: string | null } | undefined,
+): void => {
+  if (removal !== undefined)
+    localStorageKv.setItem(REMOVED_NOTICE_KEY, removal.removedBy ?? "");
+  localStorageKv.setItem(
+    WIPE_PENDING_KEY,
+    removal === undefined ? "1" : REMOVED,
+  );
   reloadApp();
 };
 
 /** Finishes a reset the previous page started; call it before anything opens storage. */
 export const finishPendingWipe = async (): Promise<void> => {
-  if (localStorageKv.getItem(WIPE_PENDING_KEY) !== "1") return;
+  const pending = localStorageKv.getItem(WIPE_PENDING_KEY);
+  if (pending !== "1" && pending !== REMOVED) return;
+  const removedBy =
+    pending === REMOVED
+      ? (localStorageKv.getItem(REMOVED_NOTICE_KEY) ?? "")
+      : null;
   const deadline = Date.now() + WIPE_DEADLINE_MS;
   // The previous page's database worker can hold its files open a moment longer.
   for (;;) {
@@ -72,4 +102,5 @@ export const finishPendingWipe = async (): Promise<void> => {
   } catch {
     // Storage disabled: nothing was kept.
   }
+  if (removedBy !== null) localStorageKv.setItem(REMOVED_NOTICE_KEY, removedBy);
 };

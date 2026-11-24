@@ -1,4 +1,5 @@
 import {
+  Button,
   Form,
   IconButton,
   Stack,
@@ -15,6 +16,7 @@ import { navigateTo } from "../platform/hashRoute";
 import { useDevice } from "../services/react";
 import { looksLikeRecoverySeed } from "../storage/account";
 import { Page, WithTopBar } from "./Page";
+import { PairingJoinDialog } from "./PairingJoinDialog";
 
 /** One password-manager-fillable field; a pasted or autofilled seed restores at once. */
 export function RestoreScreen() {
@@ -22,6 +24,7 @@ export function RestoreScreen() {
   const [seed, setSeed] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
+  const [joining, setJoining] = useState(false);
 
   const restore = async (text: string) => {
     if (restoring) return;
@@ -70,6 +73,15 @@ export function RestoreScreen() {
           </Text>
           <Text color="$colorMuted">{copy.restore.description}</Text>
         </Stack>
+        <Button
+          testID="restore-pair-join"
+          variant="secondary"
+          icon="ScanLine"
+          onPress={() => setJoining(true)}
+          disabled={restoring}
+        >
+          {copy.devices.join}
+        </Button>
         <Form onSubmit={() => void restore(seed)} gap="$xl">
           <TextField
             testID="restore-seed"
@@ -103,6 +115,15 @@ export function RestoreScreen() {
             {copy.restore.submit}
           </SubmitButton>
         </Form>
+        {joining ? (
+          <PairingJoinDialog
+            onClose={() => setJoining(false)}
+            onRecoverySeed={async (recoverySeed) => {
+              setJoining(false);
+              await restore(recoverySeed);
+            }}
+          />
+        ) : null}
       </Page>
     </WithTopBar>
   );

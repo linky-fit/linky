@@ -1,10 +1,23 @@
 import { createEvoluDeps, createRun } from "@evolu/web";
 import { linkyScopes, type LinkyStore } from "@linky-fit/linksync";
-import { openLinkyDatabase } from "@linky-fit/linksync/evolu";
+import {
+  makeEvoluRelaySettings,
+  openLinkyDatabase,
+} from "@linky-fit/linksync/evolu";
 import type { AppConfig } from "../config";
 import { reloadApp } from "../platform/deviceWipe";
 import { localStorageKv } from "../platform/storage";
 import type { Account } from "./account";
+
+/** The Evolu relays this device syncs through. */
+export const activeEvoluRelayUrls = (
+  config: AppConfig,
+): ReadonlyArray<string> =>
+  makeEvoluRelaySettings(localStorageKv, {
+    envDefaults: config.evoluRelayDefaults,
+    recommended: config.recommendedEvoluRelays,
+    hasStoredAccount: false,
+  }).activeUrls();
 
 /**
  * Opens the account's sharded Evolu database in this page; the first time,

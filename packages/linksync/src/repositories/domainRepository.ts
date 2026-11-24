@@ -136,6 +136,7 @@ const BOOLEAN_COLUMNS = {
   transaction: {},
   onchainTransfer: { refundToSender: true, isTest: true },
   onchainTransferMessage: {},
+  linkedDevice: {},
 } satisfies BooleanColumnMap;
 
 /** Converts a raw Evolu row of `table` into its clean domain record (boolean columns decoded, `isDeleted` dropped). */
