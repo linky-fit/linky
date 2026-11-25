@@ -83,9 +83,10 @@ export const checkIdentityForSwitch = async ({
 /**
  * The profile an identity publishes when the user switches to it. `source`
  * picks the name, picture and about; fields Linky does not model come from
- * the identity's own profile when it has one. The Linky address always wins,
- * and the handle is the bought name or a handle of another domain the
- * identity already published.
+ * the identity's own profile when it has one. The lightning address the
+ * identity already published stays; without one it gets its Linky address.
+ * The handle is the bought name or a handle of another domain the identity
+ * already published.
  */
 export const profileForIdentitySwitch = ({
   lightningAddress,
@@ -104,6 +105,7 @@ export const profileForIdentitySwitch = ({
   const nip05 = getProfileNip05(lightningAddress, nostrProfile?.nip05);
   // The picture belongs to the identity: whichever profile is shown, its own stays.
   const picture = nostrProfile?.picture ?? shown.picture;
+  const ownLud16 = nostrProfile?.lud16?.trim();
 
   return new ProfileMetadata({
     ...Struct.omit(shown, [
@@ -114,7 +116,8 @@ export const profileForIdentitySwitch = ({
       "picture",
     ]),
     ...(picture ? { picture } : {}),
-    lud16: lightningAddress,
+    lud16: ownLud16 || lightningAddress,
+    ...(ownLud16 && nostrProfile?.lud06 ? { lud06: nostrProfile.lud06 } : {}),
     ...(nip05 ? { nip05 } : {}),
     ...(extraFields ? { extraFields } : {}),
   });

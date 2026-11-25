@@ -341,7 +341,7 @@ export const pt = {
   identityProfileUseNostr: "Usar perfil do Nostr",
   identityProfileNoHandle: "Sem identificador NIP-05",
   identityProfileAddressNote:
-    "O endereço lightning é sempre o endereço Linky desta identidade.",
+    "Esta identidade mantém seu endereço lightning; se não tiver um, recebe seu endereço Linky.",
   identityProfileConfirm: "Trocar identidade",
   identityProfileCancel: "Cancelar",
   identityProfileChecking:

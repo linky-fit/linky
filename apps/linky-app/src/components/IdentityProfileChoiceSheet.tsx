@@ -173,9 +173,11 @@ function ProfileChoice({
           </Text>
         </Row>
       </Card>
-      <Text variant="caption" color="$colorMuted">
-        {t("identityProfileAddressNote")}
-      </Text>
+      {nostrProfile ? (
+        <Text variant="caption" color="$colorMuted">
+          {t("identityProfileAddressNote")}
+        </Text>
+      ) : null}
       <Button loading={isConfirming} onPress={() => onConfirm(source)}>
         {t("identityProfileConfirm")}
       </Button>

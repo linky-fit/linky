@@ -106,11 +106,12 @@ describe("profileForIdentitySwitch", () => {
     name: "Bob",
     about: "Bob's bio",
     lud16: "bob@getalby.com",
+    lud06: "lnurl1bob",
     nip05: "bob@nostr.example",
     extraFields: { banner: "https://bob.example/b.png" },
   });
 
-  it("publishes the Linky profile with the identity's own address and fields", () => {
+  it("publishes the Linky profile with the identity's own addresses and fields", () => {
     expect(
       profileForIdentitySwitch({
         lightningAddress: NEW_ADDRESS,
@@ -123,7 +124,8 @@ describe("profileForIdentitySwitch", () => {
         name: "Alice",
         displayName: "Alice",
         picture: "https://example.com/alice.png",
-        lud16: NEW_ADDRESS,
+        lud16: "bob@getalby.com",
+        lud06: "lnurl1bob",
         nip05: "bob@nostr.example",
         extraFields: { banner: "https://bob.example/b.png" },
       }),
@@ -144,7 +146,7 @@ describe("profileForIdentitySwitch", () => {
     expect(profile.picture).toBe("https://bob.example/bob.png");
   });
 
-  it("imports the Nostr profile but keeps the Linky address", () => {
+  it("imports the Nostr profile with its lightning address", () => {
     expect(
       profileForIdentitySwitch({
         lightningAddress: NEW_ADDRESS,
@@ -156,21 +158,26 @@ describe("profileForIdentitySwitch", () => {
       new ProfileMetadata({
         name: "Bob",
         about: "Bob's bio",
-        lud16: NEW_ADDRESS,
+        lud16: "bob@getalby.com",
+        lud06: "lnurl1bob",
         nip05: "bob@nostr.example",
         extraFields: { banner: "https://bob.example/b.png" },
       }),
     );
   });
 
-  it("uses a bought name as the address and the handle", () => {
+  it("uses a bought name as the handle, and as the address when the profile has none", () => {
     const profile = profileForIdentitySwitch({
       lightningAddress: "bob@linky.fit",
       linkyProfile,
-      nostrProfile,
+      nostrProfile: new ProfileMetadata({
+        ...nostrProfile,
+        lud16: " ",
+      }),
       source: "nostr",
     });
     expect(profile.lud16).toBe("bob@linky.fit");
+    expect(profile.lud06).toBeUndefined();
     expect(profile.nip05).toBe("bob@linky.fit");
   });
 

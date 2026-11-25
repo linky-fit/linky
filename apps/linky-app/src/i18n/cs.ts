@@ -333,7 +333,7 @@ export const cs = {
   identityProfileUseNostr: "Použít profil z Nostru",
   identityProfileNoHandle: "Bez NIP-05 jména",
   identityProfileAddressNote:
-    "Lightning adresa je vždy adresa této identity v Linky.",
+    "Identita si ponechá svou lightning adresu; pokud žádnou nemá, dostane adresu v Linky.",
   identityProfileConfirm: "Přepnout identitu",
   identityProfileCancel: "Zrušit",
   identityProfileChecking: "Ověřuji profil a lightning adresu této identity…",
