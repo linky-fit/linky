@@ -329,7 +329,7 @@ export const en = {
   identityProfileUseNostr: "Use Nostr profile",
   identityProfileNoHandle: "No NIP-05 handle",
   identityProfileAddressNote:
-    "The lightning address is always this identity's Linky address.",
+    "This identity keeps its lightning address; without one it gets its Linky address.",
   identityProfileConfirm: "Switch identity",
   identityProfileCancel: "Cancel",
   identityProfileChecking:

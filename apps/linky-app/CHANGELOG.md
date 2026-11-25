@@ -17,12 +17,14 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - A Lightning payment you confirm costs at most the fee the dialog showed; Pay waits until that fee is known.
 - Paying a Lightning address is faster.
 - Money from a payment whose connection dropped mid-way returns to your balance with the next payment from that mint, without a manual restore.
+- Using your own nsec keeps the lightning address its profile already has.
 
 ### cs-CZ
 
 - Potvrzená Lightning platba stojí nejvýš poplatek, který dialog ukázal; Zaplatit čeká, dokud není poplatek známý.
 - Platba na Lightning adresu je rychlejší.
 - Peníze z platby, které vypadlo spojení, se vrátí do zůstatku s další platbou z daného mintu, bez ruční obnovy.
+- Při použití vlastního nsec zůstane lightning adresa, kterou už má jeho profil.
 
 ## [26.11.5] - 2026-11-22
 
