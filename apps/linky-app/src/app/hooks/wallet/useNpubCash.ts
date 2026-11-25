@@ -42,6 +42,7 @@ export const useNpubCashAuthHeader = () => {
 };
 
 const INFO_REFRESH_MS = 10 * 60_000;
+const OWNED_ADDRESSES_RETRY_MS = 15_000;
 const CLAIM_POLL_MS = 30_000;
 const TOPUP_CLAIM_POLL_MS = 5_000;
 
@@ -84,6 +85,56 @@ const isUrl = (value: string): boolean => {
   } catch {
     return false;
   }
+};
+
+/** Loads the lightning addresses npub.cash holds for the identity, retrying until it answers. */
+export const useOwnedLightningAddresses = ({
+  currentNpub,
+  currentNsec,
+  setOwnedProfileLightningAddresses,
+  setOwnedProfileLightningAddressesLoading,
+}: Pick<
+  UseNpubCashParams,
+  | "currentNpub"
+  | "currentNsec"
+  | "setOwnedProfileLightningAddresses"
+  | "setOwnedProfileLightningAddressesLoading"
+>) => {
+  React.useEffect(() => {
+    setOwnedProfileLightningAddresses([]);
+    if (!currentNpub || !currentNsec) {
+      setOwnedProfileLightningAddressesLoading(false);
+      return;
+    }
+    setOwnedProfileLightningAddressesLoading(true);
+    const controller = new AbortController();
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    const load = async () => {
+      const info = await fetchNpubCashInfo(
+        currentNsec,
+        controller.signal,
+      ).catch(() => null);
+      if (controller.signal.aborted) return;
+      if (info === null) {
+        retryTimer = setTimeout(() => void load(), OWNED_ADDRESSES_RETRY_MS);
+        return;
+      }
+      setOwnedProfileLightningAddresses(
+        parseNpubCashProfileInfo(info).ownedLightningAddresses,
+      );
+      setOwnedProfileLightningAddressesLoading(false);
+    };
+    void load();
+    return () => {
+      controller.abort();
+      clearTimeout(retryTimer);
+    };
+  }, [
+    currentNpub,
+    currentNsec,
+    setOwnedProfileLightningAddresses,
+    setOwnedProfileLightningAddressesLoading,
+  ]);
 };
 
 /**
@@ -135,34 +186,12 @@ export const useNpubCash = ({
     );
   }, [currentNpub, currentNsec, defaultMintChoice, registry]);
 
-  React.useEffect(() => {
-    setOwnedProfileLightningAddresses([]);
-    if (!currentNpub || !currentNsec) {
-      setOwnedProfileLightningAddressesLoading(false);
-      return;
-    }
-    setOwnedProfileLightningAddressesLoading(true);
-    const controller = new AbortController();
-    void fetchNpubCashInfo(currentNsec, controller.signal)
-      .then(
-        (info) =>
-          info === null
-            ? []
-            : parseNpubCashProfileInfo(info).ownedLightningAddresses,
-        () => [],
-      )
-      .then((addresses) => {
-        if (controller.signal.aborted) return;
-        setOwnedProfileLightningAddresses(addresses);
-        setOwnedProfileLightningAddressesLoading(false);
-      });
-    return () => controller.abort();
-  }, [
+  useOwnedLightningAddresses({
     currentNpub,
     currentNsec,
     setOwnedProfileLightningAddresses,
     setOwnedProfileLightningAddressesLoading,
-  ]);
+  });
 
   const claimEvents = React.useMemo<NpubCashClaimEvents>(
     () => ({

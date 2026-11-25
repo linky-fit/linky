@@ -130,6 +130,50 @@ describe("profile editor", () => {
     expect(editor.current?.unregisteredOwnLightningAddress).toBeNull();
   });
 
+  it("saves a typed linky.fit name only once npub.cash confirmed it is owned", async () => {
+    const editor = await setup("bob@getalby.com");
+    await act(async () =>
+      registry.set(ownedLightningAddressesAtom, {
+        addresses: [],
+        loading: true,
+      }),
+    );
+    await act(async () => editor.current?.setProfileEditLnAddress("bob"));
+    expect(editor.current?.profileEditsSavable).toBe(false);
+    expect(editor.current?.unregisteredOwnLightningAddress).toBeNull();
+    await act(async () => editor.current?.saveProfileEdits());
+    expect(mocks.publishProfile).not.toHaveBeenCalled();
+
+    await act(async () =>
+      registry.set(ownedLightningAddressesAtom, {
+        addresses: ["bob@linky.fit"],
+        loading: false,
+      }),
+    );
+    expect(editor.current?.profileEditsSavable).toBe(true);
+    await act(async () => editor.current?.saveProfileEdits());
+    expect(mocks.publishProfile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lud16: "bob@linky.fit",
+        nip05: "bob@linky.fit",
+      }),
+    );
+  });
+
+  it("saves another provider's address while npub.cash has not answered", async () => {
+    const editor = await setup("bob@getalby.com");
+    await act(async () =>
+      registry.set(ownedLightningAddressesAtom, {
+        addresses: [],
+        loading: true,
+      }),
+    );
+    await act(async () =>
+      editor.current?.setProfileEditLnAddress("bob@example.com"),
+    );
+    expect(editor.current?.profileEditsSavable).toBe(true);
+  });
+
   it("publishes and stores the uploaded photo URL instead of the local preview", async () => {
     const editor = await setup("alice@linky.fit");
     const preview = "data:image/jpeg;base64,YXZhdGFy";

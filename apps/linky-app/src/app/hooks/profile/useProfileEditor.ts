@@ -176,13 +176,10 @@ export const useProfileEditor = () => {
     );
   }, [draft]);
 
-  const profileEditsSavable =
-    profileEditsDirty && Boolean(currentNpub && currentNsec);
-
-  const ownLightningAddressInputCandidate = React.useMemo(() => {
-    if (owned.loading) return null;
-    return getOwnLightningAddressInputCandidate(draft.lnAddress);
-  }, [owned.loading, draft.lnAddress]);
+  const ownLightningAddressInputCandidate = React.useMemo(
+    () => getOwnLightningAddressInputCandidate(draft.lnAddress),
+    [draft.lnAddress],
+  );
 
   const ownLightningAddressMatchesCurrentIdentity = React.useCallback(
     (candidate: OwnLightningAddressInputCandidate): boolean => {
@@ -208,7 +205,7 @@ export const useProfileEditor = () => {
     [defaultLightningAddress, owned.addresses],
   );
 
-  const unregisteredOwnLightningAddress = React.useMemo(() => {
+  const unconfirmedOwnLightningAddress = React.useMemo(() => {
     if (!ownLightningAddressInputCandidate) return null;
     if (
       ownLightningAddressInputCandidate.lightningAddress ===
@@ -230,22 +227,17 @@ export const useProfileEditor = () => {
     ownLightningAddressMatchesCurrentIdentity,
   ]);
 
-  const profileLightningAddressToPersist = React.useMemo(() => {
-    if (
-      ownLightningAddressInputCandidate &&
-      ownLightningAddressMatchesCurrentIdentity(
-        ownLightningAddressInputCandidate,
-      )
-    ) {
-      return ownLightningAddressInputCandidate.lightningAddress;
-    }
+  // Until npub.cash answered, the address may turn out to be owned: neither saved nor offered for sale.
+  const unregisteredOwnLightningAddress = owned.loading
+    ? null
+    : unconfirmedOwnLightningAddress;
+  const profileEditsSavable =
+    profileEditsDirty &&
+    Boolean(currentNpub && currentNsec) &&
+    !(owned.loading && unconfirmedOwnLightningAddress);
 
-    return draft.lnAddress;
-  }, [
-    ownLightningAddressInputCandidate,
-    ownLightningAddressMatchesCurrentIdentity,
-    draft.lnAddress,
-  ]);
+  const profileLightningAddressToPersist =
+    ownLightningAddressInputCandidate?.lightningAddress ?? draft.lnAddress;
 
   const { publishProfile, publishStatus } = useLinkstrCommands();
 
@@ -371,7 +363,7 @@ export const useProfileEditor = () => {
   );
 
   const saveProfileEdits = React.useCallback(async () => {
-    if (unregisteredOwnLightningAddress) {
+    if (unconfirmedOwnLightningAddress) {
       return;
     }
 
@@ -388,7 +380,7 @@ export const useProfileEditor = () => {
     draft.picture,
     draft.status,
     persistProfileValues,
-    unregisteredOwnLightningAddress,
+    unconfirmedOwnLightningAddress,
   ]);
 
   // A bought address is saved with the rest of the form at once; nothing is left to confirm.
