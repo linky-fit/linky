@@ -7,7 +7,7 @@ import { createSecretKey } from "../../../testUtils/nostrKeys";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import type { WriteOutcome } from "../../lib/storeWrite";
 import { sessionAtom } from "../../state/session/session";
-import { useApplyDefaultMint } from "./useNpubCash";
+import { useApplyDefaultMint, useOwnedLightningAddresses } from "./useNpubCash";
 
 const { pushToast, setDefaultMint, setStatus } = vi.hoisted(() => ({
   pushToast: vi.fn(),
@@ -107,5 +107,42 @@ describe("useApplyDefaultMint", () => {
     expect(pushToast).toHaveBeenCalledWith("mintUrlInvalid");
     expect(setDefaultMint).not.toHaveBeenCalled();
     await ui.view.unmount();
+  });
+});
+
+describe("useOwnedLightningAddresses", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps loading and retries until npub.cash answers", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValue(Response.json({ data: { user: { name: "bob" } } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const setAddresses = vi.fn();
+    const setLoading = vi.fn();
+    const Probe = () => {
+      useOwnedLightningAddresses({
+        currentNpub: "npub1test",
+        currentNsec: validNsec,
+        setOwnedProfileLightningAddresses: setAddresses,
+        setOwnedProfileLightningAddressesLoading: setLoading,
+      });
+      return null;
+    };
+    const view = await renderIntoDocument(<Probe />);
+    await act(() => vi.advanceTimersByTimeAsync(15_000));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(setLoading).not.toHaveBeenCalledWith(false);
+
+    await act(() => vi.advanceTimersByTimeAsync(15_000));
+    expect(setAddresses).toHaveBeenLastCalledWith(["bob@linky.fit"]);
+    expect(setLoading).toHaveBeenLastCalledWith(false);
+    await view.unmount();
   });
 });
