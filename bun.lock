@@ -270,6 +270,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@evolu/common": "8.29.0",
+        "@evolu/nodejs": "4.6.0",
         "@evolu/web": "3.9.0",
         "@linky-fit/domain": "workspace:*",
         "@linky-fit/identity": "workspace:*",
@@ -1028,6 +1029,8 @@
     "@eslint/plugin-kit": ["@eslint/plugin-kit@0.4.1", "", { "dependencies": { "@eslint/core": "^0.17.0", "levn": "^0.4.1" } }, "sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA=="],
 
     "@evolu/common": ["@evolu/common@8.29.0", "", { "dependencies": { "@noble/ciphers": "2.4.0", "@noble/hashes": "2.4.0", "@scure/bip39": "2.4.0", "kysely": "0.29.7", "random": "5.5.1" } }, "sha512-13VvHfyTMC7z0fOvbw6QQEu9jcY8bMqkFQAZTAf/G4VL84lmi4N3JiTAr+zWb5sa57lJrmmgku9qCv/QUOEjDQ=="],
+
+    "@evolu/nodejs": ["@evolu/nodejs@4.6.0", "", { "dependencies": { "ws": "8.22.0" }, "peerDependencies": { "@evolu/common": "^8.26.0", "@evolu/oxlint-config": "^0.4.1", "@evolu/typescript-config": "^0.1.1", "oxlint": "^1.87.0", "oxlint-tsgolint": "7.0.2005", "typescript": ">=7.0.0", "vite": ">=8.0.0", "webpack": ">=5.108.4" }, "optionalPeers": ["@evolu/oxlint-config", "@evolu/typescript-config", "oxlint", "oxlint-tsgolint", "typescript", "vite", "webpack"] }, "sha512-6HV6BUlocJVT+10vzGFIubvL9O1QFuoQCT5oPk3DtVVdbq9qhs3EZexsDTiLIMC/vVtum3b3X8mrQDbK0H3rvQ=="],
 
     "@evolu/sqlite-wasm": ["@evolu/sqlite-wasm@3.54.1-build4", "", { "peerDependencies": { "@evolu/common": "^8.28.0" } }, "sha512-PdRxqVY9DtQXX7UdrzpKFQ1YdOsqF79Unel7FYN4jvUTvloWzgoFxh5EXe4rG1nsby5KyOcN70khV8j4yTeLIg=="],
 
@@ -3638,6 +3641,8 @@
     "@eslint/eslintrc/globals": ["globals@14.0.0", "", {}, "sha512-oahGvuMGQlPw/ivIYBjVSrWAfWLBeku5tpPE2fOPLi+WHffIWbuh2tCjhyQhTBPMf5E9jDEH4FOmTYgYwbKwtQ=="],
 
     "@evolu/common/@noble/hashes": ["@noble/hashes@2.4.0", "", {}, "sha512-X5XaVWZIBCT7HHZGm5I7ZQXDwLG+bGXuSrMQAW+7Zvl87h1kmc1ZB1VSRJcpUfoUrGQp4Fkoxm5kZ+Ms+aW+eA=="],
+
+    "@evolu/nodejs/ws": ["ws@8.22.0", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": ">=5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-Ydggc987+RO0AnWtZ/7Wq9FtNvcrL1b/RO0ud9mWjUPgDrsAAwQSF51sm2hm1XofbU/4jkpGEsLFsZZxU+1DOg=="],
 
     "@expo/cli/ci-info": ["ci-info@3.9.0", "", {}, "sha512-NIxF55hv4nSqQswkAeiOi1r83xy8JldOFDTWiug55KBu9Jnblncd2U6ViHmYgHf01TPZS77NJBhBMKdWj9HQMQ=="],
 

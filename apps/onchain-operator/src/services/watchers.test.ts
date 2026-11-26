@@ -79,4 +79,45 @@ describe("createWatcherAlerts", () => {
     })({ _tag: "message", from: user, text: "Hi" });
     expect(sends).toBe(0);
   });
+
+  it("merges and deduplicates extraWatchers with profile watchers, even without a saved profile", async () => {
+    const [user, synced, extra] = [
+      makeIdentity().pubkey,
+      makeIdentity().pubkey,
+      makeIdentity().pubkey,
+    ];
+    const sent: Pubkey[] = [];
+    const sendText = async (
+      to: Pubkey,
+      _text: string,
+      _clientId: string,
+      ref: string,
+    ) => {
+      sent.push(to);
+      return enqueueReceipt(sent.length, ref);
+    };
+
+    await createWatcherAlerts({
+      nostr: { sendText },
+      loadProfile: async () => null,
+      extraWatchers: [extra],
+    })({ _tag: "message", from: user, text: "Hello" });
+    expect(sent).toEqual([extra]);
+
+    sent.length = 0;
+    await createWatcherAlerts({
+      nostr: { sendText },
+      loadProfile: async () => profileWith([synced, extra]),
+      extraWatchers: [extra],
+    })({ _tag: "message", from: user, text: "Hello again" });
+    expect(sent).toEqual([synced, extra]);
+
+    sent.length = 0;
+    await createWatcherAlerts({
+      nostr: { sendText },
+      loadProfile: async () => profileWith([synced]),
+      extraWatchers: [extra],
+    })({ _tag: "message", from: extra, text: "From watcher" });
+    expect(sent).toEqual([]);
+  });
 });
