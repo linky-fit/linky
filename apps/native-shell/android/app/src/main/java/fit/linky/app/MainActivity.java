@@ -174,6 +174,7 @@ public class MainActivity extends BridgeActivity {
 			return;
 		}
 
+		webView.setWebChromeClient(new LinkyWebChromeClient(getBridge()));
 		webView.addJavascriptInterface(new LinkySecretStorageBridge(this), "LinkyNativeSecretStorage");
 		webView.addJavascriptInterface(new LinkyNativeScannerBridge(), "LinkyNativeScanner");
 		webView.addJavascriptInterface(new LinkyNativeNotificationsBridge(), "LinkyNativeNotifications");
