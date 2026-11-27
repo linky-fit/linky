@@ -1,4 +1,4 @@
-import { Button, Notice, Stack } from "@linky-fit/ui";
+import { Button, Stack, Text } from "@linky-fit/ui";
 import type { IconName } from "@linky-fit/ui";
 import type { FC, ReactNode } from "react";
 import type { Translate } from "../i18n";
@@ -11,6 +11,8 @@ import { useAmountInputKeypad } from "./useAmountInputKeypad";
 
 interface PaymentAmountPanelProps {
   amount: string;
+  /** One quiet line under the amount, e.g. the allowed range or the fee; a blocked reason replaces it. */
+  amountHint?: ReactNode | undefined;
   cashuIsBusy: boolean;
   header: ReactNode;
   /** Shown under the amount when the payment can carry a note. */
@@ -31,6 +33,7 @@ interface PaymentAmountPanelProps {
 
 export const PaymentAmountPanel: FC<PaymentAmountPanelProps> = ({
   amount,
+  amountHint,
   cashuIsBusy,
   header,
   note,
@@ -70,16 +73,34 @@ export const PaymentAmountPanel: FC<PaymentAmountPanelProps> = ({
           amount={amount}
           input={amountInput}
           disabled={cashuIsBusy}
-          below={note ? <PaymentNoteInput {...note} t={t} /> : undefined}
+          below={
+            <>
+              {/* Fixed height, so a blocked reason never moves the keys under a typing thumb. */}
+              <Stack
+                minHeight={32}
+                justifyContent="center"
+                alignItems="center"
+                aria-live="polite"
+              >
+                {submitBlockedReason ? (
+                  <Text
+                    variant="caption"
+                    bold
+                    color="$danger"
+                    textAlign="center"
+                    numberOfLines={2}
+                    testID="payment-blocked-reason"
+                  >
+                    {submitBlockedReason}
+                  </Text>
+                ) : (
+                  amountHint
+                )}
+              </Stack>
+              {note ? <PaymentNoteInput {...note} t={t} /> : null}
+            </>
+          }
         />
-
-        {submitBlockedReason ? (
-          <Notice
-            tone="accent"
-            icon="CircleAlert"
-            title={submitBlockedReason}
-          />
-        ) : null}
 
         <Button
           icon={submitIcon ?? "HandCoins"}

@@ -1,4 +1,4 @@
-import { Avatar, Button, Row, Stack, Text } from "@linky-fit/ui";
+import { Avatar, Button, Stack, Text } from "@linky-fit/ui";
 import { useEffect, type FC } from "react";
 import { useDisplayAmounts, useTranslation } from "../app/hooks/shell";
 import { useWalletBalance } from "../app/hooks/wallet/useWalletInventory";
@@ -98,42 +98,42 @@ export const LnAddressPayPage: FC<LnAddressPayPageProps> = ({
     previewError !== null ||
     rangeError !== null;
 
+  // The recipient's limit first: topping up would not lift it.
   const submitBlockedReason =
-    amountSat > cashuBalanceAfterMelt
-      ? t("payInsufficient")
-      : (rangeError ?? undefined);
+    rangeError ??
+    (amountSat > cashuBalanceAfterMelt ? t("payInsufficient") : undefined);
 
   return (
     <PaymentAmountPanel
       amount={lnAddressPayAmount}
       cashuIsBusy={cashuIsBusy || previewLoading}
+      amountHint={
+        amountSat > 0 ? <LightningFeeHint amountSat={amountSat} /> : null
+      }
       header={
-        <Row>
-          {knownContact ? (
-            <Avatar
-              name={knownContact.name ?? ""}
-              uri={knownContactPictureUrl ?? undefined}
-              size="md"
-            />
+        <Stack alignItems="center" gap="$xs">
+          <Avatar
+            name={knownContact?.name || displayAddress}
+            uri={knownContactPictureUrl ?? undefined}
+            size="md"
+          />
+          {knownContact?.name ? (
+            <Text variant="title" numberOfLines={1}>
+              {knownContact.name}
+            </Text>
           ) : null}
-          <Stack flex={1} gap="$xxs">
-            {knownContact?.name ? (
-              <Text variant="title" numberOfLines={1}>
-                {knownContact.name}
-              </Text>
-            ) : null}
-            <Text color="$colorMuted">{displayAddress}</Text>
-            <Button
-              variant="ghost"
-              size="sm"
-              alignSelf="flex-start"
-              disabled={!canCoverAnything}
-              onPress={() => setLnAddressPayAmount(String(cashuBalance))}
-            >
-              {availableAmountText}
-            </Button>
-          </Stack>
-        </Row>
+          <Text color="$colorMuted" textAlign="center" numberOfLines={1}>
+            {displayAddress}
+          </Text>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={!canCoverAnything}
+            onPress={() => setLnAddressPayAmount(String(cashuBalance))}
+          >
+            {availableAmountText}
+          </Button>
+        </Stack>
       }
       note={
         commentAllowed > 0
@@ -145,15 +145,12 @@ export const LnAddressPayPage: FC<LnAddressPayPageProps> = ({
           : undefined
       }
       notices={
-        <>
-          <LnurlPayPreviewNotices
-            error={previewError}
-            loading={previewLoading}
-            preview={preview}
-            t={t}
-          />
-          {amountSat > 0 ? <LightningFeeHint amountSat={amountSat} /> : null}
-        </>
+        <LnurlPayPreviewNotices
+          error={previewError}
+          loading={previewLoading}
+          preview={preview}
+          t={t}
+        />
       }
       onAmountChange={setLnAddressPayAmount}
       onSubmit={() => {
