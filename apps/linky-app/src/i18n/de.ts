@@ -1453,6 +1453,8 @@ export const de = {
   listingImageReplace: "Foto ersetzen",
   listingImageRemove: "Foto entfernen",
   listingImageUploading: "Foto wird hochgeladen…",
+  listingImageUnreadable:
+    "Dieses Foto konnte nicht gelesen werden. Wähle ein anderes oder kopiere es zuerst auf das Telefon.",
   listingImageUploadFailed:
     "Das Foto konnte nicht hochgeladen werden. Versuche es erneut.",
   listingVia: "über",

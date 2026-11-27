@@ -8,7 +8,9 @@ import {
 import { Effect } from "effect";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { isDecodableImage } from "../app/lib/privateImageMessage";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
+import { pickFile } from "../utils/pickFile";
 import { ListingFormPage } from "./ListingFormPage";
 
 const { insert, navigateTo, records, update } = vi.hoisted(() => ({
@@ -21,6 +23,13 @@ const { insert, navigateTo, records, update } = vi.hoisted(() => ({
 }));
 
 vi.mock("../hooks/useRouting", () => ({ navigateTo }));
+
+vi.mock("../utils/pickFile", () => ({ pickFile: vi.fn() }));
+
+vi.mock("../app/lib/privateImageMessage", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../app/lib/privateImageMessage")>()),
+  isDecodableImage: vi.fn(),
+}));
 
 vi.mock("../app/hooks/shell", async () =>
   (await import("../testUtils/shellHooks")).shellHooksMock({
@@ -306,5 +315,37 @@ describe("ListingFormPage", () => {
       button(container, "listing-save").click();
     });
     expect(update.mock.calls[0]?.[1]).not.toHaveProperty("audience");
+  });
+
+  it("refuses a picked photo the WebView cannot read and keeps one it can", async () => {
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => "blob:photo"),
+      writable: true,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+      writable: true,
+    });
+    const photo = new File(["jpeg"], "photo.jpg", { type: "image/jpeg" });
+    vi.mocked(pickFile).mockResolvedValue(photo);
+    vi.mocked(isDecodableImage).mockResolvedValueOnce(false);
+    const { container } = await renderIntoDocument(<ListingFormPage />);
+
+    await act(async () => {
+      button(container, "listing-image-add").click();
+    });
+    expect(container.textContent).toContain("listingImageUnreadable");
+    expect(container.querySelector('[data-testid="listing-image"]')).toBeNull();
+
+    vi.mocked(isDecodableImage).mockResolvedValueOnce(true);
+    await act(async () => {
+      button(container, "listing-image-add").click();
+    });
+    expect(container.textContent).not.toContain("listingImageUnreadable");
+    expect(
+      container.querySelector('[data-testid="listing-image"]'),
+    ).not.toBeNull();
   });
 });

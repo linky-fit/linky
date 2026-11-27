@@ -152,6 +152,13 @@ const loadImage = async (file: File): Promise<HTMLImageElement> => {
   }
 };
 
+/** Whether the browser can read the file and decode it as an image. */
+export const isDecodableImage = async (file: File): Promise<boolean> =>
+  await loadImage(file).then(
+    () => true,
+    () => false,
+  );
+
 const canvasToBlob = async (
   canvas: HTMLCanvasElement,
   type: string,

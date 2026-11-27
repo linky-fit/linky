@@ -1436,6 +1436,8 @@ export const en = {
   listingImageReplace: "Replace photo",
   listingImageRemove: "Remove photo",
   listingImageUploading: "Uploading photo…",
+  listingImageUnreadable:
+    "This photo could not be read. Pick another one, or copy it to the phone first.",
   listingImageUploadFailed: "The photo could not be uploaded. Try again.",
   listingVia: "via",
   listingViaLead: "It reached you through your contacts. Ask them:",
