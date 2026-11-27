@@ -19,6 +19,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - Money from a payment whose connection dropped mid-way returns to your balance with the next payment from that mint, without a manual restore.
 - Using your own nsec keeps the lightning address its profile already has.
 - On payment screens, a warning such as not having enough funds shows under the amount and no longer shifts the keypad.
+- A deleted or paused listing also disappears for contacts who had it passed on by someone else.
 
 ### cs-CZ
 
@@ -27,6 +28,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - Peníze z platby, které vypadlo spojení, se vrátí do zůstatku s další platbou z daného mintu, bez ruční obnovy.
 - Při použití vlastního nsec zůstane lightning adresa, kterou už má jeho profil.
 - Na obrazovkách placení se upozornění, třeba že nemáš dost peněz, ukáže pod částkou a už neposouvá klávesnici.
+- Smazaná nebo pozastavená nabídka zmizí i kontaktům, kterým ji předal někdo další.
 
 ## [26.11.5] - 2026-11-22
 

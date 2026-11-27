@@ -13,6 +13,8 @@ export class ListingsUpdated extends Schema.TaggedClass<ListingsUpdated>()(
   {
     pubkey: Pubkey,
     document: ListingsDocument,
+    /** Whether the author gave the reader a key slot; without one the document is empty. */
+    reachesReader: Schema.Boolean,
     updatedAt: UnixSeconds,
   },
 ) {}

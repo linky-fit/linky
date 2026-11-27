@@ -242,6 +242,8 @@ export interface ListingSource {
   readonly pictureUrl: string | null;
   readonly updatedAt: number;
   readonly document: ListingsDocument;
+  /** Whether the contact shares with the user, so their document has all the user may see of theirs. */
+  readonly reachesReader: boolean;
 }
 
 /** One listing someone else shares, as the user sees it. */
@@ -255,8 +257,10 @@ export interface PeerListingEntry {
 /**
  * The listings the sources share directly, then those they pass on that the
  * user does not get from the author: one entry per author and listing, in the
- * version of the newest document, with every contact who passed it on. The
- * user's own listings and blocked authors are left out.
+ * version of the newest document, with every contact who passed it on. An
+ * author who shares with the user directly counts by their own document only,
+ * since a copy of what they withdrew lives on until whoever passed it on
+ * publishes again. The user's own listings and blocked authors are left out.
  */
 export const peerListingEntries = (
   sources: ReadonlyArray<ListingSource>,
@@ -264,10 +268,10 @@ export const peerListingEntries = (
   blocked: ReadonlySet<string>,
 ): ReadonlyArray<PeerListingEntry> => {
   const direct: Array<PeerListingEntry> = [];
-  const seen = new Set<string>();
+  const directAuthors = new Set<Pubkey>();
   for (const source of sources) {
+    if (source.reachesReader) directAuthors.add(source.pubkey);
     for (const listing of source.document.listings) {
-      seen.add(`${source.pubkey}:${listing.id}`);
       direct.push({ author: source.pubkey, listing, via: [] });
     }
   }
@@ -281,7 +285,11 @@ export const peerListingEntries = (
   for (const source of newestFirst) {
     for (const { author, listing } of source.document.passedOn ?? []) {
       const key = `${author}:${listing.id}`;
-      if (author === ownPubkey || blocked.has(author) || seen.has(key)) {
+      if (
+        author === ownPubkey ||
+        blocked.has(author) ||
+        directAuthors.has(author)
+      ) {
         continue;
       }
       const entry = passed.get(key);

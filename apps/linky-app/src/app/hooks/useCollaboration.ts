@@ -6,7 +6,10 @@ import React from "react";
 import { isDeletedContact } from "../../utils/contactName";
 import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
 import { blockListAtom } from "../state/contacts/blockList";
-import { peerListingsAtom } from "../state/contacts/listings";
+import {
+  peerListingsAtom,
+  peerListingsReachReader,
+} from "../state/contacts/listings";
 import type { ContactRowLike } from "../types/appTypes";
 import type { MessageMentionListing } from "../lib/messageMentions";
 import { formatListingPrice, listingOfRecord } from "../lib/listings";
@@ -112,6 +115,7 @@ export const useAllPeerListings = (): ReadonlyArray<PeerListing> => {
               pictureUrl: contact.pictureUrl,
               updatedAt: peer.updatedAt,
               document: peer.document,
+              reachesReader: peerListingsReachReader(peer),
             },
           ]
         : [];

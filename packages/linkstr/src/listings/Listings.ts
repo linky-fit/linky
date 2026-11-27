@@ -145,10 +145,11 @@ export class Listings extends Context.Service<Listings>()("linkstr/Listings", {
           }
           return Result.map(
             decodeListingsEvent(event, context.identity.secretKey),
-            (document) =>
+            ({ document, reachesReader }) =>
               new ListingsUpdated({
                 pubkey: event.pubkey,
                 document,
+                reachesReader,
                 updatedAt: event.created_at,
               }),
           );

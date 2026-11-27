@@ -1,5 +1,9 @@
 import { Atom } from "effect/reactivity";
-import { ListingsDocument, Pubkey } from "@linky-fit/linkstr";
+import {
+  isEmptyListingsDocument,
+  ListingsDocument,
+  Pubkey,
+} from "@linky-fit/linkstr";
 import type { PeerListingsRecord } from "@linky-fit/linksync";
 import { Option, Schema } from "effect";
 import type { KeyValuePort } from "../../../platform/ports";
@@ -8,8 +12,19 @@ import type { KeyValuePort } from "../../../platform/ports";
 export const PeerListings = Schema.Struct({
   document: ListingsDocument,
   updatedAt: Schema.Int,
+  /** Whether the author gave this identity a key slot; unknown for a stored copy. */
+  reachesReader: Schema.optionalKey(Schema.Boolean),
 });
 export type PeerListings = typeof PeerListings.Type;
+
+/** Whether the author shares with this identity; a stored copy that says nothing counts as not shared, like one without a slot. */
+export const peerListingsReachReader = ({
+  document,
+  reachesReader,
+}: PeerListings): boolean =>
+  reachesReader ??
+  (!isEmptyListingsDocument(document) ||
+    document.proxyPaymentCurrencies !== undefined);
 
 export type PeerListingsByPubkey = Readonly<Record<Pubkey, PeerListings>>;
 
