@@ -1458,6 +1458,8 @@ export const pt = {
   listingImageReplace: "Trocar foto",
   listingImageRemove: "Remover foto",
   listingImageUploading: "Enviando foto…",
+  listingImageUnreadable:
+    "Não foi possível ler esta foto. Escolha outra ou copie-a primeiro para o telefone.",
   listingImageUploadFailed: "Não foi possível enviar a foto. Tente novamente.",
   listingVia: "via",
   listingViaLead: "Chegou até você pelos seus contatos. Pergunte a eles:",

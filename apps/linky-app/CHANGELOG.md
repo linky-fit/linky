@@ -18,6 +18,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - Paying a Lightning address is faster.
 - Money from a payment whose connection dropped mid-way returns to your balance with the next payment from that mint, without a manual restore.
 - Using your own nsec keeps the lightning address its profile already has.
+- On Android, a photo from the SD card can be added to a listing too.
 
 ### cs-CZ
 
@@ -25,6 +26,7 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - Platba na Lightning adresu je rychlejší.
 - Peníze z platby, které vypadlo spojení, se vrátí do zůstatku s další platbou z daného mintu, bez ruční obnovy.
 - Při použití vlastního nsec zůstane lightning adresa, kterou už má jeho profil.
+- Na Androidu jde k nabídce přidat i fotku z SD karty.
 
 ## [26.11.5] - 2026-11-22
 

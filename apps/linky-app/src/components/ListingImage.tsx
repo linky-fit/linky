@@ -23,6 +23,9 @@ export function ListingImage({
   t,
 }: ListingImageProps): React.ReactElement {
   const { ref, loaded, failed } = usePrivateImageUrl(source);
+  // An image the browser cannot decode shows the failure instead of an empty frame.
+  const [brokenUrl, setBrokenUrl] = React.useState<string | null>(null);
+  const shown = loaded && loaded.url !== brokenUrl ? loaded : null;
   return (
     <Stack
       ref={ref}
@@ -36,15 +39,16 @@ export function ListingImage({
       backgroundColor="$neutralSoft"
       testID="listing-image"
     >
-      {loaded ? (
+      {shown ? (
         <Image
-          src={loaded.url}
+          src={shown.url}
           aria-label={label}
           width="100%"
           height="100%"
           objectFit="contain"
+          onError={() => setBrokenUrl(shown.url)}
         />
-      ) : failed ? (
+      ) : failed || loaded ? (
         <Text variant="caption" color="$colorMuted">
           {t("chatImageLoadFailed")}
         </Text>

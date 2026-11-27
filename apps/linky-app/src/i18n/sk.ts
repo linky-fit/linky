@@ -1451,6 +1451,8 @@ export const sk = {
   listingImageReplace: "Vymeniť fotku",
   listingImageRemove: "Odobrať fotku",
   listingImageUploading: "Nahrávam fotku…",
+  listingImageUnreadable:
+    "Túto fotku sa nepodarilo načítať. Vyberte inú alebo ju najprv skopírujte do telefónu.",
   listingImageUploadFailed: "Fotku sa nepodarilo nahrať. Skúste to znova.",
   listingVia: "cez",
   listingViaLead: "K vám sa dostala cez vaše kontakty. Opýtajte sa ich:",

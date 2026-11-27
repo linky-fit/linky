@@ -1445,6 +1445,8 @@ export const cs = {
   listingImageReplace: "Vyměnit fotku",
   listingImageRemove: "Odebrat fotku",
   listingImageUploading: "Nahrávám fotku…",
+  listingImageUnreadable:
+    "Tuto fotku se nepodařilo načíst. Zkuste jinou, nebo ji nejdřív zkopírujte do telefonu.",
   listingImageUploadFailed: "Fotku se nepodařilo nahrát. Zkuste to znovu.",
   listingVia: "přes",
   listingViaLead: "K vám se dostala přes vaše kontakty. Zeptejte se jich:",

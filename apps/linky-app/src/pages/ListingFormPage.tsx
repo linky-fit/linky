@@ -37,6 +37,7 @@ import {
 } from "../app/lib/listings";
 import {
   getChatAttachmentRejection,
+  isDecodableImage,
   uploadPrivateImage,
 } from "../app/lib/privateImageMessage";
 import {
@@ -199,8 +200,22 @@ export function ListingFormPage({
     const rejection = file.type.startsWith("image/")
       ? getChatAttachmentRejection(file)
       : "chatAttachmentUnsupported";
-    setError(rejection ? t(rejection) : null);
-    if (!rejection) setPickedImage(file);
+    if (rejection) {
+      setError(t(rejection));
+      return;
+    }
+    // Some Android galleries hand the WebView a file it may not read, e.g. one on an SD card.
+    if (!(await isDecodableImage(file))) {
+      reportAppLog({
+        tag: "listings.imageUnreadable",
+        summary: "Picked listing photo could not be read",
+        payload: { fileType: file.type, size: file.size },
+      });
+      setError(t("listingImageUnreadable"));
+      return;
+    }
+    setError(null);
+    setPickedImage(file);
   };
 
   const removeImage = () => {
