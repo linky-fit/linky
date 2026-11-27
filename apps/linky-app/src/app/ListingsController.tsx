@@ -154,6 +154,7 @@ const useListingsWatch = (
             [fact.pubkey]: {
               document: fact.document,
               updatedAt: fact.updatedAt,
+              reachesReader: fact.reachesReader,
             },
           },
           { takeEqual: true },
@@ -168,6 +169,7 @@ const useListingsWatch = (
           listings: fact.document.listings.length,
           proxyPaymentCurrencies: fact.document.proxyPaymentCurrencies ?? null,
           updatedAt: fact.updatedAt,
+          reachesReader: fact.reachesReader,
         },
       });
     };

@@ -117,7 +117,8 @@ vi.mock("../app/state/contacts/blockList", () => ({
 vi.mock("../app/state/session/session", () => ({
   currentPubkeyAtom: { id: "currentPubkey" },
 }));
-vi.mock("../app/state/contacts/listings", () => ({
+vi.mock("../app/state/contacts/listings", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../app/state/contacts/listings")>()),
   peerListingsAtom: { id: "peerListings" },
 }));
 vi.mock("../app/state/contacts/readModel", () => ({

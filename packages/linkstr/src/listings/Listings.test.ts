@@ -68,8 +68,9 @@ const document = new ListingsDocument({ cash: "offer", listings: [eggs] });
 
 const dropReason = <A, E>(result: Result.Result<A, E>): E | null =>
   Result.isFailure(result) ? result.failure : null;
-const documentOf = <A, E>(result: Result.Result<A, E>): A | null =>
-  Result.isSuccess(result) ? result.success : null;
+const documentOf = <A, E>(
+  result: Result.Result<{ readonly document: A }, E>,
+): A | null => (Result.isSuccess(result) ? result.success.document : null);
 
 const listingsEvent = (
   author: LinkstrIdentityService,
@@ -756,6 +757,7 @@ describe("Listings.watch", () => {
         );
         yield* eventually(() => facts.length === 2);
         expect(facts[1]?.document).toEqual(cleared);
+        expect(facts[1]?.reachesReader).toBe(true);
         yield* eventually(
           () =>
             droppedWith(inspected).filter((drop) => drop.reason === "stale")
@@ -775,6 +777,7 @@ describe("Listings.watch", () => {
         );
         yield* eventually(() => facts.length === 2);
         expect(facts[1]?.document).toEqual(emptyListingsDocument);
+        expect(facts[1]?.reachesReader).toBe(false);
         subscriptions[0]?.onEvent(listingsEvent(carol, [bob.pubkey], base));
         yield* eventually(() => droppedWith(inspected).length === 1);
         expect(droppedWith(inspected).map((drop) => drop.reason)).toEqual([

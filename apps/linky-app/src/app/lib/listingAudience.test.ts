@@ -333,12 +333,14 @@ const source = (
   key: Pubkey,
   updatedAt: number,
   document: ListingsDocument,
+  reachesReader = true,
 ): ListingSource => ({
   pubkey: key,
   name: key.slice(0, 1),
   pictureUrl: null,
   updatedAt,
   document,
+  reachesReader,
 });
 
 describe("peerListingEntries", () => {
@@ -398,6 +400,30 @@ describe("peerListingEntries", () => {
     expect(entries.map(({ author, via }) => [author, via.length])).toEqual([
       [carol, 0],
     ]);
+  });
+});
+
+describe("peerListingEntries of a withdrawn listing", () => {
+  const passing = source(
+    bob,
+    20,
+    new ListingsDocument({
+      passedOn: [new SharedListing({ author: carol, listing: listing("med") })],
+    }),
+  );
+  const idsWith = (author: ListingSource) =>
+    peerListingEntries([passing, author], me, new Set()).map(
+      ({ listing: { id } }) => id,
+    );
+
+  it("ignores a copy the author's own document no longer has", () => {
+    expect(idsWith(source(carol, 10, new ListingsDocument({})))).toEqual([]);
+  });
+
+  it("keeps the copy when the author does not share with the user", () => {
+    expect(idsWith(source(carol, 10, new ListingsDocument({}), false))).toEqual(
+      ["med"],
+    );
   });
 });
 

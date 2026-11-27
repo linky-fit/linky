@@ -307,6 +307,12 @@ const audienceListings = (
   });
 };
 
+/** What an event shares with one reader; without `reachesReader` the document is empty because the author gave the reader no slot. */
+interface ReadListings {
+  readonly document: ListingsDocument;
+  readonly reachesReader: boolean;
+}
+
 /**
  * The document a verified event of `LISTINGS_KIND` holds for the reader, or
  * why it holds none: its listings followed by those of the parts the reader's
@@ -317,7 +323,7 @@ const audienceListings = (
 export const decodeListingsEvent = (
   event: SignedPlainEvent,
   secretKey: NostrSecretKey,
-): Result.Result<ListingsDocument, ListingsDropReason> => {
+): Result.Result<ReadListings, ListingsDropReason> => {
   if (event.kind !== LISTINGS_KIND) return Result.fail("unsupported-kind");
   const position = chunkPosition(event);
   if (Result.isFailure(position)) return Result.fail(position.failure);
@@ -330,7 +336,12 @@ export const decodeListingsEvent = (
   const slot = tagsNamed(event.tags, LISTINGS_SLOT_TAG).find(
     (tag) => tag[1] === slotId,
   );
-  if (slot?.[2] === undefined) return Result.succeed(emptyListingsDocument);
+  if (slot?.[2] === undefined) {
+    return Result.succeed({
+      document: emptyListingsDocument,
+      reachesReader: false,
+    });
+  }
   const contentKeyHex = tryDecrypt(slot[2], conversationKey);
   if (contentKeyHex === null || !CONTENT_KEY_HEX.test(contentKeyHex)) {
     return Result.fail("undecryptable");
@@ -341,14 +352,16 @@ export const decodeListingsEvent = (
     onNone: () => Result.fail("malformed-document"),
     onSome: (document) => {
       const extra = audienceListings(event, slot[3], conversationKey);
-      return Result.succeed(
-        extra.length === 0
-          ? document
-          : new ListingsDocument({
-              ...document,
-              listings: [...document.listings, ...extra],
-            }),
-      );
+      return Result.succeed({
+        document:
+          extra.length === 0
+            ? document
+            : new ListingsDocument({
+                ...document,
+                listings: [...document.listings, ...extra],
+              }),
+        reachesReader: true,
+      });
     },
   });
 };
