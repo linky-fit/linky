@@ -6,6 +6,7 @@ import {
 import { Cause, Exit } from "effect";
 import React from "react";
 import { reportAppLog } from "../../devtools/inspector/appLog";
+import { subscribeAppHidden } from "../../platform/appHidden";
 import type { KeyValuePort } from "../../platform/ports";
 import { nowSeconds } from "../../utils/time";
 import { listingsPublishFingerprint } from "../lib/listings";
@@ -33,7 +34,9 @@ interface PublishWhenChangedInput {
 /**
  * Publishes `draft` whenever it or the write relays
  * differ from the last accepted publish, whose fingerprint is kept under
- * `storageKey`, and once a week even when nothing changed.
+ * `storageKey`, and once a week even when nothing changed. A publish still
+ * waiting when the app goes to the background is sent at once, since the OS
+ * may suspend the app before its timer fires.
  */
 export const usePublishWhenChanged = ({
   kv,
@@ -99,8 +102,14 @@ export const usePublishWhenChanged = ({
       }
     };
     timeout = setTimeout(() => void attempt(), PUBLISH_DEBOUNCE_MS);
+    const unsubscribeHidden = subscribeAppHidden(() => {
+      if (timeout === null) return;
+      clearTimeout(timeout);
+      void attempt();
+    });
     return () => {
       cancelled = true;
+      unsubscribeHidden();
       if (timeout !== null) clearTimeout(timeout);
     };
   }, [draft, hydrated, kv, publish, relays, settled, storageKey]);

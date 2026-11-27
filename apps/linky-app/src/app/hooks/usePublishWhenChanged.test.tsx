@@ -97,6 +97,26 @@ describe("usePublishWhenChanged", () => {
     expect(sent).toEqual([offering, emptyListingsDocument, offering]);
   });
 
+  it("publishes at once when the app goes to the background", async () => {
+    const sent: ListingsDocument[] = [];
+    const Publisher = publisherOf((draft) => {
+      sent.push(draft.document);
+      return Promise.resolve(Exit.void);
+    });
+
+    await renderIntoDocument(<Publisher document={offering} />);
+    const visibility = vi
+      .spyOn(document, "visibilityState", "get")
+      .mockReturnValue("hidden");
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    visibility.mockRestore();
+    expect(sent).toEqual([offering]);
+    await settle();
+    expect(sent).toEqual([offering]);
+  });
+
   it("publishes an unchanged document to an added relay", async () => {
     const sent: ListingsDocument[] = [];
     const Publisher = publisherOf((draft) => {
