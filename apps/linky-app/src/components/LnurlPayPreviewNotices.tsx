@@ -10,7 +10,7 @@ interface LnurlPayPreviewNoticesProps {
   t: Translate;
 }
 
-/** Loading/error state and amount constraints of an LNURL-pay target. */
+/** Loading/error state of an LNURL-pay target, and the description of a fixed-amount one. */
 export const LnurlPayPreviewNotices: FC<LnurlPayPreviewNoticesProps> = ({
   error,
   loading,
@@ -29,25 +29,12 @@ export const LnurlPayPreviewNotices: FC<LnurlPayPreviewNoticesProps> = ({
       />
     );
   }
-  if (!preview) return null;
-
-  const isFixedAmount = preview.minSendableSat === preview.maxSendableSat;
-
+  // An open-amount target's description is a generic "pay to <user>"; a fixed amount's names what is bought.
+  if (!preview?.description) return null;
+  if (preview.minSendableSat !== preview.maxSendableSat) return null;
   return (
-    <>
-      {preview.description ? (
-        <Text color="$colorMuted">{preview.description}</Text>
-      ) : null}
-      <Text color="$colorMuted">
-        {isFixedAmount
-          ? t("lnurlPayFixedHint").replace(
-              "{amount}",
-              String(preview.minSendableSat),
-            )
-          : t("lnurlPayRangeHint")
-              .replace("{min}", String(preview.minSendableSat))
-              .replace("{max}", String(preview.maxSendableSat))}
-      </Text>
-    </>
+    <Text color="$colorMuted" textAlign="center" numberOfLines={2}>
+      {preview.description}
+    </Text>
   );
 };

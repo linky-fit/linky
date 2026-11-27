@@ -38,7 +38,12 @@ export function LightningFeeHint({
     { displayCurrency: "sat", fiatRates: null, lang },
   );
   return (
-    <Text variant="caption" color="$colorMuted" testID="lightning-fee-hint">
+    <Text
+      variant="caption"
+      color="$colorMuted"
+      textAlign="center"
+      testID="lightning-fee-hint"
+    >
       {t("payLightningFeeHint").replace("{fee}", feeText)}
     </Text>
   );

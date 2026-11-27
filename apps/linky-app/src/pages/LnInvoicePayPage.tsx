@@ -41,6 +41,9 @@ export const LnInvoicePayPage: FC<LnInvoicePayPageProps> = ({
   return (
     <PaymentAmountPanel
       amount={amount}
+      amountHint={
+        amountSat > 0 ? <LightningFeeHint amountSat={amountSat} /> : null
+      }
       cashuIsBusy={cashuIsBusy}
       header={
         <Stack gap="$xxs">
@@ -60,9 +63,6 @@ export const LnInvoicePayPage: FC<LnInvoicePayPageProps> = ({
             {`${t("availablePrefix")} ${formatDisplayedAmountText(cashuBalance)}`}
           </Button>
         </Stack>
-      }
-      notices={
-        amountSat > 0 ? <LightningFeeHint amountSat={amountSat} /> : null
       }
       onAmountChange={setAmount}
       onSubmit={() => {

@@ -149,6 +149,11 @@ export const ContactPayPage: FC<ContactPayPageProps> = ({
   return (
     <PaymentAmountPanel
       amount={payAmount}
+      amountHint={
+        lightningActive && validAmount > 0 ? (
+          <LightningFeeHint amountSat={validAmount} />
+        ) : null
+      }
       cashuIsBusy={cashuIsBusy}
       header={
         <Stack alignItems="center" gap="$xs">
@@ -218,10 +223,6 @@ export const ContactPayPage: FC<ContactPayPageProps> = ({
               t={t}
             />
           )}
-
-          {lightningActive && validAmount > 0 && (
-            <LightningFeeHint amountSat={validAmount} />
-          )}
         </>
       }
       onAmountChange={setPayAmount}
@@ -240,9 +241,10 @@ export const ContactPayPage: FC<ContactPayPageProps> = ({
       submitIcon={isRequestFlow ? "Request" : undefined}
       submitLabel={isRequestFlow ? t("requestPaymentSend") : undefined}
       submitBlockedReason={
-        !isRequestFlow && validAmount > cashuBalanceAfterMelt
+        lnurlRangeError ??
+        (!isRequestFlow && validAmount > cashuBalanceAfterMelt
           ? t("payInsufficient")
-          : (lnurlRangeError ?? undefined)
+          : undefined)
       }
       t={t}
     />
